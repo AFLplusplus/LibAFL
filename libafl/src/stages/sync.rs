@@ -139,9 +139,6 @@ where
             fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
 
-        #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().finish_stage();
-
         Ok(())
     }
 }
@@ -307,8 +304,6 @@ where
         }
 
         self.client.process(fuzzer, state, executor, manager)?;
-        #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().finish_stage();
         Ok(())
     }
 }

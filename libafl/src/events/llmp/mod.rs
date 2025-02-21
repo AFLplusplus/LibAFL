@@ -33,7 +33,6 @@ pub(crate) const _LLMP_TAG_EVENT_TO_CLIENT: Tag = Tag(0x2C11E471);
 /// Only handle this in the broker
 pub(crate) const _LLMP_TAG_EVENT_TO_BROKER: Tag = Tag(0x2B80438);
 /// Handle in both
-///
 pub(crate) const LLMP_TAG_EVENT_TO_BOTH: Tag = Tag(0x2B0741);
 pub(crate) const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
 pub(crate) const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);

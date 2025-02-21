@@ -163,12 +163,7 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager);
-
-        #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().finish_stage();
-
-        ret
+        self.perform_mutational(fuzzer, executor, state, manager)
     }
 }
 

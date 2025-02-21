@@ -1,5 +1,4 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of kernels
-//!
 use core::time::Duration;
 use std::{env, path::PathBuf, process};
 

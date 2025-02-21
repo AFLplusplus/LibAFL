@@ -271,7 +271,6 @@ libafl_bolts::impl_serdeany!(MapNoveltiesMetadata);
 impl Deref for MapNoveltiesMetadata {
     type Target = [usize];
     /// Convert to a slice
-    #[must_use]
     fn deref(&self) -> &[usize] {
         &self.list
     }
@@ -279,7 +278,6 @@ impl Deref for MapNoveltiesMetadata {
 
 impl DerefMut for MapNoveltiesMetadata {
     /// Convert to a slice
-    #[must_use]
     fn deref_mut(&mut self) -> &mut [usize] {
         &mut self.list
     }
@@ -386,7 +384,7 @@ where
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
         // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
-        state.add_named_metadata(&self.name, MapFeedbackMetadata::<O::Entry>::default());
+        state.add_named_metadata_checked(&self.name, MapFeedbackMetadata::<O::Entry>::default())?;
         Ok(())
     }
 }
