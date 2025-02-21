@@ -554,7 +554,6 @@ trait InputFilter<I> {
 pub struct NopInputFilter;
 impl<I> InputFilter<I> for NopInputFilter {
     #[inline]
-    #[must_use]
     fn should_execute(&mut self, _input: &I) -> bool {
         true
     }
@@ -579,7 +578,6 @@ impl BloomInputFilter {
 #[cfg(feature = "std")]
 impl<I: Hash> InputFilter<I> for BloomInputFilter {
     #[inline]
-    #[must_use]
     fn should_execute(&mut self, input: &I) -> bool {
         !self.bloom.insert(input)
     }

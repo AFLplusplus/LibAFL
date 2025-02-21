@@ -251,7 +251,6 @@ impl ToolWrapper for LibtoolWrapper {
 
 impl Default for LibtoolWrapper {
     /// Create a new Clang Wrapper
-    #[must_use]
     fn default() -> Self {
         Self::new()
     }

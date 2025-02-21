@@ -230,7 +230,6 @@ where
 }
 
 impl AsRef<[u8]> for OwnedRef<'_, [u8]> {
-    #[must_use]
     fn as_ref(&self) -> &[u8] {
         match self {
             OwnedRef::RefRaw(r, _) => unsafe { (*r).as_ref().unwrap() },
@@ -244,7 +243,6 @@ impl<T> AsRef<T> for OwnedRef<'_, T>
 where
     T: Sized,
 {
-    #[must_use]
     fn as_ref(&self) -> &T {
         match self {
             OwnedRef::RefRaw(r, _) => unsafe { (*r).as_ref().unwrap() },
@@ -258,7 +256,6 @@ impl<T> IntoOwned for OwnedRef<'_, T>
 where
     T: Sized + Clone,
 {
-    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedRef::RefRaw(..) | OwnedRef::Ref(_) => false,
@@ -266,7 +263,6 @@ where
         }
     }
 
-    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedRef::RefRaw(r, _) => {
@@ -361,7 +357,6 @@ where
 }
 
 impl<T: ?Sized> AsRef<T> for OwnedRefMut<'_, T> {
-    #[must_use]
     fn as_ref(&self) -> &T {
         match self {
             OwnedRefMut::RefRaw(r, _) => unsafe { r.as_ref().unwrap() },
@@ -372,7 +367,6 @@ impl<T: ?Sized> AsRef<T> for OwnedRefMut<'_, T> {
 }
 
 impl<T: ?Sized> AsMut<T> for OwnedRefMut<'_, T> {
-    #[must_use]
     fn as_mut(&mut self) -> &mut T {
         match self {
             OwnedRefMut::RefRaw(r, _) => unsafe { r.as_mut().unwrap() },
@@ -386,7 +380,6 @@ impl<T> IntoOwned for OwnedRefMut<'_, T>
 where
     T: Sized + Clone,
 {
-    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedRefMut::RefRaw(..) | OwnedRefMut::Ref(_) => false,
@@ -394,7 +387,6 @@ where
         }
     }
 
-    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedRefMut::RefRaw(r, _) => unsafe {
@@ -592,7 +584,6 @@ impl<T> IntoOwned for OwnedSlice<'_, T>
 where
     T: Sized + Clone,
 {
-    #[must_use]
     fn is_owned(&self) -> bool {
         match self.inner {
             OwnedSliceInner::RefRaw(..) | OwnedSliceInner::Ref(_) => false,
@@ -600,7 +591,6 @@ where
         }
     }
 
-    #[must_use]
     fn into_owned(self) -> Self {
         match self.inner {
             OwnedSliceInner::RefRaw(rr, len, _) => Self {
@@ -787,7 +777,6 @@ impl<T> IntoOwned for OwnedMutSlice<'_, T>
 where
     T: Sized + Clone,
 {
-    #[must_use]
     fn is_owned(&self) -> bool {
         match self.inner {
             OwnedMutSliceInner::RefRaw(..) | OwnedMutSliceInner::Ref(_) => false,
@@ -795,7 +784,6 @@ where
         }
     }
 
-    #[must_use]
     fn into_owned(self) -> Self {
         let vec = match self.inner {
             OwnedMutSliceInner::RefRaw(rr, len, _) => unsafe {
@@ -987,7 +975,6 @@ impl<T, const N: usize> IntoOwned for OwnedMutSizedSlice<'_, T, N>
 where
     T: Sized + Clone,
 {
-    #[must_use]
     fn is_owned(&self) -> bool {
         match self.inner {
             OwnedMutSizedSliceInner::RefRaw(..) | OwnedMutSizedSliceInner::Ref(_) => false,
@@ -995,7 +982,6 @@ where
         }
     }
 
-    #[must_use]
     fn into_owned(self) -> Self {
         let slice: Box<[T; N]> = match self.inner {
             OwnedMutSizedSliceInner::RefRaw(rr, _) => unsafe { Box::from((*rr).clone()) },
@@ -1116,7 +1102,6 @@ where
 }
 
 impl<T: Sized> AsRef<T> for OwnedPtr<T> {
-    #[must_use]
     fn as_ref(&self) -> &T {
         match self {
             OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap() },
@@ -1129,7 +1114,6 @@ impl<T> IntoOwned for OwnedPtr<T>
 where
     T: Sized + Clone,
 {
-    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedPtr::Ptr(_) => false,
@@ -1137,7 +1121,6 @@ where
         }
     }
 
-    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedPtr::Ptr(p) => unsafe { OwnedPtr::Owned(Box::new(p.as_ref().unwrap().clone())) },
@@ -1206,7 +1189,6 @@ where
 }
 
 impl<T: Sized> AsRef<T> for OwnedMutPtr<T> {
-    #[must_use]
     fn as_ref(&self) -> &T {
         match self {
             OwnedMutPtr::Ptr(p) => unsafe { p.as_ref().unwrap() },
@@ -1228,7 +1210,6 @@ impl<T> IntoOwned for OwnedMutPtr<T>
 where
     T: Sized + Clone,
 {
-    #[must_use]
     fn is_owned(&self) -> bool {
         match self {
             OwnedMutPtr::Ptr(_) => false,
@@ -1236,7 +1217,6 @@ where
         }
     }
 
-    #[must_use]
     fn into_owned(self) -> Self {
         match self {
             OwnedMutPtr::Ptr(p) => unsafe {
