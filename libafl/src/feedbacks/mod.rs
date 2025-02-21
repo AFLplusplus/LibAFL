@@ -1,6 +1,5 @@
 //! The feedbacks reduce observer state after each run to a single `is_interesting`-value.
 //! If a testcase is interesting, it may be added to a Corpus.
-//!
 
 // TODO: make S of Feedback<S> an associated type when specialisation + AT is stable
 
@@ -760,7 +759,7 @@ macro_rules! feedback_or_fast {
 /// Variadic macro to create a [`NotFeedback`]
 #[macro_export]
 macro_rules! feedback_not {
-    ( $last:expr ) => {
+    ($last:expr) => {
         $crate::feedbacks::NotFeedback::new($last)
     };
 }

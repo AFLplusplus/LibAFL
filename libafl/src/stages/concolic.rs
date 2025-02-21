@@ -1,6 +1,5 @@
 //! This module contains the `concolic` stages, which can trace a target using symbolic execution
 //! and use the results for fuzzer input and mutations.
-//!
 use alloc::borrow::{Cow, ToOwned};
 #[cfg(feature = "concolic_mutation")]
 use alloc::{string::ToString, vec::Vec};

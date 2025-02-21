@@ -1,6 +1,5 @@
 //! `CmpLog` logs and reports back values touched during fuzzing.
 //! The values will then be used in subsequent mutations.
-//!
 
 use alloc::borrow::Cow;
 use core::fmt::Debug;

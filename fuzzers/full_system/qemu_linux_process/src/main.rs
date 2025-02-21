@@ -1,5 +1,4 @@
 //! A systemmode linux kernel example
-//!
 #[cfg(target_os = "linux")]
 mod fuzzer;
 
