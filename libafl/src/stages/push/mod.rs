@@ -238,7 +238,6 @@ static mut PUSH_STAGE_ADAPTER_ID: usize = 0;
 pub static PUSH_STAGE_ADAPTER_NAME: &str = "pushstageadapter";
 
 impl<CS, EM, I, OT, PS, Z> Named for PushStageAdapter<CS, EM, I, OT, PS, Z> {
-    #[must_use]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

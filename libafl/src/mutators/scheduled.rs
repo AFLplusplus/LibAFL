@@ -46,7 +46,6 @@ impl Deref for LogMutationMetadata {
     }
 }
 impl DerefMut for LogMutationMetadata {
-    #[must_use]
     fn deref_mut(&mut self) -> &mut [Cow<'static, str>] {
         &mut self.list
     }

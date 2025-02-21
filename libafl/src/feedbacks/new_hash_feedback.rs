@@ -76,7 +76,6 @@ impl NewHashFeedbackMetadata {
 
 impl HashSetState<u64> for NewHashFeedbackMetadata {
     /// Create new [`NewHashFeedbackMetadata`] using a name and a hash set.
-    #[must_use]
     fn with_hash_set(hash_set: HashSet<u64>) -> Self {
         Self { hash_set }
     }

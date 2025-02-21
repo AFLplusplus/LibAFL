@@ -271,7 +271,6 @@ libafl_bolts::impl_serdeany!(MapNoveltiesMetadata);
 impl Deref for MapNoveltiesMetadata {
     type Target = [usize];
     /// Convert to a slice
-    #[must_use]
     fn deref(&self) -> &[usize] {
         &self.list
     }
@@ -279,7 +278,6 @@ impl Deref for MapNoveltiesMetadata {
 
 impl DerefMut for MapNoveltiesMetadata {
     /// Convert to a slice
-    #[must_use]
     fn deref_mut(&mut self) -> &mut [usize] {
         &mut self.list
     }
