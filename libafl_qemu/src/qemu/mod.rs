@@ -76,15 +76,15 @@ pub trait ArchExtras {
         T: Into<GuestReg>;
     fn read_function_argument_with_cc(
         &self,
-        conv: CallingConvention,
         idx: u8,
+        conv: CallingConvention,
     ) -> Result<GuestReg, QemuRWError>;
 
     fn write_function_argument_with_cc<T>(
         &self,
-        conv: CallingConvention,
         idx: u8,
         val: T,
+        conv: CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>;
@@ -957,7 +957,7 @@ impl Qemu {
     where
         T: Into<GuestReg> + Copy,
     {
-        self.write_function_arguments_with_cc(&CallingConvention::Default, val)
+        self.write_function_arguments_with_cc(val, &CallingConvention::Default)
     }
 
     /// Write the function arguments by following calling convention `conv`.
@@ -968,14 +968,14 @@ impl Qemu {
     /// Support downward-growing stack only.
     pub fn write_function_arguments_with_cc<T>(
         &mut self,
-        conv: &CallingConvention,
         val: &[T],
+        conv: &CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg> + Copy,
     {
         for (idx, elem) in val.iter().enumerate() {
-            self.write_function_argument_with_cc(conv.clone(), idx as u8, elem.to_owned())?;
+            self.write_function_argument_with_cc(idx as u8, elem.to_owned(), conv.clone())?;
         }
         Ok(())
     }
@@ -988,7 +988,7 @@ impl Qemu {
     /// Support downward-growing stack only.
     /// If you need to specify a calling convention, use [`Self::read_function_argument_with_cc`].
     pub fn read_function_argument(&self, idx: u8) -> Result<GuestReg, QemuRWError> {
-        self.read_function_argument_with_cc(CallingConvention::Default, idx)
+        self.read_function_argument_with_cc(idx, CallingConvention::Default)
     }
 
     /// Write the function `val` into `idx` argument by following default calling convention.
@@ -1002,7 +1002,7 @@ impl Qemu {
     where
         T: Into<GuestReg>,
     {
-        self.write_function_argument_with_cc(CallingConvention::Default, idx, val)
+        self.write_function_argument_with_cc(idx, val, CallingConvention::Default)
     }
 }
 
@@ -1030,12 +1030,12 @@ impl ArchExtras for Qemu {
     /// Support downward-growing stack only.
     fn read_function_argument_with_cc(
         &self,
-        conv: CallingConvention,
         idx: u8,
+        conv: CallingConvention,
     ) -> Result<GuestReg, QemuRWError> {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
-            .read_function_argument_with_cc(conv, idx)
+            .read_function_argument_with_cc(idx, conv)
     }
 
     /// Write the function `val` into `idx` argument by following calling convention `conv`.
@@ -1046,16 +1046,16 @@ impl ArchExtras for Qemu {
     /// Support downward-growing stack only.
     fn write_function_argument_with_cc<T>(
         &self,
-        conv: CallingConvention,
         idx: u8,
         val: T,
+        conv: CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
-            .write_function_argument_with_cc::<T>(conv, idx, val)
+            .write_function_argument_with_cc::<T>(idx, val, conv)
     }
 }
 

@@ -101,8 +101,8 @@ impl crate::ArchExtras for crate::CPU {
 
     fn read_function_argument_with_cc(
         &self,
-        conv: CallingConvention,
         idx: u8,
+        conv: CallingConvention,
     ) -> Result<GuestReg, QemuRWError> {
         QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Aapcs64, conv)?;
 
@@ -139,9 +139,9 @@ impl crate::ArchExtras for crate::CPU {
 
     fn write_function_argument_with_cc<T>(
         &self,
-        conv: CallingConvention,
         idx: u8,
         val: T,
+        conv: CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
