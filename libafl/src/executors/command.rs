@@ -739,17 +739,25 @@ impl CommandExecutorBuilder {
 /// A `CommandConfigurator` takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
 /// # Example
 /// ```
-/// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
-/// use libafl::{Error, corpus::Corpus, inputs::{BytesInput, HasTargetBytes, Input}, executors::{Executor, command::CommandConfigurator}, state::{HasExecutions}};
+/// use std::{
+///     io::Write,
+///     process::{Child, Command, Stdio},
+///     time::Duration,
+/// };
+///
+/// use libafl::{
+///     corpus::Corpus,
+///     executors::{command::CommandConfigurator, Executor},
+///     inputs::{BytesInput, HasTargetBytes, Input},
+///     state::HasExecutions,
+///     Error,
+/// };
 /// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
 /// impl CommandConfigurator<BytesInput> for MyExecutor {
-///     fn spawn_child(
-///        &mut self,
-///        input: &BytesInput,
-///     ) -> Result<Child, Error> {
+///     fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
 ///         let mut command = Command::new("../if");
 ///         command
 ///             .stdin(Stdio::piped())

@@ -1,5 +1,4 @@
 //! A libfuzzer-like fuzzer using qemu for binary-only coverage
-//!
 #[cfg(feature = "i386")]
 use core::mem::size_of;
 use core::time::Duration;

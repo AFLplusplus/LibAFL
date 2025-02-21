@@ -173,7 +173,7 @@ pub struct arm_neon_state64 {
 ///    _STRUCT_ARM_EXCEPTION_STATE64   es;
 ///    _STRUCT_ARM_THREAD_STATE64      ss;
 ///    _STRUCT_ARM_NEON_STATE64        ns;
-///};
+/// };
 /// ```
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
@@ -271,7 +271,6 @@ use crate::Error;
 extern "C" {
     /// The `libc` `getcontext`
     /// For some reason, it's not available on `MacOS`.
-    ///
     fn getcontext(ucp: *mut ucontext_t) -> c_int;
 }
 

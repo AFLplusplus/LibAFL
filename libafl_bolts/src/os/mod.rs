@@ -1,5 +1,4 @@
 //! Operating System specific abstractions
-//!
 
 #[cfg(any(unix, all(windows, feature = "std")))]
 use crate::Error;

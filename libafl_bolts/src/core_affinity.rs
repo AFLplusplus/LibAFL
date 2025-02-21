@@ -14,19 +14,21 @@
 //!
 //! // Create a thread for each active CPU core.
 //! # #[cfg(not(miri))]
-//! let handles = core_ids.into_iter().map(|id| {
-//!     thread::spawn(move || {
-//!         // Pin this thread to a single CPU core.
-//!         id.set_affinity();
-//!         // Do more work after this.
+//! let handles = core_ids
+//!     .into_iter()
+//!     .map(|id| {
+//!         thread::spawn(move || {
+//!             // Pin this thread to a single CPU core.
+//!             id.set_affinity();
+//!             // Do more work after this.
+//!         })
 //!     })
-//! }).collect::<Vec<_>>();
+//!     .collect::<Vec<_>>();
 //!
 //! # #[cfg(not(miri))]
 //! for handle in handles.into_iter() {
 //!     handle.join().unwrap();
 //! }
-//!
 //! ```
 //!
 //! *This file is a fork of <https://github.com/Elzair/core_affinity_rs>*
@@ -60,7 +62,6 @@ impl CoreId {
     /// Note: This will *_not_* fail if the target platform does not support core affinity.
     /// (only on error cases for supported platforms)
     /// If you really need to fail for unsupported platforms (like `aarch64` on `macOS`), use [`CoreId::set_affinity_forced`] instead.
-    ///
     pub fn set_affinity(&self) -> Result<(), Error> {
         match set_for_current_helper(*self) {
             Ok(()) | Err(Error::Unsupported(_, _)) => Ok(()),

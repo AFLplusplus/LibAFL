@@ -809,7 +809,7 @@ macro_rules! tuple_for_each_mut {
 /// ```rust
 /// use libafl_bolts::{
 ///     map_tuple_list_type,
-///     tuples::{MappingFunctor, Map, tuple_list, tuple_list_type}
+///     tuples::{tuple_list, tuple_list_type, Map, MappingFunctor},
 /// };
 ///
 /// struct Wrapper<T>(T);
@@ -842,7 +842,10 @@ macro_rules! map_tuple_list_type {
 /// Merges the types of two merged [`tuple_list!`]s
 ///
 /// ```rust
-/// use libafl_bolts::{merge_tuple_list_type, tuples::{Merge, tuple_list, tuple_list_type}};
+/// use libafl_bolts::{
+///     merge_tuple_list_type,
+///     tuples::{tuple_list, tuple_list_type, Merge},
+/// };
 ///
 /// struct A;
 /// struct B;

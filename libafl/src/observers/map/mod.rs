@@ -219,7 +219,11 @@ pub mod macros {
     /// #     phantom: PhantomData<(C, O)>,
     /// # }
     /// #
-    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + AsRef<O> {
+    /// impl<C, O> MyCustomScheduler<C, O>
+    /// where
+    ///     O: MapObserver,
+    ///     C: CanTrack + AsRef<O>,
+    /// {
     ///     pub fn new(obs: &C) -> Self {
     ///         require_index_tracking!("MyCustomScheduler", C);
     ///         todo!("Construct your type")
@@ -282,7 +286,11 @@ pub mod macros {
     /// #     phantom: PhantomData<(C, O)>,
     /// # }
     /// #
-    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + AsRef<O> {
+    /// impl<C, O> MyCustomScheduler<C, O>
+    /// where
+    ///     O: MapObserver,
+    ///     C: CanTrack + AsRef<O>,
+    /// {
     ///     pub fn new(obs: &C) -> Self {
     ///         require_novelties_tracking!("MyCustomScheduler", C);
     ///         todo!("Construct your type")

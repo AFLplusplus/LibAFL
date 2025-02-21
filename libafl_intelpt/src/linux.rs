@@ -538,8 +538,10 @@ impl Default for IntelPTBuilder {
     ///     .exclude_kernel(true)
     ///     .exclude_hv(true)
     ///     .inherit(false)
-    ///     .perf_buffer_size(128 * PAGE_SIZE + PAGE_SIZE).unwrap()
-    ///     .perf_aux_buffer_size(2 * 1024 * 1024).unwrap()
+    ///     .perf_buffer_size(128 * PAGE_SIZE + PAGE_SIZE)
+    ///     .unwrap()
+    ///     .perf_aux_buffer_size(2 * 1024 * 1024)
+    ///     .unwrap()
     ///     .ip_filters(&[]);
     /// assert_eq!(builder, IntelPTBuilder::default());
     /// ```
