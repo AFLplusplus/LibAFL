@@ -1,6 +1,7 @@
 import "libafl-cc.just"
 
-OPTIMIZATIONS := env("OPTIMIZATIONS", "yes")
+ARCH := env("ARCH", "x86_64")
+OPTIMIZATIONS := env("OPTIMIZATIONS", if ARCH == "ppc" { "no" } else { "yes" })
 
 LIBPNG_ROOT :=  DEPS_DIR / "libpng-1.6.37"
 LIBPNG_BUILD := TARGET_DIR / "build-png"
