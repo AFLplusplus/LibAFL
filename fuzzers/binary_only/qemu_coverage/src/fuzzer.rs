@@ -29,8 +29,8 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     modules::{drcov::DrCovModule, SnapshotModule},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
-    QemuExitReason, QemuMappingsViewer, QemuRWError, QemuShutdownCause, Regs,
+    ArchExtras, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor, QemuExitReason,
+    QemuMappingsViewer, QemuRWError, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]

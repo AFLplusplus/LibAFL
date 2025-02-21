@@ -30,9 +30,8 @@ use libafl_bolts::{
 #[cfg(feature = "fork")]
 use libafl_qemu::QemuForkExecutor;
 use libafl_qemu::{
-    elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, CallingConvention,
-    Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuShutdownCause,
-    Regs,
+    elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, Emulator, GuestAddr,
+    GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuShutdownCause, Regs,
 };
 #[cfg(feature = "snapshot")]
 use libafl_qemu::{modules::SnapshotModule, QemuExecutor};

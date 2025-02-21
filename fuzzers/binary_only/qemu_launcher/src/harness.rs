@@ -4,9 +4,7 @@ use libafl::{
     Error,
 };
 use libafl_bolts::AsSlice;
-use libafl_qemu::{
-    elf::EasyElf, ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, Regs,
-};
+use libafl_qemu::{elf::EasyElf, ArchExtras, GuestAddr, GuestReg, MmapPerms, Qemu, Regs};
 
 pub struct Harness {
     qemu: Qemu,
@@ -118,11 +116,11 @@ impl Harness {
             .map_err(|e| Error::unknown(format!("Failed to write return address: {e:?}")))?;
 
         self.qemu
-            .write_function_argument(CallingConvention::Default, 0, self.input_addr)
+            .write_function_argument(0, self.input_addr)
             .map_err(|e| Error::unknown(format!("Failed to write argument 0: {e:?}")))?;
 
         self.qemu
-            .write_function_argument(CallingConvention::Default, 1, len)
+            .write_function_argument(1, len)
             .map_err(|e| Error::unknown(format!("Failed to write argument 1: {e:?}")))?;
         unsafe {
             let _ = self.qemu.run();

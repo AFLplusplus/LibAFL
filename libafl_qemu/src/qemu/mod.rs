@@ -1002,7 +1002,7 @@ impl Qemu {
     /// Note that the stack pointer register must point the top of the stack at the start
     /// of the called function, in case the value is in the stack.
     /// Support downward-growing stack only.
-    fn read_function_argument(&self, idx: u8) -> Result<GuestReg, QemuRWError> {
+    pub fn read_function_argument(&self, idx: u8) -> Result<GuestReg, QemuRWError> {
         self.read_function_argument_with_cc(CallingConvention::Default, idx)
     }
 
@@ -1012,7 +1012,7 @@ impl Qemu {
     /// Note that the stack pointer register must point the top of the stack at the start
     /// of the called function, in case the argument is written in the stack.
     /// Support downward-growing stack only.
-    fn write_function_argument<T>(&self, idx: u8, val: T) -> Result<(), QemuRWError>
+    pub fn write_function_argument<T>(&self, idx: u8, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
