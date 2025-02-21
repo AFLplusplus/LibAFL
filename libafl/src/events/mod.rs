@@ -214,14 +214,12 @@ impl EventConfig {
 }
 
 impl From<&str> for EventConfig {
-    #[must_use]
     fn from(name: &str) -> Self {
         Self::from_name(name)
     }
 }
 
 impl From<String> for EventConfig {
-    #[must_use]
     fn from(name: String) -> Self {
         Self::from_name(&name)
     }

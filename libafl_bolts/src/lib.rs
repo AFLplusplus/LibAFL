@@ -1,6 +1,6 @@
 /*!
-* Welcome to `LibAFL_bolts`
-*/
+ * Welcome to `LibAFL_bolts`
+ */
 #![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
@@ -305,6 +305,8 @@ pub enum Error {
     EmptyOptional(String, ErrorBacktrace),
     /// Key not in Map
     KeyNotFound(String, ErrorBacktrace),
+    /// Key already exists and should not overwrite
+    KeyExists(String, ErrorBacktrace),
     /// No elements in the current item
     Empty(String, ErrorBacktrace),
     /// End of iteration
@@ -363,6 +365,15 @@ impl Error {
         S: Into<String>,
     {
         Error::KeyNotFound(arg.into(), ErrorBacktrace::new())
+    }
+
+    /// Key already exists in Map
+    #[must_use]
+    pub fn key_exists<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::KeyExists(arg.into(), ErrorBacktrace::new())
     }
 
     /// No elements in the current item
@@ -506,6 +517,10 @@ impl Display for Error {
             }
             Self::KeyNotFound(s, b) => {
                 write!(f, "Key: `{0}` - not found", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::KeyExists(s, b) => {
+                write!(f, "Key: `{0}` - already exists", &s)?;
                 display_error_backtrace(f, b)
             }
             Self::Empty(s, b) => {

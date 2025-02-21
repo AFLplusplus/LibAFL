@@ -1,5 +1,4 @@
 //! Diff Feedback, comparing the content of two observers of the same type.
-//!
 
 use alloc::borrow::Cow;
 use core::fmt::{self, Debug, Formatter};

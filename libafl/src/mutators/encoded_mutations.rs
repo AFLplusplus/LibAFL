@@ -1,5 +1,4 @@
 //! Mutations for [`EncodedInput`]s
-//!
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cmp::{max, min},

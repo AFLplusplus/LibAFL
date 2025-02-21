@@ -417,7 +417,6 @@ impl fmt::Display for ClientPerfStats {
 }
 
 impl Default for ClientPerfStats {
-    #[must_use]
     fn default() -> Self {
         Self::new()
     }

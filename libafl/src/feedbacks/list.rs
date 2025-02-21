@@ -43,7 +43,6 @@ impl<T> ListFeedbackMetadata<T> {
 }
 
 impl<T> Default for ListFeedbackMetadata<T> {
-    #[must_use]
     fn default() -> Self {
         Self::new()
     }
