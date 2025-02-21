@@ -79,7 +79,7 @@ use std::{
 
 use clap::Parser;
 use colored::Colorize;
-use regex::RegexSet;
+use regex::{Regex, RegexSet};
 use tokio::{process::Command, task::JoinSet};
 use walkdir::{DirEntry, WalkDir};
 use which::which;
@@ -94,6 +94,43 @@ fn is_workspace_toml(path: &Path) -> bool {
     }
 
     false
+}
+
+async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) -> io::Result<()> {
+    // Make sure we parse the correct file
+    assert_eq!(
+        cargo_file_path.file_name().unwrap().to_str().unwrap(),
+        "Cargo.toml"
+    );
+
+    let mut fmt_command = Command::new("cargo");
+
+    fmt_command
+        .arg("+nightly")
+        .arg("generate-lockfile")
+        .arg("--manifest-path")
+        .arg(cargo_file_path.as_path());
+
+    if verbose {
+        println!(
+            "[*] Generating Lockfile for {}...",
+            cargo_file_path.as_path().display()
+        );
+    }
+
+    let res = fmt_command.output().await?;
+
+    if !res.status.success() {
+        let stdout = from_utf8(&res.stdout).unwrap();
+        let stderr = from_utf8(&res.stderr).unwrap();
+        return Err(io::Error::new(
+            ErrorKind::Other,
+            format!(
+                "Cargo generate-lockfile failed. Run cargo fmt for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}"),
+        ));
+    }
+
+    Ok(())
 }
 
 async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
@@ -187,10 +224,25 @@ async fn run_clang_fmt(
     }
 }
 
+/// extracts (major, minor, patch) version from `clang-format --version` output.
+pub fn parse_llvm_fmt_version(fmt_str: &str) -> Option<(u32, u32, u32)> {
+    let re =
+        Regex::new(r"clang-format version (?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)").unwrap();
+    let caps = re.captures(fmt_str)?;
+
+    Some((
+        caps["major"].parse().unwrap(),
+        caps["minor"].parse().unwrap(),
+        caps["patch"].parse().unwrap(),
+    ))
+}
+
 #[derive(Parser)]
 struct Cli {
     #[arg(short, long)]
     check: bool,
+    #[arg(short, long)]
+    generate_lockfiles: bool,
     #[arg(short, long)]
     verbose: bool,
 }
@@ -200,7 +252,7 @@ async fn main() -> io::Result<()> {
     let cli = Cli::parse();
     let libafl_root_dir = match project_root::get_project_root() {
         Ok(p) => p,
-        Err(_) => std::env::current_dir().expect("Failed to get current directory"),
+        Err(_) => std::env::current_dir().expect("Failed to get LibAFL root directory."),
     };
 
     println!("Using {libafl_root_dir:#?} as the project root");
@@ -238,7 +290,7 @@ async fn main() -> io::Result<()> {
     ])
     .expect("Could not create the regex set from the given regex");
 
-    let rust_projects_to_fmt: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
+    let rust_projects_to_handle: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| !rust_excluded_directories.is_match(e.path().as_os_str().to_str().unwrap()))
@@ -258,68 +310,90 @@ async fn main() -> io::Result<()> {
         get_version_string("cargo", &["+nightly", "fmt"]).await?
     );
 
-    let reference_clang_format = format!(
-        "clang-format-{}",
-        std::env::var("MAIN_LLVM_VERSION")
-            .inspect(|e| {
-                println!(
-                    "Overriding clang-format version from the default {REF_LLVM_VERSION} to {e} using env variable MAIN_LLVM_VERSION"
-                );
-            })
-            .unwrap_or(REF_LLVM_VERSION.to_string())
-    );
-    let unspecified_clang_format = "clang-format";
-
-    let (clang, version, warning) = if which(&reference_clang_format).is_ok() {
-        (
-            Some(reference_clang_format.as_str()),
-            Some(get_version_string(&reference_clang_format, &[]).await?),
-            None,
-        )
-    } else if which(unspecified_clang_format).is_ok() {
-        let version = get_version_string(unspecified_clang_format, &[]).await?;
-        (
-            Some(unspecified_clang_format),
-            Some(version.clone()),
-            Some(format!(
-                "using {version}, could provide a different result from {reference_clang_format}"
-            )),
-        )
-    } else {
-        (
-            None,
-            None,
-            Some("clang-format not found. Skipping C formatting...".to_string()),
-        )
-    };
-
-    if let Some(version) = &version {
-        println!("Using {version}");
-    }
-
     let mut tokio_joinset = JoinSet::new();
 
-    for project in rust_projects_to_fmt {
-        tokio_joinset.spawn(run_cargo_fmt(project, cli.check, cli.verbose));
-    }
+    if cli.generate_lockfiles {
+        for project in rust_projects_to_handle {
+            tokio_joinset.spawn(run_cargo_generate_lockfile(project, cli.verbose));
+        }
+    } else {
+        // fallback is for formatting or checking
 
-    if let Some(clang) = clang {
-        let c_files_to_fmt: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| !c_excluded_directories.is_match(e.path().as_os_str().to_str().unwrap()))
-            .filter(|e| e.file_type().is_file())
-            .filter(|e| c_file_to_format.is_match(e.file_name().to_str().unwrap()))
-            .map(DirEntry::into_path)
-            .collect();
+        let reference_clang_format = format!(
+            "clang-format-{}",
+            std::env::var("MAIN_LLVM_VERSION")
+                .inspect(|e| {
+                    println!(
+                        "Overriding clang-format version from the default {REF_LLVM_VERSION} to {e} using env variable MAIN_LLVM_VERSION"
+                    );
+                })
+                .unwrap_or(REF_LLVM_VERSION.to_string())
+        );
+        let unspecified_clang_format = "clang-format";
 
-        for c_file in c_files_to_fmt {
-            tokio_joinset.spawn(run_clang_fmt(
-                c_file,
-                clang.to_string(),
-                cli.check,
-                cli.verbose,
-            ));
+        let (clang, version, warning) = if which(&reference_clang_format).is_ok() {
+            (
+                Some(reference_clang_format.as_str()),
+                Some(get_version_string(&reference_clang_format, &[]).await?),
+                None,
+            )
+        } else if which(unspecified_clang_format).is_ok() {
+            let version_str = get_version_string(unspecified_clang_format, &[]).await?;
+            let (major, _, _) = parse_llvm_fmt_version(&version_str).unwrap();
+
+            if major == REF_LLVM_VERSION {
+                (
+                    Some(unspecified_clang_format),
+                    Some(version_str.clone()),
+                    None,
+                )
+            } else {
+                (
+                    Some(unspecified_clang_format),
+                    Some(version_str.clone()),
+                    Some(format!(
+                        "using {version_str}, could provide a different result from {reference_clang_format}"
+                    )),
+                )
+            }
+        } else {
+            (
+                None,
+                None,
+                Some("clang-format not found. Skipping C formatting...".to_string()),
+            )
+        };
+
+        if let Some(version) = &version {
+            println!("Using {version}");
+        }
+
+        let _ = warning.map(print_warning);
+
+        for project in rust_projects_to_handle.clone() {
+            tokio_joinset.spawn(run_cargo_fmt(project, cli.check, cli.verbose));
+        }
+
+        if let Some(clang) = clang {
+            let c_files_to_fmt: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|e| {
+                    !c_excluded_directories.is_match(e.path().as_os_str().to_str().unwrap())
+                })
+                .filter(|e| e.file_type().is_file())
+                .filter(|e| c_file_to_format.is_match(e.file_name().to_str().unwrap()))
+                .map(DirEntry::into_path)
+                .collect();
+
+            for c_file in c_files_to_fmt {
+                tokio_joinset.spawn(run_clang_fmt(
+                    c_file,
+                    clang.to_string(),
+                    cli.check,
+                    cli.verbose,
+                ));
+            }
         }
     }
 
@@ -333,9 +407,9 @@ async fn main() -> io::Result<()> {
         }
     }
 
-    let _ = warning.map(print_warning);
-
-    if cli.check {
+    if cli.generate_lockfiles {
+        println!("[*] Lockfile generation finished successfully.");
+    } else if cli.check {
         println!("[*] Check finished successfully.");
     } else {
         println!("[*] Formatting finished successfully.");

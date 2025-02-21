@@ -1,7 +1,7 @@
 target
 target-bin
 out
-Cargo.lock
+# Cargo.lock
 vendor
 
 .DS_Store
