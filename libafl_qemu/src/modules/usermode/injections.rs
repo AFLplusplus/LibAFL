@@ -228,7 +228,7 @@ impl InjectionModule {
         let reg: GuestAddr = qemu
             .current_cpu()
             .unwrap()
-            .read_function_argument(parameter)
+            .read_function_argument_with_cc(CallingConvention::Default, parameter)
             .unwrap_or_default();
 
         let module = emulator_modules.get_mut::<Self>().unwrap();

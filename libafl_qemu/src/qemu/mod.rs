@@ -973,7 +973,7 @@ impl Qemu {
     where
         T: Into<GuestReg> + Copy,
     {
-        write_function_arguments_with_cc(CallingConvention::Default, qemu, val)
+        Self::write_function_arguments_with_cc(&CallingConvention::Default, qemu, val)
     }
 
     /// Write the function arguments by following calling convention `conv`.
@@ -983,8 +983,8 @@ impl Qemu {
     /// of the called function, in case the argument is written in the stack.
     /// Support downward-growing stack only.
     pub fn write_function_arguments_with_cc<T>(
-        qemu: &mut Qemu,
         conv: &CallingConvention,
+        qemu: &mut Qemu,
         val: &[T],
     ) -> Result<(), QemuRWError>
     where

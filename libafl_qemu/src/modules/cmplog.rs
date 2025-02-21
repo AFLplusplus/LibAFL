@@ -12,10 +12,10 @@ pub use libafl_targets::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "usermode")]
+use crate::capstone;
 #[cfg(feature = "systemmode")]
 use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
-#[cfg(feature = "usermode")]
-use crate::{capstone, qemu::ArchExtras, CallingConvention};
 use crate::{
     emu::EmulatorModules,
     modules::{
