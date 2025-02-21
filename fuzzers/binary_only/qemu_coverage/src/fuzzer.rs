@@ -180,8 +180,8 @@ pub fn fuzz() {
                 qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
                 qemu.write_reg(Regs::Sp, stack_ptr)?;
                 qemu.write_return_address(ret_addr)?;
-                qemu.write_function_argument(, 0, input_addr)?;
-                qemu.write_function_argument(, 1, len)?;
+                qemu.write_function_argument(0, input_addr)?;
+                qemu.write_function_argument(1, len)?;
 
                 match qemu.run() {
                     Ok(QemuExitReason::Breakpoint(_)) => {}
