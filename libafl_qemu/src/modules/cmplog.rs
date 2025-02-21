@@ -301,12 +301,8 @@ impl CmpLogRoutinesModule {
 
         let qemu = Qemu::get().unwrap();
 
-        let a0: GuestAddr = qemu
-            .read_function_argument(CallingConvention::Default, 0)
-            .unwrap_or(0);
-        let a1: GuestAddr = qemu
-            .read_function_argument(CallingConvention::Default, 1)
-            .unwrap_or(0);
+        let a0: GuestAddr = qemu.read_function_argument(0).unwrap_or(0);
+        let a1: GuestAddr = qemu.read_function_argument(1).unwrap_or(0);
 
         if a0 == 0 || a1 == 0 {
             return;

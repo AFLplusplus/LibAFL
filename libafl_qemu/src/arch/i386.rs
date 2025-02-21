@@ -77,7 +77,7 @@ impl crate::ArchExtras for crate::CPU {
         Ok(())
     }
 
-    fn read_function_argument(
+    fn read_function_argument_with_cc(
         &self,
         conv: CallingConvention,
         idx: u8,
@@ -103,7 +103,7 @@ impl crate::ArchExtras for crate::CPU {
         }
     }
 
-    fn write_function_argument<T>(
+    fn write_function_argument_with_cc<T>(
         &self,
         conv: CallingConvention,
         idx: u8,

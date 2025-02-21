@@ -233,9 +233,9 @@ pub fn fuzz() -> Result<(), Error> {
             qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
             qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
             qemu.write_return_address(ret_addr).unwrap();
-            qemu.write_function_argument(CallingConvention::Default, 0, input_addr)
+            qemu.write_function_argument(0, input_addr)
                 .unwrap();
-            qemu.write_function_argument(CallingConvention::Default, 1, len)
+            qemu.write_function_argument(1, len)
                 .unwrap();
 
             match qemu.run() {
@@ -269,9 +269,9 @@ pub fn fuzz() -> Result<(), Error> {
                 qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
                 qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
                 qemu.write_return_address(ret_addr).unwrap();
-                qemu.write_function_argument(CallingConvention::Default, 0, input_addr)
+                qemu.write_function_argument( 0, input_addr)
                     .unwrap();
-                qemu.write_function_argument(CallingConvention::Default, 1, len)
+                qemu.write_function_argument(, 1, len)
                     .unwrap();
 
                 match qemu.run() {

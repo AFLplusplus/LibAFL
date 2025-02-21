@@ -74,12 +74,13 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>;
-    fn read_function_argument(
+    fn read_function_argument_with_cc(
         &self,
         conv: CallingConvention,
         idx: u8,
     ) -> Result<GuestReg, QemuRWError>;
-    fn write_function_argument<T>(
+
+    fn write_function_argument_with_cc<T>(
         &self,
         conv: CallingConvention,
         idx: u8,
@@ -962,13 +963,26 @@ impl Qemu {
         unsafe { QEMU_IS_RUNNING }
     }
 
+    /// Write the function arguments by following default calling convention.
+    /// Assume that every arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    pub fn write_function_arguments<T>(qemu: &mut Qemu, val: &[T]) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg> + Copy,
+    {
+        write_function_arguments_with_cc(CallingConvention::Default, qemu, val)
+    }
+
     /// Write the function arguments by following calling convention `conv`.
     /// Assume that every arguments has integer/pointer type, otherwise the value
     /// may be stored at wrong place because of different rules for complex types.
     /// Note that the stack pointer register must point the top of the stack at the start
     /// of the called function, in case the argument is written in the stack.
     /// Support downward-growing stack only.
-    pub fn write_function_arguments<T>(
+    pub fn write_function_arguments_with_cc<T>(
         qemu: &mut Qemu,
         conv: &CallingConvention,
         val: &[T],
@@ -977,9 +991,32 @@ impl Qemu {
         T: Into<GuestReg> + Copy,
     {
         for (idx, elem) in val.iter().enumerate() {
-            qemu.write_function_argument(conv.clone(), idx as u8, elem.to_owned())?;
+            qemu.write_function_argument_with_cc(conv.clone(), idx as u8, elem.to_owned())?;
         }
         Ok(())
+    }
+
+    /// Read the function `idx` argument by following default calling convention.
+    /// Assume that this argument and every prior arguments has integer/pointer type, otherwise
+    /// it may return a wrong value because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the value is in the stack.
+    /// Support downward-growing stack only.
+    fn read_function_argument(&self, idx: u8) -> Result<GuestReg, QemuRWError> {
+        self.read_function_argument_with_cc(CallingConvention::Default, idx)
+    }
+
+    /// Write the function `val` into `idx` argument by following default calling convention.
+    /// Assume that `val` and every prior arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    fn write_function_argument<T>(&self, idx: u8, val: T) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg>,
+    {
+        self.write_function_argument_with_cc(CallingConvention::Default, idx, val)
     }
 }
 
@@ -1005,14 +1042,14 @@ impl ArchExtras for Qemu {
     /// Note that the stack pointer register must point the top of the stack at the start
     /// of the called function, in case the value is in the stack.
     /// Support downward-growing stack only.
-    fn read_function_argument(
+    fn read_function_argument_with_cc(
         &self,
         conv: CallingConvention,
         idx: u8,
     ) -> Result<GuestReg, QemuRWError> {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
-            .read_function_argument(conv, idx)
+            .read_function_argument_with_cc(conv, idx)
     }
 
     /// Write the function `val` into `idx` argument by following calling convention `conv`.
@@ -1021,7 +1058,7 @@ impl ArchExtras for Qemu {
     /// Note that the stack pointer register must point the top of the stack at the start
     /// of the called function, in case the argument is written in the stack.
     /// Support downward-growing stack only.
-    fn write_function_argument<T>(
+    fn write_function_argument_with_cc<T>(
         &self,
         conv: CallingConvention,
         idx: u8,
@@ -1032,7 +1069,7 @@ impl ArchExtras for Qemu {
     {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
-            .write_function_argument::<T>(conv, idx, val)
+            .write_function_argument_with_cc::<T>(conv, idx, val)
     }
 }
 
