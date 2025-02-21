@@ -1,8 +1,8 @@
-## PR Description
+## Description
 
 *describe your PR here*
 
-## PR Checklist
+## Checklist
 
 Please make sure you've completed the following steps before submitting:
 
