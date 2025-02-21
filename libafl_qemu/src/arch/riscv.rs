@@ -22,6 +22,11 @@ pub const SYS_riscv_hwprobe: c_long = SYS_arch_specific_syscall + 14;
 
 use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
 
+#[expect(non_upper_case_globals)]
+impl CallingConvention {
+    pub const Default: CallingConvention = CallingConvention::RiscVilp32;
+}
+
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Regs {
@@ -111,7 +116,7 @@ impl crate::ArchExtras for crate::CPU {
         conv: CallingConvention,
         idx: u8,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Default, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::RiscVilp32, conv)?;
 
         // Note that 64 bit values may be passed in two registers (and are even-odd eg. A0, A2 and A3 where A1 is empty), then this mapping is off.
         // Note: This does not consider the floating point registers.
@@ -140,7 +145,7 @@ impl crate::ArchExtras for crate::CPU {
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Default, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::RiscVilp32, conv)?;
 
         let val: GuestReg = val.into();
         match idx {

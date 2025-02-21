@@ -160,27 +160,10 @@ pub enum CallingConvention {
     Cdecl,
     Aapcs64,
     Aapcs,
-}
-
-/// alias calling conventions
-#[expect(non_upper_case_globals)]
-impl CallingConvention {
-    #[cfg(target_arch = "x86_64")]
-    pub const Default: CallingConvention = CallingConvention::SystemV;
-    #[cfg(target_arch = "x86")]
-    pub const Default: CallingConvention = CallingConvention::Cdecl;
-    #[cfg(target_arch = "aarch64")]
-    pub const Default: CallingConvention = CallingConvention::Aapcs64;
-    #[cfg(target_arch = "arm")]
-    pub const Default: CallingConvention = CallingConvention::Aapcs;
-    #[cfg(not(any(
-        target_arch = "x86_64",
-        target_arch = "x86",
-        target_arch = "aarch64",
-        target_arch = "arm",
-    )))]
-    //TODO: Assign default calling convention for every architectures
-    pub const Default: CallingConvention = CallingConvention::Cdecl;
+    Hexagon,
+    MipsO32,
+    Ppc32,
+    RiscVilp32,
 }
 
 #[derive(Debug)]
@@ -969,11 +952,12 @@ impl Qemu {
     /// Note that the stack pointer register must point the top of the stack at the start
     /// of the called function, in case the argument is written in the stack.
     /// Support downward-growing stack only.
-    pub fn write_function_arguments<T>(qemu: &mut Qemu, val: &[T]) -> Result<(), QemuRWError>
+    /// If you need to specify a calling convention, use [`Self::write_function_arguments_with_cc`].
+    pub fn write_function_arguments<T>(&mut self, val: &[T]) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg> + Copy,
     {
-        Self::write_function_arguments_with_cc(&CallingConvention::Default, qemu, val)
+        self.write_function_arguments_with_cc(&CallingConvention::Default, val)
     }
 
     /// Write the function arguments by following calling convention `conv`.
@@ -983,15 +967,15 @@ impl Qemu {
     /// of the called function, in case the argument is written in the stack.
     /// Support downward-growing stack only.
     pub fn write_function_arguments_with_cc<T>(
+        &mut self,
         conv: &CallingConvention,
-        qemu: &mut Qemu,
         val: &[T],
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg> + Copy,
     {
         for (idx, elem) in val.iter().enumerate() {
-            qemu.write_function_argument_with_cc(conv.clone(), idx as u8, elem.to_owned())?;
+            self.write_function_argument_with_cc(conv.clone(), idx as u8, elem.to_owned())?;
         }
         Ok(())
     }
@@ -1002,6 +986,7 @@ impl Qemu {
     /// Note that the stack pointer register must point the top of the stack at the start
     /// of the called function, in case the value is in the stack.
     /// Support downward-growing stack only.
+    /// If you need to specify a calling convention, use [`Self::read_function_argument_with_cc`].
     pub fn read_function_argument(&self, idx: u8) -> Result<GuestReg, QemuRWError> {
         self.read_function_argument_with_cc(CallingConvention::Default, idx)
     }
@@ -1012,6 +997,7 @@ impl Qemu {
     /// Note that the stack pointer register must point the top of the stack at the start
     /// of the called function, in case the argument is written in the stack.
     /// Support downward-growing stack only.
+    /// If you need to specify a calling convention, use [`Self::write_function_argument_with_cc`].
     pub fn write_function_argument<T>(&self, idx: u8, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,

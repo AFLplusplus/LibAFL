@@ -8,6 +8,11 @@ pub use strum_macros::EnumIter;
 
 use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
 
+#[expect(non_upper_case_globals)]
+impl CallingConvention {
+    pub const Default: CallingConvention = CallingConvention::Hexagon;
+}
+
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Regs {
@@ -108,7 +113,7 @@ impl crate::ArchExtras for crate::CPU {
         conv: CallingConvention,
         idx: u8,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Default, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Hexagon, conv)?;
 
         // Note that 64 bit values may be passed in two registers (and may have padding), then this mapping is off.
         let reg_id = match idx {
@@ -133,9 +138,18 @@ impl crate::ArchExtras for crate::CPU {
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Default, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Hexagon, conv)?;
 
-        // TODO
-        Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, idx))
+        // Note that 64 bit values may be passed in two registers (and may have padding), then this mapping is off.
+        let val: GuestReg = val.into();
+        match idx {
+            0 => self.write_reg(Regs::R0, val),
+            1 => self.write_reg(Regs::R1, val),
+            2 => self.write_reg(Regs::R2, val),
+            3 => self.write_reg(Regs::R3, val),
+            4 => self.write_reg(Regs::R4, val),
+            5 => self.write_reg(Regs::R5, val),
+            r => Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
+        }
     }
 }

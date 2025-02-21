@@ -10,6 +10,11 @@ pub use syscall_numbers::arm::*;
 
 use crate::{sync_exit::ExitArgs, CallingConvention, GuestAddr, QemuRWError, QemuRWErrorKind};
 
+#[expect(non_upper_case_globals)]
+impl CallingConvention {
+    pub const Default: CallingConvention = CallingConvention::Aapcs;
+}
+
 /// Registers for the ARM instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]

@@ -10,6 +10,11 @@ pub use syscall_numbers::x86::*;
 
 use crate::{sync_exit::ExitArgs, CallingConvention, GuestAddr, QemuRWError, QemuRWErrorKind};
 
+#[expect(non_upper_case_globals)]
+impl CallingConvention {
+    pub const Default: CallingConvention = CallingConvention::Cdecl;
+}
+
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
 pub enum Regs {

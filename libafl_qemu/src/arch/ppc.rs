@@ -9,6 +9,11 @@ pub use syscall_numbers::powerpc::*;
 
 use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
 
+#[expect(non_upper_case_globals)]
+impl CallingConvention {
+    pub const Default: CallingConvention = CallingConvention::Ppc32;
+}
+
 /// Registers for the MIPS instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -136,7 +141,7 @@ impl crate::ArchExtras for crate::CPU {
         conv: CallingConvention,
         idx: u8,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Default, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Ppc32, conv)?;
 
         let reg_id = match idx {
             0 => Regs::R3,
@@ -160,7 +165,7 @@ impl crate::ArchExtras for crate::CPU {
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Default, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Ppc32, conv)?;
 
         let val: GuestReg = val.into();
         match idx {

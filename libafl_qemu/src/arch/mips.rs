@@ -9,6 +9,11 @@ pub use syscall_numbers::mips::*;
 
 use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
 
+#[expect(non_upper_case_globals)]
+impl CallingConvention {
+    pub const Default: CallingConvention = CallingConvention::MipsO32;
+}
+
 /// Registers for the MIPS instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -96,7 +101,7 @@ impl crate::ArchExtras for crate::CPU {
         conv: CallingConvention,
         idx: u8,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Default, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::MipsO32, conv)?;
 
         let reg_id = match idx {
             0 => Regs::A0,
@@ -119,12 +124,15 @@ impl crate::ArchExtras for crate::CPU {
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Default, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::MipsO32, conv)?;
 
         let val: GuestReg = val.into();
         match idx {
             0 => self.write_reg(Regs::A0, val),
             1 => self.write_reg(Regs::A1, val),
+            2 => self.write_reg(Regs::A2, val),
+            3 => self.write_reg(Regs::A3, val),
+            // 4.. would be on the stack, let's not do this for now
             r => Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
         }
     }
