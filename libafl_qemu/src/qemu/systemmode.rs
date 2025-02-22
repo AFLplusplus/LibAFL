@@ -92,7 +92,7 @@ impl CPU {
             let page = libafl_page_from_addr(vaddr as GuestUsize) as GuestVirtAddr;
             let mut attrs = MaybeUninit::<libafl_qemu_sys::MemTxAttrs>::uninit();
             let paddr = libafl_qemu_sys::cpu_get_phys_page_attrs_debug(
-                self.ptr,
+                self.cpu_ptr,
                 page as GuestVirtAddr,
                 attrs.as_mut_ptr(),
             );
@@ -132,7 +132,7 @@ impl CPU {
 
     #[must_use]
     pub fn current_paging_id(&self) -> Option<GuestPhysAddr> {
-        let paging_id = unsafe { libafl_qemu_current_paging_id(self.ptr) };
+        let paging_id = unsafe { libafl_qemu_current_paging_id(self.cpu_ptr) };
 
         if paging_id == 0 {
             None
@@ -149,7 +149,7 @@ impl CPU {
     pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
         // TODO use gdbstub's target_cpu_memory_rw_debug
         libafl_qemu_sys::cpu_memory_rw_debug(
-            self.ptr,
+            self.cpu_ptr,
             addr as GuestVirtAddr,
             buf.as_mut_ptr() as *mut _,
             buf.len(),
@@ -165,7 +165,7 @@ impl CPU {
     pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
         // TODO use gdbstub's target_cpu_memory_rw_debug
         libafl_qemu_sys::cpu_memory_rw_debug(
-            self.ptr,
+            self.cpu_ptr,
             addr as GuestVirtAddr,
             buf.as_ptr() as *mut _,
             buf.len(),
@@ -362,7 +362,7 @@ impl<'a> Iterator for HostMemoryIter<'a> {
         } else {
             // Host memory allocation is always host-page aligned, so we can freely go from host page to host page.
             let start_host_addr: *const u8 =
-                unsafe { libafl_qemu_sys::libafl_paddr2host(self.cpu.ptr, self.addr, false) };
+                unsafe { libafl_qemu_sys::libafl_paddr2host(self.cpu.cpu_ptr, self.addr, false) };
             let host_page_size = Qemu::get().unwrap().host_page_size();
             let mut size_taken: usize = std::cmp::min(
                 (start_host_addr as usize).next_multiple_of(host_page_size),
@@ -374,8 +374,9 @@ impl<'a> Iterator for HostMemoryIter<'a> {
 
             // Now self.addr is host-page aligned
             while self.remaining_len > 0 {
-                let next_page_host_addr: *const u8 =
-                    unsafe { libafl_qemu_sys::libafl_paddr2host(self.cpu.ptr, self.addr, false) };
+                let next_page_host_addr: *const u8 = unsafe {
+                    libafl_qemu_sys::libafl_paddr2host(self.cpu.cpu_ptr, self.addr, false)
+                };
 
                 // Non-contiguous, we stop here for the slice
                 if next_page_host_addr != start_host_addr {
