@@ -545,7 +545,6 @@ impl CompilerWrapper for ClangWrapper {
 }
 impl Default for ClangWrapper {
     /// Create a new Clang Wrapper
-    #[must_use]
     fn default() -> Self {
         Self::new()
     }

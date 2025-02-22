@@ -124,10 +124,10 @@ macro_rules! make_symexpr_optional {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! unwrap_option {
-    ($param_name:ident: RSymExpr) => {
+    ($param_name:ident : RSymExpr) => {
         $param_name?
     };
-    ($param_name:ident: $($type:tt)+) => {
+    ($param_name:ident : $($type:tt)+) => {
         $param_name
     };
 }

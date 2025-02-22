@@ -1,6 +1,5 @@
 //! This module contains the `concolic` stages, which can trace a target using symbolic execution
 //! and use the results for fuzzer input and mutations.
-//!
 use alloc::borrow::{Cow, ToOwned};
 #[cfg(feature = "concolic_mutation")]
 use alloc::{string::ToString, vec::Vec};
@@ -18,7 +17,7 @@ use crate::{
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     observers::{concolic::ConcolicObserver, ObserversTuple},
-    stages::{RetryCountRestartHelper, Stage, TracingStage},
+    stages::{Restartable, RetryCountRestartHelper, Stage, TracingStage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -76,7 +75,12 @@ where
         }
         Ok(())
     }
+}
 
+impl<EM, I, TE, S, Z> Restartable<S> for ConcolicTracingStage<'_, EM, I, TE, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
@@ -418,7 +422,13 @@ where
         }
         Ok(())
     }
+}
 
+#[cfg(feature = "concolic_mutation")]
+impl<I, S, Z> Restartable<S> for SimpleConcolicMutationalStage<I, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage

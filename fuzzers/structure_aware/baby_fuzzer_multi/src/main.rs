@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
+use std::{iter, path::PathBuf};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -43,9 +43,9 @@ fn count_set(count: usize) {
 #[expect(clippy::manual_assert)]
 pub fn main() {
     // The closure that we want to fuzz
-    let mut harness = |input: &MultipartInput<BytesInput>| {
-        let mut count = input.parts().len();
-        for (i, input) in input.parts().iter().enumerate() {
+    let mut harness = |input: &MultipartInput<BytesInput, String>| {
+        let mut count = input.len();
+        for (i, (_name, input)) in input.parts().iter().enumerate() {
             let target = input.target_bytes();
             let buf = target.as_slice();
             signals_set(i * 8);
@@ -143,12 +143,9 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // a generator here is not generalisable
-    let initial = MultipartInput::from([
-        ("part", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
-        ("part", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
-        ("part", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
-        ("part", BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
-    ]);
+    let initial = MultipartInput::from(
+        iter::repeat(("part".to_string(), BytesInput::from(&b"hello"[..]))).take(4),
+    );
 
     fuzzer
         .evaluate_input(&mut state, &mut executor, &mut mgr, &initial)

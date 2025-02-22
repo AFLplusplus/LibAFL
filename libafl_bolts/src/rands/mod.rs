@@ -223,7 +223,7 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
 }
 
 macro_rules! impl_default_new {
-    ($rand: ty) => {
+    ($rand:ty) => {
         impl Default for $rand {
             /// Creates a generator seeded with [`random_seed`].
             fn default() -> Self {
@@ -249,7 +249,7 @@ impl_default_new!(RomuDuoJrRand);
 impl_default_new!(Sfc64Rand);
 
 macro_rules! impl_rng_core {
-    ($rand: ty) => {
+    ($rand:ty) => {
         #[cfg(feature = "rand_trait")]
         impl rand_core::RngCore for $rand {
             fn next_u32(&mut self) -> u32 {

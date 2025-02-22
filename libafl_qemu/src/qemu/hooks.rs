@@ -380,7 +380,7 @@ macro_rules! create_exec_wrapper {
 }
 
 macro_rules! create_hook_id {
-    ($name:ident, $sys:ident, true) => {
+    ($name:ident, $sys:ident,true) => {
         paste::paste! {
             #[derive(Clone, Copy, PartialEq, Debug)]
             pub struct [<$name HookId>](pub(crate) usize);
@@ -397,7 +397,7 @@ macro_rules! create_hook_id {
             }
         }
     };
-    ($name:ident, $sys:ident, false) => {
+    ($name:ident, $sys:ident,false) => {
         paste::paste! {
             #[derive(Clone, Copy, PartialEq, Debug)]
             pub struct [<$name HookId>](pub(crate) usize);

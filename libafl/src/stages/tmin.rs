@@ -30,7 +30,7 @@ use crate::{
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
-        ExecutionCountRestartHelper, Stage,
+        ExecutionCountRestartHelper, Restartable, Stage,
     },
     start_timer,
     state::{
@@ -82,14 +82,6 @@ where
     M: Mutator<I, S>,
     I: Input + Hash + HasLen,
 {
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        self.restart_helper.should_restart(state, &self.name)
-    }
-
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        self.restart_helper.clear_progress::<S>(state, &self.name)
-    }
-
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -99,10 +91,20 @@ where
     ) -> Result<(), Error> {
         self.perform_minification(fuzzer, executor, state, manager)?;
 
-        #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().finish_stage();
-
         Ok(())
+    }
+}
+
+impl<E, EM, F, FF, I, M, S, Z> Restartable<S> for StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z>
+where
+    S: HasNamedMetadata + HasExecutions,
+{
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        self.restart_helper.should_restart(state, &self.name)
+    }
+
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        self.restart_helper.clear_progress::<S>(state, &self.name)
     }
 }
 

@@ -43,7 +43,6 @@ impl<T> ListFeedbackMetadata<T> {
 }
 
 impl<T> Default for ListFeedbackMetadata<T> {
-    #[must_use]
     fn default() -> Self {
         Self::new()
     }
@@ -118,7 +117,7 @@ where
     T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(self.name(), ListFeedbackMetadata::<T>::default());
+        state.add_named_metadata_checked(self.name(), ListFeedbackMetadata::<T>::default())?;
         Ok(())
     }
 }
