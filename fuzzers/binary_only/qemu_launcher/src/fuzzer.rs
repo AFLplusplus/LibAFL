@@ -10,14 +10,18 @@ use libafl::events::{ClientDescription, SimpleEventManager};
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
+    events::{ClientDescription, LlmpEventManagerBuilder},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
 #[cfg(feature = "simplemgr")]
 use libafl_bolts::core_affinity::CoreId;
-use libafl_bolts::current_time;
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
+use libafl_bolts::{
+    core_affinity::CoreId, current_time, llmp::LlmpBroker, staterestore::StateRestorer,
+    tuples::tuple_list,
+};
 #[cfg(unix)]
 use {
     nix::unistd::dup,
@@ -83,7 +87,7 @@ impl Fuzzer {
     {
         // The shared memory allocator
         #[cfg(not(feature = "simplemgr"))]
-        let shmem_provider = StdShMemProvider::new()?;
+        let mut shmem_provider = StdShMemProvider::new()?;
         /* If we are running in verbose, don't provide a replacement stdout, otherwise, use /dev/null */
         #[cfg(not(feature = "simplemgr"))]
         let stdout = if self.options.verbose {
@@ -94,12 +98,42 @@ impl Fuzzer {
 
         let client = Client::new(&self.options);
 
+        #[cfg(not(feature = "simplemgr"))]
+        if self.options.rerun_input.is_some() {
+            // If we want to rerun a single input but we use a restarting mgr, we'll have to create a fake restarting mgr that doesn't actually restart.
+            // It's not pretty but better than recompiling with simplemgr.
+
+            // Just a random number, let's hope it's free :)
+            let broker_port = 13120;
+            let _fake_broker = LlmpBroker::create_attach_to_tcp(
+                shmem_provider.clone(),
+                tuple_list!(),
+                broker_port,
+            )
+            .unwrap();
+
+            // To rerun an input, instead of using a launcher, we create dummy parameters and run the client directly.
+            return client.run(
+                None,
+                MonitorTypedEventManager::<_, M>::new(
+                    LlmpEventManagerBuilder::builder()
+                        .build_on_port(
+                            shmem_provider.clone(),
+                            broker_port,
+                            EventConfig::AlwaysUnique,
+                            None,
+                            Some(StateRestorer::new(
+                                shmem_provider.new_shmem(0x1000).unwrap(),
+                            )),
+                        )
+                        .unwrap(),
+                ),
+                ClientDescription::new(0, 0, CoreId(0)),
+            );
+        }
+
         #[cfg(feature = "simplemgr")]
         if self.options.rerun_input.is_some() {
-            // only for simplemgr
-            // DON'T USE LLMP HERE!!
-            // it doesn't work like that
-
             return client.run(
                 None,
                 SimpleEventManager::new(monitor),
