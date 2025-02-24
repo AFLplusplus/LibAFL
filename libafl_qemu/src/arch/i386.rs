@@ -67,7 +67,7 @@ impl crate::ArchExtras for crate::CPU {
     fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
         let stack_ptr: GuestReg = self.read_reg(Regs::Esp)?;
         let mut ret_addr = [0; size_of::<GuestReg>()];
-        unsafe { self.read_mem(stack_ptr, &mut ret_addr) };
+        self.read_mem(stack_ptr, &mut ret_addr)?;
         Ok(GuestReg::from_le_bytes(ret_addr).into())
     }
 
@@ -78,7 +78,7 @@ impl crate::ArchExtras for crate::CPU {
         let stack_ptr: GuestReg = self.read_reg(Regs::Esp)?;
         let val: GuestReg = val.into();
         let ret_addr = val.to_le_bytes();
-        unsafe { self.write_mem(stack_ptr, &ret_addr) };
+        self.write_mem(stack_ptr, &ret_addr)?;
         Ok(())
     }
 
@@ -89,23 +89,17 @@ impl crate::ArchExtras for crate::CPU {
     ) -> Result<GuestReg, QemuRWError> {
         QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
 
-        match idx {
-            _ => {
-                const SIZE: usize = size_of::<GuestReg>();
-                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
-                /*
-                 * Stack is full and descending. SP points to return address, arguments
-                 * are in reverse order above that.
-                 */
+        const SIZE: usize = size_of::<GuestReg>();
+        let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+        /*
+         * Stack is full and descending. SP points to return address, arguments
+         * are in reverse order above that.
+         */
 
-                let offset = (SIZE as GuestAddr) * (GuestAddr::from(idx) + 1);
-                let mut val = [0u8; SIZE];
-                unsafe {
-                    self.read_mem(stack_ptr + offset, &mut val);
-                }
-                Ok(GuestReg::from_le_bytes(val).into())
-            }
-        }
+        let offset = (SIZE as GuestAddr) * (GuestAddr::from(idx) + 1);
+        let mut val = [0u8; SIZE];
+        self.read_mem(stack_ptr + offset, &mut val)?;
+        Ok(GuestReg::from_le_bytes(val).into())
     }
 
     fn write_function_argument_with_cc<T>(
@@ -119,24 +113,17 @@ impl crate::ArchExtras for crate::CPU {
     {
         QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
 
-        match idx {
-            _ => {
-                let val: GuestReg = val.into();
-                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
-                /*
-                 * Stack is full and descending. SP points to return address, arguments
-                 * are in reverse order above that.
-                 */
-                let size: GuestAddr = size_of::<GuestReg>() as GuestAddr;
-                let offset = size * (GuestAddr::from(idx) + 1);
+        let val: GuestReg = val.into();
+        let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+        /*
+         * Stack is full and descending. SP points to return address, arguments
+         * are in reverse order above that.
+         */
+        let size: GuestAddr = size_of::<GuestReg>() as GuestAddr;
+        let offset = size * (GuestAddr::from(idx) + 1);
 
-                let arg = val.to_le_bytes();
-                unsafe {
-                    self.write_mem(stack_ptr + offset, &arg);
-                }
-                Ok(())
-            }
-            r => Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
-        }
+        let arg = val.to_le_bytes();
+        self.write_mem(stack_ptr + offset, &arg)?;
+        Ok(())
     }
 }
