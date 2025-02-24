@@ -215,7 +215,6 @@ impl ToolWrapper for ArWrapper {
 
 impl Default for ArWrapper {
     /// Create a new Clang Wrapper
-    #[must_use]
     fn default() -> Self {
         Self::new()
     }

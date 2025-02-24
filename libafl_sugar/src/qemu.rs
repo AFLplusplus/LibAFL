@@ -1,5 +1,4 @@
 //! In-memory fuzzer with `QEMU`-based binary-only instrumentation
-//!
 use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 

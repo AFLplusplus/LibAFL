@@ -59,7 +59,7 @@
 //!
 //!     log::info!("{:?}", parsed);
 //! }
-//!```
+//! ```
 
 #[cfg(feature = "frida_cli")]
 use alloc::{boxed::Box, string::ToString};

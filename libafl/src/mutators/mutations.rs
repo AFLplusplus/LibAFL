@@ -403,7 +403,7 @@ add_mutator_impl!(QwordAddMutator, u64);
 ///////////////////////////
 
 macro_rules! interesting_mutator_impl {
-    ($name: ident, $size: ty, $interesting: ident) => {
+    ($name:ident, $size:ty, $interesting:ident) => {
         /// Inserts an interesting value at a random place in the input vector
         #[derive(Default, Debug)]
         pub struct $name;

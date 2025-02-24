@@ -22,6 +22,10 @@ pub use bytessub::BytesSubInput;
 pub mod multi;
 #[cfg(feature = "multipart_inputs")]
 pub use multi::*;
+#[cfg(feature = "multipart_inputs")]
+pub mod list;
+#[cfg(feature = "multipart_inputs")]
+pub use list::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;

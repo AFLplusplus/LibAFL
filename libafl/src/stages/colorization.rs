@@ -22,7 +22,7 @@ use crate::{
     mutators::mutations::buffer_copy,
     nonzero,
     observers::ObserversTuple,
-    stages::{RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasRand},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -98,7 +98,12 @@ where
 
         Ok(())
     }
+}
 
+impl<C, E, EM, I, O, S, Z> Restartable<S> for ColorizationStage<C, E, EM, I, O, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
