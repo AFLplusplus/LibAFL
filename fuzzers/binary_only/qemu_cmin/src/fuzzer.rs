@@ -30,9 +30,8 @@ use libafl_bolts::{
 #[cfg(feature = "fork")]
 use libafl_qemu::QemuForkExecutor;
 use libafl_qemu::{
-    elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, CallingConvention,
-    Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuShutdownCause,
-    Regs,
+    elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, Emulator, GuestAddr,
+    GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuShutdownCause, Regs,
 };
 #[cfg(feature = "snapshot")]
 use libafl_qemu::{modules::SnapshotModule, QemuExecutor};
@@ -232,10 +231,8 @@ pub fn fuzz() -> Result<(), Error> {
             qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
             qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
             qemu.write_return_address(ret_addr).unwrap();
-            qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)
-                .unwrap();
-            qemu.write_function_argument(CallingConvention::Cdecl, 1, len)
-                .unwrap();
+            qemu.write_function_argument(0, input_addr).unwrap();
+            qemu.write_function_argument(1, len).unwrap();
 
             match qemu.run() {
                 Ok(QemuExitReason::Breakpoint(_)) => {}
@@ -268,10 +265,8 @@ pub fn fuzz() -> Result<(), Error> {
                 qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
                 qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
                 qemu.write_return_address(ret_addr).unwrap();
-                qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)
-                    .unwrap();
-                qemu.write_function_argument(CallingConvention::Cdecl, 1, len)
-                    .unwrap();
+                qemu.write_function_argument(0, input_addr).unwrap();
+                qemu.write_function_argument(1, len).unwrap();
 
                 match qemu.run() {
                     Ok(QemuExitReason::Breakpoint(_)) => {}

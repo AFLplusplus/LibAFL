@@ -74,16 +74,17 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>;
-    fn read_function_argument(
+    fn read_function_argument_with_cc(
         &self,
-        conv: CallingConvention,
         idx: u8,
-    ) -> Result<GuestReg, QemuRWError>;
-    fn write_function_argument<T>(
-        &self,
         conv: CallingConvention,
-        idx: i32,
+    ) -> Result<GuestReg, QemuRWError>;
+
+    fn write_function_argument_with_cc<T>(
+        &self,
+        idx: u8,
         val: T,
+        conv: CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>;
@@ -155,7 +156,14 @@ pub struct CPU {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CallingConvention {
+    SystemV,
     Cdecl,
+    Aapcs64,
+    Aapcs,
+    Hexagon,
+    MipsO32,
+    Ppc32,
+    RiscVilp32,
 }
 
 #[derive(Debug)]
@@ -937,6 +945,65 @@ impl Qemu {
     pub fn is_running(&self) -> bool {
         unsafe { QEMU_IS_RUNNING }
     }
+
+    /// Write the function arguments by following default calling convention.
+    /// Assume that every arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    /// If you need to specify a calling convention, use [`Self::write_function_arguments_with_cc`].
+    pub fn write_function_arguments<T>(&mut self, val: &[T]) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg> + Copy,
+    {
+        self.write_function_arguments_with_cc(val, &CallingConvention::Default)
+    }
+
+    /// Write the function arguments by following calling convention `conv`.
+    /// Assume that every arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    pub fn write_function_arguments_with_cc<T>(
+        &mut self,
+        val: &[T],
+        conv: &CallingConvention,
+    ) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg> + Copy,
+    {
+        for (idx, elem) in val.iter().enumerate() {
+            self.write_function_argument_with_cc(idx as u8, elem.to_owned(), conv.clone())?;
+        }
+        Ok(())
+    }
+
+    /// Read the function `idx` argument by following default calling convention.
+    /// Assume that this argument and every prior arguments has integer/pointer type, otherwise
+    /// it may return a wrong value because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the value is in the stack.
+    /// Support downward-growing stack only.
+    /// If you need to specify a calling convention, use [`Self::read_function_argument_with_cc`].
+    pub fn read_function_argument(&self, idx: u8) -> Result<GuestReg, QemuRWError> {
+        self.read_function_argument_with_cc(idx, CallingConvention::Default)
+    }
+
+    /// Write the function `val` into `idx` argument by following default calling convention.
+    /// Assume that `val` and every prior arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    /// If you need to specify a calling convention, use [`Self::write_function_argument_with_cc`].
+    pub fn write_function_argument<T>(&self, idx: u8, val: T) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg>,
+    {
+        self.write_function_argument_with_cc(idx, val, CallingConvention::Default)
+    }
 }
 
 impl ArchExtras for Qemu {
@@ -955,28 +1022,40 @@ impl ArchExtras for Qemu {
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument(
+    /// Read the function `idx` argument by following calling convention `conv`.
+    /// Assume that this argument and every prior arguments has integer/pointer type, otherwise
+    /// it may return a wrong value because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the value is in the stack.
+    /// Support downward-growing stack only.
+    fn read_function_argument_with_cc(
         &self,
-        conv: CallingConvention,
         idx: u8,
+        conv: CallingConvention,
     ) -> Result<GuestReg, QemuRWError> {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
-            .read_function_argument(conv, idx)
+            .read_function_argument_with_cc(idx, conv)
     }
 
-    fn write_function_argument<T>(
+    /// Write the function `val` into `idx` argument by following calling convention `conv`.
+    /// Assume that `val` and every prior arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    fn write_function_argument_with_cc<T>(
         &self,
-        conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         val: T,
+        conv: CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
-            .write_function_argument::<T>(conv, idx, val)
+            .write_function_argument_with_cc::<T>(idx, val, conv)
     }
 }
 

@@ -36,7 +36,7 @@ pub enum QemuRWErrorKind {
 #[derive(Clone, Debug)]
 pub enum QemuRWErrorCause {
     WrongCallingConvention(CallingConvention, CallingConvention), // expected, given
-    WrongArgument(i32),
+    WrongArgument(u8),
     CurrentCpuNotFound,
     Reg(i32),
     WrongMemoryLocation(GuestAddr, usize), // addr, size
@@ -121,8 +121,8 @@ impl QemuRWError {
     }
 
     #[must_use]
-    pub fn new_argument_error(kind: QemuRWErrorKind, reg_id: i32) -> Self {
-        Self::new(kind, QemuRWErrorCause::WrongArgument(reg_id), None)
+    pub fn new_argument_error(kind: QemuRWErrorKind, arg_id: u8) -> Self {
+        Self::new(kind, QemuRWErrorCause::WrongArgument(arg_id), None)
     }
 
     pub fn check_conv(
