@@ -61,7 +61,6 @@ RUN apt-get update && \
     python3 \
     python3-pip \
     python3-venv \
-    qemu-user \
     software-properties-common \
     wget
 RUN set -ex &&\
@@ -70,6 +69,27 @@ RUN set -ex &&\
   ./llvm.sh ${LLVM_VERSION}
 
 RUN git config --global core.pager cat
+
+# Install a modern version of QEMU
+
+WORKDIR /root
+ENV QEMU_VER=9.2.1
+RUN wget https://download.qemu.org/qemu-${QEMU_VER}.tar.xz
+RUN tar xvJf qemu-${QEMU_VER}.tar.xz
+WORKDIR /root/qemu-${QEMU_VER}
+RUN ./configure --target-list="\
+    arm-linux-user,\
+    aarch64-linux-user,\
+    i386-linux-user,\
+    ppc-linux-user,\
+    mips-linux-user,\
+    arm-softmmu,\
+    aarch64-softmmu,\
+    i386-softmmu,\
+    ppc-softmmu,\
+    mips-softmmu"
+RUN make -j
+RUN make install
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl
