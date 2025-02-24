@@ -6,7 +6,7 @@ use std::{
 
 use clap::Parser;
 #[cfg(feature = "simplemgr")]
-use libafl::events::{ClientDescription, SimpleEventManager};
+use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
@@ -14,14 +14,11 @@ use libafl::{
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
-#[cfg(feature = "simplemgr")]
-use libafl_bolts::core_affinity::CoreId;
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
-use libafl_bolts::{
-    core_affinity::CoreId, current_time, llmp::LlmpBroker, staterestore::StateRestorer,
-    tuples::tuple_list,
-};
+use libafl_bolts::{core_affinity::CoreId, current_time};
+#[cfg(not(feature = "simplemgr"))]
+use libafl_bolts::{llmp::LlmpBroker, staterestore::StateRestorer, tuples::tuple_list};
 #[cfg(unix)]
 use {
     nix::unistd::dup,
@@ -113,6 +110,7 @@ impl Fuzzer {
             .unwrap();
 
             // To rerun an input, instead of using a launcher, we create dummy parameters and run the client directly.
+            // NOTE: This is a hack for debugging that that will only work for non-crashing inputs.
             return client.run(
                 None,
                 MonitorTypedEventManager::<_, M>::new(
