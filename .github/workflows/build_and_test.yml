@@ -395,6 +395,42 @@ jobs:
         shell: bash
         run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
+  librasan-build:
+      runs-on: ubuntu-24.04
+      needs:
+        - changes
+      if: ${{ needs.changes.outputs.qemu == 'true' }}
+      steps:
+        - uses: actions/checkout@v4
+        - uses: ./.github/workflows/librasan-prepare
+        - name: Build
+          if: runner.os == 'Linux'
+          shell: bash
+          run: |
+            RUN_ON_CI=1 \
+            LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+            just \
+              -f ./libafl_qemu/librasan/Justfile \
+              build_everything
+
+  librasan-test:
+      runs-on: ubuntu-24.04
+      needs:
+        - changes
+      if: ${{ needs.changes.outputs.qemu == 'true' }}
+      steps:
+        - uses: actions/checkout@v4
+        - uses: ./.github/workflows/librasan-prepare
+        - name: Build
+          if: runner.os == 'Linux'
+          shell: bash
+          run: |
+            RUN_ON_CI=1 \
+            LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+            just \
+              -f ./libafl_qemu/librasan/Justfile \
+              test_everything
+
   fuzzers-qemu-system:
     needs:
       - changes

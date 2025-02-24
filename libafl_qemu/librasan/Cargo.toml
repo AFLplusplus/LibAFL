@@ -1,0 +1,13 @@
+[workspace]
+members = ["asan", "gasan", "qasan", "zasan", "fuzz", "dummy_libc", "runner"]
+resolver = "2"
+
+[workspace.package]
+version = "0.15.1"
+license = "MIT OR Apache-2.0"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

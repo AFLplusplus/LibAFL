@@ -1,0 +1,13 @@
+[package]
+name = "dummy_libc"
+version.workspace = true
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[features]
+default = []
+test = []
+
+[dependencies]
