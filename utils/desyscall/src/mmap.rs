@@ -9,7 +9,7 @@ use crate::{Context, Mapping, Pointer};
 
 const PAGE_SIZE: usize = 4096;
 
-extern "C" {
+unsafe extern "C" {
     //void* __libafl_raw_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
     fn __libafl_raw_mmap(
         addr: *mut c_void,

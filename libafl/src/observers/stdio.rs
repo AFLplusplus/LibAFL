@@ -143,9 +143,9 @@ use crate::{Error, observers::Observer};
 ///         assert!(input_text
 ///             .as_bytes()
 ///             .iter()
-///             .zip(STDOUT.as_ref().unwrap().iter().filter(|e| **e != 10)) // ignore newline chars
+///             .zip((&*(&raw const STDOUT)).unwrap().iter().filter(|e| **e != 10)) // ignore newline chars
 ///             .all(|(&a, &b)| a == b));
-///         assert!(STDERR.as_ref().unwrap().is_empty());
+///         assert!(&*(&raw const STDERR)).unwrap().is_empty());
 ///     }
 ///
 ///     state
@@ -162,7 +162,7 @@ use crate::{Error, observers::Observer};
 ///
 ///     unsafe {
 ///         let compare_vec: Vec<u8> = Vec::new();
-///         assert_eq!(compare_vec, *STDERR.as_ref().unwrap());
+///         assert_eq!(compare_vec, *(&*(&raw const STDERR)).unwrap());
 ///         // stdout will still contain data, we're just checking that there is an error message
 ///     }
 /// }
