@@ -223,6 +223,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@cargo-hack
+      - run: rustup upgrade
       # Note: We currently only specify minimum rust versions for the default workspace members
       - run: cargo hack check --rust-version -p libafl -p libafl_bolts -p libafl_derive -p libafl_cc -p libafl_targets
 

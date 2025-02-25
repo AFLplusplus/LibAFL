@@ -566,8 +566,11 @@ where
 {
     /// Write the config for a client `EventManager` to env vars, a new
     /// client can reattach using [`LlmpEventManagerBuilder::build_existing_client_from_env()`].
+    ///
+    /// # Safety
+    /// This will write to process env. Should only be called from a single thread at a time.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) {
+    pub unsafe fn to_env(&self, env_name: &str) {
         unsafe {
             self.llmp.to_env(env_name).unwrap();
         }
@@ -888,8 +891,13 @@ where
             #[cfg(not(unix))]
             let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
+
             // Store the information to a map.
-            staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            // # Safety
+            // Very likely single threaded here.
+            unsafe {
+                staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            }
 
             let mut ctr: u64 = 0;
             // Client->parent loop

@@ -454,7 +454,12 @@ where
                 StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
-            staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+
+            // # Safety
+            // Launcher is usually running in a single thread.
+            unsafe {
+                staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            }
 
             let mut ctr: u64 = 0;
             // Client->parent loop
