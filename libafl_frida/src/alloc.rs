@@ -222,7 +222,7 @@ impl Allocator {
 
             self.map_shadow_for_region(
                 mapping.as_ptr() as usize,
-                mapping.as_ptr().add(rounded_up_size) as usize,
+                unsafe { mapping.as_ptr().add(rounded_up_size) as usize },
                 false,
             );
             let address = mapping.as_ptr() as usize;
@@ -243,10 +243,12 @@ impl Allocator {
 
         self.largest_allocation = std::cmp::max(self.largest_allocation, metadata.actual_size);
         // unpoison the shadow memory for the allocation itself
-        Self::unpoison(
-            map_to_shadow!(self, metadata.address + self.page_size),
-            size,
-        );
+        unsafe {
+            Self::unpoison(
+                map_to_shadow!(self, metadata.address + self.page_size),
+                size,
+            );
+        }
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
@@ -285,7 +287,9 @@ impl Allocator {
         }
 
         // poison the shadow memory for the allocation
-        Self::poison(shadow_mapping_start, metadata.size);
+        unsafe {
+            Self::poison(shadow_mapping_start, metadata.size);
+        }
     }
 
     /// Finds the metadata for the allocation at the given address.

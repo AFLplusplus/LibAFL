@@ -167,7 +167,9 @@ unsafe fn update_ngram(pos: usize) -> usize {
     #[cfg(feature = "sancov_ngram4")]
     {
         let prev_array_4_ptr = &raw mut PREV_ARRAY_4;
-        let prev_array_4 = &mut *prev_array_4_ptr;
+        // # Safety
+        // the array is valid, this function is called from a single thread.
+        let prev_array_4 = unsafe { &mut *prev_array_4_ptr };
         *prev_array_4 = prev_array_4.rotate_elements_right::<1>();
         prev_array_4.shl_assign(SHR_4);
         prev_array_4.as_mut_array()[0] = pos as u32;

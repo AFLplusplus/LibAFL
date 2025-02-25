@@ -546,7 +546,7 @@ impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
 /// This function receives a raw pointer to a C string
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn test_function(message: *const gchar) {
-    if let Ok(msg) = CStr::from_ptr(message).to_str() {
+    if let Ok(msg) = unsafe { CStr::from_ptr(message).to_str() } {
         println!("{msg}");
     }
 }

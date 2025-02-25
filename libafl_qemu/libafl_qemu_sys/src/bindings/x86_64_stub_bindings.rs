@@ -8004,7 +8004,7 @@ unsafe extern "C" {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_backdoor_hook {
-    pub fun: ::std::option::Option<
+    pub generator: ::std::option::Option<
         unsafe extern "C" fn(data: u64, cpu: *mut CPUArchState, pc: target_ulong),
     >,
     pub data: u64,
@@ -8059,7 +8059,7 @@ unsafe extern "C" {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_block_hook {
-    pub fun: ::std::option::Option<unsafe extern "C" fn(data: u64, pc: target_ulong) -> u64>,
+    pub generator: ::std::option::Option<unsafe extern "C" fn(data: u64, pc: target_ulong) -> u64>,
     pub post_gen: ::std::option::Option<
         unsafe extern "C" fn(data: u64, pc: target_ulong, block_length: target_ulong),
     >,
@@ -8073,8 +8073,8 @@ pub struct libafl_block_hook {
 const _: () = {
     ["Size of libafl_block_hook"][::std::mem::size_of::<libafl_block_hook>() - 136usize];
     ["Alignment of libafl_block_hook"][::std::mem::align_of::<libafl_block_hook>() - 8usize];
-    ["Offset of field: libafl_block_hook::gen"]
-        [::std::mem::offset_of!(libafl_block_hook, gen) - 0usize];
+    ["Offset of field: libafl_block_hook::generator"]
+        [::std::mem::offset_of!(libafl_block_hook, generator) - 0usize];
     ["Offset of field: libafl_block_hook::post_gen"]
         [::std::mem::offset_of!(libafl_block_hook, post_gen) - 8usize];
     ["Offset of field: libafl_block_hook::jit"]
@@ -8117,7 +8117,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn libafl_add_block_hook(
-        fun: ::std::option::Option<unsafe extern "C" fn(data: u64, pc: target_ulong) -> u64>,
+        generator: ::std::option::Option<unsafe extern "C" fn(data: u64, pc: target_ulong) -> u64>,
         post_gen: ::std::option::Option<
             unsafe extern "C" fn(data: u64, pc: target_ulong, block_length: target_ulong),
         >,
@@ -8128,7 +8128,7 @@ unsafe extern "C" {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_cmp_hook {
-    pub fun: ::std::option::Option<
+    pub generator: ::std::option::Option<
         unsafe extern "C" fn(data: u64, pc: target_ulong, size: usize) -> u64,
     >,
     pub data: u64,
@@ -8174,7 +8174,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn libafl_add_cmp_hook(
-        fun: ::std::option::Option<
+        generator: ::std::option::Option<
             unsafe extern "C" fn(data: u64, pc: target_ulong, size: usize) -> u64,
         >,
         exec1: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64, v0: u8, v1: u8)>,
@@ -8193,7 +8193,7 @@ unsafe extern "C" {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_edge_hook {
-    pub fun: ::std::option::Option<
+    pub generator: ::std::option::Option<
         unsafe extern "C" fn(data: u64, src: target_ulong, dst: target_ulong) -> u64,
     >,
     pub jit: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64) -> usize>,
@@ -8244,7 +8244,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn libafl_add_edge_hook(
-        fun: ::std::option::Option<
+        generator: ::std::option::Option<
             unsafe extern "C" fn(data: u64, src: target_ulong, dst: target_ulong) -> u64,
         >,
         exec: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64)>,
@@ -8344,7 +8344,7 @@ pub type libafl_rw_execN_cb = ::std::option::Option<
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_rw_hook {
-    pub fun: libafl_rw_gen_cb,
+    pub generator: libafl_rw_gen_cb,
     pub data: u64,
     pub num: usize,
     pub helper_info1: TCGHelperInfo,
@@ -8392,7 +8392,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn libafl_add_read_hook(
-        fun: libafl_rw_gen_cb,
+        generator: libafl_rw_gen_cb,
         exec1: libafl_rw_exec_cb,
         exec2: libafl_rw_exec_cb,
         exec4: libafl_rw_exec_cb,
@@ -8403,7 +8403,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn libafl_add_write_hook(
-        fun: libafl_rw_gen_cb,
+        generator: libafl_rw_gen_cb,
         exec1: libafl_rw_exec_cb,
         exec2: libafl_rw_exec_cb,
         exec4: libafl_rw_exec_cb,

@@ -315,7 +315,9 @@ impl FridaRuntime for AsanRuntime {
                 }
             }));
 
-        self.register_hooks(gum);
+        unsafe {
+            self.register_hooks(gum);
+        }
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
         self.register_thread();
@@ -410,7 +412,9 @@ impl AsanRuntime {
     pub unsafe fn poison(&mut self, address: usize, size: usize) {
         let start = self.allocator_mut().map_to_shadow(address);
         if self.allocator_mut().valid_shadow(start, size) {
-            Allocator::poison(start, size);
+            unsafe {
+                Allocator::poison(start, size);
+            }
         }
     }
 
@@ -593,14 +597,16 @@ impl AsanRuntime {
     }
 
     /// Register the required hooks
+    ///
+    /// # Safety
+    /// Registers a hook for an existing location, the hook can read and write mem freely, so..
     #[expect(clippy::too_many_lines)]
-    pub fn register_hooks(&mut self, gum: &Gum) {
+    pub unsafe fn register_hooks(&mut self, gum: &Gum) {
         let mut interceptor = Interceptor::obtain(gum);
         let process = Process::obtain(gum);
         macro_rules! hook_func {
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-
                     let target_function = Module::find_global_export_by_name(stringify!($name)).expect("Failed to find function");
                     log::warn!("Hooking {} = {:?}", stringify!($name), target_function.0);
 
@@ -610,6 +616,7 @@ impl AsanRuntime {
 
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        unsafe {
                         let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
@@ -632,6 +639,7 @@ impl AsanRuntime {
                             // }
                         }
                         (original)($($param),*)
+                    }
                     }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
@@ -658,6 +666,7 @@ impl AsanRuntime {
 
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        unsafe {
                         let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
@@ -673,6 +682,7 @@ impl AsanRuntime {
                             }
                         }
                         (original)($($param),*)
+                    }
                     }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
@@ -702,6 +712,7 @@ impl AsanRuntime {
                     #[allow(non_snake_case)] // depends on the values the macro is invoked with
                     #[allow(clippy::redundant_else)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        unsafe {
                         let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
@@ -736,6 +747,7 @@ impl AsanRuntime {
                             }
                         }
                         (original)($($param),*)
+                    }
                     }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;

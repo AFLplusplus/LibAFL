@@ -494,7 +494,7 @@ mod windows {
             processor: PROCESSOR_RELATIONSHIP,
         }
 
-        extern "system" {
+        unsafe extern "system" {
             fn GetLogicalProcessorInformationEx(
                 relationship: u32,
                 data: *mut u8,

@@ -1155,7 +1155,11 @@ mod tests {
         assert!(staterestorer.has_content());
 
         // Store the information to a map.
-        staterestorer.write_to_env(_ENV_FUZZER_SENDER).unwrap();
+        // # Safety
+        // Single-threaded test code
+        unsafe {
+            staterestorer.write_to_env(_ENV_FUZZER_SENDER).unwrap();
+        }
 
         compiler_fence(Ordering::SeqCst);
 
