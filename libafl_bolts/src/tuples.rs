@@ -741,7 +741,7 @@ impl<M> Map<M> for () {
 /// Iterate over a tuple, executing the given `expr` for each element.
 #[macro_export]
 macro_rules! tuple_for_each {
-    ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr_2021) => {
+    ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
         mod $fn_name {
             pub trait ForEach {
                 fn for_each(&self);
@@ -774,7 +774,7 @@ macro_rules! tuple_for_each {
 /// Iterate over a tuple, executing the given `expr` for each element, granting mut access.
 #[macro_export]
 macro_rules! tuple_for_each_mut {
-    ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr_2021) => {
+    ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
         mod $fn_name {
             pub trait ForEachMut {
                 fn for_each_mut(&mut self);

@@ -707,11 +707,11 @@ where
 /// Variadic macro to create a chain of [`AndFeedback`](EagerAndFeedback)
 #[macro_export]
 macro_rules! feedback_and {
-    ( $last:expr_2021 ) => { $last };
+    ( $last:expr ) => { $last };
 
-    ( $last:expr_2021, ) => { $last };
+    ( $last:expr, ) => { $last };
 
-    ( $head:expr_2021, $($tail:expr_2021),+ $(,)?) => {
+    ( $head:expr, $($tail:expr),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::EagerAndFeedback::new($head , feedback_and!($($tail),+))
     };
@@ -720,11 +720,11 @@ macro_rules! feedback_and {
 /// Variadic macro to create a chain of (fast) [`AndFeedback`](FastAndFeedback)
 #[macro_export]
 macro_rules! feedback_and_fast {
-    ( $last:expr_2021 ) => { $last };
+    ( $last:expr ) => { $last };
 
-    ( $last:expr_2021, ) => { $last };
+    ( $last:expr, ) => { $last };
 
-    ( $head:expr_2021, $($tail:expr_2021),+ $(,)?) => {
+    ( $head:expr, $($tail:expr),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::FastAndFeedback::new($head , feedback_and_fast!($($tail),+))
     };
@@ -733,11 +733,11 @@ macro_rules! feedback_and_fast {
 /// Variadic macro to create a chain of [`OrFeedback`](EagerOrFeedback)
 #[macro_export]
 macro_rules! feedback_or {
-    ( $last:expr_2021 ) => { $last };
+    ( $last:expr ) => { $last };
 
-    ( $last:expr_2021, ) => { $last };
+    ( $last:expr, ) => { $last };
 
-    ( $head:expr_2021, $($tail:expr_2021),+ $(,)?) => {
+    ( $head:expr, $($tail:expr),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::EagerOrFeedback::new($head , feedback_or!($($tail),+))
     };
@@ -746,11 +746,11 @@ macro_rules! feedback_or {
 /// Combines multiple feedbacks with an `OR` operation, not executing feedbacks after the first positive result
 #[macro_export]
 macro_rules! feedback_or_fast {
-    ( $last:expr_2021 ) => { $last };
+    ( $last:expr ) => { $last };
 
-    ( $last:expr_2021, ) => { $last };
+    ( $last:expr, ) => { $last };
 
-    ( $head:expr_2021, $($tail:expr_2021),+ $(,)?) => {
+    ( $head:expr, $($tail:expr),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::FastOrFeedback::new($head , feedback_or_fast!($($tail),+))
     };
@@ -759,7 +759,7 @@ macro_rules! feedback_or_fast {
 /// Variadic macro to create a [`NotFeedback`]
 #[macro_export]
 macro_rules! feedback_not {
-    ($last:expr_2021) => {
+    ($last:expr) => {
         $crate::feedbacks::NotFeedback::new($last)
     };
 }

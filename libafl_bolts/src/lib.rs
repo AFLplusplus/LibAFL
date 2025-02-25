@@ -1339,7 +1339,7 @@ pub fn has_tls() -> bool {
 macro_rules! nonzero {
     // TODO: Further simplify with `unwrap`/`expect` once MSRV includes
     // https://github.com/rust-lang/rust/issues/67441
-    ($val:expr_2021) => {
+    ($val:expr) => {
         const {
             match core::num::NonZero::new($val) {
                 Some(x) => x,
@@ -1354,7 +1354,7 @@ macro_rules! nonzero {
 /// The same as [`core::ptr::addr_of_mut`] or `&raw mut`, but wrapped in said [`NonNull`](core::ptr::NonNull).
 #[macro_export]
 macro_rules! nonnull_raw_mut {
-    ($val:expr_2021) => {
+    ($val:expr) => {
         // # Safety
         // The pointer to a value will never be null (unless we're on an archaic OS in a CTF challenge).
         unsafe { core::ptr::NonNull::new(&raw mut $val).unwrap_unchecked() }

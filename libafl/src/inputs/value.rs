@@ -144,7 +144,7 @@ mod tests {
 
     #[cfg(feature = "std")]
     macro_rules! apply_all_ops {
-        ($prep:stmt, $value:expr_2021, $type:ty, $check_twos_complement:expr_2021) => {{
+        ($prep:stmt, $value:expr, $type:ty, $check_twos_complement:expr) => {{
             $prep
             let mut j = $value;
             j.flip_all_bits();

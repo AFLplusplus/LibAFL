@@ -647,7 +647,7 @@ impl<SP> RcShMemProvider<ServedShMemProvider<SP>> {
 
 /// A Unix sharedmem implementation.
 ///
-/// On Android, this is partially reused to wrap [`unix_shmem::ashmem::AshmemShMem`],
+/// On Android, this is partially reused to wrap `AshmemShMem`,
 /// Although for an [`ServedShMemProvider`] using a unix domain socket
 /// Is needed on top.
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]

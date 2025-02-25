@@ -242,7 +242,7 @@ where
 /// Start the timer
 #[macro_export]
 macro_rules! start_timer {
-    ($state:expr_2021) => {{
+    ($state:expr) => {{
         // Start the timer
         #[cfg(feature = "introspection")]
         $state.introspection_stats_mut().start_timer();
@@ -252,7 +252,7 @@ macro_rules! start_timer {
 /// Mark the elapsed time for the given feature
 #[macro_export]
 macro_rules! mark_feature_time {
-    ($state:expr_2021, $feature:expr_2021) => {{
+    ($state:expr, $feature:expr) => {{
         // Mark the elapsed time for the given feature
         #[cfg(feature = "introspection")]
         $state.introspection_stats_mut().mark_feature_time($feature);
@@ -262,7 +262,7 @@ macro_rules! mark_feature_time {
 /// Mark the elapsed time for the given feature
 #[macro_export]
 macro_rules! mark_feedback_time {
-    ($state:expr_2021) => {{
+    ($state:expr) => {{
         // Mark the elapsed time for the given feature
         #[cfg(feature = "introspection")]
         $state.introspection_stats_mut().mark_feedback_time();

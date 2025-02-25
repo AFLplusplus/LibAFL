@@ -295,22 +295,22 @@ where
 #[macro_export]
 macro_rules! export_runtime {
     // Simple version: just export this runtime
-    ($constructor:expr_2021 => $rt:ty) => {
+    ($constructor:expr => $rt:ty) => {
         export_runtime!(@final $constructor => $rt);
     };
 
     // Compositional version: export this chain of filters and a final runtime
-    ($filter_constructor:expr_2021 => $filter:ty ; $($constructor:expr_2021 => $rt:ty);+) => {
+    ($filter_constructor:expr => $filter:ty ; $($constructor:expr => $rt:ty);+) => {
         export_runtime!(@final export_runtime!(@combine_constructor $filter_constructor; $($constructor);+) => export_runtime!(@combine_type $filter; $($rt);+));
     };
 
     // combines a chain of filter constructor expressions
     // recursive case: wrap the constructor expression in a `filter::FilterRuntime::new`
-    (@combine_constructor $filter_constructor:expr_2021 ; $($constructor:expr_2021);+) => {
+    (@combine_constructor $filter_constructor:expr ; $($constructor:expr);+) => {
         $crate::filter::FilterRuntime::new($filter_constructor, export_runtime!(@combine_constructor $($constructor);+))
     };
     // base case
-    (@combine_constructor $constructor:expr_2021) => {
+    (@combine_constructor $constructor:expr) => {
         $constructor
     };
 
@@ -325,7 +325,7 @@ macro_rules! export_runtime {
     };
 
     // finally, generate the necessary code for the given runtime
-    (@final $constructor:expr_2021 => $rt:ty) => {
+    (@final $constructor:expr => $rt:ty) => {
         // We are creating a piece of shared mutable state here for our runtime, which is used unsafely.
         // The correct solution here would be to either use a mutex or have per-thread state,
         // however, this is not really supported in SymCC yet.
