@@ -238,9 +238,7 @@ where
                 Runtime::new().map_err(|_| Error::unknown("Tokio runtime spawning failed"))?,
             );
 
-            unsafe {
-                TcpMultiMachineState::init::<I>(&state.clone(), &rt.clone())?;
-            }
+            TcpMultiMachineState::init::<I>(&state.clone(), &rt.clone())?;
 
             Ok(TcpMultiMachineHooks {
                 sender: TcpMultiMachineLlmpSenderHook::new(state.clone(), rt.clone()),

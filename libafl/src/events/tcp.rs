@@ -1161,8 +1161,14 @@ where
             #[cfg(not(unix))]
             let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
+
             // Store the information to a map.
-            staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            // # Safety
+            // It's reasonable to assume launcher only gets called on a single thread.
+            // If not, nothing too bad will happen.
+            unsafe {
+                staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            }
 
             let mut ctr: u64 = 0;
             // Client->parent loop
