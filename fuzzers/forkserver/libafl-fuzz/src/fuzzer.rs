@@ -122,7 +122,9 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     let mut shmem = shmem_provider
         .new_shmem(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
         .unwrap();
-    shmem.write_to_env(SHMEM_ENV_VAR).unwrap();
+    unsafe {
+        shmem.write_to_env(SHMEM_ENV_VAR).unwrap();
+    }
     let shmem_buf = shmem.as_slice_mut();
 
     // If we are in Nyx Mode, we need to use a different map observer.

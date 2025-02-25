@@ -33,7 +33,8 @@ use crate::{Error, observers::Observer};
 ///     mutators::{MutationResult, NopMutator},
 ///     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
 ///     schedulers::QueueScheduler,
-///     stages::StdMutationalStage, state::{HasCorpus, StdState}, };
+///     stages::StdMutationalStage, state::{HasCorpus, StdState},
+/// };
 /// use libafl_bolts::{
 ///     Named, current_nanos,
 ///     rands::StdRand,
@@ -79,7 +80,7 @@ use crate::{Error, observers::Observer};
 ///    }
 ///  }
 ///
-/// mpl Named for ExportStdXObserver {
+/// impl Named for ExportStdXObserver {
 ///    fn name(&self) -> &Cow<'static, str> {
 ///        &Cow::Borrowed("ExportStdXObserver")
 ///    }

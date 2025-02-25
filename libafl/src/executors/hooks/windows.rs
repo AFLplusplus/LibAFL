@@ -33,75 +33,79 @@ pub mod windows_asan_handler {
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
     {
-        let data = &raw mut GLOBAL_STATE;
-        let in_handler = (*data).set_in_handler(true);
+        unsafe {
+            let data = &raw mut GLOBAL_STATE;
+            let in_handler = (*data).set_in_handler(true);
 
-        if in_handler {
-            log::error!("We crashed inside a asan death handler, but this should never happen!");
-            ExitProcess(56);
-        }
-
-        // Have we set a timer_before?
-        if (*data).ptp_timer.is_some() {
-            /*
-                We want to prevent the timeout handler being run while the main thread is executing the crash handler
-                Timeout handler runs if it has access to the critical section or data.in_target == 0
-                Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
-            */
-            compiler_fence(Ordering::SeqCst);
-            EnterCriticalSection((*data).critical as *mut CRITICAL_SECTION);
-            compiler_fence(Ordering::SeqCst);
-            (*data).in_target = 0;
-            compiler_fence(Ordering::SeqCst);
-            LeaveCriticalSection((*data).critical as *mut CRITICAL_SECTION);
-            compiler_fence(Ordering::SeqCst);
-        }
-
-        log::error!("ASAN detected crash!");
-        if (*data).current_input_ptr.is_null() {
-            {
-                log::error!("Double crash\n");
+            if in_handler {
                 log::error!(
-                    "ASAN detected crash but we're not in the target... Bug in the fuzzer? Exiting.",
+                    "We crashed inside a asan death handler, but this should never happen!"
+                );
+                ExitProcess(56);
+            }
+
+            // Have we set a timer_before?
+            if (*data).ptp_timer.is_some() {
+                /*
+                    We want to prevent the timeout handler being run while the main thread is executing the crash handler
+                    Timeout handler runs if it has access to the critical section or data.in_target == 0
+                    Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
+                */
+                compiler_fence(Ordering::SeqCst);
+                EnterCriticalSection((*data).critical as *mut CRITICAL_SECTION);
+                compiler_fence(Ordering::SeqCst);
+                (*data).in_target = 0;
+                compiler_fence(Ordering::SeqCst);
+                LeaveCriticalSection((*data).critical as *mut CRITICAL_SECTION);
+                compiler_fence(Ordering::SeqCst);
+            }
+
+            log::error!("ASAN detected crash!");
+            if (*data).current_input_ptr.is_null() {
+                {
+                    log::error!("Double crash\n");
+                    log::error!(
+                        "ASAN detected crash but we're not in the target... Bug in the fuzzer? Exiting.",
+                    );
+                }
+                #[cfg(feature = "std")]
+                {
+                    log::error!("Type QUIT to restart the child");
+                    let mut line = String::new();
+                    while line.trim() != "QUIT" {
+                        let _ = std::io::stdin().read_line(&mut line);
+                    }
+                }
+
+                // TODO tell the parent to not restart
+            } else {
+                let executor = (*data).executor_mut::<E>();
+                // reset timer
+                if (*data).ptp_timer.is_some() {
+                    (*data).ptp_timer = None;
+                }
+
+                let state = (*data).state_mut::<S>();
+                let fuzzer = (*data).fuzzer_mut::<Z>();
+                let event_mgr = (*data).event_mgr_mut::<EM>();
+
+                log::error!("Child crashed!");
+
+                // Make sure we don't crash in the crash handler forever.
+                let input = (*data).take_current_input::<I>();
+
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
                 );
             }
-            #[cfg(feature = "std")]
-            {
-                log::error!("Type QUIT to restart the child");
-                let mut line = String::new();
-                while line.trim() != "QUIT" {
-                    let _ = std::io::stdin().read_line(&mut line);
-                }
-            }
-
-            // TODO tell the parent to not restart
-        } else {
-            let executor = (*data).executor_mut::<E>();
-            // reset timer
-            if (*data).ptp_timer.is_some() {
-                (*data).ptp_timer = None;
-            }
-
-            let state = (*data).state_mut::<S>();
-            let fuzzer = (*data).fuzzer_mut::<Z>();
-            let event_mgr = (*data).event_mgr_mut::<EM>();
-
-            log::error!("Child crashed!");
-
-            // Make sure we don't crash in the crash handler forever.
-            let input = (*data).take_current_input::<I>();
-
-            run_observers_and_save_state::<E, EM, I, OF, S, Z>(
-                executor,
-                state,
-                input,
-                fuzzer,
-                event_mgr,
-                ExitKind::Crash,
-            );
+            // Don't need to exit, Asan will exit for us
+            // ExitProcess(1);
         }
-        // Don't need to exit, Asan will exit for us
-        // ExitProcess(1);
     }
 }
 
@@ -270,36 +274,41 @@ pub mod windows_exception_handler {
         Z: HasObjective<Objective = OF>,
     {
         let data: &mut InProcessExecutorHandlerData =
-            &mut *(global_state as *mut InProcessExecutorHandlerData);
+            unsafe { &mut *(global_state as *mut InProcessExecutorHandlerData) };
         compiler_fence(Ordering::SeqCst);
-        EnterCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
+        unsafe {
+            EnterCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
+        }
         compiler_fence(Ordering::SeqCst);
 
         if !data.executor_ptr.is_null()
-            && data
-                .executor_mut::<E>()
-                .inprocess_hooks_mut()
-                .handle_timeout()
+            && unsafe {
+                data.executor_mut::<E>()
+                    .inprocess_hooks_mut()
+                    .handle_timeout()
+            }
         {
             compiler_fence(Ordering::SeqCst);
-            LeaveCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
+            unsafe {
+                LeaveCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
+            }
             compiler_fence(Ordering::SeqCst);
 
             return;
         }
 
         if data.in_target == 1 {
-            let executor = data.executor_mut::<E>();
-            let state = data.state_mut::<S>();
-            let fuzzer = data.fuzzer_mut::<Z>();
-            let event_mgr = data.event_mgr_mut::<EM>();
+            let executor = unsafe { data.executor_mut::<E>() };
+            let state = unsafe { data.state_mut::<S>() };
+            let fuzzer = unsafe { data.fuzzer_mut::<Z>() };
+            let event_mgr = unsafe { data.event_mgr_mut::<EM>() };
 
             if data.current_input_ptr.is_null() {
                 log::error!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
             } else {
                 log::error!("Timeout in fuzz run.");
 
-                let input = (data.current_input_ptr as *const I).as_ref().unwrap();
+                let input = unsafe { (data.current_input_ptr as *const I).as_ref().unwrap() };
                 data.current_input_ptr = ptr::null_mut();
 
                 run_observers_and_save_state::<E, EM, I, OF, S, Z>(
@@ -313,11 +322,15 @@ pub mod windows_exception_handler {
 
                 compiler_fence(Ordering::SeqCst);
 
-                ExitProcess(1);
+                unsafe {
+                    ExitProcess(1);
+                }
             }
         }
         compiler_fence(Ordering::SeqCst);
-        LeaveCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
+        unsafe {
+            LeaveCriticalSection((data.critical as *mut CRITICAL_SECTION).as_mut().unwrap());
+        }
         compiler_fence(Ordering::SeqCst);
         // log::info!("TIMER INVOKED!");
     }
@@ -346,37 +359,43 @@ pub mod windows_exception_handler {
                 Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
             */
             compiler_fence(Ordering::SeqCst);
-            EnterCriticalSection(data.critical as *mut CRITICAL_SECTION);
+            unsafe {
+                EnterCriticalSection(data.critical as *mut CRITICAL_SECTION);
+            }
             compiler_fence(Ordering::SeqCst);
             data.in_target = 0;
             compiler_fence(Ordering::SeqCst);
-            LeaveCriticalSection(data.critical as *mut CRITICAL_SECTION);
+            unsafe {
+                LeaveCriticalSection(data.critical as *mut CRITICAL_SECTION);
+            }
             compiler_fence(Ordering::SeqCst);
         }
 
         // Is this really crash?
         let mut is_crash = true;
         #[cfg(feature = "std")]
-        if let Some(exception_pointers) = exception_pointers.as_mut() {
-            let code: ExceptionCode = ExceptionCode::from(
+        if let Some(exception_pointers) = unsafe { exception_pointers.as_mut() } {
+            let code: ExceptionCode = ExceptionCode::from(unsafe {
                 exception_pointers
                     .ExceptionRecord
                     .as_mut()
                     .unwrap()
                     .ExceptionCode
-                    .0,
-            );
+                    .0
+            });
 
             let exception_list = data.exceptions();
             if exception_list.contains(&code) {
                 log::error!(
                     "Crashed with {code} at {:?} in thread {:?}",
-                    exception_pointers
-                        .ExceptionRecord
-                        .as_mut()
-                        .unwrap()
-                        .ExceptionAddress,
-                    winapi::um::processthreadsapi::GetCurrentThreadId()
+                    unsafe {
+                        exception_pointers
+                            .ExceptionRecord
+                            .as_mut()
+                            .unwrap()
+                            .ExceptionAddress
+                    },
+                    unsafe { winapi::um::processthreadsapi::GetCurrentThreadId() }
                 );
             } else {
                 // log::trace!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
@@ -389,13 +408,15 @@ pub mod windows_exception_handler {
         if data.current_input_ptr.is_null() {
             {
                 log::error!("Double crash\n");
-                let crash_addr = exception_pointers
-                    .as_mut()
-                    .unwrap()
-                    .ExceptionRecord
-                    .as_mut()
-                    .unwrap()
-                    .ExceptionAddress as usize;
+                let crash_addr = unsafe {
+                    exception_pointers
+                        .as_mut()
+                        .unwrap()
+                        .ExceptionRecord
+                        .as_mut()
+                        .unwrap()
+                        .ExceptionAddress as usize
+                };
 
                 log::error!(
                     "We crashed at addr 0x{crash_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
@@ -412,15 +433,15 @@ pub mod windows_exception_handler {
 
             // TODO tell the parent to not restart
         } else {
-            let executor = data.executor_mut::<E>();
+            let executor = unsafe { data.executor_mut::<E>() };
             // reset timer
             if data.ptp_timer.is_some() {
                 data.ptp_timer = None;
             }
 
-            let state = data.state_mut::<S>();
-            let fuzzer = data.fuzzer_mut::<Z>();
-            let event_mgr = data.event_mgr_mut::<EM>();
+            let state = unsafe { data.state_mut::<S>() };
+            let fuzzer = unsafe { data.fuzzer_mut::<Z>() };
+            let event_mgr = unsafe { data.event_mgr_mut::<EM>() };
 
             if is_crash {
                 log::error!("Child crashed!");
@@ -432,7 +453,7 @@ pub mod windows_exception_handler {
             if is_crash {
                 log::warn!("Running observers and exiting!");
                 // // I want to disable the hooks before doing anything, especially before taking a stack dump
-                let input = data.take_current_input::<I>(); // log::set_max_level(log::LevelFilter::Trace);
+                let input = unsafe { data.take_current_input::<I>() };
                 run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                     executor,
                     state,
@@ -459,7 +480,9 @@ pub mod windows_exception_handler {
 
         if is_crash {
             log::info!("Exiting!");
-            ExitProcess(1);
+            unsafe {
+                ExitProcess(1);
+            }
         }
         // log::info!("Not Exiting!");
     }
