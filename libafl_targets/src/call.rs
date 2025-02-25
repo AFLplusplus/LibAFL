@@ -13,7 +13,7 @@ pub static mut FUNCTION_LIST: Lazy<HashMap<usize, usize>> = Lazy::new(HashMap::n
 /// May not be called concurrently.
 pub unsafe extern "C" fn __libafl_target_call_hook(id: usize) {
     let function_list_ptr = &raw mut FUNCTION_LIST;
-    let function_list = &mut *function_list_ptr;
+    let function_list = unsafe { &mut *function_list_ptr };
     *function_list.entry(id).or_insert(0) += 1;
 }
 

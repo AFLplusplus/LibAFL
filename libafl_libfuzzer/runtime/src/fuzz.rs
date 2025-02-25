@@ -141,7 +141,9 @@ where
         .or_else(|_| {
             TcpListener::bind("127.0.0.1:0").map(|sock| {
                 let port = sock.local_addr().unwrap().port();
-                std::env::set_var(PORT_PROVIDER_VAR, port.to_string());
+                unsafe {
+                    std::env::set_var(PORT_PROVIDER_VAR, port.to_string());
+                }
                 port
             })
         })?;

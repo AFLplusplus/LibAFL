@@ -125,11 +125,15 @@ impl ForkserverBytesCoverageSugar<'_> {
 
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
-            shmem.write_to_env("__AFL_SHM_ID").unwrap();
+            unsafe {
+                shmem.write_to_env("__AFL_SHM_ID").unwrap();
+            }
             let shmem_map = shmem.as_slice_mut();
 
             // To let know the AFL++ binary that we have a big map
-            std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
+            unsafe {
+                std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
+            }
 
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {

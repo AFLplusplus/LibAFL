@@ -111,7 +111,10 @@ impl<'a, M, S> MutatorProxy<'a, M, S> {
     /// Create a weak version of the proxy, which will become unusable when the custom mutator
     /// is no longer permitted to be executed.
     #[allow(clippy::type_complexity)] // no longer a problem in nightly
-    fn weak(&self) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool, M, S> {
+    fn weak(
+        &self,
+    ) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool + use<M, S>, M, S>
+    {
         let state = Rc::downgrade(&self.state);
         WeakMutatorProxy {
             accessor: move |f: &mut dyn for<'b> FnMut(&'b mut S)| {
@@ -215,8 +218,8 @@ impl<S, SM> LLVMCustomMutator<S, SM, false> {
     /// Will create the specified libfuzzer custom mutator `mutate` fn.
     /// Only safe if the custom mutator implementation is correct.
     pub unsafe fn mutate(mutator: SM) -> Result<Self, Error> {
-        if libafl_targets_has_libfuzzer_custom_mutator() {
-            Ok(Self::mutate_unchecked(mutator))
+        if unsafe { libafl_targets_has_libfuzzer_custom_mutator() } {
+            Ok(unsafe { Self::mutate_unchecked(mutator) })
         } else {
             Err(Error::illegal_state(
                 "Cowardly refusing to create a LLVMFuzzerMutator if a custom mutator is not defined.",
@@ -244,8 +247,8 @@ impl<S, SM> LLVMCustomMutator<S, SM, true> {
     /// Will create the specified libfuzzer custom crossover mutator.
     /// Only safe if the custom mutator crossover implementation is correct.
     pub unsafe fn crossover(mutator: SM) -> Result<Self, Error> {
-        if libafl_targets_has_libfuzzer_custom_crossover() {
-            Ok(Self::crossover_unchecked(mutator))
+        if unsafe { libafl_targets_has_libfuzzer_custom_crossover() } {
+            Ok(unsafe { Self::crossover_unchecked(mutator) })
         } else {
             Err(Error::illegal_state(
                 "Cowardly refusing to create a LLVMFuzzerMutator if a custom crossover is not defined.",

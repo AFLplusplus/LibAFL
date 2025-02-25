@@ -178,7 +178,7 @@ unsafe fn update_ngram(pos: usize) -> usize {
     #[cfg(feature = "sancov_ngram8")]
     {
         let prev_array_8_ptr = &raw mut PREV_ARRAY_8;
-        let prev_array_8 = &mut *prev_array_8_ptr;
+        let prev_array_8 = unsafe { &mut *prev_array_8_ptr };
         *prev_array_8 = prev_array_8.rotate_elements_right::<1>();
         prev_array_8.shl_assign(SHR_8);
         prev_array_8.as_mut_array()[0] = pos as u32;

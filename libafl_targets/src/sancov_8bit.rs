@@ -23,10 +23,10 @@ fn counter_maps_ptr_mut() -> *mut Vec<OwnedMutSlice<'static, u8>> {
 /// You are responsible for ensuring there is no multi-mutability!
 #[must_use]
 pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
-    let counter_maps = &*counter_maps_ptr();
+    let counter_maps = unsafe { &*counter_maps_ptr() };
     counter_maps
         .iter()
-        .map(|counters| {
+        .map(|counters| unsafe {
             OwnedMutSlice::from_raw_parts_mut(
                 counters.as_slice().as_ptr().cast_mut(),
                 counters.as_slice().len(),
@@ -96,7 +96,7 @@ mod observers {
     use super::{counter_maps_ptr, counter_maps_ptr_mut};
 
     #[must_use]
-    #[export_name = "counters_maps_observer"]
+    #[unsafe(export_name = "counters_maps_observer")]
     /// Create a new [`CountersMultiMapObserver`] of the [`super::COUNTERS_MAPS`].
     ///
     /// This is a special [`libafl::observers::MultiMapObserver`] for the [`super::COUNTERS_MAPS`] and may be used when

@@ -81,5 +81,5 @@ utf8-chars = "3.0.4"
 env_logger = "0.11.5"
 
 [build-dependencies]
-bindgen = "0.70.1"
+bindgen = "0.71.1"
 cc = { version = "1.1.22", features = ["parallel"] }

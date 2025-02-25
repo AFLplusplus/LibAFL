@@ -32,7 +32,9 @@ As you can see from the forkserver example,
 //Coverage map shared between observer and executor
 let mut shmem = StdShMemProvider::new().unwrap().new_shmem(MAP_SIZE).unwrap();
 //let the forkserver know the shmid
-shmem.write_to_env("__AFL_SHM_ID").unwrap();
+unsafe {
+    shmem.write_to_env("__AFL_SHM_ID").unwrap();
+}
 let mut shmem_buf = shmem.as_slice_mut();
 ```
 

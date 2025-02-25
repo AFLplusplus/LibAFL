@@ -468,7 +468,9 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
 
         // Let the Forkserver know the CmpLog shared memory map ID.
-        cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
+        unsafe {
+            cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
+        }
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
         // Create the CmpLog observer.
