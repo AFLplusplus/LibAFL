@@ -21,13 +21,6 @@ sudo mount -o size=128M -t tmpfs none /mnt/libafl_qemu_tmpfs || echo "tmpfs moun
 sudo chown $(id -u):$(id -g) "/mnt/libafl_qemu_tmpfs";
 """
 
-[tasks.remove_ram_disk]
-condition = { files_exist = ["/mnt/libafl_qemu_tmpfs"] }
-script = """
-sudo umount /mnt/libafl_qemu_tmpfs;
-sudo rm -r /mnt/libafl_qemu_tmpfs
-"""
-
 [tasks.build_target]
 dependencies = ["target_dir"]
 command = "nasm"
@@ -60,8 +53,12 @@ script = "sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ${
 dependencies = ["build_fuzzer"]
 
 [tasks.run]
-command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
 dependencies = ["build", "setcap", "convert_target_image"]
+script = """
+${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}
+sudo umount /mnt/libafl_qemu_tmpfs;
+sudo rm -r /mnt/libafl_qemu_tmpfs
+"""
 
 [tasks.default]
 alias = "run"
