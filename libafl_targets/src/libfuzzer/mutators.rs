@@ -21,7 +21,7 @@ use libafl::{
 };
 use libafl_bolts::{AsSlice, HasLen, Named, rands::Rand};
 
-extern "C" {
+unsafe extern "C" {
     fn libafl_targets_has_libfuzzer_custom_mutator() -> bool;
     fn libafl_targets_libfuzzer_custom_mutator(
         data: *mut u8,
@@ -68,7 +68,7 @@ thread_local! {
 /// Mutator which is available for user-defined mutator/crossover
 /// See: [Structure-Aware Fuzzing with libFuzzer](https://github.com/google/fuzzing/blob/master/docs/structure-aware-fuzzing.md)
 #[allow(non_snake_case)] // expect breaks here for some reason
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     MUTATOR.with(|mutator| {
         if let Ok(mut mutator) = mutator.try_borrow_mut() {

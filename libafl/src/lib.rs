@@ -96,7 +96,7 @@ pub mod prelude {
 
 #[cfg(all(any(doctest, test), not(feature = "std")))]
 /// Provide custom time in `no_std` tests.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn external_current_millis() -> u64 {
     // TODO: use "real" time here
     1000

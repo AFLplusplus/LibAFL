@@ -53,12 +53,12 @@ use crate::{
     utils::disas_count,
 };
 
-extern "C" {
+unsafe extern "C" {
     fn __register_frame(begin: *mut c_void);
 }
 
 #[cfg(not(target_vendor = "apple"))]
-extern "C" {
+unsafe extern "C" {
     fn tls_ptr() -> *const c_void;
 }
 

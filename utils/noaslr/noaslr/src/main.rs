@@ -3,7 +3,7 @@ mod args;
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 use {
     crate::args::Args,
-    anyhow::{anyhow, Result},
+    anyhow::{Result, anyhow},
     clap::Parser,
     nix::unistd::execvp,
     std::ffi::CString,
@@ -11,7 +11,7 @@ use {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use {
     crate::args::Args,
-    anyhow::{anyhow, Result},
+    anyhow::{Result, anyhow},
     clap::Parser,
     nix::{
         sys::{personality, personality::Persona},

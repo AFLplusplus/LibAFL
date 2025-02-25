@@ -24,7 +24,7 @@ use crate::inputs::{HasMutatorBytes, ResizableMutator};
 /// # use alloc::vec::Vec;
 /// #
 /// # #[cfg(not(feature = "std"))]
-/// # #[no_mangle]
+/// # #[unsafe(no_mangle)]
 /// # pub extern "C" fn external_current_millis() -> u64 { 0 }
 ///
 /// let mut bytes_input = BytesInput::new(vec![1, 2, 3]);
@@ -49,7 +49,7 @@ use crate::inputs::{HasMutatorBytes, ResizableMutator};
 /// # use alloc::vec::Vec;
 /// #
 /// # #[cfg(not(feature = "std"))]
-/// # #[no_mangle]
+/// # #[unsafe(no_mangle)]
 /// # pub extern "C" fn external_current_millis() -> u64 { 0 }
 ///
 /// let mut bytes_input = BytesInput::new(vec![1, 2, 3, 4, 5]);

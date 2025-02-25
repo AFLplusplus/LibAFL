@@ -574,7 +574,7 @@ where
     fuzz_single(initial_state, mgr, 0)
 }
 
-extern "C" {
+unsafe extern "C" {
     // redeclaration against libafl_targets because the pointers in our case may be mutable
     fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
 }
@@ -591,7 +591,7 @@ pub const STDERR_FD_VAR: &str = "_LIBAFL_LIBFUZZER_STDERR_FD";
 /// This will then call the (potentially unsafe) harness.
 /// The fuzzer itself should catch any side effects and, hence be reasonably safe, if the `harness_fn` parameter is correct.
 #[expect(clippy::similar_names)]
-#[no_mangle]
+#[unsafe(no_mangle)]mangle)]
 pub unsafe extern "C" fn LLVMFuzzerRunDriver(
     argc: *mut c_int,
     argv: *mut *mut *const c_char,

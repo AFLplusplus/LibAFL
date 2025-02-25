@@ -437,7 +437,7 @@ pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
 };
 
 /// The globale `CmpLog` map, aflpp style
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[cfg(feature = "cmplog_extended_instrumentation")]
 pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
     headers: [AFLppCmpLogHeader::new_with_raw_value(0); CMPLOG_MAP_W],

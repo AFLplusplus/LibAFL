@@ -57,7 +57,7 @@ pub use owned_map::*;
 /// # #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
 /// # unsafe { MapFeedbackMetadata::<u8>::register() }
 /// # #[cfg(not(feature = "std"))]
-/// # #[no_mangle]
+/// # #[unsafe(no_mangle)]
 /// # pub extern "C" fn external_current_millis() -> u64 { 0 }
 ///
 /// use libafl_bolts::ownedref::OwnedMutSlice;

@@ -192,7 +192,7 @@ unsafe fn update_ngram(pos: usize) -> usize {
     pos
 }
 
-extern "C" {
+unsafe extern "C" {
     /// The ctx variable
     pub static mut __afl_prev_ctx: u32;
 }
@@ -202,50 +202,52 @@ extern "C" {
 /// # Safety
 /// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
 /// Should usually not be called directly.
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[allow(unused_assignments)] // cfg dependent
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
-    #[allow(unused_variables, unused_mut)] // cfg dependent
-    let mut pos = *guard as usize;
+    unsafe {
+        #[allow(unused_variables, unused_mut)] // cfg dependent
+        let mut pos = *guard as usize;
 
-    #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
-    {
-        pos = update_ngram(pos);
-        // println!("Wrinting to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
-    }
+        #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+        {
+            pos = update_ngram(pos);
+            // println!("Wrinting to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
+        }
 
-    #[cfg(feature = "sancov_ctx")]
-    {
-        pos ^= __afl_prev_ctx as usize;
-        // println!("Wrinting to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
-    }
+        #[cfg(feature = "sancov_ctx")]
+        {
+            pos ^= __afl_prev_ctx as usize;
+            // println!("Wrinting to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
+        }
 
-    #[cfg(feature = "pointer_maps")]
-    {
-        #[cfg(feature = "sancov_pcguard_edges")]
+        #[cfg(feature = "pointer_maps")]
         {
-            EDGES_MAP_PTR.add(pos).write(1);
+            #[cfg(feature = "sancov_pcguard_edges")]
+            {
+                EDGES_MAP_PTR.add(pos).write(1);
+            }
+            #[cfg(feature = "sancov_pcguard_hitcounts")]
+            {
+                let addr = EDGES_MAP_PTR.add(pos);
+                let val = addr.read().wrapping_add(1);
+                addr.write(val);
+            }
         }
-        #[cfg(feature = "sancov_pcguard_hitcounts")]
+        #[cfg(not(feature = "pointer_maps"))]
+        #[cfg(any(feature = "sancov_pcguard_hitcounts", feature = "sancov_pcguard_edges"))]
         {
-            let addr = EDGES_MAP_PTR.add(pos);
-            let val = addr.read().wrapping_add(1);
-            addr.write(val);
-        }
-    }
-    #[cfg(not(feature = "pointer_maps"))]
-    #[cfg(any(feature = "sancov_pcguard_hitcounts", feature = "sancov_pcguard_edges"))]
-    {
-        let edges_map_ptr = &raw mut EDGES_MAP;
-        let edges_map = &mut *edges_map_ptr;
-        #[cfg(feature = "sancov_pcguard_edges")]
-        {
-            *(edges_map).get_unchecked_mut(pos) = 1;
-        }
-        #[cfg(feature = "sancov_pcguard_hitcounts")]
-        {
-            let val = (*edges_map.get_unchecked(pos)).wrapping_add(1);
-            *edges_map.get_unchecked_mut(pos) = val;
+            let edges_map_ptr = &raw mut EDGES_MAP;
+            let edges_map = &mut *edges_map_ptr;
+            #[cfg(feature = "sancov_pcguard_edges")]
+            {
+                *(edges_map).get_unchecked_mut(pos) = 1;
+            }
+            #[cfg(feature = "sancov_pcguard_hitcounts")]
+            {
+                let val = (*edges_map.get_unchecked(pos)).wrapping_add(1);
+                *edges_map.get_unchecked_mut(pos) = val;
+            }
         }
     }
 }
@@ -254,59 +256,63 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 ///
 /// # Safety
 /// Dereferences at `start` and writes to it.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {
-    #[cfg(feature = "pointer_maps")]
-    if EDGES_MAP_PTR.is_null() {
-        EDGES_MAP_PTR = &raw mut EDGES_MAP as *mut u8;
-    }
-
-    if start == stop || *start != 0 {
-        return;
-    }
-
-    while start < stop {
-        *start = MAX_EDGES_FOUND as u32;
-        start = start.offset(1);
-
+    unsafe {
         #[cfg(feature = "pointer_maps")]
-        {
-            MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1) % EDGES_MAP_ALLOCATED_SIZE;
+        if EDGES_MAP_PTR.is_null() {
+            EDGES_MAP_PTR = &raw mut EDGES_MAP as *mut u8;
         }
-        #[cfg(not(feature = "pointer_maps"))]
-        {
-            let edges_map_ptr = &raw const EDGES_MAP;
-            let edges_map_len = (*edges_map_ptr).len();
-            MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1);
-            assert!(
-                (MAX_EDGES_FOUND <= edges_map_len),
-                "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({edges_map_len}). Use the LIBAFL_EDGES_MAP_DEFAULT_SIZE env to increase it at compile time."
-            );
+
+        if start == stop || *start != 0 {
+            return;
+        }
+
+        while start < stop {
+            *start = MAX_EDGES_FOUND as u32;
+            start = start.offset(1);
+
+            #[cfg(feature = "pointer_maps")]
+            {
+                MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1) % EDGES_MAP_ALLOCATED_SIZE;
+            }
+            #[cfg(not(feature = "pointer_maps"))]
+            {
+                let edges_map_ptr = &raw const EDGES_MAP;
+                let edges_map_len = (*edges_map_ptr).len();
+                MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1);
+                assert!(
+                    (MAX_EDGES_FOUND <= edges_map_len),
+                    "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({edges_map_len}). Use the LIBAFL_EDGES_MAP_DEFAULT_SIZE env to increase it at compile time."
+                );
+            }
         }
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn __sanitizer_cov_pcs_init(pcs_beg: *const usize, pcs_end: *const usize) {
     // "The Unsafe Code Guidelines also notably defines that usize and isize are respectively compatible with uintptr_t and intptr_t defined in C."
-    let len = pcs_end.offset_from(pcs_beg);
-    let Ok(len) = usize::try_from(len) else {
-        panic!("Invalid PC Table bounds - start: {pcs_beg:x?} end: {pcs_end:x?}")
-    };
-    assert_eq!(
-        len % 2,
-        0,
-        "PC Table size is not evens - start: {pcs_beg:x?} end: {pcs_end:x?}"
-    );
-    assert_eq!(
-        (pcs_beg as usize) % align_of::<PcTableEntry>(),
-        0,
-        "Unaligned PC Table - start: {pcs_beg:x?} end: {pcs_end:x?}"
-    );
+    unsafe {
+        let len = pcs_end.offset_from(pcs_beg);
+        let Ok(len) = usize::try_from(len) else {
+            panic!("Invalid PC Table bounds - start: {pcs_beg:x?} end: {pcs_end:x?}")
+        };
+        assert_eq!(
+            len % 2,
+            0,
+            "PC Table size is not evens - start: {pcs_beg:x?} end: {pcs_end:x?}"
+        );
+        assert_eq!(
+            (pcs_beg as usize) % align_of::<PcTableEntry>(),
+            0,
+            "Unaligned PC Table - start: {pcs_beg:x?} end: {pcs_end:x?}"
+        );
 
-    let pc_tables_ptr = &raw mut PC_TABLES;
-    let pc_tables = &mut *pc_tables_ptr;
-    pc_tables.push(slice::from_raw_parts(pcs_beg as *const PcTableEntry, len));
+        let pc_tables_ptr = &raw mut PC_TABLES;
+        let pc_tables = &mut *pc_tables_ptr;
+        pc_tables.push(slice::from_raw_parts(pcs_beg as *const PcTableEntry, len));
+    }
 }
 
 /// An entry to the `sanitizer_cov` `pc_table`

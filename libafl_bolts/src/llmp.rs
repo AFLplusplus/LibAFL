@@ -1392,12 +1392,17 @@ where
 
     /// Store the info to this sender to env.
     /// A new client can reattach to it using [`LlmpSender::on_existing_from_env()`].
+    ///
+    /// # Safety
+    /// Writes to env variables and may only be done single-threaded.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
-        let current_out_shmem = self.out_shmems.last().unwrap();
-        current_out_shmem.shmem.write_to_env(env_name)?;
-        Self::client_id_to_env(env_name, self.id);
-        unsafe { current_out_shmem.msg_to_env(self.last_msg_sent, env_name) }
+    pub unsafe fn to_env(&self, env_name: &str) -> Result<(), Error> {
+        unsafe {
+            let current_out_shmem = self.out_shmems.last().unwrap();
+            current_out_shmem.shmem.write_to_env(env_name)?;
+            Self::client_id_to_env(env_name, self.id);
+            current_out_shmem.msg_to_env(self.last_msg_sent, env_name)
+        }
     }
 
     /// Waits for this sender to be save to unmap.
@@ -1932,10 +1937,15 @@ where
 {
     /// Store the info to this receiver to env.
     /// A new client can reattach to it using [`LlmpReceiver::on_existing_from_env()`]
+    ///
+    /// # Safety
+    /// Alters the env. Should only be called from a single thread.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
+    pub unsafe fn to_env(&self, env_name: &str) -> Result<(), Error> {
         let current_out_shmem = &self.current_recv_shmem;
-        current_out_shmem.shmem.write_to_env(env_name)?;
+        unsafe {
+            current_out_shmem.shmem.write_to_env(env_name)?;
+        }
         unsafe { current_out_shmem.msg_to_env(self.last_msg_recvd, env_name) }
     }
 
@@ -3804,10 +3814,15 @@ where
 
     /// Write the current state to env.
     /// A new client can attach to exactly the same state by calling [`LlmpClient::on_existing_shmem()`].
+    ///
+    /// # Safety
+    /// Writes to env variables and may only be done single-threaded.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
-        self.sender.to_env(&format!("{env_name}_SENDER"))?;
-        self.receiver.to_env(&format!("{env_name}_RECEIVER"))
+    pub unsafe fn to_env(&self, env_name: &str) -> Result<(), Error> {
+        unsafe {
+            self.sender.to_env(&format!("{env_name}_SENDER"))?;
+            self.receiver.to_env(&format!("{env_name}_RECEIVER"))
+        }
     }
 
     /// Describe this client in a way that it can be recreated, for example after crash
@@ -3885,7 +3900,11 @@ mod tests {
         // Send stuff
         client.send_buf(tag, &arr).unwrap();
 
-        client.to_env("_ENV_TEST").unwrap();
+        // # Safety
+        // Test only. Should run one instance.
+        unsafe {
+            client.to_env("_ENV_TEST").unwrap();
+        }
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         log::info!("{:?}", std::env::vars());
 

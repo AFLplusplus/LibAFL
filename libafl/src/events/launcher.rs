@@ -475,10 +475,14 @@ where
 
                             let client_description =
                                 ClientDescription::new(index, overcommit_i, core_id);
-                            std::env::set_var(
-                                _AFL_LAUNCHER_CLIENT,
-                                client_description.to_safe_string(),
-                            );
+                            // # Safety
+                            // This is set only once, in here, for the child.
+                            unsafe {
+                                std::env::set_var(
+                                    _AFL_LAUNCHER_CLIENT,
+                                    client_description.to_safe_string(),
+                                );
+                            }
                             let mut child = startable_self()?;
                             let child = (if debug_output {
                                 &mut child

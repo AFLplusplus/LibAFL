@@ -516,7 +516,7 @@ pub const unsafe fn sig_ign() -> NativeSignalHandlerType {
 }
 
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);
-extern "C" {
+unsafe extern "C" {
     pub fn signal(signum: i32, func: NativeSignalHandlerType) -> *const c_void;
 }
 

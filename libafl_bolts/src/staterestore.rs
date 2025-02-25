@@ -84,8 +84,11 @@ where
     }
 
     /// Writes this [`StateRestorer`] to env variable, to be restored later
-    pub fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
-        self.shmem.write_to_env(env_name)
+    ///
+    /// # Safety
+    /// Alters the env. Should only be called from a single thread.
+    pub unsafe fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
+        unsafe { self.shmem.write_to_env(env_name) }
     }
 
     /// Create a [`StateRestorer`] from `env` variable name

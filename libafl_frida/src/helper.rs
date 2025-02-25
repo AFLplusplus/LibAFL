@@ -544,7 +544,7 @@ impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
 /// A callback function to test calling back from FRIDA's JavaScript scripting support
 /// # Safety
 /// This function receives a raw pointer to a C string
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn test_function(message: *const gchar) {
     if let Ok(msg) = CStr::from_ptr(message).to_str() {
         println!("{msg}");

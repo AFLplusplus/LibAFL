@@ -256,8 +256,11 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
     }
 
     /// Write this map's config to env
+    ///
+    /// # Safety
+    /// Writes to env variables and may only be done single-threaded.
     #[cfg(feature = "std")]
-    fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
+    unsafe fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
         let map_size = self.len();
         let map_size_env = format!("{env_name}_SIZE");
         // TODO: Audit that the environment access only happens in single-threaded code.

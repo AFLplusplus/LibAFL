@@ -115,7 +115,7 @@ use libafl_bolts::ownedref::OwnedMutSlice;
     feature = "sancov_ctx"
 ))]
 pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
-    OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), edges_max_num())
+    unsafe { OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), edges_max_num()) }
 }
 
 /// Gets a new [`StdMapObserver`] from the current [`edges_map_mut_slice`].
@@ -156,7 +156,7 @@ pub unsafe fn std_edges_map_observer<'a, S>(name: S) -> StdMapObserver<'a, u8, f
 where
     S: Into<Cow<'static, str>>,
 {
-    StdMapObserver::from_mut_slice(name, edges_map_mut_slice())
+    unsafe { StdMapObserver::from_mut_slice(name, edges_map_mut_slice()) }
 }
 
 /// Gets the current edges map pt

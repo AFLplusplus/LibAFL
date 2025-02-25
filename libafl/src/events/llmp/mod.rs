@@ -242,9 +242,14 @@ where
     }
 
     /// Write the config for a client `EventManager` to env vars, a new client can reattach using [`LlmpEventConverterBuilder::build_existing_client_from_env()`].
+    ///
+    /// # Safety
+    /// Writes to env variables and may only be done single-threaded.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) {
-        self.llmp.to_env(env_name).unwrap();
+    pub unsafe fn to_env(&self, env_name: &str) {
+        unsafe {
+            self.llmp.to_env(env_name).unwrap();
+        }
     }
 
     // Handle arriving events in the client

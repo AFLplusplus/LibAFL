@@ -14,7 +14,7 @@ extern {
     fn return_address() -> usize;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __sanitizer_cov_trace_cmp1(arg1: u8, arg2: u8) {
     let mut pos = return_address();
     pos = (pos >> 4) ^ (pos << 8);

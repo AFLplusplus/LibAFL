@@ -568,7 +568,9 @@ where
     /// client can reattach using [`LlmpEventManagerBuilder::build_existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
-        self.llmp.to_env(env_name).unwrap();
+        unsafe {
+            self.llmp.to_env(env_name).unwrap();
+        }
     }
 
     /// Get the staterestorer
@@ -872,7 +874,11 @@ where
             }
 
             // We are the fuzzer respawner in a llmp client
-            mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+            // # Safety
+            // There should only ever be one launcher thread.
+            unsafe {
+                mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+            }
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]

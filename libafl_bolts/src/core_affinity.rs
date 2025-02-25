@@ -613,7 +613,7 @@ mod apple {
 
     #[cfg(target_arch = "x86_64")]
     #[link(name = "System", kind = "framework")]
-    extern "C" {
+    unsafe extern "C" {
         fn thread_policy_set(
             thread: thread_t,
             flavor: thread_policy_flavor_t,

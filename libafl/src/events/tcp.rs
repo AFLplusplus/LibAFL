@@ -574,8 +574,13 @@ where
     S: HasExecutions + HasMetadata + HasImported + Stoppable,
 {
     /// Write the client id for a client `EventManager` to env vars
-    pub fn to_env(&self, env_name: &str) {
-        env::set_var(env_name, format!("{}", self.client_id.0));
+    ///
+    /// # Safety
+    /// This writes to env variables, and may only be done single-threaded
+    pub unsafe fn to_env(&self, env_name: &str) {
+        unsafe {
+            env::set_var(env_name, format!("{}", self.client_id.0));
+        }
     }
 }
 
@@ -1142,7 +1147,11 @@ where
             }
 
             // We are the fuzzer respawner in a tcp client
-            mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+            // # Safety
+            // There should only ever be one thread doing launcher things.
+            unsafe {
+                mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+            }
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]

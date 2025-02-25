@@ -13,7 +13,7 @@ use libafl::{
 /// Asan death callback type
 pub type CB = unsafe extern "C" fn() -> ();
 
-extern "C" {
+unsafe extern "C" {
     fn __sanitizer_set_death_callback(cb: Option<CB>);
 }
 
