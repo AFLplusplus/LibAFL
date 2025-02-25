@@ -39,5 +39,7 @@ where
     Z: HasObjective<Objective = OF>,
     I: Input + Clone,
 {
-    __sanitizer_set_death_callback(Some(asan_death_handler::<E, EM, I, OF, S, Z>));
+    unsafe {
+        __sanitizer_set_death_callback(Some(asan_death_handler::<E, EM, I, OF, S, Z>));
+    }
 }

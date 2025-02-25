@@ -169,7 +169,7 @@ use crate::{Error, observers::Observer};
 ///        assert_eq!(compare_vec, *(&*(&raw const STDERR)).unwrap());
 ///        // stdout will still contain data, we're just checking that there is an error message
 ///    }
-///
+/// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct OutputObserver<T> {
