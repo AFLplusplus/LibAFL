@@ -7,8 +7,8 @@ use core::{
 };
 
 use libafl_bolts::{
-    subrange::{end_index, start_index, sub_range},
     HasLen,
+    subrange::{end_index, start_index, sub_range},
 };
 
 use crate::inputs::{HasMutatorBytes, ResizableMutator};
@@ -215,7 +215,7 @@ mod tests {
 
     use crate::{
         inputs::{BytesInput, HasMutatorBytes, NopInput, ResizableMutator},
-        mutators::{havoc_mutations_no_crossover, MutatorsTuple},
+        mutators::{MutatorsTuple, havoc_mutations_no_crossover},
         state::NopState,
     };
 

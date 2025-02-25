@@ -7,7 +7,7 @@ use core::mem::size_of;
 use core::{
     cell::UnsafeCell,
     ptr::{self, write_volatile},
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
 };
 use core::{
     fmt::{self, Display, Formatter},
@@ -161,7 +161,6 @@ pub struct arm_thread_state64 {
 #[derive(Debug)]
 #[repr(C, align(16))]
 #[allow(non_camel_case_types)] // expect breaks for some reason
-                               //#[repr(align(16))]
 pub struct arm_neon_state64 {
     /// opaque
     pub opaque: [u8; (32 * 16) + (2 * size_of::<u32>())],
@@ -254,21 +253,21 @@ use libc::ssize_t;
     all(target_vendor = "apple", target_arch = "aarch64")
 )))]
 pub use libc::ucontext_t;
-use libc::{
-    c_int, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE, SIGQUIT,
-    SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
-};
-pub use libc::{c_void, siginfo_t};
 #[cfg(feature = "alloc")]
 use libc::{
-    malloc, sigaction, sigaddset, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
-    SA_SIGINFO,
+    SA_NODEFER, SA_ONSTACK, SA_SIGINFO, malloc, sigaction, sigaddset, sigaltstack, sigemptyset,
+    stack_t,
 };
+use libc::{
+    SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE, SIGQUIT, SIGSEGV,
+    SIGTERM, SIGTRAP, SIGUSR2, c_int,
+};
+pub use libc::{c_void, siginfo_t};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::Error;
 
-extern "C" {
+unsafe extern "C" {
     /// The `libc` `getcontext`
     /// For some reason, it's not available on `MacOS`.
     fn getcontext(ucp: *mut ucontext_t) -> c_int;
@@ -436,18 +435,20 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 /// unless the signal handlers registered using [`setup_signal_handler()`] are broken.
 #[cfg(feature = "alloc")]
 unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
-    let signal = &Signal::try_from(sig).unwrap();
-    let handler = {
-        match &SIGNAL_HANDLERS[*signal as usize] {
-            Some(handler_holder) => &mut **handler_holder.handler.get(),
-            None => return,
-        }
-    };
-    handler.handle(
-        *signal,
-        &mut ptr::read_unaligned(info),
-        (void as *mut ucontext_t).as_mut(),
-    );
+    unsafe {
+        let signal = &Signal::try_from(sig).unwrap();
+        let handler = {
+            match &SIGNAL_HANDLERS[*signal as usize] {
+                Some(handler_holder) => &mut **handler_holder.handler.get(),
+                None => return,
+            }
+        };
+        handler.handle(
+            *signal,
+            &mut ptr::read_unaligned(info),
+            (void as *mut ucontext_t).as_mut(),
+        );
+    }
 }
 
 /// Setup signal handlers in a somewhat rusty way.
@@ -465,47 +466,49 @@ unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
 pub unsafe fn setup_signal_handler<T: 'static + SignalHandler>(
     handler: *mut T,
 ) -> Result<(), Error> {
-    // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
-    if SIGNAL_STACK_PTR.is_null() {
-        SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
+    unsafe {
+        // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
+        if SIGNAL_STACK_PTR.is_null() {
+            SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
 
-        // Rust always panics on OOM, so we will, too.
-        assert!(
-            !SIGNAL_STACK_PTR.is_null(),
-            "Failed to allocate signal stack with {SIGNAL_STACK_SIZE} bytes!"
-        );
-    }
-    let mut ss: stack_t = mem::zeroed();
-    ss.ss_size = SIGNAL_STACK_SIZE;
-    ss.ss_sp = SIGNAL_STACK_PTR;
-    sigaltstack(&raw mut ss, ptr::null_mut() as _);
-
-    let mut sa: sigaction = mem::zeroed();
-    sigemptyset(&raw mut sa.sa_mask);
-    sigaddset(&raw mut sa.sa_mask, SIGALRM);
-    sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
-    sa.sa_sigaction = handle_signal as usize;
-    let signals = unsafe { (*handler).signals() };
-    for sig in signals {
-        write_volatile(
-            &raw mut SIGNAL_HANDLERS[sig as usize],
-            Some(HandlerHolder {
-                handler: UnsafeCell::new(handler as *mut dyn SignalHandler),
-            }),
-        );
-
-        if sigaction(sig as i32, &raw mut sa, ptr::null_mut()) < 0 {
-            #[cfg(feature = "std")]
-            {
-                let err_str = CString::new(format!("Failed to setup {sig} handler")).unwrap();
-                libc::perror(err_str.as_ptr());
-            }
-            return Err(Error::unknown(format!("Could not set up {sig} handler")));
+            // Rust always panics on OOM, so we will, too.
+            assert!(
+                !SIGNAL_STACK_PTR.is_null(),
+                "Failed to allocate signal stack with {SIGNAL_STACK_SIZE} bytes!"
+            );
         }
-    }
-    compiler_fence(Ordering::SeqCst);
+        let mut ss: stack_t = mem::zeroed();
+        ss.ss_size = SIGNAL_STACK_SIZE;
+        ss.ss_sp = SIGNAL_STACK_PTR;
+        sigaltstack(&raw mut ss, ptr::null_mut() as _);
 
-    Ok(())
+        let mut sa: sigaction = mem::zeroed();
+        sigemptyset(&raw mut sa.sa_mask);
+        sigaddset(&raw mut sa.sa_mask, SIGALRM);
+        sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
+        sa.sa_sigaction = handle_signal as usize;
+        let signals = (*handler).signals();
+        for sig in signals {
+            write_volatile(
+                &raw mut SIGNAL_HANDLERS[sig as usize],
+                Some(HandlerHolder {
+                    handler: UnsafeCell::new(handler as *mut dyn SignalHandler),
+                }),
+            );
+
+            if sigaction(sig as i32, &raw mut sa, ptr::null_mut()) < 0 {
+                #[cfg(feature = "std")]
+                {
+                    let err_str = CString::new(format!("Failed to setup {sig} handler")).unwrap();
+                    libc::perror(err_str.as_ptr());
+                }
+                return Err(Error::unknown(format!("Could not set up {sig} handler")));
+            }
+        }
+        compiler_fence(Ordering::SeqCst);
+
+        Ok(())
+    }
 }
 
 /// Function to get the current [`ucontext_t`] for this process.

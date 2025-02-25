@@ -242,7 +242,7 @@ where
 /// Start the timer
 #[macro_export]
 macro_rules! start_timer {
-    ($state:expr) => {{
+    ($state:expr_2021) => {{
         // Start the timer
         #[cfg(feature = "introspection")]
         $state.introspection_stats_mut().start_timer();
@@ -252,7 +252,7 @@ macro_rules! start_timer {
 /// Mark the elapsed time for the given feature
 #[macro_export]
 macro_rules! mark_feature_time {
-    ($state:expr, $feature:expr) => {{
+    ($state:expr_2021, $feature:expr_2021) => {{
         // Mark the elapsed time for the given feature
         #[cfg(feature = "introspection")]
         $state.introspection_stats_mut().mark_feature_time($feature);
@@ -262,7 +262,7 @@ macro_rules! mark_feature_time {
 /// Mark the elapsed time for the given feature
 #[macro_export]
 macro_rules! mark_feedback_time {
-    ($state:expr) => {{
+    ($state:expr_2021) => {{
         // Mark the elapsed time for the given feature
         #[cfg(feature = "introspection")]
         $state.introspection_stats_mut().mark_feedback_time();
@@ -297,7 +297,7 @@ mod test {
     use libafl_bolts::ClientId;
     use tuple_list::tuple_list;
 
-    use super::{stats::ClientStatsManager, Monitor, NopMonitor, SimpleMonitor};
+    use super::{Monitor, NopMonitor, SimpleMonitor, stats::ClientStatsManager};
 
     #[test]
     fn test_monitor_tuple_list() {

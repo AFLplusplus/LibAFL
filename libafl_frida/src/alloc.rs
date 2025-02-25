@@ -798,7 +798,9 @@ impl Allocator {
                         self.using_pre_allocated_shadow_mapping = true;
                         break;
                     }
-                    log::warn!("shadow_bit {try_shadow_bit:} is not suitable - failed to allocate shadow memory");
+                    log::warn!(
+                        "shadow_bit {try_shadow_bit:} is not suitable - failed to allocate shadow memory"
+                    );
                 }
             }
         }

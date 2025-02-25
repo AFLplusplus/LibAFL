@@ -9,18 +9,18 @@ use core::{
 
 use libafl_bolts::{
     shmem::ShMemProvider,
-    tuples::{tuple_list, RefIndexable},
+    tuples::{RefIndexable, tuple_list},
 };
-use nix::unistd::{fork, ForkResult};
+use nix::unistd::{ForkResult, fork};
 
 use crate::{
+    Error,
     executors::{
-        hooks::ExecutorHooksTuple, inprocess_fork::GenericInProcessForkExecutorInner, Executor,
-        ExitKind, HasObservers,
+        Executor, ExitKind, HasObservers, hooks::ExecutorHooksTuple,
+        inprocess_fork::GenericInProcessForkExecutorInner,
     },
     observers::ObserversTuple,
     state::HasExecutions,
-    Error,
 };
 
 /// The `StatefulInProcessForkExecutor` with no user hooks

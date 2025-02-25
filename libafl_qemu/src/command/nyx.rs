@@ -22,20 +22,20 @@ use libc::c_uint;
 use paste::paste;
 
 use crate::{
+    Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
+    IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
     command::{
+        CommandError, CommandManager, IsCommand, NativeCommandParser,
         parser::nyx::{
             AcquireCommandParser, GetHostConfigCommandParser, GetPayloadCommandParser,
             NextPayloadCommandParser, PanicCommandParser, PrintfCommandParser,
             RangeSubmitCommandParser, ReleaseCommandParser, SetAgentConfigCommandParser,
             SubmitCR3CommandParser, SubmitPanicCommandParser, UserAbortCommandParser,
         },
-        CommandError, CommandManager, IsCommand, NativeCommandParser,
     },
     get_exit_arch_regs,
-    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
+    modules::{EmulatorModuleTuple, utils::filters::HasAddressFilterTuples},
     sync_exit::ExitArgs,
-    Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
-    IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
 };
 
 pub(crate) mod bindings {
@@ -428,8 +428,13 @@ where
         const EMPTY_RANGE: Range<GuestAddr> = 0..0;
 
         if self.allowed_range == EMPTY_RANGE {
-            log::warn!("The given range is {:#x?}, which is most likely invalid. It is most likely a guest error.", EMPTY_RANGE);
-            log::warn!("Hint: make sure the range is not getting optimized out (the volatile keyword may help you).");
+            log::warn!(
+                "The given range is {:#x?}, which is most likely invalid. It is most likely a guest error.",
+                EMPTY_RANGE
+            );
+            log::warn!(
+                "Hint: make sure the range is not getting optimized out (the volatile keyword may help you)."
+            );
         }
 
         emu.modules_mut()

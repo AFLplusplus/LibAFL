@@ -1,6 +1,6 @@
 [package]
 name = "libafl_jumper"
-edition = "2021"
+edition = "2024"
 version.workspace = true
 description = "LibAFL_Jumper: Jump to any address in memory."
 repository = "https://github.com/AFLplusplus/LibAFL/"

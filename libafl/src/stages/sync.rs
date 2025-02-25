@@ -8,16 +8,16 @@ use core::{marker::PhantomData, time::Duration};
 use std::path::{Path, PathBuf};
 
 use libafl_bolts::{
-    current_time,
+    Named, current_time,
     fs::find_new_files_rec,
     shmem::{ShMem, ShMemProvider},
-    Named,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
-    events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
+    events::{Event, EventConfig, EventFirer, llmp::LlmpEventConverter},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter},
@@ -26,7 +26,6 @@ use crate::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,
     },
-    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// Default name for `SyncFromDiskStage`; derived from AFL++

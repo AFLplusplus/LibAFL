@@ -3,7 +3,7 @@
 use crate::CMP_MAP_SIZE;
 
 /// The constant cmplog map for the current `LibAFL` target
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut libafl_cmp_map: [u8; CMP_MAP_SIZE] = [0; CMP_MAP_SIZE];
 
 pub use libafl_cmp_map as CMP_MAP;

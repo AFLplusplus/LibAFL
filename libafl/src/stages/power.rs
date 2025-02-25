@@ -11,19 +11,19 @@ use libafl_bolts::Named;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
+    schedulers::{TestcaseScore, testcase_score::CorpusPowerTestcaseScore},
     stages::{
-        mutational::{MutatedTransform, MutatedTransformPost},
         MutationalStage, Restartable, RetryCountRestartHelper, Stage,
+        mutational::{MutatedTransform, MutatedTransformPost},
     },
     start_timer,
     state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
-    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// The unique id for this stage

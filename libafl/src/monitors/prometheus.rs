@@ -31,16 +31,16 @@ use alloc::{borrow::Cow, fmt::Debug, string::String};
 use core::{fmt, fmt::Write, time::Duration};
 use std::{
     string::ToString,
-    sync::{atomic::AtomicU64, Arc},
+    sync::{Arc, atomic::AtomicU64},
     thread,
 };
 
 // using thread in order to start the HTTP server in a separate thread
 use futures::executor::block_on;
-use libafl_bolts::{current_time, ClientId};
+use libafl_bolts::{ClientId, current_time};
 // using the official rust client library for Prometheus: https://github.com/prometheus/client_rust
 use prometheus_client::{
-    encoding::{text::encode, EncodeLabelSet},
+    encoding::{EncodeLabelSet, text::encode},
     metrics::{family::Family, gauge::Gauge},
     registry::Registry,
 };
@@ -48,8 +48,8 @@ use prometheus_client::{
 use tide::Request;
 
 use crate::monitors::{
-    stats::{manager::ClientStatsManager, user_stats::UserStatsValue},
     Monitor,
+    stats::{manager::ClientStatsManager, user_stats::UserStatsValue},
 };
 
 /// Prometheus metrics for global and each client.

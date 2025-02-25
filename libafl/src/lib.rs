@@ -81,7 +81,7 @@ pub mod stages;
 pub mod state;
 
 pub use fuzzer::*;
-pub use libafl_bolts::{nonzero, Error};
+pub use libafl_bolts::{Error, nonzero};
 
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
@@ -116,6 +116,7 @@ mod tests {
     #[cfg(miri)]
     use crate::stages::ExecutionCountRestartHelperMetadata;
     use crate::{
+        StdFuzzer,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
@@ -123,11 +124,10 @@ mod tests {
         fuzzer::Fuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
-        mutators::{mutations::BitFlipMutator, StdScheduledMutator},
+        mutators::{StdScheduledMutator, mutations::BitFlipMutator},
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
-        StdFuzzer,
     };
 
     #[test]

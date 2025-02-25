@@ -14,7 +14,7 @@ use std::vec::Vec;
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
-use crate::{observers::Observer, Error};
+use crate::{Error, observers::Observer};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.

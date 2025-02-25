@@ -3,8 +3,9 @@
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
+    Error, HasMetadata,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
     executors::forkserver::ForkserverExecutor,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -13,22 +14,21 @@ use libafl::{
     monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, StdScheduledMutator},
+        scheduled::{StdScheduledMutator, tokens_mutations},
         token_mutations::Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
-    Error, HasMetadata,
 };
 use libafl_bolts::{
+    AsSliceMut,
     core_affinity::Cores,
     nonzero,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
-    AsSliceMut,
+    tuples::{Handled, Merge, tuple_list},
 };
 use typed_builder::TypedBuilder;
 

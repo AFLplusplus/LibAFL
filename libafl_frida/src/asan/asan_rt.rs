@@ -16,14 +16,14 @@ use std::{
 };
 
 use backtrace::Backtrace;
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
-    Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
+    Gum, Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
+    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
@@ -42,13 +42,13 @@ use yaxpeax_x86::{
 
 #[cfg(target_arch = "x86_64")]
 use crate::utils::frida_to_cs;
+#[cfg(target_arch = "x86_64")]
+use crate::utils::{AccessType, operand_details};
 #[cfg(target_arch = "aarch64")]
 use crate::utils::{instruction_width, writer_register};
-#[cfg(target_arch = "x86_64")]
-use crate::utils::{operand_details, AccessType};
 use crate::{
     alloc::Allocator,
-    asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
+    asan::errors::{ASAN_ERRORS, AsanError, AsanErrors, AsanReadWriteError},
     helper::{FridaRuntime, SkipRange},
     utils::disas_count,
 };
@@ -144,7 +144,7 @@ impl Lock {
 }
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
-use errno::{errno, set_errno, Errno};
+use errno::{Errno, errno, set_errno};
 #[cfg(target_os = "windows")]
 use winapi::shared::minwindef::DWORD;
 /// We need to save and restore the last error in the hooks
@@ -452,7 +452,7 @@ impl AsanRuntime {
         let (stack_start, stack_end) = Self::current_stack();
         let (tls_start, tls_end) = Self::current_tls();
         println!(
-            "registering thread {:?} with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}", 
+            "registering thread {:?} with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}",
             get_thread_id()
         );
         self.allocator_mut()
@@ -1690,9 +1690,9 @@ impl AsanRuntime {
         )[0];
 
         if insn.opcode == Opcode::MSR && insn.operands[0] == Operand::SystemReg(23056) { //the first operand is nzcv
-             //What case is this for??
-             /*insn = instructions.get(2).unwrap();
-             actual_pc = insn.address() as usize;*/
+            //What case is this for??
+            /*insn = instructions.get(2).unwrap();
+            actual_pc = insn.address() as usize;*/
         }
 
         let operands_len = insn

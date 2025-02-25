@@ -3,8 +3,8 @@ use std::{
     fmt::{Debug, Display, Formatter},
     hash::{Hash, Hasher},
     sync::{
-        atomic::{AtomicU64, Ordering},
         OnceLock,
+        atomic::{AtomicU64, Ordering},
     },
 };
 

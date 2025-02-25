@@ -16,11 +16,11 @@ use std::{
 };
 
 use ahash::RandomState;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    shmem::{ShMem, ShMemProvider},
     AsSlice, Error,
+    shmem::{ShMem, ShMemProvider},
 };
 
 /// If the saved page content equals exactly this buf, the restarted child wants to exit cleanly.
@@ -52,7 +52,10 @@ impl StateShMemContent {
     pub fn buf_len_checked(&self, shmem_size: usize) -> Result<usize, Error> {
         let buf_len = unsafe { read_volatile(&self.buf_len) };
         if size_of::<StateShMemContent>() + buf_len > shmem_size {
-            Err(Error::illegal_state(format!("Stored buf_len is larger than the shared map! Shared data corrupted? Expected {shmem_size} bytes max, but got {} (buf_len {buf_len})", size_of::<StateShMemContent>() + buf_len)))
+            Err(Error::illegal_state(format!(
+                "Stored buf_len is larger than the shared map! Shared data corrupted? Expected {shmem_size} bytes max, but got {} (buf_len {buf_len})",
+                size_of::<StateShMemContent>() + buf_len
+            )))
         } else {
             Ok(buf_len)
         }

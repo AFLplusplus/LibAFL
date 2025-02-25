@@ -2,14 +2,14 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::fmt::Debug;
 
 use libafl::{
+    Error, HasMetadata,
     executors::ExitKind,
     observers::{
-        cmp::{AFLppCmpValuesMetadata, CmpMap, CmpObserver, CmpValues},
         Observer,
+        cmp::{AFLppCmpValuesMetadata, CmpMap, CmpObserver, CmpValues},
     },
-    Error, HasMetadata,
 };
-use libafl_bolts::{ownedref::OwnedRefMut, Named};
+use libafl_bolts::{Named, ownedref::OwnedRefMut};
 use serde::{Deserialize, Serialize};
 
 use crate::cmps::AFLppCmpLogMap;

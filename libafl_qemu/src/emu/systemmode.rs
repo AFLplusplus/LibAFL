@@ -4,8 +4,8 @@ use hashbrown::HashMap;
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
-    emu::{IsSnapshotManager, QemuSnapshotCheckResult},
     DeviceSnapshotFilter, Emulator, Qemu, SnapshotId, SnapshotManagerError,
+    emu::{IsSnapshotManager, QemuSnapshotCheckResult},
 };
 
 #[derive(Debug, Clone)]

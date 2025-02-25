@@ -16,6 +16,8 @@ use num_enum::TryFromPrimitive;
 use paste::paste;
 
 use crate::{
+    CPU, Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
+    IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver,
     command::parser::{
         EndCommandParser, InputPhysCommandParser, InputVirtCommandParser, LoadCommandParser,
         LqprintfCommandParser, NativeCommandParser, SaveCommandParser, StartPhysCommandParser,
@@ -23,10 +25,8 @@ use crate::{
         VersionCommandParser,
     },
     get_exit_arch_regs,
-    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
+    modules::{EmulatorModuleTuple, utils::filters::HasAddressFilterTuples},
     sync_exit::ExitArgs,
-    Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
-    IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
 
 #[cfg(all(

@@ -8,14 +8,14 @@ use alloc::{
 use core::marker::PhantomData;
 
 use hashbrown::HashSet;
-use libafl_bolts::{impl_serdeany, Named};
+use libafl_bolts::{Named, impl_serdeany};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, Evaluator, HasMetadata,
     corpus::{Corpus, CorpusId},
     stages::{Restartable, Stage},
     state::{HasCorpus, HasSolutions},
-    Error, Evaluator, HasMetadata,
 };
 
 /// Replay all inputs

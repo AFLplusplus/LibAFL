@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use super::HasTestcase;
 use crate::{
-    corpus::{Corpus, CorpusId, Testcase},
     Error,
+    corpus::{Corpus, CorpusId, Testcase},
 };
 
 /// Keep track of the stored `Testcase` and the siblings ids (insertion order)
@@ -60,10 +60,9 @@ impl<I> TestcaseStorageMap<I> {
     /// Replace a testcase given a `CorpusId`
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Option<Testcase<I>> {
-        if let Some(entry) = self.map.get_mut(&id) {
-            Some(entry.testcase.replace(testcase))
-        } else {
-            None
+        match self.map.get_mut(&id) {
+            Some(entry) => Some(entry.testcase.replace(testcase)),
+            _ => None,
         }
     }
 
@@ -76,23 +75,30 @@ impl<I> TestcaseStorageMap<I> {
     /// Remove a testcase given a [`CorpusId`]
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn remove(&mut self, id: CorpusId) -> Option<RefCell<Testcase<I>>> {
-        if let Some(item) = self.map.remove(&id) {
-            self.remove_key(id);
-            if let Some(prev) = item.prev {
-                self.map.get_mut(&prev).unwrap().next = item.next;
-            } else {
-                // first elem
-                self.first_id = item.next;
+        match self.map.remove(&id) {
+            Some(item) => {
+                self.remove_key(id);
+                match item.prev {
+                    Some(prev) => {
+                        self.map.get_mut(&prev).unwrap().next = item.next;
+                    }
+                    _ => {
+                        // first elem
+                        self.first_id = item.next;
+                    }
+                }
+                match item.next {
+                    Some(next) => {
+                        self.map.get_mut(&next).unwrap().prev = item.prev;
+                    }
+                    _ => {
+                        // last elem
+                        self.last_id = item.prev;
+                    }
+                }
+                Some(item.testcase)
             }
-            if let Some(next) = item.next {
-                self.map.get_mut(&next).unwrap().prev = item.prev;
-            } else {
-                // last elem
-                self.last_id = item.prev;
-            }
-            Some(item.testcase)
-        } else {
-            None
+            _ => None,
         }
     }
 
@@ -121,10 +127,9 @@ impl<I> TestcaseStorageMap<I> {
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
     pub fn next(&self, id: CorpusId) -> Option<CorpusId> {
-        if let Some(item) = self.map.get(&id) {
-            item.next
-        } else {
-            None
+        match self.map.get(&id) {
+            Some(item) => item.next,
+            _ => None,
         }
     }
 
@@ -152,10 +157,9 @@ impl<I> TestcaseStorageMap<I> {
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
     pub fn prev(&self, id: CorpusId) -> Option<CorpusId> {
-        if let Some(item) = self.map.get(&id) {
-            item.prev
-        } else {
-            None
+        match self.map.get(&id) {
+            Some(item) => item.prev,
+            _ => None,
         }
     }
 

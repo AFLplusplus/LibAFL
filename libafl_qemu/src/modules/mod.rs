@@ -4,9 +4,9 @@ use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 
 use crate::{
+    Qemu, QemuParams,
     emu::EmulatorModules,
     modules::utils::filters::{AddressFilter, PageFilter},
-    Qemu, QemuParams,
 };
 
 #[cfg(feature = "usermode")]

@@ -12,8 +12,8 @@ use core::{fmt::Debug, marker::PhantomData};
 pub use concolic::ConcolicFeedback;
 pub use differential::DiffFeedback;
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 pub use list::*;
 pub use map::*;
@@ -25,7 +25,7 @@ pub use new_hash_feedback::NewHashFeedback;
 pub use new_hash_feedback::NewHashFeedbackMetadata;
 use serde::{Deserialize, Serialize};
 
-use crate::{corpus::Testcase, executors::ExitKind, observers::TimeObserver, Error};
+use crate::{Error, corpus::Testcase, executors::ExitKind, observers::TimeObserver};
 
 #[cfg(feature = "std")]
 pub mod capture_feedback;
@@ -707,11 +707,11 @@ where
 /// Variadic macro to create a chain of [`AndFeedback`](EagerAndFeedback)
 #[macro_export]
 macro_rules! feedback_and {
-    ( $last:expr ) => { $last };
+    ( $last:expr_2021 ) => { $last };
 
-    ( $last:expr, ) => { $last };
+    ( $last:expr_2021, ) => { $last };
 
-    ( $head:expr, $($tail:expr),+ $(,)?) => {
+    ( $head:expr_2021, $($tail:expr_2021),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::EagerAndFeedback::new($head , feedback_and!($($tail),+))
     };
@@ -720,11 +720,11 @@ macro_rules! feedback_and {
 /// Variadic macro to create a chain of (fast) [`AndFeedback`](FastAndFeedback)
 #[macro_export]
 macro_rules! feedback_and_fast {
-    ( $last:expr ) => { $last };
+    ( $last:expr_2021 ) => { $last };
 
-    ( $last:expr, ) => { $last };
+    ( $last:expr_2021, ) => { $last };
 
-    ( $head:expr, $($tail:expr),+ $(,)?) => {
+    ( $head:expr_2021, $($tail:expr_2021),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::FastAndFeedback::new($head , feedback_and_fast!($($tail),+))
     };
@@ -733,11 +733,11 @@ macro_rules! feedback_and_fast {
 /// Variadic macro to create a chain of [`OrFeedback`](EagerOrFeedback)
 #[macro_export]
 macro_rules! feedback_or {
-    ( $last:expr ) => { $last };
+    ( $last:expr_2021 ) => { $last };
 
-    ( $last:expr, ) => { $last };
+    ( $last:expr_2021, ) => { $last };
 
-    ( $head:expr, $($tail:expr),+ $(,)?) => {
+    ( $head:expr_2021, $($tail:expr_2021),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::EagerOrFeedback::new($head , feedback_or!($($tail),+))
     };
@@ -746,11 +746,11 @@ macro_rules! feedback_or {
 /// Combines multiple feedbacks with an `OR` operation, not executing feedbacks after the first positive result
 #[macro_export]
 macro_rules! feedback_or_fast {
-    ( $last:expr ) => { $last };
+    ( $last:expr_2021 ) => { $last };
 
-    ( $last:expr, ) => { $last };
+    ( $last:expr_2021, ) => { $last };
 
-    ( $head:expr, $($tail:expr),+ $(,)?) => {
+    ( $head:expr_2021, $($tail:expr_2021),+ $(,)?) => {
         // recursive call
         $crate::feedbacks::FastOrFeedback::new($head , feedback_or_fast!($($tail),+))
     };
@@ -759,7 +759,7 @@ macro_rules! feedback_or_fast {
 /// Variadic macro to create a [`NotFeedback`]
 #[macro_export]
 macro_rules! feedback_not {
-    ($last:expr) => {
+    ($last:expr_2021) => {
         $crate::feedbacks::NotFeedback::new($last)
     };
 }
@@ -1016,11 +1016,7 @@ impl ConstFeedback {
 
 impl From<bool> for ConstFeedback {
     fn from(val: bool) -> Self {
-        if val {
-            Self::True
-        } else {
-            Self::False
-        }
+        if val { Self::True } else { Self::False }
     }
 }
 

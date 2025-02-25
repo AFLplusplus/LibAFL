@@ -3,16 +3,16 @@ use core::{fmt::Debug, hash::Hash};
 
 use hashbrown::HashSet;
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Error, HasRefCnt, Named,
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
+    HasNamedMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::ListObserver,
-    HasNamedMetadata,
 };
 
 /// The metadata to remember past observed value

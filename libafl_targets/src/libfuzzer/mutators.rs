@@ -10,6 +10,7 @@ use std::{
 };
 
 use libafl::{
+    Error,
     corpus::Corpus,
     inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{
@@ -17,9 +18,8 @@ use libafl::{
     },
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
-    Error,
 };
-use libafl_bolts::{rands::Rand, AsSlice, HasLen, Named};
+use libafl_bolts::{AsSlice, HasLen, Named, rands::Rand};
 
 extern "C" {
     fn libafl_targets_has_libfuzzer_custom_mutator() -> bool;
@@ -273,11 +273,15 @@ where
 {
     type Mutations = SM::Mutations;
     fn mutations(&self) -> &Self::Mutations {
-        unimplemented!("It is unsafe to provide reference-based access to the mutators as they are behind a RefCell.")
+        unimplemented!(
+            "It is unsafe to provide reference-based access to the mutators as they are behind a RefCell."
+        )
     }
 
     fn mutations_mut(&mut self) -> &mut Self::Mutations {
-        unimplemented!("It is unsafe to provide reference-based access to the mutators as they are behind a RefCell.")
+        unimplemented!(
+            "It is unsafe to provide reference-based access to the mutators as they are behind a RefCell."
+        )
     }
 }
 
@@ -351,7 +355,9 @@ where
         }
 
         if new_len > max_len {
-            return Err(Error::illegal_state(format!("LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}")));
+            return Err(Error::illegal_state(format!(
+                "LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}"
+            )));
         }
         input.resize(new_len, 0);
         Ok(MutationResult::Mutated)
@@ -447,7 +453,9 @@ where
         }
 
         if new_len > max_len {
-            return Err(Error::illegal_state(format!("LLVMFuzzerCustomCrossOver returned more bytes than allowed. Expected up to {max_len} but got {new_len}")));
+            return Err(Error::illegal_state(format!(
+                "LLVMFuzzerCustomCrossOver returned more bytes than allowed. Expected up to {max_len} but got {new_len}"
+            )));
         }
 
         input.resize(new_len, 0);

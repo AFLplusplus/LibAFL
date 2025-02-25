@@ -12,6 +12,9 @@ use core::{mem::align_of, slice};
 ))]
 use libafl::executors::hooks::ExecutorHook;
 
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[allow(unused_imports)] // only used in an unused function
+use crate::EDGES_MAP_DEFAULT_SIZE;
 #[cfg(any(
     feature = "pointer_maps",
     feature = "sancov_pcguard_edges",
@@ -22,11 +25,8 @@ use libafl::executors::hooks::ExecutorHook;
 ))]
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_FOUND;
-#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
-#[allow(unused_imports)] // only used in an unused function
-use crate::EDGES_MAP_DEFAULT_SIZE;
 #[cfg(feature = "pointer_maps")]
-use crate::{coverage::EDGES_MAP_PTR, EDGES_MAP_ALLOCATED_SIZE};
+use crate::{EDGES_MAP_ALLOCATED_SIZE, coverage::EDGES_MAP_PTR};
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
@@ -278,7 +278,10 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
             let edges_map_ptr = &raw const EDGES_MAP;
             let edges_map_len = (*edges_map_ptr).len();
             MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1);
-            assert!((MAX_EDGES_FOUND <= edges_map_len), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({edges_map_len}). Use the LIBAFL_EDGES_MAP_DEFAULT_SIZE env to increase it at compile time.");
+            assert!(
+                (MAX_EDGES_FOUND <= edges_map_len),
+                "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({edges_map_len}). Use the LIBAFL_EDGES_MAP_DEFAULT_SIZE env to increase it at compile time."
+            );
         }
     }
 }

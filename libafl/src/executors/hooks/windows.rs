@@ -2,17 +2,17 @@
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_asan_handler {
     use alloc::string::String;
-    use core::sync::atomic::{compiler_fence, Ordering};
+    use core::sync::atomic::{Ordering, compiler_fence};
 
     use windows::Win32::System::Threading::{
-        EnterCriticalSection, ExitProcess, LeaveCriticalSection, CRITICAL_SECTION,
+        CRITICAL_SECTION, EnterCriticalSection, ExitProcess, LeaveCriticalSection,
     };
 
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            hooks::inprocess::GLOBAL_STATE, inprocess::run_observers_and_save_state, Executor,
-            ExitKind, HasObservers,
+            Executor, ExitKind, HasObservers, hooks::inprocess::GLOBAL_STATE,
+            inprocess::run_observers_and_save_state,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -62,7 +62,7 @@ pub mod windows_asan_handler {
             {
                 log::error!("Double crash\n");
                 log::error!(
-                "ASAN detected crash but we're not in the target... Bug in the fuzzer? Exiting.",
+                    "ASAN detected crash but we're not in the target... Bug in the fuzzer? Exiting.",
                 );
             }
             #[cfg(feature = "std")]
@@ -115,7 +115,7 @@ pub mod windows_exception_handler {
         ffi::c_void,
         mem::transmute,
         ptr,
-        sync::atomic::{compiler_fence, Ordering},
+        sync::atomic::{Ordering, compiler_fence},
     };
     #[cfg(feature = "std")]
     use std::io::Write;
@@ -123,19 +123,19 @@ pub mod windows_exception_handler {
     use std::panic;
 
     use libafl_bolts::os::windows_exceptions::{
-        ExceptionCode, ExceptionHandler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE,
-        EXCEPTION_POINTERS,
+        CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS, ExceptionCode,
+        ExceptionHandler,
     };
     use windows::Win32::System::Threading::{
-        EnterCriticalSection, ExitProcess, LeaveCriticalSection, CRITICAL_SECTION,
+        CRITICAL_SECTION, EnterCriticalSection, ExitProcess, LeaveCriticalSection,
     };
 
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
-            inprocess::{run_observers_and_save_state, HasInProcessHooks},
             Executor, ExitKind, HasObservers,
+            hooks::inprocess::{GLOBAL_STATE, HasTimeout, InProcessExecutorHandlerData},
+            inprocess::{HasInProcessHooks, run_observers_and_save_state},
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -398,7 +398,7 @@ pub mod windows_exception_handler {
                     .ExceptionAddress as usize;
 
                 log::error!(
-                "We crashed at addr 0x{crash_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
+                    "We crashed at addr 0x{crash_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
                 );
             }
             #[cfg(feature = "std")]

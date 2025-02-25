@@ -8,11 +8,11 @@ use core::{
 };
 
 use libafl_bolts::{AsSlice, AsSliceMut, HasLen, Named};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    observers::{map::MapObserver, Observer},
     Error,
+    observers::{Observer, map::MapObserver},
 };
 
 /// Exact copy of `StdMapObserver` that owns its map

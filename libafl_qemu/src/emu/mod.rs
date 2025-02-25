@@ -14,12 +14,12 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 #[cfg(doc)]
 use crate::modules::EmulatorModule;
 use crate::{
+    CPU, Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk,
+    QemuParams, QemuShutdownCause, Regs,
     breakpoint::{Breakpoint, BreakpointId},
     command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
     modules::EmulatorModuleTuple,
     sync_exit::CustomInsn,
-    Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk, QemuParams,
-    QemuShutdownCause, Regs, CPU,
 };
 
 mod hooks;

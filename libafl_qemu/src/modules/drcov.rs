@@ -5,8 +5,8 @@ use std::{
 };
 use std::{path::PathBuf, sync::Mutex};
 
-use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{executors::ExitKind, observers::ObserversTuple, HasMetadata};
+use hashbrown::{HashMap, hash_map::Entry};
+use libafl::{HasMetadata, executors::ExitKind, observers::ObserversTuple};
 use libafl_qemu_sys::{GuestAddr, GuestUsize};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
@@ -14,14 +14,14 @@ use serde::{Deserialize, Serialize};
 
 use super::utils::filters::HasAddressFilter;
 #[cfg(feature = "systemmode")]
-use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
+    Qemu,
     emu::EmulatorModules,
     modules::{
-        utils::filters::NopAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        AddressFilter, EmulatorModule, EmulatorModuleTuple, utils::filters::NopAddressFilter,
     },
     qemu::Hook,
-    Qemu,
 };
 
 /// Trace of `block_id`s met at runtime

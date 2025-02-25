@@ -4,13 +4,13 @@
 
 use std::{arch::asm, process};
 
-use libafl_intelpt::{availability, Image, IntelPT};
+use libafl_intelpt::{Image, IntelPT, availability};
 use nix::{
     sys::{
-        signal::{kill, raise, Signal},
-        wait::{waitpid, WaitPidFlag},
+        signal::{Signal, kill, raise},
+        wait::{WaitPidFlag, waitpid},
     },
-    unistd::{fork, ForkResult},
+    unistd::{ForkResult, fork},
 };
 use proc_maps::get_process_maps;
 

@@ -5,9 +5,9 @@ use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error,
     corpus::Testcase,
     feedbacks::{Feedback, FeedbackFactory, StateInitializer},
-    Error,
 };
 
 /// Type which can generate a custom filename for a given input/state pair

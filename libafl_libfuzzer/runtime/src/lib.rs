@@ -66,13 +66,13 @@
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
 
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{CStr, c_char, c_int};
 use std::{fs::File, io::stderr, os::fd::RawFd};
 
 use env_logger::Target;
 use libafl::{
-    inputs::{BytesInput, HasTargetBytes, Input},
     Error,
+    inputs::{BytesInput, HasTargetBytes, Input},
 };
 use libafl_bolts::AsSlice;
 use libc::_exit;

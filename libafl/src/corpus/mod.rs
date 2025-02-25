@@ -68,7 +68,7 @@ impl From<CorpusId> for usize {
 /// Utility macro to call `Corpus::random_id`; fetches only enabled [`Testcase`]`s`
 #[macro_export]
 macro_rules! random_corpus_id {
-    ($corpus:expr, $rand:expr) => {{
+    ($corpus:expr_2021, $rand:expr_2021) => {{
         let cnt = $corpus.count();
         #[cfg(debug_assertions)]
         let nth = $rand.below(core::num::NonZero::new(cnt).expect("Corpus may not be empty!"));
@@ -87,7 +87,7 @@ macro_rules! random_corpus_id {
 /// Note: use `Corpus::get_from_all` as disabled entries are inaccessible from `Corpus::get`
 #[macro_export]
 macro_rules! random_corpus_id_with_disabled {
-    ($corpus:expr, $rand:expr) => {{
+    ($corpus:expr_2021, $rand:expr_2021) => {{
         let cnt = $corpus.count_all();
         #[cfg(debug_assertions)]
         let nth = $rand.below(core::num::NonZero::new(cnt).expect("Corpus may not be empty!"));

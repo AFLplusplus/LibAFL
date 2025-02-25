@@ -2,24 +2,24 @@
 
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
+use libafl_bolts::{
+    ClientId,
+    llmp::{LlmpClient, LlmpClientDescription, Tag},
+    shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
+};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
-use libafl_bolts::{
-    llmp::{LlmpClient, LlmpClientDescription, Tag},
-    shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
-    ClientId,
-};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
+    Error,
     events::{Event, EventFirer},
     fuzzer::EvaluatorObservers,
     inputs::{Input, InputConverter, NopInput, NopInputConverter},
     state::{HasCurrentTestcase, HasSolutions, NopState},
-    Error,
 };
 
 /// The llmp restarting manager
@@ -265,7 +265,9 @@ where
             Event::NewTestcase {
                 input, forward_id, ..
             } => {
-                log::debug!("Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
+                log::debug!(
+                    "Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})"
+                );
 
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());

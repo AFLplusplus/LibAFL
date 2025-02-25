@@ -7,19 +7,19 @@ use core::{
 };
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, tuples::MatchName, HasLen, HasRefCnt};
+use libafl_bolts::{HasLen, HasRefCnt, rands::Rand, tuples::MatchName};
 use serde::{Deserialize, Serialize};
 
 use super::IndexesLenTimeMinimizerScheduler;
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId},
     observers::CanTrack,
     schedulers::{
-        minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         Scheduler,
+        minimizer::{DEFAULT_SKIP_NON_FAVORED_PROB, IsFavoredMetadata, MinimizerScheduler},
     },
     state::{HasCorpus, HasRand},
-    Error, HasMetadata,
 };
 
 /// A testcase metadata holding a list of indexes of a map

@@ -7,19 +7,26 @@ use libafl_qemu_sys::{CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
 
 #[cfg(feature = "usermode")]
 use crate::qemu::{
-    closure_post_syscall_hook_wrapper, closure_pre_syscall_hook_wrapper,
-    func_post_syscall_hook_wrapper, func_pre_syscall_hook_wrapper, PostSyscallHook,
-    PostSyscallHookId, PreSyscallHook, PreSyscallHookId,
-};
-#[cfg(feature = "usermode")]
-use crate::qemu::{
     CrashHookClosure, CrashHookFn, PostSyscallHookClosure, PostSyscallHookFn,
     PreSyscallHookClosure, PreSyscallHookFn,
 };
+#[cfg(feature = "usermode")]
+use crate::qemu::{
+    PostSyscallHook, PostSyscallHookId, PreSyscallHook, PreSyscallHookId,
+    closure_post_syscall_hook_wrapper, closure_pre_syscall_hook_wrapper,
+    func_post_syscall_hook_wrapper, func_pre_syscall_hook_wrapper,
+};
 use crate::{
+    CpuPostRunHook, CpuPreRunHook, CpuRunHookId, HookState, MemAccessInfo, NewThreadHookFn, Qemu,
     cpu_run_post_exec_hook_wrapper, cpu_run_pre_exec_hook_wrapper,
     modules::{EmulatorModule, EmulatorModuleTuple},
     qemu::{
+        BackdoorHook, BackdoorHookClosure, BackdoorHookFn, BackdoorHookId, BlockExecHook,
+        BlockGenHook, BlockHookId, BlockPostGenHook, CmpExecHook, CmpGenHook, CmpHookId,
+        EdgeExecHook, EdgeGenHook, EdgeHookId, Hook, HookRepr, InstructionHook,
+        InstructionHookClosure, InstructionHookFn, InstructionHookId, NewThreadHook,
+        NewThreadHookClosure, NewThreadHookId, QemuHooks, ReadExecHook, ReadExecNHook, ReadGenHook,
+        ReadHookId, TcgHookState, WriteExecHook, WriteExecNHook, WriteGenHook, WriteHookId,
         block_0_exec_hook_wrapper, block_gen_hook_wrapper, block_post_gen_hook_wrapper,
         closure_backdoor_hook_wrapper, closure_instruction_hook_wrapper,
         closure_new_thread_hook_wrapper, cmp_0_exec_hook_wrapper, cmp_1_exec_hook_wrapper,
@@ -29,15 +36,8 @@ use crate::{
         read_1_exec_hook_wrapper, read_2_exec_hook_wrapper, read_3_exec_hook_wrapper,
         read_4_exec_hook_wrapper, read_gen_hook_wrapper, write_0_exec_hook_wrapper,
         write_1_exec_hook_wrapper, write_2_exec_hook_wrapper, write_3_exec_hook_wrapper,
-        write_4_exec_hook_wrapper, write_gen_hook_wrapper, BackdoorHook, BackdoorHookClosure,
-        BackdoorHookFn, BackdoorHookId, BlockExecHook, BlockGenHook, BlockHookId, BlockPostGenHook,
-        CmpExecHook, CmpGenHook, CmpHookId, EdgeExecHook, EdgeGenHook, EdgeHookId, Hook, HookRepr,
-        InstructionHook, InstructionHookClosure, InstructionHookFn, InstructionHookId,
-        NewThreadHook, NewThreadHookClosure, NewThreadHookId, QemuHooks, ReadExecHook,
-        ReadExecNHook, ReadGenHook, ReadHookId, TcgHookState, WriteExecHook, WriteExecNHook,
-        WriteGenHook, WriteHookId,
+        write_4_exec_hook_wrapper, write_gen_hook_wrapper,
     },
-    CpuPostRunHook, CpuPreRunHook, CpuRunHookId, HookState, MemAccessInfo, NewThreadHookFn, Qemu,
 };
 
 /// Get a C-compatible function pointer from the input hook.
@@ -269,7 +269,7 @@ where
         execution_hook: EdgeExecHook<ET, I, S>,
     ) -> EdgeHookId {
         unsafe {
-            let gen = get_raw_hook!(
+            let generator = get_raw_hook!(
                 generation_hook,
                 edge_gen_hook_wrapper::<ET, I, S>,
                 unsafe extern "C" fn(
@@ -303,7 +303,7 @@ where
                     .get_unchecked_mut(),
             );
 
-            let id = self.qemu_hooks.add_edge_hooks(hook_state, gen, exec);
+            let id = self.qemu_hooks.add_edge_hooks(hook_state, generator, exec);
 
             self.hook_collection
                 .edge_hooks
@@ -324,7 +324,7 @@ where
         execution_hook: BlockExecHook<ET, I, S>,
     ) -> BlockHookId {
         unsafe {
-            let gen = get_raw_hook!(
+            let generator = get_raw_hook!(
                 generation_hook,
                 block_gen_hook_wrapper::<ET, I, S>,
                 unsafe extern "C" fn(&mut TcgHookState<1, BlockHookId>, pc: GuestAddr) -> u64
@@ -366,7 +366,7 @@ where
 
             let id = self
                 .qemu_hooks
-                .add_block_hooks(hook_state, gen, postgen, exec);
+                .add_block_hooks(hook_state, generator, postgen, exec);
 
             self.hook_collection
                 .block_hooks
@@ -442,7 +442,7 @@ where
         execution_hook_n: ReadExecNHook<ET, I, S>,
     ) -> ReadHookId {
         unsafe {
-            let gen = get_raw_hook!(
+            let generator = get_raw_hook!(
                 generation_hook,
                 read_gen_hook_wrapper::<ET, I, S>,
                 unsafe extern "C" fn(
@@ -530,7 +530,7 @@ where
 
             let id = self
                 .qemu_hooks
-                .add_read_hooks(hook_state, gen, exec1, exec2, exec4, exec8, execn);
+                .add_read_hooks(hook_state, generator, exec1, exec2, exec4, exec8, execn);
 
             self.hook_collection
                 .read_hooks
@@ -555,7 +555,7 @@ where
         execution_hook_n: WriteExecNHook<ET, I, S>,
     ) -> WriteHookId {
         unsafe {
-            let gen = get_raw_hook!(
+            let generator = get_raw_hook!(
                 generation_hook,
                 write_gen_hook_wrapper::<ET, I, S>,
                 unsafe extern "C" fn(
@@ -643,7 +643,7 @@ where
 
             let id = self
                 .qemu_hooks
-                .add_write_hooks(hook_state, gen, exec1, exec2, exec4, exec8, execn);
+                .add_write_hooks(hook_state, generator, exec1, exec2, exec4, exec8, execn);
 
             self.hook_collection
                 .write_hooks
@@ -666,7 +666,7 @@ where
         execution_hook_8: CmpExecHook<ET, I, S, u64>,
     ) -> CmpHookId {
         unsafe {
-            let gen = get_raw_hook!(
+            let generator = get_raw_hook!(
                 generation_hook,
                 cmp_gen_hook_wrapper::<ET, I, S>,
                 unsafe extern "C" fn(
@@ -721,7 +721,7 @@ where
 
             let id = self
                 .qemu_hooks
-                .add_cmp_hooks(hook_state, gen, exec1, exec2, exec4, exec8);
+                .add_cmp_hooks(hook_state, generator, exec1, exec2, exec4, exec8);
 
             self.hook_collection
                 .cmp_hooks
@@ -1204,7 +1204,9 @@ where
             if EMULATOR_MODULES.is_null() {
                 EMULATOR_MODULES = ptr::from_mut::<Self>(modules.as_mut().get_mut()) as *mut ();
             } else {
-                panic!("Emulator Modules have already been set and is still active. It is not supported to have multiple instances of `EmulatorModules` at the same time yet.")
+                panic!(
+                    "Emulator Modules have already been set and is still active. It is not supported to have multiple instances of `EmulatorModules` at the same time yet."
+                )
             }
         }
 

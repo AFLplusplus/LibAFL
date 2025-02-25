@@ -479,7 +479,10 @@ impl DrCovReader {
             if let Some(own_module) = self.module_by_id(module.id) {
                 // Module exists, make sure it's the same.
                 if own_module.base != module.base || own_module.end != module.end {
-                    return Err(Error::illegal_argument(format!("Module id of file to merge doesn't fit! Own modules: {:#x?}, other modules: {:#x?}", self.module_entries, other.module_entries)));
+                    return Err(Error::illegal_argument(format!(
+                        "Module id of file to merge doesn't fit! Own modules: {:#x?}, other modules: {:#x?}",
+                        self.module_entries, other.module_entries
+                    )));
                 }
             } else {
                 // We don't know the module. Insert as new module.

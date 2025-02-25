@@ -5,13 +5,13 @@ use std::{
 };
 
 use libafl::{
+    Error,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdOutObserver},
     state::HasExecutions,
-    Error,
 };
-use libafl_bolts::{tuples::RefIndexable, AsSlice};
+use libafl_bolts::{AsSlice, tuples::RefIndexable};
 use libnyx::NyxReturnValue;
 
 use crate::{cmplog::CMPLOG_ENABLED, helper::NyxHelper};

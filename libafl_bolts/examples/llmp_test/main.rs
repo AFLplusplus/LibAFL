@@ -12,9 +12,9 @@ use std::{num::NonZeroUsize, thread, time};
 use libafl_bolts::llmp::{LlmpBrokerInner, LlmpMsgHookResult};
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use libafl_bolts::{
+    ClientId, Error, SimpleStderrLogger,
     llmp::{self, Flags, LlmpHook, Tag},
     shmem::{ShMemProvider, StdShMemProvider},
-    ClientId, Error, SimpleStderrLogger,
 };
 use tuple_list::tuple_list;
 

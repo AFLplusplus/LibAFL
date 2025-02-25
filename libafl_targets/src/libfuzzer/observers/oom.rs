@@ -3,10 +3,10 @@ use core::{ffi::c_void, fmt::Debug};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use libafl::{
+    Error,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
-    Error,
 };
 use libafl_bolts::Named;
 use libc::SIGABRT;

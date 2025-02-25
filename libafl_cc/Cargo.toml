@@ -8,8 +8,8 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "compiler"]
-edition = "2021"
-rust-version = "1.82"
+edition = "2024"
+rust-version = "1.85"
 categories = [
   "development-tools::testing",
   "emulators",

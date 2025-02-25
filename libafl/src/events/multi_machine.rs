@@ -5,17 +5,17 @@ use std::{
     io::ErrorKind,
     process,
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc, OnceLock,
+        atomic::{AtomicU64, Ordering},
     },
     time::Duration,
     vec::Vec,
 };
 
-use enumflags2::{bitflags, BitFlags};
+use enumflags2::{BitFlags, bitflags};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::compress::GzipCompressor;
-use libafl_bolts::{current_time, ownedref::OwnedRef, Error};
+use libafl_bolts::{Error, current_time, ownedref::OwnedRef};
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},

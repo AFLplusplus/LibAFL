@@ -19,18 +19,18 @@ use std::{
 };
 
 use libafl_bolts::{
-    fs::{get_unique_std_input_file, InputFile},
+    AsSlice, AsSliceMut, Truncate,
+    fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     ownedref::OwnedSlice,
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
     tuples::{Handle, Handled, MatchNameRef, Prepend, RefIndexable},
-    AsSlice, AsSliceMut, Truncate,
 };
 use libc::RLIM_INFINITY;
 use nix::{
     sys::{
-        select::{pselect, FdSet},
-        signal::{kill, SigSet, Signal},
+        select::{FdSet, pselect},
+        signal::{SigSet, Signal, kill},
         time::TimeSpec,
         wait::waitpid,
     },
@@ -40,15 +40,15 @@ use nix::{
 use super::HasTimeout;
 #[cfg(feature = "regex")]
 use crate::observers::{
-    get_asan_runtime_flags, get_asan_runtime_flags_with_log_path, AsanBacktraceObserver,
+    AsanBacktraceObserver, get_asan_runtime_flags, get_asan_runtime_flags_with_log_path,
 };
 use crate::{
+    Error,
     executors::{Executor, ExitKind, HasObservers},
     inputs::{BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
     state::HasExecutions,
-    Error,
 };
 
 const FORKSRV_FD: i32 = 198;
@@ -365,7 +365,9 @@ impl Forkserver {
         kill_signal: Signal,
     ) -> Result<Self, Error> {
         let Some(coverage_map_size) = coverage_map_size else {
-            return Err(Error::unknown("Coverage map size unknown. Use coverage_map_size() to tell the forkserver about the map size."));
+            return Err(Error::unknown(
+                "Coverage map size unknown. Use coverage_map_size() to tell the forkserver about the map size.",
+            ));
         };
 
         if env::var("AFL_MAP_SIZE").is_err() {
@@ -442,7 +444,7 @@ impl Forkserver {
             Err(err) => {
                 return Err(Error::illegal_state(format!(
                     "Could not spawn the forkserver: {err:#?}"
-                )))
+                )));
             }
         };
 
@@ -648,8 +650,8 @@ where
 impl ForkserverExecutor<(), (), (), UnixShMem, ()> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
-    pub fn builder(
-    ) -> ForkserverExecutorBuilder<'static, NopTargetBytesConverter<BytesInput>, UnixShMemProvider>
+    pub fn builder()
+    -> ForkserverExecutorBuilder<'static, NopTargetBytesConverter<BytesInput>, UnixShMemProvider>
     {
         ForkserverExecutorBuilder::new()
     }
@@ -1003,7 +1005,7 @@ where
             None => {
                 return Err(Error::illegal_argument(
                     "ForkserverExecutorBuilder::build: target file not found".to_string(),
-                ))
+                ));
             }
         };
 
@@ -1042,7 +1044,9 @@ where
         let version: u32 = status as u32 - 0x41464c00_u32;
         match version {
             0 => {
-                return Err(Error::illegal_state("Fork server version is not assigned, this should not happen. Recompile target."));
+                return Err(Error::illegal_state(
+                    "Fork server version is not assigned, this should not happen. Recompile target.",
+                ));
             }
             FS_NEW_VERSION_MIN..=FS_NEW_VERSION_MAX => {
                 // good, do nothing
@@ -1101,9 +1105,9 @@ where
             let tokens_size_max = 0xffffff;
 
             if !(2..=tokens_size_max).contains(&autotokens_size) {
-                return Err(Error::illegal_state(
-                    format!("Autotokens size is incorrect, expected 2 to {tokens_size_max} (inclusive), but got {autotokens_size}. Make sure your afl-cc verison is up to date."),
-                ));
+                return Err(Error::illegal_state(format!(
+                    "Autotokens size is incorrect, expected 2 to {tokens_size_max} (inclusive), but got {autotokens_size}. Make sure your afl-cc verison is up to date."
+                )));
             }
             log::info!("Autotokens size {autotokens_size:x}");
             let buf = forkserver
@@ -1223,7 +1227,7 @@ where
                 return Err(Error::illegal_state(format!(
                     "The target map size is {actual_map_size} but the allocated map size is {max_size}. \
                     Increase the initial size of the forkserver map to at least that size using the forkserver builder's `coverage_map_size`."
-            )));
+                )));
             }
         } else {
             return Err(Error::illegal_state(format!(
@@ -1280,11 +1284,14 @@ where
                 // subsequent arguments as regular arguments
                 use_arg_0_as_program = false;
             } else if item.as_ref() == "@@" {
-                if let Some(name) = &moved.input_filename.clone() {
-                    // If the input file name has been modified, use this one
-                    moved = moved.arg_input_file(name);
-                } else {
-                    moved = moved.arg_input_file_std();
+                match &moved.input_filename.clone() {
+                    Some(name) => {
+                        // If the input file name has been modified, use this one
+                        moved = moved.arg_input_file(name);
+                    }
+                    _ => {
+                        moved = moved.arg_input_file_std();
+                    }
                 }
             } else {
                 moved = moved.arg(item);
@@ -1469,8 +1476,8 @@ impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, Unix
     /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[must_use]
-    pub fn new(
-    ) -> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
+    pub fn new()
+    -> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
         ForkserverExecutorBuilder {
             program: None,
             arguments: vec![],
@@ -1623,18 +1630,18 @@ mod tests {
     use std::ffi::OsString;
 
     use libafl_bolts::{
+        AsSliceMut,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::tuple_list,
-        AsSliceMut,
     };
     use serial_test::serial;
 
     use crate::{
+        Error,
         corpus::NopCorpus,
-        executors::forkserver::{ForkserverExecutor, FAILED_TO_START_FORKSERVER_MSG},
+        executors::forkserver::{FAILED_TO_START_FORKSERVER_MSG, ForkserverExecutor},
         inputs::BytesInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
-        Error,
     };
 
     #[test]

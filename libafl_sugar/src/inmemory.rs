@@ -5,9 +5,10 @@ use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
+    Error, HasMetadata,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
+    events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
+    executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -16,25 +17,24 @@ use libafl::{
     monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, StdScheduledMutator},
+        scheduled::{StdScheduledMutator, tokens_mutations},
         token_mutations::{I2SRandReplace, Tokens},
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
-    Error, HasMetadata,
 };
 use libafl_bolts::{
+    AsSlice,
     core_affinity::Cores,
     nonzero,
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
-    AsSlice,
+    tuples::{Handled, Merge, tuple_list},
 };
-use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
+use libafl_targets::{CmpLogObserver, edges_map_mut_ptr};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};

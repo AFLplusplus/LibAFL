@@ -1,15 +1,15 @@
 use std::fmt::Debug;
 
-use libafl::{observers::VarLenMapObserver, HasMetadata};
+use libafl::{HasMetadata, observers::VarLenMapObserver};
 use libafl_bolts::Error;
 use libafl_qemu_sys::GuestAddr;
 #[cfg(feature = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
+    Qemu,
     emu::EmulatorModules,
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, PageFilter},
-    Qemu,
 };
 
 mod helpers;
@@ -396,7 +396,7 @@ mod tests {
 
     use libafl::observers::{CanTrack, HitcountsMapObserver, VariableMapObserver};
     use libafl_bolts::ownedref::OwnedMutSlice;
-    use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
+    use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND, edges_map_mut_ptr};
 
     use crate::modules::StdEdgeCoverageModule;
 

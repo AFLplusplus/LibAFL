@@ -22,21 +22,21 @@ use std::{net::SocketAddr, string::String};
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     shmem::ShMemProvider,
-    tuples::{tuple_list, Handle},
+    tuples::{Handle, tuple_list},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use typed_builder::TypedBuilder;
 #[cfg(all(unix, feature = "fork"))]
 use {
     crate::{
-        events::{centralized::CentralizedEventManager, CentralizedLlmpHook, StdLlmpEventHook},
+        events::{CentralizedLlmpHook, StdLlmpEventHook, centralized::CentralizedEventManager},
         inputs::Input,
     },
     alloc::string::ToString,
     libafl_bolts::{
         core_affinity::get_core_ids,
         llmp::{Broker, Brokers, LlmpBroker},
-        os::{fork, ForkResult},
+        os::{ForkResult, fork},
     },
     std::boxed::Box,
 };
@@ -51,13 +51,13 @@ use {libafl_bolts::os::startable_self, std::process::Stdio};
 #[cfg(all(unix, feature = "fork", feature = "multi_machine"))]
 use crate::events::multi_machine::{NodeDescriptor, TcpMultiMachineHooks};
 use crate::{
+    Error,
     events::{
-        llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
         EventConfig, EventManagerHooksTuple,
+        llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
     },
     monitors::Monitor,
     observers::TimeObserver,
-    Error,
 };
 
 /// The (internal) `env` that indicates we're running as client.
@@ -300,10 +300,13 @@ where
                             if !debug_output {
                                 if let Some(file) = &self.opened_stdout_file {
                                     dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                    if let Some(stderr) = &self.opened_stderr_file {
-                                        dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                    } else {
-                                        dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                    match &self.opened_stderr_file {
+                                        Some(stderr) => {
+                                            dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
+                                        _ => {
+                                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
                                     }
                                 }
                             }
@@ -365,7 +368,9 @@ where
         } else {
             for handle in &handles {
                 let mut status = 0;
-                log::info!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
+                log::info!(
+                    "Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit..."
+                );
                 unsafe {
                     libc::waitpid(*handle, &mut status, 0);
                     if status != 0 {
@@ -522,7 +527,9 @@ where
                 handle.kill()?;
             }
         } else {
-            log::info!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
+            log::info!(
+                "Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit..."
+            );
             for handle in &mut handles {
                 let ecode = handle.wait()?;
                 if !ecode.success() {
@@ -759,10 +766,13 @@ where
                             if !debug_output {
                                 if let Some(file) = &self.opened_stdout_file {
                                     dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                    if let Some(stderr) = &self.opened_stderr_file {
-                                        dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                    } else {
-                                        dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                    match &self.opened_stderr_file {
+                                        Some(stderr) => {
+                                            dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
+                                        _ => {
+                                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
                                     }
                                 }
                             }

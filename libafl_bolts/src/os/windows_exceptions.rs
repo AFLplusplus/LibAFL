@@ -6,7 +6,7 @@ use core::{
     cell::UnsafeCell,
     fmt::{self, Display, Formatter},
     ptr::{self, write_volatile},
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
 };
 use std::os::raw::{c_long, c_void};
 
@@ -14,9 +14,9 @@ use num_enum::FromPrimitive;
 pub use windows::Win32::{
     Foundation::{BOOL, NTSTATUS},
     System::{
-        Console::{SetConsoleCtrlHandler, CTRL_BREAK_EVENT, CTRL_C_EVENT, PHANDLER_ROUTINE},
+        Console::{CTRL_BREAK_EVENT, CTRL_C_EVENT, PHANDLER_ROUTINE, SetConsoleCtrlHandler},
         Diagnostics::Debug::{
-            AddVectoredExceptionHandler, UnhandledExceptionFilter, EXCEPTION_POINTERS,
+            AddVectoredExceptionHandler, EXCEPTION_POINTERS, UnhandledExceptionFilter,
         },
         Threading::{IsProcessorFeaturePresent, PROCESSOR_FEATURE_ID},
     },

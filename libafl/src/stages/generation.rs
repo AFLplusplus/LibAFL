@@ -7,10 +7,10 @@
 use core::marker::PhantomData;
 
 use crate::{
+    Error, Evaluator,
     generators::Generator,
     stages::{Restartable, Stage},
     state::HasRand,
-    Error, Evaluator,
 };
 
 /// A [`Stage`] that generates a single input via a [`Generator`] and evaluates

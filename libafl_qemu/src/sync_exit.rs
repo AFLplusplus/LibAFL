@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use enum_map::Enum;
 
-use crate::{get_exit_arch_regs, GuestReg, Regs, CPU};
+use crate::{CPU, GuestReg, Regs, get_exit_arch_regs};
 
 #[derive(Debug, Clone, Enum)]
 pub enum ExitArgs {

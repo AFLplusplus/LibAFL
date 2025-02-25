@@ -56,12 +56,12 @@ mod generators {
     use libafl_qemu_sys::GuestAddr;
 
     use super::{
-        super::EdgeCoverageVariant, QemuEdgesMapMetadata, LIBAFL_QEMU_EDGES_MAP_MASK_MAX,
-        LIBAFL_QEMU_EDGES_MAP_SIZE_PTR,
+        super::EdgeCoverageVariant, LIBAFL_QEMU_EDGES_MAP_MASK_MAX, LIBAFL_QEMU_EDGES_MAP_SIZE_PTR,
+        QemuEdgesMapMetadata,
     };
     use crate::{
-        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
         EmulatorModules, Qemu,
+        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
     };
 
     fn get_mask<const IS_CONST_MAP: bool, const MAP_SIZE: usize>() -> usize {

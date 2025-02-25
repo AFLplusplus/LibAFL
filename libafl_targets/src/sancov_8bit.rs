@@ -1,7 +1,7 @@
 //! [`LLVM` `8-bit-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
 
-use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut};
+use libafl_bolts::{AsSlice, AsSliceMut, ownedref::OwnedMutSlice};
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
 /// They are initialized by calling [`__sanitizer_cov_8bit_counters_init`](
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop
 }
 
 #[cfg(feature = "observers")]
-pub use self::observers::{counters_maps_observer, CountersMultiMapObserver};
+pub use self::observers::{CountersMultiMapObserver, counters_maps_observer};
 
 #[cfg(feature = "observers")]
 mod observers {
@@ -80,15 +80,15 @@ mod observers {
         hash::{Hash, Hasher},
         iter::Flatten,
         mem::size_of,
-        slice::{from_raw_parts, Iter, IterMut},
+        slice::{Iter, IterMut, from_raw_parts},
     };
 
     use libafl::{
-        observers::{DifferentialObserver, MapObserver, Observer},
         Error,
+        observers::{DifferentialObserver, MapObserver, Observer},
     };
     use libafl_bolts::{
-        ownedref::OwnedMutSlice, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named,
+        AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, ownedref::OwnedMutSlice,
     };
     use meminterval::IntervalTree;
     use serde::{Deserialize, Serialize};

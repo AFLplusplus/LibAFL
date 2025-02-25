@@ -1,19 +1,19 @@
 use core::ffi::c_int;
 #[cfg(unix)]
-use std::io::{stderr, stdout, Write};
+use std::io::{Write, stderr, stdout};
 use std::{fmt::Debug, fs::File, net::TcpListener, os::fd::AsRawFd, str::FromStr};
 
 use libafl::{
+    Error, Fuzzer, HasMetadata,
     corpus::Corpus,
     events::{
-        launcher::Launcher, EventConfig, EventReceiver, ProgressReporter, SimpleEventManager,
-        SimpleRestartingEventManager,
+        EventConfig, EventReceiver, ProgressReporter, SimpleEventManager,
+        SimpleRestartingEventManager, launcher::Launcher,
     },
     executors::ExitKind,
-    monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
+    monitors::{Monitor, MultiMonitor, tui::TuiMonitor},
     stages::StagesTuple,
     state::{HasCurrentStageId, HasExecutions, HasLastReportTime, HasSolutions, Stoppable},
-    Error, Fuzzer, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,

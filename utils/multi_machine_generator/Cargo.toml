@@ -5,7 +5,7 @@ version = "0.15.1"
 description = "Generator for multi-machine setup"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 petgraph = "0.6"

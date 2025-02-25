@@ -8,7 +8,7 @@ use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use {
-    libafl_bolts::{fs::write_file_atomic, Error},
+    libafl_bolts::{Error, fs::write_file_atomic},
     std::{fs::File, io::Read, path::Path},
 };
 
@@ -144,7 +144,7 @@ mod tests {
 
     #[cfg(feature = "std")]
     macro_rules! apply_all_ops {
-        ($prep:stmt, $value:expr, $type:ty, $check_twos_complement:expr) => {{
+        ($prep:stmt, $value:expr_2021, $type:ty, $check_twos_complement:expr_2021) => {{
             $prep
             let mut j = $value;
             j.flip_all_bits();

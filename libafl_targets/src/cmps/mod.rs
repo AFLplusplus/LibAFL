@@ -13,8 +13,8 @@ use core::{
 };
 
 use libafl::{
-    observers::{cmp::AFLppCmpLogHeader, CmpMap, CmpValues, CmplogBytes},
     Error,
+    observers::{CmpMap, CmpValues, CmplogBytes, cmp::AFLppCmpLogHeader},
 };
 use libafl_bolts::HasLen;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -47,7 +47,7 @@ pub const CMPLOG_KIND_RTN: u8 = 1;
 
 #[cfg(feature = "cmplog")]
 // void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2)
-extern "C" {
+unsafe extern "C" {
     /// Logs an instruction for feedback during fuzzing
     pub fn __libafl_targets_cmplog_instructions(k: usize, shape: u8, arg1: u64, arg2: u64);
 
@@ -62,7 +62,7 @@ extern "C" {
 pub use libafl_cmplog_map_ptr as CMPLOG_MAP_PTR;
 
 /// Value indicating if cmplog is enabled.
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[allow(non_upper_case_globals)] // expect breaks here for some reason
 pub static mut libafl_cmplog_enabled: u8 = 0;
 
@@ -423,7 +423,7 @@ impl CmpMap for CmpLogMap {
 }
 
 /// The global `CmpLog` map for the current `LibAFL` run.
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[allow(non_upper_case_globals)] // expect breaks here for some reason
 pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
     headers: [CmpLogHeader {
