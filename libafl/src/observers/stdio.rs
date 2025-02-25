@@ -12,6 +12,10 @@ use core::marker::PhantomData;
 use std::vec::Vec;
 
 use libafl_bolts::Named;
+use serde::{Deserialize, Serialize};
+
+use crate::{Error, observers::Observer};
+
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
 ///
@@ -166,7 +170,6 @@ use libafl_bolts::Named;
 ///    }
 ///
 /// ```
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct OutputObserver<T> {
     /// The name of the observer.
