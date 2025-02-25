@@ -1,4 +1,4 @@
-/// Same as `inproc_crash_handler`, but this is called when address sanitizer exits, not from the exception handler
+/// In-Process crash handling for `Windows`
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_asan_handler {
     use alloc::string::String;
