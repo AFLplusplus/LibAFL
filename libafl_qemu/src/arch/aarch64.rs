@@ -117,7 +117,7 @@ impl crate::ArchExtras for crate::CPU {
             7 => self.read_reg(Regs::X7),
             _ => {
                 const SIZE: usize = size_of::<GuestReg>();
-                let stack_ptr: GuestAddr = self.read_reg(Regs::Rsp)?;
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
                 /*
                  * Stack is full and descending. SP points to return address, arguments
                  * are in reverse order above that. 8th argument is at SP + 8.

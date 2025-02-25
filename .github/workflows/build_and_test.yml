@@ -365,7 +365,7 @@ jobs:
         shell: bash
         run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
-  fuzzers-qemu:
+  fuzzers-qemu-user:
     needs:
       - changes
     if: ${{ needs.changes.outputs.qemu == 'true' }}
@@ -377,7 +377,31 @@ jobs:
           - ./fuzzers/binary_only/qemu_cmin
           - ./fuzzers/binary_only/qemu_coverage
           - ./fuzzers/binary_only/qemu_launcher
+        arch:
+          - aarch64
+          - arm
+          - i386
+          - ppc
+          - x86_64
 
+    runs-on: [ self-hosted, qemu ]
+    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Build and run example QEMU fuzzers (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+
+  fuzzers-qemu-system:
+    needs:
+      - changes
+    if: ${{ needs.changes.outputs.qemu == 'true' }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04]
+        fuzzer:
           # Full-system
           - ./fuzzers/full_system/qemu_baremetal
           - ./fuzzers/full_system/qemu_linux_kernel
