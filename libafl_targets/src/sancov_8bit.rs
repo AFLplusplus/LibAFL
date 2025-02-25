@@ -8,12 +8,18 @@ use libafl_bolts::{AsSlice, AsSliceMut, ownedref::OwnedMutSlice};
 pub static mut COUNTERS_MAPS: Vec<OwnedMutSlice<'static, u8>> = Vec::new();
 
 /// Gets a pointer to [`COUNTER_MAPS`]
-fn counter_maps_ptr() -> *const Vec<OwnedMutSlice<'static, u8>> {
+///
+/// # Safety
+/// The resulting pointer points to a global. Handle with care!
+pub unsafe fn counter_maps_ptr() -> *const Vec<OwnedMutSlice<'static, u8>> {
     &raw const COUNTERS_MAPS
 }
 
 /// Gets a pointer to [`COUNTER_MAPS`], mut
-fn counter_maps_ptr_mut() -> *mut Vec<OwnedMutSlice<'static, u8>> {
+///
+/// # Safety
+/// The resulting pointer points to a global. Handle with care!
+pub unsafe fn counter_maps_ptr_mut() -> *mut Vec<OwnedMutSlice<'static, u8>> {
     &raw mut COUNTERS_MAPS
 }
 
