@@ -25,7 +25,7 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_targets::{COUNTERS_MAPS, OomFeedback, OomObserver};
+use libafl_targets::{counters_maps_ptr_mut, OomFeedback, OomObserver};
 
 use crate::{
     corpus::{ArtifactCorpus, LibfuzzerCorpus},
@@ -96,7 +96,7 @@ pub fn merge(
     }
 
     #[expect(clippy::deref_addrof)]
-    let edges = unsafe { core::mem::take(&mut *(&raw mut COUNTERS_MAPS)) };
+    let edges = unsafe { core::mem::take(&mut *(counters_maps_ptr_mut()) };
     let edges_observer = MultiMapObserver::new("edges", edges);
 
     let time = TimeObserver::new("time");
