@@ -171,7 +171,7 @@ impl AsanErrorCallback {
     /// The `ASan` error report accesses [`FullBacktraceCollector`]
     #[must_use]
     pub unsafe fn report() -> Self {
-        Self::new(Box::new(|rt, qemu, pc, err| {
+        Self::new(Box::new(|rt, qemu, pc, err| unsafe {
             asan_report(rt, qemu, pc, &err);
         }))
     }
@@ -330,7 +330,7 @@ impl AsanModuleBuilder {
             self.detect_leaks,
             self.snapshot,
             self.filter,
-            Some(AsanErrorCallback::report()),
+            Some(unsafe { AsanErrorCallback::report() }),
             self.target_crash,
         )
     }
