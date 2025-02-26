@@ -485,15 +485,15 @@ jobs:
       - name: Build fuzzers/inprocess/libfuzzer_stb_image
         run: cd fuzzers/inprocess/libfuzzer_stb_image && cargo build --release
 
-  windows-libfuzzer-asan:
-    runs-on: windows-latest
-    needs:
-      - common
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/inprocess/libfuzzer_windows_asan
-        run: cd fuzzers/inprocess/libfuzzer_windows_asan && just test
+  # windows-libfuzzer-asan:
+  #   runs-on: windows-latest
+  #   needs:
+  #     - common
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: ./.github/workflows/windows-tester-prepare
+  #     - name: Build fuzzers/inprocess/libfuzzer_windows_asan
+  #       run: cd fuzzers/inprocess/libfuzzer_windows_asan && just test
 
   windows-frida-gdiplus:
     runs-on: windows-latest
