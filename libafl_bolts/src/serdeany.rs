@@ -840,17 +840,17 @@ impl<'de> Deserialize<'de> for Box<dyn crate::serdeany::SerdeAny> {
 #[macro_export]
 macro_rules! create_register {
     ($struct_type:ty) => {
-        const _: () = {
+        $crate::ctor::declarative::ctor! {
             /// Automatically register this type
-            #[$crate::ctor]
-            fn register() {
+            #[ctor(anonymous)]
+            unsafe fn register() {
                 // # Safety
                 // This `register` call will always run at startup and never in parallel.
                 unsafe {
                     $crate::serdeany::RegistryBuilder::register::<$struct_type>();
                 }
             }
-        };
+        }
     };
 }
 
