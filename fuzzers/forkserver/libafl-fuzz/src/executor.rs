@@ -200,7 +200,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
         false
     };
 
-    #[expect(clippy::useless_conversion)] // u16 on MacOS, u32 on Linux
+    #[allow(clippy::useless_conversion)] // u16 on MacOS, u32 on Linux
     let permission = if is_library {
         u32::from(S_IRUSR) // user can read
     } else {
