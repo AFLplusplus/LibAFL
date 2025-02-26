@@ -477,43 +477,45 @@ impl AsanModule {
 }
 
 impl AsanGiovese {
-    unsafe fn init(self: &mut Pin<Box<Self>>, qemu_hooks: QemuHooks) { unsafe {
-        assert_ne!(
-            libc::mmap(
-                HIGH_SHADOW_ADDR,
-                HIGH_SHADOW_SIZE,
-                PROT_READ | PROT_WRITE,
-                MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
-                -1,
-                0
-            ),
-            MAP_FAILED
-        );
-        assert_ne!(
-            libc::mmap(
-                LOW_SHADOW_ADDR,
-                LOW_SHADOW_SIZE,
-                PROT_READ | PROT_WRITE,
-                MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
-                -1,
-                0
-            ),
-            MAP_FAILED
-        );
-        assert_ne!(
-            libc::mmap(
-                GAP_SHADOW_ADDR,
-                GAP_SHADOW_SIZE,
-                PROT_READ | PROT_WRITE,
-                MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
-                -1,
-                0
-            ),
-            MAP_FAILED
-        );
+    unsafe fn init(self: &mut Pin<Box<Self>>, qemu_hooks: QemuHooks) {
+        unsafe {
+            assert_ne!(
+                libc::mmap(
+                    HIGH_SHADOW_ADDR,
+                    HIGH_SHADOW_SIZE,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
+                    -1,
+                    0
+                ),
+                MAP_FAILED
+            );
+            assert_ne!(
+                libc::mmap(
+                    LOW_SHADOW_ADDR,
+                    LOW_SHADOW_SIZE,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
+                    -1,
+                    0
+                ),
+                MAP_FAILED
+            );
+            assert_ne!(
+                libc::mmap(
+                    GAP_SHADOW_ADDR,
+                    GAP_SHADOW_SIZE,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
+                    -1,
+                    0
+                ),
+                MAP_FAILED
+            );
 
-        qemu_hooks.add_pre_syscall_hook(self.as_mut(), Self::fake_syscall);
-    }}
+            qemu_hooks.add_pre_syscall_hook(self.as_mut(), Self::fake_syscall);
+        }
+    }
 
     #[must_use]
     fn new() -> Pin<Box<Self>> {

@@ -1141,9 +1141,9 @@ where
 
     /// # Safety
     /// This will potentially call an unsafe backdoor hook
-    pub unsafe fn backdoor(&mut self, hook: BackdoorHook<ET, I, S>) -> Option<BackdoorHookId> { unsafe {
-        self.hooks.backdoor(hook)
-    }}
+    pub unsafe fn backdoor(&mut self, hook: BackdoorHook<ET, I, S>) -> Option<BackdoorHookId> {
+        unsafe { self.hooks.backdoor(hook) }
+    }
 
     pub fn backdoor_function(&mut self, hook: BackdoorHookFn<ET, I, S>) -> BackdoorHookId {
         self.hooks.backdoor_function(hook)
@@ -1154,9 +1154,9 @@ where
     pub unsafe fn backdoor_closure(
         &mut self,
         hook: BackdoorHookClosure<ET, I, S>,
-    ) -> BackdoorHookId { unsafe {
-        self.hooks.backdoor_closure(hook)
-    }}
+    ) -> BackdoorHookId {
+        unsafe { self.hooks.backdoor_closure(hook) }
+    }
 
     pub fn thread_creation(&mut self, hook: NewThreadHook<ET, I, S>) -> Option<NewThreadHookId> {
         self.hooks.thread_creation(hook)

@@ -152,7 +152,9 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
         }
     }
 
-    unsafe { libc::_exit(128 + (signal as i32)); }
+    unsafe {
+        libc::_exit(128 + (signal as i32));
+    }
 }
 
 #[cfg(feature = "systemmode")]
@@ -182,14 +184,14 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
         if BREAK_ON_TMOUT.load(Ordering::Acquire) {
             libafl_exit_request_timeout();
         } else {
-                libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
-                    E,
-                    EM,
-                    I,
-                    OF,
-                    S,
-                    Z,
-                >(signal, info, context, data);
+            libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
+                E,
+                EM,
+                I,
+                OF,
+                S,
+                Z,
+            >(signal, info, context, data);
         }
     }
 
