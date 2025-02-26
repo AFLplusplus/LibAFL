@@ -139,7 +139,8 @@ use crate::{Error, observers::Observer};
 ///                .as_bytes()
 ///                .iter()
 ///                .zip(
-///                    (&*(&raw const STDOUT)).as_ref()
+///                    (&*(&raw const STDOUT))
+///                        .as_ref()
 ///                        .unwrap()
 ///                        .iter()
 ///                        .filter(|e| **e != 10)
