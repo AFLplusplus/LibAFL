@@ -1,12 +1,6 @@
 #![allow(clippy::cast_possible_wrap)]
 
-use std::{
-    env,
-    fmt::{self, Debug, Formatter},
-    fs,
-    ops::Range,
-    path::PathBuf,
-};
+use std::{env, fmt::Debug, fs, ops::Range, path::PathBuf};
 
 use libafl_qemu_sys::{GuestAddr, MapInfo};
 
@@ -25,34 +19,12 @@ use crate::{
     sys::TCGTemp,
 };
 
-#[derive(Clone)]
-struct QemuAsanGuestMapping {
-    start: GuestAddr,
-    end: GuestAddr,
-    path: String,
-}
-
-impl Debug for QemuAsanGuestMapping {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "0x{:016x}-0x{:016x} {}", self.start, self.end, self.path)
-    }
-}
-
-impl From<&MapInfo> for QemuAsanGuestMapping {
-    fn from(map: &MapInfo) -> QemuAsanGuestMapping {
-        let path = map.path().map(ToString::to_string).unwrap_or_default();
-        let start = map.start();
-        let end = map.end();
-        QemuAsanGuestMapping { start, end, path }
-    }
-}
-
 #[derive(Debug)]
 pub struct AsanGuestModule<F> {
     env: Vec<(String, String)>,
     filter: F,
-    mappings: Option<Vec<QemuAsanGuestMapping>>,
     asan_lib: Option<String>,
+    asan_mappings: Option<Vec<MapInfo>>,
 }
 
 #[cfg(any(
@@ -112,8 +84,8 @@ where
         Self {
             env: env.to_vec(),
             filter,
-            mappings: None,
             asan_lib: None,
+            asan_mappings: None,
         }
     }
 
@@ -144,12 +116,10 @@ where
     }
 
     /* Don't sanitize the sanitizer! */
-    unsafe {
-        if h.mappings
-            .as_mut()
-            .unwrap_unchecked()
+    if let Some(asan_mappings) = &h.asan_mappings {
+        if asan_mappings
             .iter()
-            .any(|m| m.start <= pc && pc < m.end)
+            .any(|m| m.start() <= pc && pc < m.end())
         {
             return None;
         }
@@ -157,11 +127,9 @@ where
 
     let size = info.size();
 
-    /* TODO - If our size is > 8 then do things via a runtime callback */
-    assert!(size <= 8, "I shouldn't be here!");
-
+    // TODO: Handle larger load/store operations
     unsafe {
-        libafl_tcg_gen_asan(addr, size);
+        libafl_tcg_gen_asan(addr, size.min(8));
     }
 
     None
@@ -309,37 +277,35 @@ where
         I: Unpin,
         S: Unpin,
     {
-        for mapping in qemu.mappings() {
-            println!("mapping: {mapping:#?}");
-        }
-
-        let mappings = qemu
-            .mappings()
-            .map(|m| QemuAsanGuestMapping::from(&m))
-            .collect::<Vec<QemuAsanGuestMapping>>();
-
+        let mappings = qemu.mappings().collect::<Vec<MapInfo>>();
         for mapping in &mappings {
-            println!("guest mapping: {mapping:#?}");
+            log::info!("mapping: {mapping:}");
         }
 
-        mappings
+        let high_shadow = mappings
             .iter()
-            .find(|m| m.start <= Self::HIGH_SHADOW_START && m.end > Self::HIGH_SHADOW_END)
+            .find(|m| m.start() <= Self::HIGH_SHADOW_START && m.end() > Self::HIGH_SHADOW_END)
             .expect("HighShadow not found, confirm ASAN DSO is loaded in the guest");
+        log::info!("high_shadow: {high_shadow:}");
 
-        mappings
+        let low_shadow = mappings
             .iter()
-            .find(|m| m.start <= Self::LOW_SHADOW_START && m.end > Self::LOW_SHADOW_END)
+            .find(|m| m.start() <= Self::LOW_SHADOW_START && m.end() > Self::LOW_SHADOW_END)
             .expect("LowShadow not found, confirm ASAN DSO is loaded in the guest");
+        log::info!("low_shadow: {low_shadow:}");
 
-        let mappings = mappings
-            .iter()
-            .filter(|m| &m.path == self.asan_lib.as_ref().unwrap())
-            .cloned()
-            .collect::<Vec<QemuAsanGuestMapping>>();
-
-        for mapping in &mappings {
-            println!("asan mapping: {mapping:#?}");
+        if let Some(asan_lib) = &self.asan_lib {
+            let asan_mappings = mappings
+                .into_iter()
+                .filter(|m| match m.path() {
+                    Some(p) => p == asan_lib,
+                    None => false,
+                })
+                .collect::<Vec<MapInfo>>();
+            asan_mappings
+                .iter()
+                .for_each(|m| println!("asan mapping: {m:}"));
+            self.asan_mappings = Some(asan_mappings);
         }
 
         emulator_modules.reads(
