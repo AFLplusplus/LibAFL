@@ -183,7 +183,6 @@ pub fn build() {
         .expect("Could not write bindings.");
 
     bindgen::Builder::default()
-        .rust_edition(2024)
         .derive_debug(true)
         .derive_default(true)
         .impl_debug(true)
