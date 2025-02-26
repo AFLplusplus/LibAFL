@@ -104,7 +104,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
                     // we are running in a nested signal handling
                     // and the signal is a host QEMU signal
 
-                    let si_addr = { info.si_addr() as usize };
+                    let si_addr = unsafe { info.si_addr() as usize };
                     log::error!(
                         "QEMU Host crash crashed at addr 0x{si_addr:x}... Bug in QEMU or Emulator modules? Exiting.\n"
                     );
@@ -124,7 +124,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
                     log::debug!("Running crash hooks.");
                     run_target_crash_hooks::<ET, I, S>(signal.into());
 
-                    assert!(data.maybe_report_crash::<E, EM, I, OF, S, Z>(None));
+                    assert!(unsafe { data.maybe_report_crash::<E, EM, I, OF, S, Z>(None) });
 
                     if let Some(cpu) = qemu.current_cpu() {
                         eprint!("QEMU Context:\n{}", cpu.display_context());
@@ -133,7 +133,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
             }
         } else {
             // qemu is not running, it is a bug in LibAFL
-            let si_addr = { info.si_addr() as usize };
+            let si_addr = unsafe { info.si_addr() as usize };
             log::error!("The fuzzer crashed at addr 0x{si_addr:x}... Bug in the fuzzer? Exiting.");
 
             let bsod = minibsod::generate_minibsod_to_vec(signal, info, context.as_deref());
@@ -150,7 +150,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
         }
     }
 
-    libc::_exit(128 + (signal as i32));
+    unsafe { libc::_exit(128 + (signal as i32)); }
 }
 
 #[cfg(feature = "systemmode")]
@@ -180,14 +180,16 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
         if BREAK_ON_TMOUT.load(Ordering::Acquire) {
             libafl_exit_request_timeout();
         } else {
-            libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
-                E,
-                EM,
-                I,
-                OF,
-                S,
-                Z,
-            >(signal, info, context, data);
+            unsafe {
+                libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
+                    E,
+                    EM,
+                    I,
+                    OF,
+                    S,
+                    Z,
+                >(signal, info, context, data);
+            }
         }
     }
 
@@ -198,14 +200,16 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
             emulator_modules.modules_mut().on_timeout_all();
         }
 
-        libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
-            E,
-            EM,
-            I,
-            OF,
-            S,
-            Z,
-        >(signal, info, context, data);
+        unsafe {
+            libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
+                E,
+                EM,
+                I,
+                OF,
+                S,
+                Z,
+            >(signal, info, context, data);
+        }
     }
 }
 

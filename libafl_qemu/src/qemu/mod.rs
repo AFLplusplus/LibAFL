@@ -645,9 +645,11 @@ impl Qemu {
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run(&self) -> Result<QemuExitReason, QemuExitError> {
-        QEMU_IS_RUNNING = true;
-        self.run_inner();
-        QEMU_IS_RUNNING = false;
+        unsafe {
+            QEMU_IS_RUNNING = true;
+            self.run_inner();
+            QEMU_IS_RUNNING = false;
+        }
 
         let exit_reason = unsafe { libafl_get_exit_reason() };
         if exit_reason.is_null() {
@@ -774,25 +776,25 @@ impl Qemu {
     /// The read object should have the same layout as the type of val.
     /// No checked is performed to check whether the returned object makes sense or not.
     // TODO: Use sized array when const generics are stabilized.
-    pub unsafe fn read_mem_val<T>(&self, addr: GuestAddr) -> Result<T, QemuRWError> {
+    pub unsafe fn read_mem_val<T>(&self, addr: GuestAddr) -> Result<T, QemuRWError> { unsafe {
         // let mut val_buf: [u8; size_of::<T>()] = [0; size_of::<T>()];
 
         let val_buf: Vec<u8> = vec_init(size_of::<T>(), |buf| self.read_mem(addr, buf))?;
 
         Ok(ptr::read(val_buf.as_ptr() as *const T))
-    }
+    }}
 
     /// Write a value to memory at a guest addr, taking into account the potential indirections with the current CPU.
     ///
     /// # Safety
     ///
     /// val will be used as parameter of [`slice::from_raw_parts`], and thus must enforce the same requirements.
-    pub unsafe fn write_mem_val<T>(&self, addr: GuestAddr, val: &T) -> Result<(), QemuRWError> {
+    pub unsafe fn write_mem_val<T>(&self, addr: GuestAddr, val: &T) -> Result<(), QemuRWError> { unsafe {
         let val_buf: &[u8] = slice::from_raw_parts(ptr::from_ref(val) as *const u8, size_of::<T>());
         self.write_mem(addr, val_buf)?;
 
         Ok(())
-    }
+    }}
 
     /// Read a value from a guest address.
     ///
@@ -803,11 +805,11 @@ impl Qemu {
     /// In any case, no check will be performed on the correctness of the operation.
     ///
     /// Please refer to [`CPU::read_mem`] for more details.
-    pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
+    pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) { unsafe {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
             .read_mem_unchecked(addr, buf);
-    }
+    }}
 
     /// Write a value to a guest address.
     ///
@@ -818,11 +820,11 @@ impl Qemu {
     ///
     /// This may only be safely used for valid guest addresses.
     /// Please refer to [`CPU::write_mem`] for more details.
-    pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
+    pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) { unsafe {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
             .write_mem_unchecked(addr, buf);
-    }
+    }}
 
     #[must_use]
     pub fn num_regs(&self) -> i32 {
@@ -922,7 +924,7 @@ impl Qemu {
     ///
     /// Calling this multiple times concurrently will access static variables and is unsafe.
     #[expect(clippy::type_complexity)]
-    pub unsafe fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
+    pub unsafe fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) { unsafe {
         let fat: Box<FatPtr> = Box::new(transmute::<
             Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
             FatPtr,
@@ -930,7 +932,7 @@ impl Qemu {
         libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
         let commands_ptr = &raw mut GDB_COMMANDS;
         (*commands_ptr).push(fat);
-    }
+    }}
 
     pub fn gdb_reply(&self, output: &str) {
         unsafe { libafl_qemu_gdb_reply(output.as_bytes().as_ptr(), output.len()) };

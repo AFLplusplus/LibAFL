@@ -361,13 +361,13 @@ where
             .post_exec_all(qemu, emulator_modules, state, input, observers, exit_kind);
     }
 
-    unsafe fn on_crash_all(&mut self) {
+    unsafe fn on_crash_all(&mut self) { unsafe {
         self.0.on_crash();
         self.1.on_crash_all();
-    }
+    }}
 
-    unsafe fn on_timeout_all(&mut self) {
+    unsafe fn on_timeout_all(&mut self) { unsafe {
         self.0.on_timeout();
         self.1.on_timeout_all();
-    }
+    }}
 }

@@ -477,7 +477,7 @@ impl AsanModule {
 }
 
 impl AsanGiovese {
-    unsafe fn init(self: &mut Pin<Box<Self>>, qemu_hooks: QemuHooks) {
+    unsafe fn init(self: &mut Pin<Box<Self>>, qemu_hooks: QemuHooks) { unsafe {
         assert_ne!(
             libc::mmap(
                 HIGH_SHADOW_ADDR,
@@ -513,7 +513,7 @@ impl AsanGiovese {
         );
 
         qemu_hooks.add_pre_syscall_hook(self.as_mut(), Self::fake_syscall);
-    }
+    }}
 
     #[must_use]
     fn new() -> Pin<Box<Self>> {

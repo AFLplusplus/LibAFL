@@ -431,7 +431,7 @@ where
 
             // Run QEMU
             log::debug!("Running QEMU...");
-            let mut exit_reason = self.run_qemu();
+            let mut exit_reason = unsafe { self.run_qemu() };
             log::debug!("QEMU stopped.");
 
             // Handle QEMU exit
@@ -444,12 +444,13 @@ where
     }
 
     /// This function will run the emulator until the next breakpoint, or until finish.
+    ///
     /// # Safety
     ///
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run_qemu(&self) -> Result<EmulatorExitResult<C>, EmulatorExitError> {
-        match self.qemu.run() {
+        match unsafe { self.qemu.run() } {
             Ok(qemu_exit_reason) => Ok(match qemu_exit_reason {
                 QemuExitReason::End(qemu_shutdown_cause) => {
                     EmulatorExitResult::QemuExit(qemu_shutdown_cause)

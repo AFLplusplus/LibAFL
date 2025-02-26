@@ -155,10 +155,10 @@ impl CPU {
     /// This will read from a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
+    pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) { unsafe {
         let host_addr = Qemu::get().unwrap().g2h(addr);
         copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
-    }
+    }}
 
     /// Write a value to a guest address.
     /// The input address in not checked for validity.
@@ -167,10 +167,10 @@ impl CPU {
     /// This will write to a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
+    pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) { unsafe {
         let host_addr = Qemu::get().unwrap().g2h(addr);
         copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
-    }
+    }}
 
     #[must_use]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
@@ -248,9 +248,9 @@ impl Qemu {
         }
     }
 
-    pub(super) unsafe fn run_inner(self) {
+    pub(super) unsafe fn run_inner(self) { unsafe {
         libafl_qemu_run();
-    }
+    }}
 
     #[must_use]
     pub fn binary_path<'a>(&self) -> &'a str {
@@ -386,9 +386,9 @@ impl Qemu {
         host_sig: c_int,
         info: *mut siginfo_t,
         puc: *mut c_void,
-    ) {
+    ) { unsafe {
         libafl_qemu_sys::libafl_qemu_native_signal_handler(host_sig, info, puc);
-    }
+    }}
 
     /// Emulate a signal coming from the target
     ///
@@ -396,11 +396,11 @@ impl Qemu {
     ///
     /// This may raise a signal to host. Some signals could have a funky behaviour.
     /// SIGSEGV is safe to use.
-    pub unsafe fn target_signal(&self, signal: Signal) {
+    pub unsafe fn target_signal(&self, signal: Signal) { unsafe {
         QEMU_IS_RUNNING = true;
         libafl_qemu_sys::libafl_set_in_target_signal_ctx();
         libc::raise(signal.into());
-    }
+    }}
 }
 
 #[cfg(feature = "python")]
