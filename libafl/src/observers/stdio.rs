@@ -40,9 +40,6 @@ use crate::{Error, observers::Observer};
 ///     rands::StdRand,
 ///     tuples::{Handle, Handled, MatchNameRef, tuple_list},
 /// };
-/// use serde::{Deserialize, Serialize};
-///
-/// use crate::{Error, observers::Observer};
 ///
 /// static mut STDOUT: Option<Vec<u8>> = None;
 /// static mut STDERR: Option<Vec<u8>> = None;
@@ -149,7 +146,7 @@ use crate::{Error, observers::Observer};
 ///                ) // ignore newline chars
 ///                .all(|(&a, &b)| a == b)
 ///        );
-///        assert!(&*(&raw const STDERR)).unwrap().is_empty();
+///        assert!((&*(&raw const STDERR)).unwrap().is_empty());
 ///    }
 ///
 ///    state
@@ -171,6 +168,7 @@ use crate::{Error, observers::Observer};
 ///    }
 /// }
 /// ```
+///
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct OutputObserver<T> {
     /// The name of the observer.
