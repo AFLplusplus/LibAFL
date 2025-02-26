@@ -22,6 +22,8 @@ pub use libc::c_ulong;
 #[cfg(feature = "std")]
 use nix::errno::Errno;
 
+/// The special exit code when the target signal handler is crashing recursively
+pub const SIGNAL_RECURSION_EXIT: i32 = 101;
 /// The special exit code when the target exited through ctrl-c
 pub const CTRL_C_EXIT: i32 = 100;
 

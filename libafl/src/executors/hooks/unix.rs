@@ -5,7 +5,9 @@ pub mod unix_signal_handler {
     use core::mem::transmute;
     use std::{io::Write, panic};
 
-    use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
+    use libafl_bolts::os::unix_signals::{
+        ucontext_t, Signal, SignalHandler, SIGNAL_RECURSION_EXIT,
+    };
     use libc::siginfo_t;
 
     use crate::{
@@ -51,6 +53,12 @@ pub mod unix_signal_handler {
         ) {
             unsafe {
                 let data = &raw mut GLOBAL_STATE;
+                let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
+
+                if max_depth_reached {
+                    log::error!("The in process signal handler has been triggered {signal_depth} times recursively, which is not expected. Exiting with error code {SIGNAL_RECURSION_EXIT}...");
+                    libc::exit(SIGNAL_RECURSION_EXIT);
+                }
 
                 match signal {
                     Signal::SigUser2 | Signal::SigAlarm => {
@@ -66,6 +74,7 @@ pub mod unix_signal_handler {
                         }
                     }
                 }
+                (*data).signal_handler_exit();
             }
         }
 
@@ -89,11 +98,11 @@ pub mod unix_signal_handler {
         panic::set_hook(Box::new(move |panic_info| unsafe {
             old_hook(panic_info);
             let data = &raw mut GLOBAL_STATE;
-            let in_handler = (*data).set_in_handler(true);
+            let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
 
-            if in_handler {
-                log::error!("We crashed inside a crash panic hook, but this should never happen!");
-                libc::exit(56);
+            if max_depth_reached {
+                log::error!("The in process signal handler has been triggered {signal_depth} times recursively, which is not expected. Exiting with error code {SIGNAL_RECURSION_EXIT}...");
+                libc::exit(SIGNAL_RECURSION_EXIT);
             }
 
             if (*data).is_valid() {
@@ -115,7 +124,8 @@ pub mod unix_signal_handler {
 
                 libc::_exit(128 + 6); // SIGABRT exit code
             }
-            (*data).set_in_handler(in_handler);
+
+            (*data).signal_handler_exit();
         }));
     }
 
