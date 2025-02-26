@@ -538,9 +538,9 @@ macro_rules! fuzz_with {
         use libafl::observers::{
             HitcountsIterableMapObserver, HitcountsMapObserver, MultiMapObserver, StdMapObserver,
         };
-        use libafl_targets::{counter_maps_ptr, extra_counters};
+        use libafl_targets::{counters_maps_ptr, extra_counters};
 
-        let counters_len = unsafe { &*counter_maps_ptr() }.len();
+        let counters_len = unsafe { &*counters_maps_ptr() }.len();
 
         // Create an observation channel using the coverage map
         if counters_len == 1 {
