@@ -51,7 +51,11 @@ where
             index % 8
         };
         let mask = 1 << bit_index;
-        if val { byte | mask } else { byte & !mask }
+        if val {
+            byte | mask
+        } else {
+            byte & !mask
+        }
     }
     #[inline]
     pub fn set_bit(&mut self, index: usize, val: bool) {
@@ -338,16 +342,7 @@ impl Default for __pthread_cond_s {
 }
 impl ::std::fmt::Debug for __pthread_cond_s {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "__pthread_cond_s {{ __wseq: {:?}, __g1_start: {:?}, __g_size: {:?}, __g1_orig_size: {:?}, __wrefs: {:?}, __g_signals: {:?} }}",
-            self.__wseq,
-            self.__g1_start,
-            self.__g_size,
-            self.__g1_orig_size,
-            self.__wrefs,
-            self.__g_signals
-        )
+        write ! (f , "__pthread_cond_s {{ __wseq: {:?}, __g1_start: {:?}, __g_size: {:?}, __g1_orig_size: {:?}, __wrefs: {:?}, __g_signals: {:?} }}" , self . __wseq , self . __g1_start , self . __g_size , self . __g1_orig_size , self . __wrefs , self . __g_signals)
     }
 }
 pub type pthread_t = ::std::os::raw::c_ulong;
@@ -682,11 +677,7 @@ impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_2 {
 }
 impl ::std::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_2 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "siginfo_t__bindgen_ty_1__bindgen_ty_2 {{ si_tid: {:?}, si_overrun: {:?}, si_sigval: {:?} }}",
-            self.si_tid, self.si_overrun, self.si_sigval
-        )
+        write ! (f , "siginfo_t__bindgen_ty_1__bindgen_ty_2 {{ si_tid: {:?}, si_overrun: {:?}, si_sigval: {:?} }}" , self . si_tid , self . si_overrun , self . si_sigval)
     }
 }
 #[repr(C)]
@@ -720,11 +711,7 @@ impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_3 {
 }
 impl ::std::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_3 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "siginfo_t__bindgen_ty_1__bindgen_ty_3 {{ si_pid: {:?}, si_uid: {:?}, si_sigval: {:?} }}",
-            self.si_pid, self.si_uid, self.si_sigval
-        )
+        write ! (f , "siginfo_t__bindgen_ty_1__bindgen_ty_3 {{ si_pid: {:?}, si_uid: {:?}, si_sigval: {:?} }}" , self . si_pid , self . si_uid , self . si_sigval)
     }
 }
 #[repr(C)]
@@ -780,16 +767,8 @@ const _: () = {
     ["Alignment of siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1"]
         [::std::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1>(
         ) - 8usize];
-    ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1::_lower"]
-        [::std::mem::offset_of!(
-            siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1,
-            _lower
-        ) - 0usize];
-    ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1::_upper"]
-        [::std::mem::offset_of!(
-            siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1,
-            _upper
-        ) - 8usize];
+    ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1::_lower"] [:: std :: mem :: offset_of ! (siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 , _lower) - 0usize] ;
+    ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1::_upper"] [:: std :: mem :: offset_of ! (siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 , _upper) - 8usize] ;
 };
 impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
     fn default() -> Self {
@@ -856,11 +835,7 @@ impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_5 {
 }
 impl ::std::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_5 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "siginfo_t__bindgen_ty_1__bindgen_ty_5 {{ si_addr: {:?}, si_addr_lsb: {:?}, _bounds: {:?} }}",
-            self.si_addr, self.si_addr_lsb, self._bounds
-        )
+        write ! (f , "siginfo_t__bindgen_ty_1__bindgen_ty_5 {{ si_addr: {:?}, si_addr_lsb: {:?}, _bounds: {:?} }}" , self . si_addr , self . si_addr_lsb , self . _bounds)
     }
 }
 #[repr(C)]
@@ -2244,21 +2219,7 @@ impl Default for BusState {
 }
 impl ::std::fmt::Debug for BusState {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "BusState {{ obj: {:?}, parent: {:?}, name: {:?}, hotplug_handler: {:?}, max_index: {:?}, realized: {:?}, full: {:?}, num_children: {:?}, children: {:?}, sibling: {:?}, reset: {:?} }}",
-            self.obj,
-            self.parent,
-            self.name,
-            self.hotplug_handler,
-            self.max_index,
-            self.realized,
-            self.full,
-            self.num_children,
-            self.children,
-            self.sibling,
-            self.reset
-        )
+        write ! (f , "BusState {{ obj: {:?}, parent: {:?}, name: {:?}, hotplug_handler: {:?}, max_index: {:?}, realized: {:?}, full: {:?}, num_children: {:?}, children: {:?}, sibling: {:?}, reset: {:?} }}" , self . obj , self . parent , self . name , self . hotplug_handler , self . max_index , self . realized , self . full , self . num_children , self . children , self . sibling , self . reset)
     }
 }
 pub type PTR = *mut ::std::os::raw::c_void;
@@ -3684,11 +3645,7 @@ impl Default for CPUNegativeOffsetState {
 }
 impl ::std::fmt::Debug for CPUNegativeOffsetState {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "CPUNegativeOffsetState {{ tlb: {:?}, plugin_mem_cbs: {:?}, icount_decr: {:?}, can_do_io: {:?} }}",
-            self.tlb, self.plugin_mem_cbs, self.icount_decr, self.can_do_io
-        )
+        write ! (f , "CPUNegativeOffsetState {{ tlb: {:?}, plugin_mem_cbs: {:?}, icount_decr: {:?}, can_do_io: {:?} }}" , self . tlb , self . plugin_mem_cbs , self . icount_decr , self . can_do_io)
     }
 }
 #[repr(C)]
@@ -4017,63 +3974,7 @@ impl Default for CPUState {
 }
 impl ::std::fmt::Debug for CPUState {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "CPUState {{ parent_obj: {:?}, cc: {:?}, nr_cores: {:?}, nr_threads: {:?}, thread: {:?}, thread_id: {:?}, running: {:?}, has_waiter: {:?}, halt_cond: {:?}, thread_kicked: {:?}, created: {:?}, stop: {:?}, stopped: {:?}, start_powered_off: {:?}, unplug: {:?}, crash_occurred: {:?}, exit_request: {:?}, exclusive_context_count: {:?}, singlestep_enabled: {:?}, jmp_env: {:?}, work_mutex: {:?}, work_list: {:?}, cpu_ases: {:?}, cpu_ases_count: {:?}, num_ases: {:?}, as: {:?}, memory: {:?}, tb_jmp_cache: {:?}, gdb_regs: {:?}, gdb_num_regs: {:?}, gdb_num_g_regs: {:?}, node: {:?}, breakpoints: {:?}, watchpoints: {:?}, watchpoint_hit: {:?}, opaque: {:?}, kvm_fd: {:?}, kvm_state: {:?}, kvm_run: {:?}, kvm_dirty_gfns: {:?}, kvm_vcpu_stats_fd: {:?}, vcpu_dirty: {:?}, in_ioctl_lock: {:?}, plugin_state: {:?}, cpu_index: {:?}, cluster_index: {:?}, accel: {:?}, throttle_thread_scheduled: {:?}, ignore_memory_transaction_failures: {:?}, prctl_unalign_sigbus: {:?}, iommu_notifiers: {:?}, neg_align: {:?}, neg: {:?} }}",
-            self.parent_obj,
-            self.cc,
-            self.nr_cores,
-            self.nr_threads,
-            self.thread,
-            self.thread_id,
-            self.running,
-            self.has_waiter,
-            self.halt_cond,
-            self.thread_kicked,
-            self.created,
-            self.stop,
-            self.stopped,
-            self.start_powered_off,
-            self.unplug,
-            self.crash_occurred,
-            self.exit_request,
-            self.exclusive_context_count,
-            self.singlestep_enabled,
-            self.jmp_env,
-            self.work_mutex,
-            self.work_list,
-            self.cpu_ases,
-            self.cpu_ases_count,
-            self.num_ases,
-            self.as_,
-            self.memory,
-            self.tb_jmp_cache,
-            self.gdb_regs,
-            self.gdb_num_regs,
-            self.gdb_num_g_regs,
-            self.node,
-            self.breakpoints,
-            self.watchpoints,
-            self.watchpoint_hit,
-            self.opaque,
-            self.kvm_fd,
-            self.kvm_state,
-            self.kvm_run,
-            self.kvm_dirty_gfns,
-            self.kvm_vcpu_stats_fd,
-            self.vcpu_dirty,
-            self.in_ioctl_lock,
-            self.plugin_state,
-            self.cpu_index,
-            self.cluster_index,
-            self.accel,
-            self.throttle_thread_scheduled,
-            self.ignore_memory_transaction_failures,
-            self.prctl_unalign_sigbus,
-            self.iommu_notifiers,
-            self.neg_align,
-            self.neg
-        )
+        write ! (f , "CPUState {{ parent_obj: {:?}, cc: {:?}, nr_cores: {:?}, nr_threads: {:?}, thread: {:?}, thread_id: {:?}, running: {:?}, has_waiter: {:?}, halt_cond: {:?}, thread_kicked: {:?}, created: {:?}, stop: {:?}, stopped: {:?}, start_powered_off: {:?}, unplug: {:?}, crash_occurred: {:?}, exit_request: {:?}, exclusive_context_count: {:?}, singlestep_enabled: {:?}, jmp_env: {:?}, work_mutex: {:?}, work_list: {:?}, cpu_ases: {:?}, cpu_ases_count: {:?}, num_ases: {:?}, as: {:?}, memory: {:?}, tb_jmp_cache: {:?}, gdb_regs: {:?}, gdb_num_regs: {:?}, gdb_num_g_regs: {:?}, node: {:?}, breakpoints: {:?}, watchpoints: {:?}, watchpoint_hit: {:?}, opaque: {:?}, kvm_fd: {:?}, kvm_state: {:?}, kvm_run: {:?}, kvm_dirty_gfns: {:?}, kvm_vcpu_stats_fd: {:?}, vcpu_dirty: {:?}, in_ioctl_lock: {:?}, plugin_state: {:?}, cpu_index: {:?}, cluster_index: {:?}, accel: {:?}, throttle_thread_scheduled: {:?}, ignore_memory_transaction_failures: {:?}, prctl_unalign_sigbus: {:?}, iommu_notifiers: {:?}, neg_align: {:?}, neg: {:?} }}" , self . parent_obj , self . cc , self . nr_cores , self . nr_threads , self . thread , self . thread_id , self . running , self . has_waiter , self . halt_cond , self . thread_kicked , self . created , self . stop , self . stopped , self . start_powered_off , self . unplug , self . crash_occurred , self . exit_request , self . exclusive_context_count , self . singlestep_enabled , self . jmp_env , self . work_mutex , self . work_list , self . cpu_ases , self . cpu_ases_count , self . num_ases , self . as_ , self . memory , self . tb_jmp_cache , self . gdb_regs , self . gdb_num_regs , self . gdb_num_g_regs , self . node , self . breakpoints , self . watchpoints , self . watchpoint_hit , self . opaque , self . kvm_fd , self . kvm_state , self . kvm_run , self . kvm_dirty_gfns , self . kvm_vcpu_stats_fd , self . vcpu_dirty , self . in_ioctl_lock , self . plugin_state , self . cpu_index , self . cluster_index , self . accel , self . throttle_thread_scheduled , self . ignore_memory_transaction_failures , self . prctl_unalign_sigbus , self . iommu_notifiers , self . neg_align , self . neg)
     }
 }
 unsafe extern "C" {
@@ -4158,18 +4059,7 @@ impl Default for Property {
 }
 impl ::std::fmt::Debug for Property {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "Property {{ name: {:?}, info: {:?}, set_default: {:?}, defval: {:?}, arrayoffset: {:?}, arrayinfo: {:?}, arrayfieldsize: {:?}, link_type: {:?} }}",
-            self.name,
-            self.info,
-            self.set_default,
-            self.defval,
-            self.arrayoffset,
-            self.arrayinfo,
-            self.arrayfieldsize,
-            self.link_type
-        )
+        write ! (f , "Property {{ name: {:?}, info: {:?}, set_default: {:?}, defval: {:?}, arrayoffset: {:?}, arrayinfo: {:?}, arrayfieldsize: {:?}, link_type: {:?} }}" , self . name , self . info , self . set_default , self . defval , self . arrayoffset , self . arrayinfo , self . arrayfieldsize , self . link_type)
     }
 }
 #[repr(C)]
@@ -5456,66 +5346,7 @@ impl Default for CPUArchState {
 }
 impl ::std::fmt::Debug for CPUArchState {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "CPUArchState {{ regs: {:?}, segs: {:?}, ldt: {:?}, tr: {:?}, gdt: {:?}, idt: {:?}, cr: {:?}, pdptrs_valid: {:?}, pdptrs: {:?}, bnd_regs: {:?}, bndcs_regs: {:?}, start_init_save: {:?}, fpstt: {:?}, fptags: {:?}, fpregs: {:?}, fp_status: {:?}, ft0: {:?}, mmx_status: {:?}, sse_status: {:?}, xmm_regs: {:?}, xmm_t0: {:?}, mmx_t0: {:?}, opmask_regs: {:?}, xtilecfg: {:?}, xtiledata: {:?}, msr_ia32_sgxlepubkeyhash: {:?}, msr_fixed_counters: {:?}, msr_gp_counters: {:?}, msr_gp_evtsel: {:?}, end_init_save: {:?}, msr_hv_crash_params: {:?}, msr_hv_synic_sint: {:?}, msr_hv_stimer_config: {:?}, msr_hv_stimer_count: {:?}, msr_rtit_addrs: {:?}, lbr_records: {:?}, error_code: {:?}, exception_is_int: {:?}, dr: {:?}, __bindgen_anon_1: {:?}, old_exception: {:?}, end_reset_fields: {:?}, features: {:?}, user_features: {:?}, cpuid_model: {:?}, cache_info_cpuid2: {:?}, cache_info_cpuid4: {:?}, cache_info_amd: {:?}, mtrr_fixed: {:?}, mtrr_var: {:?}, tsc_valid: {:?}, mce_banks: {:?}, tpr_access_type: {:?}, nr_dies: {:?}, nr_modules: {:?}, avail_cpu_topo: {:?} }}",
-            self.regs,
-            self.segs,
-            self.ldt,
-            self.tr,
-            self.gdt,
-            self.idt,
-            self.cr,
-            self.pdptrs_valid,
-            self.pdptrs,
-            self.bnd_regs,
-            self.bndcs_regs,
-            self.start_init_save,
-            self.fpstt,
-            self.fptags,
-            self.fpregs,
-            self.fp_status,
-            self.ft0,
-            self.mmx_status,
-            self.sse_status,
-            self.xmm_regs,
-            self.xmm_t0,
-            self.mmx_t0,
-            self.opmask_regs,
-            self.xtilecfg,
-            self.xtiledata,
-            self.msr_ia32_sgxlepubkeyhash,
-            self.msr_fixed_counters,
-            self.msr_gp_counters,
-            self.msr_gp_evtsel,
-            self.end_init_save,
-            self.msr_hv_crash_params,
-            self.msr_hv_synic_sint,
-            self.msr_hv_stimer_config,
-            self.msr_hv_stimer_count,
-            self.msr_rtit_addrs,
-            self.lbr_records,
-            self.error_code,
-            self.exception_is_int,
-            self.dr,
-            self.__bindgen_anon_1,
-            self.old_exception,
-            self.end_reset_fields,
-            self.features,
-            self.user_features,
-            self.cpuid_model,
-            self.cache_info_cpuid2,
-            self.cache_info_cpuid4,
-            self.cache_info_amd,
-            self.mtrr_fixed,
-            self.mtrr_var,
-            self.tsc_valid,
-            self.mce_banks,
-            self.tpr_access_type,
-            self.nr_dies,
-            self.nr_modules,
-            self.avail_cpu_topo
-        )
+        write ! (f , "CPUArchState {{ regs: {:?}, segs: {:?}, ldt: {:?}, tr: {:?}, gdt: {:?}, idt: {:?}, cr: {:?}, pdptrs_valid: {:?}, pdptrs: {:?}, bnd_regs: {:?}, bndcs_regs: {:?}, start_init_save: {:?}, fpstt: {:?}, fptags: {:?}, fpregs: {:?}, fp_status: {:?}, ft0: {:?}, mmx_status: {:?}, sse_status: {:?}, xmm_regs: {:?}, xmm_t0: {:?}, mmx_t0: {:?}, opmask_regs: {:?}, xtilecfg: {:?}, xtiledata: {:?}, msr_ia32_sgxlepubkeyhash: {:?}, msr_fixed_counters: {:?}, msr_gp_counters: {:?}, msr_gp_evtsel: {:?}, end_init_save: {:?}, msr_hv_crash_params: {:?}, msr_hv_synic_sint: {:?}, msr_hv_stimer_config: {:?}, msr_hv_stimer_count: {:?}, msr_rtit_addrs: {:?}, lbr_records: {:?}, error_code: {:?}, exception_is_int: {:?}, dr: {:?}, __bindgen_anon_1: {:?}, old_exception: {:?}, end_reset_fields: {:?}, features: {:?}, user_features: {:?}, cpuid_model: {:?}, cache_info_cpuid2: {:?}, cache_info_cpuid4: {:?}, cache_info_amd: {:?}, mtrr_fixed: {:?}, mtrr_var: {:?}, tsc_valid: {:?}, mce_banks: {:?}, tpr_access_type: {:?}, nr_dies: {:?}, nr_modules: {:?}, avail_cpu_topo: {:?} }}" , self . regs , self . segs , self . ldt , self . tr , self . gdt , self . idt , self . cr , self . pdptrs_valid , self . pdptrs , self . bnd_regs , self . bndcs_regs , self . start_init_save , self . fpstt , self . fptags , self . fpregs , self . fp_status , self . ft0 , self . mmx_status , self . sse_status , self . xmm_regs , self . xmm_t0 , self . mmx_t0 , self . opmask_regs , self . xtilecfg , self . xtiledata , self . msr_ia32_sgxlepubkeyhash , self . msr_fixed_counters , self . msr_gp_counters , self . msr_gp_evtsel , self . end_init_save , self . msr_hv_crash_params , self . msr_hv_synic_sint , self . msr_hv_stimer_config , self . msr_hv_stimer_count , self . msr_rtit_addrs , self . lbr_records , self . error_code , self . exception_is_int , self . dr , self . __bindgen_anon_1 , self . old_exception , self . end_reset_fields , self . features , self . user_features , self . cpuid_model , self . cache_info_cpuid2 , self . cache_info_cpuid4 , self . cache_info_amd , self . mtrr_fixed , self . mtrr_var , self . tsc_valid , self . mce_banks , self . tpr_access_type , self . nr_dies , self . nr_modules , self . avail_cpu_topo)
     }
 }
 pub type CPUX86State = CPUArchState;
@@ -5752,54 +5583,7 @@ impl Default for ArchCPU {
 }
 impl ::std::fmt::Debug for ArchCPU {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(
-            f,
-            "ArchCPU {{ parent_obj: {:?}, env: {:?}, vmsentry: {:?}, hyperv_vendor: {:?}, hyperv_synic_kvm_only: {:?}, hyperv_passthrough: {:?}, hyperv_no_nonarch_cs: {:?}, hyperv_vendor_id: {:?}, hyperv_interface_id: {:?}, hyperv_limits: {:?}, hyperv_enforce_cpuid: {:?}, check_cpuid: {:?}, enforce_cpuid: {:?}, force_features: {:?}, expose_kvm: {:?}, expose_tcg: {:?}, migratable: {:?}, migrate_smi_count: {:?}, max_features: {:?}, vmware_cpuid_freq: {:?}, cache_info_passthrough: {:?}, mwait: {:?}, filtered_features: {:?}, enable_pmu: {:?}, enable_lmce: {:?}, enable_l3_cache: {:?}, l1_cache_per_core: {:?}, legacy_cache: {:?}, legacy_multi_node: {:?}, enable_cpuid_0xb: {:?}, full_cpuid_auto_level: {:?}, vendor_cpuid_only: {:?}, amd_topoext_features_only: {:?}, intel_pt_auto_level: {:?}, fill_mtrr_mask: {:?}, host_phys_bits: {:?}, kvm_pv_enforce_cpuid: {:?}, apic_state: {:?}, cpu_as_root: {:?}, cpu_as_mem: {:?}, smram: {:?}, machine_done: {:?}, kvm_msr_buf: {:?}, xen_vapic: {:?} }}",
-            self.parent_obj,
-            self.env,
-            self.vmsentry,
-            self.hyperv_vendor,
-            self.hyperv_synic_kvm_only,
-            self.hyperv_passthrough,
-            self.hyperv_no_nonarch_cs,
-            self.hyperv_vendor_id,
-            self.hyperv_interface_id,
-            self.hyperv_limits,
-            self.hyperv_enforce_cpuid,
-            self.check_cpuid,
-            self.enforce_cpuid,
-            self.force_features,
-            self.expose_kvm,
-            self.expose_tcg,
-            self.migratable,
-            self.migrate_smi_count,
-            self.max_features,
-            self.vmware_cpuid_freq,
-            self.cache_info_passthrough,
-            self.mwait,
-            self.filtered_features,
-            self.enable_pmu,
-            self.enable_lmce,
-            self.enable_l3_cache,
-            self.l1_cache_per_core,
-            self.legacy_cache,
-            self.legacy_multi_node,
-            self.enable_cpuid_0xb,
-            self.full_cpuid_auto_level,
-            self.vendor_cpuid_only,
-            self.amd_topoext_features_only,
-            self.intel_pt_auto_level,
-            self.fill_mtrr_mask,
-            self.host_phys_bits,
-            self.kvm_pv_enforce_cpuid,
-            self.apic_state,
-            self.cpu_as_root,
-            self.cpu_as_mem,
-            self.smram,
-            self.machine_done,
-            self.kvm_msr_buf,
-            self.xen_vapic
-        )
+        write ! (f , "ArchCPU {{ parent_obj: {:?}, env: {:?}, vmsentry: {:?}, hyperv_vendor: {:?}, hyperv_synic_kvm_only: {:?}, hyperv_passthrough: {:?}, hyperv_no_nonarch_cs: {:?}, hyperv_vendor_id: {:?}, hyperv_interface_id: {:?}, hyperv_limits: {:?}, hyperv_enforce_cpuid: {:?}, check_cpuid: {:?}, enforce_cpuid: {:?}, force_features: {:?}, expose_kvm: {:?}, expose_tcg: {:?}, migratable: {:?}, migrate_smi_count: {:?}, max_features: {:?}, vmware_cpuid_freq: {:?}, cache_info_passthrough: {:?}, mwait: {:?}, filtered_features: {:?}, enable_pmu: {:?}, enable_lmce: {:?}, enable_l3_cache: {:?}, l1_cache_per_core: {:?}, legacy_cache: {:?}, legacy_multi_node: {:?}, enable_cpuid_0xb: {:?}, full_cpuid_auto_level: {:?}, vendor_cpuid_only: {:?}, amd_topoext_features_only: {:?}, intel_pt_auto_level: {:?}, fill_mtrr_mask: {:?}, host_phys_bits: {:?}, kvm_pv_enforce_cpuid: {:?}, apic_state: {:?}, cpu_as_root: {:?}, cpu_as_mem: {:?}, smram: {:?}, machine_done: {:?}, kvm_msr_buf: {:?}, xen_vapic: {:?} }}" , self . parent_obj , self . env , self . vmsentry , self . hyperv_vendor , self . hyperv_synic_kvm_only , self . hyperv_passthrough , self . hyperv_no_nonarch_cs , self . hyperv_vendor_id , self . hyperv_interface_id , self . hyperv_limits , self . hyperv_enforce_cpuid , self . check_cpuid , self . enforce_cpuid , self . force_features , self . expose_kvm , self . expose_tcg , self . migratable , self . migrate_smi_count , self . max_features , self . vmware_cpuid_freq , self . cache_info_passthrough , self . mwait , self . filtered_features , self . enable_pmu , self . enable_lmce , self . enable_l3_cache , self . l1_cache_per_core , self . legacy_cache , self . legacy_multi_node , self . enable_cpuid_0xb , self . full_cpuid_auto_level , self . vendor_cpuid_only , self . amd_topoext_features_only , self . intel_pt_auto_level , self . fill_mtrr_mask , self . host_phys_bits , self . kvm_pv_enforce_cpuid , self . apic_state , self . cpu_as_root , self . cpu_as_mem , self . smram , self . machine_done , self . kvm_msr_buf , self . xen_vapic)
     }
 }
 unsafe extern "C" {
