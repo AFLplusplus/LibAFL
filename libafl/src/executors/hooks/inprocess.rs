@@ -454,7 +454,8 @@ impl InProcessExecutorHandlerData {
             let input = self.take_current_input::<I>();
 
             log::error!("Target crashed!");
-
+            log::debug!("why?");
+            log::error!("porco dio");
             if let Some(bsod_info) = bsod_info {
                 let bsod = generate_minibsod_to_vec(
                     bsod_info.signal,
