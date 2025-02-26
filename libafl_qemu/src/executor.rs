@@ -95,7 +95,9 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
                     // we did not run QEMU's signal handler, run it not
                     log::debug!("It's a simple signal, let QEMU handle it first");
 
-                    qemu.run_signal_handler(signal.into(), info, puc);
+                    unsafe {
+                        qemu.run_signal_handler(signal.into(), info, puc);
+                    }
 
                     // if we are there, we can safely to execution
                     return;
@@ -176,11 +178,10 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
     Z: HasObjective<Objective = OF>,
 {
     #[cfg(feature = "systemmode")]
-    {
+    unsafe {
         if BREAK_ON_TMOUT.load(Ordering::Acquire) {
             libafl_exit_request_timeout();
         } else {
-            unsafe {
                 libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
                     E,
                     EM,
@@ -189,27 +190,24 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
                     S,
                     Z,
                 >(signal, info, context, data);
-            }
         }
     }
 
     #[cfg(feature = "usermode")]
-    {
+    unsafe {
         // run modules' crash callback
         if let Some(emulator_modules) = EmulatorModules::<ET, I, S>::emulator_modules_mut() {
             emulator_modules.modules_mut().on_timeout_all();
         }
 
-        unsafe {
-            libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
-                E,
-                EM,
-                I,
-                OF,
-                S,
-                Z,
-            >(signal, info, context, data);
-        }
+        libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
+            E,
+            EM,
+            I,
+            OF,
+            S,
+            Z,
+        >(signal, info, context, data);
     }
 }
 

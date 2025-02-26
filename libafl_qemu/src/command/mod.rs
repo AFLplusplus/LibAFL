@@ -37,15 +37,13 @@ pub mod nyx;
 pub mod parser;
 
 mod bindings {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(improper_ctypes)]
-    #![allow(unused_mut)]
-    #![allow(unused)]
-    #![allow(unused_variables)]
-    #![allow(clippy::all)]
-    #![allow(clippy::pedantic)]
+    #![expect(non_upper_case_globals)]
+    #![expect(non_camel_case_types)]
+    #![expect(non_snake_case)]
+    #![expect(unused)]
+    #![expect(clippy::all)]
+    #![expect(clippy::pedantic)]
+    #![expect(unsafe_op_in_unsafe_fn)]
 
     include!(concat!(env!("OUT_DIR"), "/libafl_qemu_bindings.rs"));
 }

@@ -784,7 +784,7 @@ where
     pub unsafe fn backdoor(&mut self, hook: BackdoorHook<ET, I, S>) -> Option<BackdoorHookId> {
         match hook {
             Hook::Function(f) => Some(self.backdoor_function(f)),
-            Hook::Closure(c) => Some(self.backdoor_closure(c)),
+            Hook::Closure(c) => Some(unsafe { self.backdoor_closure(c) }),
             Hook::Raw(r) => {
                 let z: *const () = ptr::null::<()>();
                 Some(self.qemu_hooks.add_backdoor_hook(z, r))
