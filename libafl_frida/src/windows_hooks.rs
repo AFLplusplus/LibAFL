@@ -10,14 +10,16 @@ use libafl_bolts::os::windows_exceptions::{
 unsafe extern "C" fn is_processor_feature_present_detour(feature: u32) -> bool {
     match feature {
         0x17 => false,
-        _ => IsProcessorFeaturePresent(PROCESSOR_FEATURE_ID(feature)).as_bool(),
+        _ => unsafe { IsProcessorFeaturePresent(PROCESSOR_FEATURE_ID(feature)).as_bool() },
     }
 }
 unsafe extern "C" fn unhandled_exception_filter_detour(
     exception_pointers: *mut EXCEPTION_POINTERS,
 ) -> i32 {
-    handle_exception(exception_pointers);
-    UnhandledExceptionFilter(exception_pointers)
+    unsafe {
+        handle_exception(exception_pointers);
+        UnhandledExceptionFilter(exception_pointers)
+    }
 }
 /// Initialize the hooks
 pub fn initialize(gum: &Gum) {

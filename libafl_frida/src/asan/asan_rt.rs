@@ -774,7 +774,7 @@ impl AsanRuntime {
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
-                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+                        let this = unsafe { &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime) };
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
                         if $always_enabled || this.hooks_enabled {
                             if has_tls() {
