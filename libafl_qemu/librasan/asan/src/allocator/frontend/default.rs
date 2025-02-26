@@ -18,10 +18,10 @@ use log::debug;
 use thiserror::Error;
 
 use crate::{
+    GuestAddr,
     allocator::{backend::AllocatorBackend, frontend::AllocatorFrontend},
     shadow::{PoisonType, Shadow},
     tracking::Tracking,
-    GuestAddr,
 };
 
 struct Allocation {

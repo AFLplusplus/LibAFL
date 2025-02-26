@@ -5,25 +5,24 @@
 //! applications where the library has been statically linked.
 use core::{
     cmp::Ordering,
-    ffi::{c_int, c_void, CStr},
+    ffi::{CStr, c_int, c_void},
     marker::PhantomData,
     ptr::null_mut,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 
 use libc::{
-    off_t, size_t, MADV_DONTDUMP, MADV_HUGEPAGE, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE,
+    MADV_DONTDUMP, MADV_HUGEPAGE, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE, off_t, size_t,
 };
 use log::trace;
 use thiserror::Error;
 
 use crate::{
-    asan_swap,
+    GuestAddr, asan_swap,
     mmap::{Mmap, MmapProt},
     symbols::{
         AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols, SymbolsLookupStr,
     },
-    GuestAddr,
 };
 
 #[derive(Debug)]
@@ -216,9 +215,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
     fn protect(addr: GuestAddr, len: usize, prot: MmapProt) -> Result<(), Self::Error> {
         trace!(
             "protect - addr: {:#x}, len: {:#x}, prot: {:#x}",
-            addr,
-            len,
-            prot
+            addr, len, prot
         );
         let fn_mprotect = Self::get_mprotect()?;
         unsafe { asan_swap(false) };

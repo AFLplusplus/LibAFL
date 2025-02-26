@@ -4,7 +4,7 @@ use core::alloc::{GlobalAlloc, Layout, LayoutError};
 use baby_mimalloc::Mimalloc;
 use thiserror::Error;
 
-use crate::{allocator::backend::AllocatorBackend, GuestAddr};
+use crate::{GuestAddr, allocator::backend::AllocatorBackend};
 
 pub struct MimallocBackend<G: GlobalAlloc + Debug> {
     mimalloc: Mimalloc<G>,

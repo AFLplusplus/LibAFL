@@ -1,6 +1,6 @@
-use core::ffi::{c_char, c_long, CStr};
+use core::ffi::{CStr, c_char, c_long};
 
-use libc::{c_int, c_void, SYS_read};
+use libc::{SYS_read, c_int, c_void};
 use log::trace;
 
 use crate::{
@@ -20,21 +20,23 @@ static SYSCALL_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), no_mangle)]
-#[cfg_attr(feature = "test", export_name = "patch_read")]
+#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
+#[cfg_attr(feature = "test", unsafe(export_name = "patch_read"))]
 pub unsafe extern "C" fn read(fd: c_int, buf: *mut c_void, count: size_t) -> ssize_t {
-    trace!("read - fd: {:#x}, buf: {:p}, count: {:#x}", fd, buf, count);
+    unsafe {
+        trace!("read - fd: {:#x}, buf: {:p}, count: {:#x}", fd, buf, count);
 
-    if buf.is_null() && count != 0 {
-        asan_panic(c"read - buf is null".as_ptr() as *const c_char);
+        if buf.is_null() && count != 0 {
+            asan_panic(c"read - buf is null".as_ptr() as *const c_char);
+        }
+
+        asan_store(buf, count);
+        let addr = SYSCALL_ADDR
+            .get_or_insert_with(|| asan_sym(FunctionSyscall::NAME.as_ptr() as *const c_char));
+        let fn_syscall = FunctionSyscall::as_ptr(addr).unwrap();
+        asan_swap(false);
+        let ret = fn_syscall(SYS_read, fd, buf, count);
+        asan_swap(true);
+        ret as ssize_t
     }
-
-    asan_store(buf, count);
-    let addr = SYSCALL_ADDR
-        .get_or_insert_with(|| asan_sym(FunctionSyscall::NAME.as_ptr() as *const c_char));
-    let fn_syscall = FunctionSyscall::as_ptr(addr).unwrap();
-    asan_swap(false);
-    let ret = fn_syscall(SYS_read, fd, buf, count);
-    asan_swap(true);
-    ret as ssize_t
 }

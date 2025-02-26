@@ -1,21 +1,21 @@
 use core::{
-    ffi::{c_char, c_void, CStr},
+    ffi::{CStr, c_char, c_void},
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use log::{error, trace, Level};
+use log::{Level, error, trace};
 use spin::{Lazy, Mutex};
 
 use crate::{
+    GuestAddr,
     allocator::{
         backend::dlmalloc::DlmallocBackend,
-        frontend::{default::DefaultFrontend, AllocatorFrontend},
+        frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
     exit::exit,
     shadow::Shadow,
     symbols::Symbols,
     tracking::Tracking,
-    GuestAddr,
 };
 
 #[cfg(not(feature = "libc"))]
@@ -82,7 +82,7 @@ static FRONTEND: Lazy<Mutex<TestFrontend>> = Lazy::new(|| {
     Mutex::new(frontend)
 });
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_load(addr: *const c_void, size: usize) {
     trace!("load - addr: 0x{:x}, size: {:#x}", addr as GuestAddr, size);
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn asan_load(addr: *const c_void, size: usize) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_store(addr: *const c_void, size: usize) {
     trace!("store - addr: 0x{:x}, size: {:#x}", addr as GuestAddr, size);
@@ -110,47 +110,45 @@ pub unsafe extern "C" fn asan_store(addr: *const c_void, size: usize) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_alloc(len: usize, align: usize) -> *mut c_void {
     trace!("alloc - len: {:#x}, align: {:#x}", len, align);
     let ptr = FRONTEND.lock().alloc(len, align).unwrap() as *mut c_void;
     trace!(
         "alloc - len: {:#x}, align: {:#x}, ptr: {:p}",
-        len,
-        align,
-        ptr
+        len, align, ptr
     );
     ptr
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_dealloc(addr: *const c_void) {
     trace!("free - addr: {:p}", addr);
     FRONTEND.lock().dealloc(addr as GuestAddr).unwrap();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_get_size(addr: *const c_void) -> usize {
     trace!("get_size - addr: {:p}", addr);
     FRONTEND.lock().get_size(addr as GuestAddr).unwrap()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_sym(name: *const c_char) -> GuestAddr {
     TestSyms::lookup(name).unwrap()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_page_size() -> usize {
     PAGE_SIZE
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_unpoison(addr: *const c_void, len: usize) {
     trace!("unpoison - addr: {:p}, len: {:#x}", addr, len);
@@ -161,7 +159,7 @@ pub unsafe extern "C" fn asan_unpoison(addr: *const c_void, len: usize) {
         .unwrap();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_track(addr: *const c_void, len: usize) {
     trace!("track - addr: {:p}, len: {:#x}", addr, len);
@@ -172,7 +170,7 @@ pub unsafe extern "C" fn asan_track(addr: *const c_void, len: usize) {
         .unwrap();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_untrack(addr: *const c_void) {
     trace!("untrack - addr: {:p}", addr);
@@ -189,7 +187,7 @@ pub fn expect_panic() {
     EXPECT_PANIC.store(true, Ordering::SeqCst);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_panic(msg: *const c_char) -> ! {
     trace!("panic - msg: {:p}", msg);
@@ -205,7 +203,7 @@ pub unsafe extern "C" fn asan_panic(msg: *const c_char) -> ! {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_swap(enabled: bool) {
     trace!("swap - enabled: {}", enabled);

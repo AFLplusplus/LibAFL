@@ -2,8 +2,8 @@ use alloc::string::String;
 use core::fmt::Debug;
 
 use crate::{
-    maps::{decode::MapDecode, entry::MapEntry, MapReader},
     GuestAddr,
+    maps::{MapReader, decode::MapDecode, entry::MapEntry},
 };
 
 #[derive(Debug)]

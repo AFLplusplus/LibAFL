@@ -13,7 +13,7 @@ fn panic(info: &PanicInfo) -> ! {
     abort();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn rust_eh_personality() {
     error!("rust_eh_personality");
     abort();

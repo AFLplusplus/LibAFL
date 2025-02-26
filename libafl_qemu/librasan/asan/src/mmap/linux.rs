@@ -12,13 +12,13 @@ use core::{
 use log::trace;
 use rustix::{
     io::Errno,
-    mm::{madvise, mmap_anonymous, mprotect, munmap, Advice, MapFlags, MprotectFlags, ProtFlags},
+    mm::{Advice, MapFlags, MprotectFlags, ProtFlags, madvise, mmap_anonymous, mprotect, munmap},
 };
 use thiserror::Error;
 
 use crate::{
-    mmap::{Mmap, MmapProt},
     GuestAddr,
+    mmap::{Mmap, MmapProt},
 };
 
 #[derive(Ord, PartialOrd, PartialEq, Eq, Debug)]
@@ -72,9 +72,7 @@ impl Mmap for LinuxMmap {
     fn protect(addr: GuestAddr, len: usize, prot: MmapProt) -> Result<(), Self::Error> {
         trace!(
             "protect - addr: {:#x}, len: {:#x}, prot: {:#x}",
-            addr,
-            len,
-            prot
+            addr, len, prot
         );
         unsafe {
             mprotect(addr as *mut c_void, len, MprotectFlags::from(&prot))

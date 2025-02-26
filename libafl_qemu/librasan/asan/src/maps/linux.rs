@@ -1,7 +1,7 @@
 use rustix::{
     fd::OwnedFd,
-    fs::{open, Mode, OFlags},
-    io::{read, Errno},
+    fs::{Mode, OFlags, open},
+    io::{Errno, read},
 };
 use thiserror::Error;
 

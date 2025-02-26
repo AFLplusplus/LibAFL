@@ -7,7 +7,7 @@ use core::slice::from_raw_parts_mut;
 use log::{debug, trace};
 use thiserror::Error;
 
-use crate::{patch::Patch, GuestAddr};
+use crate::{GuestAddr, patch::Patch};
 
 #[derive(Debug)]
 pub struct RawPatch;

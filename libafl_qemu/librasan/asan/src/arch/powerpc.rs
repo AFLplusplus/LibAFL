@@ -6,7 +6,7 @@ use crate::size_t;
 type pid_t = i32;
 
 // Rustix does not currently implement these necessary symbols for powerpc.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mmap64(
     _addr: *mut c_void,
     _length: usize,
@@ -18,22 +18,22 @@ pub unsafe extern "C" fn mmap64(
     unimplemented!();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __errno_location() -> *mut c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn kill(_pid: pid_t, _sig: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn posix_madvise(_addr: *mut c_void, _len: size_t, _advice: c_int) -> c_int {
     unimplemented!();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn madvise(_addr: *mut c_void, _len: size_t, _advice: c_int) -> c_int {
     unimplemented!();
 }

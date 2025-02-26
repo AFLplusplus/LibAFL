@@ -6,16 +6,18 @@ use crate::{asan_alloc, asan_page_size, size_t};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), no_mangle)]
-#[cfg_attr(feature = "test", export_name = "patch_pvalloc")]
+#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
+#[cfg_attr(feature = "test", unsafe(export_name = "patch_pvalloc"))]
 pub unsafe extern "C" fn pvalloc(size: size_t) -> *mut c_void {
-    trace!("pvalloc - size: {:#x}", size);
-    let page_size = asan_page_size();
-    let aligned_size = if size == 0 {
-        page_size
-    } else {
-        (size + page_size - 1) & !(page_size - 1)
-    };
-    assert_ne!(aligned_size, 0);
-    asan_alloc(aligned_size, page_size)
+    unsafe {
+        trace!("pvalloc - size: {:#x}", size);
+        let page_size = asan_page_size();
+        let aligned_size = if size == 0 {
+            page_size
+        } else {
+            (size + page_size - 1) & !(page_size - 1)
+        };
+        assert_ne!(aligned_size, 0);
+        asan_alloc(aligned_size, page_size)
+    }
 }

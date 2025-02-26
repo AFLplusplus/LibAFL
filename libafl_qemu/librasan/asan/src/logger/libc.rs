@@ -1,14 +1,13 @@
 use alloc::{boxed::Box, format};
-use core::ffi::{c_int, c_void, CStr};
+use core::ffi::{CStr, c_int, c_void};
 
-use libc::{size_t, ssize_t, STDERR_FILENO};
+use libc::{STDERR_FILENO, size_t, ssize_t};
 use log::{Level, LevelFilter, Log, Metadata, Record};
 use spin::Once;
 
 use crate::{
-    asan_swap,
+    GuestAddr, asan_swap,
     symbols::{Function, FunctionPointer, Symbols, SymbolsLookupStr},
-    GuestAddr,
 };
 
 #[derive(Debug)]

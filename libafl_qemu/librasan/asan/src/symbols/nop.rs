@@ -2,7 +2,7 @@ use core::ffi::c_char;
 
 use thiserror::Error;
 
-use crate::{symbols::Symbols, GuestAddr};
+use crate::{GuestAddr, symbols::Symbols};
 
 #[derive(Debug)]
 pub struct NopSymbols;

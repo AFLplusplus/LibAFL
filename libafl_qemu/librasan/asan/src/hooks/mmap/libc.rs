@@ -1,4 +1,4 @@
-use core::ffi::{c_char, CStr};
+use core::ffi::{CStr, c_char};
 
 use libc::{c_int, c_void};
 use log::trace;
@@ -27,8 +27,8 @@ static MMAP_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), no_mangle)]
-#[cfg_attr(feature = "test", export_name = "patch_mmap")]
+#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
+#[cfg_attr(feature = "test", unsafe(export_name = "patch_mmap"))]
 pub unsafe extern "C" fn mmap(
     addr: *mut c_void,
     len: size_t,
@@ -37,26 +37,23 @@ pub unsafe extern "C" fn mmap(
     fd: c_int,
     offset: off_t,
 ) -> *mut c_void {
-    trace!(
-        "mmap - addr: {:p}, len: {:#x}, prot: {:#x}, flags: {:#x}, fd: {:#x}, offset: {:#x}",
-        addr,
-        len,
-        prot,
-        flags,
-        fd,
-        offset
-    );
-    let mmap_addr =
-        MMAP_ADDR.get_or_insert_with(|| asan_sym(FunctionMmap::NAME.as_ptr() as *const c_char));
-    asan_swap(false);
-    let fn_mmap = FunctionMmap::as_ptr(mmap_addr).unwrap();
-    asan_swap(true);
-    let map = fn_mmap(addr, len, prot, flags, fd, offset);
-    if map == libc::MAP_FAILED {
-        return libc::MAP_FAILED;
-    }
+    unsafe {
+        trace!(
+            "mmap - addr: {:p}, len: {:#x}, prot: {:#x}, flags: {:#x}, fd: {:#x}, offset: {:#x}",
+            addr, len, prot, flags, fd, offset
+        );
+        let mmap_addr =
+            MMAP_ADDR.get_or_insert_with(|| asan_sym(FunctionMmap::NAME.as_ptr() as *const c_char));
+        asan_swap(false);
+        let fn_mmap = FunctionMmap::as_ptr(mmap_addr).unwrap();
+        asan_swap(true);
+        let map = fn_mmap(addr, len, prot, flags, fd, offset);
+        if map == libc::MAP_FAILED {
+            return libc::MAP_FAILED;
+        }
 
-    asan_unpoison(map, len);
-    asan_track(map, len);
-    map
+        asan_unpoison(map, len);
+        asan_track(map, len);
+        map
+    }
 }

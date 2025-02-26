@@ -3,11 +3,11 @@
 use std::sync::{LazyLock, Mutex, MutexGuard};
 
 use asan::{
-    tracking::{
-        guest::{GuestTracking, GuestTrackingError},
-        Tracking,
-    },
     GuestAddr,
+    tracking::{
+        Tracking,
+        guest::{GuestTracking, GuestTrackingError},
+    },
 };
 use libfuzzer_sys::fuzz_target;
 use log::{debug, info};

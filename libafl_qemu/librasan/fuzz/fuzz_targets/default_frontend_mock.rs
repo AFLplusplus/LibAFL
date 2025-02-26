@@ -6,17 +6,17 @@ use std::{
 };
 
 use asan::{
+    GuestAddr,
     allocator::{
         backend::AllocatorBackend,
-        frontend::{default::DefaultFrontend, AllocatorFrontend},
+        frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
-    mmap::{linux::LinuxMmap, Mmap},
+    mmap::{Mmap, linux::LinuxMmap},
     shadow::{
-        guest::{DefaultShadowLayout, GuestShadow},
         Shadow,
+        guest::{DefaultShadowLayout, GuestShadow},
     },
     tracking::guest::GuestTracking,
-    GuestAddr,
 };
 use libfuzzer_sys::fuzz_target;
 use log::{debug, info};

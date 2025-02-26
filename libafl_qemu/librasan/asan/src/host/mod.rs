@@ -6,7 +6,7 @@
 //! interacting the host may be different.
 use core::fmt::Debug;
 
-use crate::{shadow::PoisonType, GuestAddr};
+use crate::{GuestAddr, shadow::PoisonType};
 
 #[cfg(feature = "libc")]
 pub mod libc;

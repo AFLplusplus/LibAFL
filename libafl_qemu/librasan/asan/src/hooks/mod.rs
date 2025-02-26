@@ -57,11 +57,11 @@ pub mod write;
 pub mod fgets;
 
 use alloc::vec::Vec;
-use core::ffi::{c_char, c_int, c_void, CStr};
+use core::ffi::{CStr, c_char, c_int, c_void};
 
-use crate::{hooks, size_t, wchar_t, GuestAddr};
+use crate::{GuestAddr, hooks, size_t, wchar_t};
 
-extern "C" {
+unsafe extern "C" {
     pub fn asprintf(strp: *mut *mut c_char, fmt: *const c_char, ...) -> c_int;
     pub fn vasprintf(strp: *mut *mut c_char, fmt: *const c_char, va: *const c_void) -> c_int;
 }

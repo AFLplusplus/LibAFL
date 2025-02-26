@@ -8,7 +8,7 @@ use core::cmp::Ordering;
 use log::debug;
 use thiserror::Error;
 
-use crate::{tracking::Tracking, GuestAddr};
+use crate::{GuestAddr, tracking::Tracking};
 
 #[derive(Eq, Debug)]
 struct Range {

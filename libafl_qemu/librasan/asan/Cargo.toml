@@ -1,7 +1,8 @@
 [package]
 name = "asan"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
+rust-version.workspace = true
 
 [lib]
 crate-type = ["rlib"]

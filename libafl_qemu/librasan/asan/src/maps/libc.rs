@@ -1,5 +1,5 @@
 use core::{
-    ffi::{c_char, c_int, CStr},
+    ffi::{CStr, c_char, c_int},
     marker::PhantomData,
 };
 
@@ -88,8 +88,8 @@ impl<S: Symbols> LibcMapReader<S> {
         Ok(f)
     }
 
-    fn get_errno_location(
-    ) -> Result<<FunctionErrnoLocation as Function>::Func, LibcMapReaderError<S>> {
+    fn get_errno_location()
+    -> Result<<FunctionErrnoLocation as Function>::Func, LibcMapReaderError<S>> {
         let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
             S::lookup_str(FunctionErrnoLocation::NAME)
                 .map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))

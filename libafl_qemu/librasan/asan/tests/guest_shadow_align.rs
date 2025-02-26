@@ -2,9 +2,9 @@
 #[cfg(feature = "guest")]
 mod tests {
     use asan::{
+        GuestAddr,
         mmap::Mmap,
         shadow::guest::{DefaultShadowLayout, GuestShadow},
-        GuestAddr,
     };
 
     #[derive(Ord, PartialOrd, PartialEq, Eq, Debug)]

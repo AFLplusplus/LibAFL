@@ -9,9 +9,9 @@ use log::debug;
 use thiserror::Error;
 
 use crate::{
+    GuestAddr,
     host::Host,
     shadow::{PoisonType, Shadow},
-    GuestAddr,
 };
 
 #[derive(Debug)]

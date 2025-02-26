@@ -1,7 +1,8 @@
 [package]
 name = "runner"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
+rust-version.workspace = true
 
 [[bin]]
 name = "runner-arm"

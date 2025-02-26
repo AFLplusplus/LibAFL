@@ -4,13 +4,13 @@ mod tests {
     use std::sync::Mutex;
 
     use asan::{
+        GuestAddr,
         mmap::libc::LibcMmap,
         shadow::{
-            guest::{DefaultShadowLayout, GuestShadow, GuestShadowError},
             Shadow,
+            guest::{DefaultShadowLayout, GuestShadow, GuestShadowError},
         },
         symbols::dlsym::{DlSymSymbols, LookupTypeNext},
-        GuestAddr,
     };
     use spin::Lazy;
 

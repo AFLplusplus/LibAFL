@@ -6,8 +6,8 @@ mod tests {
     use asan::{
         mmap::libc::LibcMmap,
         shadow::{
-            guest::{DefaultShadowLayout, GuestShadow},
             PoisonType, Shadow,
+            guest::{DefaultShadowLayout, GuestShadow},
         },
         symbols::dlsym::{DlSymSymbols, LookupTypeNext},
     };

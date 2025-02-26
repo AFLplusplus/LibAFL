@@ -6,9 +6,11 @@ use crate::asan_dealloc;
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), no_mangle)]
-#[cfg_attr(feature = "test", export_name = "patch_free")]
+#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
+#[cfg_attr(feature = "test", unsafe(export_name = "patch_free"))]
 pub unsafe extern "C" fn free(p: *mut c_void) {
-    trace!("free - p: {:p}", p);
-    asan_dealloc(p);
+    unsafe {
+        trace!("free - p: {:p}", p);
+        asan_dealloc(p);
+    }
 }

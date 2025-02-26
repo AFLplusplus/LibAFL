@@ -1,14 +1,14 @@
 #[cfg(test)]
 #[cfg(feature = "libc")]
 mod tests {
-    use core::ffi::{c_int, c_void, CStr};
+    use core::ffi::{CStr, c_int, c_void};
 
     use asan::{
-        symbols::{
-            dlsym::{DlSymSymbols, LookupTypeDefault},
-            Function, SymbolsLookupStr,
-        },
         GuestAddr,
+        symbols::{
+            Function, SymbolsLookupStr,
+            dlsym::{DlSymSymbols, LookupTypeDefault},
+        },
     };
     use libc::{off_t, size_t};
 

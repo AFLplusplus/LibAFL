@@ -5,6 +5,8 @@ resolver = "2"
 [workspace.package]
 version = "0.15.1"
 license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.85"
 
 [profile.dev]
 panic = "abort"

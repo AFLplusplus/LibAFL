@@ -1,11 +1,10 @@
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{CStr, c_char, c_int};
 
-use libc::{pid_t, SIGABRT};
+use libc::{SIGABRT, pid_t};
 
 use crate::{
-    asan_swap,
+    GuestAddr, asan_swap,
     symbols::{Function, FunctionPointer},
-    GuestAddr,
 };
 
 #[derive(Debug)]
@@ -32,7 +31,7 @@ impl Function for FunctionExit {
     const NAME: &'static CStr = c"_exit";
 }
 
-extern "C" {
+unsafe extern "C" {
     fn asan_sym(name: *const c_char) -> GuestAddr;
 }
 

@@ -5,7 +5,7 @@ mod tests {
     use std::sync::Mutex;
 
     use asan::{
-        allocator::backend::{dlmalloc::DlmallocBackend, AllocatorBackend},
+        allocator::backend::{AllocatorBackend, dlmalloc::DlmallocBackend},
         mmap::linux::LinuxMmap,
     };
     use spin::Lazy;

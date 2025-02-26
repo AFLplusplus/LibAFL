@@ -3,17 +3,17 @@
 mod tests {
 
     use asan::{
+        GuestAddr,
         allocator::{
             backend::AllocatorBackend,
-            frontend::{default::DefaultFrontend, AllocatorFrontend},
+            frontend::{AllocatorFrontend, default::DefaultFrontend},
         },
-        mmap::{linux::LinuxMmap, Mmap},
+        mmap::{Mmap, linux::LinuxMmap},
         shadow::{
-            guest::{DefaultShadowLayout, GuestShadow},
             Shadow,
+            guest::{DefaultShadowLayout, GuestShadow},
         },
         tracking::guest::GuestTracking,
-        GuestAddr,
     };
     use log::{debug, info};
     use mockall::mock;

@@ -5,11 +5,11 @@ mod tests {
     use std::sync::Mutex;
 
     use asan::{
-        tracking::{
-            guest::{GuestTracking, GuestTrackingError},
-            Tracking,
-        },
         GuestAddr,
+        tracking::{
+            Tracking,
+            guest::{GuestTracking, GuestTrackingError},
+        },
     };
     use spin::Lazy;
 

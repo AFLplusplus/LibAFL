@@ -2,19 +2,19 @@
 //! The `LibcHost` supports the established means of interacting with the QEMU
 //! emulator on Linux by means of issuing a bespoke syscall via the libc library
 use core::{
-    ffi::{c_long, CStr},
+    ffi::{CStr, c_long},
     marker::PhantomData,
 };
 
 use thiserror::Error;
 
 use crate::{
+    GuestAddr,
     host::{Host, HostAction},
     shadow::PoisonType,
     symbols::{
         AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols, SymbolsLookupStr,
     },
-    GuestAddr,
 };
 
 #[derive(Debug)]

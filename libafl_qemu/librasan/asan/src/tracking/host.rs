@@ -9,7 +9,7 @@ use log::debug;
 use syscalls::Errno;
 use thiserror::Error;
 
-use crate::{host::Host, tracking::Tracking, GuestAddr};
+use crate::{GuestAddr, host::Host, tracking::Tracking};
 
 #[derive(Debug)]
 pub struct HostTracking<H> {

@@ -3,12 +3,12 @@
 //! emulator on Linux by means of issuing a bespoke syscall.
 use core::mem::transmute;
 
-use syscalls::{syscall2, syscall3, syscall4, Errno, Sysno};
+use syscalls::{Errno, Sysno, syscall2, syscall3, syscall4};
 
 use crate::{
+    GuestAddr,
     host::{Host, HostAction},
     shadow::PoisonType,
-    GuestAddr,
 };
 
 #[derive(Debug)]

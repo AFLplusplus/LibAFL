@@ -9,9 +9,9 @@ use log::{debug, trace};
 use thiserror::Error;
 
 use crate::{
+    GuestAddr,
     mmap::Mmap,
     shadow::{PoisonType, Shadow},
-    GuestAddr,
 };
 
 #[allow(dead_code)]
@@ -184,19 +184,13 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
                 if first_k != 0 && test_len > first_k {
                     trace!(
                         "is_poison #1 - start: 0x{:x}, len: 0x{:x}, first_k: 0x{:x}, first_len: 0x{:x}",
-                        start,
-                        len,
-                        first_k,
-                        test_len
+                        start, len, first_k, test_len
                     );
                     return Ok(true);
                 } else {
                     trace!(
                         "!is_poison #1 - start: 0x{:x}, len: 0x{:x}, first_k: 0x{:x}, first_len: 0x{:x}",
-                        start,
-                        len,
-                        first_k,
-                        test_len
+                        start, len, first_k, test_len
                     );
                     return Ok(false);
                 }
@@ -211,9 +205,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
             if first_k != 0 {
                 trace!(
                     "is_poison #2 - start: 0x{:x}, len: 0x{:x}, first_k: 0x{:x}",
-                    start,
-                    len,
-                    first_k
+                    start, len, first_k
                 );
                 return Ok(true);
             }
@@ -230,10 +222,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
             if last_k != 0 && last_len as i8 > last_k {
                 trace!(
                     "is_poison #3 - start: 0x{:x}, len: 0x{:x}, last_k: 0x{:x}, last_len: 0x{:x}",
-                    start,
-                    len,
-                    last_k,
-                    last_len
+                    start, len, last_k, last_len
                 );
                 return Ok(true);
             }
@@ -255,15 +244,13 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
         if poisoned {
             trace!(
                 "is_poison #4 - start_aligned: 0x{:x}, remaining_len: 0x{:x}",
-                start_aligned,
-                remaining_len
+                start_aligned, remaining_len
             );
             Ok(true)
         } else {
             trace!(
                 "!is_poison #4 - start_aligned: 0x{:x}, remaining_len: 0x{:x}",
-                start_aligned,
-                remaining_len
+                start_aligned, remaining_len
             );
             Ok(false)
         }

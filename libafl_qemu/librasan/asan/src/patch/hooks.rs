@@ -1,5 +1,5 @@
 use alloc::{collections::BTreeMap, fmt::Debug, vec::Vec};
-use core::ffi::{c_char, CStr};
+use core::ffi::{CStr, c_char};
 
 use itertools::Itertools;
 use log::{debug, trace};
@@ -7,12 +7,12 @@ use spin::Mutex;
 use thiserror::Error;
 
 use crate::{
+    GuestAddr,
     hooks::PatchedHook,
-    maps::{entry::MapEntry, iterator::MapIterator, MapReader},
+    maps::{MapReader, entry::MapEntry, iterator::MapIterator},
     mmap::Mmap,
     patch::Patch,
     symbols::Symbols,
-    GuestAddr,
 };
 
 static PATCHED: Mutex<Option<BTreeMap<GuestAddr, PatchedHook>>> = Mutex::new(None);
@@ -20,8 +20,8 @@ static PATCHED: Mutex<Option<BTreeMap<GuestAddr, PatchedHook>>> = Mutex::new(Non
 pub struct PatchedHooks;
 
 impl PatchedHooks {
-    pub fn init<S: Symbols, P: Patch, R: MapReader, M: Mmap>(
-    ) -> Result<(), PatchesError<S, P, R, M>> {
+    pub fn init<S: Symbols, P: Patch, R: MapReader, M: Mmap>()
+    -> Result<(), PatchesError<S, P, R, M>> {
         debug!("Installing patches");
         let reader = R::new().map_err(|e| PatchesError::MapReaderError(e))?;
         let mappings = MapIterator::new(reader).collect::<Vec<MapEntry>>();
@@ -57,10 +57,9 @@ impl PatchedHooks {
     }
 
     pub fn check_patched(addr: GuestAddr) -> Result<(), PatchesCheckError> {
-        if let Some(patch) = PATCHED.lock().as_ref().and_then(|p| p.get(&addr)) {
-            Err(PatchesCheckError::AddressPatchedError(addr, patch.name))?
-        } else {
-            Ok(())
+        match PATCHED.lock().as_ref().and_then(|p| p.get(&addr)) {
+            Some(patch) => Err(PatchesCheckError::AddressPatchedError(addr, patch.name))?,
+            _ => Ok(()),
         }
     }
 }

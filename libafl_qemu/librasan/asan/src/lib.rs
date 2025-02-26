@@ -124,7 +124,7 @@ pub type off_t = libc::off_t;
 use ::core::ffi::{c_char, c_void};
 
 #[cfg(not(feature = "test"))]
-extern "C" {
+unsafe extern "C" {
     pub fn asan_load(addr: *const c_void, size: usize);
     pub fn asan_store(addr: *const c_void, size: usize);
     pub fn asan_alloc(len: usize, align: usize) -> *mut c_void;

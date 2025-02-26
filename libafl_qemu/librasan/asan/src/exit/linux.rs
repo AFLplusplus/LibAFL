@@ -1,7 +1,7 @@
 use core::ffi::c_int;
 
-use rustix::process::{kill_current_process_group, Signal};
-use syscalls::{syscall1, Sysno};
+use rustix::process::{Signal, kill_current_process_group};
+use syscalls::{Sysno, syscall1};
 
 pub fn abort() -> ! {
     kill_current_process_group(Signal::Abort).unwrap();

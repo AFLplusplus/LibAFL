@@ -2,13 +2,13 @@
 #[cfg(feature = "libc")]
 mod tests {
     use asan::{
-        mmap::{linux::LinuxMmap, Mmap, MmapProt},
-        patch::{raw::RawPatch, Patch},
         GuestAddr,
+        mmap::{Mmap, MmapProt, linux::LinuxMmap},
+        patch::{Patch, raw::RawPatch},
     };
     use log::info;
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     extern "C" fn test1(a1: usize, a2: usize, a3: usize, a4: usize, a5: usize, a6: usize) -> usize {
         assert_eq!(a1, 1);
         assert_eq!(a2, 2);
@@ -19,7 +19,7 @@ mod tests {
         return 0xdeadface;
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     extern "C" fn test2(a1: usize, a2: usize, a3: usize, a4: usize, a5: usize, a6: usize) -> usize {
         assert_eq!(a1, 1);
         assert_eq!(a2, 2);

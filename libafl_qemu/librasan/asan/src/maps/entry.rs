@@ -5,8 +5,8 @@ use core::{
 };
 
 use crate::{
-    mmap::{Mmap, MmapProt},
     GuestAddr,
+    mmap::{Mmap, MmapProt},
 };
 
 pub struct MapEntry {

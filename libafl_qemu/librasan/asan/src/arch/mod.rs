@@ -11,7 +11,7 @@ mod arm;
 #[cfg(target_arch = "powerpc")]
 mod powerpc;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn _Unwind_Resume() {
     error!("_Unwind_Resume");
     abort();

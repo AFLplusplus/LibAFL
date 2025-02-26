@@ -5,12 +5,12 @@ mod tests {
     use asan::{
         allocator::{
             backend::dlmalloc::DlmallocBackend,
-            frontend::{default::DefaultFrontend, AllocatorFrontend},
+            frontend::{AllocatorFrontend, default::DefaultFrontend},
         },
         mmap::linux::LinuxMmap,
         shadow::{
-            guest::{DefaultShadowLayout, GuestShadow},
             Shadow,
+            guest::{DefaultShadowLayout, GuestShadow},
         },
         tracking::guest::GuestTracking,
     };

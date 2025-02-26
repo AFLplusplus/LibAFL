@@ -5,16 +5,16 @@
 //! linked
 use alloc::fmt::Debug;
 use core::{
-    ffi::{c_char, c_void, CStr},
+    ffi::{CStr, c_char, c_void},
     ptr::null_mut,
     sync::atomic::{AtomicPtr, Ordering},
 };
 
 use thiserror::Error;
 
+use crate::GuestAddr;
 #[cfg(feature = "hooks")]
 use crate::patch::hooks::{PatchedHooks, PatchesCheckError};
-use crate::GuestAddr;
 
 #[cfg(feature = "libc")]
 pub mod dlsym;

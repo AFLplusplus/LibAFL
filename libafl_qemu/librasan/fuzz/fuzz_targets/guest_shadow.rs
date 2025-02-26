@@ -3,13 +3,13 @@
 use std::sync::{LazyLock, Mutex, MutexGuard};
 
 use asan::{
+    GuestAddr,
     mmap::libc::LibcMmap,
     shadow::{
-        guest::{DefaultShadowLayout, GuestShadow, GuestShadowError},
         PoisonType, Shadow,
+        guest::{DefaultShadowLayout, GuestShadow, GuestShadowError},
     },
     symbols::dlsym::{DlSymSymbols, LookupTypeNext},
-    GuestAddr,
 };
 use libfuzzer_sys::fuzz_target;
 use log::info;

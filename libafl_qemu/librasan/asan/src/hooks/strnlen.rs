@@ -6,28 +6,30 @@ use crate::{asan_load, asan_panic, size_t};
 
 /// # Safety
 /// See man pages
-#[export_name = "patch_strnlen"]
+#[unsafe(export_name = "patch_strnlen")]
 pub unsafe extern "C" fn strnlen(cs: *const c_char, maxlen: size_t) -> size_t {
-    trace!("strnlen - cs: {:p}, maxlen: {:#x}", cs, maxlen);
+    unsafe {
+        trace!("strnlen - cs: {:p}, maxlen: {:#x}", cs, maxlen);
 
-    if maxlen == 0 {
-        return 0;
-    }
+        if maxlen == 0 {
+            return 0;
+        }
 
-    if cs.is_null() {
-        asan_panic(c"strnlen - cs is null".as_ptr() as *const c_char);
-    }
+        if cs.is_null() {
+            asan_panic(c"strnlen - cs is null".as_ptr() as *const c_char);
+        }
 
-    let mut len = 0;
-    while *cs.add(len) != 0 {
-        len += 1;
-    }
+        let mut len = 0;
+        while *cs.add(len) != 0 {
+            len += 1;
+        }
 
-    if len < maxlen {
-        asan_load(cs as *const c_void, len + 1);
-        len
-    } else {
-        asan_load(cs as *const c_void, maxlen);
-        maxlen
+        if len < maxlen {
+            asan_load(cs as *const c_void, len + 1);
+            len
+        } else {
+            asan_load(cs as *const c_void, maxlen);
+            maxlen
+        }
     }
 }

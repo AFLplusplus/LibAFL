@@ -1,11 +1,11 @@
 use std::{env, fmt::Write};
 
-use clap::{builder::Str, Parser};
+use clap::{Parser, builder::Str};
 use libafl_bolts::tuples::tuple_list;
 use libafl_qemu::{
+    Emulator, NopEmulatorDriver, NopSnapshotManager, QemuExitError, QemuInitError,
     command::NopCommandManager,
     modules::{AsanGuestModule, AsanModule, EmulatorModuleTuple},
-    Emulator, NopEmulatorDriver, NopSnapshotManager, QemuExitError, QemuInitError,
 };
 use log::{error, info};
 use thiserror::Error;

@@ -8,13 +8,13 @@ pub mod libc;
 #[cfg(feature = "linux")]
 pub mod linux;
 
-use core::ffi::{c_char, CStr};
+use core::ffi::{CStr, c_char};
 
 use log::trace;
 
 /// # Safety
 /// `msg` must be a pointer to a zero-terminated string
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn log_trace(msg: *const c_char) {
     if msg.is_null() {
         return;

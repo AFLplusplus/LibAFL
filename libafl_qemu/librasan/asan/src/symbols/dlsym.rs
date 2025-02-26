@@ -7,14 +7,14 @@
 //!   `dlsym(RTLD_NEXT, name)`
 use alloc::{ffi::NulError, fmt::Debug};
 use core::{
-    ffi::{c_char, c_void, CStr},
+    ffi::{CStr, c_char, c_void},
     marker::PhantomData,
 };
 
-use libc::{dlerror, dlsym, RTLD_DEFAULT, RTLD_NEXT};
+use libc::{RTLD_DEFAULT, RTLD_NEXT, dlerror, dlsym};
 use thiserror::Error;
 
-use crate::{symbols::Symbols, GuestAddr};
+use crate::{GuestAddr, symbols::Symbols};
 
 pub trait LookupType: Debug + Send {
     const HANDLE: *mut c_void;

@@ -9,7 +9,7 @@ use dlmalloc::{Allocator, Dlmalloc};
 use log::debug;
 use thiserror::Error;
 
-use crate::{allocator::backend::AllocatorBackend, mmap::Mmap, GuestAddr};
+use crate::{GuestAddr, allocator::backend::AllocatorBackend, mmap::Mmap};
 
 pub struct DlmallocBackendMap<M: Mmap> {
     page_size: usize,
