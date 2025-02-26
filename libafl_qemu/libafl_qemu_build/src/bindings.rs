@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use bindgen::{BindgenError, Bindings, RustEdition};
+use bindgen::{BindgenError, Bindings};
 
 use crate::store_generated_content_if_different;
 
