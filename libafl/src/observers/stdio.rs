@@ -139,14 +139,14 @@ use crate::{Error, observers::Observer};
 ///                .as_bytes()
 ///                .iter()
 ///                .zip(
-///                    (&*(&raw const STDOUT))
+///                    (&*(&raw const STDOUT)).as_ref()
 ///                        .unwrap()
 ///                        .iter()
 ///                        .filter(|e| **e != 10)
 ///                ) // ignore newline chars
 ///                .all(|(&a, &b)| a == b)
 ///        );
-///        assert!((&*(&raw const STDERR)).unwrap().is_empty());
+///        assert!((&*(&raw const STDERR)).as_ref().unwrap().is_empty());
 ///    }
 ///
 ///    state
