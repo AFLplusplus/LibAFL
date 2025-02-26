@@ -102,7 +102,9 @@ fn find_llvm_config() -> Result<String, String> {
     if which("llvm-config").is_ok() {
         if let Some(ver) = find_llvm_version("llvm-config".to_owned()) {
             if ver < rustc_llvm_ver {
-                println!("cargo:warning=Version of llvm-config is {ver} but needs to be at least rustc's version ({rustc_llvm_ver})! We will (try to) continue to build. Continue at your own risk, or rebuild with a set LLVM_CONFIG_PATH env variable, pointing to a newer version.");
+                println!(
+                    "cargo:warning=Version of llvm-config is {ver} but needs to be at least rustc's version ({rustc_llvm_ver})! We will (try to) continue to build. Continue at your own risk, or rebuild with a set LLVM_CONFIG_PATH env variable, pointing to a newer version."
+                );
             }
             return Ok("llvm-config".to_owned());
         }
@@ -163,7 +165,11 @@ fn qemu_bindgen_clang_args(
 ) -> Vec<String> {
     if env::var("LLVM_CONFIG_PATH").is_err() {
         let found = find_llvm_config().expect("Cannot find a suitable llvm-config, it must be a version equal or greater than the rustc LLVM version. Try specifying LLVM_CONFIG_PATH.");
-        env::set_var("LLVM_CONFIG_PATH", found);
+        // # Safety
+        // This edits env variables but in a build script there's not much that can go wrong
+        unsafe {
+            env::set_var("LLVM_CONFIG_PATH", found);
+        }
     }
 
     // load compile commands
@@ -419,7 +425,9 @@ pub fn maybe_generate_stub_bindings(
             false,
         );
     } else if env::var("CARGO_CFG_DOC").is_ok() {
-        println!("cargo:warning=Bindings regeneration has been skipped. Please rerun with x86_64 with usermode to trigger the bindings regeneration.");
+        println!(
+            "cargo:warning=Bindings regeneration has been skipped. Please rerun with x86_64 with usermode to trigger the bindings regeneration."
+        );
     }
 }
 

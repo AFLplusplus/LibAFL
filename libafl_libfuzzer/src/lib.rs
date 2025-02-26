@@ -115,7 +115,7 @@ use std::ffi::{c_char, c_int};
 
 pub use libfuzzer_sys::*;
 
-extern "C" {
+unsafe extern "C" {
     /// `LLVMFuzzerRunDriver` allows for harnesses which specify their own main. See: <https://llvm.org/docs/LibFuzzer.html#using-libfuzzer-as-a-library>
     ///
     /// You can call this function inside of a main function in your harness, or specify `#![no_main]`

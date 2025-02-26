@@ -2,7 +2,7 @@
 
 use libafl_bolts::ClientId;
 
-use crate::monitors::{stats::ClientStatsManager, Monitor};
+use crate::monitors::{Monitor, stats::ClientStatsManager};
 
 /// The wrapped monitor will keep displaying until the closure evaluates to false
 #[derive(Debug)]

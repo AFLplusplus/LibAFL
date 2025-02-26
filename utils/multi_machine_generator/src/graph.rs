@@ -3,7 +3,7 @@ use std::{
     mem,
 };
 
-use petgraph::{graph::NodeIndex, Direction, Graph};
+use petgraph::{Direction, Graph, graph::NodeIndex};
 use serde::Serialize;
 
 /// A node of the network

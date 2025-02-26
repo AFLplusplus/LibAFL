@@ -3,8 +3,8 @@ use std::{borrow::Cow, cell::RefCell, fmt, rc::Rc};
 use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::Observer};
 use libafl_bolts::{Error, Named};
 use serde::{
-    de::{self, Deserialize, Deserializer, MapAccess, Visitor},
     Serialize,
+    de::{self, Deserialize, Deserializer, MapAccess, Visitor},
 };
 
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};

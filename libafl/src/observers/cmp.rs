@@ -8,10 +8,10 @@ use core::{
 use arbitrary_int::{u1, u4, u5, u6};
 use bitbybit::bitfield;
 use hashbrown::HashMap;
-use libafl_bolts::{ownedref::OwnedRefMut, AsSlice, HasLen, Named};
+use libafl_bolts::{AsSlice, HasLen, Named, ownedref::OwnedRefMut};
 use serde::{Deserialize, Serialize};
 
-use crate::{executors::ExitKind, observers::Observer, Error, HasMetadata};
+use crate::{Error, HasMetadata, executors::ExitKind, observers::Observer};
 
 /// A bytes string for cmplog with up to 32 elements.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]

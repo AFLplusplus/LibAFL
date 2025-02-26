@@ -16,9 +16,9 @@ use libafl_bolts::serdeany::SerdeAnyMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error,
     corpus::{CachedOnDiskCorpus, Corpus, CorpusId, HasTestcase, Testcase},
     inputs::Input,
-    Error,
 };
 
 /// Options for the the format of the on-disk metadata

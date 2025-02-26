@@ -6,7 +6,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{CompilerWrapper, Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
+use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX, ToolWrapper};
 
 /// The `OUT_DIR` for `LLVM` compiler passes
 pub const OUT_DIR: &str = env!("OUT_DIR");

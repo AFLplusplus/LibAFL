@@ -2,18 +2,18 @@ use core::{marker::PhantomData, ptr, time::Duration};
 use std::fmt::{Debug, Formatter};
 
 use libafl::{
+    Error,
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     state::HasExecutions,
-    Error,
 };
 use libafl_bolts::{
-    fs::{InputFile, INPUTFILE_STD},
+    AsSlice, AsSliceMut,
+    fs::{INPUTFILE_STD, InputFile},
     shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
     tuples::RefIndexable,
-    AsSlice, AsSliceMut,
 };
-use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
+use tinyinst::tinyinst::{TinyInst, litecov::RunResult};
 
 /// [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
 pub struct TinyInstExecutor<S, SHM, OT> {

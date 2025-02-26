@@ -44,14 +44,14 @@ where
 macro_rules! expression_builder {
     ($method_name:ident ( $($param_name:ident : $param_type:ty ),+ ) => $message:ident) => {
         // #[expect(clippy::missing_safety_doc)]
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         fn $method_name(&mut self, $( $param_name : $param_type, )+ ) -> Option<RSymExpr> {
             self.write_message(SymExpr::$message { $($param_name,)+ })
         }
     };
     ($method_name:ident () => $message:ident) => {
         // #[expect(clippy::missing_safety_doc)]
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         fn $method_name(&mut self) -> Option<RSymExpr> {
             self.write_message(SymExpr::$message)
         }
@@ -74,7 +74,7 @@ impl<SHM> Runtime for TracingRuntime<SHM>
 where
     SHM: ShMem,
 {
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     fn build_integer_from_buffer(
         &mut self,
         _buffer: *mut core::ffi::c_void,

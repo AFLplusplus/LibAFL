@@ -5,7 +5,7 @@ authors = [
 ]
 name = "deexit"
 version.workspace = true
-edition = "2021"
+edition = "2024"
 description = "DeExit: Replace exits with aborts to catch them during in-process fuzzing"
 documentation = "https://docs.rs/libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"

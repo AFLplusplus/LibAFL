@@ -2,44 +2,44 @@
 
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
-use core::sync::atomic::{compiler_fence, Ordering};
+use core::sync::atomic::{Ordering, compiler_fence};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
+use libafl_bolts::ClientId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
-use libafl_bolts::os::{fork, ForkResult};
-use libafl_bolts::ClientId;
+use libafl_bolts::os::{ForkResult, fork};
 #[cfg(feature = "std")]
 use libafl_bolts::{
     os::CTRL_C_EXIT,
     shmem::{ShMem, ShMemProvider},
     staterestore::StateRestorer,
 };
+use serde::Serialize;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
-use serde::Serialize;
 
-use super::{std_on_restart, AwaitRestartSafe, ProgressReporter, RecordSerializationTime};
+use super::{AwaitRestartSafe, ProgressReporter, RecordSerializationTime, std_on_restart};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
+    Error, HasMetadata,
     events::{
-        std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
-        Event, EventFirer, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
-        SendExiting,
+        BrokerEventResult, CanSerializeObserver, Event, EventFirer, EventManagerId, EventReceiver,
+        EventRestarter, HasEventManagerId, SendExiting, std_maybe_report_progress,
+        std_report_progress,
     },
-    monitors::{stats::ClientStatsManager, Monitor},
+    monitors::{Monitor, stats::ClientStatsManager},
     state::{
         HasCurrentStageId, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable,
     },
-    Error, HasMetadata,
 };
 #[cfg(feature = "std")]
 use crate::{
-    monitors::{stats::ClientStats, SimplePrintingMonitor},
+    monitors::{SimplePrintingMonitor, stats::ClientStats},
     state::HasSolutions,
 };
 
@@ -132,7 +132,7 @@ where
                 _ => {
                     return Err(Error::unknown(format!(
                         "Received illegal message that message should not have arrived: {event:?}."
-                    )))
+                    )));
                 }
             }
         }
@@ -454,7 +454,12 @@ where
                 StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
-            staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+
+            // # Safety
+            // Launcher is usually running in a single thread.
+            unsafe {
+                staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            }
 
             let mut ctr: u64 = 0;
             // Client->parent loop
@@ -509,10 +514,14 @@ where
                 if !staterestorer.has_content() {
                     #[cfg(unix)]
                     if child_status == 9 {
-                        panic!("Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart");
+                        panic!(
+                            "Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart"
+                        );
                     }
                     // Storing state in the last round did not work
-                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
+                    panic!(
+                        "Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})"
+                    );
                 }
 
                 ctr = ctr.wrapping_add(1);

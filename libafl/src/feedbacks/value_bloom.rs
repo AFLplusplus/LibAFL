@@ -5,17 +5,16 @@ use core::hash::Hash;
 
 use fastbloom::BloomFilter;
 use libafl_bolts::{
-    impl_serdeany,
+    Error, Named, impl_serdeany,
     tuples::{Handle, MatchNameRef},
-    Error, Named,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    HasNamedMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::{ObserversTuple, ValueObserver},
-    HasNamedMetadata,
 };
 
 impl_serdeany!(ValueBloomFeedbackMetadata);

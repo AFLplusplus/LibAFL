@@ -17,8 +17,8 @@ use cadence::{BufferedUdpMetricSink, Gauged, QueuingMetricSink, StatsdClient};
 use libafl_bolts::ClientId;
 
 use super::{
-    stats::{manager::GlobalStats, ClientStatsManager, EdgeCoverage, ItemGeometry},
     Monitor,
+    stats::{ClientStatsManager, EdgeCoverage, ItemGeometry, manager::GlobalStats},
 };
 
 const METRIC_PREFIX: &str = "fuzzing";

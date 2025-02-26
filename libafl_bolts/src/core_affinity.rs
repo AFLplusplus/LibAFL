@@ -242,10 +242,10 @@ mod linux {
     use libc::cpu_set_t;
     #[cfg(target_os = "freebsd")]
     use libc::cpuset_t as cpu_set_t;
-    #[cfg(target_os = "dragonfly")]
-    use libc::{sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET};
     #[cfg(not(target_os = "dragonfly"))]
-    use libc::{sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
+    use libc::{CPU_ISSET, CPU_SET, CPU_SETSIZE, sched_getaffinity, sched_setaffinity};
+    #[cfg(target_os = "dragonfly")]
+    use libc::{CPU_ISSET, CPU_SET, sched_getaffinity, sched_setaffinity};
     #[cfg(target_os = "dragonfly")]
     const CPU_SETSIZE: libc::c_int = 256;
 
@@ -494,7 +494,7 @@ mod windows {
             processor: PROCESSOR_RELATIONSHIP,
         }
 
-        extern "system" {
+        unsafe extern "system" {
             fn GetLogicalProcessorInformationEx(
                 relationship: u32,
                 data: *mut u8,
@@ -595,9 +595,9 @@ mod apple {
 
     #[cfg(target_arch = "x86_64")]
     use libc::{
-        integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
-        thread_policy_flavor_t, thread_policy_t, thread_t, KERN_SUCCESS, THREAD_AFFINITY_POLICY,
-        THREAD_AFFINITY_POLICY_COUNT,
+        KERN_SUCCESS, THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT, integer_t,
+        kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
+        thread_policy_flavor_t, thread_policy_t, thread_t,
     };
     #[cfg(all(target_arch = "aarch64", not(miri)))]
     use libc::{pthread_set_qos_class_self_np, qos_class_t::QOS_CLASS_USER_INITIATED};
@@ -613,7 +613,7 @@ mod apple {
 
     #[cfg(target_arch = "x86_64")]
     #[link(name = "System", kind = "framework")]
-    extern "C" {
+    unsafe extern "C" {
         fn thread_policy_set(
             thread: thread_t,
             flavor: thread_policy_flavor_t,

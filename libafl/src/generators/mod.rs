@@ -5,7 +5,7 @@ use core::{marker::PhantomData, num::NonZeroUsize};
 
 use libafl_bolts::rands::Rand;
 
-use crate::{inputs::bytes::BytesInput, nonzero, state::HasRand, Error};
+use crate::{Error, inputs::bytes::BytesInput, nonzero, state::HasRand};
 
 pub mod gramatron;
 use core::cmp::max;
@@ -44,16 +44,16 @@ where
 /// An [`Iterator`] built from a [`Generator`].
 #[derive(Debug)]
 pub struct GeneratorIter<'a, I, S, G> {
-    gen: G,
+    generator: G,
     state: &'a mut S,
     phantom: PhantomData<I>,
 }
 
 impl<'a, I, S, G> GeneratorIter<'a, I, S, G> {
     /// Create a new [`GeneratorIter`]
-    pub fn new(gen: G, state: &'a mut S) -> Self {
+    pub fn new(generator: G, state: &'a mut S) -> Self {
         Self {
-            gen,
+            generator,
             state,
             phantom: PhantomData,
         }
@@ -67,7 +67,7 @@ where
     type Item = I;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.gen.generate(self.state).ok()
+        self.generator.generate(self.state).ok()
     }
 }
 

@@ -231,22 +231,32 @@ fn build_pass(
             Ok(s) => {
                 if !s.success() {
                     if required {
-                        panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {s}");
+                        panic!(
+                            "Failed to compile required compiler pass src/{src_file} - Exit status: {s}"
+                        );
                     } else {
-                        println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}. You can ignore this error unless you want this compiler pass.");
+                        println!(
+                            "cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}. You can ignore this error unless you want this compiler pass."
+                        );
                     }
                 }
             }
             Err(err) => {
                 if required {
-                    panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {err}");
+                    panic!(
+                        "Failed to compile required compiler pass src/{src_file} - Exit status: {err}"
+                    );
                 } else {
-                    println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {err}. You can ignore this error unless you want this compiler pass.");
+                    println!(
+                        "cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {err}. You can ignore this error unless you want this compiler pass."
+                    );
                 }
             }
         },
         None => {
-            println!("cargo:warning=Skipping compiler pass src/{src_file} - Only supported on Windows or *nix.");
+            println!(
+                "cargo:warning=Skipping compiler pass src/{src_file} - Only supported on Windows or *nix."
+            );
         }
     }
 }
@@ -350,7 +360,11 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         found = false;
     }
 
-    assert!(found, "\n\tAt least one of the LLVM dependencies could not be found.\n\tThe following search directory was considered: {}\n", bindir_path.display());
+    assert!(
+        found,
+        "\n\tAt least one of the LLVM dependencies could not be found.\n\tThe following search directory was considered: {}\n",
+        bindir_path.display()
+    );
 
     let cxxflags = if let Ok(flags) = llvm_cxxflags {
         flags

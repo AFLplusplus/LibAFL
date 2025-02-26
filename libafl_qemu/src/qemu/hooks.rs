@@ -9,13 +9,13 @@ use core::{ffi::c_void, fmt::Debug, mem::transmute, ptr};
 use libafl::executors::hooks::inprocess::inprocess_get_state;
 use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize};
 #[cfg(feature = "python")]
-use pyo3::{pyclass, pymethods, FromPyObject};
+use pyo3::{FromPyObject, pyclass, pymethods};
 
 use crate::{
+    HookData, HookId,
     emu::EmulatorModules,
     qemu::{MemAccessInfo, Qemu},
     sys::TCGTemp,
-    HookData, HookId,
 };
 
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
@@ -31,7 +31,7 @@ pub enum HookRepr {
 #[derive(Debug)]
 pub struct TcgHookState<const N: usize, H: HookId> {
     id: H,
-    gen: HookRepr,
+    generator: HookRepr,
     post_gen: HookRepr,
     execs: [HookRepr; N],
 }
@@ -44,10 +44,10 @@ pub struct HookState<H: HookId> {
 }
 
 impl<const N: usize, H: HookId> TcgHookState<N, H> {
-    pub fn new(id: H, gen: HookRepr, post_gen: HookRepr, execs: [HookRepr; N]) -> Self {
+    pub fn new(id: H, generator: HookRepr, post_gen: HookRepr, execs: [HookRepr; N]) -> Self {
         Self {
             id,
-            gen,
+            generator,
             post_gen,
             execs,
         }
@@ -297,7 +297,7 @@ macro_rules! create_gen_wrapper {
                     let qemu = Qemu::get_unchecked();
                     let modules = EmulatorModules::<ET, I, S>::emulator_modules_mut_unchecked();
 
-                    match &mut hook.gen {
+                    match &mut hook.generator {
                         HookRepr::Function(ptr) => {
                             let func: fn(Qemu, &mut EmulatorModules<ET, I, S>, Option<&mut S>, $($param_type),*) -> Option<$ret_type> =
                                 transmute(*ptr);
@@ -1035,15 +1035,15 @@ impl QemuHooks {
     pub fn add_edge_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<unsafe extern "C" fn(T, GuestAddr, GuestAddr) -> u64>,
+        generator: Option<unsafe extern "C" fn(T, GuestAddr, GuestAddr) -> u64>,
         exec: Option<unsafe extern "C" fn(T, u64)>,
     ) -> EdgeHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<unsafe extern "C" fn(u64, GuestAddr, GuestAddr) -> u64> =
-                transmute(gen);
+            let generator: Option<unsafe extern "C" fn(u64, GuestAddr, GuestAddr) -> u64> =
+                transmute(generator);
             let exec: Option<unsafe extern "C" fn(u64, u64)> = transmute(exec);
-            let num = libafl_qemu_sys::libafl_add_edge_hook(gen, exec, data);
+            let num = libafl_qemu_sys::libafl_add_edge_hook(generator, exec, data);
             EdgeHookId(num)
         }
     }
@@ -1061,17 +1061,18 @@ impl QemuHooks {
     pub fn add_block_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<unsafe extern "C" fn(T, GuestAddr) -> u64>,
+        generator: Option<unsafe extern "C" fn(T, GuestAddr) -> u64>,
         post_gen: Option<unsafe extern "C" fn(T, GuestAddr, GuestUsize)>,
         exec: Option<unsafe extern "C" fn(T, u64)>,
     ) -> BlockHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<unsafe extern "C" fn(u64, GuestAddr) -> u64> = transmute(gen);
+            let generator: Option<unsafe extern "C" fn(u64, GuestAddr) -> u64> =
+                transmute(generator);
             let post_gen: Option<unsafe extern "C" fn(u64, GuestAddr, GuestUsize)> =
                 transmute(post_gen);
             let exec: Option<unsafe extern "C" fn(u64, u64)> = transmute(exec);
-            let num = libafl_qemu_sys::libafl_add_block_hook(gen, post_gen, exec, data);
+            let num = libafl_qemu_sys::libafl_add_block_hook(generator, post_gen, exec, data);
             BlockHookId(num)
         }
     }
@@ -1113,7 +1114,7 @@ impl QemuHooks {
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<unsafe extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
+        generator: Option<unsafe extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
         exec1: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
         exec2: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
         exec4: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
@@ -1122,14 +1123,14 @@ impl QemuHooks {
     ) -> ReadHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<
+            let generator: Option<
                 unsafe extern "C" fn(
                     u64,
                     GuestAddr,
                     *mut TCGTemp,
                     libafl_qemu_sys::MemOpIdx,
                 ) -> u64,
-            > = transmute(gen);
+            > = transmute(generator);
             let exec1: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
                 transmute(exec1);
             let exec2: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
@@ -1141,7 +1142,7 @@ impl QemuHooks {
             let exec_n: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr, usize)> =
                 transmute(exec_n);
             let num = libafl_qemu_sys::libafl_add_read_hook(
-                gen, exec1, exec2, exec4, exec8, exec_n, data,
+                generator, exec1, exec2, exec4, exec8, exec_n, data,
             );
             ReadHookId(num)
         }
@@ -1165,7 +1166,7 @@ impl QemuHooks {
     pub fn add_write_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<unsafe extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
+        generator: Option<unsafe extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
         exec1: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
         exec2: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
         exec4: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
@@ -1174,14 +1175,14 @@ impl QemuHooks {
     ) -> WriteHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<
+            let generator: Option<
                 unsafe extern "C" fn(
                     u64,
                     GuestAddr,
                     *mut TCGTemp,
                     libafl_qemu_sys::MemOpIdx,
                 ) -> u64,
-            > = transmute(gen);
+            > = transmute(generator);
             let exec1: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
                 transmute(exec1);
             let exec2: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
@@ -1193,7 +1194,7 @@ impl QemuHooks {
             let exec_n: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr, usize)> =
                 transmute(exec_n);
             let num = libafl_qemu_sys::libafl_add_write_hook(
-                gen, exec1, exec2, exec4, exec8, exec_n, data,
+                generator, exec1, exec2, exec4, exec8, exec_n, data,
             );
             WriteHookId(num)
         }
@@ -1202,7 +1203,7 @@ impl QemuHooks {
     pub fn add_cmp_hooks<T: Into<HookData>>(
         &self,
         data: T,
-        gen: Option<unsafe extern "C" fn(T, GuestAddr, usize) -> u64>,
+        generator: Option<unsafe extern "C" fn(T, GuestAddr, usize) -> u64>,
         exec1: Option<unsafe extern "C" fn(T, u64, u8, u8)>,
         exec2: Option<unsafe extern "C" fn(T, u64, u16, u16)>,
         exec4: Option<unsafe extern "C" fn(T, u64, u32, u32)>,
@@ -1210,12 +1211,14 @@ impl QemuHooks {
     ) -> CmpHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let gen: Option<unsafe extern "C" fn(u64, GuestAddr, usize) -> u64> = transmute(gen);
+            let generator: Option<unsafe extern "C" fn(u64, GuestAddr, usize) -> u64> =
+                transmute(generator);
             let exec1: Option<unsafe extern "C" fn(u64, u64, u8, u8)> = transmute(exec1);
             let exec2: Option<unsafe extern "C" fn(u64, u64, u16, u16)> = transmute(exec2);
             let exec4: Option<unsafe extern "C" fn(u64, u64, u32, u32)> = transmute(exec4);
             let exec8: Option<unsafe extern "C" fn(u64, u64, u64, u64)> = transmute(exec8);
-            let num = libafl_qemu_sys::libafl_add_cmp_hook(gen, exec1, exec2, exec4, exec8, data);
+            let num =
+                libafl_qemu_sys::libafl_add_cmp_hook(generator, exec1, exec2, exec4, exec8, data);
             CmpHookId(num)
         }
     }

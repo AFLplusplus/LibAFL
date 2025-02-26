@@ -1,7 +1,7 @@
 [package]
 name = "libafl_fmt"
 version = "0.15.1"
-edition = "2021"
+edition = "2024"
 description = "Format the LibAFL repository"
 authors = ["Romain Malmain <romain.malmain@pm.me>"]
 license = "MIT OR Apache-2.0"

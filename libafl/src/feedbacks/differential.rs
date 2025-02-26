@@ -4,17 +4,17 @@ use alloc::borrow::Cow;
 use core::fmt::{self, Debug, Formatter};
 
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
+    Error,
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackFactory, StateInitializer},
-    Error,
 };
 
 /// The result of a differential test between two observers.
@@ -179,12 +179,12 @@ where
 mod tests {
     use alloc::borrow::Cow;
 
-    use libafl_bolts::{tuples::tuple_list, Named};
+    use libafl_bolts::{Named, tuples::tuple_list};
 
     use crate::{
         events::NopEventManager,
         executors::ExitKind,
-        feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
+        feedbacks::{DiffFeedback, Feedback, differential::DiffResult},
         inputs::BytesInput,
         observers::Observer,
         state::NopState,

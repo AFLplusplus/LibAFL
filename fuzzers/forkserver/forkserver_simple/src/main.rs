@@ -3,27 +3,26 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use libafl::{
+    HasMetadata,
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{forkserver::ForkserverExecutor, HasObservers},
+    executors::{HasObservers, forkserver::ForkserverExecutor},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
+    mutators::{StdScheduledMutator, Tokens, havoc_mutations, tokens_mutations},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
-    HasMetadata,
 };
 use libafl_bolts::{
-    current_nanos,
+    AsSliceMut, Truncate, current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, Truncate,
+    tuples::{Handled, Merge, tuple_list},
 };
 use nix::sys::signal::Signal;
 
@@ -97,7 +96,9 @@ pub fn main() {
     // The coverage map shared between observer and executor
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     // let the forkserver know the shmid
-    shmem.write_to_env("__AFL_SHM_ID").unwrap();
+    unsafe {
+        shmem.write_to_env("__AFL_SHM_ID").unwrap();
+    }
     let shmem_buf = shmem.as_slice_mut();
 
     // Create an observation channel using the signals map

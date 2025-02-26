@@ -13,27 +13,27 @@ use std::{
 #[cfg(unix)]
 use libafl_bolts::os::peak_rss_mb_child_processes;
 use libafl_bolts::{
+    Named,
     core_affinity::CoreId,
     current_time,
     tuples::{Handle, Handled, MatchNameRef},
-    Named,
 };
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 use crate::{
+    Error, HasMetadata, HasNamedMetadata, HasScheduler,
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::{Event, EventFirer},
     executors::HasObservers,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
-    schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
-    stages::{calibrate::UnstableEntriesMetadata, Restartable, Stage},
+    schedulers::{HasQueueCycles, minimizer::IsFavoredMetadata},
+    stages::{Restartable, Stage, calibrate::UnstableEntriesMetadata},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable},
     std::string::ToString,
-    Error, HasMetadata, HasNamedMetadata, HasScheduler,
 };
 
 /// AFL++'s default stats update interval

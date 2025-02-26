@@ -6,7 +6,7 @@ use core::{
     cell::UnsafeCell,
     fmt::{self, Display, Formatter},
     ptr::{self, write_volatile},
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
 };
 use std::os::raw::{c_long, c_void};
 
@@ -14,9 +14,9 @@ use num_enum::FromPrimitive;
 pub use windows::Win32::{
     Foundation::{BOOL, NTSTATUS},
     System::{
-        Console::{SetConsoleCtrlHandler, CTRL_BREAK_EVENT, CTRL_C_EVENT, PHANDLER_ROUTINE},
+        Console::{CTRL_BREAK_EVENT, CTRL_C_EVENT, PHANDLER_ROUTINE, SetConsoleCtrlHandler},
         Diagnostics::Debug::{
-            AddVectoredExceptionHandler, UnhandledExceptionFilter, EXCEPTION_POINTERS,
+            AddVectoredExceptionHandler, EXCEPTION_POINTERS, UnhandledExceptionFilter,
         },
         Threading::{IsProcessorFeaturePresent, PROCESSOR_FEATURE_ID},
     },
@@ -463,14 +463,16 @@ unsafe fn internal_handle_exception(
         .iter()
         .position(|x| *x == exception_code)
         .unwrap();
-    if let Some(handler_holder) = &EXCEPTION_HANDLERS[index] {
+    if let Some(handler_holder) = unsafe { &EXCEPTION_HANDLERS[index] } {
         log::info!(
             "{:?}: Handling exception {}",
             std::process::id(),
             exception_code
         );
-        let handler = &mut **handler_holder.handler.get();
-        handler.handle(exception_code, exception_pointers);
+        let handler = unsafe { &mut **handler_holder.handler.get() };
+        unsafe {
+            handler.handle(exception_code, exception_pointers);
+        }
         EXCEPTION_CONTINUE_EXECUTION
     } else {
         log::info!(
@@ -479,11 +481,13 @@ unsafe fn internal_handle_exception(
             exception_code
         );
         // Go to Default one
-        let handler_holder = &EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]
+        let handler_holder = unsafe { &EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1] }
             .as_ref()
             .unwrap();
-        let handler = &mut **handler_holder.handler.get();
-        handler.handle(exception_code, exception_pointers);
+        let handler = unsafe { &mut **handler_holder.handler.get() };
+        unsafe {
+            handler.handle(exception_code, exception_pointers);
+        }
         EXCEPTION_CONTINUE_SEARCH
     }
 }
@@ -494,16 +498,18 @@ unsafe fn internal_handle_exception(
 pub unsafe extern "system" fn handle_exception(
     exception_pointers: *mut EXCEPTION_POINTERS,
 ) -> c_long {
-    let code = exception_pointers
-        .as_mut()
-        .unwrap()
-        .ExceptionRecord
-        .as_mut()
-        .unwrap()
-        .ExceptionCode;
+    let code = unsafe {
+        exception_pointers
+            .as_mut()
+            .unwrap()
+            .ExceptionRecord
+            .as_mut()
+            .unwrap()
+            .ExceptionCode
+    };
     let exception_code = From::from(code.0);
     log::info!("Received exception; code: {}", exception_code);
-    internal_handle_exception(exception_code, exception_pointers)
+    unsafe { internal_handle_exception(exception_code, exception_pointers) }
 }
 
 /// Return `SIGIGN` this is 1 (when represented as u64)
@@ -512,17 +518,19 @@ pub unsafe extern "system" fn handle_exception(
 /// It is just casting into another type, nothing unsafe.
 #[must_use]
 pub const unsafe fn sig_ign() -> NativeSignalHandlerType {
-    core::mem::transmute(1usize)
+    unsafe { core::mem::transmute(1_usize) }
 }
 
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);
-extern "C" {
+unsafe extern "C" {
     pub fn signal(signum: i32, func: NativeSignalHandlerType) -> *const c_void;
 }
 
 unsafe extern "C" fn handle_signal(_signum: i32) {
     // log::info!("Received signal {}", _signum);
-    internal_handle_exception(ExceptionCode::AssertionFailure, ptr::null_mut());
+    unsafe {
+        internal_handle_exception(ExceptionCode::AssertionFailure, ptr::null_mut());
+    }
 }
 
 /// Setup Win32 exception handlers in a somewhat rusty way.
@@ -532,7 +540,7 @@ unsafe extern "C" fn handle_signal(_signum: i32) {
 pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(
     handler: *mut T,
 ) -> Result<(), Error> {
-    let exceptions = (*handler).exceptions();
+    let exceptions = unsafe { (*handler).exceptions() };
     let mut catch_assertions = false;
     for exception_code in exceptions {
         if exception_code == ExceptionCode::AssertionFailure {
@@ -542,33 +550,41 @@ pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(
             .iter()
             .position(|x| *x == exception_code)
             .unwrap();
+        unsafe {
+            write_volatile(
+                &raw mut EXCEPTION_HANDLERS[index],
+                Some(HandlerHolder {
+                    handler: UnsafeCell::new(handler as *mut dyn ExceptionHandler),
+                }),
+            );
+        }
+    }
+
+    unsafe {
         write_volatile(
-            &raw mut EXCEPTION_HANDLERS[index],
+            &raw mut (EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]),
             Some(HandlerHolder {
                 handler: UnsafeCell::new(handler as *mut dyn ExceptionHandler),
             }),
         );
     }
-
-    write_volatile(
-        &raw mut (EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]),
-        Some(HandlerHolder {
-            handler: UnsafeCell::new(handler as *mut dyn ExceptionHandler),
-        }),
-    );
     compiler_fence(Ordering::SeqCst);
     if catch_assertions {
-        signal(SIGABRT, handle_signal);
+        unsafe {
+            signal(SIGABRT, handle_signal);
+        }
     }
     // SetUnhandledFilter does not work with frida since the stack is changed and exception handler is lost with Stalker enabled.
     // See https://github.com/AFLplusplus/LibAFL/pull/403
-    AddVectoredExceptionHandler(
-        0,
-        Some(core::mem::transmute::<
-            *const core::ffi::c_void,
-            unsafe extern "system" fn(*mut EXCEPTION_POINTERS) -> i32,
-        >(handle_exception as *const c_void)),
-    );
+    unsafe {
+        AddVectoredExceptionHandler(
+            0,
+            Some(core::mem::transmute::<
+                *const core::ffi::c_void,
+                unsafe extern "system" fn(*mut EXCEPTION_POINTERS) -> i32,
+            >(handle_exception as *const c_void)),
+        );
+    }
     Ok(())
 }
 
@@ -591,16 +607,18 @@ static mut CTRL_HANDLER: Option<CtrlHandlerHolder> = None;
 pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
     handler: *mut T,
 ) -> Result<(), Error> {
-    write_volatile(
-        &raw mut (CTRL_HANDLER),
-        Some(CtrlHandlerHolder {
-            handler: UnsafeCell::new(handler as *mut dyn CtrlHandler),
-        }),
-    );
+    unsafe {
+        write_volatile(
+            &raw mut (CTRL_HANDLER),
+            Some(CtrlHandlerHolder {
+                handler: UnsafeCell::new(handler as *mut dyn CtrlHandler),
+            }),
+        );
+    }
     compiler_fence(Ordering::SeqCst);
 
     // Log the result of SetConsoleCtrlHandler
-    let result = SetConsoleCtrlHandler(Some(Some(ctrl_handler)), true);
+    let result = unsafe { SetConsoleCtrlHandler(Some(Some(ctrl_handler)), true) };
     match result {
         Ok(()) => {
             log::info!("SetConsoleCtrlHandler succeeded");
@@ -614,12 +632,12 @@ pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
 }
 
 unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> BOOL {
-    let handler = ptr::read_volatile(&raw const (CTRL_HANDLER));
+    let handler = unsafe { ptr::read_volatile(&raw const (CTRL_HANDLER)) };
     match handler {
         Some(handler_holder) => {
             log::info!("{:?}: Handling ctrl {}", std::process::id(), ctrl_type);
-            let handler = &mut *handler_holder.handler.get();
-            if let Some(ctrl_handler) = handler.as_mut() {
+            let handler = unsafe { &mut *handler_holder.handler.get() };
+            if let Some(ctrl_handler) = unsafe { handler.as_mut() } {
                 (*ctrl_handler).handle(ctrl_type).into()
             } else {
                 false.into()

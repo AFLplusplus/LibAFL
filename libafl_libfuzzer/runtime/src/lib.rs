@@ -66,13 +66,13 @@
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
 
-use core::ffi::{c_char, c_int, CStr};
+use core::ffi::{CStr, c_char, c_int};
 use std::{fs::File, io::stderr, os::fd::RawFd};
 
 use env_logger::Target;
 use libafl::{
-    inputs::{BytesInput, HasTargetBytes, Input},
     Error,
+    inputs::{BytesInput, HasTargetBytes, Input},
 };
 use libafl_bolts::AsSlice;
 use libc::_exit;
@@ -144,6 +144,7 @@ macro_rules! fuzz_with {
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
                 AsSlice,
+                nonnull_raw_mut,
         };
         use libafl::{
             corpus::Corpus,
@@ -159,7 +160,7 @@ macro_rules! fuzz_with {
                 UnicodeCategoryTokenReplaceMutator, UnicodeSubcategoryTokenReplaceMutator, Tokens, tokens_mutations,
                 UnicodeInput,
             },
-            observers::{stacktrace::BacktraceObserver, TimeObserver, CanTrack},
+            observers::{stacktrace::BacktraceObserver, TimeObserver, CanTrack, ConstMapObserver},
             schedulers::{
                 IndexesLenTimeMinimizerScheduler, powersched::PowerSchedule, PowerQueueScheduler,
             },
@@ -205,7 +206,7 @@ macro_rules! fuzz_with {
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
             // Create an observer using the cmp map for value profile
-            let value_profile_observer = unsafe { StdMapObserver::from_mut_ptr("cmps", CMP_MAP.as_mut_ptr(), CMP_MAP.len()) };
+            let value_profile_observer = unsafe { ConstMapObserver::from_mut_ptr("cmps", nonnull_raw_mut!(CMP_MAP)) };
 
             // Create a stacktrace observer
             let backtrace_observer = BacktraceObserver::owned(
@@ -537,17 +538,19 @@ macro_rules! fuzz_with {
         use libafl::observers::{
             HitcountsIterableMapObserver, HitcountsMapObserver, MultiMapObserver, StdMapObserver,
         };
-        use libafl_targets::{COUNTERS_MAPS, extra_counters};
+        use libafl_targets::{counters_maps_ptr, extra_counters};
+
+        let counters_len = unsafe { &*counters_maps_ptr() }.len();
 
         // Create an observation channel using the coverage map
-        if unsafe { COUNTERS_MAPS.len() } == 1 {
+        if counters_len == 1 {
             fuzz_with!($options, $harness, $operation, $and_then, || {
                 let edges = unsafe { extra_counters() };
                 let edges_observer =
                     HitcountsMapObserver::new(StdMapObserver::from_mut_slice("edges", edges.into_iter().next().unwrap()));
                 edges_observer
             })
-        } else if unsafe { COUNTERS_MAPS.len() } > 1 {
+        } else if counters_len > 1 {
             fuzz_with!($options, $harness, $operation, $and_then, || {
                 let edges = unsafe { extra_counters() };
                 let edges_observer =
@@ -574,7 +577,7 @@ where
     fuzz_single(initial_state, mgr, 0)
 }
 
-extern "C" {
+unsafe extern "C" {
     // redeclaration against libafl_targets because the pointers in our case may be mutable
     fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
 }
@@ -591,7 +594,7 @@ pub const STDERR_FD_VAR: &str = "_LIBAFL_LIBFUZZER_STDERR_FD";
 /// This will then call the (potentially unsafe) harness.
 /// The fuzzer itself should catch any side effects and, hence be reasonably safe, if the `harness_fn` parameter is correct.
 #[expect(clippy::similar_names)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn LLVMFuzzerRunDriver(
     argc: *mut c_int,
     argv: *mut *mut *const c_char,
@@ -613,11 +616,13 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
             .map_err(Error::from)
             .and_then(|s| RawFd::from_str(&s).map_err(Error::from))
             .unwrap_or_else(|_| {
-                let stderr = libc::dup(stderr().as_raw_fd());
-                std::env::set_var(STDERR_FD_VAR, stderr.to_string());
+                let stderr = unsafe { libc::dup(stderr().as_raw_fd()) };
+                unsafe {
+                    std::env::set_var(STDERR_FD_VAR, stderr.to_string());
+                }
                 stderr
             });
-        let stderr = File::from_raw_fd(stderr_fd);
+        let stderr = unsafe { File::from_raw_fd(stderr_fd) };
         env_logger::builder()
             .parse_default_env()
             .target(Target::Pipe(Box::new(stderr)))
@@ -626,7 +631,9 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
 
     // it appears that no one, not even libfuzzer, uses this return value
     // https://github.com/llvm/llvm-project/blob/llvmorg-15.0.7/compiler-rt/lib/fuzzer/FuzzerDriver.cpp#L648
-    libafl_targets_libfuzzer_init(argc, argv);
+    unsafe {
+        libafl_targets_libfuzzer_init(argc, argv);
+    }
 
     let argc = unsafe { *argc } as isize;
     let argv = unsafe { *argv };
@@ -653,7 +660,9 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
                 "Required folder {} did not exist; failing fast.",
                 folder.to_string_lossy()
             );
-            _exit(1);
+            unsafe {
+                _exit(1);
+            }
         }
     }
 
@@ -666,7 +675,11 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
             let input = BytesInput::from_file(input).unwrap_or_else(|_| {
                 panic!("Couldn't load input {}", input.to_string_lossy().as_ref())
             });
-            libafl_targets::libfuzzer::libfuzzer_test_one_input(input.target_bytes().as_slice());
+            unsafe {
+                libafl_targets::libfuzzer::libfuzzer_test_one_input(
+                    input.target_bytes().as_slice(),
+                );
+            }
         }
         return 0;
     }

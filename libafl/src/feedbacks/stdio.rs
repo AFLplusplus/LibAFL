@@ -3,17 +3,16 @@
 use alloc::{borrow::Cow, string::String};
 
 use libafl_bolts::{
-    impl_serdeany,
+    Named, impl_serdeany,
     tuples::{Handle, Handled, MatchName, MatchNameRef},
-    Named,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata,
     corpus::Testcase,
     feedbacks::{Feedback, StateInitializer},
     observers::{StdErrObserver, StdOutObserver},
-    Error, HasMetadata,
 };
 
 /// Metadata for [`StdOutToMetadataFeedback`].

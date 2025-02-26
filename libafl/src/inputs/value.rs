@@ -8,7 +8,7 @@ use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use {
-    libafl_bolts::{fs::write_file_atomic, Error},
+    libafl_bolts::{Error, fs::write_file_atomic},
     std::{fs::File, io::Read, path::Path},
 };
 

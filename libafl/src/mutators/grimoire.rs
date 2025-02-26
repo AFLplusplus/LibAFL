@@ -9,17 +9,17 @@ use core::{
 };
 
 use libafl_bolts::{
-    rands::{choose, fast_bound, Rand},
     Named,
+    rands::{Rand, choose, fast_bound},
 };
 
 use crate::{
+    Error, HasMetadata,
     corpus::Corpus,
     inputs::{GeneralizedInputMetadata, GeneralizedItem},
-    mutators::{token_mutations::Tokens, MutationResult, Mutator},
+    mutators::{MutationResult, Mutator, token_mutations::Tokens},
     random_corpus_id,
     state::{HasCorpus, HasRand},
-    Error, HasMetadata,
 };
 
 const RECURSIVE_REPLACEMENT_DEPTH: [usize; 6] = [2, 4, 8, 16, 32, 64];
@@ -46,9 +46,9 @@ where
                 .metadata_map()
                 .get::<GeneralizedInputMetadata>()
             {
-                let gen = other.generalized();
+                let generalized = other.generalized();
 
-                for (i, _) in gen
+                for (i, _) in generalized
                     .iter()
                     .enumerate()
                     .filter(|&(_, x)| *x == GeneralizedItem::Gap)
@@ -64,7 +64,7 @@ where
                 if items.last() == Some(&GeneralizedItem::Gap) {
                     min_idx += 1;
                 }
-                items.extend_from_slice(&gen[min_idx..=max_idx]);
+                items.extend_from_slice(&generalized[min_idx..=max_idx]);
 
                 debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
                 debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
@@ -93,25 +93,27 @@ where
     }
 
     let other_testcase = state.corpus().get(id)?.borrow();
-    if let Some(other) = other_testcase
+    match other_testcase
         .metadata_map()
         .get::<GeneralizedInputMetadata>()
     {
-        let gen = other.generalized();
+        Some(other) => {
+            let generalized = other.generalized();
 
-        if items.last() == Some(&GeneralizedItem::Gap) && gen.first() == Some(&GeneralizedItem::Gap)
-        {
-            items.extend_from_slice(&gen[1..]);
-        } else {
-            items.extend_from_slice(gen);
+            if items.last() == Some(&GeneralizedItem::Gap)
+                && generalized.first() == Some(&GeneralizedItem::Gap)
+            {
+                items.extend_from_slice(&generalized[1..]);
+            } else {
+                items.extend_from_slice(generalized);
+            }
+
+            debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
+            debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
+
+            Ok(MutationResult::Mutated)
         }
-
-        debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
-        debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
-
-        Ok(MutationResult::Mutated)
-    } else {
-        Ok(MutationResult::Skipped)
+        _ => Ok(MutationResult::Skipped),
     }
 }
 
@@ -185,9 +187,9 @@ where
                 break;
             }
 
-            let gen = generalised_meta.generalized_mut();
+            let generalized = generalised_meta.generalized_mut();
 
-            for (i, _) in gen
+            for (i, _) in generalized
                 .iter()
                 .enumerate()
                 .filter(|&(_, x)| *x == GeneralizedItem::Gap)
@@ -200,16 +202,16 @@ where
             let selected = *state.rand_mut().choose(&self.gap_indices).unwrap();
             self.gap_indices.clear();
 
-            self.scratch.extend_from_slice(&gen[selected + 1..]);
-            gen.truncate(selected);
+            self.scratch.extend_from_slice(&generalized[selected + 1..]);
+            generalized.truncate(selected);
 
-            if extend_with_random_generalized(state, gen, &mut self.gap_indices)?
+            if extend_with_random_generalized(state, generalized, &mut self.gap_indices)?
                 == MutationResult::Skipped
             {
-                gen.push(GeneralizedItem::Gap);
+                generalized.push(GeneralizedItem::Gap);
             }
 
-            gen.extend_from_slice(&self.scratch);
+            generalized.extend_from_slice(&self.scratch);
             self.scratch.clear();
 
             mutated = MutationResult::Mutated;
@@ -266,8 +268,8 @@ where
             }
         };
 
-        let gen = generalised_meta.generalized_mut();
-        let Some(_) = NonZero::new(gen.len()) else {
+        let generalized = generalised_meta.generalized_mut();
+        let Some(_) = NonZero::new(generalized.len()) else {
             return Err(Error::illegal_state("No generalized metadata found."));
         };
 
@@ -289,10 +291,10 @@ where
         // # Safety
         // gen.len() is positive.
         let rand_idx = fast_bound(rand_idx, unsafe {
-            NonZero::new(gen.len()).unwrap_unchecked()
+            NonZero::new(generalized.len()).unwrap_unchecked()
         });
 
-        'first: for item in &mut gen[..rand_idx] {
+        'first: for item in &mut generalized[..rand_idx] {
             if let GeneralizedItem::Bytes(bytes) = item {
                 let mut i = 0;
                 while bytes
@@ -315,7 +317,7 @@ where
             }
         }
         if mutated == MutationResult::Skipped || !stop_at_first {
-            'second: for item in &mut gen[rand_idx..] {
+            'second: for item in &mut generalized[rand_idx..] {
                 if let GeneralizedItem::Bytes(bytes) = item {
                     let mut i = 0;
                     while bytes
@@ -376,9 +378,9 @@ where
         state: &mut S,
         generalised_meta: &mut GeneralizedInputMetadata,
     ) -> Result<MutationResult, Error> {
-        let gen = generalised_meta.generalized_mut();
+        let generalized = generalised_meta.generalized_mut();
 
-        for i in gen
+        for i in generalized
             .iter()
             .enumerate()
             .filter_map(|(i, x)| (*x == GeneralizedItem::Gap).then_some(i))
@@ -402,7 +404,7 @@ where
         let result = if min_idx == max_idx {
             MutationResult::Skipped
         } else {
-            gen.drain(min_idx..max_idx);
+            generalized.drain(min_idx..max_idx);
             MutationResult::Mutated
         };
 

@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use crate::observers::concolic::{serialization_format::MessageFileReader, SymExpr, SymExprRef};
+use crate::observers::concolic::{SymExpr, SymExprRef, serialization_format::MessageFileReader};
 
 /// A metadata holding a buffer of a concolic trace.
 #[derive(Default, Serialize, Deserialize, Debug)]

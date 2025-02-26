@@ -1,29 +1,29 @@
 #[cfg(feature = "usermode")]
-use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
+use capstone::{Capstone, InsnDetail, arch::BuildsCapstone};
 use hashbrown::HashMap;
 use libafl::HasMetadata;
 use libafl_bolts::hash_64_fast;
 use libafl_qemu_sys::GuestAddr;
 pub use libafl_targets::{
+    CMPLOG_MAP_H, CMPLOG_MAP_PTR, CMPLOG_MAP_SIZE, CMPLOG_MAP_W, CmpLogMap, CmpLogObserver,
     cmps::{
         __libafl_targets_cmplog_instructions, __libafl_targets_cmplog_routines, CMPLOG_ENABLED,
     },
-    CmpLogMap, CmpLogObserver, CMPLOG_MAP_H, CMPLOG_MAP_PTR, CMPLOG_MAP_SIZE, CMPLOG_MAP_W,
 };
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "usermode")]
 use crate::capstone;
 #[cfg(feature = "systemmode")]
-use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
+    Qemu,
     emu::EmulatorModules,
     modules::{
-        utils::filters::{HasAddressFilter, StdAddressFilter},
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        utils::filters::{HasAddressFilter, StdAddressFilter},
     },
     qemu::Hook,
-    Qemu,
 };
 
 #[cfg_attr(

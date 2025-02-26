@@ -6,18 +6,19 @@ use libafl_qemu_sys::GuestVirtAddr;
 use libc::c_uint;
 
 use crate::{
+    IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
     command::{
+        CommandError, NativeExitKind,
         nyx::{
-            bindings, AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand,
+            AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand,
             NyxCommandManager, PanicCommand, PrintfCommand, RangeSubmitCommand, ReleaseCommand,
             SetAgentConfigCommand, SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
+            bindings,
         },
         parser::NativeCommandParser,
-        CommandError, NativeExitKind,
     },
-    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
+    modules::{EmulatorModuleTuple, utils::filters::HasAddressFilterTuples},
     sync_exit::ExitArgs,
-    IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
 };
 
 fn get_guest_string(qemu: Qemu, string_ptr_reg: Regs) -> Result<String, CommandError> {

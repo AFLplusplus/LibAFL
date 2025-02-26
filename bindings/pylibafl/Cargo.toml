@@ -5,7 +5,7 @@ version = "0.15.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 keywords = ["fuzzing", "testing", "security", "python"]
-edition = "2021"
+edition = "2024"
 categories = ["development-tools::testing", "emulators", "embedded", "os"]
 
 [dependencies]

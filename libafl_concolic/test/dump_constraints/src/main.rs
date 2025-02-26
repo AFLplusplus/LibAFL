@@ -64,16 +64,24 @@ fn main() {
     let concolic_shmem = shmemprovider
         .new_shmem(1024 * 1024 * 1024)
         .expect("unable to create shared mapping");
-    concolic_shmem
-        .write_to_env(DEFAULT_ENV_NAME)
-        .expect("unable to write shared mapping info to environment");
+    // # Safety
+    // Single-threaded env variable access
+    unsafe {
+        concolic_shmem
+            .write_to_env(DEFAULT_ENV_NAME)
+            .expect("unable to write shared mapping info to environment");
+    }
 
     let coverage_map = StdShMemProvider::new()
         .unwrap()
         .new_shmem(COVERAGE_MAP_SIZE)
         .unwrap();
-    //let the forkserver know the shmid
-    coverage_map.write_to_env(HITMAP_ENV_NAME).unwrap();
+    // let the forkserver know the shmid
+    // # Safety
+    // Single-threaded env variable access
+    unsafe {
+        coverage_map.write_to_env(HITMAP_ENV_NAME).unwrap();
+    }
 
     if let Some(symbolize_offsets) = opt.symbolize_offsets {
         std::env::set_var(

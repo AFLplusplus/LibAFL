@@ -9,10 +9,10 @@ use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, Testcase},
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand},
-    Error, HasMetadata,
 };
 
 /// Conduct reservoir sampling (probabilistic sampling) over all corpus elements.
@@ -189,12 +189,12 @@ mod tests {
     use libafl_bolts::rands::StdRand;
 
     use crate::{
+        Error,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
         state::{HasCorpus, StdState},
-        Error,
     };
 
     const FACTOR: f64 = 1337.0;

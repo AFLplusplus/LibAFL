@@ -77,7 +77,7 @@ pub mod frida_helper_shutdown_observer;
 
 // for parsing asan and cmplog cores
 
-use libafl_bolts::core_affinity::{get_core_ids, CoreId, Cores};
+use libafl_bolts::core_affinity::{CoreId, Cores, get_core_ids};
 /// A representation of the various Frida options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[expect(clippy::struct_excessive_bools)]
@@ -331,20 +331,20 @@ mod tests {
     use clap::Parser;
     use frida_gum::Gum;
     use libafl::{
+        Fuzzer, StdFuzzer,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         feedback_and_fast, feedback_or_fast,
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasTargetBytes},
-        mutators::{mutations::BitFlipMutator, StdScheduledMutator},
+        mutators::{StdScheduledMutator, mutations::BitFlipMutator},
         schedulers::StdScheduler,
         stages::StdMutationalStage,
         state::{HasSolutions, StdState},
-        Fuzzer, StdFuzzer,
     };
     use libafl_bolts::{
-        cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
+        AsSlice, SimpleStdoutLogger, cli::FuzzerOptions, rands::StdRand, tuples::tuple_list,
     };
     use mimalloc::MiMalloc;
 

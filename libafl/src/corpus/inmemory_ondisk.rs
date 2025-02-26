@@ -20,13 +20,13 @@ use libafl_bolts::compress::GzipCompressor;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    ondisk::{OnDiskMetadata, OnDiskMetadataFormat},
     HasTestcase,
+    ondisk::{OnDiskMetadata, OnDiskMetadataFormat},
 };
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::Input,
-    Error, HasMetadata,
 };
 
 /// Creates the given `path` and returns an error if it fails.

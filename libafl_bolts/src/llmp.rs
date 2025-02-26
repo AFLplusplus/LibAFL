@@ -72,7 +72,7 @@ use core::{
     num::NonZeroUsize,
     ops::{BitAnd, BitOr, Not},
     ptr, slice,
-    sync::atomic::{fence, AtomicU16, Ordering},
+    sync::atomic::{AtomicU16, Ordering, fence},
     time::Duration,
 };
 #[cfg(feature = "std")]
@@ -97,15 +97,15 @@ use tuple_list::tuple_list;
 #[cfg(all(unix, not(miri)))]
 use crate::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
-use crate::os::unix_signals::{siginfo_t, ucontext_t, Signal, SignalHandler};
+use crate::os::unix_signals::{Signal, SignalHandler, siginfo_t, ucontext_t};
 #[cfg(all(windows, feature = "std"))]
-use crate::os::windows_exceptions::{setup_ctrl_handler, CtrlHandler};
-#[cfg(feature = "std")]
-use crate::{current_time, IP_LOCALHOST};
+use crate::os::windows_exceptions::{CtrlHandler, setup_ctrl_handler};
 use crate::{
-    shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     ClientId, Error,
+    shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
 };
+#[cfg(feature = "std")]
+use crate::{IP_LOCALHOST, current_time};
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
@@ -412,9 +412,11 @@ unsafe fn shmem2page<SHM: ShMem>(afl_shmem: &SHM) -> *const LlmpPage {
 /// Return, if a msg is contained in the current page
 #[inline]
 unsafe fn llmp_msg_in_page(page: *const LlmpPage, msg: *const LlmpMsg) -> bool {
-    /* DBG("llmp_msg_in_page %p within %p-%p\n", msg, page, page + page->size_total); */
-    (page as *const u8) < msg as *const u8
-        && (page as *const u8).add((*page).size_total) > msg as *const u8
+    unsafe {
+        /* DBG("llmp_msg_in_page %p within %p-%p\n", msg, page, page + page->size_total); */
+        (page as *const u8) < msg as *const u8
+            && (page as *const u8).add((*page).size_total) > msg as *const u8
+    }
 }
 
 /// Align the page to `LLMP_CFG_ALIGNNMENT=64` bytes
@@ -530,32 +532,34 @@ fn next_shmem_size(max_alloc: usize) -> usize {
 /// # Safety
 /// Will write to the raw SHM page header, should be safe for correct [`ShMem`] implementations
 unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow_reinit: bool) {
-    #[cfg(feature = "llmp_debug")]
-    log::trace!("llmp_page_init: shmem {:?}", &shmem);
-    let map_size = shmem.len();
-    let page = shmem2page_mut(shmem);
-    #[cfg(feature = "llmp_debug")]
-    log::trace!("llmp_page_init: page {:?}", &(*page));
+    unsafe {
+        #[cfg(feature = "llmp_debug")]
+        log::trace!("llmp_page_init: shmem {:?}", &shmem);
+        let map_size = shmem.len();
+        let page = shmem2page_mut(shmem);
+        #[cfg(feature = "llmp_debug")]
+        log::trace!("llmp_page_init: page {:?}", &(*page));
 
-    if !allow_reinit {
-        assert!(
-            (*page).magic != PAGE_INITIALIZED_MAGIC,
-            "Tried to initialize page {page:?} twice (for shmem {shmem:?})"
-        );
+        if !allow_reinit {
+            assert!(
+                (*page).magic != PAGE_INITIALIZED_MAGIC,
+                "Tried to initialize page {page:?} twice (for shmem {shmem:?})"
+            );
+        }
+
+        (*page).magic = PAGE_INITIALIZED_MAGIC;
+        (*page).sender_id = sender_id;
+        (*page).current_msg_id.store(0, Ordering::Relaxed);
+        (*page).max_alloc_size = 0;
+        // Don't forget to subtract our own header size
+        (*page).size_total = map_size - LLMP_PAGE_HEADER_LEN;
+        (*page).size_used = 0;
+        (*(*page).messages.as_mut_ptr()).message_id = MessageId(0);
+        (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
+        (*page).receivers_joined_count.store(0, Ordering::Release);
+        (*page).receivers_left_count.store(0, Ordering::Relaxed);
+        assert!((*page).size_total != 0);
     }
-
-    (*page).magic = PAGE_INITIALIZED_MAGIC;
-    (*page).sender_id = sender_id;
-    (*page).current_msg_id.store(0, Ordering::Relaxed);
-    (*page).max_alloc_size = 0;
-    // Don't forget to subtract our own header size
-    (*page).size_total = map_size - LLMP_PAGE_HEADER_LEN;
-    (*page).size_used = 0;
-    (*(*page).messages.as_mut_ptr()).message_id = MessageId(0);
-    (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
-    (*page).receivers_joined_count.store(0, Ordering::Release);
-    (*page).receivers_left_count.store(0, Ordering::Relaxed);
-    assert!((*page).size_total != 0);
 }
 
 /// Get the next pointer and make sure it's in the current page, and has enough space.
@@ -568,20 +572,22 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     last_msg: *const LlmpMsg,
     alloc_size: usize,
 ) -> Result<*mut LlmpMsg, Error> {
-    let page = map.page_mut();
-    let map_size = map.shmem.len();
-    let msg_begin_min = (page as *const u8).add(size_of::<LlmpPage>());
-    // We still need space for this msg (alloc_size).
-    let msg_begin_max = (page as *const u8).add(map_size - alloc_size);
-    let next = llmp_next_msg_ptr(last_msg);
-    let next_ptr = next as *const u8;
-    if next_ptr >= msg_begin_min && next_ptr <= msg_begin_max {
-        Ok(next)
-    } else {
-        Err(Error::illegal_state(format!(
-            "Inconsistent data on sharedmap, or Bug (next_ptr was {:x}, sharedmap page was {:x})",
-            next_ptr as usize, page as usize
-        )))
+    unsafe {
+        let page = map.page_mut();
+        let map_size = map.shmem.len();
+        let msg_begin_min = (page as *const u8).add(size_of::<LlmpPage>());
+        // We still need space for this msg (alloc_size).
+        let msg_begin_max = (page as *const u8).add(map_size - alloc_size);
+        let next = llmp_next_msg_ptr(last_msg);
+        let next_ptr = next as *const u8;
+        if next_ptr >= msg_begin_min && next_ptr <= msg_begin_max {
+            Ok(next)
+        } else {
+            Err(Error::illegal_state(format!(
+                "Inconsistent data on sharedmap, or Bug (next_ptr was {:x}, sharedmap page was {:x})",
+                next_ptr as usize, page as usize
+            )))
+        }
     }
 }
 
@@ -593,10 +599,12 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
 #[inline]
 #[expect(clippy::cast_ptr_alignment)]
 unsafe fn llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
-    /* DBG("llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
-    (last_msg as *mut u8)
-        .add(size_of::<LlmpMsg>())
-        .add((*last_msg).buf_len_padded as usize) as *mut LlmpMsg
+    unsafe {
+        /* DBG("llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
+        (last_msg as *mut u8)
+            .add(size_of::<LlmpMsg>())
+            .add((*last_msg).buf_len_padded as usize) as *mut LlmpMsg
+    }
 }
 
 /// Description of a shared map.
@@ -650,7 +658,7 @@ impl LlmpMsg {
     /// This is unsafe if somebody has access to shared mem pages on the system.
     #[must_use]
     pub unsafe fn as_slice_unsafe(&self) -> &[u8] {
-        slice::from_raw_parts(self.buf.as_ptr(), self.buf_len as usize)
+        unsafe { slice::from_raw_parts(self.buf.as_ptr(), self.buf_len as usize) }
     }
 
     /// Gets the buffer from this message as a mutable slice, with the correct length.
@@ -659,7 +667,7 @@ impl LlmpMsg {
     /// This is unsafe if somebody has access to shared mem pages on the system.
     #[must_use]
     pub unsafe fn as_slice_mut_unsafe(&mut self) -> &mut [u8] {
-        slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.buf_len as usize)
+        unsafe { slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.buf_len as usize) }
     }
 
     /// Gets the buffer from this message as slice, with the correct length.
@@ -671,7 +679,9 @@ impl LlmpMsg {
             if self.in_shmem(map) {
                 Ok(self.as_slice_unsafe())
             } else {
-                Err(Error::illegal_state("Current message not in page. The sharedmap get tampered with or we have a BUG."))
+                Err(Error::illegal_state(
+                    "Current message not in page. The sharedmap get tampered with or we have a BUG.",
+                ))
             }
         }
     }
@@ -686,7 +696,9 @@ impl LlmpMsg {
             if self.in_shmem(map) {
                 Ok(self.as_slice_mut_unsafe())
             } else {
-                Err(Error::illegal_state("Current message not in page. The sharedmap get tampered with or we have a BUG."))
+                Err(Error::illegal_state(
+                    "Current message not in page. The sharedmap get tampered with or we have a BUG.",
+                ))
             }
         }
     }
@@ -1006,41 +1018,45 @@ where
     /// eventually. This function sees if we can deallocate older pages.
     /// The broker would have informed us by setting the safe_to_unmap-flag.
     unsafe fn prune_old_pages(&mut self) {
-        // Exclude the current page by splitting of the last element for this iter
-        let mut unmap_until_excl = 0;
-        for map in self.out_shmems.split_last_mut().unwrap().1 {
-            if (*map.page()).receivers_joined_count.load(Ordering::Acquire) == 0 {
-                // The broker didn't read this page yet, no more pages to unmap.
-                break;
+        unsafe {
+            // Exclude the current page by splitting of the last element for this iter
+            let mut unmap_until_excl = 0;
+            for map in self.out_shmems.split_last_mut().unwrap().1 {
+                if (*map.page()).receivers_joined_count.load(Ordering::Acquire) == 0 {
+                    // The broker didn't read this page yet, no more pages to unmap.
+                    break;
+                }
+                unmap_until_excl += 1;
             }
-            unmap_until_excl += 1;
-        }
 
-        if unmap_until_excl == 0 && self.out_shmems.len() > LLMP_CFG_MAX_PENDING_UNREAD_PAGES {
-            // Looks like nobody is listening to our pages anymore! :/
-            // The n old pages have not been touched yet.
-            // We send one last information to the broker before quitting.
-            self.send_buf(LLMP_SLOW_RECEIVER_PANIC, &[]).unwrap();
-            panic!("The receiver/broker could not process our sent llmp messages in time. Either we're sending too many messages too fast, the broker got stuck, or it crashed. Giving up.");
-        }
+            if unmap_until_excl == 0 && self.out_shmems.len() > LLMP_CFG_MAX_PENDING_UNREAD_PAGES {
+                // Looks like nobody is listening to our pages anymore! :/
+                // The n old pages have not been touched yet.
+                // We send one last information to the broker before quitting.
+                self.send_buf(LLMP_SLOW_RECEIVER_PANIC, &[]).unwrap();
+                panic!(
+                    "The receiver/broker could not process our sent llmp messages in time. Either we're sending too many messages too fast, the broker got stuck, or it crashed. Giving up."
+                );
+            }
 
-        // Remove all maps that the broker already mapped, move them to our unused pages cache
-        self.out_shmems.reserve(unmap_until_excl);
-        for _ in 0..unmap_until_excl {
-            let mut map = self.out_shmems.remove(0);
+            // Remove all maps that the broker already mapped, move them to our unused pages cache
+            self.out_shmems.reserve(unmap_until_excl);
+            for _ in 0..unmap_until_excl {
+                let mut map = self.out_shmems.remove(0);
 
-            let page = shmem2page_mut(&mut map.shmem);
-            assert!(
-                (*page).magic == PAGE_INITIALIZED_MAGIC,
-                "LLMP: Tried to free uninitialized shared map at addr {:#}!",
-                page as usize
-            );
-            (*page).magic = PAGE_DEINITIALIZED_MAGIC;
+                let page = shmem2page_mut(&mut map.shmem);
+                assert!(
+                    (*page).magic == PAGE_INITIALIZED_MAGIC,
+                    "LLMP: Tried to free uninitialized shared map at addr {:#}!",
+                    page as usize
+                );
+                (*page).magic = PAGE_DEINITIALIZED_MAGIC;
 
-            #[cfg(feature = "llmp_debug")]
-            log::debug!("Moving unused map to cache: {map:?} {:x?}", map.page());
-            self.unused_shmem_cache
-                .insert(self.unused_shmem_cache.len(), map);
+                #[cfg(feature = "llmp_debug")]
+                log::debug!("Moving unused map to cache: {map:?} {:x?}", map.page());
+                self.unused_shmem_cache
+                    .insert(self.unused_shmem_cache.len(), map);
+            }
         }
     }
 
@@ -1051,123 +1067,129 @@ where
         sender_id: ClientId,
         next_min_shmem_size: usize,
     ) -> Result<LlmpSharedMap<SHM>, Error> {
-        // Find a shared map that has been released to reuse, from which all receivers left / finished reading.
-        let cached_shmem = self
-            .unused_shmem_cache
-            .iter()
-            .position(|cached_shmem| {
-                let page = &(*shmem2page(&cached_shmem.shmem));
-                let receivers_joined_count = page.receivers_joined_count.load(Ordering::Relaxed);
-                debug_assert_ne!(receivers_joined_count, 0);
-                let receivers_left_count = page.receivers_left_count.load(Ordering::Relaxed);
-                debug_assert!(receivers_joined_count >= receivers_left_count);
+        unsafe {
+            // Find a shared map that has been released to reuse, from which all receivers left / finished reading.
+            let cached_shmem = self
+                .unused_shmem_cache
+                .iter()
+                .position(|cached_shmem| {
+                    let page = &(*shmem2page(&cached_shmem.shmem));
+                    let receivers_joined_count =
+                        page.receivers_joined_count.load(Ordering::Relaxed);
+                    debug_assert_ne!(receivers_joined_count, 0);
+                    let receivers_left_count = page.receivers_left_count.load(Ordering::Relaxed);
+                    debug_assert!(receivers_joined_count >= receivers_left_count);
 
-                let ret = receivers_joined_count == receivers_left_count;
+                    let ret = receivers_joined_count == receivers_left_count;
 
-                // For proper refcounts, double check that nobody joined in the meantime.
-                debug_assert_eq!(
-                    receivers_joined_count,
-                    page.receivers_joined_count.load(Ordering::Relaxed),
-                    "Oops, some receiver joined while re-using the page!"
-                );
+                    // For proper refcounts, double check that nobody joined in the meantime.
+                    debug_assert_eq!(
+                        receivers_joined_count,
+                        page.receivers_joined_count.load(Ordering::Relaxed),
+                        "Oops, some receiver joined while re-using the page!"
+                    );
 
-                ret
-            })
-            .map(|e| self.unused_shmem_cache.remove(e));
+                    ret
+                })
+                .map(|e| self.unused_shmem_cache.remove(e));
 
-        if let Some(mut cached_shmem) = cached_shmem {
-            // We got cached shmems laying around, hand it out, if they are large enough.
-            if cached_shmem.shmem.len() < next_min_shmem_size {
-                // This map is too small, we will never need it again (llmp allocation sizes always increase). Drop it, then call this function again..
-                #[cfg(feature = "llmp_debug")]
-                log::info!("Dropping too small shmem {cached_shmem:?}");
-                drop(cached_shmem);
-                self.new_or_unused_shmem(sender_id, next_min_shmem_size)
-            } else {
-                #[cfg(feature = "llmp_debug")]
-                log::info!("Returning cached shmem {cached_shmem:?}");
-                unsafe {
-                    llmp_page_init(&mut cached_shmem.shmem, sender_id, false);
+            match cached_shmem {
+                Some(mut cached_shmem) => {
+                    // We got cached shmems laying around, hand it out, if they are large enough.
+                    if cached_shmem.shmem.len() < next_min_shmem_size {
+                        // This map is too small, we will never need it again (llmp allocation sizes always increase). Drop it, then call this function again..
+                        #[cfg(feature = "llmp_debug")]
+                        log::info!("Dropping too small shmem {cached_shmem:?}");
+                        drop(cached_shmem);
+                        self.new_or_unused_shmem(sender_id, next_min_shmem_size)
+                    } else {
+                        #[cfg(feature = "llmp_debug")]
+                        log::info!("Returning cached shmem {cached_shmem:?}");
+                        llmp_page_init(&mut cached_shmem.shmem, sender_id, false);
+                        Ok(cached_shmem)
+                    }
                 }
-                Ok(cached_shmem)
+                _ => {
+                    // No cached maps that fit our need, let's allocate a new one.
+                    Ok(LlmpSharedMap::new(
+                        sender_id,
+                        self.shmem_provider.new_shmem(next_min_shmem_size)?,
+                    ))
+                }
             }
-        } else {
-            // No cached maps that fit our need, let's allocate a new one.
-            Ok(LlmpSharedMap::new(
-                sender_id,
-                self.shmem_provider.new_shmem(next_min_shmem_size)?,
-            ))
         }
     }
 
     /// listener about it using a EOP message.
     unsafe fn handle_out_eop(&mut self) -> Result<(), Error> {
-        #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        {
-            #[cfg(debug_assertions)]
-            let bt = Backtrace::new();
-            #[cfg(not(debug_assertions))]
-            let bt = "<n/a (release)>";
-            let shm = self.out_shmems.last().unwrap();
-            log::info!(
-                "LLMP_DEBUG: End of page reached for map {} with len {}, sending EOP, bt: {:?}",
-                shm.shmem.id(),
-                shm.shmem.len(),
-                bt
-            );
-        }
+        unsafe {
+            #[cfg(all(feature = "llmp_debug", feature = "std"))]
+            {
+                #[cfg(debug_assertions)]
+                let bt = Backtrace::new();
+                #[cfg(not(debug_assertions))]
+                let bt = "<n/a (release)>";
+                let shm = self.out_shmems.last().unwrap();
+                log::info!(
+                    "LLMP_DEBUG: End of page reached for map {} with len {}, sending EOP, bt: {:?}",
+                    shm.shmem.id(),
+                    shm.shmem.len(),
+                    bt
+                );
+            }
 
-        // If we want to get red if old pages, (client to broker), do that now
-        if !self.keep_pages_forever {
+            // If we want to get red if old pages, (client to broker), do that now
+            if !self.keep_pages_forever {
+                #[cfg(feature = "llmp_debug")]
+                log::debug!("LLMP DEBUG: pruning old pages");
+                self.prune_old_pages();
+            }
+
+            let old_map = self.out_shmems.last_mut().unwrap().page_mut();
+
+            let next_min_shmem_size = next_shmem_size((*old_map).max_alloc_size);
+
             #[cfg(feature = "llmp_debug")]
-            log::debug!("LLMP DEBUG: pruning old pages");
-            self.prune_old_pages();
+            log::info!("Next min ShMem Size {next_min_shmem_size}",);
+
+            // Get a new shared page, or reuse an old one, if available.
+            let mut new_map_shmem =
+                self.new_or_unused_shmem((*old_map).sender_id, next_min_shmem_size)?;
+
+            let new_map = new_map_shmem.page_mut();
+
+            #[cfg(feature = "llmp_debug")]
+            log::info!("got new map at: {new_map:?}");
+
+            // New maps always start with 0 as message id -> No messages yet.
+            (*new_map).current_msg_id.store(0, Ordering::Release);
+
+            #[cfg(feature = "llmp_debug")]
+            log::info!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
+
+            // Allocations may never shrink:
+            // keep track of the max message size we allocated across maps.
+            (*new_map).max_alloc_size = (*old_map).max_alloc_size;
+
+            /* On the old map, place a last message linking to the new map for the clients
+             * to consume */
+            let out = self.alloc_eop()?;
+
+            #[expect(clippy::cast_ptr_alignment)]
+            let end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+            (*end_of_page_msg).map_size = new_map_shmem.shmem.len();
+            (*end_of_page_msg).shm_str = *new_map_shmem.shmem.id().as_array();
+
+            /* Send the last msg (the EOP message) on the old buf */
+            self.send(out, true)?;
+
+            // Set the new page as current page.
+            self.out_shmems.push(new_map_shmem);
+            // We never sent a msg on the new buf */
+            self.last_msg_sent = ptr::null_mut();
+
+            Ok(())
         }
-
-        let old_map = self.out_shmems.last_mut().unwrap().page_mut();
-
-        let next_min_shmem_size = next_shmem_size((*old_map).max_alloc_size);
-
-        #[cfg(feature = "llmp_debug")]
-        log::info!("Next min ShMem Size {next_min_shmem_size}",);
-
-        // Get a new shared page, or reuse an old one, if available.
-        let mut new_map_shmem =
-            self.new_or_unused_shmem((*old_map).sender_id, next_min_shmem_size)?;
-
-        let new_map = new_map_shmem.page_mut();
-
-        #[cfg(feature = "llmp_debug")]
-        log::info!("got new map at: {new_map:?}");
-
-        // New maps always start with 0 as message id -> No messages yet.
-        (*new_map).current_msg_id.store(0, Ordering::Release);
-
-        #[cfg(feature = "llmp_debug")]
-        log::info!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
-
-        // Allocations may never shrink:
-        // keep track of the max message size we allocated across maps.
-        (*new_map).max_alloc_size = (*old_map).max_alloc_size;
-
-        /* On the old map, place a last message linking to the new map for the clients
-         * to consume */
-        let out = self.alloc_eop()?;
-
-        #[expect(clippy::cast_ptr_alignment)]
-        let end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-        (*end_of_page_msg).map_size = new_map_shmem.shmem.len();
-        (*end_of_page_msg).shm_str = *new_map_shmem.shmem.id().as_array();
-
-        /* Send the last msg (the EOP message) on the old buf */
-        self.send(out, true)?;
-
-        // Set the new page as current page.
-        self.out_shmems.push(new_map_shmem);
-        // We never sent a msg on the new buf */
-        self.last_msg_sent = ptr::null_mut();
-
-        Ok(())
     }
 
     /// Allocates the next space on this sender page
@@ -1196,11 +1218,13 @@ where
     /// # Safety
     /// They msg pointer may no longer be used after `cancel_send`
     pub unsafe fn cancel_send(&mut self, msg: *mut LlmpMsg) {
-        /* DBG("Client %d cancels send of msg at %p with tag 0x%X and size %ld", client->id, msg, msg->tag,
-         * msg->buf_len_padded); */
-        let page = self.out_shmems.last_mut().unwrap().page_mut();
-        (*msg).tag = LLMP_TAG_UNSET;
-        (*page).size_used -= (*msg).buf_len_padded as usize + size_of::<LlmpMsg>();
+        unsafe {
+            /* DBG("Client %d cancels send of msg at %p with tag 0x%X and size %ld", client->id, msg, msg->tag,
+             * msg->buf_len_padded); */
+            let page = self.out_shmems.last_mut().unwrap().page_mut();
+            (*msg).tag = LLMP_TAG_UNSET;
+            (*page).size_used -= (*msg).buf_len_padded as usize + size_of::<LlmpMsg>();
+        }
     }
 
     /// Shrinks the allocated [`LlmpMsg`] to a given size.
@@ -1212,38 +1236,43 @@ where
         msg: *mut LlmpMsg,
         shrinked_len: usize,
     ) -> Result<(), Error> {
-        if msg.is_null() {
-            return Err(Error::illegal_argument("Null msg passed to shrink_alloced"));
-        } else if !self.has_unsent_message {
-            return Err(Error::illegal_state(
-                "Called shrink_alloced, but the msg was not unsent",
-            ));
+        unsafe {
+            if msg.is_null() {
+                return Err(Error::illegal_argument("Null msg passed to shrink_alloced"));
+            } else if !self.has_unsent_message {
+                return Err(Error::illegal_state(
+                    "Called shrink_alloced, but the msg was not unsent",
+                ));
+            }
+
+            let old_len_padded = (*msg).buf_len_padded;
+
+            let msg_start = msg as usize;
+            // Make sure the end of our msg is aligned.
+            let buf_len_padded = llmp_align(msg_start + shrinked_len + size_of::<LlmpMsg>())
+                - msg_start
+                - size_of::<LlmpMsg>();
+
+            if buf_len_padded > old_len_padded.try_into().unwrap() {
+                return Err(Error::illegal_argument(format!(
+                    "Cannot shrink msg of size {} (paded: {old_len_padded}) to requested larger size of {shrinked_len} (padded: {buf_len_padded})!",
+                    (*msg).buf_len
+                )));
+            }
+
+            (*msg).buf_len = shrinked_len as u64;
+            (*msg).buf_len_padded = buf_len_padded as u64;
+
+            let page = self.out_shmems.last_mut().unwrap().page_mut();
+
+            // Doing this step by step will catch underflows in debug builds :)
+            (*page).size_used -= old_len_padded as usize;
+            (*page).size_used += buf_len_padded;
+
+            (*llmp_next_msg_ptr(msg)).tag = LLMP_TAG_UNSET;
+
+            Ok(())
         }
-
-        let old_len_padded = (*msg).buf_len_padded;
-
-        let msg_start = msg as usize;
-        // Make sure the end of our msg is aligned.
-        let buf_len_padded = llmp_align(msg_start + shrinked_len + size_of::<LlmpMsg>())
-            - msg_start
-            - size_of::<LlmpMsg>();
-
-        if buf_len_padded > old_len_padded.try_into().unwrap() {
-            return Err(Error::illegal_argument(format!("Cannot shrink msg of size {} (paded: {old_len_padded}) to requested larger size of {shrinked_len} (padded: {buf_len_padded})!", (*msg).buf_len)));
-        }
-
-        (*msg).buf_len = shrinked_len as u64;
-        (*msg).buf_len_padded = buf_len_padded as u64;
-
-        let page = self.out_shmems.last_mut().unwrap().page_mut();
-
-        // Doing this step by step will catch underflows in debug builds :)
-        (*page).size_used -= old_len_padded as usize;
-        (*page).size_used += buf_len_padded;
-
-        (*llmp_next_msg_ptr(msg)).tag = LLMP_TAG_UNSET;
-
-        Ok(())
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
@@ -1331,12 +1360,14 @@ where
     /// Only safe if you really really restart the page on everything connected
     /// No receiver should read from this page at a different location.
     pub unsafe fn reset(&mut self) {
-        llmp_page_init(
-            &mut self.out_shmems.last_mut().unwrap().shmem,
-            self.id,
-            true,
-        );
-        self.last_msg_sent = ptr::null_mut();
+        unsafe {
+            llmp_page_init(
+                &mut self.out_shmems.last_mut().unwrap().shmem,
+                self.id,
+                true,
+            );
+            self.last_msg_sent = ptr::null_mut();
+        }
     }
 
     /// Reads the stored sender / client id for the given `env_name` (by appending `_CLIENT_ID`).
@@ -1355,17 +1386,23 @@ where
     /// Writes the `id` to an env var
     #[cfg(feature = "std")]
     fn client_id_to_env(env_name: &str, id: ClientId) {
-        env::set_var(format!("{env_name}_CLIENT_ID"), format!("{}", id.0));
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var(format!("{env_name}_CLIENT_ID"), format!("{}", id.0)) };
     }
 
     /// Store the info to this sender to env.
     /// A new client can reattach to it using [`LlmpSender::on_existing_from_env()`].
+    ///
+    /// # Safety
+    /// Writes to env variables and may only be done single-threaded.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
-        let current_out_shmem = self.out_shmems.last().unwrap();
-        current_out_shmem.shmem.write_to_env(env_name)?;
-        Self::client_id_to_env(env_name, self.id);
-        unsafe { current_out_shmem.msg_to_env(self.last_msg_sent, env_name) }
+    pub unsafe fn to_env(&self, env_name: &str) -> Result<(), Error> {
+        unsafe {
+            let current_out_shmem = self.out_shmems.last().unwrap();
+            current_out_shmem.shmem.write_to_env(env_name)?;
+            Self::client_id_to_env(env_name, self.id);
+            current_out_shmem.msg_to_env(self.last_msg_sent, env_name)
+        }
     }
 
     /// Waits for this sender to be save to unmap.
@@ -1405,7 +1442,9 @@ where
     /// # Safety
     /// If this method is called, the page may be unmapped before it is read by any receiver.
     pub unsafe fn mark_safe_to_unmap(&mut self) {
-        (*self.out_shmems.last_mut().unwrap().page_mut()).receiver_joined();
+        unsafe {
+            (*self.out_shmems.last_mut().unwrap().page_mut()).receiver_joined();
+        }
     }
 
     /// Intern: Special allocation function for `EOP` messages (and nothing else!)
@@ -1413,116 +1452,127 @@ where
     /// So if [`alloc_next`] fails, create new page if necessary, use this function,
     /// place `EOP`, commit `EOP`, reset, alloc again on the new space.
     unsafe fn alloc_eop(&mut self) -> Result<*mut LlmpMsg, Error> {
-        let map = self.out_shmems.last_mut().unwrap();
-        let page = map.page_mut();
-        let last_msg = self.last_msg_sent;
-        assert!((*page).size_used + EOP_MSG_SIZE <= (*page).size_total,
+        unsafe {
+            let map = self.out_shmems.last_mut().unwrap();
+            let page = map.page_mut();
+            let last_msg = self.last_msg_sent;
+            assert!(
+                (*page).size_used + EOP_MSG_SIZE <= (*page).size_total,
                 "PROGRAM ABORT : BUG: EOP does not fit in page! page {page:?}, size_current {:?}, size_total {:?}",
-                &raw const (*page).size_used, &raw const (*page).size_total);
+                &raw const (*page).size_used,
+                &raw const (*page).size_total
+            );
 
-        let ret: *mut LlmpMsg = if last_msg.is_null() {
-            (*page).messages.as_mut_ptr()
-        } else {
-            llmp_next_msg_ptr_checked(map, last_msg, EOP_MSG_SIZE)?
-        };
-        assert!(
-            (*ret).tag != LLMP_TAG_UNINITIALIZED,
-            "Did not call send() on last message!"
-        );
+            let ret: *mut LlmpMsg = if last_msg.is_null() {
+                (*page).messages.as_mut_ptr()
+            } else {
+                llmp_next_msg_ptr_checked(map, last_msg, EOP_MSG_SIZE)?
+            };
+            assert!(
+                (*ret).tag != LLMP_TAG_UNINITIALIZED,
+                "Did not call send() on last message!"
+            );
 
-        (*ret).buf_len = size_of::<LlmpPayloadSharedMapInfo>() as u64;
+            (*ret).buf_len = size_of::<LlmpPayloadSharedMapInfo>() as u64;
 
-        // We don't need to pad the EOP message: it'll always be the last in this page.
-        (*ret).buf_len_padded = (*ret).buf_len;
-        (*ret).message_id = if last_msg.is_null() {
-            MessageId(1)
-        } else {
-            MessageId((*last_msg).message_id.0 + 1)
-        };
-        (*ret).tag = LLMP_TAG_END_OF_PAGE;
-        (*page).size_used += EOP_MSG_SIZE;
-        Ok(ret)
+            // We don't need to pad the EOP message: it'll always be the last in this page.
+            (*ret).buf_len_padded = (*ret).buf_len;
+            (*ret).message_id = if last_msg.is_null() {
+                MessageId(1)
+            } else {
+                MessageId((*last_msg).message_id.0 + 1)
+            };
+            (*ret).tag = LLMP_TAG_END_OF_PAGE;
+            (*page).size_used += EOP_MSG_SIZE;
+            Ok(ret)
+        }
     }
 
     /// Intern: Will return a ptr to the next msg buf, or None if map is full.
     /// Never call [`alloc_next`] without either sending or cancelling the last allocated message for this page!
     /// There can only ever be up to one message allocated per page at each given time.
     unsafe fn alloc_next_if_space(&mut self, buf_len: usize) -> Option<*mut LlmpMsg> {
-        let map = self.out_shmems.last_mut().unwrap();
-        let page = map.page_mut();
-        let last_msg = self.last_msg_sent;
+        unsafe {
+            let map = self.out_shmems.last_mut().unwrap();
+            let page = map.page_mut();
+            let last_msg = self.last_msg_sent;
 
-        assert!(
-            !self.has_unsent_message,
-            "Called alloc without calling send inbetween"
-        );
+            assert!(
+                !self.has_unsent_message,
+                "Called alloc without calling send inbetween"
+            );
 
-        #[cfg(feature = "llmp_debug")]
-        log::info!(
-            "Allocating {} bytes on page {:?} / map {:?} (last msg: {:?})",
-            buf_len,
-            page,
-            &map.shmem.id().as_str(),
-            last_msg
-        );
-
-        let msg_start = (*page).messages.as_mut_ptr() as usize + (*page).size_used;
-
-        // Make sure the end of our msg is aligned.
-        let buf_len_padded = llmp_align(msg_start + buf_len + size_of::<LlmpMsg>())
-            - msg_start
-            - size_of::<LlmpMsg>();
-
-        #[cfg(feature = "llmp_debug")]
-        log::trace!(
-            "{page:?} {:?} size_used={:x} buf_len_padded={:x} EOP_MSG_SIZE={:x} size_total={}",
-            &(*page),
-            (*page).size_used,
-            buf_len_padded,
-            EOP_MSG_SIZE,
-            (*page).size_total
-        );
-
-        // For future allocs, keep track of the maximum (aligned) alloc size we used
-        (*page).max_alloc_size = max(
-            (*page).max_alloc_size,
-            size_of::<LlmpMsg>() + buf_len_padded,
-        );
-
-        // We need enough space for the current page size_used + payload + padding
-        if (*page).size_used + size_of::<LlmpMsg>() + buf_len_padded + EOP_MSG_SIZE
-            > (*page).size_total
-        {
             #[cfg(feature = "llmp_debug")]
-            log::info!("LLMP: Page full.");
+            log::info!(
+                "Allocating {} bytes on page {:?} / map {:?} (last msg: {:?})",
+                buf_len,
+                page,
+                &map.shmem.id().as_str(),
+                last_msg
+            );
 
-            /* We're full. */
-            return None;
+            let msg_start = (*page).messages.as_mut_ptr() as usize + (*page).size_used;
+
+            // Make sure the end of our msg is aligned.
+            let buf_len_padded = llmp_align(msg_start + buf_len + size_of::<LlmpMsg>())
+                - msg_start
+                - size_of::<LlmpMsg>();
+
+            #[cfg(feature = "llmp_debug")]
+            log::trace!(
+                "{page:?} {:?} size_used={:x} buf_len_padded={:x} EOP_MSG_SIZE={:x} size_total={}",
+                &(*page),
+                (*page).size_used,
+                buf_len_padded,
+                EOP_MSG_SIZE,
+                (*page).size_total
+            );
+
+            // For future allocs, keep track of the maximum (aligned) alloc size we used
+            (*page).max_alloc_size = max(
+                (*page).max_alloc_size,
+                size_of::<LlmpMsg>() + buf_len_padded,
+            );
+
+            // We need enough space for the current page size_used + payload + padding
+            if (*page).size_used + size_of::<LlmpMsg>() + buf_len_padded + EOP_MSG_SIZE
+                > (*page).size_total
+            {
+                #[cfg(feature = "llmp_debug")]
+                log::info!("LLMP: Page full.");
+
+                /* We're full. */
+                return None;
+            }
+
+            let ret = msg_start as *mut LlmpMsg;
+
+            /* We need to start with 1 for ids, as current message id is initialized
+             * with 0... */
+            (*ret).message_id = if last_msg.is_null() {
+                MessageId(1)
+            } else if (*page).current_msg_id.load(Ordering::Relaxed) == (*last_msg).message_id.0 {
+                MessageId((*last_msg).message_id.0 + 1)
+            } else {
+                /* Oops, wrong usage! */
+                panic!(
+                    "BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {:?})",
+                    &raw const (*page).current_msg_id,
+                    (*last_msg).message_id
+                );
+            };
+
+            (*ret).buf_len = buf_len as u64;
+            (*ret).buf_len_padded = buf_len_padded as u64;
+            (*page).size_used += size_of::<LlmpMsg>() + buf_len_padded;
+
+            (*llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
+            (*ret).tag = LLMP_TAG_UNINITIALIZED;
+
+            self.has_unsent_message = true;
+
+            Some(ret)
         }
-
-        let ret = msg_start as *mut LlmpMsg;
-
-        /* We need to start with 1 for ids, as current message id is initialized
-         * with 0... */
-        (*ret).message_id = if last_msg.is_null() {
-            MessageId(1)
-        } else if (*page).current_msg_id.load(Ordering::Relaxed) == (*last_msg).message_id.0 {
-            MessageId((*last_msg).message_id.0 + 1)
-        } else {
-            /* Oops, wrong usage! */
-            panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {:?})", &raw const (*page).current_msg_id, (*last_msg).message_id);
-        };
-
-        (*ret).buf_len = buf_len as u64;
-        (*ret).buf_len_padded = buf_len_padded as u64;
-        (*page).size_used += size_of::<LlmpMsg>() + buf_len_padded;
-
-        (*llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
-        (*ret).tag = LLMP_TAG_UNINITIALIZED;
-
-        self.has_unsent_message = true;
-
-        Some(ret)
     }
 
     /// Commit the message last allocated by [`alloc_next`] to the queue.
@@ -1531,44 +1581,46 @@ where
     /// If `overwrite_client_id` is `false`, the message's `sender` won't be touched (for broker forwarding)
     #[inline(never)] // Not inlined to make cpu-level reodering (hopefully?) improbable
     unsafe fn send(&mut self, msg: *mut LlmpMsg, overwrite_client_id: bool) -> Result<(), Error> {
-        // log::info!("Sending msg {:?}", msg);
+        unsafe {
+            // log::info!("Sending msg {:?}", msg);
 
-        assert!(self.last_msg_sent != msg, "Message sent twice!");
-        assert!(
-            (*msg).tag != LLMP_TAG_UNSET,
-            "No tag set on message with id {:?}",
-            (*msg).message_id
-        );
-        // A client gets the sender id assigned to by the broker during the initial handshake.
-        if overwrite_client_id {
-            (*msg).sender = self.id;
+            assert!(self.last_msg_sent != msg, "Message sent twice!");
+            assert!(
+                (*msg).tag != LLMP_TAG_UNSET,
+                "No tag set on message with id {:?}",
+                (*msg).message_id
+            );
+            // A client gets the sender id assigned to by the broker during the initial handshake.
+            if overwrite_client_id {
+                (*msg).sender = self.id;
+            }
+            let page = self.out_shmems.last_mut().unwrap().page_mut();
+            if msg.is_null() || !llmp_msg_in_page(page, msg) {
+                return Err(Error::unknown(format!(
+                    "Llmp Message {msg:?} is null or not in current page"
+                )));
+            }
+
+            let mid = (*page).current_msg_id.load(Ordering::Relaxed) + 1;
+            (*msg).message_id.0 = mid;
+
+            // Make sure all things have been written to the page, and commit the message to the page
+            (*page)
+                .current_msg_id
+                .store((*msg).message_id.0, Ordering::Release);
+
+            self.last_msg_sent = msg;
+            self.has_unsent_message = false;
+
+            log::debug!(
+                "[{} - {:#x}] Send message with id {}",
+                self.id.0,
+                ptr::from_ref::<Self>(self) as u64,
+                mid
+            );
+
+            Ok(())
         }
-        let page = self.out_shmems.last_mut().unwrap().page_mut();
-        if msg.is_null() || !llmp_msg_in_page(page, msg) {
-            return Err(Error::unknown(format!(
-                "Llmp Message {msg:?} is null or not in current page"
-            )));
-        }
-
-        let mid = (*page).current_msg_id.load(Ordering::Relaxed) + 1;
-        (*msg).message_id.0 = mid;
-
-        // Make sure all things have been written to the page, and commit the message to the page
-        (*page)
-            .current_msg_id
-            .store((*msg).message_id.0, Ordering::Release);
-
-        self.last_msg_sent = msg;
-        self.has_unsent_message = false;
-
-        log::debug!(
-            "[{} - {:#x}] Send message with id {}",
-            self.id.0,
-            ptr::from_ref::<Self>(self) as u64,
-            mid
-        );
-
-        Ok(())
     }
 
     /// Describe this [`LlmpClient`] in a way that it can be restored later, using [`Self::on_existing_from_description`].
@@ -1653,122 +1705,126 @@ where
     /// Will *not* update `self.last_msg_time`.
     #[inline(never)]
     unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, Error> {
-        /* DBG("recv %p %p\n", page, last_msg); */
-        let page = self.current_recv_shmem.page_mut();
-        let last_msg = self.last_msg_recvd;
+        unsafe {
+            /* DBG("recv %p %p\n", page, last_msg); */
+            let page = self.current_recv_shmem.page_mut();
+            let last_msg = self.last_msg_recvd;
 
-        let (current_msg_id, loaded) =
-            if !last_msg.is_null() && self.highest_msg_id > (*last_msg).message_id {
-                // read the msg_id from cache
-                (self.highest_msg_id, false)
+            let (current_msg_id, loaded) =
+                if !last_msg.is_null() && self.highest_msg_id > (*last_msg).message_id {
+                    // read the msg_id from cache
+                    (self.highest_msg_id, false)
+                } else {
+                    // read the msg_id from shared map
+                    let current_msg_id = (*page).current_msg_id.load(Ordering::Relaxed);
+                    self.highest_msg_id = MessageId(current_msg_id);
+                    (MessageId(current_msg_id), true)
+                };
+
+            // Read the message from the page
+            let ret = if current_msg_id.0 == 0 {
+                /* No messages yet */
+                None
+            } else if last_msg.is_null() {
+                /* We never read a message from this queue. Return first. */
+                fence(Ordering::Acquire);
+                Some((*page).messages.as_mut_ptr())
+            } else if (*last_msg).message_id == current_msg_id {
+                /* Oops! No new message! */
+                None
             } else {
-                // read the msg_id from shared map
-                let current_msg_id = (*page).current_msg_id.load(Ordering::Relaxed);
-                self.highest_msg_id = MessageId(current_msg_id);
-                (MessageId(current_msg_id), true)
+                if loaded {
+                    // we read a higher id from this page, fetch.
+                    fence(Ordering::Acquire);
+                }
+                // We don't know how big the msg wants to be, assert at least the header has space.
+                Some(llmp_next_msg_ptr_checked(
+                    &mut self.current_recv_shmem,
+                    last_msg,
+                    size_of::<LlmpMsg>(),
+                )?)
             };
 
-        // Read the message from the page
-        let ret = if current_msg_id.0 == 0 {
-            /* No messages yet */
-            None
-        } else if last_msg.is_null() {
-            /* We never read a message from this queue. Return first. */
-            fence(Ordering::Acquire);
-            Some((*page).messages.as_mut_ptr())
-        } else if (*last_msg).message_id == current_msg_id {
-            /* Oops! No new message! */
-            None
-        } else {
-            if loaded {
-                // we read a higher id from this page, fetch.
-                fence(Ordering::Acquire);
-            }
-            // We don't know how big the msg wants to be, assert at least the header has space.
-            Some(llmp_next_msg_ptr_checked(
-                &mut self.current_recv_shmem,
-                last_msg,
-                size_of::<LlmpMsg>(),
-            )?)
-        };
-
-        // Let's see what we got.
-        if let Some(msg) = ret {
-            if !(*msg).in_shmem(&mut self.current_recv_shmem) {
-                return Err(Error::illegal_state("Unexpected message in map (out of map bounds) - buggy client or tampered shared map detected!"));
-            }
-
-            log::debug!(
-                "[{} - {:#x}] Received message with ID {}...",
-                self.id.0,
-                ptr::from_ref::<Self>(self) as u64,
-                (*msg).message_id.0
-            );
-
-            // Handle special, LLMP internal, messages.
-            match (*msg).tag {
-                LLMP_TAG_UNSET => panic!(
-                    "BUG: Read unallocated msg (tag was {:?} - msg header: {:?}",
-                    LLMP_TAG_UNSET,
-                    &(*msg)
-                ),
-                LLMP_TAG_EXITING => {
-                    // The other side is done.
-                    assert_eq!((*msg).buf_len, 0);
-                    return Err(Error::shutting_down());
+            // Let's see what we got.
+            if let Some(msg) = ret {
+                if !(*msg).in_shmem(&mut self.current_recv_shmem) {
+                    return Err(Error::illegal_state(
+                        "Unexpected message in map (out of map bounds) - buggy client or tampered shared map detected!",
+                    ));
                 }
-                LLMP_TAG_END_OF_PAGE => {
-                    log::debug!("Received end of page, allocating next");
-                    // Handle end of page
-                    assert!(
-                        (*msg).buf_len >= size_of::<LlmpPayloadSharedMapInfo>() as u64,
-                        "Illegal message length for EOP (is {}/{}, expected {})",
-                        (*msg).buf_len,
-                        (*msg).buf_len_padded,
-                        size_of::<LlmpPayloadSharedMapInfo>()
-                    );
 
-                    #[expect(clippy::cast_ptr_alignment)]
-                    let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+                log::debug!(
+                    "[{} - {:#x}] Received message with ID {}...",
+                    self.id.0,
+                    ptr::from_ref::<Self>(self) as u64,
+                    (*msg).message_id.0
+                );
 
-                    /* The pageinfo points to the map we're about to unmap.
-                    Copy the contents first to be safe (probably fine in rust either way). */
-                    let pageinfo_cpy = *pageinfo;
+                // Handle special, LLMP internal, messages.
+                match (*msg).tag {
+                    LLMP_TAG_UNSET => panic!(
+                        "BUG: Read unallocated msg (tag was {:?} - msg header: {:?}",
+                        LLMP_TAG_UNSET,
+                        &(*msg)
+                    ),
+                    LLMP_TAG_EXITING => {
+                        // The other side is done.
+                        assert_eq!((*msg).buf_len, 0);
+                        return Err(Error::shutting_down());
+                    }
+                    LLMP_TAG_END_OF_PAGE => {
+                        log::debug!("Received end of page, allocating next");
+                        // Handle end of page
+                        assert!(
+                            (*msg).buf_len >= size_of::<LlmpPayloadSharedMapInfo>() as u64,
+                            "Illegal message length for EOP (is {}/{}, expected {})",
+                            (*msg).buf_len,
+                            (*msg).buf_len_padded,
+                            size_of::<LlmpPayloadSharedMapInfo>()
+                        );
 
-                    // Set last msg we received to null (as the map may no longer exist)
-                    self.last_msg_recvd = ptr::null();
-                    self.highest_msg_id = MessageId(0);
+                        #[expect(clippy::cast_ptr_alignment)]
+                        let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
-                    // Mark the old page save to remap.
-                    (*page).receiver_left();
+                        /* The pageinfo points to the map we're about to unmap.
+                        Copy the contents first to be safe (probably fine in rust either way). */
+                        let pageinfo_cpy = *pageinfo;
 
-                    // Map the new page. The old one should be unmapped by Drop
-                    self.current_recv_shmem =
-                        LlmpSharedMap::existing(self.shmem_provider.shmem_from_id_and_size(
-                            ShMemId::from_array(&pageinfo_cpy.shm_str),
-                            pageinfo_cpy.map_size,
-                        )?);
-                    let new_page = self.current_recv_shmem.page_mut();
+                        // Set last msg we received to null (as the map may no longer exist)
+                        self.last_msg_recvd = ptr::null();
+                        self.highest_msg_id = MessageId(0);
 
-                    // Mark the old page as save to remap (it's mapped by us, the receiver, now)
-                    (*new_page).receiver_joined();
+                        // Mark the old page save to remap.
+                        (*page).receiver_left();
 
-                    #[cfg(feature = "llmp_debug")]
-                    log::info!(
-                        "LLMP_DEBUG: Got a new recv map {} with len {:?}",
-                        self.current_recv_shmem.shmem.id(),
-                        self.current_recv_shmem.shmem.len()
-                    );
-                    // After we mapped the new page, return the next message, if available
-                    return self.recv();
+                        // Map the new page. The old one should be unmapped by Drop
+                        self.current_recv_shmem =
+                            LlmpSharedMap::existing(self.shmem_provider.shmem_from_id_and_size(
+                                ShMemId::from_array(&pageinfo_cpy.shm_str),
+                                pageinfo_cpy.map_size,
+                            )?);
+                        let new_page = self.current_recv_shmem.page_mut();
+
+                        // Mark the old page as save to remap (it's mapped by us, the receiver, now)
+                        (*new_page).receiver_joined();
+
+                        #[cfg(feature = "llmp_debug")]
+                        log::info!(
+                            "LLMP_DEBUG: Got a new recv map {} with len {:?}",
+                            self.current_recv_shmem.shmem.id(),
+                            self.current_recv_shmem.shmem.len()
+                        );
+                        // After we mapped the new page, return the next message, if available
+                        return self.recv();
+                    }
+                    _ => (),
                 }
-                _ => (),
-            }
 
-            // Store the last msg for next time
-            self.last_msg_recvd = msg;
+                // Store the last msg for next time
+                self.last_msg_recvd = msg;
+            }
+            Ok(ret)
         }
-        Ok(ret)
     }
 
     /// Blocks/spins until the next message gets posted to the page,
@@ -1776,25 +1832,27 @@ where
     /// # Safety
     /// Returns a raw ptr, on the recv map. Should be safe in general
     pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, Error> {
-        let mut current_msg_id = MessageId(0);
-        let page = self.current_recv_shmem.page_mut();
-        let last_msg = self.last_msg_recvd;
-        if !last_msg.is_null() {
-            assert!(
-                (*last_msg).tag != LLMP_TAG_END_OF_PAGE || llmp_msg_in_page(page, last_msg),
-                "BUG: full page passed to await_message_blocking or reset failed"
-            );
+        unsafe {
+            let mut current_msg_id = MessageId(0);
+            let page = self.current_recv_shmem.page_mut();
+            let last_msg = self.last_msg_recvd;
+            if !last_msg.is_null() {
+                assert!(
+                    (*last_msg).tag != LLMP_TAG_END_OF_PAGE || llmp_msg_in_page(page, last_msg),
+                    "BUG: full page passed to await_message_blocking or reset failed"
+                );
 
-            current_msg_id = (*last_msg).message_id;
-        }
-        loop {
-            if (*page).current_msg_id.load(Ordering::Relaxed) != current_msg_id.0 {
-                return match self.recv()? {
-                    Some(msg) => Ok(msg),
-                    None => panic!("BUG: blocking llmp message should never be NULL"),
-                };
+                current_msg_id = (*last_msg).message_id;
             }
-            hint::spin_loop();
+            loop {
+                if (*page).current_msg_id.load(Ordering::Relaxed) != current_msg_id.0 {
+                    return match self.recv()? {
+                        Some(msg) => Ok(msg),
+                        None => panic!("BUG: blocking llmp message should never be NULL"),
+                    };
+                }
+                hint::spin_loop();
+            }
         }
     }
 
@@ -1879,10 +1937,15 @@ where
 {
     /// Store the info to this receiver to env.
     /// A new client can reattach to it using [`LlmpReceiver::on_existing_from_env()`]
+    ///
+    /// # Safety
+    /// Alters the env. Should only be called from a single thread.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
+    pub unsafe fn to_env(&self, env_name: &str) -> Result<(), Error> {
         let current_out_shmem = &self.current_recv_shmem;
-        current_out_shmem.shmem.write_to_env(env_name)?;
+        unsafe {
+            current_out_shmem.shmem.write_to_env(env_name)?;
+        }
         unsafe { current_out_shmem.msg_to_env(self.last_msg_recvd, env_name) }
     }
 
@@ -1976,14 +2039,14 @@ where
     /// # Safety
     /// The unsafe page pointer is obviously unsafe.
     pub unsafe fn page_mut(&mut self) -> *mut LlmpPage {
-        shmem2page_mut(&mut self.shmem)
+        unsafe { shmem2page_mut(&mut self.shmem) }
     }
 
     /// Get the unsafe ptr to this page, situated on the shared map
     /// # Safety
     /// The unsafe page pointer is obviously unsafe.
     pub unsafe fn page(&self) -> *const LlmpPage {
-        shmem2page(&self.shmem)
+        unsafe { shmem2page(&self.shmem) }
     }
 
     /// Gets the offset of a message on this here page.
@@ -1993,15 +2056,17 @@ where
     /// This dereferences msg, make sure to pass a proper pointer to it.
     #[expect(clippy::cast_sign_loss)]
     pub unsafe fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, Error> {
-        let page = self.page();
-        if llmp_msg_in_page(page, msg) {
-            // Cast both sides to u8 arrays, get the offset, then cast the return isize to u64
-            Ok((msg as *const u8).offset_from((*page).messages.as_ptr() as *const u8) as u64)
-        } else {
-            Err(Error::illegal_argument(format!(
-                "Message (0x{:X}) not in page (0x{:X})",
-                page as u64, msg as u64
-            )))
+        unsafe {
+            let page = self.page();
+            if llmp_msg_in_page(page, msg) {
+                // Cast both sides to u8 arrays, get the offset, then cast the return isize to u64
+                Ok((msg as *const u8).offset_from((*page).messages.as_ptr() as *const u8) as u64)
+            } else {
+                Err(Error::illegal_argument(format!(
+                    "Message (0x{:X}) not in page (0x{:X})",
+                    page as u64, msg as u64
+                )))
+            }
         }
     }
 
@@ -2023,12 +2088,16 @@ where
     #[cfg(feature = "std")]
     pub unsafe fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), Error> {
         if msg.is_null() {
-            env::set_var(format!("{map_env_name}_OFFSET"), _NULL_ENV_STR);
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe { env::set_var(format!("{map_env_name}_OFFSET"), _NULL_ENV_STR) };
         } else {
-            env::set_var(
-                format!("{map_env_name}_OFFSET"),
-                format!("{}", self.msg_to_offset(msg)?),
-            );
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe {
+                env::set_var(
+                    format!("{map_env_name}_OFFSET"),
+                    format!("{}", self.msg_to_offset(msg)?),
+                );
+            };
         }
         Ok(())
     }
@@ -2640,115 +2709,13 @@ where
     #[expect(clippy::cast_ptr_alignment)]
     #[expect(clippy::too_many_lines)]
     unsafe fn handle_new_msgs(&mut self, client_id: ClientId) -> Result<bool, Error> {
-        let mut new_messages = false;
+        unsafe {
+            let mut new_messages = false;
 
-        // TODO: We could memcpy a range of pending messages, instead of one by one.
-        loop {
-            // log::trace!("{:#?}", self.llmp_clients);
-            let msg = {
-                let pos = if (client_id.0 as usize) < self.inner.llmp_clients.len()
-                    && self.inner.llmp_clients[client_id.0 as usize].id == client_id
-                {
-                    // Fast path when no client before this one was removed
-                    client_id.0 as usize
-                } else {
-                    self.inner
-                        .llmp_clients
-                        .binary_search_by_key(&client_id, |x| x.id)
-                        .unwrap_or_else(|_| {
-                            panic!(
-                                "Fatal error, client ID {client_id:?} not found in llmp_clients."
-                            )
-                        })
-                };
-                let client = &mut self.inner.llmp_clients[pos];
-                match client.recv()? {
-                    None => {
-                        // We're done handling this client
-                        #[cfg(feature = "std")]
-                        if new_messages {
-                            // set the recv time
-                            // We don't do that in recv() to keep calls to `current_time` to a minimum.
-                            self.inner.llmp_clients[pos].last_msg_time = current_time();
-                        }
-                        return Ok(new_messages);
-                    }
-                    Some(msg) => msg,
-                }
-            };
-            // We got a new message
-            new_messages = true;
-
-            match (*msg).tag {
-                // first, handle the special, llmp-internal messages
-                LLMP_SLOW_RECEIVER_PANIC => {
-                    return Err(Error::unknown(format!("The broker was too slow to handle messages of client {client_id:?} in time, so it quit. Either the client sent messages too fast, or we (the broker) got stuck!")));
-                }
-                LLMP_TAG_CLIENT_EXIT => {
-                    let msg_buf_len_padded = (*msg).buf_len_padded;
-                    if (*msg).buf_len < size_of::<LlmpClientExitInfo>() as u64 {
-                        log::info!("Ignoring broken CLIENT_EXIT msg due to incorrect size. Expected {} but got {}",
-                            msg_buf_len_padded,
-                            size_of::<LlmpClientExitInfo>()
-                        );
-                        #[cfg(not(feature = "std"))]
-                        return Err(Error::unknown(format!("Broken CLIENT_EXIT msg with incorrect size received. Expected {} but got {}",
-                                                          msg_buf_len_padded,
-                                                          size_of::<LlmpClientExitInfo>()
-                        )));
-                    }
-                    let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
-                    let client_id = ClientId((*exitinfo).client_id);
-                    log::info!("Client exit message received!, we are removing clients whose client_group_id is {:#?}", client_id);
-
-                    self.inner.clients_to_remove.push(client_id);
-                }
-                LLMP_TAG_NEW_SHM_CLIENT => {
-                    /* This client informs us about yet another new client
-                    add it to the list! Also, no need to forward this msg. */
-                    let msg_buf_len_padded = (*msg).buf_len_padded;
-                    if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
-                        log::info!("Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
-                            msg_buf_len_padded,
-                            size_of::<LlmpPayloadSharedMapInfo>()
-                        );
-                        #[cfg(not(feature = "std"))]
-                        return Err(Error::unknown(format!("Broken CLIENT_ADDED msg with incorrect size received. Expected {} but got {}",
-                                                          msg_buf_len_padded,
-                                                          size_of::<LlmpPayloadSharedMapInfo>()
-                        )));
-                    }
-                    let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-                    match self.inner.shmem_provider.shmem_from_id_and_size(
-                        ShMemId::from_array(&(*pageinfo).shm_str),
-                        (*pageinfo).map_size,
-                    ) {
-                        Ok(new_shmem) => {
-                            let mut new_page = LlmpSharedMap::existing(new_shmem);
-                            new_page.mark_safe_to_unmap();
-
-                            let _new_client = self.inner.add_client(LlmpReceiver {
-                                id: ClientId(0), // will be auto-filled
-                                current_recv_shmem: new_page,
-                                last_msg_recvd: ptr::null_mut(),
-                                shmem_provider: self.inner.shmem_provider.clone(),
-                                highest_msg_id: MessageId(0),
-                                // We don't know the last received time, just assume the current time.
-                                #[cfg(feature = "std")]
-                                last_msg_time: current_time(),
-                            });
-                        }
-                        Err(e) => {
-                            log::info!("Error adding client! Ignoring: {e:?}");
-                            #[cfg(not(feature = "std"))]
-                            return Err(Error::unknown(format!(
-                                "Error adding client! PANIC! {e:?}"
-                            )));
-                        }
-                    }
-                }
-                // handle all other messages
-                _ => {
+            // TODO: We could memcpy a range of pending messages, instead of one by one.
+            loop {
+                // log::trace!("{:#?}", self.llmp_clients);
+                let msg = {
                     let pos = if (client_id.0 as usize) < self.inner.llmp_clients.len()
                         && self.inner.llmp_clients[client_id.0 as usize].id == client_id
                     {
@@ -2758,32 +2725,145 @@ where
                         self.inner
                             .llmp_clients
                             .binary_search_by_key(&client_id, |x| x.id)
-                            .unwrap_or_else(|_| panic!("Fatal error, client ID {client_id:?} not found in llmp_clients."))
+                            .unwrap_or_else(|_| {
+                                panic!(
+                                "Fatal error, client ID {client_id:?} not found in llmp_clients."
+                            )
+                            })
                     };
-
-                    let map = &mut self.inner.llmp_clients[pos].current_recv_shmem;
-                    let msg_buf = (*msg).try_as_slice_mut(map)?;
-
-                    // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
-                    let mut new_msgs: Vec<(Tag, Flags, Vec<u8>)> = Vec::new();
-                    if let LlmpMsgHookResult::ForwardToClients = self.hooks.on_new_message_all(
-                        &mut self.inner,
-                        client_id,
-                        &mut (*msg).tag,
-                        &mut (*msg).flags,
-                        msg_buf,
-                        &mut new_msgs,
-                    )? {
-                        self.inner.forward_msg(msg)?;
+                    let client = &mut self.inner.llmp_clients[pos];
+                    match client.recv()? {
+                        None => {
+                            // We're done handling this client
+                            #[cfg(feature = "std")]
+                            if new_messages {
+                                // set the recv time
+                                // We don't do that in recv() to keep calls to `current_time` to a minimum.
+                                self.inner.llmp_clients[pos].last_msg_time = current_time();
+                            }
+                            return Ok(new_messages);
+                        }
+                        Some(msg) => msg,
                     }
+                };
+                // We got a new message
+                new_messages = true;
 
-                    log::debug!("New msg vector: {}", new_msgs.len());
-                    for (new_msg_tag, new_msg_flag, new_msg) in new_msgs {
-                        self.inner.llmp_out.send_buf_with_flags(
-                            new_msg_tag,
-                            new_msg_flag,
-                            new_msg.as_ref(),
-                        )?;
+                match (*msg).tag {
+                    // first, handle the special, llmp-internal messages
+                    LLMP_SLOW_RECEIVER_PANIC => {
+                        return Err(Error::unknown(format!(
+                            "The broker was too slow to handle messages of client {client_id:?} in time, so it quit. Either the client sent messages too fast, or we (the broker) got stuck!"
+                        )));
+                    }
+                    LLMP_TAG_CLIENT_EXIT => {
+                        let msg_buf_len_padded = (*msg).buf_len_padded;
+                        if (*msg).buf_len < size_of::<LlmpClientExitInfo>() as u64 {
+                            log::info!(
+                                "Ignoring broken CLIENT_EXIT msg due to incorrect size. Expected {} but got {}",
+                                msg_buf_len_padded,
+                                size_of::<LlmpClientExitInfo>()
+                            );
+                            #[cfg(not(feature = "std"))]
+                            return Err(Error::unknown(format!(
+                                "Broken CLIENT_EXIT msg with incorrect size received. Expected {} but got {}",
+                                msg_buf_len_padded,
+                                size_of::<LlmpClientExitInfo>()
+                            )));
+                        }
+                        let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
+                        let client_id = ClientId((*exitinfo).client_id);
+                        log::info!(
+                            "Client exit message received!, we are removing clients whose client_group_id is {:#?}",
+                            client_id
+                        );
+
+                        self.inner.clients_to_remove.push(client_id);
+                    }
+                    LLMP_TAG_NEW_SHM_CLIENT => {
+                        /* This client informs us about yet another new client
+                        add it to the list! Also, no need to forward this msg. */
+                        let msg_buf_len_padded = (*msg).buf_len_padded;
+                        if (*msg).buf_len < size_of::<LlmpPayloadSharedMapInfo>() as u64 {
+                            log::info!(
+                                "Ignoring broken CLIENT_ADDED msg due to incorrect size. Expected {} but got {}",
+                                msg_buf_len_padded,
+                                size_of::<LlmpPayloadSharedMapInfo>()
+                            );
+                            #[cfg(not(feature = "std"))]
+                            return Err(Error::unknown(format!(
+                                "Broken CLIENT_ADDED msg with incorrect size received. Expected {} but got {}",
+                                msg_buf_len_padded,
+                                size_of::<LlmpPayloadSharedMapInfo>()
+                            )));
+                        }
+                        let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+                        match self.inner.shmem_provider.shmem_from_id_and_size(
+                            ShMemId::from_array(&(*pageinfo).shm_str),
+                            (*pageinfo).map_size,
+                        ) {
+                            Ok(new_shmem) => {
+                                let mut new_page = LlmpSharedMap::existing(new_shmem);
+                                new_page.mark_safe_to_unmap();
+
+                                let _new_client = self.inner.add_client(LlmpReceiver {
+                                    id: ClientId(0), // will be auto-filled
+                                    current_recv_shmem: new_page,
+                                    last_msg_recvd: ptr::null_mut(),
+                                    shmem_provider: self.inner.shmem_provider.clone(),
+                                    highest_msg_id: MessageId(0),
+                                    // We don't know the last received time, just assume the current time.
+                                    #[cfg(feature = "std")]
+                                    last_msg_time: current_time(),
+                                });
+                            }
+                            Err(e) => {
+                                log::info!("Error adding client! Ignoring: {e:?}");
+                                #[cfg(not(feature = "std"))]
+                                return Err(Error::unknown(format!(
+                                    "Error adding client! PANIC! {e:?}"
+                                )));
+                            }
+                        }
+                    }
+                    // handle all other messages
+                    _ => {
+                        let pos = if (client_id.0 as usize) < self.inner.llmp_clients.len()
+                            && self.inner.llmp_clients[client_id.0 as usize].id == client_id
+                        {
+                            // Fast path when no client before this one was removed
+                            client_id.0 as usize
+                        } else {
+                            self.inner
+                            .llmp_clients
+                            .binary_search_by_key(&client_id, |x| x.id)
+                            .unwrap_or_else(|_| panic!("Fatal error, client ID {client_id:?} not found in llmp_clients."))
+                        };
+
+                        let map = &mut self.inner.llmp_clients[pos].current_recv_shmem;
+                        let msg_buf = (*msg).try_as_slice_mut(map)?;
+
+                        // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
+                        let mut new_msgs: Vec<(Tag, Flags, Vec<u8>)> = Vec::new();
+                        if let LlmpMsgHookResult::ForwardToClients = self.hooks.on_new_message_all(
+                            &mut self.inner,
+                            client_id,
+                            &mut (*msg).tag,
+                            &mut (*msg).flags,
+                            msg_buf,
+                            &mut new_msgs,
+                        )? {
+                            self.inner.forward_msg(msg)?;
+                        }
+
+                        log::debug!("New msg vector: {}", new_msgs.len());
+                        for (new_msg_tag, new_msg_flag, new_msg) in new_msgs {
+                            self.inner.llmp_out.send_buf_with_flags(
+                                new_msg_tag,
+                                new_msg_flag,
+                                new_msg.as_ref(),
+                            )?;
+                        }
                     }
                 }
             }
@@ -2955,7 +3035,7 @@ where
             _ => {
                 return Err(Error::illegal_state(
                     "Unexpected response from B2B server received.".to_string(),
-                ))
+                ));
             }
         }
 
@@ -3008,21 +3088,23 @@ where
 
     /// For internal use: Forward the current message to the out map.
     unsafe fn forward_msg(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
-        let out: *mut LlmpMsg = self.alloc_next((*msg).buf_len_padded as usize)?;
+        unsafe {
+            let out: *mut LlmpMsg = self.alloc_next((*msg).buf_len_padded as usize)?;
 
-        /* Copy over the whole message.
-        If we should need zero copy, we could instead post a link to the
-        original msg with the map_id and offset. */
-        let actual_size = (*out).buf_len_padded;
-        let complete_size = actual_size as usize + size_of::<LlmpMsg>();
-        (msg as *const u8).copy_to_nonoverlapping(out as *mut u8, complete_size);
-        (*out).buf_len_padded = actual_size;
-        /* We need to replace the message ID with our own */
-        if let Err(e) = self.llmp_out.send(out, false) {
-            panic!("Error sending msg: {e:?}");
+            /* Copy over the whole message.
+            If we should need zero copy, we could instead post a link to the
+            original msg with the map_id and offset. */
+            let actual_size = (*out).buf_len_padded;
+            let complete_size = actual_size as usize + size_of::<LlmpMsg>();
+            (msg as *const u8).copy_to_nonoverlapping(out as *mut u8, complete_size);
+            (*out).buf_len_padded = actual_size;
+            /* We need to replace the message ID with our own */
+            if let Err(e) = self.llmp_out.send(out, false) {
+                panic!("Error sending msg: {e:?}");
+            }
+            self.llmp_out.last_msg_sent = out;
+            Ok(())
         }
-        self.llmp_out.last_msg_sent = out;
-        Ok(())
     }
 
     /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
@@ -3194,7 +3276,9 @@ where
                                     payload: payload.to_vec(),
                                 },
                             ) {
-                                log::info!("Got error {e} while trying to forward a message to broker {peer_address}, exiting thread");
+                                log::info!(
+                                    "Got error {e} while trying to forward a message to broker {peer_address}, exiting thread"
+                                );
                                 return;
                             }
                         }
@@ -3569,7 +3653,7 @@ where
     /// Should be save, unless the internal state is corrupt. Returns raw ptr.
     #[inline]
     pub unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, Error> {
-        self.receiver.recv()
+        unsafe { self.receiver.recv() }
     }
 
     /// A client blocks/spins until the next message gets posted to the page,
@@ -3578,7 +3662,7 @@ where
     /// Should be save, unless the internal state is corrupt. Returns raw ptr.
     #[inline]
     pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, Error> {
-        self.receiver.recv_blocking()
+        unsafe { self.receiver.recv_blocking() }
     }
 
     /// The current page could have changed in recv (EOP).
@@ -3716,22 +3800,29 @@ where
     /// Calling this in other contexts may lead to a premature page unmap and result in a crash in another process,
     /// or an unexpected read from an empty page in a receiving process.
     pub unsafe fn mark_safe_to_unmap(&mut self) {
-        self.sender.mark_safe_to_unmap();
+        unsafe {
+            self.sender.mark_safe_to_unmap();
+        }
     }
 
     /// Commits a msg to the client's out map
     /// # Safety
     /// Needs to be called with a proper msg pointer
     pub unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
-        self.sender.send(msg, true)
+        unsafe { self.sender.send(msg, true) }
     }
 
     /// Write the current state to env.
     /// A new client can attach to exactly the same state by calling [`LlmpClient::on_existing_shmem()`].
+    ///
+    /// # Safety
+    /// Writes to env variables and may only be done single-threaded.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
-        self.sender.to_env(&format!("{env_name}_SENDER"))?;
-        self.receiver.to_env(&format!("{env_name}_RECEIVER"))
+    pub unsafe fn to_env(&self, env_name: &str) -> Result<(), Error> {
+        unsafe {
+            self.sender.to_env(&format!("{env_name}_SENDER"))?;
+            self.receiver.to_env(&format!("{env_name}_RECEIVER"))
+        }
     }
 
     /// Describe this client in a way that it can be recreated, for example after crash
@@ -3809,7 +3900,11 @@ mod tests {
         // Send stuff
         client.send_buf(tag, &arr).unwrap();
 
-        client.to_env("_ENV_TEST").unwrap();
+        // # Safety
+        // Test only. Should run one instance.
+        unsafe {
+            client.to_env("_ENV_TEST").unwrap();
+        }
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         log::info!("{:?}", std::env::vars());
 

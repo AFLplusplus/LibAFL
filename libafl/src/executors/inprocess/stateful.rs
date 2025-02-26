@@ -8,21 +8,21 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::tuples::{tuple_list, RefIndexable};
+use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
+    Error,
     events::{EventFirer, EventRestarter},
     executors::{
-        hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
-        inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
         Executor, ExitKind, HasObservers,
+        hooks::{ExecutorHooksTuple, inprocess::InProcessHooks},
+        inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
-    Error,
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure

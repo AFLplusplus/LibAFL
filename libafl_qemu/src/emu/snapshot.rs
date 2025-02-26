@@ -10,7 +10,7 @@ pub trait IsSnapshotManager: Clone + Debug {
 
     fn save(&mut self, qemu: Qemu) -> SnapshotId;
     fn restore(&mut self, qemu: Qemu, snapshot_id: &SnapshotId)
-        -> Result<(), SnapshotManagerError>;
+    -> Result<(), SnapshotManagerError>;
     fn do_check(
         &self,
         qemu: Qemu,

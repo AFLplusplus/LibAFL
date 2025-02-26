@@ -1,28 +1,29 @@
 //! Mutator definitions for [`MultipartInput`]s. See [`crate::inputs::multi`] for details.
 
 use core::{
-    cmp::{min, Ordering},
+    cmp::{Ordering, min},
     num::NonZero,
 };
 
-use libafl_bolts::{rands::Rand, Error};
+use libafl_bolts::{Error, rands::Rand};
 
 use crate::{
     corpus::{Corpus, CorpusId},
     impl_default_multipart,
-    inputs::{multi::MultipartInput, HasMutatorBytes, Input, Keyed as _, ResizableMutator},
+    inputs::{HasMutatorBytes, Input, Keyed as _, ResizableMutator, multi::MultipartInput},
     mutators::{
+        MutationResult, Mutator,
         mutations::{
-            rand_range, BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator,
-            ByteIncMutator, ByteInterestingMutator, ByteNegMutator, ByteRandMutator,
-            BytesCopyMutator, BytesDeleteMutator, BytesExpandMutator, BytesInsertCopyMutator,
-            BytesInsertMutator, BytesRandInsertMutator, BytesRandSetMutator, BytesSetMutator,
-            BytesSwapMutator, CrossoverInsertMutator as BytesInputCrossoverInsertMutator,
+            BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator, ByteIncMutator,
+            ByteInterestingMutator, ByteNegMutator, ByteRandMutator, BytesCopyMutator,
+            BytesDeleteMutator, BytesExpandMutator, BytesInsertCopyMutator, BytesInsertMutator,
+            BytesRandInsertMutator, BytesRandSetMutator, BytesSetMutator, BytesSwapMutator,
+            CrossoverInsertMutator as BytesInputCrossoverInsertMutator,
             CrossoverReplaceMutator as BytesInputCrossoverReplaceMutator, DwordAddMutator,
             DwordInterestingMutator, QwordAddMutator, WordAddMutator, WordInterestingMutator,
+            rand_range,
         },
         token_mutations::{I2SRandReplace, TokenInsert, TokenReplace},
-        MutationResult, Mutator,
     },
     random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},

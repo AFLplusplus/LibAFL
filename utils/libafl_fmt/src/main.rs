@@ -138,7 +138,8 @@ async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) 
         return Err(io::Error::new(
             ErrorKind::Other,
             format!(
-                "Cargo fmt failed. Run cargo fmt for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}"),
+                "Cargo fmt failed. Run cargo fmt for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}"
+            ),
         ));
     }
 
