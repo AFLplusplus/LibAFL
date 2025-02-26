@@ -175,7 +175,7 @@ pub fn build() {
             is_global: true,
             is_bitfield: true,
         })
-        .rust_edition(bindgen::RustEdition::Edition2024)
+        // .rust_edition(bindgen::RustEdition::Edition2024)
         .header(libafl_qemu_hdr.display().to_string())
         .generate()
         .expect("Exit bindings generation failed.")
@@ -191,7 +191,7 @@ pub fn build() {
             is_global: true,
             is_bitfield: true,
         })
-        .rust_edition(bindgen::RustEdition::Edition2024)
+        // .rust_edition(bindgen::RustEdition::Edition2024)
         .header(nyx_hdr.display().to_string())
         .generate()
         .expect("Exit bindings generation failed.")
