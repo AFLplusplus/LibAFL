@@ -95,10 +95,12 @@ pub fn main() {
 
     // The coverage map shared between observer and executor
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
-    // let the forkserver know the shmid
+
     unsafe {
+        // let the forkserver know the shmid
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
+
     let shmem_buf = shmem.as_slice_mut();
 
     // Create an observation channel using the signals map
