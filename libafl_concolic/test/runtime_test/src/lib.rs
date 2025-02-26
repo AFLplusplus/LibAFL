@@ -3,14 +3,9 @@
 #![forbid(unexpected_cfgs)]
 //! Just a small runtime to be used in the smoke test.
 
-use symcc_runtime::{
-    export_runtime,
-    filter::NoFloat,
-    tracing::{self, StdShMemMessageFileWriter},
-    Runtime, StdShMem,
-};
-
-// use libafl_bolts::StdShmem;
+#[cfg(not(test))]
+use symcc_runtime::tracing::StdShMemMessageFileWriter;
+use symcc_runtime::{Runtime, StdShMem, export_runtime, filter::NoFloat, tracing};
 
 export_runtime!(
     NoFloat => NoFloat;
