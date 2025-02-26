@@ -5,6 +5,7 @@
 #![expect(clippy::pedantic)]
 #![expect(improper_ctypes)]
 #![expect(unsafe_op_in_unsafe_fn)]
+#![allow(unused_imports)]
 
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
 #[rustfmt::skip]
