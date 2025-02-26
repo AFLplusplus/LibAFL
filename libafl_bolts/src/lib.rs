@@ -75,7 +75,7 @@ pub extern crate alloc;
 
 #[cfg(feature = "ctor")]
 #[doc(hidden)]
-pub use ctor::ctor;
+pub use ctor;
 #[cfg(feature = "alloc")]
 pub mod anymap;
 #[cfg(feature = "std")]
