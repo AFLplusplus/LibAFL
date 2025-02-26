@@ -7,6 +7,7 @@
 #![allow(clippy::all)]
 #![allow(clippy::pedantic)]
 #![allow(improper_ctypes)]
+#![allow(unsafe_op_in_unsafe_fn)]
 
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
 #[rustfmt::skip]
