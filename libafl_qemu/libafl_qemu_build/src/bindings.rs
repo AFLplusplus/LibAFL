@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use bindgen::{BindgenError, Bindings};
+use bindgen::{BindgenError, Bindings, RustEdition};
 
 use crate::store_generated_content_if_different;
 
@@ -132,6 +132,7 @@ pub fn generate(
         })
         .header(wrapper_h.display().to_string())
         .clang_args(clang_args)
+        .rust_edition(RustEdition::Edition2024)
         .allowlist_var("libafl_dump_core_hook")
         .allowlist_var("libafl_force_dfl")
         .allowlist_var("mmap_next_start")

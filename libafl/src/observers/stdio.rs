@@ -164,7 +164,7 @@ use crate::{Error, observers::Observer};
 ///
 ///    unsafe {
 ///        let compare_vec: Vec<u8> = Vec::new();
-///        assert_eq!(compare_vec, *(&*(&raw const STDERR)).unwrap());
+///        assert_eq!(compare_vec, *(&*(&raw const STDERR)).clone().unwrap());
 ///        // stdout will still contain data, we're just checking that there is an error message
 ///    }
 /// }
