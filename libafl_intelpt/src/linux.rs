@@ -1,4 +1,4 @@
-use std::{
+use alloc::{
     borrow::ToOwned,
     boxed::Box,
     ffi::{CStr, CString},

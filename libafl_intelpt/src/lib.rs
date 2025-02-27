@@ -12,9 +12,9 @@
 #[macro_use]
 extern crate std;
 
+use alloc::{borrow::ToOwned, string::String, vec::Vec};
 #[cfg(target_os = "linux")]
 use std::fs;
-use std::{borrow::ToOwned, string::String, vec::Vec};
 
 use raw_cpuid::CpuId;
 

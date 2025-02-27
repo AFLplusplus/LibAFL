@@ -1158,12 +1158,11 @@ pub mod unix_shmem {
     /// Module containing `ashmem` shared memory support, commonly used on Android.
     #[cfg(all(any(target_os = "linux", target_os = "android"), feature = "std"))]
     pub mod ashmem {
-        use alloc::string::ToString;
+        use alloc::{ffi::CString, string::ToString};
         use core::{
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::ffi::CString;
 
         use libc::{
             c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
@@ -1379,12 +1378,12 @@ pub mod unix_shmem {
         any(target_os = "linux", target_os = "android", target_os = "freebsd")
     ))]
     pub mod memfd {
-        use alloc::string::ToString;
+        use alloc::{ffi::CString, string::ToString};
         use core::{
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::{ffi::CString, os::fd::IntoRawFd};
+        use std::os::fd::IntoRawFd;
 
         use libc::{
             c_void, close, fstat, ftruncate, mmap, munmap, MAP_SHARED, PROT_READ, PROT_WRITE,
@@ -1447,7 +1446,7 @@ pub mod unix_shmem {
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 let fd = i32::from(id);
                 unsafe {
-                    let mut stat = std::mem::zeroed();
+                    let mut stat = core::mem::zeroed();
                     if fstat(fd, &mut stat) == -1 {
                         return Err(Error::unknown(
                             "Failed to map the memfd mapping".to_string(),
