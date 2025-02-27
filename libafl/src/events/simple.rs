@@ -9,7 +9,7 @@ use libafl_bolts::ClientId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", not(miri)))]
-use libafl_bolts::os::unix_signals::{SIGNAL_RECURSION_EXIT, setup_signal_handler};
+use libafl_bolts::{os::unix_signals::setup_signal_handler, SIGNAL_RECURSION_EXIT};
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{ForkResult, fork};
 #[cfg(feature = "std")]

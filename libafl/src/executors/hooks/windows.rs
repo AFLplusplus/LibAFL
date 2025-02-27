@@ -4,6 +4,7 @@ pub mod windows_asan_handler {
     use alloc::string::String;
     use core::sync::atomic::{Ordering, compiler_fence};
 
+    use libafl_bolts::os::SIGNAL_RECURSION_EXIT;
     use windows::Win32::System::Threading::{
         CRITICAL_SECTION, EnterCriticalSection, ExitProcess, LeaveCriticalSection,
     };
@@ -35,13 +36,13 @@ pub mod windows_asan_handler {
     {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
-            let (max_depth_reached, signal_depth) = (*data).signal_handler_enter(true);
+            let (max_depth_reached, _signal_depth) = (*data).signal_handler_enter();
 
-            if max_depth_reached  {
+            if max_depth_reached {
                 log::error!(
                     "We crashed inside a asan death handler, but this should never happen!"
                 );
-                ExitProcess(SIGNAL_RECURSION_EXIT);
+                ExitProcess(SIGNAL_RECURSION_EXIT as u32);
             }
 
             // Have we set a timer_before?
@@ -126,9 +127,12 @@ pub mod windows_exception_handler {
     #[cfg(feature = "std")]
     use std::panic;
 
-    use libafl_bolts::os::windows_exceptions::{
-        CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS, ExceptionCode,
-        ExceptionHandler,
+    use libafl_bolts::os::{
+        SIGNAL_RECURSION_EXIT,
+        windows_exceptions::{
+            CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS, ExceptionCode,
+            ExceptionHandler,
+        },
     };
     use windows::Win32::System::Threading::{
         CRITICAL_SECTION, EnterCriticalSection, ExitProcess, LeaveCriticalSection,
@@ -168,18 +172,18 @@ pub mod windows_exception_handler {
         ) {
             unsafe {
                 let data = &raw mut GLOBAL_STATE;
-                let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
+                let (max_depth_reached, _signal_depth) = (*data).signal_handler_enter();
 
                 if max_depth_reached {
                     log::error!("We crashed inside a crash handler, but this should never happen!");
-                    ExitProcess(SIGNAL_RECURSION_EXIT);
+                    ExitProcess(SIGNAL_RECURSION_EXIT as u32);
                 }
 
                 if !(*data).crash_handler.is_null() {
                     let func: HandlerFuncPtr = transmute((*data).crash_handler);
                     (func)(exception_pointers, data);
                 }
-                (*data).signal_handler_exit(in_handler);
+                (*data).signal_handler_exit();
             }
         }
 
@@ -208,11 +212,11 @@ pub mod windows_exception_handler {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
             let data = &raw mut GLOBAL_STATE;
-            let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
+            let (max_depth_reached, _signal_depth) = (*data).signal_handler_enter();
 
             if max_depth_reached {
                 log::error!("We crashed inside a crash handler, but this should never happen!");
-                ExitProcess(SIGNAL_RECURSION_EXIT);
+                ExitProcess(SIGNAL_RECURSION_EXIT as u32);
             }
 
             // Have we set a timer_before?
@@ -252,7 +256,7 @@ pub mod windows_exception_handler {
                 ExitProcess(1);
             }
             old_hook(panic_info);
-            (*data).signal_handler_exit(in_handler);
+            (*data).signal_handler_exit();
         }));
     }
 
