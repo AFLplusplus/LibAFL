@@ -347,16 +347,18 @@ impl CmpLogRoutinesModule {
             #[allow(unused_mut)] // cfg dependent
             let mut code = {
                 #[cfg(feature = "usermode")]
-                unsafe {
-                    std::slice::from_raw_parts(qemu.g2h(pc), 512);
+                {
+                    unsafe { std::slice::from_raw_parts(qemu.g2h(pc), 512) }
                 }
                 #[cfg(feature = "systemmode")]
-                &mut [0; 512]
+                {
+                    &mut [0; 512]
+                }
             };
             #[cfg(feature = "systemmode")]
-            unsafe {
-                qemu.read_mem(pc, code)
-            }; // TODO handle faults
+            {
+                unsafe { qemu.read_mem(pc, code) }; // TODO handle faults
+            }
 
             let mut iaddr = pc;
 
@@ -391,11 +393,15 @@ impl CmpLogRoutinesModule {
                 iaddr += insn.bytes().len() as GuestAddr;
 
                 #[cfg(feature = "usermode")]
-                code = unsafe { std::slice::from_raw_parts(qemu.g2h(iaddr), 512) };
+                {
+                    code = unsafe { std::slice::from_raw_parts(qemu.g2h(iaddr), 512) };
+                }
                 #[cfg(feature = "systemmode")]
-                unsafe {
-                    qemu.read_mem(pc, code);
-                } // TODO handle faults
+                {
+                    unsafe {
+                        qemu.read_mem(pc, code);
+                    } // TODO handle faults
+                }
             }
         }
 

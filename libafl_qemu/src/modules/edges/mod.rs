@@ -34,7 +34,9 @@ pub use child::{
 };
 use libafl::observers::ConstLenMapObserver;
 
-use super::utils::filters::{HasAddressFilter, HasPageFilter};
+use super::utils::filters::HasAddressFilter;
+#[cfg(feature = "systemmode")]
+use super::utils::filters::HasPageFilter;
 
 /// Standard edge coverage module, adapted to most use cases
 pub type StdEdgeCoverageModule = StdEdgeCoverageFullModule;
