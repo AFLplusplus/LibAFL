@@ -1,10 +1,11 @@
 use std::{env, fmt::Write};
 
 use clap::{Parser, builder::Str};
-use libafl_bolts::tuples::tuple_list;
+use libafl_bolts::{Error, tuples::tuple_list};
 use libafl_qemu::{
     Emulator, NopEmulatorDriver, NopSnapshotManager, QemuExitError, QemuInitError,
     command::NopCommandManager,
+    elf::EasyElf,
     modules::{AsanGuestModule, AsanModule, EmulatorModuleTuple},
 };
 use log::{error, info};
@@ -108,7 +109,7 @@ fn run<M: EmulatorModuleTuple<(), ()>>(
     modules: M,
 ) -> Result<(), LauncherError> {
     info!("Building emulator");
-    let emulator: Emulator<
+    let mut emulator: Emulator<
         (),
         NopCommandManager,
         NopEmulatorDriver,
@@ -123,6 +124,30 @@ fn run<M: EmulatorModuleTuple<(), ()>>(
         .map_err(LauncherError::Init)?;
     info!("Build emultor");
     let qemu = emulator.qemu();
+
+    let mut elf_buffer = Vec::new();
+    let elf =
+        EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).map_err(LauncherError::ElfError)?;
+
+    let test_one_input = elf.resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr());
+    log::info!(
+        "LLVMFuzzerTestOneInput @ {:#x}",
+        test_one_input.unwrap_or_default()
+    );
+    let main = elf.resolve_symbol("main", qemu.load_addr());
+    log::info!("main @ {:#x}", main.unwrap_or_default());
+
+    let entry = test_one_input.or(main);
+    log::info!("entry @ {:#x}", entry.unwrap_or_default());
+
+    match entry {
+        Some(e) => qemu.entry_break(e),
+        None => Err(LauncherError::FailedToFindEntry)?,
+    }
+
+    let mut state = ();
+    emulator.modules_mut().first_exec_all(qemu, &mut state);
+
     info!("Running emulator");
     unsafe { qemu.run().map_err(LauncherError::Exit)? };
     info!("Emulator exited");
@@ -135,4 +160,8 @@ pub enum LauncherError {
     Init(QemuInitError),
     #[error("Qemu error: {0:?}")]
     Exit(QemuExitError),
+    #[error("Elf error: {0:?}")]
+    ElfError(Error),
+    #[error("Failed to find entry point")]
+    FailedToFindEntry,
 }
