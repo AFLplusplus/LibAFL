@@ -194,7 +194,7 @@ impl ShMemId {
     #[cfg(feature = "alloc")]
     #[must_use]
     pub fn as_str(&self) -> &str {
-        alloc::str::from_utf8(&self.id[..self.null_pos()]).unwrap()
+        core::str::from_utf8(&self.id[..self.null_pos()]).unwrap()
     }
 }
 

@@ -148,6 +148,10 @@ all = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
 cargo_common_metadata = "deny"
 
+alloc_instead_of_core = "deny"
+std_instead_of_alloc = "deny"
+std_instead_of_core = "deny"
+
 # Warn
 cargo = { level = "warn", priority = -1 }
 

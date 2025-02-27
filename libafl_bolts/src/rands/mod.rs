@@ -36,10 +36,8 @@ fn random_seed_deterministic() -> u64 {
 
 #[cfg(feature = "std")]
 fn random_seed_from_random_state() -> u64 {
-    use std::{
-        collections::hash_map::RandomState,
-        hash::{BuildHasher, Hasher},
-    };
+    use core::hash::{BuildHasher, Hasher};
+    use std::collections::hash_map::RandomState;
     RandomState::new().build_hasher().finish()
 }
 

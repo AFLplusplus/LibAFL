@@ -5,14 +5,15 @@ use core::{
     hash::{BuildHasher, Hasher},
     marker::PhantomData,
     mem::size_of,
-    ptr, slice,
+    ptr,
+    ptr::read_volatile,
+    slice,
 };
 use std::{
     env::temp_dir,
     fs::{self, File},
     io::{Read, Write},
     path::PathBuf,
-    ptr::read_volatile,
 };
 
 use ahash::RandomState;

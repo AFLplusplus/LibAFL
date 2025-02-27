@@ -7,7 +7,7 @@ use std::convert::Infallible;
 use libc::{c_char, strlen};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
-use pyo3::{pyclass, pymethods, types::PyInt, Bound, IntoPyObject, Python};
+use pyo3::{types::PyInt, Bound, IntoPyObject, Python};
 use strum_macros::EnumIter;
 
 use crate::MmapPerms;

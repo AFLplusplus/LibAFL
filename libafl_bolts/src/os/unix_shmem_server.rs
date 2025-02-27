@@ -5,12 +5,17 @@ Hence, the `unix_shmem_server` keeps track of existing maps, creates new maps fo
 and forwards them over unix domain sockets.
 */
 
+use alloc::{
+    rc::{Rc, Weak},
+    sync::Arc,
+};
 #[cfg(feature = "std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::{
+    cell::RefCell,
     fmt::Debug,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
@@ -18,13 +23,11 @@ use core::{
 #[cfg(target_vendor = "apple")]
 use std::fs;
 use std::{
-    cell::RefCell,
     env,
     io::{Read, Write},
     marker::PhantomData,
     os::fd::{AsFd, BorrowedFd},
-    rc::{Rc, Weak},
-    sync::{Arc, Condvar, Mutex},
+    sync::{Condvar, Mutex},
     thread::JoinHandle,
 };
 #[cfg(all(feature = "std", unix))]

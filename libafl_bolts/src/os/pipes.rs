@@ -1,14 +1,14 @@
 //! Unix `pipe` wrapper for `LibAFL`
 #[cfg(feature = "std")]
+use alloc::{borrow::Borrow, rc::Rc};
+#[cfg(feature = "std")]
 use std::{
-    borrow::Borrow,
     cell::RefCell,
     io::{self, ErrorKind, Read, Write},
     os::{
         fd::{AsFd, AsRawFd, OwnedFd},
         unix::io::RawFd,
     },
-    rc::Rc,
 };
 
 #[cfg(feature = "std")]
