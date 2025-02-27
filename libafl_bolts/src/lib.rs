@@ -145,13 +145,14 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::{Hash, Hasher};
+#[cfg(all(unix, feature = "std"))]
+use core::mem;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
 use std::{
     fs::File,
     io::{Write, stderr, stdout},
-    mem,
     os::fd::{AsRawFd, FromRawFd, RawFd},
     panic,
 };

@@ -64,9 +64,10 @@
 #[cfg(feature = "frida_cli")]
 use alloc::{boxed::Box, string::ToString};
 use alloc::{string::String, vec::Vec};
+use core::{net::SocketAddr, time::Duration};
 #[cfg(feature = "frida_cli")]
 use std::error;
-use std::{net::SocketAddr, path::PathBuf, time::Duration};
+use std::path::PathBuf;
 
 #[cfg(feature = "frida_cli")]
 use clap::ValueEnum;

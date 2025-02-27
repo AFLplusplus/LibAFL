@@ -7,9 +7,8 @@
     doc = r"For example, they are supported on the [`crate::executors::CommandExecutor`]."
 )]
 
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, vec::Vec};
 use core::marker::PhantomData;
-use std::vec::Vec;
 
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};

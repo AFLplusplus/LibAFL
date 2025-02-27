@@ -1,6 +1,9 @@
 use alloc::borrow::Cow;
-use core::{ffi::c_void, fmt::Debug};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::{
+    ffi::c_void,
+    fmt::Debug,
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+};
 
 use libafl::{
     Error,

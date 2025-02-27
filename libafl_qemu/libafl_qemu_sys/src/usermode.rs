@@ -1,7 +1,7 @@
+#[cfg(feature = "python")]
+use core::convert::Infallible;
 #[cfg(target_os = "linux")]
 use core::{slice::from_raw_parts, str::from_utf8_unchecked};
-#[cfg(feature = "python")]
-use std::convert::Infallible;
 
 #[cfg(target_os = "linux")]
 use libc::{c_char, strlen};

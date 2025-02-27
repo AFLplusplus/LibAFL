@@ -1,7 +1,10 @@
 //! The Nyx `CmpLog` Observer
 //!
 //! Reads and parses the redqueen results written by QEMU-Nyx and adds them to the state as `CmpValuesMetadata`.
-use std::borrow::Cow;
+
+extern crate alloc;
+
+use alloc::borrow::Cow;
 
 use libafl::{
     Error, HasMetadata,
@@ -43,7 +46,7 @@ impl NyxCmpObserver {
 impl<I, S> Observer<I, S> for NyxCmpObserver
 where
     S: HasMetadata + HasExecutions,
-    I: std::fmt::Debug,
+    I: core::fmt::Debug,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         unsafe {

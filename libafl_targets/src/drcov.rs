@@ -63,7 +63,7 @@ impl From<DrCovBasicBlockEntry> for [u8; 8] {
             size_of::<[u8; 8]>(),
             "`DrCovBasicBlockEntry` size changed!"
         );
-        unsafe { std::slice::from_raw_parts(ptr::from_ref(&value).cast::<u8>(), 8) }
+        unsafe { core::slice::from_raw_parts(ptr::from_ref(&value).cast::<u8>(), 8) }
             .try_into()
             .unwrap()
     }
@@ -75,7 +75,7 @@ impl From<&DrCovBasicBlockEntry> for &[u8] {
         // The value is a c struct.
         // Casting its pointer to bytes should be safe.
         unsafe {
-            std::slice::from_raw_parts(
+            core::slice::from_raw_parts(
                 ptr::from_ref(value).cast::<u8>(),
                 size_of::<DrCovBasicBlockEntry>(),
             )
@@ -539,12 +539,8 @@ impl DrCovReader {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        env::temp_dir,
-        fs,
-        path::PathBuf,
-        string::{String, ToString},
-    };
+    use alloc::string::{String, ToString};
+    use std::{env::temp_dir, fs, path::PathBuf};
 
     use rangemap::RangeMap;
 

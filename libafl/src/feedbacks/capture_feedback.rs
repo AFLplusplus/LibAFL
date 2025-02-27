@@ -1,5 +1,6 @@
 //! Feedback that captures Timeouts for re-running
-use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
+use alloc::{borrow::Cow, rc::Rc};
+use core::{cell::RefCell, fmt::Debug};
 
 use libafl_bolts::{Error, Named};
 use serde::{Serialize, de::DeserializeOwned};

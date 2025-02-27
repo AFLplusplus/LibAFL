@@ -323,7 +323,7 @@ mod tests {
     use libafl_bolts::tuples::tuple_list;
 
     use crate::modules::{
-        EmulatorModule, EmulatorModuleTuple,
+        EmulatorModule,
         utils::filters::{
             AddressFilter, NopAddressFilter, NopPageFilter, PageFilter, StdAddressFilter,
             StdPageFilter,

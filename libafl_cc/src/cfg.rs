@@ -1,9 +1,11 @@
 //! LLVM style control flow graph with information of AFL-style index of the each
 //! edges, use together with ``AFLCoverage`` pass having --dump-afl-cfg flag enabled.
-use std::{
-    collections::{BinaryHeap, HashMap, HashSet},
-    marker::PhantomData,
-};
+
+extern crate alloc;
+
+use alloc::collections::BinaryHeap;
+use core::marker::PhantomData;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 

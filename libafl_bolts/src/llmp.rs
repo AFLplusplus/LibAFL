@@ -58,8 +58,12 @@ Check out the `llmp_test` example in ./examples, or build it with `cargo run --e
 */
 
 #[cfg(feature = "std")]
+use alloc::boxed::Box;
+#[cfg(feature = "std")]
 use alloc::string::ToString;
 use alloc::{string::String, vec::Vec};
+#[cfg(feature = "std")]
+use core::net::SocketAddr;
 #[cfg(not(target_pointer_width = "64"))]
 use core::sync::atomic::AtomicU32;
 #[cfg(target_pointer_width = "64")]
@@ -77,10 +81,9 @@ use core::{
 };
 #[cfg(feature = "std")]
 use std::{
-    boxed::Box,
     env,
     io::{ErrorKind, Read, Write},
-    net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
+    net::{TcpListener, TcpStream, ToSocketAddrs},
     sync::mpsc::channel,
     thread,
 };
@@ -3864,7 +3867,8 @@ impl<SHM, SP> LlmpClient<SHM, SP> {
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 mod tests {
 
-    use std::{thread::sleep, time::Duration};
+    use core::time::Duration;
+    use std::thread::sleep;
 
     use serial_test::serial;
 

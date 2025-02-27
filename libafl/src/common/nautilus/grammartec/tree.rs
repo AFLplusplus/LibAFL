@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
-use std::{cmp, io, io::Write, marker::Sized};
+use core::{cmp, marker::Sized};
+use std::io::{Cursor, Write, stdout};
 
 use hashbrown::HashSet;
 use libafl_bolts::rands::Rand;
@@ -28,7 +29,7 @@ enum UnparseStep<'dat> {
 struct Unparser<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> {
     tree: &'tree T,
     stack: Vec<UnparseStep<'data>>,
-    buffers: Vec<io::Cursor<Vec<u8>>>,
+    buffers: Vec<Cursor<Vec<u8>>>,
     w: W,
     i: usize,
     ctx: &'ctx Context,
@@ -81,10 +82,7 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
     }
     fn script(&mut self, py: Python, num: usize, expr: &PyObject) -> PyResult<()> {
         let bufs = self.buffers.split_off(self.buffers.len() - num);
-        let bufs = bufs
-            .into_iter()
-            .map(io::Cursor::into_inner)
-            .collect::<Vec<_>>();
+        let bufs = bufs.into_iter().map(Cursor::into_inner).collect::<Vec<_>>();
         let byte_arrays = bufs.iter().map(|b| PyBytes::new(py, b));
         let res = expr.call1(py, PyTuple::new(py, byte_arrays)?)?;
         let bound = res.bind(py);
@@ -103,7 +101,7 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
     }
 
     fn push_buffer(&mut self) {
-        self.buffers.push(io::Cursor::new(vec![]));
+        self.buffers.push(Cursor::new(vec![]));
     }
 
     fn next_rule(&mut self, nt: NTermId) {
@@ -184,7 +182,7 @@ where
     }
 
     fn unparse_print(&self, ctx: &Context) {
-        self.unparse_to(ctx, &mut io::stdout());
+        self.unparse_to(ctx, &mut stdout());
     }
 }
 
