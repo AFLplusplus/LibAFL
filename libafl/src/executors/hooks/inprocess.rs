@@ -421,6 +421,7 @@ impl InProcessExecutorHandlerData {
     }
 
     /// Returns true if signal handling max depth has been reached, false otherwise
+    #[cfg(feature = "std")]
     pub(crate) fn signal_handler_enter(&mut self) -> (bool, usize) {
         self.signal_handler_depth += 1;
         (
@@ -429,6 +430,7 @@ impl InProcessExecutorHandlerData {
         )
     }
 
+    #[cfg(feature = "std")]
     pub(crate) fn signal_handler_exit(&mut self) {
         self.signal_handler_depth -= 1;
     }

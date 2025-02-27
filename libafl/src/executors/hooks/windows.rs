@@ -1,5 +1,4 @@
 /// In-Process crash handling for `Windows`
-#[cfg(all(windows, feature = "std"))]
 pub mod windows_asan_handler {
     use alloc::string::String;
     use core::sync::atomic::{Ordering, compiler_fence};
@@ -110,7 +109,6 @@ pub mod windows_asan_handler {
     }
 }
 
-#[cfg(all(windows, feature = "std"))]
 /// The module to take care of windows crash or timeouts
 pub mod windows_exception_handler {
     #[cfg(feature = "std")]
