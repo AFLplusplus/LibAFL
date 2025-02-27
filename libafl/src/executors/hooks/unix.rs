@@ -5,9 +5,9 @@ pub mod unix_signal_handler {
     use core::mem::transmute;
     use std::{io::Write, panic};
 
-    use libafl_bolts::{
+    use libafl_bolts::os::{
         SIGNAL_RECURSION_EXIT,
-        os::unix_signals::{Signal, SignalHandler, ucontext_t},
+        unix_signals::{Signal, SignalHandler, ucontext_t},
     };
     use libc::siginfo_t;
 
