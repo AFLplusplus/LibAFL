@@ -8,11 +8,11 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::{
     marker::PhantomData,
+    net::SocketAddr,
     num::NonZeroUsize,
     sync::atomic::{Ordering, compiler_fence},
     time::Duration,
 };
-use std::net::SocketAddr;
 #[cfg(feature = "std")]
 use std::net::TcpStream;
 

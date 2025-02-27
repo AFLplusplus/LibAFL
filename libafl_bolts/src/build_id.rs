@@ -1,14 +1,11 @@
 //! Based on <https://github.com/alecmocatta/build_id>
 //! (C) Alec Mocatta <alec@mocatta.net> under license MIT or Apache 2
 
-use std::{
+use core::{
     any::TypeId,
-    env,
-    fs::File,
     hash::{Hash, Hasher},
-    io,
-    sync::OnceLock,
 };
+use std::{env, fs::File, io, sync::OnceLock};
 
 use uuid::Uuid;
 

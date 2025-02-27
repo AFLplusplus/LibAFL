@@ -1014,11 +1014,11 @@ mod test {
     fn test_macros() {
         let mut t = tuple_list!(1, "a");
 
-        tuple_for_each!(f1, std::fmt::Display, t, |x| {
+        tuple_for_each!(f1, core::fmt::Display, t, |x| {
             log::info!("{x}");
         });
 
-        tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
+        tuple_for_each_mut!(f2, core::fmt::Display, t, |x| {
             log::info!("{x}");
         });
     }

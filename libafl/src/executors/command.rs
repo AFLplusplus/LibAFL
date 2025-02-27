@@ -1,22 +1,23 @@
 //! The command executor executes a sub program for each run
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use alloc::ffi::CString;
 use alloc::vec::Vec;
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use core::ffi::CStr;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     ops::IndexMut,
+    time::Duration,
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use std::{
-    ffi::{CStr, CString},
-    os::fd::AsRawFd,
-};
+use std::os::fd::AsRawFd;
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
     os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    time::Duration,
 };
 
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]

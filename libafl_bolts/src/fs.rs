@@ -1,8 +1,8 @@
 //! `LibAFL` functionality for filesystem interaction
 
-use alloc::rc::Rc;
 #[cfg(feature = "std")]
 use alloc::{borrow::ToOwned, vec::Vec};
+use alloc::{rc::Rc, string::String};
 use core::cell::RefCell;
 #[cfg(feature = "std")]
 use core::time::Duration;
@@ -14,7 +14,6 @@ use std::{
     fs::{self, File, OpenOptions, remove_file},
     io::{Seek, Write},
     path::{Path, PathBuf},
-    string::String,
 };
 
 use crate::Error;

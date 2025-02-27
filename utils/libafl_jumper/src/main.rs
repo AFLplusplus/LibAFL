@@ -27,57 +27,59 @@ fn panic(_panic: &PanicInfo<'_>) -> ! {
 #[inline(never)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn libafl_jmp(target: *mut c_void) -> ! {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    asm!(
-        "jmp {target}", // Jump on x86
-        target = in(reg) target,
-        options(noreturn)
-    );
+    unsafe {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        asm!(
+            "jmp {target}", // Jump on x86
+            target = in(reg) target,
+            options(noreturn)
+        );
 
-    #[cfg(target_arch = "arm")]
-    asm!(
-        "bx {target}",       // Branch and exchange instruction (ARM)
-        target = in(reg) target,
-        options(noreturn)
-    );
+        #[cfg(target_arch = "arm")]
+        asm!(
+            "bx {target}",       // Branch and exchange instruction (ARM)
+            target = in(reg) target,
+            options(noreturn)
+        );
 
-    #[cfg(target_arch = "aarch64")]
-    asm!(
-        "br {target}",        // Branch register instruction (AArch64)
-        target = in(reg) target,
-        options(noreturn)
-    );
+        #[cfg(target_arch = "aarch64")]
+        asm!(
+            "br {target}",        // Branch register instruction (AArch64)
+            target = in(reg) target,
+            options(noreturn)
+        );
 
-    #[cfg(target_arch = "hexagon")]
-    asm!(
-        "jumpr {target}",   // Jump register instruction (Hexagon)
-        target = in(reg) target,
-        options(noreturn)
-    );
+        #[cfg(target_arch = "hexagon")]
+        asm!(
+            "jumpr {target}",   // Jump register instruction (Hexagon)
+            target = in(reg) target,
+            options(noreturn)
+        );
 
-    #[cfg(any(target_arch = "powerpc", target_arch = "powerpc64"))]
-    asm!(
-        "b {target}",       // Branch instruction (PowerPC)
-        target = in(reg) target,
-        options(noreturn)
-    );
+        #[cfg(any(target_arch = "powerpc", target_arch = "powerpc64"))]
+        asm!(
+            "b {target}",       // Branch instruction (PowerPC)
+            target = in(reg) target,
+            options(noreturn)
+        );
 
-    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
-    asm!(
-        "jalr x0, {target}, 0",  // Jump and link register (RISC-V)
-        target = in(reg) target,
-        options(noreturn)
-    );
+        #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+        asm!(
+            "jalr x0, {target}, 0",  // Jump and link register (RISC-V)
+            target = in(reg) target,
+            options(noreturn)
+        );
 
-    #[cfg(target_arch = "mips")]
-    asm!(
-        "jr {target}",       // Jump register (MIPS)
-        "nop",               // Delay slot
-        target = in(reg) target,
-        options(noreturn)
-    );
+        #[cfg(target_arch = "mips")]
+        asm!(
+            "jr {target}",       // Jump register (MIPS)
+            "nop",               // Delay slot
+            target = in(reg) target,
+            options(noreturn)
+        );
 
-    //unreachable!("asm should have jumped!");
+        //unreachable!("asm should have jumped!");
+    }
 }
 
 /// The "normal" rust main, mainly for testing

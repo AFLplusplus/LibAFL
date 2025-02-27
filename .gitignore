@@ -76,3 +76,6 @@ program
 fuzzer_libpng*
 
 *.patch
+
+# Sometimes this happens
+rustc-ice-*

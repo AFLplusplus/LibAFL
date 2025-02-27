@@ -1,9 +1,6 @@
 use alloc::{string::String, vec::Vec};
-use std::{
-    fs::File,
-    io::Write,
-    sync::{RwLock, atomic::AtomicBool},
-};
+use core::sync::atomic::AtomicBool;
+use std::{fs::File, io::Write, sync::RwLock};
 
 use hashbrown::{HashMap, HashSet};
 use libafl_bolts::rands::Rand;

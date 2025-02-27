@@ -11,6 +11,7 @@ pub static mut COUNTERS_MAPS: Vec<OwnedMutSlice<'static, u8>> = Vec::new();
 ///
 /// # Safety
 /// The resulting pointer points to a global. Handle with care!
+#[must_use]
 pub unsafe fn counters_maps_ptr() -> *const Vec<OwnedMutSlice<'static, u8>> {
     &raw const COUNTERS_MAPS
 }
@@ -29,8 +30,8 @@ pub unsafe fn counters_maps_ptr_mut() -> *mut Vec<OwnedMutSlice<'static, u8>> {
 /// You are responsible for ensuring there is no multi-mutability!
 #[must_use]
 pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
-    let counter_maps = unsafe { &*counters_maps_ptr() };
-    counter_maps
+    let counters_maps = unsafe { &*counters_maps_ptr() };
+    counters_maps
         .iter()
         .map(|counters| unsafe {
             OwnedMutSlice::from_raw_parts_mut(
@@ -49,8 +50,8 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 #[expect(clippy::cast_sign_loss)]
 pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
-        let counter_maps = &mut *counters_maps_ptr_mut();
-        for existing in counter_maps {
+        let counters_maps = &mut *counters_maps_ptr_mut();
+        for existing in counters_maps {
             let range = existing.as_slice_mut().as_mut_ptr()
                 ..=existing
                     .as_slice_mut()
@@ -66,9 +67,9 @@ pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop
             }
         }
 
-        let counter_maps = &mut *counters_maps_ptr_mut();
+        let counters_maps = &mut *counters_maps_ptr_mut();
         // we didn't overlap; keep going
-        counter_maps.push(OwnedMutSlice::from_raw_parts_mut(
+        counters_maps.push(OwnedMutSlice::from_raw_parts_mut(
             start,
             stop.offset_from(start) as usize,
         ));

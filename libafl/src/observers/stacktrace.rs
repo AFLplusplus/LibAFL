@@ -1,14 +1,14 @@
 //! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
-use alloc::{borrow::Cow, string::String, vec::Vec};
 #[cfg(feature = "casr")]
+use alloc::string::ToString;
+use alloc::{borrow::Cow, string::String, vec::Vec};
+use core::fmt::Debug;
+#[cfg(feature = "casr")]
+use core::hash::{Hash, Hasher};
+#[cfg(feature = "casr")]
+use std::collections::hash_map::DefaultHasher;
 use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-    string::ToString,
-};
-use std::{
-    fmt::Debug,
     fs::{self, File},
     io::Read,
     path::Path,

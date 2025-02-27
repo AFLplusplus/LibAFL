@@ -16,7 +16,7 @@ impl ConcolicMetadata {
     /// Iterates over all messages in the buffer. Does not consume the buffer.
     pub fn iter_messages(&self) -> impl Iterator<Item = (SymExprRef, SymExpr)> + '_ {
         let mut parser = MessageFileReader::from_buffer(&self.buffer);
-        std::iter::from_fn(move || parser.next_message()).flatten()
+        core::iter::from_fn(move || parser.next_message()).flatten()
     }
 
     pub(crate) fn from_buffer(buffer: Vec<u8>) -> Self {

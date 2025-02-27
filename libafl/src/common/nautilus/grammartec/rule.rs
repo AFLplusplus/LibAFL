@@ -25,7 +25,7 @@ static SPLITTER: OnceLock<regex::Regex> = OnceLock::new();
 static TOKENIZER: OnceLock<regex::bytes::Regex> = OnceLock::new();
 
 fn show_bytes(bs: &[u8]) -> String {
-    use std::{ascii::escape_default, str};
+    use core::{ascii::escape_default, str};
 
     let mut visible = String::new();
     for &b in bs {
@@ -265,7 +265,7 @@ impl Rule {
                 if let Some(sub) = cap.get(1) {
                     //println!("cap.get(1): {}", sub.as_str());
                     RuleChild::from_nt(
-                        std::str::from_utf8(sub.as_bytes())
+                        core::str::from_utf8(sub.as_bytes())
                             .expect("nonterminals need to be valid strings"),
                         ctx,
                     )

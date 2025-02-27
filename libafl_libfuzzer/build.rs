@@ -1,5 +1,5 @@
+use core::error::Error;
 use std::{
-    error::Error,
     fs,
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},

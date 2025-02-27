@@ -3,11 +3,13 @@ This shows how llmp can be used directly, without libafl abstractions
 */
 extern crate alloc;
 
+use core::marker::PhantomData;
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
+use core::num::NonZeroUsize;
 #[cfg(not(target_os = "haiku"))]
 use core::time::Duration;
-use std::marker::PhantomData;
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-use std::{num::NonZeroUsize, thread, time};
+use std::{thread, time};
 
 use libafl_bolts::llmp::{LlmpBrokerInner, LlmpMsgHookResult};
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
@@ -37,7 +39,7 @@ const SLEEP_BETWEEN_FORWARDS: Duration = Duration::from_millis(5);
 static LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+fn adder_loop(port: u16) -> Result<(), Box<dyn core::error::Error>> {
     let shmem_provider = StdShMemProvider::new()?;
     let mut client = llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
     let mut last_result: u32 = 0;
@@ -75,7 +77,7 @@ fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-fn large_msg_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+fn large_msg_loop(port: u16) -> Result<(), Box<dyn core::error::Error>> {
     let mut client = llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
 
     #[cfg(not(target_vendor = "apple"))]
@@ -165,7 +167,7 @@ fn main() {
 }
 
 #[cfg(not(target_os = "haiku"))]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn core::error::Error>> {
     /* The main node has a broker, and a few worker threads */
 
     use libafl_bolts::llmp::Broker;
