@@ -5,7 +5,7 @@ use backtrace::Backtrace;
 use libc::{c_char, wchar_t};
 
 use crate::{
-    alloc::Allocator,
+    allocator::Allocator,
     asan::{
         asan_rt::AsanRuntime,
         errors::{AsanError, AsanErrors},

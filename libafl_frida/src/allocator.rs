@@ -7,7 +7,17 @@
         target_os = "android"
     )
 ))]
-use core::{collections::BTreeMap, ffi::c_void};
+use alloc::collections::BTreeMap;
+#[cfg(any(
+    windows,
+    target_os = "linux",
+    target_vendor = "apple",
+    all(
+        any(target_arch = "aarch64", target_arch = "x86_64"),
+        target_os = "android"
+    )
+))]
+use core::ffi::c_void;
 
 use backtrace::Backtrace;
 use frida_gum::{PageProtection, RangeDetails};

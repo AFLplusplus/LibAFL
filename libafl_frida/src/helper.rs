@@ -1,12 +1,14 @@
-use alloc::{
+use alloc::rc::Rc;
+use core::{
     any::TypeId,
     cell::{Ref, RefCell, RefMut},
     ffi::CStr,
+    fmt::{self, Debug, Formatter},
+};
+use std::{
     fs::{self, read_to_string},
     path::{Path, PathBuf},
-    rc::Rc,
 };
-use core::fmt::{self, Debug, Formatter};
 
 use frida_gum::{
     Backend, Gum, Module, ModuleMap, Script,

@@ -43,8 +43,10 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
     )
 )]
 
+extern crate alloc;
+
 /// The frida-asan allocator
-pub mod alloc;
+pub mod allocator;
 
 pub mod asan;
 
@@ -325,8 +327,9 @@ impl Default for FridaOptions {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{cell::RefCell, rc::Rc, sync::OnceLock};
-    use core::num::NonZero;
+    use alloc::rc::Rc;
+    use core::{cell::RefCell, num::NonZero};
+    use std::sync::OnceLock;
 
     use clap::Parser;
     use frida_gum::Gum;

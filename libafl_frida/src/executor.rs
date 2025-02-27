@@ -1,5 +1,10 @@
-use alloc::{cell::RefCell, ffi::c_void, marker::PhantomData, rc::Rc};
-use core::fmt::{self, Debug, Formatter};
+use alloc::rc::Rc;
+use core::{
+    cell::RefCell,
+    ffi::c_void,
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+};
 #[cfg(all(windows, not(test)))]
 use std::process::abort;
 

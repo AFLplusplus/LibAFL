@@ -6,14 +6,14 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
-use alloc::{
+use alloc::rc::Rc;
+use core::{
     cell::Cell,
     ffi::{c_char, c_void},
+    fmt::{self, Debug, Formatter},
     ptr::write_volatile,
-    rc::Rc,
-    sync::{Mutex, MutexGuard},
 };
-use core::fmt::{self, Debug, Formatter};
+use std::sync::{Mutex, MutexGuard};
 
 use backtrace::Backtrace;
 use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm};
@@ -47,7 +47,7 @@ use crate::utils::{AccessType, operand_details};
 #[cfg(target_arch = "aarch64")]
 use crate::utils::{instruction_width, writer_register};
 use crate::{
-    alloc::Allocator,
+    allocator::Allocator,
     asan::errors::{ASAN_ERRORS, AsanError, AsanErrors, AsanReadWriteError},
     helper::{FridaRuntime, SkipRange},
     utils::disas_count,

@@ -1,9 +1,7 @@
 //! Generates `DrCov` traces
-use alloc::{
-    hash::{BuildHasher, Hasher},
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use alloc::rc::Rc;
+use core::hash::{BuildHasher, Hasher};
+use std::path::{Path, PathBuf};
 
 use ahash::RandomState;
 use frida_gum::ModuleMap;

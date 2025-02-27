@@ -1,4 +1,5 @@
-use alloc::{borrow::Cow, cell::RefCell, fmt, rc::Rc};
+use alloc::{borrow::Cow, rc::Rc};
+use core::{cell::RefCell, fmt};
 
 use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::Observer};
 use libafl_bolts::{Error, Named};
