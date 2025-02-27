@@ -29,7 +29,7 @@ pub struct NautilusRandomMutator<'a> {
 }
 
 impl Debug for NautilusRandomMutator<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "NautilusRandomMutator {{}}")
     }
 }
@@ -91,7 +91,7 @@ pub struct NautilusRecursionMutator<'a> {
 }
 
 impl Debug for NautilusRecursionMutator<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "NautilusRecursionMutator {{}}")
     }
 }
@@ -155,7 +155,7 @@ pub struct NautilusSpliceMutator<'a> {
 }
 
 impl Debug for NautilusSpliceMutator<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "NautilusSpliceMutator {{}}")
     }
 }

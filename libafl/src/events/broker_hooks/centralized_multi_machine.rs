@@ -1,4 +1,4 @@
-use std::{
+use alloc::{
     fmt::{Debug, Display},
     marker::PhantomData,
     slice,

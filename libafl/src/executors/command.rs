@@ -1,15 +1,15 @@
 //! The command executor executes a sub program for each run
 use alloc::vec::Vec;
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use alloc::{
+    ffi::{CStr, CString},
+    os::fd::AsRawFd,
+};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     ops::IndexMut,
     time::Duration,
-};
-#[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use std::{
-    ffi::{CStr, CString},
-    os::fd::AsRawFd,
 };
 use std::{
     ffi::{OsStr, OsString},

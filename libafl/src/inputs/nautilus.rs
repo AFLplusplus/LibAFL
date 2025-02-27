@@ -1,7 +1,9 @@
 //! Input for the [`Nautilus`](https://github.com/RUB-SysSec/nautilus) grammar fuzzer methods
 use alloc::{rc::Rc, vec::Vec};
-use core::cell::RefCell;
-use std::hash::{Hash, Hasher};
+use core::{
+    cell::RefCell,
+    hash::{Hash, Hasher},
+};
 
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};

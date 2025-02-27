@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use std::{cmp, io, io::Write, marker::Sized};
+use core::{cmp, io, io::Write, marker::Sized};
 
 use hashbrown::HashSet;
 use libafl_bolts::rands::Rand;

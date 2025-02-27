@@ -1,5 +1,4 @@
-use alloc::vec::Vec;
-use std::fmt;
+use alloc::{fmt, vec::Vec};
 
 use hashbrown::HashMap;
 use libafl_bolts::{

@@ -4,10 +4,12 @@ This shows how llmp can be used directly, without libafl abstractions
 extern crate alloc;
 
 use core::marker::PhantomData;
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
+use core::num::NonZeroUsize;
 #[cfg(not(target_os = "haiku"))]
 use core::time::Duration;
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-use core::{num::NonZeroUsize, thread, time};
+use std::{thread, time};
 
 use libafl_bolts::llmp::{LlmpBrokerInner, LlmpMsgHookResult};
 #[cfg(all(feature = "std", not(target_os = "haiku")))]

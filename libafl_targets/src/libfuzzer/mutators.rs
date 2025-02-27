@@ -1,13 +1,11 @@
 use alloc::{
     borrow::Cow,
-    rc::{Rc, Weak},
-};
-use std::{
-    cell::RefCell,
+    boxed::Box,
     marker::PhantomData,
-    ops::Deref,
-    prelude::rust_2015::{Box, Vec},
+    rc::{Rc, Weak},
+    vec::Vec,
 };
+use core::{cell::RefCell, ops::Deref};
 
 use libafl::{
     corpus::Corpus,

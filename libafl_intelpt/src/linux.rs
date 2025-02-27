@@ -1,19 +1,22 @@
+extern crate alloc;
+
 use alloc::{
     borrow::ToOwned,
     boxed::Box,
-    ffi::{CStr, CString},
-    fmt::Debug,
-    format, fs,
-    ops::RangeInclusive,
+    ffi::CString,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{ffi::CStr, fmt::Debug, ops::RangeInclusive, ptr};
+use std::{
+    fs,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
         raw::c_void,
     },
     path::Path,
-    ptr,
-    string::{String, ToString},
     sync::LazyLock,
-    vec::Vec,
 };
 
 use arbitrary_int::u4;

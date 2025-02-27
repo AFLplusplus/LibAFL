@@ -3,7 +3,7 @@
 //! This crate interacts with the linux kernel (specifically with perf) and therefore it only works
 //! on linux hosts
 
-// Just in case this crate will have real no_std support in the future
+// Just in case this crate will have real `no_std` support in the future
 #![no_std]
 #![cfg(target_arch = "x86_64")]
 #![cfg(feature = "std")]
@@ -11,6 +11,8 @@
 
 #[macro_use]
 extern crate std;
+
+extern crate alloc;
 
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
 #[cfg(target_os = "linux")]

@@ -1,16 +1,13 @@
-use core::fmt::Display;
-use std::{
+use alloc::{
     boxed::Box,
     collections::HashMap,
     io::ErrorKind,
     process,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, OnceLock,
-    },
+    sync::{atomic::core::sync::atomic, Arc, OnceLock},
     time::Duration,
     vec::Vec,
 };
+use core::fmt::Display;
 
 use enumflags2::{bitflags, BitFlags};
 #[cfg(feature = "llmp_compression")]

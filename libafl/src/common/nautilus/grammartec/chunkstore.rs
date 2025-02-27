@@ -1,5 +1,5 @@
 use alloc::{string::String, vec::Vec};
-use std::{
+use core::{
     fs::File,
     io::Write,
     sync::{atomic::AtomicBool, RwLock},

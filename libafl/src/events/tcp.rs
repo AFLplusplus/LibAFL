@@ -1,17 +1,17 @@
 //! TCP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::vec::Vec;
+use alloc::{
+    env,
+    io::{ErrorKind, Read, Write},
+    net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
+    sync::Arc,
+    vec::Vec,
+};
 use core::{
     marker::PhantomData,
     num::NonZeroUsize,
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
-};
-use std::{
-    env,
-    io::{ErrorKind, Read, Write},
-    net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
-    sync::Arc,
 };
 
 #[cfg(feature = "tcp_compression")]
