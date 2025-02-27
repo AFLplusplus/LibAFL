@@ -11,7 +11,7 @@ use libafl_bolts::os::startable_self;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{ForkResult, fork};
 #[cfg(all(unix, feature = "std", not(miri)))]
-use libafl_bolts::{SIGNAL_RECURSION_EXIT, os::unix_signals::setup_signal_handler};
+use libafl_bolts::os::{SIGNAL_RECURSION_EXIT, unix_signals::setup_signal_handler};
 #[cfg(feature = "std")]
 use libafl_bolts::{
     os::CTRL_C_EXIT,
