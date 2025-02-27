@@ -2,10 +2,11 @@
 
 use alloc::{borrow::Cow, string::String, vec::Vec};
 #[cfg(feature = "casr")]
-use alloc::{
+use alloc::string::ToString;
+#[cfg(feature = "casr")]
+use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
-    string::ToString,
 };
 use core::fmt::Debug;
 use std::{

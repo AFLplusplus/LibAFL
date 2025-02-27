@@ -143,11 +143,11 @@ where
 }
 #[repr(C)]
 #[derive(Default)]
-pub struct __IncompleteArrayField<T>(::std::marker::PhantomData<T>, [T; 0]);
+pub struct __IncompleteArrayField<T>(::core::marker::PhantomData<T>, [T; 0]);
 impl<T> __IncompleteArrayField<T> {
     #[inline]
     pub const fn new() -> Self {
-        __IncompleteArrayField(::std::marker::PhantomData, [])
+        __IncompleteArrayField(::core::marker::PhantomData, [])
     }
     #[inline]
     pub fn as_ptr(&self) -> *const T {
@@ -159,15 +159,15 @@ impl<T> __IncompleteArrayField<T> {
     }
     #[inline]
     pub unsafe fn as_slice(&self, len: usize) -> &[T] {
-        ::std::slice::from_raw_parts(self.as_ptr(), len)
+        ::core::slice::from_raw_parts(self.as_ptr(), len)
     }
     #[inline]
     pub unsafe fn as_mut_slice(&mut self, len: usize) -> &mut [T] {
-        ::std::slice::from_raw_parts_mut(self.as_mut_ptr(), len)
+        ::core::slice::from_raw_parts_mut(self.as_mut_ptr(), len)
     }
 }
-impl<T> ::std::fmt::Debug for __IncompleteArrayField<T> {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl<T> ::core::fmt::Debug for __IncompleteArrayField<T> {
+    fn fmt(&self, fmt: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         fmt.write_str("__IncompleteArrayField")
     }
 }
@@ -185,8 +185,8 @@ pub struct __sigset_t {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of __sigset_t"][::std::mem::size_of::<__sigset_t>() - 128usize];
-    ["Alignment of __sigset_t"][::std::mem::align_of::<__sigset_t>() - 8usize];
+    ["Size of __sigset_t"][::core::mem::size_of::<__sigset_t>() - 128usize];
+    ["Alignment of __sigset_t"][::core::mem::align_of::<__sigset_t>() - 8usize];
     ["Offset of field: __sigset_t::__val"][::std::mem::offset_of!(__sigset_t, __val) - 0usize];
 };
 #[repr(C)]
@@ -204,9 +204,9 @@ pub struct __atomic_wide_counter__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of __atomic_wide_counter__bindgen_ty_1"]
-        [::std::mem::size_of::<__atomic_wide_counter__bindgen_ty_1>() - 8usize];
+        [::core::mem::size_of::<__atomic_wide_counter__bindgen_ty_1>() - 8usize];
     ["Alignment of __atomic_wide_counter__bindgen_ty_1"]
-        [::std::mem::align_of::<__atomic_wide_counter__bindgen_ty_1>() - 4usize];
+        [::core::mem::align_of::<__atomic_wide_counter__bindgen_ty_1>() - 4usize];
     ["Offset of field: __atomic_wide_counter__bindgen_ty_1::__low"]
         [::std::mem::offset_of!(__atomic_wide_counter__bindgen_ty_1, __low) - 0usize];
     ["Offset of field: __atomic_wide_counter__bindgen_ty_1::__high"]
@@ -214,9 +214,9 @@ const _: () = {
 };
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of __atomic_wide_counter"][::std::mem::size_of::<__atomic_wide_counter>() - 8usize];
+    ["Size of __atomic_wide_counter"][::core::mem::size_of::<__atomic_wide_counter>() - 8usize];
     ["Alignment of __atomic_wide_counter"]
-        [::std::mem::align_of::<__atomic_wide_counter>() - 8usize];
+        [::core::mem::align_of::<__atomic_wide_counter>() - 8usize];
     ["Offset of field: __atomic_wide_counter::__value64"]
         [::std::mem::offset_of!(__atomic_wide_counter, __value64) - 0usize];
     ["Offset of field: __atomic_wide_counter::__value32"]
@@ -224,15 +224,15 @@ const _: () = {
 };
 impl Default for __atomic_wide_counter {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for __atomic_wide_counter {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for __atomic_wide_counter {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "__atomic_wide_counter {{ union }}")
     }
 }
@@ -244,9 +244,10 @@ pub struct __pthread_internal_list {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of __pthread_internal_list"][::std::mem::size_of::<__pthread_internal_list>() - 16usize];
+    ["Size of __pthread_internal_list"]
+        [::core::mem::size_of::<__pthread_internal_list>() - 16usize];
     ["Alignment of __pthread_internal_list"]
-        [::std::mem::align_of::<__pthread_internal_list>() - 8usize];
+        [::core::mem::align_of::<__pthread_internal_list>() - 8usize];
     ["Offset of field: __pthread_internal_list::__prev"]
         [::std::mem::offset_of!(__pthread_internal_list, __prev) - 0usize];
     ["Offset of field: __pthread_internal_list::__next"]
@@ -254,9 +255,9 @@ const _: () = {
 };
 impl Default for __pthread_internal_list {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -276,8 +277,8 @@ pub struct __pthread_mutex_s {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of __pthread_mutex_s"][::std::mem::size_of::<__pthread_mutex_s>() - 40usize];
-    ["Alignment of __pthread_mutex_s"][::std::mem::align_of::<__pthread_mutex_s>() - 8usize];
+    ["Size of __pthread_mutex_s"][::core::mem::size_of::<__pthread_mutex_s>() - 40usize];
+    ["Alignment of __pthread_mutex_s"][::core::mem::align_of::<__pthread_mutex_s>() - 8usize];
     ["Offset of field: __pthread_mutex_s::__lock"]
         [::std::mem::offset_of!(__pthread_mutex_s, __lock) - 0usize];
     ["Offset of field: __pthread_mutex_s::__count"]
@@ -297,9 +298,9 @@ const _: () = {
 };
 impl Default for __pthread_mutex_s {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -317,8 +318,8 @@ pub struct __pthread_cond_s {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of __pthread_cond_s"][::std::mem::size_of::<__pthread_cond_s>() - 48usize];
-    ["Alignment of __pthread_cond_s"][::std::mem::align_of::<__pthread_cond_s>() - 8usize];
+    ["Size of __pthread_cond_s"][::core::mem::size_of::<__pthread_cond_s>() - 48usize];
+    ["Alignment of __pthread_cond_s"][::core::mem::align_of::<__pthread_cond_s>() - 8usize];
     ["Offset of field: __pthread_cond_s::__wseq"]
         [::std::mem::offset_of!(__pthread_cond_s, __wseq) - 0usize];
     ["Offset of field: __pthread_cond_s::__g1_start"]
@@ -336,15 +337,15 @@ const _: () = {
 };
 impl Default for __pthread_cond_s {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for __pthread_cond_s {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for __pthread_cond_s {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write ! (f , "__pthread_cond_s {{ __wseq: {:?}, __g1_start: {:?}, __g_refs: {:?}, __g_size: {:?}, __g1_orig_size: {:?}, __wrefs: {:?}, __g_signals: {:?} }}" , self . __wseq , self . __g1_start , self . __g_refs , self . __g_size , self . __g1_orig_size , self . __wrefs , self . __g_signals)
     }
 }
@@ -358,8 +359,8 @@ pub union pthread_mutex_t {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of pthread_mutex_t"][::std::mem::size_of::<pthread_mutex_t>() - 40usize];
-    ["Alignment of pthread_mutex_t"][::std::mem::align_of::<pthread_mutex_t>() - 8usize];
+    ["Size of pthread_mutex_t"][::core::mem::size_of::<pthread_mutex_t>() - 40usize];
+    ["Alignment of pthread_mutex_t"][::core::mem::align_of::<pthread_mutex_t>() - 8usize];
     ["Offset of field: pthread_mutex_t::__data"]
         [::std::mem::offset_of!(pthread_mutex_t, __data) - 0usize];
     ["Offset of field: pthread_mutex_t::__size"]
@@ -369,15 +370,15 @@ const _: () = {
 };
 impl Default for pthread_mutex_t {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for pthread_mutex_t {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for pthread_mutex_t {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "pthread_mutex_t {{ union }}")
     }
 }
@@ -390,8 +391,8 @@ pub union pthread_cond_t {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of pthread_cond_t"][::std::mem::size_of::<pthread_cond_t>() - 48usize];
-    ["Alignment of pthread_cond_t"][::std::mem::align_of::<pthread_cond_t>() - 8usize];
+    ["Size of pthread_cond_t"][::core::mem::size_of::<pthread_cond_t>() - 48usize];
+    ["Alignment of pthread_cond_t"][::core::mem::align_of::<pthread_cond_t>() - 8usize];
     ["Offset of field: pthread_cond_t::__data"]
         [::std::mem::offset_of!(pthread_cond_t, __data) - 0usize];
     ["Offset of field: pthread_cond_t::__size"]
@@ -401,15 +402,15 @@ const _: () = {
 };
 impl Default for pthread_cond_t {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for pthread_cond_t {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for pthread_cond_t {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "pthread_cond_t {{ union }}")
     }
 }
@@ -465,8 +466,8 @@ pub struct _IO_FILE {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of _IO_FILE"][::std::mem::size_of::<_IO_FILE>() - 216usize];
-    ["Alignment of _IO_FILE"][::std::mem::align_of::<_IO_FILE>() - 8usize];
+    ["Size of _IO_FILE"][::core::mem::size_of::<_IO_FILE>() - 216usize];
+    ["Alignment of _IO_FILE"][::core::mem::align_of::<_IO_FILE>() - 8usize];
     ["Offset of field: _IO_FILE::_flags"][::std::mem::offset_of!(_IO_FILE, _flags) - 0usize];
     ["Offset of field: _IO_FILE::_IO_read_ptr"]
         [::std::mem::offset_of!(_IO_FILE, _IO_read_ptr) - 8usize];
@@ -518,9 +519,9 @@ const _: () = {
 };
 impl Default for _IO_FILE {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -535,8 +536,8 @@ pub struct __jmp_buf_tag {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of __jmp_buf_tag"][::std::mem::size_of::<__jmp_buf_tag>() - 200usize];
-    ["Alignment of __jmp_buf_tag"][::std::mem::align_of::<__jmp_buf_tag>() - 8usize];
+    ["Size of __jmp_buf_tag"][::core::mem::size_of::<__jmp_buf_tag>() - 200usize];
+    ["Alignment of __jmp_buf_tag"][::core::mem::align_of::<__jmp_buf_tag>() - 8usize];
     ["Offset of field: __jmp_buf_tag::__jmpbuf"]
         [::std::mem::offset_of!(__jmp_buf_tag, __jmpbuf) - 0usize];
     ["Offset of field: __jmp_buf_tag::__mask_was_saved"]
@@ -553,22 +554,22 @@ pub union sigval {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of sigval"][::std::mem::size_of::<sigval>() - 8usize];
-    ["Alignment of sigval"][::std::mem::align_of::<sigval>() - 8usize];
+    ["Size of sigval"][::core::mem::size_of::<sigval>() - 8usize];
+    ["Alignment of sigval"][::core::mem::align_of::<sigval>() - 8usize];
     ["Offset of field: sigval::sival_int"][::std::mem::offset_of!(sigval, sival_int) - 0usize];
     ["Offset of field: sigval::sival_ptr"][::std::mem::offset_of!(sigval, sival_ptr) - 0usize];
 };
 impl Default for sigval {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for sigval {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for sigval {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "sigval {{ union }}")
     }
 }
@@ -594,9 +595,9 @@ pub struct siginfo_t__bindgen_ty_1__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of siginfo_t__bindgen_ty_1__bindgen_ty_1"]
-        [::std::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_1>() - 8usize];
+        [::core::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_1>() - 8usize];
     ["Alignment of siginfo_t__bindgen_ty_1__bindgen_ty_1"]
-        [::std::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_1>() - 4usize];
+        [::core::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_1>() - 4usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_1::si_pid"]
         [::std::mem::offset_of!(siginfo_t__bindgen_ty_1__bindgen_ty_1, si_pid) - 0usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_1::si_uid"]
@@ -612,9 +613,9 @@ pub struct siginfo_t__bindgen_ty_1__bindgen_ty_2 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of siginfo_t__bindgen_ty_1__bindgen_ty_2"]
-        [::std::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_2>() - 16usize];
+        [::core::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_2>() - 16usize];
     ["Alignment of siginfo_t__bindgen_ty_1__bindgen_ty_2"]
-        [::std::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_2>() - 8usize];
+        [::core::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_2>() - 8usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_2::si_tid"]
         [::std::mem::offset_of!(siginfo_t__bindgen_ty_1__bindgen_ty_2, si_tid) - 0usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_2::si_overrun"]
@@ -624,15 +625,15 @@ const _: () = {
 };
 impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_2 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_2 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_2 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write ! (f , "siginfo_t__bindgen_ty_1__bindgen_ty_2 {{ si_tid: {:?}, si_overrun: {:?}, si_sigval: {:?} }}" , self . si_tid , self . si_overrun , self . si_sigval)
     }
 }
@@ -646,9 +647,9 @@ pub struct siginfo_t__bindgen_ty_1__bindgen_ty_3 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of siginfo_t__bindgen_ty_1__bindgen_ty_3"]
-        [::std::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_3>() - 16usize];
+        [::core::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_3>() - 16usize];
     ["Alignment of siginfo_t__bindgen_ty_1__bindgen_ty_3"]
-        [::std::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_3>() - 8usize];
+        [::core::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_3>() - 8usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_3::si_pid"]
         [::std::mem::offset_of!(siginfo_t__bindgen_ty_1__bindgen_ty_3, si_pid) - 0usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_3::si_uid"]
@@ -658,15 +659,15 @@ const _: () = {
 };
 impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_3 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_3 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_3 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write ! (f , "siginfo_t__bindgen_ty_1__bindgen_ty_3 {{ si_pid: {:?}, si_uid: {:?}, si_sigval: {:?} }}" , self . si_pid , self . si_uid , self . si_sigval)
     }
 }
@@ -682,9 +683,9 @@ pub struct siginfo_t__bindgen_ty_1__bindgen_ty_4 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of siginfo_t__bindgen_ty_1__bindgen_ty_4"]
-        [::std::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_4>() - 32usize];
+        [::core::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_4>() - 32usize];
     ["Alignment of siginfo_t__bindgen_ty_1__bindgen_ty_4"]
-        [::std::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_4>() - 8usize];
+        [::core::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_4>() - 8usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_4::si_pid"]
         [::std::mem::offset_of!(siginfo_t__bindgen_ty_1__bindgen_ty_4, si_pid) - 0usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_4::si_uid"]
@@ -718,19 +719,19 @@ pub struct siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1"]
-        [::std::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1>(
+        [::core::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1>(
         ) - 16usize];
     ["Alignment of siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1"]
-        [::std::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1>(
+        [::core::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1>(
         ) - 8usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1::_lower"] [:: std :: mem :: offset_of ! (siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 , _lower) - 0usize] ;
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1::_upper"] [:: std :: mem :: offset_of ! (siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 , _upper) - 8usize] ;
 };
 impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -738,9 +739,9 @@ impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1__bindgen_ty
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1"]
-        [::std::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1>() - 16usize];
+        [::core::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1>() - 16usize];
     ["Alignment of siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1"]
-        [::std::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1>() - 8usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1::_addr_bnd"][::std::mem::offset_of!(
         siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1,
         _addr_bnd
@@ -752,15 +753,15 @@ const _: () = {
 };
 impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1 {{ union }}"
@@ -770,9 +771,9 @@ impl ::std::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_5__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of siginfo_t__bindgen_ty_1__bindgen_ty_5"]
-        [::std::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5>() - 32usize];
+        [::core::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5>() - 32usize];
     ["Alignment of siginfo_t__bindgen_ty_1__bindgen_ty_5"]
-        [::std::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5>() - 8usize];
+        [::core::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_5>() - 8usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_5::si_addr"]
         [::std::mem::offset_of!(siginfo_t__bindgen_ty_1__bindgen_ty_5, si_addr) - 0usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_5::si_addr_lsb"]
@@ -782,15 +783,15 @@ const _: () = {
 };
 impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_5 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_5 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for siginfo_t__bindgen_ty_1__bindgen_ty_5 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write ! (f , "siginfo_t__bindgen_ty_1__bindgen_ty_5 {{ si_addr: {:?}, si_addr_lsb: {:?}, _bounds: {:?} }}" , self . si_addr , self . si_addr_lsb , self . _bounds)
     }
 }
@@ -803,9 +804,9 @@ pub struct siginfo_t__bindgen_ty_1__bindgen_ty_6 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of siginfo_t__bindgen_ty_1__bindgen_ty_6"]
-        [::std::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_6>() - 16usize];
+        [::core::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_6>() - 16usize];
     ["Alignment of siginfo_t__bindgen_ty_1__bindgen_ty_6"]
-        [::std::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_6>() - 8usize];
+        [::core::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_6>() - 8usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_6::si_band"]
         [::std::mem::offset_of!(siginfo_t__bindgen_ty_1__bindgen_ty_6, si_band) - 0usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_6::si_fd"]
@@ -821,9 +822,9 @@ pub struct siginfo_t__bindgen_ty_1__bindgen_ty_7 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of siginfo_t__bindgen_ty_1__bindgen_ty_7"]
-        [::std::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_7>() - 16usize];
+        [::core::mem::size_of::<siginfo_t__bindgen_ty_1__bindgen_ty_7>() - 16usize];
     ["Alignment of siginfo_t__bindgen_ty_1__bindgen_ty_7"]
-        [::std::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_7>() - 8usize];
+        [::core::mem::align_of::<siginfo_t__bindgen_ty_1__bindgen_ty_7>() - 8usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_7::_call_addr"]
         [::std::mem::offset_of!(siginfo_t__bindgen_ty_1__bindgen_ty_7, _call_addr) - 0usize];
     ["Offset of field: siginfo_t__bindgen_ty_1__bindgen_ty_7::_syscall"]
@@ -833,9 +834,9 @@ const _: () = {
 };
 impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_7 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -843,9 +844,9 @@ impl Default for siginfo_t__bindgen_ty_1__bindgen_ty_7 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of siginfo_t__bindgen_ty_1"]
-        [::std::mem::size_of::<siginfo_t__bindgen_ty_1>() - 112usize];
+        [::core::mem::size_of::<siginfo_t__bindgen_ty_1>() - 112usize];
     ["Alignment of siginfo_t__bindgen_ty_1"]
-        [::std::mem::align_of::<siginfo_t__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<siginfo_t__bindgen_ty_1>() - 8usize];
     ["Offset of field: siginfo_t__bindgen_ty_1::_pad"]
         [::std::mem::offset_of!(siginfo_t__bindgen_ty_1, _pad) - 0usize];
     ["Offset of field: siginfo_t__bindgen_ty_1::_kill"]
@@ -865,15 +866,15 @@ const _: () = {
 };
 impl Default for siginfo_t__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for siginfo_t__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for siginfo_t__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "siginfo_t__bindgen_ty_1 {{ union }}")
     }
 }
@@ -891,16 +892,16 @@ pub struct _GArray {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of _GArray"][::std::mem::size_of::<_GArray>() - 16usize];
-    ["Alignment of _GArray"][::std::mem::align_of::<_GArray>() - 8usize];
+    ["Size of _GArray"][::core::mem::size_of::<_GArray>() - 16usize];
+    ["Alignment of _GArray"][::core::mem::align_of::<_GArray>() - 8usize];
     ["Offset of field: _GArray::data"][::std::mem::offset_of!(_GArray, data) - 0usize];
     ["Offset of field: _GArray::len"][::std::mem::offset_of!(_GArray, len) - 8usize];
 };
 impl Default for _GArray {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -913,16 +914,16 @@ pub struct _GByteArray {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of _GByteArray"][::std::mem::size_of::<_GByteArray>() - 16usize];
-    ["Alignment of _GByteArray"][::std::mem::align_of::<_GByteArray>() - 8usize];
+    ["Size of _GByteArray"][::core::mem::size_of::<_GByteArray>() - 16usize];
+    ["Alignment of _GByteArray"][::core::mem::align_of::<_GByteArray>() - 8usize];
     ["Offset of field: _GByteArray::data"][::std::mem::offset_of!(_GByteArray, data) - 0usize];
     ["Offset of field: _GByteArray::len"][::std::mem::offset_of!(_GByteArray, len) - 8usize];
 };
 impl Default for _GByteArray {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -942,16 +943,16 @@ pub struct _GSList {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of _GSList"][::std::mem::size_of::<_GSList>() - 16usize];
-    ["Alignment of _GSList"][::std::mem::align_of::<_GSList>() - 8usize];
+    ["Size of _GSList"][::core::mem::size_of::<_GSList>() - 16usize];
+    ["Alignment of _GSList"][::core::mem::align_of::<_GSList>() - 8usize];
     ["Offset of field: _GSList::data"][::std::mem::offset_of!(_GSList, data) - 0usize];
     ["Offset of field: _GSList::next"][::std::mem::offset_of!(_GSList, next) - 8usize];
 };
 impl Default for _GSList {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1031,8 +1032,8 @@ pub struct QEnumLookup {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of QEnumLookup"][::std::mem::size_of::<QEnumLookup>() - 24usize];
-    ["Alignment of QEnumLookup"][::std::mem::align_of::<QEnumLookup>() - 8usize];
+    ["Size of QEnumLookup"][::core::mem::size_of::<QEnumLookup>() - 24usize];
+    ["Alignment of QEnumLookup"][::core::mem::align_of::<QEnumLookup>() - 8usize];
     ["Offset of field: QEnumLookup::array"][::std::mem::offset_of!(QEnumLookup, array) - 0usize];
     ["Offset of field: QEnumLookup::special_features"]
         [::std::mem::offset_of!(QEnumLookup, special_features) - 8usize];
@@ -1040,9 +1041,9 @@ const _: () = {
 };
 impl Default for QEnumLookup {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1058,23 +1059,23 @@ pub struct QemuMutex {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of QemuMutex"][::std::mem::size_of::<QemuMutex>() - 48usize];
-    ["Alignment of QemuMutex"][::std::mem::align_of::<QemuMutex>() - 8usize];
+    ["Size of QemuMutex"][::core::mem::size_of::<QemuMutex>() - 48usize];
+    ["Alignment of QemuMutex"][::core::mem::align_of::<QemuMutex>() - 8usize];
     ["Offset of field: QemuMutex::lock"][::std::mem::offset_of!(QemuMutex, lock) - 0usize];
     ["Offset of field: QemuMutex::initialized"]
         [::std::mem::offset_of!(QemuMutex, initialized) - 40usize];
 };
 impl Default for QemuMutex {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for QemuMutex {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for QemuMutex {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "QemuMutex {{ lock: {:?}, initialized: {:?} }}",
@@ -1090,23 +1091,23 @@ pub struct QemuCond {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of QemuCond"][::std::mem::size_of::<QemuCond>() - 56usize];
-    ["Alignment of QemuCond"][::std::mem::align_of::<QemuCond>() - 8usize];
+    ["Size of QemuCond"][::core::mem::size_of::<QemuCond>() - 56usize];
+    ["Alignment of QemuCond"][::core::mem::align_of::<QemuCond>() - 8usize];
     ["Offset of field: QemuCond::cond"][::std::mem::offset_of!(QemuCond, cond) - 0usize];
     ["Offset of field: QemuCond::initialized"]
         [::std::mem::offset_of!(QemuCond, initialized) - 48usize];
 };
 impl Default for QemuCond {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for QemuCond {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for QemuCond {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "QemuCond {{ cond: {:?}, initialized: {:?} }}",
@@ -1121,8 +1122,8 @@ pub struct QemuThread {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of QemuThread"][::std::mem::size_of::<QemuThread>() - 8usize];
-    ["Alignment of QemuThread"][::std::mem::align_of::<QemuThread>() - 8usize];
+    ["Size of QemuThread"][::core::mem::size_of::<QemuThread>() - 8usize];
+    ["Alignment of QemuThread"][::core::mem::align_of::<QemuThread>() - 8usize];
     ["Offset of field: QemuThread::thread"][::std::mem::offset_of!(QemuThread, thread) - 0usize];
 };
 #[repr(C)]
@@ -1132,8 +1133,8 @@ pub struct QemuSpin {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of QemuSpin"][::std::mem::size_of::<QemuSpin>() - 4usize];
-    ["Alignment of QemuSpin"][::std::mem::align_of::<QemuSpin>() - 4usize];
+    ["Size of QemuSpin"][::core::mem::size_of::<QemuSpin>() - 4usize];
+    ["Alignment of QemuSpin"][::core::mem::align_of::<QemuSpin>() - 4usize];
     ["Offset of field: QemuSpin::value"][::std::mem::offset_of!(QemuSpin, value) - 0usize];
 };
 #[repr(C)]
@@ -1143,8 +1144,8 @@ pub struct QemuLockCnt {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of QemuLockCnt"][::std::mem::size_of::<QemuLockCnt>() - 4usize];
-    ["Alignment of QemuLockCnt"][::std::mem::align_of::<QemuLockCnt>() - 4usize];
+    ["Size of QemuLockCnt"][::core::mem::size_of::<QemuLockCnt>() - 4usize];
+    ["Alignment of QemuLockCnt"][::core::mem::align_of::<QemuLockCnt>() - 4usize];
     ["Offset of field: QemuLockCnt::count"][::std::mem::offset_of!(QemuLockCnt, count) - 0usize];
 };
 #[repr(C)]
@@ -1156,25 +1157,25 @@ pub struct MemTxAttrs {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of MemTxAttrs"][::std::mem::size_of::<MemTxAttrs>() - 4usize];
-    ["Alignment of MemTxAttrs"][::std::mem::align_of::<MemTxAttrs>() - 4usize];
+    ["Size of MemTxAttrs"][::core::mem::size_of::<MemTxAttrs>() - 4usize];
+    ["Alignment of MemTxAttrs"][::core::mem::align_of::<MemTxAttrs>() - 4usize];
 };
 impl MemTxAttrs {
     #[inline]
     pub fn unspecified(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(0usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_unspecified(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(0usize, 1u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn unspecified_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 0usize,
                 1u8,
@@ -1184,7 +1185,7 @@ impl MemTxAttrs {
     #[inline]
     pub unsafe fn set_unspecified_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 3usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 0usize,
@@ -1195,19 +1196,19 @@ impl MemTxAttrs {
     }
     #[inline]
     pub fn secure(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(1usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_secure(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(1usize, 1u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn secure_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 1usize,
                 1u8,
@@ -1217,7 +1218,7 @@ impl MemTxAttrs {
     #[inline]
     pub unsafe fn set_secure_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 3usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 1usize,
@@ -1228,19 +1229,19 @@ impl MemTxAttrs {
     }
     #[inline]
     pub fn space(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(2usize, 2u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(2usize, 2u8) as u32) }
     }
     #[inline]
     pub fn set_space(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(2usize, 2u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn space_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 2usize,
                 2u8,
@@ -1250,7 +1251,7 @@ impl MemTxAttrs {
     #[inline]
     pub unsafe fn set_space_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 3usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 2usize,
@@ -1261,19 +1262,19 @@ impl MemTxAttrs {
     }
     #[inline]
     pub fn user(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(4usize, 1u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(4usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_user(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(4usize, 1u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn user_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 4usize,
                 1u8,
@@ -1283,7 +1284,7 @@ impl MemTxAttrs {
     #[inline]
     pub unsafe fn set_user_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 3usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 4usize,
@@ -1294,19 +1295,19 @@ impl MemTxAttrs {
     }
     #[inline]
     pub fn memory(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(5usize, 1u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(5usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_memory(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(5usize, 1u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn memory_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 5usize,
                 1u8,
@@ -1316,7 +1317,7 @@ impl MemTxAttrs {
     #[inline]
     pub unsafe fn set_memory_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 3usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 5usize,
@@ -1327,19 +1328,19 @@ impl MemTxAttrs {
     }
     #[inline]
     pub fn requester_id(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(6usize, 16u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(6usize, 16u8) as u32) }
     }
     #[inline]
     pub fn set_requester_id(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(6usize, 16u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn requester_id_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 6usize,
                 16u8,
@@ -1349,7 +1350,7 @@ impl MemTxAttrs {
     #[inline]
     pub unsafe fn set_requester_id_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 3usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 6usize,
@@ -1369,27 +1370,27 @@ impl MemTxAttrs {
     ) -> __BindgenBitfieldUnit<[u8; 3usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 3usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
-            let unspecified: u32 = unsafe { ::std::mem::transmute(unspecified) };
+            let unspecified: u32 = unsafe { ::core::mem::transmute(unspecified) };
             unspecified as u64
         });
         __bindgen_bitfield_unit.set(1usize, 1u8, {
-            let secure: u32 = unsafe { ::std::mem::transmute(secure) };
+            let secure: u32 = unsafe { ::core::mem::transmute(secure) };
             secure as u64
         });
         __bindgen_bitfield_unit.set(2usize, 2u8, {
-            let space: u32 = unsafe { ::std::mem::transmute(space) };
+            let space: u32 = unsafe { ::core::mem::transmute(space) };
             space as u64
         });
         __bindgen_bitfield_unit.set(4usize, 1u8, {
-            let user: u32 = unsafe { ::std::mem::transmute(user) };
+            let user: u32 = unsafe { ::core::mem::transmute(user) };
             user as u64
         });
         __bindgen_bitfield_unit.set(5usize, 1u8, {
-            let memory: u32 = unsafe { ::std::mem::transmute(memory) };
+            let memory: u32 = unsafe { ::core::mem::transmute(memory) };
             memory as u64
         });
         __bindgen_bitfield_unit.set(6usize, 16u8, {
-            let requester_id: u32 = unsafe { ::std::mem::transmute(requester_id) };
+            let requester_id: u32 = unsafe { ::core::mem::transmute(requester_id) };
             requester_id as u64
         });
         __bindgen_bitfield_unit
@@ -1403,8 +1404,8 @@ pub struct QTailQLink {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of QTailQLink"][::std::mem::size_of::<QTailQLink>() - 16usize];
-    ["Alignment of QTailQLink"][::std::mem::align_of::<QTailQLink>() - 8usize];
+    ["Size of QTailQLink"][::core::mem::size_of::<QTailQLink>() - 16usize];
+    ["Alignment of QTailQLink"][::core::mem::align_of::<QTailQLink>() - 8usize];
     ["Offset of field: QTailQLink::tql_next"]
         [::std::mem::offset_of!(QTailQLink, tql_next) - 0usize];
     ["Offset of field: QTailQLink::tql_prev"]
@@ -1412,9 +1413,9 @@ const _: () = {
 };
 impl Default for QTailQLink {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1422,7 +1423,7 @@ impl Default for QTailQLink {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Notifier {
-    pub notify: ::std::option::Option<
+    pub notify: ::core::option::Option<
         unsafe extern "C" fn(notifier: *mut Notifier, data: *mut ::std::os::raw::c_void),
     >,
     pub node: Notifier__bindgen_ty_1,
@@ -1435,9 +1436,9 @@ pub struct Notifier__bindgen_ty_1 {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of Notifier__bindgen_ty_1"][::std::mem::size_of::<Notifier__bindgen_ty_1>() - 16usize];
+    ["Size of Notifier__bindgen_ty_1"][::core::mem::size_of::<Notifier__bindgen_ty_1>() - 16usize];
     ["Alignment of Notifier__bindgen_ty_1"]
-        [::std::mem::align_of::<Notifier__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<Notifier__bindgen_ty_1>() - 8usize];
     ["Offset of field: Notifier__bindgen_ty_1::le_next"]
         [::std::mem::offset_of!(Notifier__bindgen_ty_1, le_next) - 0usize];
     ["Offset of field: Notifier__bindgen_ty_1::le_prev"]
@@ -1445,30 +1446,30 @@ const _: () = {
 };
 impl Default for Notifier__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of Notifier"][::std::mem::size_of::<Notifier>() - 24usize];
-    ["Alignment of Notifier"][::std::mem::align_of::<Notifier>() - 8usize];
+    ["Size of Notifier"][::core::mem::size_of::<Notifier>() - 24usize];
+    ["Alignment of Notifier"][::core::mem::align_of::<Notifier>() - 8usize];
     ["Offset of field: Notifier::notify"][::std::mem::offset_of!(Notifier, notify) - 0usize];
     ["Offset of field: Notifier::node"][::std::mem::offset_of!(Notifier, node) - 8usize];
 };
 impl Default for Notifier {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-pub type RCUCBFunc = ::std::option::Option<unsafe extern "C" fn(head: *mut rcu_head)>;
+pub type RCUCBFunc = ::core::option::Option<unsafe extern "C" fn(head: *mut rcu_head)>;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct rcu_head {
@@ -1477,16 +1478,16 @@ pub struct rcu_head {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of rcu_head"][::std::mem::size_of::<rcu_head>() - 16usize];
-    ["Alignment of rcu_head"][::std::mem::align_of::<rcu_head>() - 8usize];
+    ["Size of rcu_head"][::core::mem::size_of::<rcu_head>() - 16usize];
+    ["Alignment of rcu_head"][::core::mem::align_of::<rcu_head>() - 8usize];
     ["Offset of field: rcu_head::next"][::std::mem::offset_of!(rcu_head, next) - 0usize];
     ["Offset of field: rcu_head::func"][::std::mem::offset_of!(rcu_head, func) - 8usize];
 };
 impl Default for rcu_head {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1498,7 +1499,7 @@ pub struct TypeImpl {
 }
 pub type Type = *mut TypeImpl;
 #[doc = " typedef ObjectPropertyAccessor:\n @obj: the object that owns the property\n @v: the visitor that contains the property data\n @name: the name of the property\n @opaque: the object property opaque\n @errp: a pointer to an Error that is filled if getting/setting fails.\n\n Called when trying to get/set a property."]
-pub type ObjectPropertyAccessor = ::std::option::Option<
+pub type ObjectPropertyAccessor = ::core::option::Option<
     unsafe extern "C" fn(
         obj: *mut Object,
         v: *mut Visitor,
@@ -1508,7 +1509,7 @@ pub type ObjectPropertyAccessor = ::std::option::Option<
     ),
 >;
 #[doc = " typedef ObjectPropertyResolve:\n @obj: the object that owns the property\n @opaque: the opaque registered with the property\n @part: the name of the property\n\n Resolves the #Object corresponding to property @part.\n\n The returned object can also be used as a starting point\n to resolve a relative path starting with \"@part\".\n\n Returns: If @path is the path that led to @obj, the function\n returns the #Object corresponding to \"@path/@part\".\n If \"@path/@part\" is not a valid object path, it returns #NULL."]
-pub type ObjectPropertyResolve = ::std::option::Option<
+pub type ObjectPropertyResolve = ::core::option::Option<
     unsafe extern "C" fn(
         obj: *mut Object,
         opaque: *mut ::std::os::raw::c_void,
@@ -1516,7 +1517,7 @@ pub type ObjectPropertyResolve = ::std::option::Option<
     ) -> *mut Object,
 >;
 #[doc = " typedef ObjectPropertyRelease:\n @obj: the object that owns the property\n @name: the name of the property\n @opaque: the opaque registered with the property\n\n Called when a property is removed from a object."]
-pub type ObjectPropertyRelease = ::std::option::Option<
+pub type ObjectPropertyRelease = ::core::option::Option<
     unsafe extern "C" fn(
         obj: *mut Object,
         name: *const ::std::os::raw::c_char,
@@ -1525,7 +1526,7 @@ pub type ObjectPropertyRelease = ::std::option::Option<
 >;
 #[doc = " typedef ObjectPropertyInit:\n @obj: the object that owns the property\n @prop: the property to set\n\n Called when a property is initialized."]
 pub type ObjectPropertyInit =
-    ::std::option::Option<unsafe extern "C" fn(obj: *mut Object, prop: *mut ObjectProperty)>;
+    ::core::option::Option<unsafe extern "C" fn(obj: *mut Object, prop: *mut ObjectProperty)>;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct ObjectProperty {
@@ -1542,8 +1543,8 @@ pub struct ObjectProperty {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ObjectProperty"][::std::mem::size_of::<ObjectProperty>() - 80usize];
-    ["Alignment of ObjectProperty"][::std::mem::align_of::<ObjectProperty>() - 8usize];
+    ["Size of ObjectProperty"][::core::mem::size_of::<ObjectProperty>() - 80usize];
+    ["Alignment of ObjectProperty"][::core::mem::align_of::<ObjectProperty>() - 8usize];
     ["Offset of field: ObjectProperty::name"]
         [::std::mem::offset_of!(ObjectProperty, name) - 0usize];
     ["Offset of field: ObjectProperty::type_"]
@@ -1565,17 +1566,18 @@ const _: () = {
 };
 impl Default for ObjectProperty {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
 #[doc = " typedef ObjectUnparent:\n @obj: the object that is being removed from the composition tree\n\n Called when an object is being removed from the QOM composition tree.\n The function should remove any backlinks from children objects to @obj."]
-pub type ObjectUnparent = ::std::option::Option<unsafe extern "C" fn(obj: *mut Object)>;
+pub type ObjectUnparent = ::core::option::Option<unsafe extern "C" fn(obj: *mut Object)>;
 #[doc = " typedef ObjectFree:\n @obj: the object being freed\n\n Called when an object's last reference is removed."]
-pub type ObjectFree = ::std::option::Option<unsafe extern "C" fn(obj: *mut ::std::os::raw::c_void)>;
+pub type ObjectFree =
+    ::core::option::Option<unsafe extern "C" fn(obj: *mut ::std::os::raw::c_void)>;
 #[doc = " struct ObjectClass:\n\n The base for all classes.  The only thing that #ObjectClass contains is an\n integer type handle."]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -1589,8 +1591,8 @@ pub struct ObjectClass {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ObjectClass"][::std::mem::size_of::<ObjectClass>() - 96usize];
-    ["Alignment of ObjectClass"][::std::mem::align_of::<ObjectClass>() - 8usize];
+    ["Size of ObjectClass"][::core::mem::size_of::<ObjectClass>() - 96usize];
+    ["Alignment of ObjectClass"][::core::mem::align_of::<ObjectClass>() - 8usize];
     ["Offset of field: ObjectClass::type_"][::std::mem::offset_of!(ObjectClass, type_) - 0usize];
     ["Offset of field: ObjectClass::interfaces"]
         [::std::mem::offset_of!(ObjectClass, interfaces) - 8usize];
@@ -1605,9 +1607,9 @@ const _: () = {
 };
 impl Default for ObjectClass {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1624,8 +1626,8 @@ pub struct Object {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of Object"][::std::mem::size_of::<Object>() - 40usize];
-    ["Alignment of Object"][::std::mem::align_of::<Object>() - 8usize];
+    ["Size of Object"][::core::mem::size_of::<Object>() - 40usize];
+    ["Alignment of Object"][::core::mem::align_of::<Object>() - 8usize];
     ["Offset of field: Object::class"][::std::mem::offset_of!(Object, class) - 0usize];
     ["Offset of field: Object::free"][::std::mem::offset_of!(Object, free) - 8usize];
     ["Offset of field: Object::properties"][::std::mem::offset_of!(Object, properties) - 16usize];
@@ -1634,9 +1636,9 @@ const _: () = {
 };
 impl Default for Object {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1656,8 +1658,8 @@ pub struct ResettableState {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ResettableState"][::std::mem::size_of::<ResettableState>() - 8usize];
-    ["Alignment of ResettableState"][::std::mem::align_of::<ResettableState>() - 4usize];
+    ["Size of ResettableState"][::core::mem::size_of::<ResettableState>() - 8usize];
+    ["Alignment of ResettableState"][::core::mem::align_of::<ResettableState>() - 4usize];
     ["Offset of field: ResettableState::count"]
         [::std::mem::offset_of!(ResettableState, count) - 0usize];
     ["Offset of field: ResettableState::hold_phase_pending"]
@@ -1666,9 +1668,9 @@ const _: () = {
         [::std::mem::offset_of!(ResettableState, exit_phase_in_progress) - 5usize];
 };
 pub type DeviceRealize =
-    ::std::option::Option<unsafe extern "C" fn(dev: *mut DeviceState, errp: *mut *mut Error)>;
-pub type DeviceUnrealize = ::std::option::Option<unsafe extern "C" fn(dev: *mut DeviceState)>;
-pub type DeviceReset = ::std::option::Option<unsafe extern "C" fn(dev: *mut DeviceState)>;
+    ::core::option::Option<unsafe extern "C" fn(dev: *mut DeviceState, errp: *mut *mut Error)>;
+pub type DeviceUnrealize = ::core::option::Option<unsafe extern "C" fn(dev: *mut DeviceState)>;
+pub type DeviceReset = ::core::option::Option<unsafe extern "C" fn(dev: *mut DeviceState)>;
 #[doc = " struct DeviceClass - The base class for all devices.\n @props: Properties accessing state fields.\n @realize: Callback function invoked when the #DeviceState:realized\n property is changed to %true.\n @unrealize: Callback function invoked when the #DeviceState:realized\n property is changed to %false.\n @hotpluggable: indicates if #DeviceClass is hotpluggable, available\n as readonly \"hotpluggable\" property of #DeviceState instance\n"]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -1696,8 +1698,8 @@ pub struct DeviceClass {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of DeviceClass"][::std::mem::size_of::<DeviceClass>() - 176usize];
-    ["Alignment of DeviceClass"][::std::mem::align_of::<DeviceClass>() - 8usize];
+    ["Size of DeviceClass"][::core::mem::size_of::<DeviceClass>() - 176usize];
+    ["Alignment of DeviceClass"][::core::mem::align_of::<DeviceClass>() - 8usize];
     ["Offset of field: DeviceClass::parent_class"]
         [::std::mem::offset_of!(DeviceClass, parent_class) - 0usize];
     ["Offset of field: DeviceClass::categories"]
@@ -1722,9 +1724,9 @@ const _: () = {
 };
 impl Default for DeviceClass {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1747,9 +1749,9 @@ pub struct NamedGPIOList__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of NamedGPIOList__bindgen_ty_1"]
-        [::std::mem::size_of::<NamedGPIOList__bindgen_ty_1>() - 16usize];
+        [::core::mem::size_of::<NamedGPIOList__bindgen_ty_1>() - 16usize];
     ["Alignment of NamedGPIOList__bindgen_ty_1"]
-        [::std::mem::align_of::<NamedGPIOList__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<NamedGPIOList__bindgen_ty_1>() - 8usize];
     ["Offset of field: NamedGPIOList__bindgen_ty_1::le_next"]
         [::std::mem::offset_of!(NamedGPIOList__bindgen_ty_1, le_next) - 0usize];
     ["Offset of field: NamedGPIOList__bindgen_ty_1::le_prev"]
@@ -1757,17 +1759,17 @@ const _: () = {
 };
 impl Default for NamedGPIOList__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of NamedGPIOList"][::std::mem::size_of::<NamedGPIOList>() - 40usize];
-    ["Alignment of NamedGPIOList"][::std::mem::align_of::<NamedGPIOList>() - 8usize];
+    ["Size of NamedGPIOList"][::core::mem::size_of::<NamedGPIOList>() - 40usize];
+    ["Alignment of NamedGPIOList"][::core::mem::align_of::<NamedGPIOList>() - 8usize];
     ["Offset of field: NamedGPIOList::name"][::std::mem::offset_of!(NamedGPIOList, name) - 0usize];
     ["Offset of field: NamedGPIOList::in_"][::std::mem::offset_of!(NamedGPIOList, in_) - 8usize];
     ["Offset of field: NamedGPIOList::num_in"]
@@ -1778,9 +1780,9 @@ const _: () = {
 };
 impl Default for NamedGPIOList {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1803,9 +1805,9 @@ pub struct NamedClockList__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of NamedClockList__bindgen_ty_1"]
-        [::std::mem::size_of::<NamedClockList__bindgen_ty_1>() - 16usize];
+        [::core::mem::size_of::<NamedClockList__bindgen_ty_1>() - 16usize];
     ["Alignment of NamedClockList__bindgen_ty_1"]
-        [::std::mem::align_of::<NamedClockList__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<NamedClockList__bindgen_ty_1>() - 8usize];
     ["Offset of field: NamedClockList__bindgen_ty_1::le_next"]
         [::std::mem::offset_of!(NamedClockList__bindgen_ty_1, le_next) - 0usize];
     ["Offset of field: NamedClockList__bindgen_ty_1::le_prev"]
@@ -1813,17 +1815,17 @@ const _: () = {
 };
 impl Default for NamedClockList__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of NamedClockList"][::std::mem::size_of::<NamedClockList>() - 40usize];
-    ["Alignment of NamedClockList"][::std::mem::align_of::<NamedClockList>() - 8usize];
+    ["Size of NamedClockList"][::core::mem::size_of::<NamedClockList>() - 40usize];
+    ["Alignment of NamedClockList"][::core::mem::align_of::<NamedClockList>() - 8usize];
     ["Offset of field: NamedClockList::name"]
         [::std::mem::offset_of!(NamedClockList, name) - 0usize];
     ["Offset of field: NamedClockList::clock"]
@@ -1837,9 +1839,9 @@ const _: () = {
 };
 impl Default for NamedClockList {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1851,8 +1853,8 @@ pub struct MemReentrancyGuard {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of MemReentrancyGuard"][::std::mem::size_of::<MemReentrancyGuard>() - 1usize];
-    ["Alignment of MemReentrancyGuard"][::std::mem::align_of::<MemReentrancyGuard>() - 1usize];
+    ["Size of MemReentrancyGuard"][::core::mem::size_of::<MemReentrancyGuard>() - 1usize];
+    ["Alignment of MemReentrancyGuard"][::core::mem::align_of::<MemReentrancyGuard>() - 1usize];
     ["Offset of field: MemReentrancyGuard::engaged_in_io"]
         [::std::mem::offset_of!(MemReentrancyGuard, engaged_in_io) - 0usize];
 };
@@ -1863,16 +1865,16 @@ pub struct NamedGPIOListHead {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of NamedGPIOListHead"][::std::mem::size_of::<NamedGPIOListHead>() - 8usize];
-    ["Alignment of NamedGPIOListHead"][::std::mem::align_of::<NamedGPIOListHead>() - 8usize];
+    ["Size of NamedGPIOListHead"][::core::mem::size_of::<NamedGPIOListHead>() - 8usize];
+    ["Alignment of NamedGPIOListHead"][::core::mem::align_of::<NamedGPIOListHead>() - 8usize];
     ["Offset of field: NamedGPIOListHead::lh_first"]
         [::std::mem::offset_of!(NamedGPIOListHead, lh_first) - 0usize];
 };
 impl Default for NamedGPIOListHead {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1884,16 +1886,16 @@ pub struct NamedClockListHead {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of NamedClockListHead"][::std::mem::size_of::<NamedClockListHead>() - 8usize];
-    ["Alignment of NamedClockListHead"][::std::mem::align_of::<NamedClockListHead>() - 8usize];
+    ["Size of NamedClockListHead"][::core::mem::size_of::<NamedClockListHead>() - 8usize];
+    ["Alignment of NamedClockListHead"][::core::mem::align_of::<NamedClockListHead>() - 8usize];
     ["Offset of field: NamedClockListHead::lh_first"]
         [::std::mem::offset_of!(NamedClockListHead, lh_first) - 0usize];
 };
 impl Default for NamedClockListHead {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1905,16 +1907,16 @@ pub struct BusStateHead {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of BusStateHead"][::std::mem::size_of::<BusStateHead>() - 8usize];
-    ["Alignment of BusStateHead"][::std::mem::align_of::<BusStateHead>() - 8usize];
+    ["Size of BusStateHead"][::core::mem::size_of::<BusStateHead>() - 8usize];
+    ["Alignment of BusStateHead"][::core::mem::align_of::<BusStateHead>() - 8usize];
     ["Offset of field: BusStateHead::lh_first"]
         [::std::mem::offset_of!(BusStateHead, lh_first) - 0usize];
 };
 impl Default for BusStateHead {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -1963,8 +1965,8 @@ pub struct DeviceState {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of DeviceState"][::std::mem::size_of::<DeviceState>() - 160usize];
-    ["Alignment of DeviceState"][::std::mem::align_of::<DeviceState>() - 8usize];
+    ["Size of DeviceState"][::core::mem::size_of::<DeviceState>() - 160usize];
+    ["Alignment of DeviceState"][::core::mem::align_of::<DeviceState>() - 8usize];
     ["Offset of field: DeviceState::parent_obj"]
         [::std::mem::offset_of!(DeviceState, parent_obj) - 0usize];
     ["Offset of field: DeviceState::id"][::std::mem::offset_of!(DeviceState, id) - 40usize];
@@ -2002,9 +2004,9 @@ const _: () = {
 };
 impl Default for DeviceState {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -2025,9 +2027,9 @@ pub union BusChild__bindgen_ty_1 {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of BusChild__bindgen_ty_1"][::std::mem::size_of::<BusChild__bindgen_ty_1>() - 16usize];
+    ["Size of BusChild__bindgen_ty_1"][::core::mem::size_of::<BusChild__bindgen_ty_1>() - 16usize];
     ["Alignment of BusChild__bindgen_ty_1"]
-        [::std::mem::align_of::<BusChild__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<BusChild__bindgen_ty_1>() - 8usize];
     ["Offset of field: BusChild__bindgen_ty_1::tqe_next"]
         [::std::mem::offset_of!(BusChild__bindgen_ty_1, tqe_next) - 0usize];
     ["Offset of field: BusChild__bindgen_ty_1::tqe_circ"]
@@ -2035,22 +2037,22 @@ const _: () = {
 };
 impl Default for BusChild__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for BusChild__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for BusChild__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "BusChild__bindgen_ty_1 {{ union }}")
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of BusChild"][::std::mem::size_of::<BusChild>() - 48usize];
-    ["Alignment of BusChild"][::std::mem::align_of::<BusChild>() - 8usize];
+    ["Size of BusChild"][::core::mem::size_of::<BusChild>() - 48usize];
+    ["Alignment of BusChild"][::core::mem::align_of::<BusChild>() - 8usize];
     ["Offset of field: BusChild::rcu"][::std::mem::offset_of!(BusChild, rcu) - 0usize];
     ["Offset of field: BusChild::child"][::std::mem::offset_of!(BusChild, child) - 16usize];
     ["Offset of field: BusChild::index"][::std::mem::offset_of!(BusChild, index) - 24usize];
@@ -2058,15 +2060,15 @@ const _: () = {
 };
 impl Default for BusChild {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for BusChild {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for BusChild {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "BusChild {{ rcu: {:?}, child: {:?}, index: {:?}, sibling: {:?} }}",
@@ -2082,8 +2084,8 @@ pub union BusChildHead {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of BusChildHead"][::std::mem::size_of::<BusChildHead>() - 16usize];
-    ["Alignment of BusChildHead"][::std::mem::align_of::<BusChildHead>() - 8usize];
+    ["Size of BusChildHead"][::core::mem::size_of::<BusChildHead>() - 16usize];
+    ["Alignment of BusChildHead"][::core::mem::align_of::<BusChildHead>() - 8usize];
     ["Offset of field: BusChildHead::tqh_first"]
         [::std::mem::offset_of!(BusChildHead, tqh_first) - 0usize];
     ["Offset of field: BusChildHead::tqh_circ"]
@@ -2091,15 +2093,15 @@ const _: () = {
 };
 impl Default for BusChildHead {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for BusChildHead {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for BusChildHead {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "BusChildHead {{ union }}")
     }
 }
@@ -2111,8 +2113,8 @@ pub struct BusStateEntry {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of BusStateEntry"][::std::mem::size_of::<BusStateEntry>() - 16usize];
-    ["Alignment of BusStateEntry"][::std::mem::align_of::<BusStateEntry>() - 8usize];
+    ["Size of BusStateEntry"][::core::mem::size_of::<BusStateEntry>() - 16usize];
+    ["Alignment of BusStateEntry"][::core::mem::align_of::<BusStateEntry>() - 8usize];
     ["Offset of field: BusStateEntry::le_next"]
         [::std::mem::offset_of!(BusStateEntry, le_next) - 0usize];
     ["Offset of field: BusStateEntry::le_prev"]
@@ -2120,9 +2122,9 @@ const _: () = {
 };
 impl Default for BusStateEntry {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -2148,8 +2150,8 @@ pub struct BusState {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of BusState"][::std::mem::size_of::<BusState>() - 120usize];
-    ["Alignment of BusState"][::std::mem::align_of::<BusState>() - 8usize];
+    ["Size of BusState"][::core::mem::size_of::<BusState>() - 120usize];
+    ["Alignment of BusState"][::core::mem::align_of::<BusState>() - 8usize];
     ["Offset of field: BusState::obj"][::std::mem::offset_of!(BusState, obj) - 0usize];
     ["Offset of field: BusState::parent"][::std::mem::offset_of!(BusState, parent) - 40usize];
     ["Offset of field: BusState::name"][::std::mem::offset_of!(BusState, name) - 48usize];
@@ -2166,15 +2168,15 @@ const _: () = {
 };
 impl Default for BusState {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for BusState {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for BusState {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write ! (f , "BusState {{ obj: {:?}, parent: {:?}, name: {:?}, hotplug_handler: {:?}, max_index: {:?}, realized: {:?}, full: {:?}, num_children: {:?}, children: {:?}, sibling: {:?}, reset: {:?} }}" , self . obj , self . parent , self . name , self . hotplug_handler , self . max_index , self . realized , self . full , self . num_children , self . children , self . sibling , self . reset)
     }
 }
@@ -2197,27 +2199,27 @@ pub const bfd_flavour_bfd_target_os9k_flavour: bfd_flavour = bfd_flavour(12);
 pub const bfd_flavour_bfd_target_versados_flavour: bfd_flavour = bfd_flavour(13);
 pub const bfd_flavour_bfd_target_msdos_flavour: bfd_flavour = bfd_flavour(14);
 pub const bfd_flavour_bfd_target_evax_flavour: bfd_flavour = bfd_flavour(15);
-impl ::std::ops::BitOr<bfd_flavour> for bfd_flavour {
+impl ::core::ops::BitOr<bfd_flavour> for bfd_flavour {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         bfd_flavour(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for bfd_flavour {
+impl ::core::ops::BitOrAssign for bfd_flavour {
     #[inline]
     fn bitor_assign(&mut self, rhs: bfd_flavour) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<bfd_flavour> for bfd_flavour {
+impl ::core::ops::BitAnd<bfd_flavour> for bfd_flavour {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         bfd_flavour(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for bfd_flavour {
+impl ::core::ops::BitAndAssign for bfd_flavour {
     #[inline]
     fn bitand_assign(&mut self, rhs: bfd_flavour) {
         self.0 &= rhs.0;
@@ -2229,27 +2231,27 @@ pub struct bfd_flavour(pub ::std::os::raw::c_uint);
 pub const bfd_endian_BFD_ENDIAN_BIG: bfd_endian = bfd_endian(0);
 pub const bfd_endian_BFD_ENDIAN_LITTLE: bfd_endian = bfd_endian(1);
 pub const bfd_endian_BFD_ENDIAN_UNKNOWN: bfd_endian = bfd_endian(2);
-impl ::std::ops::BitOr<bfd_endian> for bfd_endian {
+impl ::core::ops::BitOr<bfd_endian> for bfd_endian {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         bfd_endian(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for bfd_endian {
+impl ::core::ops::BitOrAssign for bfd_endian {
     #[inline]
     fn bitor_assign(&mut self, rhs: bfd_endian) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<bfd_endian> for bfd_endian {
+impl ::core::ops::BitAnd<bfd_endian> for bfd_endian {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         bfd_endian(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for bfd_endian {
+impl ::core::ops::BitAndAssign for bfd_endian {
     #[inline]
     fn bitand_assign(&mut self, rhs: bfd_endian) {
         self.0 &= rhs.0;
@@ -2301,27 +2303,27 @@ pub const bfd_architecture_bfd_arch_ia64: bfd_architecture = bfd_architecture(39
 pub const bfd_architecture_bfd_arch_rx: bfd_architecture = bfd_architecture(40);
 pub const bfd_architecture_bfd_arch_loongarch: bfd_architecture = bfd_architecture(41);
 pub const bfd_architecture_bfd_arch_last: bfd_architecture = bfd_architecture(42);
-impl ::std::ops::BitOr<bfd_architecture> for bfd_architecture {
+impl ::core::ops::BitOr<bfd_architecture> for bfd_architecture {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         bfd_architecture(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for bfd_architecture {
+impl ::core::ops::BitOrAssign for bfd_architecture {
     #[inline]
     fn bitor_assign(&mut self, rhs: bfd_architecture) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<bfd_architecture> for bfd_architecture {
+impl ::core::ops::BitAnd<bfd_architecture> for bfd_architecture {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         bfd_architecture(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for bfd_architecture {
+impl ::core::ops::BitAndAssign for bfd_architecture {
     #[inline]
     fn bitand_assign(&mut self, rhs: bfd_architecture) {
         self.0 &= rhs.0;
@@ -2345,9 +2347,9 @@ pub union symbol_cache_entry__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of symbol_cache_entry__bindgen_ty_1"]
-        [::std::mem::size_of::<symbol_cache_entry__bindgen_ty_1>() - 8usize];
+        [::core::mem::size_of::<symbol_cache_entry__bindgen_ty_1>() - 8usize];
     ["Alignment of symbol_cache_entry__bindgen_ty_1"]
-        [::std::mem::align_of::<symbol_cache_entry__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<symbol_cache_entry__bindgen_ty_1>() - 8usize];
     ["Offset of field: symbol_cache_entry__bindgen_ty_1::p"]
         [::std::mem::offset_of!(symbol_cache_entry__bindgen_ty_1, p) - 0usize];
     ["Offset of field: symbol_cache_entry__bindgen_ty_1::i"]
@@ -2355,22 +2357,22 @@ const _: () = {
 };
 impl Default for symbol_cache_entry__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for symbol_cache_entry__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for symbol_cache_entry__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "symbol_cache_entry__bindgen_ty_1 {{ union }}")
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of symbol_cache_entry"][::std::mem::size_of::<symbol_cache_entry>() - 16usize];
-    ["Alignment of symbol_cache_entry"][::std::mem::align_of::<symbol_cache_entry>() - 8usize];
+    ["Size of symbol_cache_entry"][::core::mem::size_of::<symbol_cache_entry>() - 16usize];
+    ["Alignment of symbol_cache_entry"][::core::mem::align_of::<symbol_cache_entry>() - 8usize];
     ["Offset of field: symbol_cache_entry::name"]
         [::std::mem::offset_of!(symbol_cache_entry, name) - 0usize];
     ["Offset of field: symbol_cache_entry::udata"]
@@ -2378,15 +2380,15 @@ const _: () = {
 };
 impl Default for symbol_cache_entry {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for symbol_cache_entry {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for symbol_cache_entry {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "symbol_cache_entry {{ name: {:?}, udata: {:?} }}",
@@ -2395,7 +2397,7 @@ impl ::std::fmt::Debug for symbol_cache_entry {
     }
 }
 pub type asymbol = symbol_cache_entry;
-pub type fprintf_function = ::std::option::Option<
+pub type fprintf_function = ::core::option::Option<
     unsafe extern "C" fn(
         f: *mut FILE,
         fmt: *const ::std::os::raw::c_char,
@@ -2410,27 +2412,27 @@ pub const dis_insn_type_dis_jsr: dis_insn_type = dis_insn_type(4);
 pub const dis_insn_type_dis_condjsr: dis_insn_type = dis_insn_type(5);
 pub const dis_insn_type_dis_dref: dis_insn_type = dis_insn_type(6);
 pub const dis_insn_type_dis_dref2: dis_insn_type = dis_insn_type(7);
-impl ::std::ops::BitOr<dis_insn_type> for dis_insn_type {
+impl ::core::ops::BitOr<dis_insn_type> for dis_insn_type {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         dis_insn_type(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for dis_insn_type {
+impl ::core::ops::BitOrAssign for dis_insn_type {
     #[inline]
     fn bitor_assign(&mut self, rhs: dis_insn_type) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<dis_insn_type> for dis_insn_type {
+impl ::core::ops::BitAnd<dis_insn_type> for dis_insn_type {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         dis_insn_type(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for dis_insn_type {
+impl ::core::ops::BitAndAssign for dis_insn_type {
     #[inline]
     fn bitand_assign(&mut self, rhs: dis_insn_type) {
         self.0 &= rhs.0;
@@ -2453,7 +2455,7 @@ pub struct disassemble_info {
     pub num_symbols: ::std::os::raw::c_int,
     pub flags: ::std::os::raw::c_ulong,
     pub private_data: PTR,
-    pub read_memory_func: ::std::option::Option<
+    pub read_memory_func: ::core::option::Option<
         unsafe extern "C" fn(
             memaddr: bfd_vma,
             myaddr: *mut bfd_byte,
@@ -2461,7 +2463,7 @@ pub struct disassemble_info {
             info: *mut disassemble_info,
         ) -> ::std::os::raw::c_int,
     >,
-    pub memory_error_func: ::std::option::Option<
+    pub memory_error_func: ::core::option::Option<
         unsafe extern "C" fn(
             status: ::std::os::raw::c_int,
             memaddr: bfd_vma,
@@ -2469,11 +2471,11 @@ pub struct disassemble_info {
         ),
     >,
     pub print_address_func:
-        ::std::option::Option<unsafe extern "C" fn(addr: bfd_vma, info: *mut disassemble_info)>,
-    pub print_insn: ::std::option::Option<
+        ::core::option::Option<unsafe extern "C" fn(addr: bfd_vma, info: *mut disassemble_info)>,
+    pub print_insn: ::core::option::Option<
         unsafe extern "C" fn(addr: bfd_vma, info: *mut disassemble_info) -> ::std::os::raw::c_int,
     >,
-    pub symbol_at_address_func: ::std::option::Option<
+    pub symbol_at_address_func: ::core::option::Option<
         unsafe extern "C" fn(addr: bfd_vma, info: *mut disassemble_info) -> ::std::os::raw::c_int,
     >,
     pub buffer: *const bfd_byte,
@@ -2498,8 +2500,8 @@ pub struct disassemble_info {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of disassemble_info"][::std::mem::size_of::<disassemble_info>() - 216usize];
-    ["Alignment of disassemble_info"][::std::mem::align_of::<disassemble_info>() - 8usize];
+    ["Size of disassemble_info"][::core::mem::size_of::<disassemble_info>() - 216usize];
+    ["Alignment of disassemble_info"][::core::mem::align_of::<disassemble_info>() - 8usize];
     ["Offset of field: disassemble_info::fprintf_func"]
         [::std::mem::offset_of!(disassemble_info, fprintf_func) - 0usize];
     ["Offset of field: disassemble_info::stream"]
@@ -2573,9 +2575,9 @@ const _: () = {
 };
 impl Default for disassemble_info {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -2598,9 +2600,9 @@ pub union CPUBreakpoint__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of CPUBreakpoint__bindgen_ty_1"]
-        [::std::mem::size_of::<CPUBreakpoint__bindgen_ty_1>() - 16usize];
+        [::core::mem::size_of::<CPUBreakpoint__bindgen_ty_1>() - 16usize];
     ["Alignment of CPUBreakpoint__bindgen_ty_1"]
-        [::std::mem::align_of::<CPUBreakpoint__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<CPUBreakpoint__bindgen_ty_1>() - 8usize];
     ["Offset of field: CPUBreakpoint__bindgen_ty_1::tqe_next"]
         [::std::mem::offset_of!(CPUBreakpoint__bindgen_ty_1, tqe_next) - 0usize];
     ["Offset of field: CPUBreakpoint__bindgen_ty_1::tqe_circ"]
@@ -2608,22 +2610,22 @@ const _: () = {
 };
 impl Default for CPUBreakpoint__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUBreakpoint__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUBreakpoint__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "CPUBreakpoint__bindgen_ty_1 {{ union }}")
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUBreakpoint"][::std::mem::size_of::<CPUBreakpoint>() - 32usize];
-    ["Alignment of CPUBreakpoint"][::std::mem::align_of::<CPUBreakpoint>() - 8usize];
+    ["Size of CPUBreakpoint"][::core::mem::size_of::<CPUBreakpoint>() - 32usize];
+    ["Alignment of CPUBreakpoint"][::core::mem::align_of::<CPUBreakpoint>() - 8usize];
     ["Offset of field: CPUBreakpoint::pc"][::std::mem::offset_of!(CPUBreakpoint, pc) - 0usize];
     ["Offset of field: CPUBreakpoint::flags"]
         [::std::mem::offset_of!(CPUBreakpoint, flags) - 8usize];
@@ -2632,15 +2634,15 @@ const _: () = {
 };
 impl Default for CPUBreakpoint {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUBreakpoint {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUBreakpoint {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "CPUBreakpoint {{ flags: {:?}, entry: {:?} }}",
@@ -2667,9 +2669,9 @@ pub union CPUWatchpoint__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of CPUWatchpoint__bindgen_ty_1"]
-        [::std::mem::size_of::<CPUWatchpoint__bindgen_ty_1>() - 16usize];
+        [::core::mem::size_of::<CPUWatchpoint__bindgen_ty_1>() - 16usize];
     ["Alignment of CPUWatchpoint__bindgen_ty_1"]
-        [::std::mem::align_of::<CPUWatchpoint__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<CPUWatchpoint__bindgen_ty_1>() - 8usize];
     ["Offset of field: CPUWatchpoint__bindgen_ty_1::tqe_next"]
         [::std::mem::offset_of!(CPUWatchpoint__bindgen_ty_1, tqe_next) - 0usize];
     ["Offset of field: CPUWatchpoint__bindgen_ty_1::tqe_circ"]
@@ -2677,22 +2679,22 @@ const _: () = {
 };
 impl Default for CPUWatchpoint__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUWatchpoint__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUWatchpoint__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "CPUWatchpoint__bindgen_ty_1 {{ union }}")
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUWatchpoint"][::std::mem::size_of::<CPUWatchpoint>() - 48usize];
-    ["Alignment of CPUWatchpoint"][::std::mem::align_of::<CPUWatchpoint>() - 8usize];
+    ["Size of CPUWatchpoint"][::core::mem::size_of::<CPUWatchpoint>() - 48usize];
+    ["Alignment of CPUWatchpoint"][::core::mem::align_of::<CPUWatchpoint>() - 8usize];
     ["Offset of field: CPUWatchpoint::vaddr"]
         [::std::mem::offset_of!(CPUWatchpoint, vaddr) - 0usize];
     ["Offset of field: CPUWatchpoint::len"][::std::mem::offset_of!(CPUWatchpoint, len) - 8usize];
@@ -2707,15 +2709,15 @@ const _: () = {
 };
 impl Default for CPUWatchpoint {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUWatchpoint {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUWatchpoint {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "CPUWatchpoint {{ hitattrs: {:?}, flags: {:?}, entry: {:?} }}",
@@ -2741,9 +2743,9 @@ pub struct CPUTLBEntry__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of CPUTLBEntry__bindgen_ty_1"]
-        [::std::mem::size_of::<CPUTLBEntry__bindgen_ty_1>() - 32usize];
+        [::core::mem::size_of::<CPUTLBEntry__bindgen_ty_1>() - 32usize];
     ["Alignment of CPUTLBEntry__bindgen_ty_1"]
-        [::std::mem::align_of::<CPUTLBEntry__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<CPUTLBEntry__bindgen_ty_1>() - 8usize];
     ["Offset of field: CPUTLBEntry__bindgen_ty_1::addr_read"]
         [::std::mem::offset_of!(CPUTLBEntry__bindgen_ty_1, addr_read) - 0usize];
     ["Offset of field: CPUTLBEntry__bindgen_ty_1::addr_write"]
@@ -2755,22 +2757,22 @@ const _: () = {
 };
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUTLBEntry"][::std::mem::size_of::<CPUTLBEntry>() - 32usize];
-    ["Alignment of CPUTLBEntry"][::std::mem::align_of::<CPUTLBEntry>() - 8usize];
+    ["Size of CPUTLBEntry"][::core::mem::size_of::<CPUTLBEntry>() - 32usize];
+    ["Alignment of CPUTLBEntry"][::core::mem::align_of::<CPUTLBEntry>() - 8usize];
     ["Offset of field: CPUTLBEntry::addr_idx"]
         [::std::mem::offset_of!(CPUTLBEntry, addr_idx) - 0usize];
 };
 impl Default for CPUTLBEntry {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUTLBEntry {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUTLBEntry {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "CPUTLBEntry {{ union }}")
     }
 }
@@ -2782,8 +2784,8 @@ pub struct CPUTLBDescFast {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUTLBDescFast"][::std::mem::size_of::<CPUTLBDescFast>() - 16usize];
-    ["Alignment of CPUTLBDescFast"][::std::mem::align_of::<CPUTLBDescFast>() - 8usize];
+    ["Size of CPUTLBDescFast"][::core::mem::size_of::<CPUTLBDescFast>() - 16usize];
+    ["Alignment of CPUTLBDescFast"][::core::mem::align_of::<CPUTLBDescFast>() - 8usize];
     ["Offset of field: CPUTLBDescFast::mask"]
         [::std::mem::offset_of!(CPUTLBDescFast, mask) - 0usize];
     ["Offset of field: CPUTLBDescFast::table"]
@@ -2791,9 +2793,9 @@ const _: () = {
 };
 impl Default for CPUTLBDescFast {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -2802,27 +2804,27 @@ pub const OnOffAuto_ON_OFF_AUTO_AUTO: OnOffAuto = OnOffAuto(0);
 pub const OnOffAuto_ON_OFF_AUTO_ON: OnOffAuto = OnOffAuto(1);
 pub const OnOffAuto_ON_OFF_AUTO_OFF: OnOffAuto = OnOffAuto(2);
 pub const OnOffAuto_ON_OFF_AUTO__MAX: OnOffAuto = OnOffAuto(3);
-impl ::std::ops::BitOr<OnOffAuto> for OnOffAuto {
+impl ::core::ops::BitOr<OnOffAuto> for OnOffAuto {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         OnOffAuto(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for OnOffAuto {
+impl ::core::ops::BitOrAssign for OnOffAuto {
     #[inline]
     fn bitor_assign(&mut self, rhs: OnOffAuto) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<OnOffAuto> for OnOffAuto {
+impl ::core::ops::BitAnd<OnOffAuto> for OnOffAuto {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         OnOffAuto(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for OnOffAuto {
+impl ::core::ops::BitAndAssign for OnOffAuto {
     #[inline]
     fn bitand_assign(&mut self, rhs: OnOffAuto) {
         self.0 &= rhs.0;
@@ -2837,27 +2839,27 @@ pub const CpuS390Entitlement_S390_CPU_ENTITLEMENT_MEDIUM: CpuS390Entitlement =
     CpuS390Entitlement(2);
 pub const CpuS390Entitlement_S390_CPU_ENTITLEMENT_HIGH: CpuS390Entitlement = CpuS390Entitlement(3);
 pub const CpuS390Entitlement_S390_CPU_ENTITLEMENT__MAX: CpuS390Entitlement = CpuS390Entitlement(4);
-impl ::std::ops::BitOr<CpuS390Entitlement> for CpuS390Entitlement {
+impl ::core::ops::BitOr<CpuS390Entitlement> for CpuS390Entitlement {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         CpuS390Entitlement(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for CpuS390Entitlement {
+impl ::core::ops::BitOrAssign for CpuS390Entitlement {
     #[inline]
     fn bitor_assign(&mut self, rhs: CpuS390Entitlement) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<CpuS390Entitlement> for CpuS390Entitlement {
+impl ::core::ops::BitAnd<CpuS390Entitlement> for CpuS390Entitlement {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         CpuS390Entitlement(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for CpuS390Entitlement {
+impl ::core::ops::BitAndAssign for CpuS390Entitlement {
     #[inline]
     fn bitand_assign(&mut self, rhs: CpuS390Entitlement) {
         self.0 &= rhs.0;
@@ -2897,27 +2899,27 @@ pub const SysEmuTarget_SYS_EMU_TARGET_X86_64: SysEmuTarget = SysEmuTarget(27);
 pub const SysEmuTarget_SYS_EMU_TARGET_XTENSA: SysEmuTarget = SysEmuTarget(28);
 pub const SysEmuTarget_SYS_EMU_TARGET_XTENSAEB: SysEmuTarget = SysEmuTarget(29);
 pub const SysEmuTarget_SYS_EMU_TARGET__MAX: SysEmuTarget = SysEmuTarget(30);
-impl ::std::ops::BitOr<SysEmuTarget> for SysEmuTarget {
+impl ::core::ops::BitOr<SysEmuTarget> for SysEmuTarget {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         SysEmuTarget(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for SysEmuTarget {
+impl ::core::ops::BitOrAssign for SysEmuTarget {
     #[inline]
     fn bitor_assign(&mut self, rhs: SysEmuTarget) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<SysEmuTarget> for SysEmuTarget {
+impl ::core::ops::BitAnd<SysEmuTarget> for SysEmuTarget {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         SysEmuTarget(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for SysEmuTarget {
+impl ::core::ops::BitAndAssign for SysEmuTarget {
     #[inline]
     fn bitand_assign(&mut self, rhs: SysEmuTarget) {
         self.0 &= rhs.0;
@@ -2932,27 +2934,27 @@ pub const CpuS390State_S390_CPU_STATE_CHECK_STOP: CpuS390State = CpuS390State(2)
 pub const CpuS390State_S390_CPU_STATE_OPERATING: CpuS390State = CpuS390State(3);
 pub const CpuS390State_S390_CPU_STATE_LOAD: CpuS390State = CpuS390State(4);
 pub const CpuS390State_S390_CPU_STATE__MAX: CpuS390State = CpuS390State(5);
-impl ::std::ops::BitOr<CpuS390State> for CpuS390State {
+impl ::core::ops::BitOr<CpuS390State> for CpuS390State {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         CpuS390State(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for CpuS390State {
+impl ::core::ops::BitOrAssign for CpuS390State {
     #[inline]
     fn bitor_assign(&mut self, rhs: CpuS390State) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<CpuS390State> for CpuS390State {
+impl ::core::ops::BitAnd<CpuS390State> for CpuS390State {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         CpuS390State(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for CpuS390State {
+impl ::core::ops::BitAndAssign for CpuS390State {
     #[inline]
     fn bitand_assign(&mut self, rhs: CpuS390State) {
         self.0 &= rhs.0;
@@ -2972,8 +2974,8 @@ pub struct CpuInfoS390 {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CpuInfoS390"][::std::mem::size_of::<CpuInfoS390>() - 12usize];
-    ["Alignment of CpuInfoS390"][::std::mem::align_of::<CpuInfoS390>() - 4usize];
+    ["Size of CpuInfoS390"][::core::mem::size_of::<CpuInfoS390>() - 12usize];
+    ["Alignment of CpuInfoS390"][::core::mem::align_of::<CpuInfoS390>() - 4usize];
     ["Offset of field: CpuInfoS390::cpu_state"]
         [::std::mem::offset_of!(CpuInfoS390, cpu_state) - 0usize];
     ["Offset of field: CpuInfoS390::has_dedicated"]
@@ -2987,9 +2989,9 @@ const _: () = {
 };
 impl Default for CpuInfoS390 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -3012,30 +3014,30 @@ pub union CpuInfoFast__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of CpuInfoFast__bindgen_ty_1"]
-        [::std::mem::size_of::<CpuInfoFast__bindgen_ty_1>() - 12usize];
+        [::core::mem::size_of::<CpuInfoFast__bindgen_ty_1>() - 12usize];
     ["Alignment of CpuInfoFast__bindgen_ty_1"]
-        [::std::mem::align_of::<CpuInfoFast__bindgen_ty_1>() - 4usize];
+        [::core::mem::align_of::<CpuInfoFast__bindgen_ty_1>() - 4usize];
     ["Offset of field: CpuInfoFast__bindgen_ty_1::s390x"]
         [::std::mem::offset_of!(CpuInfoFast__bindgen_ty_1, s390x) - 0usize];
 };
 impl Default for CpuInfoFast__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CpuInfoFast__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CpuInfoFast__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "CpuInfoFast__bindgen_ty_1 {{ union }}")
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CpuInfoFast"][::std::mem::size_of::<CpuInfoFast>() - 48usize];
-    ["Alignment of CpuInfoFast"][::std::mem::align_of::<CpuInfoFast>() - 8usize];
+    ["Size of CpuInfoFast"][::core::mem::size_of::<CpuInfoFast>() - 48usize];
+    ["Alignment of CpuInfoFast"][::core::mem::align_of::<CpuInfoFast>() - 8usize];
     ["Offset of field: CpuInfoFast::cpu_index"]
         [::std::mem::offset_of!(CpuInfoFast, cpu_index) - 0usize];
     ["Offset of field: CpuInfoFast::qom_path"]
@@ -3048,15 +3050,15 @@ const _: () = {
 };
 impl Default for CpuInfoFast {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CpuInfoFast {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CpuInfoFast {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "CpuInfoFast {{ qom_path: {:?}, props: {:?}, target: {:?}, u: {:?} }}",
@@ -3088,9 +3090,9 @@ pub struct CpuInstanceProperties {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CpuInstanceProperties"][::std::mem::size_of::<CpuInstanceProperties>() - 144usize];
+    ["Size of CpuInstanceProperties"][::core::mem::size_of::<CpuInstanceProperties>() - 144usize];
     ["Alignment of CpuInstanceProperties"]
-        [::std::mem::align_of::<CpuInstanceProperties>() - 8usize];
+        [::core::mem::align_of::<CpuInstanceProperties>() - 8usize];
     ["Offset of field: CpuInstanceProperties::has_node_id"]
         [::std::mem::offset_of!(CpuInstanceProperties, has_node_id) - 0usize];
     ["Offset of field: CpuInstanceProperties::node_id"]
@@ -3140,27 +3142,27 @@ pub const ShutdownCause_SHUTDOWN_CAUSE_GUEST_PANIC: ShutdownCause = ShutdownCaus
 pub const ShutdownCause_SHUTDOWN_CAUSE_SUBSYSTEM_RESET: ShutdownCause = ShutdownCause(9);
 pub const ShutdownCause_SHUTDOWN_CAUSE_SNAPSHOT_LOAD: ShutdownCause = ShutdownCause(10);
 pub const ShutdownCause_SHUTDOWN_CAUSE__MAX: ShutdownCause = ShutdownCause(11);
-impl ::std::ops::BitOr<ShutdownCause> for ShutdownCause {
+impl ::core::ops::BitOr<ShutdownCause> for ShutdownCause {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         ShutdownCause(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for ShutdownCause {
+impl ::core::ops::BitOrAssign for ShutdownCause {
     #[inline]
     fn bitor_assign(&mut self, rhs: ShutdownCause) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<ShutdownCause> for ShutdownCause {
+impl ::core::ops::BitAnd<ShutdownCause> for ShutdownCause {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         ShutdownCause(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for ShutdownCause {
+impl ::core::ops::BitAndAssign for ShutdownCause {
     #[inline]
     fn bitand_assign(&mut self, rhs: ShutdownCause) {
         self.0 &= rhs.0;
@@ -3189,21 +3191,21 @@ pub struct SysemuCPUOps {
 #[derive(Debug, Copy, Clone)]
 pub struct CPUClass {
     pub parent_class: DeviceClass,
-    pub class_by_name: ::std::option::Option<
+    pub class_by_name: ::core::option::Option<
         unsafe extern "C" fn(cpu_model: *const ::std::os::raw::c_char) -> *mut ObjectClass,
     >,
-    pub parse_features: ::std::option::Option<
+    pub parse_features: ::core::option::Option<
         unsafe extern "C" fn(
             typename: *const ::std::os::raw::c_char,
             str_: *mut ::std::os::raw::c_char,
             errp: *mut *mut Error,
         ),
     >,
-    pub has_work: ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> bool>,
-    pub mmu_index: ::std::option::Option<
+    pub has_work: ::core::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> bool>,
+    pub mmu_index: ::core::option::Option<
         unsafe extern "C" fn(cpu: *mut CPUState, ifetch: bool) -> ::std::os::raw::c_int,
     >,
-    pub memory_rw_debug: ::std::option::Option<
+    pub memory_rw_debug: ::core::option::Option<
         unsafe extern "C" fn(
             cpu: *mut CPUState,
             addr: vaddr,
@@ -3212,22 +3214,22 @@ pub struct CPUClass {
             is_write: bool,
         ) -> ::std::os::raw::c_int,
     >,
-    pub dump_state: ::std::option::Option<
+    pub dump_state: ::core::option::Option<
         unsafe extern "C" fn(cpu: *mut CPUState, arg1: *mut FILE, flags: ::std::os::raw::c_int),
     >,
     pub query_cpu_fast:
-        ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState, value: *mut CpuInfoFast)>,
-    pub get_arch_id: ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> i64>,
-    pub set_pc: ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState, value: vaddr)>,
-    pub get_pc: ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> vaddr>,
-    pub gdb_read_register: ::std::option::Option<
+        ::core::option::Option<unsafe extern "C" fn(cpu: *mut CPUState, value: *mut CpuInfoFast)>,
+    pub get_arch_id: ::core::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> i64>,
+    pub set_pc: ::core::option::Option<unsafe extern "C" fn(cpu: *mut CPUState, value: vaddr)>,
+    pub get_pc: ::core::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> vaddr>,
+    pub gdb_read_register: ::core::option::Option<
         unsafe extern "C" fn(
             cpu: *mut CPUState,
             buf: *mut GByteArray,
             reg: ::std::os::raw::c_int,
         ) -> ::std::os::raw::c_int,
     >,
-    pub gdb_write_register: ::std::option::Option<
+    pub gdb_write_register: ::core::option::Option<
         unsafe extern "C" fn(
             cpu: *mut CPUState,
             buf: *mut u8,
@@ -3235,18 +3237,18 @@ pub struct CPUClass {
         ) -> ::std::os::raw::c_int,
     >,
     pub gdb_adjust_breakpoint:
-        ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState, addr: vaddr) -> vaddr>,
+        ::core::option::Option<unsafe extern "C" fn(cpu: *mut CPUState, addr: vaddr) -> vaddr>,
     pub gdb_core_xml_file: *const ::std::os::raw::c_char,
     pub gdb_arch_name:
-        ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> *const gchar>,
-    pub disas_set_info: ::std::option::Option<
+        ::core::option::Option<unsafe extern "C" fn(cpu: *mut CPUState) -> *const gchar>,
+    pub disas_set_info: ::core::option::Option<
         unsafe extern "C" fn(cpu: *mut CPUState, info: *mut disassemble_info),
     >,
     pub deprecation_note: *const ::std::os::raw::c_char,
     pub accel_cpu: *mut AccelCPUClass,
     pub sysemu_ops: *const SysemuCPUOps,
     pub tcg_ops: *const TCGCPUOps,
-    pub init_accel_cpu: ::std::option::Option<
+    pub init_accel_cpu: ::core::option::Option<
         unsafe extern "C" fn(accel_cpu: *mut AccelCPUClass, cc: *mut CPUClass),
     >,
     pub reset_dump_flags: ::std::os::raw::c_int,
@@ -3255,8 +3257,8 @@ pub struct CPUClass {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUClass"][::std::mem::size_of::<CPUClass>() - 360usize];
-    ["Alignment of CPUClass"][::std::mem::align_of::<CPUClass>() - 8usize];
+    ["Size of CPUClass"][::core::mem::size_of::<CPUClass>() - 360usize];
+    ["Alignment of CPUClass"][::core::mem::align_of::<CPUClass>() - 8usize];
     ["Offset of field: CPUClass::parent_class"]
         [::std::mem::offset_of!(CPUClass, parent_class) - 0usize];
     ["Offset of field: CPUClass::class_by_name"]
@@ -3306,9 +3308,9 @@ const _: () = {
 };
 impl Default for CPUClass {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -3340,9 +3342,9 @@ pub struct CPUTLBEntryFull__bindgen_ty_1__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of CPUTLBEntryFull__bindgen_ty_1__bindgen_ty_1"]
-        [::std::mem::size_of::<CPUTLBEntryFull__bindgen_ty_1__bindgen_ty_1>() - 3usize];
+        [::core::mem::size_of::<CPUTLBEntryFull__bindgen_ty_1__bindgen_ty_1>() - 3usize];
     ["Alignment of CPUTLBEntryFull__bindgen_ty_1__bindgen_ty_1"]
-        [::std::mem::align_of::<CPUTLBEntryFull__bindgen_ty_1__bindgen_ty_1>() - 1usize];
+        [::core::mem::align_of::<CPUTLBEntryFull__bindgen_ty_1__bindgen_ty_1>() - 1usize];
     ["Offset of field: CPUTLBEntryFull__bindgen_ty_1__bindgen_ty_1::pte_attrs"]
         [::std::mem::offset_of!(CPUTLBEntryFull__bindgen_ty_1__bindgen_ty_1, pte_attrs) - 0usize];
     ["Offset of field: CPUTLBEntryFull__bindgen_ty_1__bindgen_ty_1::shareability"][::std::mem::offset_of!(
@@ -3355,30 +3357,30 @@ const _: () = {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of CPUTLBEntryFull__bindgen_ty_1"]
-        [::std::mem::size_of::<CPUTLBEntryFull__bindgen_ty_1>() - 3usize];
+        [::core::mem::size_of::<CPUTLBEntryFull__bindgen_ty_1>() - 3usize];
     ["Alignment of CPUTLBEntryFull__bindgen_ty_1"]
-        [::std::mem::align_of::<CPUTLBEntryFull__bindgen_ty_1>() - 1usize];
+        [::core::mem::align_of::<CPUTLBEntryFull__bindgen_ty_1>() - 1usize];
     ["Offset of field: CPUTLBEntryFull__bindgen_ty_1::arm"]
         [::std::mem::offset_of!(CPUTLBEntryFull__bindgen_ty_1, arm) - 0usize];
 };
 impl Default for CPUTLBEntryFull__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUTLBEntryFull__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUTLBEntryFull__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "CPUTLBEntryFull__bindgen_ty_1 {{ union }}")
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUTLBEntryFull"][::std::mem::size_of::<CPUTLBEntryFull>() - 32usize];
-    ["Alignment of CPUTLBEntryFull"][::std::mem::align_of::<CPUTLBEntryFull>() - 8usize];
+    ["Size of CPUTLBEntryFull"][::core::mem::size_of::<CPUTLBEntryFull>() - 32usize];
+    ["Alignment of CPUTLBEntryFull"][::core::mem::align_of::<CPUTLBEntryFull>() - 8usize];
     ["Offset of field: CPUTLBEntryFull::xlat_section"]
         [::std::mem::offset_of!(CPUTLBEntryFull, xlat_section) - 0usize];
     ["Offset of field: CPUTLBEntryFull::phys_addr"]
@@ -3398,15 +3400,15 @@ const _: () = {
 };
 impl Default for CPUTLBEntryFull {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUTLBEntryFull {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUTLBEntryFull {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "CPUTLBEntryFull {{ attrs: {:?}, slow_flags: {:?}, extra: {:?} }}",
@@ -3429,8 +3431,8 @@ pub struct CPUTLBDesc {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUTLBDesc"][::std::mem::size_of::<CPUTLBDesc>() - 568usize];
-    ["Alignment of CPUTLBDesc"][::std::mem::align_of::<CPUTLBDesc>() - 8usize];
+    ["Size of CPUTLBDesc"][::core::mem::size_of::<CPUTLBDesc>() - 568usize];
+    ["Alignment of CPUTLBDesc"][::core::mem::align_of::<CPUTLBDesc>() - 8usize];
     ["Offset of field: CPUTLBDesc::large_page_addr"]
         [::std::mem::offset_of!(CPUTLBDesc, large_page_addr) - 0usize];
     ["Offset of field: CPUTLBDesc::large_page_mask"]
@@ -3450,15 +3452,15 @@ const _: () = {
 };
 impl Default for CPUTLBDesc {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUTLBDesc {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUTLBDesc {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "CPUTLBDesc {{ vtable: {:?}, vfulltlb: {:?}, fulltlb: {:?} }}",
@@ -3477,8 +3479,8 @@ pub struct CPUTLBCommon {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUTLBCommon"][::std::mem::size_of::<CPUTLBCommon>() - 32usize];
-    ["Alignment of CPUTLBCommon"][::std::mem::align_of::<CPUTLBCommon>() - 8usize];
+    ["Size of CPUTLBCommon"][::core::mem::size_of::<CPUTLBCommon>() - 32usize];
+    ["Alignment of CPUTLBCommon"][::core::mem::align_of::<CPUTLBCommon>() - 8usize];
     ["Offset of field: CPUTLBCommon::lock"][::std::mem::offset_of!(CPUTLBCommon, lock) - 0usize];
     ["Offset of field: CPUTLBCommon::dirty"][::std::mem::offset_of!(CPUTLBCommon, dirty) - 4usize];
     ["Offset of field: CPUTLBCommon::full_flush_count"]
@@ -3498,23 +3500,23 @@ pub struct CPUTLB {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUTLB"][::std::mem::size_of::<CPUTLB>() - 9376usize];
-    ["Alignment of CPUTLB"][::std::mem::align_of::<CPUTLB>() - 16usize];
+    ["Size of CPUTLB"][::core::mem::size_of::<CPUTLB>() - 9376usize];
+    ["Alignment of CPUTLB"][::core::mem::align_of::<CPUTLB>() - 16usize];
     ["Offset of field: CPUTLB::c"][::std::mem::offset_of!(CPUTLB, c) - 0usize];
     ["Offset of field: CPUTLB::d"][::std::mem::offset_of!(CPUTLB, d) - 32usize];
     ["Offset of field: CPUTLB::f"][::std::mem::offset_of!(CPUTLB, f) - 9120usize];
 };
 impl Default for CPUTLB {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUTLB {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUTLB {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "CPUTLB {{ c: {:?}, d: {:?}, f: {:?} }}",
@@ -3537,9 +3539,9 @@ pub struct IcountDecr__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of IcountDecr__bindgen_ty_1"]
-        [::std::mem::size_of::<IcountDecr__bindgen_ty_1>() - 4usize];
+        [::core::mem::size_of::<IcountDecr__bindgen_ty_1>() - 4usize];
     ["Alignment of IcountDecr__bindgen_ty_1"]
-        [::std::mem::align_of::<IcountDecr__bindgen_ty_1>() - 2usize];
+        [::core::mem::align_of::<IcountDecr__bindgen_ty_1>() - 2usize];
     ["Offset of field: IcountDecr__bindgen_ty_1::low"]
         [::std::mem::offset_of!(IcountDecr__bindgen_ty_1, low) - 0usize];
     ["Offset of field: IcountDecr__bindgen_ty_1::high"]
@@ -3547,22 +3549,22 @@ const _: () = {
 };
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of IcountDecr"][::std::mem::size_of::<IcountDecr>() - 4usize];
-    ["Alignment of IcountDecr"][::std::mem::align_of::<IcountDecr>() - 4usize];
+    ["Size of IcountDecr"][::core::mem::size_of::<IcountDecr>() - 4usize];
+    ["Alignment of IcountDecr"][::core::mem::align_of::<IcountDecr>() - 4usize];
     ["Offset of field: IcountDecr::u32_"][::std::mem::offset_of!(IcountDecr, u32_) - 0usize];
     ["Offset of field: IcountDecr::u16_"][::std::mem::offset_of!(IcountDecr, u16_) - 0usize];
 };
 impl Default for IcountDecr {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for IcountDecr {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for IcountDecr {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "IcountDecr {{ union }}")
     }
 }
@@ -3578,9 +3580,10 @@ pub struct CPUNegativeOffsetState {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUNegativeOffsetState"][::std::mem::size_of::<CPUNegativeOffsetState>() - 9392usize];
+    ["Size of CPUNegativeOffsetState"]
+        [::core::mem::size_of::<CPUNegativeOffsetState>() - 9392usize];
     ["Alignment of CPUNegativeOffsetState"]
-        [::std::mem::align_of::<CPUNegativeOffsetState>() - 16usize];
+        [::core::mem::align_of::<CPUNegativeOffsetState>() - 16usize];
     ["Offset of field: CPUNegativeOffsetState::tlb"]
         [::std::mem::offset_of!(CPUNegativeOffsetState, tlb) - 0usize];
     ["Offset of field: CPUNegativeOffsetState::plugin_mem_cbs"]
@@ -3592,15 +3595,15 @@ const _: () = {
 };
 impl Default for CPUNegativeOffsetState {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUNegativeOffsetState {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUNegativeOffsetState {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write ! (f , "CPUNegativeOffsetState {{ tlb: {:?}, plugin_mem_cbs: {:?}, icount_decr: {:?}, can_do_io: {:?} }}" , self . tlb , self . plugin_mem_cbs , self . icount_decr , self . can_do_io)
     }
 }
@@ -3698,9 +3701,9 @@ pub struct CPUState__bindgen_ty_1 {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUState__bindgen_ty_1"][::std::mem::size_of::<CPUState__bindgen_ty_1>() - 16usize];
+    ["Size of CPUState__bindgen_ty_1"][::core::mem::size_of::<CPUState__bindgen_ty_1>() - 16usize];
     ["Alignment of CPUState__bindgen_ty_1"]
-        [::std::mem::align_of::<CPUState__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<CPUState__bindgen_ty_1>() - 8usize];
     ["Offset of field: CPUState__bindgen_ty_1::sqh_first"]
         [::std::mem::offset_of!(CPUState__bindgen_ty_1, sqh_first) - 0usize];
     ["Offset of field: CPUState__bindgen_ty_1::sqh_last"]
@@ -3708,9 +3711,9 @@ const _: () = {
 };
 impl Default for CPUState__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -3723,9 +3726,9 @@ pub union CPUState__bindgen_ty_2 {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUState__bindgen_ty_2"][::std::mem::size_of::<CPUState__bindgen_ty_2>() - 16usize];
+    ["Size of CPUState__bindgen_ty_2"][::core::mem::size_of::<CPUState__bindgen_ty_2>() - 16usize];
     ["Alignment of CPUState__bindgen_ty_2"]
-        [::std::mem::align_of::<CPUState__bindgen_ty_2>() - 8usize];
+        [::core::mem::align_of::<CPUState__bindgen_ty_2>() - 8usize];
     ["Offset of field: CPUState__bindgen_ty_2::tqe_next"]
         [::std::mem::offset_of!(CPUState__bindgen_ty_2, tqe_next) - 0usize];
     ["Offset of field: CPUState__bindgen_ty_2::tqe_circ"]
@@ -3733,15 +3736,15 @@ const _: () = {
 };
 impl Default for CPUState__bindgen_ty_2 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUState__bindgen_ty_2 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUState__bindgen_ty_2 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "CPUState__bindgen_ty_2 {{ union }}")
     }
 }
@@ -3753,9 +3756,9 @@ pub union CPUState__bindgen_ty_3 {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUState__bindgen_ty_3"][::std::mem::size_of::<CPUState__bindgen_ty_3>() - 16usize];
+    ["Size of CPUState__bindgen_ty_3"][::core::mem::size_of::<CPUState__bindgen_ty_3>() - 16usize];
     ["Alignment of CPUState__bindgen_ty_3"]
-        [::std::mem::align_of::<CPUState__bindgen_ty_3>() - 8usize];
+        [::core::mem::align_of::<CPUState__bindgen_ty_3>() - 8usize];
     ["Offset of field: CPUState__bindgen_ty_3::tqh_first"]
         [::std::mem::offset_of!(CPUState__bindgen_ty_3, tqh_first) - 0usize];
     ["Offset of field: CPUState__bindgen_ty_3::tqh_circ"]
@@ -3763,15 +3766,15 @@ const _: () = {
 };
 impl Default for CPUState__bindgen_ty_3 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUState__bindgen_ty_3 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUState__bindgen_ty_3 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "CPUState__bindgen_ty_3 {{ union }}")
     }
 }
@@ -3783,9 +3786,9 @@ pub union CPUState__bindgen_ty_4 {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUState__bindgen_ty_4"][::std::mem::size_of::<CPUState__bindgen_ty_4>() - 16usize];
+    ["Size of CPUState__bindgen_ty_4"][::core::mem::size_of::<CPUState__bindgen_ty_4>() - 16usize];
     ["Alignment of CPUState__bindgen_ty_4"]
-        [::std::mem::align_of::<CPUState__bindgen_ty_4>() - 8usize];
+        [::core::mem::align_of::<CPUState__bindgen_ty_4>() - 8usize];
     ["Offset of field: CPUState__bindgen_ty_4::tqh_first"]
         [::std::mem::offset_of!(CPUState__bindgen_ty_4, tqh_first) - 0usize];
     ["Offset of field: CPUState__bindgen_ty_4::tqh_circ"]
@@ -3793,22 +3796,22 @@ const _: () = {
 };
 impl Default for CPUState__bindgen_ty_4 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUState__bindgen_ty_4 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUState__bindgen_ty_4 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "CPUState__bindgen_ty_4 {{ union }}")
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUState"][::std::mem::size_of::<CPUState>() - 10176usize];
-    ["Alignment of CPUState"][::std::mem::align_of::<CPUState>() - 16usize];
+    ["Size of CPUState"][::core::mem::size_of::<CPUState>() - 10176usize];
+    ["Alignment of CPUState"][::core::mem::align_of::<CPUState>() - 16usize];
     ["Offset of field: CPUState::parent_obj"]
         [::std::mem::offset_of!(CPUState, parent_obj) - 0usize];
     ["Offset of field: CPUState::cc"][::std::mem::offset_of!(CPUState, cc) - 160usize];
@@ -3921,15 +3924,15 @@ const _: () = {
 };
 impl Default for CPUState {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUState {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUState {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write ! (f , "CPUState {{ parent_obj: {:?}, cc: {:?}, nr_cores: {:?}, nr_threads: {:?}, thread: {:?}, thread_id: {:?}, running: {:?}, has_waiter: {:?}, halt_cond: {:?}, thread_kicked: {:?}, created: {:?}, stop: {:?}, stopped: {:?}, start_powered_off: {:?}, unplug: {:?}, crash_occurred: {:?}, exit_request: {:?}, exclusive_context_count: {:?}, singlestep_enabled: {:?}, jmp_env: {:?}, work_mutex: {:?}, work_list: {:?}, cpu_ases: {:?}, cpu_ases_count: {:?}, num_ases: {:?}, as: {:?}, memory: {:?}, tb_jmp_cache: {:?}, gdb_regs: {:?}, gdb_num_regs: {:?}, gdb_num_g_regs: {:?}, node: {:?}, breakpoints: {:?}, watchpoints: {:?}, watchpoint_hit: {:?}, opaque: {:?}, kvm_fd: {:?}, kvm_state: {:?}, kvm_run: {:?}, kvm_dirty_gfns: {:?}, kvm_vcpu_stats_fd: {:?}, vcpu_dirty: {:?}, in_ioctl_lock: {:?}, plugin_state: {:?}, cpu_index: {:?}, cluster_index: {:?}, accel: {:?}, throttle_thread_scheduled: {:?}, ignore_memory_transaction_failures: {:?}, prctl_unalign_sigbus: {:?}, iommu_notifiers: {:?}, neg_align: {:?}, neg: {:?} }}" , self . parent_obj , self . cc , self . nr_cores , self . nr_threads , self . thread , self . thread_id , self . running , self . has_waiter , self . halt_cond , self . thread_kicked , self . created , self . stop , self . stopped , self . start_powered_off , self . unplug , self . crash_occurred , self . exit_request , self . exclusive_context_count , self . singlestep_enabled , self . jmp_env , self . work_mutex , self . work_list , self . cpu_ases , self . cpu_ases_count , self . num_ases , self . as_ , self . memory , self . tb_jmp_cache , self . gdb_regs , self . gdb_num_regs , self . gdb_num_g_regs , self . node , self . breakpoints , self . watchpoints , self . watchpoint_hit , self . opaque , self . kvm_fd , self . kvm_state , self . kvm_run , self . kvm_dirty_gfns , self . kvm_vcpu_stats_fd , self . vcpu_dirty , self . in_ioctl_lock , self . plugin_state , self . cpu_index , self . cluster_index , self . accel , self . throttle_thread_scheduled , self . ignore_memory_transaction_failures , self . prctl_unalign_sigbus , self . iommu_notifiers , self . neg_align , self . neg)
     }
 }
@@ -3963,9 +3966,9 @@ pub union Property__bindgen_ty_1 {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of Property__bindgen_ty_1"][::std::mem::size_of::<Property__bindgen_ty_1>() - 8usize];
+    ["Size of Property__bindgen_ty_1"][::core::mem::size_of::<Property__bindgen_ty_1>() - 8usize];
     ["Alignment of Property__bindgen_ty_1"]
-        [::std::mem::align_of::<Property__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<Property__bindgen_ty_1>() - 8usize];
     ["Offset of field: Property__bindgen_ty_1::i"]
         [::std::mem::offset_of!(Property__bindgen_ty_1, i) - 0usize];
     ["Offset of field: Property__bindgen_ty_1::u"]
@@ -3973,22 +3976,22 @@ const _: () = {
 };
 impl Default for Property__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for Property__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for Property__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "Property__bindgen_ty_1 {{ union }}")
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of Property"][::std::mem::size_of::<Property>() - 88usize];
-    ["Alignment of Property"][::std::mem::align_of::<Property>() - 8usize];
+    ["Size of Property"][::core::mem::size_of::<Property>() - 88usize];
+    ["Alignment of Property"][::core::mem::align_of::<Property>() - 8usize];
     ["Offset of field: Property::name"][::std::mem::offset_of!(Property, name) - 0usize];
     ["Offset of field: Property::info"][::std::mem::offset_of!(Property, info) - 8usize];
     ["Offset of field: Property::offset"][::std::mem::offset_of!(Property, offset) - 16usize];
@@ -4006,15 +4009,15 @@ const _: () = {
 };
 impl Default for Property {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for Property {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for Property {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write ! (f , "Property {{ name: {:?}, info: {:?}, set_default: {:?}, defval: {:?}, arrayoffset: {:?}, arrayinfo: {:?}, arrayfieldsize: {:?}, link_type: {:?} }}" , self . name , self . info , self . set_default , self . defval , self . arrayoffset , self . arrayinfo , self . arrayfieldsize , self . link_type)
     }
 }
@@ -4025,7 +4028,7 @@ pub struct PropertyInfo {
     pub description: *const ::std::os::raw::c_char,
     pub enum_table: *const QEnumLookup,
     pub realized_set_allowed: bool,
-    pub print: ::std::option::Option<
+    pub print: ::core::option::Option<
         unsafe extern "C" fn(
             obj: *mut Object,
             prop: *mut Property,
@@ -4033,9 +4036,10 @@ pub struct PropertyInfo {
             len: usize,
         ) -> ::std::os::raw::c_int,
     >,
-    pub set_default_value:
-        ::std::option::Option<unsafe extern "C" fn(op: *mut ObjectProperty, prop: *const Property)>,
-    pub create: ::std::option::Option<
+    pub set_default_value: ::core::option::Option<
+        unsafe extern "C" fn(op: *mut ObjectProperty, prop: *const Property),
+    >,
+    pub create: ::core::option::Option<
         unsafe extern "C" fn(
             oc: *mut ObjectClass,
             name: *const ::std::os::raw::c_char,
@@ -4048,8 +4052,8 @@ pub struct PropertyInfo {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of PropertyInfo"][::std::mem::size_of::<PropertyInfo>() - 80usize];
-    ["Alignment of PropertyInfo"][::std::mem::align_of::<PropertyInfo>() - 8usize];
+    ["Size of PropertyInfo"][::core::mem::size_of::<PropertyInfo>() - 80usize];
+    ["Alignment of PropertyInfo"][::core::mem::align_of::<PropertyInfo>() - 8usize];
     ["Offset of field: PropertyInfo::name"][::std::mem::offset_of!(PropertyInfo, name) - 0usize];
     ["Offset of field: PropertyInfo::description"]
         [::std::mem::offset_of!(PropertyInfo, description) - 8usize];
@@ -4069,9 +4073,9 @@ const _: () = {
 };
 impl Default for PropertyInfo {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -4085,27 +4089,27 @@ pub const CPUTopoLevel_CPU_TOPO_LEVEL_MODULE: CPUTopoLevel = CPUTopoLevel(3);
 pub const CPUTopoLevel_CPU_TOPO_LEVEL_DIE: CPUTopoLevel = CPUTopoLevel(4);
 pub const CPUTopoLevel_CPU_TOPO_LEVEL_PACKAGE: CPUTopoLevel = CPUTopoLevel(5);
 pub const CPUTopoLevel_CPU_TOPO_LEVEL_MAX: CPUTopoLevel = CPUTopoLevel(6);
-impl ::std::ops::BitOr<CPUTopoLevel> for CPUTopoLevel {
+impl ::core::ops::BitOr<CPUTopoLevel> for CPUTopoLevel {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         CPUTopoLevel(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for CPUTopoLevel {
+impl ::core::ops::BitOrAssign for CPUTopoLevel {
     #[inline]
     fn bitor_assign(&mut self, rhs: CPUTopoLevel) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<CPUTopoLevel> for CPUTopoLevel {
+impl ::core::ops::BitAnd<CPUTopoLevel> for CPUTopoLevel {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         CPUTopoLevel(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for CPUTopoLevel {
+impl ::core::ops::BitAndAssign for CPUTopoLevel {
     #[inline]
     fn bitand_assign(&mut self, rhs: CPUTopoLevel) {
         self.0 &= rhs.0;
@@ -4125,8 +4129,8 @@ pub struct floatx80 {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of floatx80"][::std::mem::size_of::<floatx80>() - 16usize];
-    ["Alignment of floatx80"][::std::mem::align_of::<floatx80>() - 8usize];
+    ["Size of floatx80"][::core::mem::size_of::<floatx80>() - 16usize];
+    ["Alignment of floatx80"][::core::mem::align_of::<floatx80>() - 8usize];
     ["Offset of field: floatx80::low"][::std::mem::offset_of!(floatx80, low) - 0usize];
     ["Offset of field: floatx80::high"][::std::mem::offset_of!(floatx80, high) - 8usize];
 };
@@ -4137,27 +4141,27 @@ pub const FloatRoundMode_float_round_to_zero: FloatRoundMode = FloatRoundMode(3)
 pub const FloatRoundMode_float_round_ties_away: FloatRoundMode = FloatRoundMode(4);
 pub const FloatRoundMode_float_round_to_odd: FloatRoundMode = FloatRoundMode(5);
 pub const FloatRoundMode_float_round_to_odd_inf: FloatRoundMode = FloatRoundMode(6);
-impl ::std::ops::BitOr<FloatRoundMode> for FloatRoundMode {
+impl ::core::ops::BitOr<FloatRoundMode> for FloatRoundMode {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         FloatRoundMode(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for FloatRoundMode {
+impl ::core::ops::BitOrAssign for FloatRoundMode {
     #[inline]
     fn bitor_assign(&mut self, rhs: FloatRoundMode) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<FloatRoundMode> for FloatRoundMode {
+impl ::core::ops::BitAnd<FloatRoundMode> for FloatRoundMode {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         FloatRoundMode(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for FloatRoundMode {
+impl ::core::ops::BitAndAssign for FloatRoundMode {
     #[inline]
     fn bitand_assign(&mut self, rhs: FloatRoundMode) {
         self.0 &= rhs.0;
@@ -4169,27 +4173,27 @@ pub struct FloatRoundMode(pub ::std::os::raw::c_uchar);
 pub const FloatX80RoundPrec_floatx80_precision_x: FloatX80RoundPrec = FloatX80RoundPrec(0);
 pub const FloatX80RoundPrec_floatx80_precision_d: FloatX80RoundPrec = FloatX80RoundPrec(1);
 pub const FloatX80RoundPrec_floatx80_precision_s: FloatX80RoundPrec = FloatX80RoundPrec(2);
-impl ::std::ops::BitOr<FloatX80RoundPrec> for FloatX80RoundPrec {
+impl ::core::ops::BitOr<FloatX80RoundPrec> for FloatX80RoundPrec {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         FloatX80RoundPrec(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for FloatX80RoundPrec {
+impl ::core::ops::BitOrAssign for FloatX80RoundPrec {
     #[inline]
     fn bitor_assign(&mut self, rhs: FloatX80RoundPrec) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<FloatX80RoundPrec> for FloatX80RoundPrec {
+impl ::core::ops::BitAnd<FloatX80RoundPrec> for FloatX80RoundPrec {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         FloatX80RoundPrec(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for FloatX80RoundPrec {
+impl ::core::ops::BitAndAssign for FloatX80RoundPrec {
     #[inline]
     fn bitand_assign(&mut self, rhs: FloatX80RoundPrec) {
         self.0 &= rhs.0;
@@ -4216,8 +4220,8 @@ pub struct float_status {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of float_status"][::std::mem::size_of::<float_status>() - 14usize];
-    ["Alignment of float_status"][::std::mem::align_of::<float_status>() - 2usize];
+    ["Size of float_status"][::core::mem::size_of::<float_status>() - 14usize];
+    ["Alignment of float_status"][::core::mem::align_of::<float_status>() - 2usize];
     ["Offset of field: float_status::float_exception_flags"]
         [::std::mem::offset_of!(float_status, float_exception_flags) - 0usize];
     ["Offset of field: float_status::float_rounding_mode"]
@@ -4245,9 +4249,9 @@ const _: () = {
 };
 impl Default for float_status {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -4263,8 +4267,8 @@ pub struct SegmentCache {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of SegmentCache"][::std::mem::size_of::<SegmentCache>() - 24usize];
-    ["Alignment of SegmentCache"][::std::mem::align_of::<SegmentCache>() - 8usize];
+    ["Size of SegmentCache"][::core::mem::size_of::<SegmentCache>() - 24usize];
+    ["Alignment of SegmentCache"][::core::mem::align_of::<SegmentCache>() - 8usize];
     ["Offset of field: SegmentCache::selector"]
         [::std::mem::offset_of!(SegmentCache, selector) - 0usize];
     ["Offset of field: SegmentCache::base"][::std::mem::offset_of!(SegmentCache, base) - 8usize];
@@ -4283,8 +4287,8 @@ pub union MMXReg {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of MMXReg"][::std::mem::size_of::<MMXReg>() - 8usize];
-    ["Alignment of MMXReg"][::std::mem::align_of::<MMXReg>() - 8usize];
+    ["Size of MMXReg"][::core::mem::size_of::<MMXReg>() - 8usize];
+    ["Alignment of MMXReg"][::core::mem::align_of::<MMXReg>() - 8usize];
     ["Offset of field: MMXReg::_b_MMXReg"][::std::mem::offset_of!(MMXReg, _b_MMXReg) - 0usize];
     ["Offset of field: MMXReg::_w_MMXReg"][::std::mem::offset_of!(MMXReg, _w_MMXReg) - 0usize];
     ["Offset of field: MMXReg::_l_MMXReg"][::std::mem::offset_of!(MMXReg, _l_MMXReg) - 0usize];
@@ -4294,15 +4298,15 @@ const _: () = {
 };
 impl Default for MMXReg {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for MMXReg {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for MMXReg {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "MMXReg {{ union }}")
     }
 }
@@ -4313,21 +4317,21 @@ pub union XMMReg {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of XMMReg"][::std::mem::size_of::<XMMReg>() - 16usize];
-    ["Alignment of XMMReg"][::std::mem::align_of::<XMMReg>() - 8usize];
+    ["Size of XMMReg"][::core::mem::size_of::<XMMReg>() - 16usize];
+    ["Alignment of XMMReg"][::core::mem::align_of::<XMMReg>() - 8usize];
     ["Offset of field: XMMReg::_q_XMMReg"][::std::mem::offset_of!(XMMReg, _q_XMMReg) - 0usize];
 };
 impl Default for XMMReg {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for XMMReg {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for XMMReg {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "XMMReg {{ union }}")
     }
 }
@@ -4339,22 +4343,22 @@ pub union YMMReg {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of YMMReg"][::std::mem::size_of::<YMMReg>() - 32usize];
-    ["Alignment of YMMReg"][::std::mem::align_of::<YMMReg>() - 8usize];
+    ["Size of YMMReg"][::core::mem::size_of::<YMMReg>() - 32usize];
+    ["Alignment of YMMReg"][::core::mem::align_of::<YMMReg>() - 8usize];
     ["Offset of field: YMMReg::_q_YMMReg"][::std::mem::offset_of!(YMMReg, _q_YMMReg) - 0usize];
     ["Offset of field: YMMReg::_x_YMMReg"][::std::mem::offset_of!(YMMReg, _x_YMMReg) - 0usize];
 };
 impl Default for YMMReg {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for YMMReg {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for YMMReg {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "YMMReg {{ union }}")
     }
 }
@@ -4373,8 +4377,8 @@ pub union ZMMReg {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ZMMReg"][::std::mem::size_of::<ZMMReg>() - 64usize];
-    ["Alignment of ZMMReg"][::std::mem::align_of::<ZMMReg>() - 8usize];
+    ["Size of ZMMReg"][::core::mem::size_of::<ZMMReg>() - 64usize];
+    ["Alignment of ZMMReg"][::core::mem::align_of::<ZMMReg>() - 8usize];
     ["Offset of field: ZMMReg::_b_ZMMReg"][::std::mem::offset_of!(ZMMReg, _b_ZMMReg) - 0usize];
     ["Offset of field: ZMMReg::_w_ZMMReg"][::std::mem::offset_of!(ZMMReg, _w_ZMMReg) - 0usize];
     ["Offset of field: ZMMReg::_l_ZMMReg"][::std::mem::offset_of!(ZMMReg, _l_ZMMReg) - 0usize];
@@ -4387,15 +4391,15 @@ const _: () = {
 };
 impl Default for ZMMReg {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for ZMMReg {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for ZMMReg {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "ZMMReg {{ union }}")
     }
 }
@@ -4407,8 +4411,8 @@ pub struct BNDReg {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of BNDReg"][::std::mem::size_of::<BNDReg>() - 16usize];
-    ["Alignment of BNDReg"][::std::mem::align_of::<BNDReg>() - 8usize];
+    ["Size of BNDReg"][::core::mem::size_of::<BNDReg>() - 16usize];
+    ["Alignment of BNDReg"][::core::mem::align_of::<BNDReg>() - 8usize];
     ["Offset of field: BNDReg::lb"][::std::mem::offset_of!(BNDReg, lb) - 0usize];
     ["Offset of field: BNDReg::ub"][::std::mem::offset_of!(BNDReg, ub) - 8usize];
 };
@@ -4420,8 +4424,8 @@ pub struct BNDCSReg {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of BNDCSReg"][::std::mem::size_of::<BNDCSReg>() - 16usize];
-    ["Alignment of BNDCSReg"][::std::mem::align_of::<BNDCSReg>() - 8usize];
+    ["Size of BNDCSReg"][::core::mem::size_of::<BNDCSReg>() - 16usize];
+    ["Alignment of BNDCSReg"][::core::mem::align_of::<BNDCSReg>() - 8usize];
     ["Offset of field: BNDCSReg::cfgu"][::std::mem::offset_of!(BNDCSReg, cfgu) - 0usize];
     ["Offset of field: BNDCSReg::sts"][::std::mem::offset_of!(BNDCSReg, sts) - 8usize];
 };
@@ -4434,22 +4438,22 @@ pub union FPReg {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of FPReg"][::std::mem::size_of::<FPReg>() - 16usize];
-    ["Alignment of FPReg"][::std::mem::align_of::<FPReg>() - 16usize];
+    ["Size of FPReg"][::core::mem::size_of::<FPReg>() - 16usize];
+    ["Alignment of FPReg"][::core::mem::align_of::<FPReg>() - 16usize];
     ["Offset of field: FPReg::d"][::std::mem::offset_of!(FPReg, d) - 0usize];
     ["Offset of field: FPReg::mmx"][::std::mem::offset_of!(FPReg, mmx) - 0usize];
 };
 impl Default for FPReg {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for FPReg {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for FPReg {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "FPReg {{ union }}")
     }
 }
@@ -4461,8 +4465,8 @@ pub struct MTRRVar {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of MTRRVar"][::std::mem::size_of::<MTRRVar>() - 16usize];
-    ["Alignment of MTRRVar"][::std::mem::align_of::<MTRRVar>() - 8usize];
+    ["Size of MTRRVar"][::core::mem::size_of::<MTRRVar>() - 16usize];
+    ["Alignment of MTRRVar"][::core::mem::align_of::<MTRRVar>() - 8usize];
     ["Offset of field: MTRRVar::base"][::std::mem::offset_of!(MTRRVar, base) - 0usize];
     ["Offset of field: MTRRVar::mask"][::std::mem::offset_of!(MTRRVar, mask) - 8usize];
 };
@@ -4475,35 +4479,35 @@ pub struct LBREntry {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of LBREntry"][::std::mem::size_of::<LBREntry>() - 24usize];
-    ["Alignment of LBREntry"][::std::mem::align_of::<LBREntry>() - 8usize];
+    ["Size of LBREntry"][::core::mem::size_of::<LBREntry>() - 24usize];
+    ["Alignment of LBREntry"][::core::mem::align_of::<LBREntry>() - 8usize];
     ["Offset of field: LBREntry::from"][::std::mem::offset_of!(LBREntry, from) - 0usize];
     ["Offset of field: LBREntry::to"][::std::mem::offset_of!(LBREntry, to) - 8usize];
     ["Offset of field: LBREntry::info"][::std::mem::offset_of!(LBREntry, info) - 16usize];
 };
 pub const TPRAccess_TPR_ACCESS_READ: TPRAccess = TPRAccess(0);
 pub const TPRAccess_TPR_ACCESS_WRITE: TPRAccess = TPRAccess(1);
-impl ::std::ops::BitOr<TPRAccess> for TPRAccess {
+impl ::core::ops::BitOr<TPRAccess> for TPRAccess {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         TPRAccess(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for TPRAccess {
+impl ::core::ops::BitOrAssign for TPRAccess {
     #[inline]
     fn bitor_assign(&mut self, rhs: TPRAccess) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<TPRAccess> for TPRAccess {
+impl ::core::ops::BitAnd<TPRAccess> for TPRAccess {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         TPRAccess(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for TPRAccess {
+impl ::core::ops::BitAndAssign for TPRAccess {
     #[inline]
     fn bitand_assign(&mut self, rhs: TPRAccess) {
         self.0 &= rhs.0;
@@ -4515,27 +4519,27 @@ pub struct TPRAccess(pub ::std::os::raw::c_uint);
 pub const CacheType_DATA_CACHE: CacheType = CacheType(0);
 pub const CacheType_INSTRUCTION_CACHE: CacheType = CacheType(1);
 pub const CacheType_UNIFIED_CACHE: CacheType = CacheType(2);
-impl ::std::ops::BitOr<CacheType> for CacheType {
+impl ::core::ops::BitOr<CacheType> for CacheType {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         CacheType(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for CacheType {
+impl ::core::ops::BitOrAssign for CacheType {
     #[inline]
     fn bitor_assign(&mut self, rhs: CacheType) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<CacheType> for CacheType {
+impl ::core::ops::BitAnd<CacheType> for CacheType {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         CacheType(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for CacheType {
+impl ::core::ops::BitAndAssign for CacheType {
     #[inline]
     fn bitand_assign(&mut self, rhs: CacheType) {
         self.0 &= rhs.0;
@@ -4563,8 +4567,8 @@ pub struct CPUCacheInfo {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUCacheInfo"][::std::mem::size_of::<CPUCacheInfo>() - 32usize];
-    ["Alignment of CPUCacheInfo"][::std::mem::align_of::<CPUCacheInfo>() - 4usize];
+    ["Size of CPUCacheInfo"][::core::mem::size_of::<CPUCacheInfo>() - 32usize];
+    ["Alignment of CPUCacheInfo"][::core::mem::align_of::<CPUCacheInfo>() - 4usize];
     ["Offset of field: CPUCacheInfo::type_"][::std::mem::offset_of!(CPUCacheInfo, type_) - 0usize];
     ["Offset of field: CPUCacheInfo::level"][::std::mem::offset_of!(CPUCacheInfo, level) - 4usize];
     ["Offset of field: CPUCacheInfo::size"][::std::mem::offset_of!(CPUCacheInfo, size) - 8usize];
@@ -4590,9 +4594,9 @@ const _: () = {
 };
 impl Default for CPUCacheInfo {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -4607,8 +4611,8 @@ pub struct CPUCaches {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUCaches"][::std::mem::size_of::<CPUCaches>() - 32usize];
-    ["Alignment of CPUCaches"][::std::mem::align_of::<CPUCaches>() - 8usize];
+    ["Size of CPUCaches"][::core::mem::size_of::<CPUCaches>() - 32usize];
+    ["Alignment of CPUCaches"][::core::mem::align_of::<CPUCaches>() - 8usize];
     ["Offset of field: CPUCaches::l1d_cache"]
         [::std::mem::offset_of!(CPUCaches, l1d_cache) - 0usize];
     ["Offset of field: CPUCaches::l1i_cache"]
@@ -4618,9 +4622,9 @@ const _: () = {
 };
 impl Default for CPUCaches {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -4843,9 +4847,9 @@ pub struct CPUArchState__bindgen_ty_1 {}
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of CPUArchState__bindgen_ty_1"]
-        [::std::mem::size_of::<CPUArchState__bindgen_ty_1>() - 0usize];
+        [::core::mem::size_of::<CPUArchState__bindgen_ty_1>() - 0usize];
     ["Alignment of CPUArchState__bindgen_ty_1"]
-        [::std::mem::align_of::<CPUArchState__bindgen_ty_1>() - 1usize];
+        [::core::mem::align_of::<CPUArchState__bindgen_ty_1>() - 1usize];
 };
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -4853,9 +4857,9 @@ pub struct CPUArchState__bindgen_ty_2 {}
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of CPUArchState__bindgen_ty_2"]
-        [::std::mem::size_of::<CPUArchState__bindgen_ty_2>() - 0usize];
+        [::core::mem::size_of::<CPUArchState__bindgen_ty_2>() - 0usize];
     ["Alignment of CPUArchState__bindgen_ty_2"]
-        [::std::mem::align_of::<CPUArchState__bindgen_ty_2>() - 1usize];
+        [::core::mem::align_of::<CPUArchState__bindgen_ty_2>() - 1usize];
 };
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -4866,9 +4870,9 @@ pub union CPUArchState__bindgen_ty_3 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of CPUArchState__bindgen_ty_3"]
-        [::std::mem::size_of::<CPUArchState__bindgen_ty_3>() - 32usize];
+        [::core::mem::size_of::<CPUArchState__bindgen_ty_3>() - 32usize];
     ["Alignment of CPUArchState__bindgen_ty_3"]
-        [::std::mem::align_of::<CPUArchState__bindgen_ty_3>() - 8usize];
+        [::core::mem::align_of::<CPUArchState__bindgen_ty_3>() - 8usize];
     ["Offset of field: CPUArchState__bindgen_ty_3::cpu_breakpoint"]
         [::std::mem::offset_of!(CPUArchState__bindgen_ty_3, cpu_breakpoint) - 0usize];
     ["Offset of field: CPUArchState__bindgen_ty_3::cpu_watchpoint"]
@@ -4876,15 +4880,15 @@ const _: () = {
 };
 impl Default for CPUArchState__bindgen_ty_3 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUArchState__bindgen_ty_3 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUArchState__bindgen_ty_3 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "CPUArchState__bindgen_ty_3 {{ union }}")
     }
 }
@@ -4894,14 +4898,14 @@ pub struct CPUArchState__bindgen_ty_4 {}
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of CPUArchState__bindgen_ty_4"]
-        [::std::mem::size_of::<CPUArchState__bindgen_ty_4>() - 0usize];
+        [::core::mem::size_of::<CPUArchState__bindgen_ty_4>() - 0usize];
     ["Alignment of CPUArchState__bindgen_ty_4"]
-        [::std::mem::align_of::<CPUArchState__bindgen_ty_4>() - 1usize];
+        [::core::mem::align_of::<CPUArchState__bindgen_ty_4>() - 1usize];
 };
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUArchState"][::std::mem::size_of::<CPUArchState>() - 15008usize];
-    ["Alignment of CPUArchState"][::std::mem::align_of::<CPUArchState>() - 16usize];
+    ["Size of CPUArchState"][::core::mem::size_of::<CPUArchState>() - 15008usize];
+    ["Alignment of CPUArchState"][::core::mem::align_of::<CPUArchState>() - 16usize];
     ["Offset of field: CPUArchState::regs"][::std::mem::offset_of!(CPUArchState, regs) - 0usize];
     ["Offset of field: CPUArchState::eip"][::std::mem::offset_of!(CPUArchState, eip) - 128usize];
     ["Offset of field: CPUArchState::eflags"]
@@ -5293,15 +5297,15 @@ const _: () = {
 };
 impl Default for CPUArchState {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for CPUArchState {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for CPUArchState {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write ! (f , "CPUArchState {{ regs: {:?}, segs: {:?}, ldt: {:?}, tr: {:?}, gdt: {:?}, idt: {:?}, cr: {:?}, pdptrs_valid: {:?}, pdptrs: {:?}, bnd_regs: {:?}, bndcs_regs: {:?}, start_init_save: {:?}, fpstt: {:?}, fptags: {:?}, fpregs: {:?}, fp_status: {:?}, ft0: {:?}, mmx_status: {:?}, sse_status: {:?}, xmm_regs: {:?}, xmm_t0: {:?}, mmx_t0: {:?}, opmask_regs: {:?}, xtilecfg: {:?}, xtiledata: {:?}, msr_ia32_sgxlepubkeyhash: {:?}, msr_fixed_counters: {:?}, msr_gp_counters: {:?}, msr_gp_evtsel: {:?}, end_init_save: {:?}, msr_hv_crash_params: {:?}, msr_hv_synic_sint: {:?}, msr_hv_stimer_config: {:?}, msr_hv_stimer_count: {:?}, msr_rtit_addrs: {:?}, lbr_records: {:?}, error_code: {:?}, exception_is_int: {:?}, dr: {:?}, __bindgen_anon_1: {:?}, old_exception: {:?}, end_reset_fields: {:?}, features: {:?}, user_features: {:?}, cpuid_model: {:?}, cache_info_cpuid2: {:?}, cache_info_cpuid4: {:?}, cache_info_amd: {:?}, mtrr_fixed: {:?}, mtrr_var: {:?}, tsc_valid: {:?}, mce_banks: {:?}, tpr_access_type: {:?}, nr_dies: {:?}, nr_modules: {:?}, avail_cpu_topo: {:?} }}" , self . regs , self . segs , self . ldt , self . tr , self . gdt , self . idt , self . cr , self . pdptrs_valid , self . pdptrs , self . bnd_regs , self . bndcs_regs , self . start_init_save , self . fpstt , self . fptags , self . fpregs , self . fp_status , self . ft0 , self . mmx_status , self . sse_status , self . xmm_regs , self . xmm_t0 , self . mmx_t0 , self . opmask_regs , self . xtilecfg , self . xtiledata , self . msr_ia32_sgxlepubkeyhash , self . msr_fixed_counters , self . msr_gp_counters , self . msr_gp_evtsel , self . end_init_save , self . msr_hv_crash_params , self . msr_hv_synic_sint , self . msr_hv_stimer_config , self . msr_hv_stimer_count , self . msr_rtit_addrs , self . lbr_records , self . error_code , self . exception_is_int , self . dr , self . __bindgen_anon_1 , self . old_exception , self . end_reset_fields , self . features , self . user_features , self . cpuid_model , self . cache_info_cpuid2 , self . cache_info_cpuid4 , self . cache_info_amd , self . mtrr_fixed , self . mtrr_var , self . tsc_valid , self . mce_banks , self . tpr_access_type , self . nr_dies , self . nr_modules , self . avail_cpu_topo)
     }
 }
@@ -5391,9 +5395,9 @@ pub struct ArchCPU__bindgen_ty_1 {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ArchCPU__bindgen_ty_1"][::std::mem::size_of::<ArchCPU__bindgen_ty_1>() - 16usize];
+    ["Size of ArchCPU__bindgen_ty_1"][::core::mem::size_of::<ArchCPU__bindgen_ty_1>() - 16usize];
     ["Alignment of ArchCPU__bindgen_ty_1"]
-        [::std::mem::align_of::<ArchCPU__bindgen_ty_1>() - 4usize];
+        [::core::mem::align_of::<ArchCPU__bindgen_ty_1>() - 4usize];
     ["Offset of field: ArchCPU__bindgen_ty_1::eax"]
         [::std::mem::offset_of!(ArchCPU__bindgen_ty_1, eax) - 0usize];
     ["Offset of field: ArchCPU__bindgen_ty_1::ebx"]
@@ -5405,8 +5409,8 @@ const _: () = {
 };
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of ArchCPU"][::std::mem::size_of::<ArchCPU>() - 25792usize];
-    ["Alignment of ArchCPU"][::std::mem::align_of::<ArchCPU>() - 16usize];
+    ["Size of ArchCPU"][::core::mem::size_of::<ArchCPU>() - 25792usize];
+    ["Alignment of ArchCPU"][::core::mem::align_of::<ArchCPU>() - 16usize];
     ["Offset of field: ArchCPU::parent_obj"][::std::mem::offset_of!(ArchCPU, parent_obj) - 0usize];
     ["Offset of field: ArchCPU::env"][::std::mem::offset_of!(ArchCPU, env) - 10176usize];
     ["Offset of field: ArchCPU::vmsentry"][::std::mem::offset_of!(ArchCPU, vmsentry) - 25184usize];
@@ -5530,15 +5534,15 @@ const _: () = {
 };
 impl Default for ArchCPU {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for ArchCPU {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for ArchCPU {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write ! (f , "ArchCPU {{ parent_obj: {:?}, env: {:?}, vmsentry: {:?}, hyperv_vendor: {:?}, hyperv_synic_kvm_only: {:?}, hyperv_passthrough: {:?}, hyperv_no_nonarch_cs: {:?}, hyperv_vendor_id: {:?}, hyperv_interface_id: {:?}, hyperv_limits: {:?}, hyperv_enforce_cpuid: {:?}, check_cpuid: {:?}, enforce_cpuid: {:?}, force_features: {:?}, expose_kvm: {:?}, expose_tcg: {:?}, migratable: {:?}, migrate_smi_count: {:?}, max_features: {:?}, vmware_cpuid_freq: {:?}, cache_info_passthrough: {:?}, mwait: {:?}, filtered_features: {:?}, enable_pmu: {:?}, enable_lmce: {:?}, enable_l3_cache: {:?}, l1_cache_per_core: {:?}, legacy_cache: {:?}, legacy_multi_node: {:?}, enable_cpuid_0xb: {:?}, full_cpuid_auto_level: {:?}, vendor_cpuid_only: {:?}, amd_topoext_features_only: {:?}, intel_pt_auto_level: {:?}, fill_mtrr_mask: {:?}, host_phys_bits: {:?}, kvm_pv_enforce_cpuid: {:?}, apic_state: {:?}, cpu_as_root: {:?}, cpu_as_mem: {:?}, smram: {:?}, machine_done: {:?}, kvm_msr_buf: {:?}, xen_vapic: {:?} }}" , self . parent_obj , self . env , self . vmsentry , self . hyperv_vendor , self . hyperv_synic_kvm_only , self . hyperv_passthrough , self . hyperv_no_nonarch_cs , self . hyperv_vendor_id , self . hyperv_interface_id , self . hyperv_limits , self . hyperv_enforce_cpuid , self . check_cpuid , self . enforce_cpuid , self . force_features , self . expose_kvm , self . expose_tcg , self . migratable , self . migrate_smi_count , self . max_features , self . vmware_cpuid_freq , self . cache_info_passthrough , self . mwait , self . filtered_features , self . enable_pmu , self . enable_lmce , self . enable_l3_cache , self . l1_cache_per_core , self . legacy_cache , self . legacy_multi_node , self . enable_cpuid_0xb , self . full_cpuid_auto_level , self . vendor_cpuid_only , self . amd_topoext_features_only , self . intel_pt_auto_level , self . fill_mtrr_mask , self . host_phys_bits , self . kvm_pv_enforce_cpuid , self . apic_state , self . cpu_as_root , self . cpu_as_mem , self . smram , self . machine_done , self . kvm_msr_buf , self . xen_vapic)
     }
 }
@@ -5560,8 +5564,8 @@ pub struct RBNode {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of RBNode"][::std::mem::size_of::<RBNode>() - 24usize];
-    ["Alignment of RBNode"][::std::mem::align_of::<RBNode>() - 8usize];
+    ["Size of RBNode"][::core::mem::size_of::<RBNode>() - 24usize];
+    ["Alignment of RBNode"][::core::mem::align_of::<RBNode>() - 8usize];
     ["Offset of field: RBNode::rb_parent_color"]
         [::std::mem::offset_of!(RBNode, rb_parent_color) - 0usize];
     ["Offset of field: RBNode::rb_right"][::std::mem::offset_of!(RBNode, rb_right) - 8usize];
@@ -5569,9 +5573,9 @@ const _: () = {
 };
 impl Default for RBNode {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -5583,15 +5587,15 @@ pub struct RBRoot {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of RBRoot"][::std::mem::size_of::<RBRoot>() - 8usize];
-    ["Alignment of RBRoot"][::std::mem::align_of::<RBRoot>() - 8usize];
+    ["Size of RBRoot"][::core::mem::size_of::<RBRoot>() - 8usize];
+    ["Alignment of RBRoot"][::core::mem::align_of::<RBRoot>() - 8usize];
     ["Offset of field: RBRoot::rb_node"][::std::mem::offset_of!(RBRoot, rb_node) - 0usize];
 };
 impl Default for RBRoot {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -5604,8 +5608,8 @@ pub struct RBRootLeftCached {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of RBRootLeftCached"][::std::mem::size_of::<RBRootLeftCached>() - 16usize];
-    ["Alignment of RBRootLeftCached"][::std::mem::align_of::<RBRootLeftCached>() - 8usize];
+    ["Size of RBRootLeftCached"][::core::mem::size_of::<RBRootLeftCached>() - 16usize];
+    ["Alignment of RBRootLeftCached"][::core::mem::align_of::<RBRootLeftCached>() - 8usize];
     ["Offset of field: RBRootLeftCached::rb_root"]
         [::std::mem::offset_of!(RBRootLeftCached, rb_root) - 0usize];
     ["Offset of field: RBRootLeftCached::rb_leftmost"]
@@ -5613,9 +5617,9 @@ const _: () = {
 };
 impl Default for RBRootLeftCached {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -5630,8 +5634,8 @@ pub struct IntervalTreeNode {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of IntervalTreeNode"][::std::mem::size_of::<IntervalTreeNode>() - 48usize];
-    ["Alignment of IntervalTreeNode"][::std::mem::align_of::<IntervalTreeNode>() - 8usize];
+    ["Size of IntervalTreeNode"][::core::mem::size_of::<IntervalTreeNode>() - 48usize];
+    ["Alignment of IntervalTreeNode"][::core::mem::align_of::<IntervalTreeNode>() - 8usize];
     ["Offset of field: IntervalTreeNode::rb"]
         [::std::mem::offset_of!(IntervalTreeNode, rb) - 0usize];
     ["Offset of field: IntervalTreeNode::start"]
@@ -5643,9 +5647,9 @@ const _: () = {
 };
 impl Default for IntervalTreeNode {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -5727,27 +5731,27 @@ pub const MemOp_MO_TESW: MemOp = MemOp(9);
 pub const MemOp_MO_TESL: MemOp = MemOp(10);
 pub const MemOp_MO_TESQ: MemOp = MemOp(11);
 pub const MemOp_MO_SSIZE: MemOp = MemOp(15);
-impl ::std::ops::BitOr<MemOp> for MemOp {
+impl ::core::ops::BitOr<MemOp> for MemOp {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         MemOp(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for MemOp {
+impl ::core::ops::BitOrAssign for MemOp {
     #[inline]
     fn bitor_assign(&mut self, rhs: MemOp) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<MemOp> for MemOp {
+impl ::core::ops::BitAnd<MemOp> for MemOp {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         MemOp(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for MemOp {
+impl ::core::ops::BitAndAssign for MemOp {
     #[inline]
     fn bitand_assign(&mut self, rhs: MemOp) {
         self.0 &= rhs.0;
@@ -5800,8 +5804,8 @@ pub struct image_info {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of image_info"][::std::mem::size_of::<image_info>() - 264usize];
-    ["Alignment of image_info"][::std::mem::align_of::<image_info>() - 8usize];
+    ["Size of image_info"][::core::mem::size_of::<image_info>() - 264usize];
+    ["Alignment of image_info"][::core::mem::align_of::<image_info>() - 8usize];
     ["Offset of field: image_info::load_bias"]
         [::std::mem::offset_of!(image_info, load_bias) - 0usize];
     ["Offset of field: image_info::load_addr"]
@@ -5865,9 +5869,9 @@ const _: () = {
 };
 impl Default for image_info {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -5880,16 +5884,16 @@ pub struct tb_tc {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of tb_tc"][::std::mem::size_of::<tb_tc>() - 16usize];
-    ["Alignment of tb_tc"][::std::mem::align_of::<tb_tc>() - 8usize];
+    ["Size of tb_tc"][::core::mem::size_of::<tb_tc>() - 16usize];
+    ["Alignment of tb_tc"][::core::mem::align_of::<tb_tc>() - 8usize];
     ["Offset of field: tb_tc::ptr"][::std::mem::offset_of!(tb_tc, ptr) - 0usize];
     ["Offset of field: tb_tc::size"][::std::mem::offset_of!(tb_tc, size) - 8usize];
 };
 impl Default for tb_tc {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -5915,8 +5919,8 @@ pub struct TranslationBlock {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of TranslationBlock"][::std::mem::size_of::<TranslationBlock>() - 168usize];
-    ["Alignment of TranslationBlock"][::std::mem::align_of::<TranslationBlock>() - 8usize];
+    ["Size of TranslationBlock"][::core::mem::size_of::<TranslationBlock>() - 168usize];
+    ["Alignment of TranslationBlock"][::core::mem::align_of::<TranslationBlock>() - 8usize];
     ["Offset of field: TranslationBlock::pc"]
         [::std::mem::offset_of!(TranslationBlock, pc) - 0usize];
     ["Offset of field: TranslationBlock::cs_base"]
@@ -5950,9 +5954,9 @@ const _: () = {
 };
 impl Default for TranslationBlock {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -5999,8 +6003,8 @@ pub struct libafl_breakpoint {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_breakpoint"][::std::mem::size_of::<libafl_breakpoint>() - 16usize];
-    ["Alignment of libafl_breakpoint"][::std::mem::align_of::<libafl_breakpoint>() - 8usize];
+    ["Size of libafl_breakpoint"][::core::mem::size_of::<libafl_breakpoint>() - 16usize];
+    ["Alignment of libafl_breakpoint"][::core::mem::align_of::<libafl_breakpoint>() - 8usize];
     ["Offset of field: libafl_breakpoint::addr"]
         [::std::mem::offset_of!(libafl_breakpoint, addr) - 0usize];
     ["Offset of field: libafl_breakpoint::next"]
@@ -6008,9 +6012,9 @@ const _: () = {
 };
 impl Default for libafl_breakpoint {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -6019,27 +6023,27 @@ pub const libafl_exit_reason_kind_INTERNAL: libafl_exit_reason_kind = libafl_exi
 pub const libafl_exit_reason_kind_BREAKPOINT: libafl_exit_reason_kind = libafl_exit_reason_kind(1);
 pub const libafl_exit_reason_kind_CUSTOM_INSN: libafl_exit_reason_kind = libafl_exit_reason_kind(2);
 pub const libafl_exit_reason_kind_TIMEOUT: libafl_exit_reason_kind = libafl_exit_reason_kind(3);
-impl ::std::ops::BitOr<libafl_exit_reason_kind> for libafl_exit_reason_kind {
+impl ::core::ops::BitOr<libafl_exit_reason_kind> for libafl_exit_reason_kind {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         libafl_exit_reason_kind(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for libafl_exit_reason_kind {
+impl ::core::ops::BitOrAssign for libafl_exit_reason_kind {
     #[inline]
     fn bitor_assign(&mut self, rhs: libafl_exit_reason_kind) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<libafl_exit_reason_kind> for libafl_exit_reason_kind {
+impl ::core::ops::BitAnd<libafl_exit_reason_kind> for libafl_exit_reason_kind {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         libafl_exit_reason_kind(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for libafl_exit_reason_kind {
+impl ::core::ops::BitAndAssign for libafl_exit_reason_kind {
     #[inline]
     fn bitand_assign(&mut self, rhs: libafl_exit_reason_kind) {
         self.0 &= rhs.0;
@@ -6054,27 +6058,27 @@ pub const libafl_custom_insn_kind_LIBAFL_CUSTOM_INSN_LIBAFL: libafl_custom_insn_
     libafl_custom_insn_kind(1);
 pub const libafl_custom_insn_kind_LIBAFL_CUSTOM_INSN_NYX: libafl_custom_insn_kind =
     libafl_custom_insn_kind(2);
-impl ::std::ops::BitOr<libafl_custom_insn_kind> for libafl_custom_insn_kind {
+impl ::core::ops::BitOr<libafl_custom_insn_kind> for libafl_custom_insn_kind {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         libafl_custom_insn_kind(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for libafl_custom_insn_kind {
+impl ::core::ops::BitOrAssign for libafl_custom_insn_kind {
     #[inline]
     fn bitor_assign(&mut self, rhs: libafl_custom_insn_kind) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<libafl_custom_insn_kind> for libafl_custom_insn_kind {
+impl ::core::ops::BitAnd<libafl_custom_insn_kind> for libafl_custom_insn_kind {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         libafl_custom_insn_kind(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for libafl_custom_insn_kind {
+impl ::core::ops::BitAndAssign for libafl_custom_insn_kind {
     #[inline]
     fn bitand_assign(&mut self, rhs: libafl_custom_insn_kind) {
         self.0 &= rhs.0;
@@ -6092,9 +6096,9 @@ pub struct libafl_exit_reason_internal {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of libafl_exit_reason_internal"]
-        [::std::mem::size_of::<libafl_exit_reason_internal>() - 8usize];
+        [::core::mem::size_of::<libafl_exit_reason_internal>() - 8usize];
     ["Alignment of libafl_exit_reason_internal"]
-        [::std::mem::align_of::<libafl_exit_reason_internal>() - 4usize];
+        [::core::mem::align_of::<libafl_exit_reason_internal>() - 4usize];
     ["Offset of field: libafl_exit_reason_internal::cause"]
         [::std::mem::offset_of!(libafl_exit_reason_internal, cause) - 0usize];
     ["Offset of field: libafl_exit_reason_internal::signal"]
@@ -6102,9 +6106,9 @@ const _: () = {
 };
 impl Default for libafl_exit_reason_internal {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -6117,9 +6121,9 @@ pub struct libafl_exit_reason_breakpoint {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of libafl_exit_reason_breakpoint"]
-        [::std::mem::size_of::<libafl_exit_reason_breakpoint>() - 8usize];
+        [::core::mem::size_of::<libafl_exit_reason_breakpoint>() - 8usize];
     ["Alignment of libafl_exit_reason_breakpoint"]
-        [::std::mem::align_of::<libafl_exit_reason_breakpoint>() - 8usize];
+        [::core::mem::align_of::<libafl_exit_reason_breakpoint>() - 8usize];
     ["Offset of field: libafl_exit_reason_breakpoint::addr"]
         [::std::mem::offset_of!(libafl_exit_reason_breakpoint, addr) - 0usize];
 };
@@ -6131,17 +6135,17 @@ pub struct libafl_exit_reason_custom_insn {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of libafl_exit_reason_custom_insn"]
-        [::std::mem::size_of::<libafl_exit_reason_custom_insn>() - 4usize];
+        [::core::mem::size_of::<libafl_exit_reason_custom_insn>() - 4usize];
     ["Alignment of libafl_exit_reason_custom_insn"]
-        [::std::mem::align_of::<libafl_exit_reason_custom_insn>() - 4usize];
+        [::core::mem::align_of::<libafl_exit_reason_custom_insn>() - 4usize];
     ["Offset of field: libafl_exit_reason_custom_insn::kind"]
         [::std::mem::offset_of!(libafl_exit_reason_custom_insn, kind) - 0usize];
 };
 impl Default for libafl_exit_reason_custom_insn {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -6152,9 +6156,9 @@ pub struct libafl_exit_reason_timeout {}
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of libafl_exit_reason_timeout"]
-        [::std::mem::size_of::<libafl_exit_reason_timeout>() - 0usize];
+        [::core::mem::size_of::<libafl_exit_reason_timeout>() - 0usize];
     ["Alignment of libafl_exit_reason_timeout"]
-        [::std::mem::align_of::<libafl_exit_reason_timeout>() - 1usize];
+        [::core::mem::align_of::<libafl_exit_reason_timeout>() - 1usize];
 };
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -6175,9 +6179,9 @@ pub union libafl_exit_reason__bindgen_ty_1 {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of libafl_exit_reason__bindgen_ty_1"]
-        [::std::mem::size_of::<libafl_exit_reason__bindgen_ty_1>() - 8usize];
+        [::core::mem::size_of::<libafl_exit_reason__bindgen_ty_1>() - 8usize];
     ["Alignment of libafl_exit_reason__bindgen_ty_1"]
-        [::std::mem::align_of::<libafl_exit_reason__bindgen_ty_1>() - 8usize];
+        [::core::mem::align_of::<libafl_exit_reason__bindgen_ty_1>() - 8usize];
     ["Offset of field: libafl_exit_reason__bindgen_ty_1::internal"]
         [::std::mem::offset_of!(libafl_exit_reason__bindgen_ty_1, internal) - 0usize];
     ["Offset of field: libafl_exit_reason__bindgen_ty_1::breakpoint"]
@@ -6189,22 +6193,22 @@ const _: () = {
 };
 impl Default for libafl_exit_reason__bindgen_ty_1 {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for libafl_exit_reason__bindgen_ty_1 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for libafl_exit_reason__bindgen_ty_1 {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "libafl_exit_reason__bindgen_ty_1 {{ union }}")
     }
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_exit_reason"][::std::mem::size_of::<libafl_exit_reason>() - 32usize];
-    ["Alignment of libafl_exit_reason"][::std::mem::align_of::<libafl_exit_reason>() - 8usize];
+    ["Size of libafl_exit_reason"][::core::mem::size_of::<libafl_exit_reason>() - 32usize];
+    ["Alignment of libafl_exit_reason"][::core::mem::align_of::<libafl_exit_reason>() - 8usize];
     ["Offset of field: libafl_exit_reason::kind"]
         [::std::mem::offset_of!(libafl_exit_reason, kind) - 0usize];
     ["Offset of field: libafl_exit_reason::cpu"]
@@ -6216,15 +6220,15 @@ const _: () = {
 };
 impl Default for libafl_exit_reason {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
-impl ::std::fmt::Debug for libafl_exit_reason {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl ::core::fmt::Debug for libafl_exit_reason {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(
             f,
             "libafl_exit_reason {{ kind: {:?}, cpu: {:?}, data: {:?} }}",
@@ -6290,8 +6294,8 @@ pub struct libafl_mapinfo {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_mapinfo"][::std::mem::size_of::<libafl_mapinfo>() - 48usize];
-    ["Alignment of libafl_mapinfo"][::std::mem::align_of::<libafl_mapinfo>() - 8usize];
+    ["Size of libafl_mapinfo"][::core::mem::size_of::<libafl_mapinfo>() - 48usize];
+    ["Alignment of libafl_mapinfo"][::core::mem::align_of::<libafl_mapinfo>() - 8usize];
     ["Offset of field: libafl_mapinfo::start"]
         [::std::mem::offset_of!(libafl_mapinfo, start) - 0usize];
     ["Offset of field: libafl_mapinfo::end"][::std::mem::offset_of!(libafl_mapinfo, end) - 8usize];
@@ -6308,9 +6312,9 @@ const _: () = {
 };
 impl Default for libafl_mapinfo {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -6323,8 +6327,8 @@ pub struct libafl_qemu_sig_ctx {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_qemu_sig_ctx"][::std::mem::size_of::<libafl_qemu_sig_ctx>() - 2usize];
-    ["Alignment of libafl_qemu_sig_ctx"][::std::mem::align_of::<libafl_qemu_sig_ctx>() - 1usize];
+    ["Size of libafl_qemu_sig_ctx"][::core::mem::size_of::<libafl_qemu_sig_ctx>() - 2usize];
+    ["Alignment of libafl_qemu_sig_ctx"][::core::mem::align_of::<libafl_qemu_sig_ctx>() - 1usize];
     ["Offset of field: libafl_qemu_sig_ctx::in_qemu_sig_hdlr"]
         [::std::mem::offset_of!(libafl_qemu_sig_ctx, in_qemu_sig_hdlr) - 0usize];
     ["Offset of field: libafl_qemu_sig_ctx::is_target_signal"]
@@ -6391,16 +6395,16 @@ unsafe extern "C" {
 #[derive(Debug, Copy, Clone)]
 pub struct AccelCPUClass {
     pub parent_class: ObjectClass,
-    pub cpu_class_init: ::std::option::Option<unsafe extern "C" fn(cc: *mut CPUClass)>,
-    pub cpu_instance_init: ::std::option::Option<unsafe extern "C" fn(cpu: *mut CPUState)>,
-    pub cpu_target_realize: ::std::option::Option<
+    pub cpu_class_init: ::core::option::Option<unsafe extern "C" fn(cc: *mut CPUClass)>,
+    pub cpu_instance_init: ::core::option::Option<unsafe extern "C" fn(cpu: *mut CPUState)>,
+    pub cpu_target_realize: ::core::option::Option<
         unsafe extern "C" fn(cpu: *mut CPUState, errp: *mut *mut Error) -> bool,
     >,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of AccelCPUClass"][::std::mem::size_of::<AccelCPUClass>() - 120usize];
-    ["Alignment of AccelCPUClass"][::std::mem::align_of::<AccelCPUClass>() - 8usize];
+    ["Size of AccelCPUClass"][::core::mem::size_of::<AccelCPUClass>() - 120usize];
+    ["Alignment of AccelCPUClass"][::core::mem::align_of::<AccelCPUClass>() - 8usize];
     ["Offset of field: AccelCPUClass::parent_class"]
         [::std::mem::offset_of!(AccelCPUClass, parent_class) - 0usize];
     ["Offset of field: AccelCPUClass::cpu_class_init"]
@@ -6412,9 +6416,9 @@ const _: () = {
 };
 impl Default for AccelCPUClass {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -6422,27 +6426,27 @@ impl Default for AccelCPUClass {
 pub const qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_R: qemu_plugin_mem_rw = qemu_plugin_mem_rw(1);
 pub const qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_W: qemu_plugin_mem_rw = qemu_plugin_mem_rw(2);
 pub const qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_RW: qemu_plugin_mem_rw = qemu_plugin_mem_rw(3);
-impl ::std::ops::BitOr<qemu_plugin_mem_rw> for qemu_plugin_mem_rw {
+impl ::core::ops::BitOr<qemu_plugin_mem_rw> for qemu_plugin_mem_rw {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         qemu_plugin_mem_rw(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for qemu_plugin_mem_rw {
+impl ::core::ops::BitOrAssign for qemu_plugin_mem_rw {
     #[inline]
     fn bitor_assign(&mut self, rhs: qemu_plugin_mem_rw) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<qemu_plugin_mem_rw> for qemu_plugin_mem_rw {
+impl ::core::ops::BitAnd<qemu_plugin_mem_rw> for qemu_plugin_mem_rw {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         qemu_plugin_mem_rw(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for qemu_plugin_mem_rw {
+impl ::core::ops::BitAndAssign for qemu_plugin_mem_rw {
     #[inline]
     fn bitand_assign(&mut self, rhs: qemu_plugin_mem_rw) {
         self.0 &= rhs.0;
@@ -6472,8 +6476,8 @@ pub struct CPUPluginState {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of CPUPluginState"][::std::mem::size_of::<CPUPluginState>() - 8usize];
-    ["Alignment of CPUPluginState"][::std::mem::align_of::<CPUPluginState>() - 8usize];
+    ["Size of CPUPluginState"][::core::mem::size_of::<CPUPluginState>() - 8usize];
+    ["Alignment of CPUPluginState"][::core::mem::align_of::<CPUPluginState>() - 8usize];
     ["Offset of field: CPUPluginState::event_mask"]
         [::std::mem::offset_of!(CPUPluginState, event_mask) - 0usize];
 };
@@ -6519,27 +6523,27 @@ pub const TCGReg_TCG_REG_RSI: TCGReg = TCGReg(6);
 pub const TCGReg_TCG_REG_RDI: TCGReg = TCGReg(7);
 pub const TCGReg_TCG_AREG0: TCGReg = TCGReg(5);
 pub const TCGReg_TCG_REG_CALL_STACK: TCGReg = TCGReg(4);
-impl ::std::ops::BitOr<TCGReg> for TCGReg {
+impl ::core::ops::BitOr<TCGReg> for TCGReg {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         TCGReg(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for TCGReg {
+impl ::core::ops::BitOrAssign for TCGReg {
     #[inline]
     fn bitor_assign(&mut self, rhs: TCGReg) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<TCGReg> for TCGReg {
+impl ::core::ops::BitAnd<TCGReg> for TCGReg {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         TCGReg(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for TCGReg {
+impl ::core::ops::BitAndAssign for TCGReg {
     #[inline]
     fn bitand_assign(&mut self, rhs: TCGReg) {
         self.0 &= rhs.0;
@@ -6556,27 +6560,27 @@ pub const TCGType_TCG_TYPE_V128: TCGType = TCGType(4);
 pub const TCGType_TCG_TYPE_V256: TCGType = TCGType(5);
 pub const TCGType_TCG_TYPE_REG: TCGType = TCGType(1);
 pub const TCGType_TCG_TYPE_PTR: TCGType = TCGType(1);
-impl ::std::ops::BitOr<TCGType> for TCGType {
+impl ::core::ops::BitOr<TCGType> for TCGType {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         TCGType(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for TCGType {
+impl ::core::ops::BitOrAssign for TCGType {
     #[inline]
     fn bitor_assign(&mut self, rhs: TCGType) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<TCGType> for TCGType {
+impl ::core::ops::BitAnd<TCGType> for TCGType {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         TCGType(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for TCGType {
+impl ::core::ops::BitAndAssign for TCGType {
     #[inline]
     fn bitand_assign(&mut self, rhs: TCGType) {
         self.0 &= rhs.0;
@@ -6595,27 +6599,27 @@ pub const TCGTempVal_TEMP_VAL_DEAD: TCGTempVal = TCGTempVal(0);
 pub const TCGTempVal_TEMP_VAL_REG: TCGTempVal = TCGTempVal(1);
 pub const TCGTempVal_TEMP_VAL_MEM: TCGTempVal = TCGTempVal(2);
 pub const TCGTempVal_TEMP_VAL_CONST: TCGTempVal = TCGTempVal(3);
-impl ::std::ops::BitOr<TCGTempVal> for TCGTempVal {
+impl ::core::ops::BitOr<TCGTempVal> for TCGTempVal {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         TCGTempVal(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for TCGTempVal {
+impl ::core::ops::BitOrAssign for TCGTempVal {
     #[inline]
     fn bitor_assign(&mut self, rhs: TCGTempVal) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<TCGTempVal> for TCGTempVal {
+impl ::core::ops::BitAnd<TCGTempVal> for TCGTempVal {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         TCGTempVal(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for TCGTempVal {
+impl ::core::ops::BitAndAssign for TCGTempVal {
     #[inline]
     fn bitand_assign(&mut self, rhs: TCGTempVal) {
         self.0 &= rhs.0;
@@ -6629,27 +6633,27 @@ pub const TCGTempKind_TEMP_TB: TCGTempKind = TCGTempKind(1);
 pub const TCGTempKind_TEMP_GLOBAL: TCGTempKind = TCGTempKind(2);
 pub const TCGTempKind_TEMP_FIXED: TCGTempKind = TCGTempKind(3);
 pub const TCGTempKind_TEMP_CONST: TCGTempKind = TCGTempKind(4);
-impl ::std::ops::BitOr<TCGTempKind> for TCGTempKind {
+impl ::core::ops::BitOr<TCGTempKind> for TCGTempKind {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         TCGTempKind(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for TCGTempKind {
+impl ::core::ops::BitOrAssign for TCGTempKind {
     #[inline]
     fn bitor_assign(&mut self, rhs: TCGTempKind) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<TCGTempKind> for TCGTempKind {
+impl ::core::ops::BitAnd<TCGTempKind> for TCGTempKind {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         TCGTempKind(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for TCGTempKind {
+impl ::core::ops::BitAndAssign for TCGTempKind {
     #[inline]
     fn bitand_assign(&mut self, rhs: TCGTempKind) {
         self.0 &= rhs.0;
@@ -6672,8 +6676,8 @@ pub struct TCGTemp {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of TCGTemp"][::std::mem::size_of::<TCGTemp>() - 56usize];
-    ["Alignment of TCGTemp"][::std::mem::align_of::<TCGTemp>() - 8usize];
+    ["Size of TCGTemp"][::core::mem::size_of::<TCGTemp>() - 56usize];
+    ["Alignment of TCGTemp"][::core::mem::align_of::<TCGTemp>() - 8usize];
     ["Offset of field: TCGTemp::val"][::std::mem::offset_of!(TCGTemp, val) - 8usize];
     ["Offset of field: TCGTemp::mem_base"][::std::mem::offset_of!(TCGTemp, mem_base) - 16usize];
     ["Offset of field: TCGTemp::mem_offset"][::std::mem::offset_of!(TCGTemp, mem_offset) - 24usize];
@@ -6683,9 +6687,9 @@ const _: () = {
 };
 impl Default for TCGTemp {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -6693,19 +6697,19 @@ impl Default for TCGTemp {
 impl TCGTemp {
     #[inline]
     pub fn reg(&self) -> TCGReg {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(0usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_reg(&mut self, val: TCGReg) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(0usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn reg_raw(this: *const Self) -> TCGReg {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 0usize,
                 8u8,
@@ -6715,7 +6719,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_reg_raw(this: *mut Self, val: TCGReg) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 0usize,
@@ -6726,19 +6730,19 @@ impl TCGTemp {
     }
     #[inline]
     pub fn val_type(&self) -> TCGTempVal {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(8usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(8usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_val_type(&mut self, val: TCGTempVal) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(8usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn val_type_raw(this: *const Self) -> TCGTempVal {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 8usize,
                 8u8,
@@ -6748,7 +6752,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_val_type_raw(this: *mut Self, val: TCGTempVal) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 8usize,
@@ -6759,19 +6763,19 @@ impl TCGTemp {
     }
     #[inline]
     pub fn base_type(&self) -> TCGType {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(16usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(16usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_base_type(&mut self, val: TCGType) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(16usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn base_type_raw(this: *const Self) -> TCGType {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 16usize,
                 8u8,
@@ -6781,7 +6785,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_base_type_raw(this: *mut Self, val: TCGType) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 16usize,
@@ -6792,19 +6796,19 @@ impl TCGTemp {
     }
     #[inline]
     pub fn type_(&self) -> TCGType {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(24usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(24usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_type(&mut self, val: TCGType) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(24usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn type__raw(this: *const Self) -> TCGType {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 24usize,
                 8u8,
@@ -6814,7 +6818,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_type_raw(this: *mut Self, val: TCGType) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 24usize,
@@ -6825,19 +6829,19 @@ impl TCGTemp {
     }
     #[inline]
     pub fn kind(&self) -> TCGTempKind {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(32usize, 3u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(32usize, 3u8) as u32) }
     }
     #[inline]
     pub fn set_kind(&mut self, val: TCGTempKind) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(32usize, 3u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn kind_raw(this: *const Self) -> TCGTempKind {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 32usize,
                 3u8,
@@ -6847,7 +6851,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_kind_raw(this: *mut Self, val: TCGTempKind) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 32usize,
@@ -6858,19 +6862,19 @@ impl TCGTemp {
     }
     #[inline]
     pub fn indirect_reg(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(35usize, 1u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(35usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_indirect_reg(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(35usize, 1u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn indirect_reg_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 35usize,
                 1u8,
@@ -6880,7 +6884,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_indirect_reg_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 35usize,
@@ -6891,19 +6895,19 @@ impl TCGTemp {
     }
     #[inline]
     pub fn indirect_base(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(36usize, 1u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(36usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_indirect_base(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(36usize, 1u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn indirect_base_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 36usize,
                 1u8,
@@ -6913,7 +6917,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_indirect_base_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 36usize,
@@ -6924,19 +6928,19 @@ impl TCGTemp {
     }
     #[inline]
     pub fn mem_coherent(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(37usize, 1u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(37usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_mem_coherent(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(37usize, 1u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn mem_coherent_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 37usize,
                 1u8,
@@ -6946,7 +6950,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_mem_coherent_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 37usize,
@@ -6957,19 +6961,19 @@ impl TCGTemp {
     }
     #[inline]
     pub fn mem_allocated(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(38usize, 1u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(38usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_mem_allocated(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(38usize, 1u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn mem_allocated_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 38usize,
                 1u8,
@@ -6979,7 +6983,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_mem_allocated_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 38usize,
@@ -6990,19 +6994,19 @@ impl TCGTemp {
     }
     #[inline]
     pub fn temp_allocated(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(39usize, 1u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(39usize, 1u8) as u32) }
     }
     #[inline]
     pub fn set_temp_allocated(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(39usize, 1u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn temp_allocated_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 39usize,
                 1u8,
@@ -7012,7 +7016,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_temp_allocated_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 39usize,
@@ -7023,19 +7027,19 @@ impl TCGTemp {
     }
     #[inline]
     pub fn temp_subindex(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(40usize, 2u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(40usize, 2u8) as u32) }
     }
     #[inline]
     pub fn set_temp_subindex(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(40usize, 2u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn temp_subindex_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 6usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 40usize,
                 2u8,
@@ -7045,7 +7049,7 @@ impl TCGTemp {
     #[inline]
     pub unsafe fn set_temp_subindex_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 6usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 40usize,
@@ -7070,47 +7074,47 @@ impl TCGTemp {
     ) -> __BindgenBitfieldUnit<[u8; 6usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 6usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
-            let reg: u32 = unsafe { ::std::mem::transmute(reg) };
+            let reg: u32 = unsafe { ::core::mem::transmute(reg) };
             reg as u64
         });
         __bindgen_bitfield_unit.set(8usize, 8u8, {
-            let val_type: u32 = unsafe { ::std::mem::transmute(val_type) };
+            let val_type: u32 = unsafe { ::core::mem::transmute(val_type) };
             val_type as u64
         });
         __bindgen_bitfield_unit.set(16usize, 8u8, {
-            let base_type: u32 = unsafe { ::std::mem::transmute(base_type) };
+            let base_type: u32 = unsafe { ::core::mem::transmute(base_type) };
             base_type as u64
         });
         __bindgen_bitfield_unit.set(24usize, 8u8, {
-            let type_: u32 = unsafe { ::std::mem::transmute(type_) };
+            let type_: u32 = unsafe { ::core::mem::transmute(type_) };
             type_ as u64
         });
         __bindgen_bitfield_unit.set(32usize, 3u8, {
-            let kind: u32 = unsafe { ::std::mem::transmute(kind) };
+            let kind: u32 = unsafe { ::core::mem::transmute(kind) };
             kind as u64
         });
         __bindgen_bitfield_unit.set(35usize, 1u8, {
-            let indirect_reg: u32 = unsafe { ::std::mem::transmute(indirect_reg) };
+            let indirect_reg: u32 = unsafe { ::core::mem::transmute(indirect_reg) };
             indirect_reg as u64
         });
         __bindgen_bitfield_unit.set(36usize, 1u8, {
-            let indirect_base: u32 = unsafe { ::std::mem::transmute(indirect_base) };
+            let indirect_base: u32 = unsafe { ::core::mem::transmute(indirect_base) };
             indirect_base as u64
         });
         __bindgen_bitfield_unit.set(37usize, 1u8, {
-            let mem_coherent: u32 = unsafe { ::std::mem::transmute(mem_coherent) };
+            let mem_coherent: u32 = unsafe { ::core::mem::transmute(mem_coherent) };
             mem_coherent as u64
         });
         __bindgen_bitfield_unit.set(38usize, 1u8, {
-            let mem_allocated: u32 = unsafe { ::std::mem::transmute(mem_allocated) };
+            let mem_allocated: u32 = unsafe { ::core::mem::transmute(mem_allocated) };
             mem_allocated as u64
         });
         __bindgen_bitfield_unit.set(39usize, 1u8, {
-            let temp_allocated: u32 = unsafe { ::std::mem::transmute(temp_allocated) };
+            let temp_allocated: u32 = unsafe { ::core::mem::transmute(temp_allocated) };
             temp_allocated as u64
         });
         __bindgen_bitfield_unit.set(40usize, 2u8, {
-            let temp_subindex: u32 = unsafe { ::std::mem::transmute(temp_subindex) };
+            let temp_subindex: u32 = unsafe { ::core::mem::transmute(temp_subindex) };
             temp_subindex as u64
         });
         __bindgen_bitfield_unit
@@ -7119,27 +7123,27 @@ impl TCGTemp {
 pub const TCGCallReturnKind_TCG_CALL_RET_NORMAL: TCGCallReturnKind = TCGCallReturnKind(0);
 pub const TCGCallReturnKind_TCG_CALL_RET_BY_REF: TCGCallReturnKind = TCGCallReturnKind(1);
 pub const TCGCallReturnKind_TCG_CALL_RET_BY_VEC: TCGCallReturnKind = TCGCallReturnKind(2);
-impl ::std::ops::BitOr<TCGCallReturnKind> for TCGCallReturnKind {
+impl ::core::ops::BitOr<TCGCallReturnKind> for TCGCallReturnKind {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         TCGCallReturnKind(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for TCGCallReturnKind {
+impl ::core::ops::BitOrAssign for TCGCallReturnKind {
     #[inline]
     fn bitor_assign(&mut self, rhs: TCGCallReturnKind) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<TCGCallReturnKind> for TCGCallReturnKind {
+impl ::core::ops::BitAnd<TCGCallReturnKind> for TCGCallReturnKind {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         TCGCallReturnKind(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for TCGCallReturnKind {
+impl ::core::ops::BitAndAssign for TCGCallReturnKind {
     #[inline]
     fn bitand_assign(&mut self, rhs: TCGCallReturnKind) {
         self.0 &= rhs.0;
@@ -7155,27 +7159,27 @@ pub const TCGCallArgumentKind_TCG_CALL_ARG_EXTEND_U: TCGCallArgumentKind = TCGCa
 pub const TCGCallArgumentKind_TCG_CALL_ARG_EXTEND_S: TCGCallArgumentKind = TCGCallArgumentKind(4);
 pub const TCGCallArgumentKind_TCG_CALL_ARG_BY_REF: TCGCallArgumentKind = TCGCallArgumentKind(5);
 pub const TCGCallArgumentKind_TCG_CALL_ARG_BY_REF_N: TCGCallArgumentKind = TCGCallArgumentKind(6);
-impl ::std::ops::BitOr<TCGCallArgumentKind> for TCGCallArgumentKind {
+impl ::core::ops::BitOr<TCGCallArgumentKind> for TCGCallArgumentKind {
     type Output = Self;
     #[inline]
     fn bitor(self, other: Self) -> Self {
         TCGCallArgumentKind(self.0 | other.0)
     }
 }
-impl ::std::ops::BitOrAssign for TCGCallArgumentKind {
+impl ::core::ops::BitOrAssign for TCGCallArgumentKind {
     #[inline]
     fn bitor_assign(&mut self, rhs: TCGCallArgumentKind) {
         self.0 |= rhs.0;
     }
 }
-impl ::std::ops::BitAnd<TCGCallArgumentKind> for TCGCallArgumentKind {
+impl ::core::ops::BitAnd<TCGCallArgumentKind> for TCGCallArgumentKind {
     type Output = Self;
     #[inline]
     fn bitand(self, other: Self) -> Self {
         TCGCallArgumentKind(self.0 & other.0)
     }
 }
-impl ::std::ops::BitAndAssign for TCGCallArgumentKind {
+impl ::core::ops::BitAndAssign for TCGCallArgumentKind {
     #[inline]
     fn bitand_assign(&mut self, rhs: TCGCallArgumentKind) {
         self.0 &= rhs.0;
@@ -7193,14 +7197,14 @@ pub struct TCGCallArgumentLoc {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of TCGCallArgumentLoc"][::std::mem::size_of::<TCGCallArgumentLoc>() - 4usize];
-    ["Alignment of TCGCallArgumentLoc"][::std::mem::align_of::<TCGCallArgumentLoc>() - 4usize];
+    ["Size of TCGCallArgumentLoc"][::core::mem::size_of::<TCGCallArgumentLoc>() - 4usize];
+    ["Alignment of TCGCallArgumentLoc"][::core::mem::align_of::<TCGCallArgumentLoc>() - 4usize];
 };
 impl Default for TCGCallArgumentLoc {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -7208,19 +7212,19 @@ impl Default for TCGCallArgumentLoc {
 impl TCGCallArgumentLoc {
     #[inline]
     pub fn kind(&self) -> TCGCallArgumentKind {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(0usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_kind(&mut self, val: TCGCallArgumentKind) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(0usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn kind_raw(this: *const Self) -> TCGCallArgumentKind {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 0usize,
                 8u8,
@@ -7230,7 +7234,7 @@ impl TCGCallArgumentLoc {
     #[inline]
     pub unsafe fn set_kind_raw(this: *mut Self, val: TCGCallArgumentKind) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 4usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 0usize,
@@ -7241,19 +7245,19 @@ impl TCGCallArgumentLoc {
     }
     #[inline]
     pub fn arg_slot(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(8usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(8usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_arg_slot(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(8usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn arg_slot_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 8usize,
                 8u8,
@@ -7263,7 +7267,7 @@ impl TCGCallArgumentLoc {
     #[inline]
     pub unsafe fn set_arg_slot_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 4usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 8usize,
@@ -7274,19 +7278,19 @@ impl TCGCallArgumentLoc {
     }
     #[inline]
     pub fn ref_slot(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(16usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(16usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_ref_slot(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(16usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn ref_slot_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 16usize,
                 8u8,
@@ -7296,7 +7300,7 @@ impl TCGCallArgumentLoc {
     #[inline]
     pub unsafe fn set_ref_slot_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 4usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 16usize,
@@ -7307,19 +7311,19 @@ impl TCGCallArgumentLoc {
     }
     #[inline]
     pub fn arg_idx(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(24usize, 4u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(24usize, 4u8) as u32) }
     }
     #[inline]
     pub fn set_arg_idx(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(24usize, 4u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn arg_idx_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 24usize,
                 4u8,
@@ -7329,7 +7333,7 @@ impl TCGCallArgumentLoc {
     #[inline]
     pub unsafe fn set_arg_idx_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 4usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 24usize,
@@ -7340,19 +7344,19 @@ impl TCGCallArgumentLoc {
     }
     #[inline]
     pub fn tmp_subindex(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(28usize, 2u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(28usize, 2u8) as u32) }
     }
     #[inline]
     pub fn set_tmp_subindex(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(28usize, 2u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn tmp_subindex_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 4usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 28usize,
                 2u8,
@@ -7362,7 +7366,7 @@ impl TCGCallArgumentLoc {
     #[inline]
     pub unsafe fn set_tmp_subindex_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 4usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 28usize,
@@ -7381,23 +7385,23 @@ impl TCGCallArgumentLoc {
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
-            let kind: u32 = unsafe { ::std::mem::transmute(kind) };
+            let kind: u32 = unsafe { ::core::mem::transmute(kind) };
             kind as u64
         });
         __bindgen_bitfield_unit.set(8usize, 8u8, {
-            let arg_slot: u32 = unsafe { ::std::mem::transmute(arg_slot) };
+            let arg_slot: u32 = unsafe { ::core::mem::transmute(arg_slot) };
             arg_slot as u64
         });
         __bindgen_bitfield_unit.set(16usize, 8u8, {
-            let ref_slot: u32 = unsafe { ::std::mem::transmute(ref_slot) };
+            let ref_slot: u32 = unsafe { ::core::mem::transmute(ref_slot) };
             ref_slot as u64
         });
         __bindgen_bitfield_unit.set(24usize, 4u8, {
-            let arg_idx: u32 = unsafe { ::std::mem::transmute(arg_idx) };
+            let arg_idx: u32 = unsafe { ::core::mem::transmute(arg_idx) };
             arg_idx as u64
         });
         __bindgen_bitfield_unit.set(28usize, 2u8, {
-            let tmp_subindex: u32 = unsafe { ::std::mem::transmute(tmp_subindex) };
+            let tmp_subindex: u32 = unsafe { ::core::mem::transmute(tmp_subindex) };
             tmp_subindex as u64
         });
         __bindgen_bitfield_unit
@@ -7415,8 +7419,8 @@ pub struct TCGHelperInfo {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of TCGHelperInfo"][::std::mem::size_of::<TCGHelperInfo>() - 88usize];
-    ["Alignment of TCGHelperInfo"][::std::mem::align_of::<TCGHelperInfo>() - 8usize];
+    ["Size of TCGHelperInfo"][::core::mem::size_of::<TCGHelperInfo>() - 88usize];
+    ["Alignment of TCGHelperInfo"][::core::mem::align_of::<TCGHelperInfo>() - 8usize];
     ["Offset of field: TCGHelperInfo::func"][::std::mem::offset_of!(TCGHelperInfo, func) - 0usize];
     ["Offset of field: TCGHelperInfo::name"][::std::mem::offset_of!(TCGHelperInfo, name) - 8usize];
     ["Offset of field: TCGHelperInfo::init"][::std::mem::offset_of!(TCGHelperInfo, init) - 16usize];
@@ -7424,9 +7428,9 @@ const _: () = {
 };
 impl Default for TCGHelperInfo {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -7434,19 +7438,19 @@ impl Default for TCGHelperInfo {
 impl TCGHelperInfo {
     #[inline]
     pub fn typemask(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 32u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(0usize, 32u8) as u32) }
     }
     #[inline]
     pub fn set_typemask(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(0usize, 32u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn typemask_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 8usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 8usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 0usize,
                 32u8,
@@ -7456,7 +7460,7 @@ impl TCGHelperInfo {
     #[inline]
     pub unsafe fn set_typemask_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 8usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 0usize,
@@ -7467,19 +7471,19 @@ impl TCGHelperInfo {
     }
     #[inline]
     pub fn flags(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(32usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(32usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_flags(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(32usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn flags_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 8usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 8usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 32usize,
                 8u8,
@@ -7489,7 +7493,7 @@ impl TCGHelperInfo {
     #[inline]
     pub unsafe fn set_flags_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 8usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 32usize,
@@ -7500,19 +7504,19 @@ impl TCGHelperInfo {
     }
     #[inline]
     pub fn nr_in(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(40usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(40usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_nr_in(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(40usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn nr_in_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 8usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 8usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 40usize,
                 8u8,
@@ -7522,7 +7526,7 @@ impl TCGHelperInfo {
     #[inline]
     pub unsafe fn set_nr_in_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 8usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 40usize,
@@ -7533,19 +7537,19 @@ impl TCGHelperInfo {
     }
     #[inline]
     pub fn nr_out(&self) -> ::std::os::raw::c_uint {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(48usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(48usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_nr_out(&mut self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(48usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn nr_out_raw(this: *const Self) -> ::std::os::raw::c_uint {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 8usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 8usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 48usize,
                 8u8,
@@ -7555,7 +7559,7 @@ impl TCGHelperInfo {
     #[inline]
     pub unsafe fn set_nr_out_raw(this: *mut Self, val: ::std::os::raw::c_uint) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 8usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 48usize,
@@ -7566,19 +7570,19 @@ impl TCGHelperInfo {
     }
     #[inline]
     pub fn out_kind(&self) -> TCGCallReturnKind {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(56usize, 8u8) as u32) }
+        unsafe { ::core::mem::transmute(self._bitfield_1.get(56usize, 8u8) as u32) }
     }
     #[inline]
     pub fn set_out_kind(&mut self, val: TCGCallReturnKind) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             self._bitfield_1.set(56usize, 8u8, val as u64)
         }
     }
     #[inline]
     pub unsafe fn out_kind_raw(this: *const Self) -> TCGCallReturnKind {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 8usize]>>::raw_get(
+            ::core::mem::transmute(<__BindgenBitfieldUnit<[u8; 8usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 56usize,
                 8u8,
@@ -7588,7 +7592,7 @@ impl TCGHelperInfo {
     #[inline]
     pub unsafe fn set_out_kind_raw(this: *mut Self, val: TCGCallReturnKind) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = ::core::mem::transmute(val);
             <__BindgenBitfieldUnit<[u8; 8usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 56usize,
@@ -7607,23 +7611,23 @@ impl TCGHelperInfo {
     ) -> __BindgenBitfieldUnit<[u8; 8usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 8usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 32u8, {
-            let typemask: u32 = unsafe { ::std::mem::transmute(typemask) };
+            let typemask: u32 = unsafe { ::core::mem::transmute(typemask) };
             typemask as u64
         });
         __bindgen_bitfield_unit.set(32usize, 8u8, {
-            let flags: u32 = unsafe { ::std::mem::transmute(flags) };
+            let flags: u32 = unsafe { ::core::mem::transmute(flags) };
             flags as u64
         });
         __bindgen_bitfield_unit.set(40usize, 8u8, {
-            let nr_in: u32 = unsafe { ::std::mem::transmute(nr_in) };
+            let nr_in: u32 = unsafe { ::core::mem::transmute(nr_in) };
             nr_in as u64
         });
         __bindgen_bitfield_unit.set(48usize, 8u8, {
-            let nr_out: u32 = unsafe { ::std::mem::transmute(nr_out) };
+            let nr_out: u32 = unsafe { ::core::mem::transmute(nr_out) };
             nr_out as u64
         });
         __bindgen_bitfield_unit.set(56usize, 8u8, {
-            let out_kind: u32 = unsafe { ::std::mem::transmute(out_kind) };
+            let out_kind: u32 = unsafe { ::core::mem::transmute(out_kind) };
             out_kind as u64
         });
         __bindgen_bitfield_unit
@@ -7641,8 +7645,8 @@ pub struct qemu_plugin_hwaddr {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of qemu_plugin_hwaddr"][::std::mem::size_of::<qemu_plugin_hwaddr>() - 24usize];
-    ["Alignment of qemu_plugin_hwaddr"][::std::mem::align_of::<qemu_plugin_hwaddr>() - 8usize];
+    ["Size of qemu_plugin_hwaddr"][::core::mem::size_of::<qemu_plugin_hwaddr>() - 24usize];
+    ["Alignment of qemu_plugin_hwaddr"][::core::mem::align_of::<qemu_plugin_hwaddr>() - 8usize];
     ["Offset of field: qemu_plugin_hwaddr::is_io"]
         [::std::mem::offset_of!(qemu_plugin_hwaddr, is_io) - 0usize];
     ["Offset of field: qemu_plugin_hwaddr::is_store"]
@@ -7654,9 +7658,9 @@ const _: () = {
 };
 impl Default for qemu_plugin_hwaddr {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -7721,7 +7725,7 @@ unsafe extern "C" {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_custom_gdb_cmd {
-    pub callback: ::std::option::Option<
+    pub callback: ::core::option::Option<
         unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void, arg2: *mut u8, arg3: usize) -> bool,
     >,
     pub data: *mut ::std::os::raw::c_void,
@@ -7729,9 +7733,9 @@ pub struct libafl_custom_gdb_cmd {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_custom_gdb_cmd"][::std::mem::size_of::<libafl_custom_gdb_cmd>() - 24usize];
+    ["Size of libafl_custom_gdb_cmd"][::core::mem::size_of::<libafl_custom_gdb_cmd>() - 24usize];
     ["Alignment of libafl_custom_gdb_cmd"]
-        [::std::mem::align_of::<libafl_custom_gdb_cmd>() - 8usize];
+        [::core::mem::align_of::<libafl_custom_gdb_cmd>() - 8usize];
     ["Offset of field: libafl_custom_gdb_cmd::callback"]
         [::std::mem::offset_of!(libafl_custom_gdb_cmd, callback) - 0usize];
     ["Offset of field: libafl_custom_gdb_cmd::data"]
@@ -7741,16 +7745,16 @@ const _: () = {
 };
 impl Default for libafl_custom_gdb_cmd {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
 unsafe extern "C" {
     pub fn libafl_qemu_add_gdb_cmd(
-        callback: ::std::option::Option<
+        callback: ::core::option::Option<
             unsafe extern "C" fn(
                 arg1: *mut ::std::os::raw::c_void,
                 arg2: *mut u8,
@@ -7787,7 +7791,7 @@ unsafe extern "C" {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_backdoor_hook {
-    pub gen: ::std::option::Option<
+    pub gen: ::core::option::Option<
         unsafe extern "C" fn(data: u64, cpu: *mut CPUArchState, pc: target_ulong),
     >,
     pub data: u64,
@@ -7797,8 +7801,8 @@ pub struct libafl_backdoor_hook {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_backdoor_hook"][::std::mem::size_of::<libafl_backdoor_hook>() - 120usize];
-    ["Alignment of libafl_backdoor_hook"][::std::mem::align_of::<libafl_backdoor_hook>() - 8usize];
+    ["Size of libafl_backdoor_hook"][::core::mem::size_of::<libafl_backdoor_hook>() - 120usize];
+    ["Alignment of libafl_backdoor_hook"][::core::mem::align_of::<libafl_backdoor_hook>() - 8usize];
     ["Offset of field: libafl_backdoor_hook::gen"]
         [::std::mem::offset_of!(libafl_backdoor_hook, gen) - 0usize];
     ["Offset of field: libafl_backdoor_hook::data"]
@@ -7812,9 +7816,9 @@ const _: () = {
 };
 impl Default for libafl_backdoor_hook {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -7824,7 +7828,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn libafl_add_backdoor_hook(
-        exec: ::std::option::Option<
+        exec: ::core::option::Option<
             unsafe extern "C" fn(data: u64, cpu: *mut CPUArchState, pc: target_ulong),
         >,
         data: u64,
@@ -7842,11 +7846,11 @@ unsafe extern "C" {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_block_hook {
-    pub gen: ::std::option::Option<unsafe extern "C" fn(data: u64, pc: target_ulong) -> u64>,
-    pub post_gen: ::std::option::Option<
+    pub gen: ::core::option::Option<unsafe extern "C" fn(data: u64, pc: target_ulong) -> u64>,
+    pub post_gen: ::core::option::Option<
         unsafe extern "C" fn(data: u64, pc: target_ulong, block_length: target_ulong),
     >,
-    pub jit: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64) -> usize>,
+    pub jit: ::core::option::Option<unsafe extern "C" fn(data: u64, id: u64) -> usize>,
     pub data: u64,
     pub num: usize,
     pub helper_info: TCGHelperInfo,
@@ -7854,8 +7858,8 @@ pub struct libafl_block_hook {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_block_hook"][::std::mem::size_of::<libafl_block_hook>() - 136usize];
-    ["Alignment of libafl_block_hook"][::std::mem::align_of::<libafl_block_hook>() - 8usize];
+    ["Size of libafl_block_hook"][::core::mem::size_of::<libafl_block_hook>() - 136usize];
+    ["Alignment of libafl_block_hook"][::core::mem::align_of::<libafl_block_hook>() - 8usize];
     ["Offset of field: libafl_block_hook::gen"]
         [::std::mem::offset_of!(libafl_block_hook, gen) - 0usize];
     ["Offset of field: libafl_block_hook::post_gen"]
@@ -7873,9 +7877,9 @@ const _: () = {
 };
 impl Default for libafl_block_hook {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -7889,7 +7893,7 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn libafl_qemu_block_hook_set_jit(
         num: usize,
-        jit: ::std::option::Option<unsafe extern "C" fn(arg1: u64, arg2: u64) -> usize>,
+        jit: ::core::option::Option<unsafe extern "C" fn(arg1: u64, arg2: u64) -> usize>,
     ) -> bool;
 }
 unsafe extern "C" {
@@ -7900,18 +7904,18 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn libafl_add_block_hook(
-        gen: ::std::option::Option<unsafe extern "C" fn(data: u64, pc: target_ulong) -> u64>,
-        post_gen: ::std::option::Option<
+        gen: ::core::option::Option<unsafe extern "C" fn(data: u64, pc: target_ulong) -> u64>,
+        post_gen: ::core::option::Option<
             unsafe extern "C" fn(data: u64, pc: target_ulong, block_length: target_ulong),
         >,
-        exec: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64)>,
+        exec: ::core::option::Option<unsafe extern "C" fn(data: u64, id: u64)>,
         data: u64,
     ) -> usize;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_cmp_hook {
-    pub gen: ::std::option::Option<
+    pub gen: ::core::option::Option<
         unsafe extern "C" fn(data: u64, pc: target_ulong, size: usize) -> u64,
     >,
     pub data: u64,
@@ -7924,8 +7928,8 @@ pub struct libafl_cmp_hook {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_cmp_hook"][::std::mem::size_of::<libafl_cmp_hook>() - 384usize];
-    ["Alignment of libafl_cmp_hook"][::std::mem::align_of::<libafl_cmp_hook>() - 8usize];
+    ["Size of libafl_cmp_hook"][::core::mem::size_of::<libafl_cmp_hook>() - 384usize];
+    ["Alignment of libafl_cmp_hook"][::core::mem::align_of::<libafl_cmp_hook>() - 8usize];
     ["Offset of field: libafl_cmp_hook::gen"]
         [::std::mem::offset_of!(libafl_cmp_hook, gen) - 0usize];
     ["Offset of field: libafl_cmp_hook::data"]
@@ -7945,9 +7949,9 @@ const _: () = {
 };
 impl Default for libafl_cmp_hook {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -7957,13 +7961,13 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn libafl_add_cmp_hook(
-        gen: ::std::option::Option<
+        gen: ::core::option::Option<
             unsafe extern "C" fn(data: u64, pc: target_ulong, size: usize) -> u64,
         >,
-        exec1: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64, v0: u8, v1: u8)>,
-        exec2: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64, v0: u16, v1: u16)>,
-        exec4: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64, v0: u32, v1: u32)>,
-        exec8: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64, v0: u64, v1: u64)>,
+        exec1: ::core::option::Option<unsafe extern "C" fn(data: u64, id: u64, v0: u8, v1: u8)>,
+        exec2: ::core::option::Option<unsafe extern "C" fn(data: u64, id: u64, v0: u16, v1: u16)>,
+        exec4: ::core::option::Option<unsafe extern "C" fn(data: u64, id: u64, v0: u32, v1: u32)>,
+        exec8: ::core::option::Option<unsafe extern "C" fn(data: u64, id: u64, v0: u64, v1: u64)>,
         data: u64,
     ) -> usize;
 }
@@ -7976,10 +7980,10 @@ unsafe extern "C" {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_edge_hook {
-    pub gen: ::std::option::Option<
+    pub gen: ::core::option::Option<
         unsafe extern "C" fn(data: u64, src: target_ulong, dst: target_ulong) -> u64,
     >,
-    pub jit: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64) -> usize>,
+    pub jit: ::core::option::Option<unsafe extern "C" fn(data: u64, id: u64) -> usize>,
     pub data: u64,
     pub num: usize,
     pub cur_id: u64,
@@ -7988,8 +7992,8 @@ pub struct libafl_edge_hook {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_edge_hook"][::std::mem::size_of::<libafl_edge_hook>() - 136usize];
-    ["Alignment of libafl_edge_hook"][::std::mem::align_of::<libafl_edge_hook>() - 8usize];
+    ["Size of libafl_edge_hook"][::core::mem::size_of::<libafl_edge_hook>() - 136usize];
+    ["Alignment of libafl_edge_hook"][::core::mem::align_of::<libafl_edge_hook>() - 8usize];
     ["Offset of field: libafl_edge_hook::gen"]
         [::std::mem::offset_of!(libafl_edge_hook, gen) - 0usize];
     ["Offset of field: libafl_edge_hook::jit"]
@@ -8007,9 +8011,9 @@ const _: () = {
 };
 impl Default for libafl_edge_hook {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -8027,17 +8031,17 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn libafl_add_edge_hook(
-        gen: ::std::option::Option<
+        gen: ::core::option::Option<
             unsafe extern "C" fn(data: u64, src: target_ulong, dst: target_ulong) -> u64,
         >,
-        exec: ::std::option::Option<unsafe extern "C" fn(data: u64, id: u64)>,
+        exec: ::core::option::Option<unsafe extern "C" fn(data: u64, id: u64)>,
         data: u64,
     ) -> usize;
 }
 unsafe extern "C" {
     pub fn libafl_qemu_edge_hook_set_jit(
         num: usize,
-        jit: ::std::option::Option<unsafe extern "C" fn(arg1: u64, arg2: u64) -> usize>,
+        jit: ::core::option::Option<unsafe extern "C" fn(arg1: u64, arg2: u64) -> usize>,
     ) -> bool;
 }
 unsafe extern "C" {
@@ -8053,7 +8057,7 @@ unsafe extern "C" {
     pub fn libafl_qemu_hook_edge_run();
 }
 pub type libafl_instruction_cb =
-    ::std::option::Option<unsafe extern "C" fn(data: u64, pc: target_ulong)>;
+    ::core::option::Option<unsafe extern "C" fn(data: u64, pc: target_ulong)>;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_instruction_hook {
@@ -8066,9 +8070,9 @@ pub struct libafl_instruction_hook {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of libafl_instruction_hook"]
-        [::std::mem::size_of::<libafl_instruction_hook>() - 120usize];
+        [::core::mem::size_of::<libafl_instruction_hook>() - 120usize];
     ["Alignment of libafl_instruction_hook"]
-        [::std::mem::align_of::<libafl_instruction_hook>() - 8usize];
+        [::core::mem::align_of::<libafl_instruction_hook>() - 8usize];
     ["Offset of field: libafl_instruction_hook::data"]
         [::std::mem::offset_of!(libafl_instruction_hook, data) - 0usize];
     ["Offset of field: libafl_instruction_hook::num"]
@@ -8082,9 +8086,9 @@ const _: () = {
 };
 impl Default for libafl_instruction_hook {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -8115,13 +8119,13 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn libafl_qemu_hook_instruction_run(pc_next: vaddr);
 }
-pub type libafl_rw_gen_cb = ::std::option::Option<
+pub type libafl_rw_gen_cb = ::core::option::Option<
     unsafe extern "C" fn(data: u64, pc: target_ulong, addr: *mut TCGTemp, oi: MemOpIdx) -> u64,
 >;
-pub type libafl_rw_exec_cb = ::std::option::Option<
+pub type libafl_rw_exec_cb = ::core::option::Option<
     unsafe extern "C" fn(data: u64, id: u64, pc: target_ulong, addr: target_ulong),
 >;
-pub type libafl_rw_execN_cb = ::std::option::Option<
+pub type libafl_rw_execN_cb = ::core::option::Option<
     unsafe extern "C" fn(data: u64, id: u64, pc: target_ulong, addr: target_ulong, size: usize),
 >;
 #[repr(C)]
@@ -8139,8 +8143,8 @@ pub struct libafl_rw_hook {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_rw_hook"][::std::mem::size_of::<libafl_rw_hook>() - 472usize];
-    ["Alignment of libafl_rw_hook"][::std::mem::align_of::<libafl_rw_hook>() - 8usize];
+    ["Size of libafl_rw_hook"][::core::mem::size_of::<libafl_rw_hook>() - 472usize];
+    ["Alignment of libafl_rw_hook"][::core::mem::align_of::<libafl_rw_hook>() - 8usize];
     ["Offset of field: libafl_rw_hook::gen"][::std::mem::offset_of!(libafl_rw_hook, gen) - 0usize];
     ["Offset of field: libafl_rw_hook::data"]
         [::std::mem::offset_of!(libafl_rw_hook, data) - 8usize];
@@ -8160,9 +8164,9 @@ const _: () = {
 };
 impl Default for libafl_rw_hook {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -8208,7 +8212,7 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 pub type libafl_cpu_run_fn =
-    ::std::option::Option<unsafe extern "C" fn(data: u64, cpu: *mut CPUState)>;
+    ::core::option::Option<unsafe extern "C" fn(data: u64, cpu: *mut CPUState)>;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_cpu_run_hook {
@@ -8220,8 +8224,8 @@ pub struct libafl_cpu_run_hook {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_cpu_run_hook"][::std::mem::size_of::<libafl_cpu_run_hook>() - 40usize];
-    ["Alignment of libafl_cpu_run_hook"][::std::mem::align_of::<libafl_cpu_run_hook>() - 8usize];
+    ["Size of libafl_cpu_run_hook"][::core::mem::size_of::<libafl_cpu_run_hook>() - 40usize];
+    ["Alignment of libafl_cpu_run_hook"][::core::mem::align_of::<libafl_cpu_run_hook>() - 8usize];
     ["Offset of field: libafl_cpu_run_hook::pre_cpu_run"]
         [::std::mem::offset_of!(libafl_cpu_run_hook, pre_cpu_run) - 0usize];
     ["Offset of field: libafl_cpu_run_hook::post_cpu_run"]
@@ -8235,9 +8239,9 @@ const _: () = {
 };
 impl Default for libafl_cpu_run_hook {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -8264,7 +8268,7 @@ unsafe extern "C" {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_new_thread_hook {
-    pub callback: ::std::option::Option<
+    pub callback: ::core::option::Option<
         unsafe extern "C" fn(data: u64, cpu: *mut CPUArchState, tid: u32) -> bool,
     >,
     pub data: u64,
@@ -8273,9 +8277,9 @@ pub struct libafl_new_thread_hook {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_new_thread_hook"][::std::mem::size_of::<libafl_new_thread_hook>() - 32usize];
+    ["Size of libafl_new_thread_hook"][::core::mem::size_of::<libafl_new_thread_hook>() - 32usize];
     ["Alignment of libafl_new_thread_hook"]
-        [::std::mem::align_of::<libafl_new_thread_hook>() - 8usize];
+        [::core::mem::align_of::<libafl_new_thread_hook>() - 8usize];
     ["Offset of field: libafl_new_thread_hook::callback"]
         [::std::mem::offset_of!(libafl_new_thread_hook, callback) - 0usize];
     ["Offset of field: libafl_new_thread_hook::data"]
@@ -8287,16 +8291,16 @@ const _: () = {
 };
 impl Default for libafl_new_thread_hook {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
 unsafe extern "C" {
     pub fn libafl_add_new_thread_hook(
-        callback: ::std::option::Option<
+        callback: ::core::option::Option<
             unsafe extern "C" fn(data: u64, env: *mut CPUArchState, tid: u32) -> bool,
         >,
         data: u64,
@@ -8316,8 +8320,8 @@ pub struct syshook_ret {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of syshook_ret"][::std::mem::size_of::<syshook_ret>() - 16usize];
-    ["Alignment of syshook_ret"][::std::mem::align_of::<syshook_ret>() - 8usize];
+    ["Size of syshook_ret"][::core::mem::size_of::<syshook_ret>() - 16usize];
+    ["Alignment of syshook_ret"][::core::mem::align_of::<syshook_ret>() - 8usize];
     ["Offset of field: syshook_ret::retval"][::std::mem::offset_of!(syshook_ret, retval) - 0usize];
     ["Offset of field: syshook_ret::skip_syscall"]
         [::std::mem::offset_of!(syshook_ret, skip_syscall) - 8usize];
@@ -8325,7 +8329,7 @@ const _: () = {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_pre_syscall_hook {
-    pub callback: ::std::option::Option<
+    pub callback: ::core::option::Option<
         unsafe extern "C" fn(
             data: u64,
             sys_num: ::std::os::raw::c_int,
@@ -8345,9 +8349,10 @@ pub struct libafl_pre_syscall_hook {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of libafl_pre_syscall_hook"][::std::mem::size_of::<libafl_pre_syscall_hook>() - 32usize];
+    ["Size of libafl_pre_syscall_hook"]
+        [::core::mem::size_of::<libafl_pre_syscall_hook>() - 32usize];
     ["Alignment of libafl_pre_syscall_hook"]
-        [::std::mem::align_of::<libafl_pre_syscall_hook>() - 8usize];
+        [::core::mem::align_of::<libafl_pre_syscall_hook>() - 8usize];
     ["Offset of field: libafl_pre_syscall_hook::callback"]
         [::std::mem::offset_of!(libafl_pre_syscall_hook, callback) - 0usize];
     ["Offset of field: libafl_pre_syscall_hook::data"]
@@ -8359,9 +8364,9 @@ const _: () = {
 };
 impl Default for libafl_pre_syscall_hook {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
@@ -8369,7 +8374,7 @@ impl Default for libafl_pre_syscall_hook {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct libafl_post_syscall_hook {
-    pub callback: ::std::option::Option<
+    pub callback: ::core::option::Option<
         unsafe extern "C" fn(
             data: u64,
             ret: target_ulong,
@@ -8391,9 +8396,9 @@ pub struct libafl_post_syscall_hook {
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of libafl_post_syscall_hook"]
-        [::std::mem::size_of::<libafl_post_syscall_hook>() - 32usize];
+        [::core::mem::size_of::<libafl_post_syscall_hook>() - 32usize];
     ["Alignment of libafl_post_syscall_hook"]
-        [::std::mem::align_of::<libafl_post_syscall_hook>() - 8usize];
+        [::core::mem::align_of::<libafl_post_syscall_hook>() - 8usize];
     ["Offset of field: libafl_post_syscall_hook::callback"]
         [::std::mem::offset_of!(libafl_post_syscall_hook, callback) - 0usize];
     ["Offset of field: libafl_post_syscall_hook::data"]
@@ -8405,16 +8410,16 @@ const _: () = {
 };
 impl Default for libafl_post_syscall_hook {
     fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        let mut s = ::core::mem::MaybeUninit::<Self>::uninit();
         unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            ::core::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
             s.assume_init()
         }
     }
 }
 unsafe extern "C" {
     pub fn libafl_add_pre_syscall_hook(
-        callback: ::std::option::Option<
+        callback: ::core::option::Option<
             unsafe extern "C" fn(
                 data: u64,
                 sys_num: ::std::os::raw::c_int,
@@ -8433,7 +8438,7 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn libafl_add_post_syscall_hook(
-        callback: ::std::option::Option<
+        callback: ::core::option::Option<
             unsafe extern "C" fn(
                 data: u64,
                 ret: target_ulong,

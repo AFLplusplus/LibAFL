@@ -2,7 +2,7 @@
 #![cfg(feature = "libipt")]
 #![cfg(target_os = "linux")]
 
-use std::{arch::asm, process};
+use core::{arch::asm, process};
 
 use libafl_intelpt::{availability, Image, IntelPT};
 use nix::{

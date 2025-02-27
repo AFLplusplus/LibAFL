@@ -28,16 +28,19 @@
 //! When using docker, you may need to point `prometheus.yml` to the `docker0` interface or `host.docker.internal`
 
 use alloc::{
-    string::ToString,
-    sync::{core::sync::atomic, Arc},
-    thread,
+    string::ToString, sync::Arc,
+    borrow::Cow,
+    string::String,
 };
 use core::{
-    borrow::Cow,
     fmt,
     fmt::{Debug, Write},
-    string::String,
     time::Duration,
+};
+use std::{
+sync::{core::sync::atomic,
+    thread,
+    sync::atomic::AtomicU64,
 };
 
 // using thread in order to start the HTTP server in a separate thread

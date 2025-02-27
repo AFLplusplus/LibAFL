@@ -2,10 +2,10 @@
 use alloc::vec::Vec;
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::{
-    ffi::{CStr, CString},
-    os::fd::AsRawFd,
+    ffi::CString,
 };
 use core::{
+    ffi::CStr, 
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     ops::IndexMut,
@@ -14,6 +14,7 @@ use core::{
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
+    os::fd::AsRawFd,
     os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},

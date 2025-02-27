@@ -1,10 +1,10 @@
 use alloc::{
     fmt::{Debug, Display},
-    marker::PhantomData,
     slice,
     sync::Arc,
     vec::Vec,
 };
+use core::marker::PhantomData;
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::llmp::LLMP_FLAG_COMPRESSED;
