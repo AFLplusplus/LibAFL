@@ -2,6 +2,8 @@
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::ffi::CString;
 use alloc::vec::Vec;
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use core::ffi::CStr;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,

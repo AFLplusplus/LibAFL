@@ -5,10 +5,9 @@ use alloc::string::ToString;
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::fmt::Debug;
 #[cfg(feature = "casr")]
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-};
+use core::hash::{Hash, Hasher};
+#[cfg(feature = "casr")]
+use std::collections::hash_map::DefaultHasher;
 use std::{
     fs::{self, File},
     io::Read,

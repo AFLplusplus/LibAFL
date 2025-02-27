@@ -1,7 +1,7 @@
+use alloc::{cell::RefCell, ffi::c_void, marker::PhantomData, rc::Rc};
 use core::fmt::{self, Debug, Formatter};
 #[cfg(all(windows, not(test)))]
 use std::process::abort;
-use std::{cell::RefCell, ffi::c_void, marker::PhantomData, rc::Rc};
 
 use frida_gum::{
     Gum, MemoryRange, NativePointer,

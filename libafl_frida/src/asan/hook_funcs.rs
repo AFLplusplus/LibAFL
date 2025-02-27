@@ -1,5 +1,5 @@
 //! The allocator hooks for address sanitizer.
-use std::ffi::c_void;
+use core::ffi::c_void;
 
 use backtrace::Backtrace;
 use libc::{c_char, wchar_t};
@@ -21,7 +21,7 @@ unsafe extern "system" {
     fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
 }
 
-use std::ptr;
+use core::ptr;
 
 #[cfg(windows)]
 use winapi::um::memoryapi::VirtualQuery;
@@ -2371,7 +2371,7 @@ impl AsanRuntime {
         {
             panic!("ASAN: Crashing target!");
         }
-        let mn = std::cmp::min(n, unsafe { strlen(src) } + 1);
+        let mn = core::cmp::min(n, unsafe { strlen(src) } + 1);
         if !self.allocator_mut().check_shadow(src as *const c_void, mn)
             && AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgRead((
                 "strncpy".to_string(),

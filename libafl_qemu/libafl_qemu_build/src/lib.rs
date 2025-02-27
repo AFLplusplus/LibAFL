@@ -1,10 +1,11 @@
 // #[rustversion::nightly]
-// use std::io::{BufRead, BufReader};
+extern crate alloc;
+
+use core::hash::Hasher;
 use std::{
     collections::hash_map,
     env,
     fs::{self, File},
-    hash::Hasher,
     io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     process::Command,

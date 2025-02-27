@@ -1,6 +1,6 @@
 //! Functionality regarding binary-only coverage collection.
 
-use std::{cell::RefCell, marker::PhantomPinned, pin::Pin, rc::Rc};
+use alloc::{cell::RefCell, marker::PhantomPinned, pin::Pin, rc::Rc};
 
 #[cfg(target_arch = "aarch64")]
 use dynasmrt::DynasmLabelApi;

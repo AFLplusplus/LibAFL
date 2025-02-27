@@ -189,12 +189,12 @@ macro_rules! impl_nop_runtime_fn {
     // special case for expression_unreachable, because it has a different signature in our runtime trait than in the c interface.
     (pub fn expression_unreachable(expressions: *mut RSymExpr, num_elements: usize), $c_name:ident;) => {
         // #[expect(clippy::default_trait_access)]
-        fn expression_unreachable(&mut self, _exprs: &[RSymExpr]) {std::default::Default::default()}
+        fn expression_unreachable(&mut self, _exprs: &[RSymExpr]) {core::default::Default::default()}
     };
 
     (pub fn $name:ident($( $arg:ident : $type:ty ),*$(,)?)$( -> $ret:ty)?, $c_name:ident;) => {
         // #[expect(clippy::default_trait_access)]
-        fn $name(&mut self, $( _ : $type),*)$( -> Option<$ret>)? {std::default::Default::default()}
+        fn $name(&mut self, $( _ : $type),*)$( -> Option<$ret>)? {core::default::Default::default()}
     };
 }
 

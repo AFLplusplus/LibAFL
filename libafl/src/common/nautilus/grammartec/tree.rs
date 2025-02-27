@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use core::{cmp, marker::Sized};
-use std::io::{Cursor, io::Write, stdout};
+use std::io::{Cursor, Write, stdout};
 
 use hashbrown::HashSet;
 use libafl_bolts::rands::Rand;

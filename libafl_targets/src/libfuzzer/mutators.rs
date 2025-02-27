@@ -1,11 +1,10 @@
 use alloc::{
     borrow::Cow,
     boxed::Box,
-    marker::PhantomData,
     rc::{Rc, Weak},
     vec::Vec,
 };
-use core::{cell::RefCell, ops::Deref};
+use core::{cell::RefCell, marker::PhantomData, ops::Deref};
 
 use libafl::{
     Error,

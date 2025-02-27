@@ -1,5 +1,6 @@
 /// [`NyxHelper`] is used to wrap `NyxProcess`
-use std::{fmt::Debug, fs::File, path::Path, time::Duration};
+use core::{fmt::Debug, time::Duration};
+use std::{fs::File, path::Path};
 
 use libafl::Error;
 use libnyx::{NyxConfig, NyxProcess, NyxProcessRole};

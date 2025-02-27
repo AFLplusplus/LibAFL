@@ -1,9 +1,11 @@
+extern crate alloc;
+
+use alloc::{collections::VecDeque, rc::Rc};
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::HashSet,
     fs,
     io::{BufReader, Write},
     path::{Path, PathBuf},
-    rc::Rc,
     sync::OnceLock,
 };
 

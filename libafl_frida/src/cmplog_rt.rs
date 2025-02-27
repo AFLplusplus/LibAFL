@@ -6,9 +6,9 @@
 //! related to the input.
 //! Read the [`RedQueen`](https://www.ndss-symposium.org/ndss-paper/redqueen-fuzzing-with-input-to-state-correspondence/) paper for the general concepts.
 
+use alloc::rc::Rc;
 #[cfg(target_arch = "aarch64")]
 use core::ffi::c_void;
-use std::rc::Rc;
 
 use dynasmrt::dynasm;
 #[cfg(target_arch = "aarch64")]

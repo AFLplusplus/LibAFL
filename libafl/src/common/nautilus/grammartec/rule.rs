@@ -25,7 +25,7 @@ static SPLITTER: OnceLock<regex::Regex> = OnceLock::new();
 static TOKENIZER: OnceLock<regex::bytes::Regex> = OnceLock::new();
 
 fn show_bytes(bs: &[u8]) -> String {
-    use alloc::{ascii::escape_default, str};
+    use core::{ascii::escape_default, str};
 
     let mut visible = String::new();
     for &b in bs {

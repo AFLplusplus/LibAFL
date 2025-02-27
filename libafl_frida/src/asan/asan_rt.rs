@@ -6,14 +6,14 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
-use core::fmt::{self, Debug, Formatter};
-use std::{
+use alloc::{
     cell::Cell,
     ffi::{c_char, c_void},
     ptr::write_volatile,
     rc::Rc,
     sync::{Mutex, MutexGuard},
 };
+use core::fmt::{self, Debug, Formatter};
 
 use backtrace::Backtrace;
 use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm};
@@ -95,7 +95,7 @@ impl Default for AsanInHookGuard {
 /// This is a simple way to prevent reentrancy in the hooks when we don't have TLS.
 /// This is not a perfect solution, as it is global so it orders all threads without TLS.
 /// However, this is a rare situation and should not affect performance significantly.
-use std::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 #[derive(Debug)]
 struct Lock {
@@ -612,7 +612,7 @@ impl AsanRuntime {
 
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
-                    let _ = [<$name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap();
+                    let _ = [<$name:snake:upper _PTR>].set(unsafe {core::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap();
 
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
@@ -662,7 +662,7 @@ impl AsanRuntime {
 
                     static [<$lib_ident:snake:upper _ $name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
-                    let _ = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap();
+                    let _ = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].set(unsafe {core::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap();
 
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
@@ -707,7 +707,7 @@ impl AsanRuntime {
                     log::warn!("Hooking {} = {:?}", stringify!($name), target_function.0);
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
-                    let _ = [<$name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap_or_else(|e| println!("{:?}", e));
+                    let _ = [<$name:snake:upper _PTR>].set(unsafe {core::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap_or_else(|e| println!("{:?}", e));
 
                     #[allow(non_snake_case)] // depends on the values the macro is invoked with
                     #[allow(clippy::redundant_else)]
@@ -1522,7 +1522,7 @@ impl AsanRuntime {
 
         let instructions: Vec<Instruction> = disas_count(
             &decoder,
-            unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 24) },
+            unsafe { core::slice::from_raw_parts(actual_pc as *mut u8, 24) },
             3,
         );
 

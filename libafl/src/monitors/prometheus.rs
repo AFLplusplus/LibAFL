@@ -35,12 +35,10 @@ use alloc::{
 use core::{
     fmt,
     fmt::{Debug, Write},
+    sync::atomic::AtomicU64,
     time::Duration,
 };
-use std::{
-    sync::{atomic::AtomicU64, sync::atomic},
-    thread,
-};
+use std::thread;
 
 // using thread in order to start the HTTP server in a separate thread
 use futures::executor::block_on;

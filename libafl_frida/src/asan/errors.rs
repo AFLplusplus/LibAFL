@@ -1,5 +1,5 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
-use std::{
+use core::{
     borrow::Cow,
     fmt::Debug,
     io::Write,
@@ -263,7 +263,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 let insts = disas_count(
                     &decoder,
-                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
+                    unsafe { core::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
                     11,
                 );
 
@@ -534,7 +534,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 let insts = disas_count(
                     &decoder,
-                    unsafe { std::slice::from_raw_parts(*start_pc as *mut u8, 15 * 11) },
+                    unsafe { core::slice::from_raw_parts(*start_pc as *mut u8, 15 * 11) },
                     11,
                 );
 

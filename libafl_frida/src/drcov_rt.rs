@@ -1,5 +1,5 @@
 //! Generates `DrCov` traces
-use std::{
+use alloc::{
     hash::{BuildHasher, Hasher},
     path::{Path, PathBuf},
     rc::Rc,
