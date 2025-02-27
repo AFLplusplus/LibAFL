@@ -346,13 +346,13 @@ where
 }
 
 impl HasAddressFilter for InjectionModule {
-    type ModuleAddressFilter = NopAddressFilter;
+    type AddressFilter = NopAddressFilter;
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &NopAddressFilter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         unsafe { (&raw mut NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "usermode")]
 use crate::capstone;
 #[cfg(feature = "systemmode")]
-use crate::modules::utils::filters::{NOP_PAGE_FILTER, NopPageFilter};
+use crate::modules::utils::filters::{HasPageFilter, NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
     Qemu,
     emu::EmulatorModules,
@@ -95,25 +95,26 @@ where
 }
 
 impl HasAddressFilter for CmpLogModule {
-    type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
+    type AddressFilter = StdAddressFilter;
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.address_filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.address_filter
     }
+}
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter(&self) -> &Self::ModulePageFilter {
+#[cfg(feature = "systemmode")]
+impl HasPageFilter for CmpLogModule {
+    type PageFilter = NopPageFilter;
+
+    fn page_filter(&self) -> &Self::PageFilter {
         &NopPageFilter
     }
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+    fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
         unsafe { (&raw mut NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
@@ -167,25 +168,26 @@ where
 }
 
 impl HasAddressFilter for CmpLogChildModule {
-    type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
+    type AddressFilter = StdAddressFilter;
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.address_filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.address_filter
     }
+}
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter(&self) -> &Self::ModulePageFilter {
+#[cfg(feature = "systemmode")]
+impl HasPageFilter for CmpLogChildModule {
+    type PageFilter = NopPageFilter;
+
+    fn page_filter(&self) -> &Self::PageFilter {
         &NopPageFilter
     }
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+    fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
         unsafe { (&raw mut NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
@@ -427,15 +429,15 @@ where
 
 #[cfg(feature = "usermode")]
 impl HasAddressFilter for CmpLogRoutinesModule {
-    type ModuleAddressFilter = StdAddressFilter;
+    type AddressFilter = StdAddressFilter;
     #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.address_filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.address_filter
     }
 
