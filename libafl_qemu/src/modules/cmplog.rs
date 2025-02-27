@@ -389,9 +389,7 @@ impl CmpLogRoutinesModule {
                 iaddr += insn.bytes().len() as GuestAddr;
 
                 #[cfg(feature = "usermode")]
-                unsafe {
-                    code = std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
-                }
+                code = unsafe { std::slice::from_raw_parts(qemu.g2h(iaddr), 512) };
                 #[cfg(feature = "systemmode")]
                 unsafe {
                     qemu.read_mem(pc, code);
