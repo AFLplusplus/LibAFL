@@ -330,10 +330,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
         if testcase.filename().is_some() {
             // We are renaming!
 
-            let old_filename = testcase
-                .filename_mut()
-                .take()
-                .ok_or_else(|| Error::illegal_argument("Testcase missing filename for renaming"))?;
+            let old_filename = testcase.filename_mut().take().unwrap();
             let new_filename = filename;
 
             // Do operations below when new filename is specified

@@ -75,36 +75,30 @@ impl<I> TestcaseStorageMap<I> {
 
     /// Remove a testcase given a [`CorpusId`]
     #[cfg(not(feature = "corpus_btreemap"))]
-    pub fn remove(&mut self, id: CorpusId) -> Result<RefCell<Testcase<I>>, Error> {
+    pub fn remove(&mut self, id: CorpusId) -> Option<RefCell<Testcase<I>>> {
         if let Some(item) = self.map.remove(&id) {
             self.remove_key(id);
             if let Some(prev) = item.prev {
-                self.map
-                    .get_mut(&prev)
-                    .ok_or_else(|| Error::illegal_state("Unable to fetch next CorpusId"))?
-                    .next = item.next;
+                self.map.get_mut(&prev).unwrap().next = item.next;
             } else {
                 // first elem
                 self.first_id = item.next;
             }
             if let Some(next) = item.next {
-                self.map
-                    .get_mut(&next)
-                    .ok_or_else(|| Error::illegal_state("Unable to fetch previous CorpusId"))?
-                    .prev = item.prev;
+                self.map.get_mut(&next).unwrap().prev = item.prev;
             } else {
                 // last elem
                 self.last_id = item.prev;
             }
-            Ok(item.testcase)
+            Some(item.testcase)
         } else {
-            Err(Error::illegal_argument("Testcase not found in storage"))
+            None
         }
     }
 
     /// Remove a testcase given a [`CorpusId`]
     #[cfg(feature = "corpus_btreemap")]
-    pub fn remove(&mut self, id: CorpusId) -> Result<RefCell<Testcase<I>>, Error> {
+    pub fn remove(&mut self, id: CorpusId) -> Option<RefCell<Testcase<I>>> {
         self.remove_key(id);
         self.map.remove(&id)
     }
@@ -365,9 +359,9 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
-        let mut testcase = self.storage.enabled.remove(id).ok();
+        let mut testcase = self.storage.enabled.remove(id);
         if testcase.is_none() {
-            testcase = self.storage.disabled.remove(id).ok();
+            testcase = self.storage.disabled.remove(id);
         }
         testcase
             .map(|x| x.take())
