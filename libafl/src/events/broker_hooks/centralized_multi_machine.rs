@@ -1,9 +1,8 @@
-use std::{
+use alloc::{sync::Arc, vec::Vec};
+use core::{
     fmt::{Debug, Display},
     marker::PhantomData,
     slice,
-    sync::Arc,
-    vec::Vec,
 };
 
 #[cfg(feature = "llmp_compression")]

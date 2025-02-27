@@ -382,10 +382,11 @@ jobs:
           - ./fuzzers/binary_only/qemu_coverage
           - ./fuzzers/binary_only/qemu_launcher
         arch:
-          - aarch64
-          - arm
-          - i386
-          - ppc
+          # unless somebody pays us for the servers.
+          # - aarch64
+          # - arm
+          # - i386
+          # - ppc
           - x86_64
 
     runs-on: [ self-hosted, qemu ]

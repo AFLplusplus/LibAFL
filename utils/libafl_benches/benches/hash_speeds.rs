@@ -1,6 +1,6 @@
 //! Compare the speed of rust hash implementations
 
-use std::{
+use core::{
     hash::{BuildHasher, Hasher},
     num::NonZero,
 };

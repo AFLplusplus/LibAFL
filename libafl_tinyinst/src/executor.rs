@@ -1,5 +1,9 @@
-use core::{marker::PhantomData, ptr, time::Duration};
-use std::fmt::{Debug, Formatter};
+use core::{
+    fmt::{Debug, Formatter},
+    marker::PhantomData,
+    ptr,
+    time::Duration,
+};
 
 use libafl::{
     Error,
@@ -35,7 +39,7 @@ impl TinyInstExecutor<(), NopShMem, ()> {
 }
 
 impl<S, SHM, OT> Debug for TinyInstExecutor<S, SHM, OT> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         f.debug_struct("TinyInstExecutor")
             .field("timeout", &self.timeout)
             .finish_non_exhaustive()

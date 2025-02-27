@@ -7,9 +7,9 @@ __Warning__: The documentation is built by default for `x86_64` in `usermode`. T
 
 #![cfg_attr(nightly, feature(used_with_arg))]
 
+use core::ffi::c_void;
 #[cfg(target_os = "linux")]
 use core::ops::BitAnd;
-use std::ffi::c_void;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use strum_macros::EnumIter;

@@ -15,15 +15,17 @@ pub use unix_signals::CTRL_C_EXIT;
 pub mod pipes;
 
 #[cfg(all(unix, feature = "std"))]
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, ffi::CString};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::CStr;
 #[cfg(feature = "std")]
 use std::{env, process::Command};
 #[cfg(all(unix, feature = "std"))]
-use std::{ffi::CString, os::fd::RawFd};
-#[cfg(all(unix, feature = "std"))]
-use std::{fs::File, os::fd::AsRawFd, sync::OnceLock};
+use std::{
+    fs::File,
+    os::fd::{AsRawFd, RawFd},
+    sync::OnceLock,
+};
 
 // Allow a few extra features we need for the whole module
 #[cfg(all(windows, feature = "std"))]

@@ -1,16 +1,10 @@
-use core::fmt::Display;
-use std::{
-    boxed::Box,
-    collections::HashMap,
-    io::ErrorKind,
-    process,
-    sync::{
-        Arc, OnceLock,
-        atomic::{AtomicU64, Ordering},
-    },
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use core::{
+    fmt::Display,
+    sync::atomic::{AtomicU64, Ordering},
     time::Duration,
-    vec::Vec,
 };
+use std::{collections::HashMap, io::ErrorKind, process, sync::OnceLock};
 
 use enumflags2::{BitFlags, bitflags};
 #[cfg(feature = "llmp_compression")]
@@ -407,9 +401,9 @@ where
 
     /// Write an [`OwnedTcpMultiMachineMsg`] to a stream.
     /// Can be read back using [`TcpMultiMachineState::read_msg`].
-    async fn write_msg<'a, I: Input>(
+    async fn write_msg<I: Input>(
         stream: &mut TcpStream,
-        msg: &MultiMachineMsg<'a, I>,
+        msg: &MultiMachineMsg<'_, I>,
     ) -> Result<(), Error> {
         let serialized_msg = msg.serialize_as_ref();
         let msg_len = u32::to_le_bytes(serialized_msg.len() as u32);
@@ -451,9 +445,9 @@ where
         Ok(())
     }
 
-    pub(crate) async fn send_interesting_event_to_nodes<'a, I: Input>(
+    pub(crate) async fn send_interesting_event_to_nodes<I: Input>(
         &mut self,
-        msg: &MultiMachineMsg<'a, I>,
+        msg: &MultiMachineMsg<'_, I>,
     ) -> Result<(), Error> {
         log::debug!("Sending interesting events to nodes...");
 
@@ -503,9 +497,9 @@ where
 
     /// Flush the message queue from other nodes and add incoming events to the
     /// centralized event manager queue.
-    pub(crate) async fn receive_new_messages_from_nodes<'a, I: Input>(
+    pub(crate) async fn receive_new_messages_from_nodes<I: Input>(
         &mut self,
-        msgs: &mut Vec<MultiMachineMsg<'a, I>>,
+        msgs: &mut Vec<MultiMachineMsg<'_, I>>,
     ) -> Result<(), Error> {
         log::debug!("Checking for new events from other nodes...");
         // let mut nb_received = 0usize;

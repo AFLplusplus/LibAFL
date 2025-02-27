@@ -1,18 +1,14 @@
 //! Wrappers that abstracts references (or pointers) and owned data accesses.
 // The serialization is towards owned, allowing to serialize pointers without troubles.
 
-use alloc::{
-    boxed::Box,
-    slice::{Iter, IterMut},
-    vec::Vec,
-};
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     clone::Clone,
     fmt::Debug,
     ops::{Deref, DerefMut, RangeBounds},
     ptr::NonNull,
     slice,
-    slice::SliceIndex,
+    slice::{Iter, IterMut, SliceIndex},
 };
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

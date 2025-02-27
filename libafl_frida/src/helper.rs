@@ -1,11 +1,13 @@
-use core::fmt::{self, Debug, Formatter};
-use std::{
+use alloc::rc::Rc;
+use core::{
     any::TypeId,
     cell::{Ref, RefCell, RefMut},
     ffi::CStr,
+    fmt::{self, Debug, Formatter},
+};
+use std::{
     fs::{self, read_to_string},
     path::{Path, PathBuf},
-    rc::Rc,
 };
 
 use frida_gum::{
@@ -35,7 +37,7 @@ use crate::cmplog_rt::CmpLogRuntime;
 use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
 /// The Runtime trait
-pub trait FridaRuntime: 'static + Debug + std::any::Any {
+pub trait FridaRuntime: 'static + Debug + core::any::Any {
     /// Initialization
     fn init(
         &mut self,
@@ -65,7 +67,7 @@ where
     FR1: Debug,
     FR2: Debug,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&self.if_runtimes, f)?;
         Debug::fmt(&self.else_runtimes, f)?;
         Ok(())
@@ -202,7 +204,7 @@ impl MatchFirstType for FridaRuntimeVec {
     fn match_first_type<T: 'static>(&self) -> Option<&T> {
         for member in &self.0 {
             if TypeId::of::<T>() == member.type_id() {
-                let raw = std::ptr::from_ref::<dyn FridaRuntime>(&**member) as *const T;
+                let raw = core::ptr::from_ref::<dyn FridaRuntime>(&**member) as *const T;
                 return unsafe { raw.as_ref() };
             }
         }
@@ -213,7 +215,7 @@ impl MatchFirstType for FridaRuntimeVec {
     fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> {
         for member in &mut self.0 {
             if TypeId::of::<T>() == member.type_id() {
-                let raw = std::ptr::from_mut::<dyn FridaRuntime>(&mut **member) as *mut T;
+                let raw = core::ptr::from_mut::<dyn FridaRuntime>(&mut **member) as *mut T;
                 return unsafe { raw.as_mut() };
             }
         }
@@ -259,7 +261,7 @@ impl FridaRuntimeTuple for FridaRuntimeVec {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SkipRange {
     /// An absolute range
-    Absolute(std::ops::Range<usize>),
+    Absolute(core::ops::Range<usize>),
 
     /// A range relative to the module with the given name
     ModuleRelative {
@@ -267,7 +269,7 @@ pub enum SkipRange {
         name: String,
 
         /// The address range
-        range: std::ops::Range<usize>,
+        range: core::ops::Range<usize>,
     },
 }
 
@@ -810,14 +812,14 @@ where
             for _ in 0..512 {
                 mmap_anonymous(
                     None,
-                    std::num::NonZeroUsize::new_unchecked(128 * 1024),
+                    core::num::NonZeroUsize::new_unchecked(128 * 1024),
                     ProtFlags::PROT_NONE,
                     MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
                 mmap_anonymous(
                     None,
-                    std::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
+                    core::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
                     ProtFlags::PROT_NONE,
                     MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
                 )

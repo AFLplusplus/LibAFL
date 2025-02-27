@@ -111,7 +111,7 @@
     )
 )]
 
-use std::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int};
 
 pub use libfuzzer_sys::*;
 

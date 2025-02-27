@@ -1,3 +1,4 @@
+use core::str;
 #[cfg(any(
     target_vendor = "apple",
     feature = "ddg-instr",
@@ -11,7 +12,7 @@
     feature = "profiling",
 ))]
 use std::path::PathBuf;
-use std::{env, fs::File, io::Write, path::Path, process::Command, str};
+use std::{env, fs::File, io::Write, path::Path, process::Command};
 
 #[cfg(target_vendor = "apple")]
 use glob::glob;

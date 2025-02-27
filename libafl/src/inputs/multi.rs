@@ -1,7 +1,7 @@
 //! An input composed of multiple parts identified by a key.
 
-use alloc::{fmt::Debug, string::String, vec::Vec};
-use core::hash::Hash;
+use alloc::{string::String, vec::Vec};
+use core::{fmt::Debug, hash::Hash};
 
 use serde::{Serialize, de::DeserializeOwned};
 

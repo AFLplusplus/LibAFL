@@ -1,7 +1,7 @@
 //! The [`NewHashFeedback`] uses the backtrace hash and a hashset to only keep novel cases
 
 use alloc::{borrow::Cow, string::ToString};
-use std::fmt::Debug;
+use core::fmt::Debug;
 
 use hashbrown::HashSet;
 use libafl_bolts::{
