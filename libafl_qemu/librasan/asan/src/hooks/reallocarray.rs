@@ -9,8 +9,7 @@ use crate::{asan_alloc, asan_dealloc, asan_get_size, asan_load, asan_panic, size
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_reallocarray"))]
+#[unsafe(export_name = "patch_reallocarray")]
 pub unsafe extern "C" fn reallocarray(
     ptr: *mut c_void,
     nmemb: size_t,

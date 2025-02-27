@@ -10,8 +10,7 @@ use crate::{GuestAddr, asan_alloc, asan_panic, size_t};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_posix_memalign"))]
+#[unsafe(export_name = "patch_posix_memalign")]
 pub unsafe extern "C" fn posix_memalign(
     memptr: *mut *mut c_void,
     align: size_t,

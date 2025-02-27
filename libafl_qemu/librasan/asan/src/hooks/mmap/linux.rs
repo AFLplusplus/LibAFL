@@ -10,8 +10,7 @@ use crate::{GuestAddr, asan_track, asan_unpoison, off_t, size_t};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_mmap"))]
+#[unsafe(export_name = "patch_mmap")]
 pub unsafe extern "C" fn mmap(
     addr: *mut c_void,
     len: size_t,

@@ -30,11 +30,53 @@ fix_zasan:
 		--allow-dirty
 
 [unix]
-link_zasan: compile_zasan
+rel_zasan: compile_zasan build_dummy
 	#!/bin/bash
 	source {{ DOTENV }}
 	${CROSS_CC} \
 		${LIBRASAN_CFLAGS} \
+		-r \
+		-nodefaultlibs \
+		-nostartfiles \
+		-nostdlib \
+		-g \
+		-u patch_aligned_alloc \
+		-u patch_atoi \
+		-u patch_atol \
+		-u patch_atoll \
+		-u patch_calloc \
+		-u patch_free \
+		-u patch_malloc \
+		-u patch_malloc_usable_size \
+		-u patch_memalign \
+		-u patch_memset \
+		-u patch_mmap \
+		-u patch_munmap \
+		-u patch_posix_memalign \
+		-u patch_pvalloc \
+		-u patch_read \
+		-u patch_realloc \
+		-u patch_reallocarray \
+		-u patch_valloc \
+		-u patch_write \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libzasan.rel \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libzasan.a
+
+[unix]
+rename_zasan: rel_zasan
+	#!/bin/bash
+	source {{ DOTENV }}
+	${CROSS_OBJCOPY} \
+		--redefine-sym memset=old_memset \
+		--redefine-syms={{ ZASAN_SOURCE_DIR }}/rename.syms \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libzasan.rel \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libzasan.renamed
+
+[unix]
+link_zasan: rename_zasan
+	#!/bin/bash
+	source {{ DOTENV }}
+	${CROSS_CC} \
 		-shared \
 		-nodefaultlibs \
 		-nostartfiles \
@@ -59,11 +101,11 @@ link_zasan: compile_zasan
 		-u reallocarray \
 		-u valloc \
 		-u write \
-		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libzasan.so \
 		-Wl,--version-script={{ ZASAN_SOURCE_DIR }}/zasan.map \
 		-Wl,--gc-sections \
 		-Wl,--no-undefined \
-		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libzasan.a \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libzasan.so \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libzasan.renamed
 
 [unix]
 strip_zasan: link_zasan

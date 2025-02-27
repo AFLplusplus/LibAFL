@@ -9,8 +9,7 @@ use crate::{asan_alloc, asan_panic, size_t};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_calloc"))]
+#[unsafe(export_name = "patch_calloc")]
 pub unsafe extern "C" fn calloc(nobj: size_t, size: size_t) -> *mut c_void {
     unsafe {
         trace!("calloc - nobj: {:#x}, size: {:#x}", nobj, size);

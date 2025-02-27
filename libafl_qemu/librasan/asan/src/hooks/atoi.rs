@@ -9,8 +9,7 @@ use crate::{asan_load, asan_panic};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_atoi"))]
+#[unsafe(export_name = "patch_atoi")]
 pub unsafe extern "C" fn atoi(s: *const c_char) -> c_int {
     unsafe {
         trace!("atoi - s: {:p}", s);

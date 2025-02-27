@@ -20,8 +20,7 @@ static MUNMAP_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_munmap"))]
+#[unsafe(export_name = "patch_munmap")]
 pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
     unsafe {
         trace!("munmap - addr: {:p}, len: {:#x}", addr, len);

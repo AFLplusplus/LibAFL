@@ -6,8 +6,7 @@ use crate::{asan_alloc, size_t};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_malloc"))]
+#[unsafe(export_name = "patch_malloc")]
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
     unsafe {
         trace!("malloc - size: {:#x}", size);
