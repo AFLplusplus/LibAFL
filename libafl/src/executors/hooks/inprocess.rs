@@ -356,7 +356,7 @@ pub struct InProcessExecutorHandlerData {
     pub executor_ptr: *const c_void,
     pub(crate) current_input_ptr: *const c_void,
 
-    #[cfg(all(feature = "std", any(unix, windows)))]
+    #[cfg(feature = "std")]
     pub(crate) signal_handler_depth: usize,
 
     /// The timeout handler
@@ -378,7 +378,7 @@ unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
 impl InProcessExecutorHandlerData {
-    #[cfg(all(feature = "std", any(unix, windows)))]
+    #[cfg(feature = "std")]
     const SIGNAL_HANDLER_MAX_DEPTH: usize = 3;
 
     /// # Safety
@@ -513,6 +513,7 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     // The current input for signal handling
     current_input_ptr: ptr::null(),
 
+    #[cfg(feature = "std")]
     signal_handler_depth: 0,
 
     // The crash handler fn
