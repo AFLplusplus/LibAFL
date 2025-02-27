@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use libafl_bolts::{AsSlice, AsSliceMut, ownedref::OwnedMutSlice};
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
-/// They are initializesd by calling [`__sanitizer_cov_8bit_counters_init`](
+/// They are initialized by calling [`__sanitizer_cov_8bit_counters_init`](
 pub static mut COUNTERS_MAPS: Vec<OwnedMutSlice<'static, u8>> = Vec::new();
 
 /// Gets a pointer to [`COUNTERS_MAPS`]
