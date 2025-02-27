@@ -120,6 +120,8 @@ jobs:
       # ---- build normal and examples ----
       - name: Run a normal build
         run: cargo build --verbose
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Run libafl_qemu usermode tests
         run: cd libafL_qemu && cargo test
       - name: Run libafl_qemu systemmode tests
