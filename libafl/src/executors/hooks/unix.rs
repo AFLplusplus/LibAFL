@@ -6,7 +6,7 @@ pub mod unix_signal_handler {
     use std::{io::Write, panic};
 
     use libafl_bolts::os::unix_signals::{
-        ucontext_t, Signal, SignalHandler, SIGNAL_RECURSION_EXIT,
+        SIGNAL_RECURSION_EXIT, Signal, SignalHandler, ucontext_t,
     };
     use libc::siginfo_t;
 
@@ -55,7 +55,9 @@ pub mod unix_signal_handler {
                 let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
 
                 if max_depth_reached {
-                    log::error!("The in process signal handler has been triggered {signal_depth} times recursively, which is not expected. Exiting with error code {SIGNAL_RECURSION_EXIT}...");
+                    log::error!(
+                        "The in process signal handler has been triggered {signal_depth} times recursively, which is not expected. Exiting with error code {SIGNAL_RECURSION_EXIT}..."
+                    );
                     libc::exit(SIGNAL_RECURSION_EXIT);
                 }
 
@@ -100,7 +102,9 @@ pub mod unix_signal_handler {
             let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
 
             if max_depth_reached {
-                log::error!("The in process signal handler has been triggered {signal_depth} times recursively, which is not expected. Exiting with error code {SIGNAL_RECURSION_EXIT}...");
+                log::error!(
+                    "The in process signal handler has been triggered {signal_depth} times recursively, which is not expected. Exiting with error code {SIGNAL_RECURSION_EXIT}..."
+                );
                 libc::exit(SIGNAL_RECURSION_EXIT);
             }
 

@@ -9,7 +9,7 @@ use libafl_bolts::ClientId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", not(miri)))]
-use libafl_bolts::os::unix_signals::{setup_signal_handler, SIGNAL_RECURSION_EXIT};
+use libafl_bolts::os::unix_signals::{SIGNAL_RECURSION_EXIT, setup_signal_handler};
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{ForkResult, fork};
 #[cfg(feature = "std")]
@@ -512,7 +512,9 @@ where
 
                 #[cfg(all(unix, feature = "std"))]
                 if child_status == SIGNAL_RECURSION_EXIT {
-                    return Err(Error::illegal_state("The client is stuck in an unexpected signal handler recursion. It is most likely a fuzzer bug."));
+                    return Err(Error::illegal_state(
+                        "The client is stuck in an unexpected signal handler recursion. It is most likely a fuzzer bug.",
+                    ));
                 }
 
                 #[expect(clippy::manual_assert)]
