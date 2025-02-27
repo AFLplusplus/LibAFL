@@ -1,19 +1,19 @@
 use std::{ffi::CStr, sync::OnceLock};
 
-use enum_map::{enum_map, EnumMap};
+use enum_map::{EnumMap, enum_map};
 use libafl::{executors::ExitKind, inputs::HasTargetBytes};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 use libc::c_uint;
 
 use crate::{
-    command::{
-        bindings, AddressAllowCommand, CommandError, CommandManager, EndCommand, InputCommand,
-        IsCommand, LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand, StartCommand,
-        StdCommandManager, TestCommand, VersionCommand,
-    },
-    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
-    sync_exit::ExitArgs,
     GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
+    command::{
+        AddressAllowCommand, CommandError, CommandManager, EndCommand, InputCommand, IsCommand,
+        LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand, StartCommand, StdCommandManager,
+        TestCommand, VersionCommand, bindings,
+    },
+    modules::{EmulatorModuleTuple, utils::filters::HasAddressFilterTuples},
+    sync_exit::ExitArgs,
 };
 
 #[cfg(all(

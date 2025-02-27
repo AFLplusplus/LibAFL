@@ -1,13 +1,13 @@
 use alloc::vec::Vec;
 use core::{cmp, marker::Sized};
-use std::io::{io::Write, stdout, Cursor};
+use std::io::{Cursor, io::Write, stdout};
 
 use hashbrown::HashSet;
 use libafl_bolts::rands::Rand;
 use pyo3::{
+    PyTypeInfo,
     prelude::{PyObject, PyResult, Python},
     types::{PyAnyMethods, PyBytes, PyBytesMethods, PyString, PyStringMethods, PyTuple},
-    PyTypeInfo,
 };
 use serde::{Deserialize, Serialize};
 
@@ -378,11 +378,7 @@ impl Tree {
                 done_nterms.insert(nterm);
             }
         }
-        if ret.is_empty() {
-            None
-        } else {
-            Some(ret)
-        }
+        if ret.is_empty() { None } else { Some(ret) }
     }
 
     #[expect(dead_code)]

@@ -1,23 +1,20 @@
-use alloc::{
-    boxed::Box,
-    sync::Arc,
-    time::Duration,
-    vec::Vec,
-};
+use alloc::{boxed::Box, sync::Arc, time::Duration, vec::Vec};
 use core::fmt::Display;
 use std::{
-    
-    sync::{core::sync::atomic, OnceLock},
-    process,
-    io::ErrorKind,
     collections::HashMap,
-    sync::atomic::{AtomicU64, Ordering},
+    io::ErrorKind,
+    process,
+    sync::{
+        OnceLock,
+        atomic::{AtomicU64, Ordering},
+        core::sync::atomic,
+    },
 };
 
-use enumflags2::{bitflags, BitFlags};
+use enumflags2::{BitFlags, bitflags};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::compress::GzipCompressor;
-use libafl_bolts::{current_time, ownedref::OwnedRef, Error};
+use libafl_bolts::{Error, current_time, ownedref::OwnedRef};
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -218,34 +215,35 @@ where
     where
         I: Input + Send + Sync + 'static,
     {
-        let node_descriptor = self.node_descriptor.take().ok_or_else(|| {
-            Error::illegal_state(
-                "The node descriptor can never be `None` at this point in the code",
-            )
-        })?;
-
-        // Create the state of the hook. This will be shared with the background server, so we wrap
-        // it with concurrent-safe objects
-        let state = Arc::new(RwLock::new(TcpMultiMachineState {
-            node_descriptor,
-            parent: None,
-            children: HashMap::default(),
-            old_msgs: Vec::new(),
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::new(),
-        }));
-
-        let rt =
-            Arc::new(Runtime::new().map_err(|_| Error::unknown("Tokio runtime spawning failed"))?);
-
         unsafe {
-            TcpMultiMachineState::init::<I>(&state.clone(), &rt.clone())?;
-        }
+            let node_descriptor = self.node_descriptor.take().ok_or_else(|| {
+                Error::illegal_state(
+                    "The node descriptor can never be `None` at this point in the code",
+                )
+            })?;
 
-        Ok(TcpMultiMachineHooks {
-            sender: TcpMultiMachineLlmpSenderHook::new(state.clone(), rt.clone()),
-            receiver: TcpMultiMachineLlmpReceiverHook::new(state, rt),
-        })
+            // Create the state of the hook. This will be shared with the background server, so we wrap
+            // it with concurrent-safe objects
+            let state = Arc::new(RwLock::new(TcpMultiMachineState {
+                node_descriptor,
+                parent: None,
+                children: HashMap::default(),
+                old_msgs: Vec::new(),
+                #[cfg(feature = "llmp_compression")]
+                compressor: GzipCompressor::new(),
+            }));
+
+            let rt = Arc::new(
+                Runtime::new().map_err(|_| Error::unknown("Tokio runtime spawning failed"))?,
+            );
+
+            TcpMultiMachineState::init::<I>(&state.clone(), &rt.clone())?;
+
+            Ok(TcpMultiMachineHooks {
+                sender: TcpMultiMachineLlmpSenderHook::new(state.clone(), rt.clone()),
+                receiver: TcpMultiMachineLlmpReceiverHook::new(state, rt),
+            })
+        }
     }
 }
 

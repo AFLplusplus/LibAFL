@@ -6,10 +6,10 @@ use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error,
     generators::Generator,
     inputs::{GramatronInput, Terminal},
     state::HasRand,
-    Error,
 };
 
 /// A trigger

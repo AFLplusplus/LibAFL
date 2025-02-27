@@ -2,7 +2,7 @@
 #[cfg(all(target_os = "linux", feature = "std"))]
 use core::mem::zeroed;
 #[cfg(any(unix, all(windows, feature = "std")))]
-use core::sync::atomic::{compiler_fence, Ordering};
+use core::sync::atomic::{Ordering, compiler_fence};
 use core::{
     ffi::c_void,
     marker::PhantomData,
@@ -13,7 +13,7 @@ use core::{
 #[cfg(all(target_os = "linux", feature = "std"))]
 use libafl_bolts::current_time;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::minibsod::{generate_minibsod_to_vec, BsodInfo};
+use libafl_bolts::minibsod::{BsodInfo, generate_minibsod_to_vec};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
@@ -24,16 +24,16 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 #[cfg(feature = "std")]
 use crate::executors::hooks::timer::TimerStruct;
 use crate::{
+    Error, HasObjective,
     events::{EventFirer, EventRestarter},
-    executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
+    executors::{Executor, HasObservers, hooks::ExecutorHook, inprocess::HasInProcessHooks},
     feedbacks::Feedback,
     state::{HasExecutions, HasSolutions},
-    Error, HasObjective,
 };
 #[cfg(all(unix, feature = "std"))]
 use crate::{
     executors::{
-        hooks::unix::unix_signal_handler, inprocess::run_observers_and_save_state, ExitKind,
+        ExitKind, hooks::unix::unix_signal_handler, inprocess::run_observers_and_save_state,
     },
     state::HasCorpus,
 };
@@ -445,43 +445,45 @@ impl InProcessExecutorHandlerData {
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
-        if self.is_valid() {
-            let executor = self.executor_mut::<E>();
-            // disarms timeout in case of timeout
-            let state = self.state_mut::<S>();
-            let event_mgr = self.event_mgr_mut::<EM>();
-            let fuzzer = self.fuzzer_mut::<Z>();
-            let input = self.take_current_input::<I>();
+        unsafe {
+            if self.is_valid() {
+                let executor = self.executor_mut::<E>();
+                // disarms timeout in case of timeout
+                let state = self.state_mut::<S>();
+                let event_mgr = self.event_mgr_mut::<EM>();
+                let fuzzer = self.fuzzer_mut::<Z>();
+                let input = self.take_current_input::<I>();
 
-            log::error!("Target crashed!");
+                log::error!("Target crashed!");
 
-            if let Some(bsod_info) = bsod_info {
-                let bsod = generate_minibsod_to_vec(
-                    bsod_info.signal,
-                    &bsod_info.siginfo,
-                    bsod_info.ucontext.as_ref(),
-                );
+                if let Some(bsod_info) = bsod_info {
+                    let bsod = generate_minibsod_to_vec(
+                        bsod_info.signal,
+                        &bsod_info.siginfo,
+                        bsod_info.ucontext.as_ref(),
+                    );
 
-                if let Ok(bsod) = bsod {
-                    if let Ok(r) = core::str::from_utf8(&bsod) {
-                        log::error!("{}", r);
+                    if let Ok(bsod) = bsod {
+                        if let Ok(r) = core::str::from_utf8(&bsod) {
+                            log::error!("{}", r);
+                        }
                     }
                 }
+
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
+
+                return true;
             }
 
-            run_observers_and_save_state::<E, EM, I, OF, S, Z>(
-                executor,
-                state,
-                input,
-                fuzzer,
-                event_mgr,
-                ExitKind::Crash,
-            );
-
-            return true;
+            false
         }
-
-        false
     }
 }
 

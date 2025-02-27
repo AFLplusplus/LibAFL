@@ -9,9 +9,9 @@ use core::marker::PhantomData;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::llmp::LLMP_FLAG_COMPRESSED;
 use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag, LLMP_FLAG_FROM_MM},
-    ownedref::OwnedRef,
     ClientId, Error,
+    llmp::{Flags, LLMP_FLAG_FROM_MM, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
+    ownedref::OwnedRef,
 };
 use serde::Serialize;
 use tokio::{
@@ -23,9 +23,9 @@ use tokio::{
 
 use crate::{
     events::{
+        Event,
         centralized::_LLMP_TAG_TO_MAIN,
         multi_machine::{MultiMachineMsg, TcpMultiMachineState},
-        Event,
     },
     inputs::Input,
 };

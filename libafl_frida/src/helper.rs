@@ -9,9 +9,9 @@ use std::{
 };
 
 use frida_gum::{
+    Backend, Gum, Module, ModuleMap, Script,
     instruction_writer::InstructionWriter,
     stalker::{StalkerIterator, StalkerOutput, Transformer},
-    Backend, Gum, Module, ModuleMap, Script,
 };
 use frida_gum_sys::gchar;
 use libafl::Error;
@@ -21,7 +21,7 @@ use libafl_bolts::{
 };
 use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
-use nix::sys::mman::{mmap_anonymous, MapFlags, ProtFlags};
+use nix::sys::mman::{MapFlags, ProtFlags, mmap_anonymous};
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -544,9 +544,9 @@ impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
 /// A callback function to test calling back from FRIDA's JavaScript scripting support
 /// # Safety
 /// This function receives a raw pointer to a C string
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn test_function(message: *const gchar) {
-    if let Ok(msg) = CStr::from_ptr(message).to_str() {
+    if let Ok(msg) = unsafe { CStr::from_ptr(message).to_str() } {
         println!("{msg}");
     }
 }

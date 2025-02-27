@@ -9,7 +9,7 @@ use crate::{Context, Mapping, Pointer};
 
 const PAGE_SIZE: usize = 4096;
 
-extern "C" {
+unsafe extern "C" {
     //void* __libafl_raw_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
     fn __libafl_raw_mmap(
         addr: *mut c_void,
@@ -41,7 +41,7 @@ extern "C" {
 
 /// # Safety
 /// Call to functions using syscalls
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[expect(clippy::too_many_lines)]
 #[cfg(not(windows))]
 pub unsafe extern "C" fn mmap(
@@ -227,7 +227,7 @@ pub unsafe extern "C" fn mmap(
 
 /// # Safety
 /// Call to functions using syscalls
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn munmap(addr: *mut c_void, length: size_t) -> c_int {
     let ctx = Context::get();
 
@@ -318,7 +318,7 @@ pub unsafe extern "C" fn munmap(addr: *mut c_void, length: size_t) -> c_int {
 
 /// # Safety
 /// Calling to functions using syscalls
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn mprotect(addr: *mut c_void, length: size_t, prot: c_int) -> c_int {
     let ctx = Context::get();
 
@@ -443,7 +443,7 @@ pub unsafe extern "C" fn mprotect(addr: *mut c_void, length: size_t, prot: c_int
 
 /// # Safety
 /// Call to functions using syscalls
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[cfg(not(windows))]
 pub unsafe extern "C" fn madvise(addr: *mut c_void, length: size_t, advice: c_int) -> c_int {
     let ctx = Context::get();

@@ -9,12 +9,12 @@ use core::{
 };
 
 use ahash::RandomState;
-use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use libafl_bolts::{AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, ownedref::OwnedRef};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    observers::{MapObserver, Observer, ObserverWithHashField},
     Error,
+    observers::{MapObserver, Observer, ObserverWithHashField},
 };
 
 /// A simple observer with a single value.
@@ -234,17 +234,18 @@ impl<'it, T: 'it> Iterator for RefCellValueObserverIterMut<'it, T> {
     type Item = RefMut<'it, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(v) = self.v.take() {
-            let next_slice = if v.len() > 1 {
-                let (next, remainder) = RefMut::map_split(v, |v| v.split_at_mut(1));
-                self.v = Some(remainder);
-                next
-            } else {
-                v
-            };
-            Some(RefMut::map(next_slice, |v| &mut v[0]))
-        } else {
-            None
+        match self.v.take() {
+            Some(v) => {
+                let next_slice = if v.len() > 1 {
+                    let (next, remainder) = RefMut::map_split(v, |v| v.split_at_mut(1));
+                    self.v = Some(remainder);
+                    next
+                } else {
+                    v
+                };
+                Some(RefMut::map(next_slice, |v| &mut v[0]))
+            }
+            _ => None,
         }
     }
 }

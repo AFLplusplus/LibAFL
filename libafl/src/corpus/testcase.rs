@@ -11,11 +11,11 @@ use core::{
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
-use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
+use libafl_bolts::{HasLen, serdeany::SerdeAnyMap};
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;
-use crate::{corpus::CorpusId, Error, HasMetadata};
+use crate::{Error, HasMetadata, corpus::CorpusId};
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.

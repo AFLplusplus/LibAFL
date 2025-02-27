@@ -1,7 +1,7 @@
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::Aarch64Register;
 #[cfg(target_arch = "x86_64")]
-use frida_gum::{instruction_writer::X86Register, CpuContext};
+use frida_gum::{CpuContext, instruction_writer::X86Register};
 #[cfg(target_arch = "x86_64")]
 use libafl::Error;
 #[cfg(target_arch = "aarch64")]

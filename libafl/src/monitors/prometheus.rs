@@ -28,9 +28,9 @@
 //! When using docker, you may need to point `prometheus.yml` to the `docker0` interface or `host.docker.internal`
 
 use alloc::{
-    string::ToString, sync::Arc,
     borrow::Cow,
-    string::String,
+    string::{String, ToString},
+    sync::Arc,
 };
 use core::{
     fmt,
@@ -38,17 +38,16 @@ use core::{
     time::Duration,
 };
 use std::{
-sync::{core::sync::atomic,
+    sync::{atomic::AtomicU64, sync::atomic},
     thread,
-    sync::atomic::AtomicU64,
 };
 
 // using thread in order to start the HTTP server in a separate thread
 use futures::executor::block_on;
-use libafl_bolts::{current_time, ClientId};
+use libafl_bolts::{ClientId, current_time};
 // using the official rust client library for Prometheus: https://github.com/prometheus/client_rust
 use prometheus_client::{
-    encoding::{text::encode, EncodeLabelSet},
+    encoding::{EncodeLabelSet, text::encode},
     metrics::{family::Family, gauge::Gauge},
     registry::Registry,
 };
@@ -56,8 +55,8 @@ use prometheus_client::{
 use tide::Request;
 
 use crate::monitors::{
-    stats::{manager::ClientStatsManager, user_stats::UserStatsValue},
     Monitor,
+    stats::{manager::ClientStatsManager, user_stats::UserStatsValue},
 };
 
 /// Prometheus metrics for global and each client.

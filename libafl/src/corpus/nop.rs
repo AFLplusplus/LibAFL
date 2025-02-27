@@ -4,8 +4,8 @@ use core::{cell::RefCell, marker::PhantomData};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, Testcase},
     Error,
+    corpus::{Corpus, CorpusId, Testcase},
 };
 
 /// A corpus which does not store any [`Testcase`]s.

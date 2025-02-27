@@ -2,6 +2,7 @@
 
 #[cfg(feature = "alloc")]
 use alloc::{borrow::Cow, vec::Vec};
+use core::{any::TypeId, mem::transmute};
 #[cfg(feature = "alloc")]
 use core::{
     any::type_name,
@@ -9,17 +10,16 @@ use core::{
     marker::PhantomData,
     ops::{Deref, DerefMut, Index, IndexMut},
 };
-use core::{any::TypeId, mem::transmute};
 
 #[cfg(feature = "alloc")]
 use serde::{Deserialize, Serialize};
-pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
+pub use tuple_list::{TupleList, tuple_list, tuple_list_type};
 
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
-use crate::hash_std;
 use crate::HasLen;
 #[cfg(feature = "alloc")]
 use crate::Named;
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+use crate::hash_std;
 
 /// Returns if the type `T` is equal to `U`, ignoring lifetimes.
 #[must_use]
@@ -809,7 +809,7 @@ macro_rules! tuple_for_each_mut {
 /// ```rust
 /// use libafl_bolts::{
 ///     map_tuple_list_type,
-///     tuples::{tuple_list, tuple_list_type, Map, MappingFunctor},
+///     tuples::{Map, MappingFunctor, tuple_list, tuple_list_type},
 /// };
 ///
 /// struct Wrapper<T>(T);
@@ -844,7 +844,7 @@ macro_rules! map_tuple_list_type {
 /// ```rust
 /// use libafl_bolts::{
 ///     merge_tuple_list_type,
-///     tuples::{tuple_list, tuple_list_type, Merge},
+///     tuples::{Merge, tuple_list, tuple_list_type},
 /// };
 ///
 /// struct A;
@@ -919,7 +919,7 @@ mod test {
 
     #[cfg(feature = "alloc")]
     use crate::ownedref::OwnedMutSlice;
-    use crate::tuples::{type_eq, Map, MappingFunctor, Merge};
+    use crate::tuples::{Map, MappingFunctor, Merge, type_eq};
 
     #[test]
     // for type name tests

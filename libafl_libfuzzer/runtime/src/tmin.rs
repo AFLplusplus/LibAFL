@@ -4,26 +4,26 @@ use std::{
 };
 
 use libafl::{
+    Error, ExecutesInput, Fuzzer, StdFuzzer,
     corpus::{Corpus, HasTestcase, InMemoryCorpus, Testcase},
     events::SimpleEventManager,
-    executors::{inprocess_fork::InProcessForkExecutor, ExitKind},
+    executors::{ExitKind, inprocess_fork::InProcessForkExecutor},
     feedbacks::{CrashFeedback, TimeoutFeedback},
     inputs::{BytesInput, HasMutatorBytes, HasTargetBytes},
-    mutators::{havoc_mutations_no_crossover, Mutator, StdScheduledMutator},
+    mutators::{Mutator, StdScheduledMutator, havoc_mutations_no_crossover},
     schedulers::QueueScheduler,
     stages::StdTMinMutationalStage,
     state::{HasCorpus, StdState},
-    Error, ExecutesInput, Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{
+    AsSlice, HasLen,
     rands::{RomuDuoJrRand, StdRand},
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsSlice, HasLen,
 };
 use libafl_targets::LLVMCustomMutator;
 
-use crate::{options::LibfuzzerOptions, CustomMutationStatus};
+use crate::{CustomMutationStatus, options::LibfuzzerOptions};
 
 type TMinState =
     StdState<InMemoryCorpus<BytesInput>, BytesInput, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;

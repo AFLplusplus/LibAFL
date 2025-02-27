@@ -5,9 +5,9 @@ use core::time::Duration;
 use std::thread::sleep;
 
 use libafl::monitors::{
-    stats::{manager::ClientStatsManager, ClientStats},
-    tui::TuiMonitor,
     Monitor,
+    stats::{ClientStats, manager::ClientStatsManager},
+    tui::TuiMonitor,
 };
 use libafl_bolts::ClientId;
 

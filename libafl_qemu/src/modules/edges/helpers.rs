@@ -13,16 +13,16 @@ pub use tracers::{
 
 // Constants used for variable-length maps
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub(super) static mut LIBAFL_QEMU_EDGES_MAP_PTR: *mut u8 = ptr::null_mut();
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub(super) static mut LIBAFL_QEMU_EDGES_MAP_SIZE_PTR: *mut usize = ptr::null_mut();
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub(super) static mut LIBAFL_QEMU_EDGES_MAP_ALLOCATED_SIZE: usize = 0;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub(super) static mut LIBAFL_QEMU_EDGES_MAP_MASK_MAX: usize = 0;
 
 #[cfg_attr(
@@ -56,12 +56,12 @@ mod generators {
     use libafl_qemu_sys::GuestAddr;
 
     use super::{
-        super::EdgeCoverageVariant, QemuEdgesMapMetadata, LIBAFL_QEMU_EDGES_MAP_MASK_MAX,
-        LIBAFL_QEMU_EDGES_MAP_SIZE_PTR,
+        super::EdgeCoverageVariant, LIBAFL_QEMU_EDGES_MAP_MASK_MAX, LIBAFL_QEMU_EDGES_MAP_SIZE_PTR,
+        QemuEdgesMapMetadata,
     };
     use crate::{
-        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
         EmulatorModules, Qemu,
+        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
     };
 
     fn get_mask<const IS_CONST_MAP: bool, const MAP_SIZE: usize>() -> usize {

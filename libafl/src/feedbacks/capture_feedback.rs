@@ -3,15 +3,15 @@ use alloc::{borrow::Cow, rc::Rc};
 use core::{cell::RefCell, fmt::Debug};
 
 use libafl_bolts::{Error, Named};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
+    HasMetadata,
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     stages::verify_timeouts::TimeoutsToVerify,
     state::HasCorpus,
-    HasMetadata,
 };
 
 /// A Feedback that captures all timeouts and stores them in State for re-evaluation later.

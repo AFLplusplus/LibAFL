@@ -12,8 +12,8 @@ use core::{fmt::Debug, marker::PhantomData};
 pub use concolic::ConcolicFeedback;
 pub use differential::DiffFeedback;
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 pub use list::*;
 pub use map::*;
@@ -25,7 +25,7 @@ pub use new_hash_feedback::NewHashFeedback;
 pub use new_hash_feedback::NewHashFeedbackMetadata;
 use serde::{Deserialize, Serialize};
 
-use crate::{corpus::Testcase, executors::ExitKind, observers::TimeObserver, Error};
+use crate::{Error, corpus::Testcase, executors::ExitKind, observers::TimeObserver};
 
 #[cfg(feature = "std")]
 pub mod capture_feedback;
@@ -1016,11 +1016,7 @@ impl ConstFeedback {
 
 impl From<bool> for ConstFeedback {
     fn from(val: bool) -> Self {
-        if val {
-            Self::True
-        } else {
-            Self::False
-        }
+        if val { Self::True } else { Self::False }
     }
 }
 

@@ -10,7 +10,7 @@ use core::{
     marker::PhantomData,
     net::SocketAddr,
     num::NonZeroUsize,
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
     time::Duration,
 };
 #[cfg(feature = "std")]
@@ -21,7 +21,12 @@ use libafl_bolts::os::startable_self;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "fork", unix))]
-use libafl_bolts::os::{fork, ForkResult};
+use libafl_bolts::os::{ForkResult, fork};
+#[cfg(feature = "std")]
+use libafl_bolts::{
+    IP_LOCALHOST,
+    llmp::{TcpRequest, TcpResponse, recv_tcp_msg, send_tcp_msg},
+};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
@@ -31,19 +36,14 @@ use libafl_bolts::{
     core_affinity::CoreId,
     current_time,
     llmp::{
-        Broker, LlmpBroker, LlmpClient, LlmpClientDescription, LlmpConnection, LLMP_FLAG_FROM_MM,
+        Broker, LLMP_FLAG_FROM_MM, LlmpBroker, LlmpClient, LlmpClientDescription, LlmpConnection,
     },
     os::CTRL_C_EXIT,
     shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     staterestore::StateRestorer,
-    tuples::{tuple_list, Handle, MatchNameRef},
+    tuples::{Handle, MatchNameRef, tuple_list},
 };
-#[cfg(feature = "std")]
-use libafl_bolts::{
-    llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse},
-    IP_LOCALHOST,
-};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "llmp_compression")]
@@ -51,14 +51,15 @@ use crate::events::COMPRESS_THRESHOLD;
 #[cfg(all(unix, not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
+    Error,
     common::HasMetadata,
     events::{
+        _LLMP_TAG_EVENT_TO_BROKER, AdaptiveSerializer, AwaitRestartSafe, CanSerializeObserver,
+        Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventReceiver,
+        EventRestarter, HasEventManagerId, LLMP_TAG_EVENT_TO_BOTH, LlmpShouldSaveState,
+        ProgressReporter, RecordSerializationTime, SendExiting, StdLlmpEventHook,
         launcher::ClientDescription, serialize_observers_adaptive, std_maybe_report_progress,
-        std_report_progress, AdaptiveSerializer, AwaitRestartSafe, CanSerializeObserver, Event,
-        EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventReceiver,
-        EventRestarter, HasEventManagerId, LlmpShouldSaveState, ProgressReporter,
-        RecordSerializationTime, SendExiting, StdLlmpEventHook, LLMP_TAG_EVENT_TO_BOTH,
-        _LLMP_TAG_EVENT_TO_BROKER,
+        std_report_progress,
     },
     inputs::Input,
     monitors::Monitor,
@@ -67,7 +68,6 @@ use crate::{
         HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime,
         HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
-    Error,
 };
 
 const INITIAL_EVENT_BUFFER_SIZE: usize = 1024 * 4;
@@ -285,7 +285,7 @@ where
     SP: ShMemProvider<ShMem = SHM>,
 {
     fn send_exiting(&mut self) -> Result<(), Error> {
-        if let Some(ref mut sr) = &mut self.staterestorer {
+        if let Some(sr) = &mut self.staterestorer {
             sr.send_exiting();
         }
         // Also inform the broker that we are about to exit.
@@ -366,7 +366,10 @@ where
                     ..
                 } => {
                     #[cfg(feature = "std")]
-                    log::debug!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
+                    log::debug!(
+                        "[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})",
+                        std::process::id()
+                    );
 
                     if client_config.match_with(&self.configuration) && observers_buf.is_some() {
                         return Ok(Some((event, true)));
@@ -563,9 +566,14 @@ where
 {
     /// Write the config for a client `EventManager` to env vars, a new
     /// client can reattach using [`LlmpEventManagerBuilder::build_existing_client_from_env()`].
+    ///
+    /// # Safety
+    /// This will write to process env. Should only be called from a single thread at a time.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) {
-        self.llmp.to_env(env_name).unwrap();
+    pub unsafe fn to_env(&self, env_name: &str) {
+        unsafe {
+            self.llmp.to_env(env_name).unwrap();
+        }
     }
 
     /// Get the staterestorer
@@ -842,7 +850,9 @@ where
                     )?;
 
                     broker_things(broker, self.remote_broker_addr)?;
-                    unreachable!("The broker may never return normally, only on errors or when shutting down.");
+                    unreachable!(
+                        "The broker may never return normally, only on errors or when shutting down."
+                    );
                 }
                 ManagerKind::Client { client_description } => {
                     // We are a client
@@ -867,7 +877,11 @@ where
             }
 
             // We are the fuzzer respawner in a llmp client
-            mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+            // # Safety
+            // There should only ever be one launcher thread.
+            unsafe {
+                mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+            }
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]
@@ -877,8 +891,13 @@ where
             #[cfg(not(unix))]
             let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
+
             // Store the information to a map.
-            staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            // # Safety
+            // Very likely single threaded here.
+            unsafe {
+                staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            }
 
             let mut ctr: u64 = 0;
             // Client->parent loop
@@ -943,9 +962,14 @@ where
                         log::error!("Failed to detach from broker: {err}");
                     }
                     #[cfg(unix)]
-                    assert_ne!(9, child_status, "Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart");
+                    assert_ne!(
+                        9, child_status,
+                        "Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart"
+                    );
                     // Storing state in the last round did not work
-                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
+                    panic!(
+                        "Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})"
+                    );
                 }
 
                 ctr = ctr.wrapping_add(1);
@@ -1026,21 +1050,22 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::sync::atomic::{compiler_fence, Ordering};
+    use core::sync::atomic::{Ordering, compiler_fence};
 
     use libafl_bolts::{
+        ClientId,
         llmp::{LlmpClient, LlmpSharedMap},
         rands::StdRand,
         shmem::{ShMemProvider, StdShMem, StdShMemProvider},
         staterestore::StateRestorer,
-        tuples::{tuple_list, Handled},
-        ClientId,
+        tuples::{Handled, tuple_list},
     };
     use serial_test::serial;
 
     use crate::{
+        StdFuzzer,
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        events::llmp::restarting::{LlmpEventManagerBuilder, _ENV_FUZZER_SENDER},
+        events::llmp::restarting::{_ENV_FUZZER_SENDER, LlmpEventManagerBuilder},
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
         fuzzer::Fuzzer,
@@ -1050,7 +1075,6 @@ mod tests {
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::StdState,
-        StdFuzzer,
     };
 
     #[test]
@@ -1131,7 +1155,11 @@ mod tests {
         assert!(staterestorer.has_content());
 
         // Store the information to a map.
-        staterestorer.write_to_env(_ENV_FUZZER_SENDER).unwrap();
+        // # Safety
+        // Single-threaded test code
+        unsafe {
+            staterestorer.write_to_env(_ENV_FUZZER_SENDER).unwrap();
+        }
 
         compiler_fence(Ordering::SeqCst);
 

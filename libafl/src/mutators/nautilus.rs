@@ -4,11 +4,12 @@ use alloc::borrow::Cow;
 use core::fmt::Debug;
 
 use libafl_bolts::{
-    rands::{Rand, RomuDuoJrRand},
     Named,
+    rands::{Rand, RomuDuoJrRand},
 };
 
 use crate::{
+    Error, HasMetadata,
     common::nautilus::grammartec::{
         context::Context,
         mutator::Mutator as BackingMutator,
@@ -19,7 +20,6 @@ use crate::{
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasRand},
-    Error, HasMetadata,
 };
 
 /// The randomic mutator for `Nautilus` grammar.

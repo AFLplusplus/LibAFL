@@ -1,23 +1,25 @@
 // Based on the example of setting hooks: Https://github.com/frida/frida-rust/blob/main/examples/gum/hook_open/src/lib.rs
 use std::ffi::c_void;
 
-use frida_gum::{interceptor::Interceptor, Gum, NativePointer, Process};
+use frida_gum::{Gum, NativePointer, Process, interceptor::Interceptor};
 use libafl_bolts::os::windows_exceptions::{
-    handle_exception, IsProcessorFeaturePresent, UnhandledExceptionFilter, EXCEPTION_POINTERS,
-    PROCESSOR_FEATURE_ID,
+    EXCEPTION_POINTERS, IsProcessorFeaturePresent, PROCESSOR_FEATURE_ID, UnhandledExceptionFilter,
+    handle_exception,
 };
 
 unsafe extern "C" fn is_processor_feature_present_detour(feature: u32) -> bool {
     match feature {
         0x17 => false,
-        _ => IsProcessorFeaturePresent(PROCESSOR_FEATURE_ID(feature)).as_bool(),
+        _ => unsafe { IsProcessorFeaturePresent(PROCESSOR_FEATURE_ID(feature)).as_bool() },
     }
 }
 unsafe extern "C" fn unhandled_exception_filter_detour(
     exception_pointers: *mut EXCEPTION_POINTERS,
 ) -> i32 {
-    handle_exception(exception_pointers);
-    UnhandledExceptionFilter(exception_pointers)
+    unsafe {
+        handle_exception(exception_pointers);
+        UnhandledExceptionFilter(exception_pointers)
+    }
 }
 /// Initialize the hooks
 pub fn initialize(gum: &Gum) {

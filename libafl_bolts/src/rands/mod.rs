@@ -8,7 +8,7 @@ use core::{
     num::{NonZero, NonZeroUsize},
 };
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 #[cfg(feature = "alloc")]
 pub mod loaded_dice;
@@ -672,7 +672,7 @@ pub mod pybind {
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
-    use super::{random_seed, Rand, StdRand};
+    use super::{Rand, StdRand, random_seed};
 
     #[pyclass(unsendable, name = "StdRand")]
     #[expect(clippy::unsafe_derive_deserialize)]

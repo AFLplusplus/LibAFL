@@ -15,11 +15,11 @@ use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, Testcase},
     inputs::Input,
     stages::{Restartable, Stage},
     state::{HasCorpus, HasRand, HasSolutions},
-    Error, HasMetadata,
 };
 
 /// Metadata used to store information about disk dump indexes for names

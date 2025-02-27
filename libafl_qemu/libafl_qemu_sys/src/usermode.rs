@@ -7,12 +7,12 @@ use core::{slice::from_raw_parts, str::from_utf8_unchecked};
 use libc::{c_char, strlen};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
-use pyo3::{pyclass, pymethods, types::PyInt, Bound, IntoPyObject, Python};
+use pyo3::{Bound, IntoPyObject, Python, pyclass, pymethods, types::PyInt};
 use strum_macros::EnumIter;
 
 use crate::MmapPerms;
 #[cfg(target_os = "linux")]
-use crate::{libafl_mapinfo, GuestAddr};
+use crate::{GuestAddr, libafl_mapinfo};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(i32)]

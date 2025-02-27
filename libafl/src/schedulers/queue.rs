@@ -3,10 +3,10 @@
 use alloc::borrow::ToOwned;
 
 use crate::{
+    Error,
     corpus::{Corpus, CorpusId},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::HasCorpus,
-    Error,
 };
 
 /// Walk the corpus in a queue-like fashion

@@ -8,11 +8,12 @@ use core::{fmt::Debug, time::Duration};
 #[cfg(feature = "std")]
 use fastbloom::BloomFilter;
 use libafl_bolts::{current_time, tuples::MatchName};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{
         CanSerializeObserver, Event, EventConfig, EventFirer, EventReceiver, ProgressReporter,
@@ -30,7 +31,6 @@ use crate::{
         HasCorpus, HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported,
         HasLastFoundTime, HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
-    Error, HasMetadata,
 };
 
 /// Send a monitor update all 15 (or more) seconds
@@ -1129,24 +1129,32 @@ mod tests {
             InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut manager)
                 .unwrap();
         let input = BytesInput::new(vec![1, 2, 3]);
-        assert!(fuzzer
-            .evaluate_input(&mut state, &mut executor, &mut manager, &input)
-            .is_ok());
+        assert!(
+            fuzzer
+                .evaluate_input(&mut state, &mut executor, &mut manager, &input)
+                .is_ok()
+        );
         assert_eq!(1, *execution_count.borrow()); // evaluate_input does not add it to the filter
 
-        assert!(fuzzer
-            .evaluate_filtered(&mut state, &mut executor, &mut manager, &input)
-            .is_ok());
+        assert!(
+            fuzzer
+                .evaluate_filtered(&mut state, &mut executor, &mut manager, &input)
+                .is_ok()
+        );
         assert_eq!(2, *execution_count.borrow()); // at to the filter
 
-        assert!(fuzzer
-            .evaluate_filtered(&mut state, &mut executor, &mut manager, &input)
-            .is_ok());
+        assert!(
+            fuzzer
+                .evaluate_filtered(&mut state, &mut executor, &mut manager, &input)
+                .is_ok()
+        );
         assert_eq!(2, *execution_count.borrow()); // the harness is not called
 
-        assert!(fuzzer
-            .evaluate_input(&mut state, &mut executor, &mut manager, &input)
-            .is_ok());
+        assert!(
+            fuzzer
+                .evaluate_input(&mut state, &mut executor, &mut manager, &input)
+                .is_ok()
+        );
         assert_eq!(3, *execution_count.borrow()); // evaluate_input ignores filters
     }
 }

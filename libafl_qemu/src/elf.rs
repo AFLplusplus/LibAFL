@@ -2,7 +2,7 @@
 
 use std::{fs::File, io::Read, ops::Range, path::Path, str};
 
-use goblin::elf::{header::ET_DYN, Elf};
+use goblin::elf::{Elf, header::ET_DYN};
 use libafl::Error;
 use libafl_qemu_sys::GuestAddr;
 

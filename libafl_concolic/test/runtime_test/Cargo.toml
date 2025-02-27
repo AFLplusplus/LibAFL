@@ -1,9 +1,10 @@
 [package]
 name = "runtime_test"
 version.workspace = true
-edition = "2021"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
-description = "Runtime test of LibAFL fuzzing with symbolicc execution"
+description = "Runtime test of LibAFL fuzzing with symbolic execution"
 documentation = "https://docs.rs/libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"

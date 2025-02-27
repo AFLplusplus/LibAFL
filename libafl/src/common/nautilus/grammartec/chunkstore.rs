@@ -2,7 +2,7 @@ use alloc::{string::String, vec::Vec};
 use core::{
     fs::File,
     io::Write,
-    sync::{atomic::AtomicBool, RwLock},
+    sync::{RwLock, atomic::AtomicBool},
 };
 
 use hashbrown::{HashMap, HashSet};

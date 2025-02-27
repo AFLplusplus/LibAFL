@@ -9,14 +9,14 @@ use core::{
 };
 
 use libafl_bolts::{
-    ownedref::OwnedMutSlice, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named,
+    AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, ownedref::OwnedMutSlice,
 };
 use meminterval::IntervalTree;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    observers::{map::MapObserver, DifferentialObserver, Observer},
     Error,
+    observers::{DifferentialObserver, Observer, map::MapObserver},
 };
 
 /// The Multi Map Observer merge different maps into one observer

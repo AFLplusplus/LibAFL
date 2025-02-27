@@ -122,7 +122,9 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     let mut shmem = shmem_provider
         .new_shmem(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
         .unwrap();
-    shmem.write_to_env(SHMEM_ENV_VAR).unwrap();
+    unsafe {
+        shmem.write_to_env(SHMEM_ENV_VAR).unwrap();
+    }
     let shmem_buf = shmem.as_slice_mut();
 
     // If we are in Nyx Mode, we need to use a different map observer.
@@ -300,14 +302,17 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
 
     // Set LD_PRELOAD (Linux) && DYLD_INSERT_LIBRARIES (OSX) for target.
     if let Some(preload_env) = &opt.afl_preload {
-        std::env::set_var("LD_PRELOAD", preload_env);
-        std::env::set_var("DYLD_INSERT_LIBRARIES", preload_env);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("LD_PRELOAD", preload_env) };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DYLD_INSERT_LIBRARIES", preload_env) };
     }
 
     // Insert appropriate shared libraries if frida_mode
     if opt.frida_mode {
         if opt.frida_asan {
-            std::env::set_var("ASAN_OPTIONS", "detect_leaks=false");
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe { std::env::set_var("ASAN_OPTIONS", "detect_leaks=false") };
         }
         let frida_bin = find_afl_binary("afl-frida-trace.so", Some(opt.executable.clone()))?
             .display()
@@ -317,8 +322,10 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         } else {
             frida_bin
         };
-        std::env::set_var("LD_PRELOAD", &preload);
-        std::env::set_var("DYLD_INSERT_LIBRARIES", &preload);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("LD_PRELOAD", &preload) };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("DYLD_INSERT_LIBRARIES", &preload) };
     }
     #[cfg(feature = "nyx")]
     let mut executor = {
@@ -456,7 +463,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     // We only run cmplog on the main node
     let cmplog_executable_path = match &opt.cmplog {
         None => "-",
-        Some(ref p) => match p.as_str() {
+        Some(p) => match p.as_str() {
             "0" => opt.executable.to_str().unwrap(),
             _ => p,
         },
@@ -468,7 +475,9 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
 
         // Let the Forkserver know the CmpLog shared memory map ID.
-        cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
+        unsafe {
+            cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
+        }
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
         // Create the CmpLog observer.

@@ -44,7 +44,7 @@ macro_rules! extern_c_checked {
             static [<__ $c_fn:upper __>]: unsafe extern "C" fn($($param_ty),*) $( -> $ret_ty )? = $c_fn;
         }
 
-        extern "C" {
+        unsafe extern "C" {
             $visibility fn $c_fn($($param_ident : $param_ty),*) $( -> $ret_ty )?;
         }
 
@@ -64,7 +64,7 @@ macro_rules! extern_c_checked {
             static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: &raw const $c_var } };
         }
 
-        extern "C" {
+        unsafe extern "C" {
             $visibility static $c_var: $c_var_ty;
         }
 
@@ -84,7 +84,7 @@ macro_rules! extern_c_checked {
             static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: &raw const $c_var } };
         }
 
-        extern "C" {
+        unsafe extern "C" {
             $visibility static mut $c_var: $c_var_ty;
         }
 

@@ -12,11 +12,11 @@ use libafl_bolts::{AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, Trunca
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error,
     executors::ExitKind,
     observers::{
-        map::MapObserver, ConstLenMapObserver, DifferentialObserver, Observer, VarLenMapObserver,
+        ConstLenMapObserver, DifferentialObserver, Observer, VarLenMapObserver, map::MapObserver,
     },
-    Error,
 };
 
 /// Hitcounts class lookup

@@ -21,7 +21,7 @@ use libafl_bolts::{
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 mod stack;
 pub use stack::StageStack;
@@ -29,6 +29,7 @@ pub use stack::StageStack;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::ClientPerfStats;
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::StateInitializer,
@@ -36,7 +37,6 @@ use crate::{
     generators::Generator,
     inputs::{Input, NopInput},
     stages::StageId,
-    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// The maximum size of a testcase

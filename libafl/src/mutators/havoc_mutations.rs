@@ -2,7 +2,7 @@
 
 use libafl_bolts::{
     map_tuple_list_type, merge_tuple_list_type,
-    tuples::{tuple_list, tuple_list_type, Map, Merge},
+    tuples::{Map, Merge, tuple_list, tuple_list_type},
 };
 
 use crate::mutators::{

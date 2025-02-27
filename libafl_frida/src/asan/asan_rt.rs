@@ -16,14 +16,14 @@ use std::{
 };
 
 use backtrace::Backtrace;
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
-    Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
+    Gum, Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
+    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
@@ -42,23 +42,23 @@ use yaxpeax_x86::{
 
 #[cfg(target_arch = "x86_64")]
 use crate::utils::frida_to_cs;
+#[cfg(target_arch = "x86_64")]
+use crate::utils::{AccessType, operand_details};
 #[cfg(target_arch = "aarch64")]
 use crate::utils::{instruction_width, writer_register};
-#[cfg(target_arch = "x86_64")]
-use crate::utils::{operand_details, AccessType};
 use crate::{
     alloc::Allocator,
-    asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
+    asan::errors::{ASAN_ERRORS, AsanError, AsanErrors, AsanReadWriteError},
     helper::{FridaRuntime, SkipRange},
     utils::disas_count,
 };
 
-extern "C" {
+unsafe extern "C" {
     fn __register_frame(begin: *mut c_void);
 }
 
 #[cfg(not(target_vendor = "apple"))]
-extern "C" {
+unsafe extern "C" {
     fn tls_ptr() -> *const c_void;
 }
 
@@ -144,7 +144,7 @@ impl Lock {
 }
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
-use errno::{errno, set_errno, Errno};
+use errno::{Errno, errno, set_errno};
 #[cfg(target_os = "windows")]
 use winapi::shared::minwindef::DWORD;
 /// We need to save and restore the last error in the hooks
@@ -315,7 +315,9 @@ impl FridaRuntime for AsanRuntime {
                 }
             }));
 
-        self.register_hooks(gum);
+        unsafe {
+            self.register_hooks(gum);
+        }
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
         self.register_thread();
@@ -410,7 +412,9 @@ impl AsanRuntime {
     pub unsafe fn poison(&mut self, address: usize, size: usize) {
         let start = self.allocator_mut().map_to_shadow(address);
         if self.allocator_mut().valid_shadow(start, size) {
-            Allocator::poison(start, size);
+            unsafe {
+                Allocator::poison(start, size);
+            }
         }
     }
 
@@ -452,7 +456,7 @@ impl AsanRuntime {
         let (stack_start, stack_end) = Self::current_stack();
         let (tls_start, tls_end) = Self::current_tls();
         println!(
-            "registering thread {:?} with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}", 
+            "registering thread {:?} with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}",
             get_thread_id()
         );
         self.allocator_mut()
@@ -593,14 +597,16 @@ impl AsanRuntime {
     }
 
     /// Register the required hooks
+    ///
+    /// # Safety
+    /// Registers a hook for an existing location, the hook can read and write mem freely, so..
     #[expect(clippy::too_many_lines)]
-    pub fn register_hooks(&mut self, gum: &Gum) {
+    pub unsafe fn register_hooks(&mut self, gum: &Gum) {
         let mut interceptor = Interceptor::obtain(gum);
         let process = Process::obtain(gum);
         macro_rules! hook_func {
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-
                     let target_function = Module::find_global_export_by_name(stringify!($name)).expect("Failed to find function");
                     log::warn!("Hooking {} = {:?}", stringify!($name), target_function.0);
 
@@ -610,6 +616,7 @@ impl AsanRuntime {
 
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        unsafe {
                         let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
@@ -632,6 +639,7 @@ impl AsanRuntime {
                             // }
                         }
                         (original)($($param),*)
+                    }
                     }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
@@ -658,6 +666,7 @@ impl AsanRuntime {
 
                     #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        unsafe {
                         let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
@@ -673,6 +682,7 @@ impl AsanRuntime {
                             }
                         }
                         (original)($($param),*)
+                    }
                     }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
@@ -702,6 +712,7 @@ impl AsanRuntime {
                     #[allow(non_snake_case)] // depends on the values the macro is invoked with
                     #[allow(clippy::redundant_else)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
+                        unsafe {
                         let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
@@ -737,6 +748,7 @@ impl AsanRuntime {
                         }
                         (original)($($param),*)
                     }
+                    }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
                     let _ = interceptor.replace(
@@ -762,7 +774,7 @@ impl AsanRuntime {
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
-                        let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
+                        let this = unsafe { &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime) };
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
                         if $always_enabled || this.hooks_enabled {
                             if has_tls() {
@@ -1690,9 +1702,9 @@ impl AsanRuntime {
         )[0];
 
         if insn.opcode == Opcode::MSR && insn.operands[0] == Operand::SystemReg(23056) { //the first operand is nzcv
-             //What case is this for??
-             /*insn = instructions.get(2).unwrap();
-             actual_pc = insn.address() as usize;*/
+            //What case is this for??
+            /*insn = instructions.get(2).unwrap();
+            actual_pc = insn.address() as usize;*/
         }
 
         let operands_len = insn

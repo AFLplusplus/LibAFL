@@ -1,13 +1,13 @@
 use std::sync::OnceLock;
 
-use enum_map::{enum_map, EnumMap};
+use enum_map::{EnumMap, enum_map};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::powerpc::*;
 
-use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
+use crate::{CallingConvention, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
 
 #[expect(non_upper_case_globals)]
 impl CallingConvention {

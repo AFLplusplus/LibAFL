@@ -4,7 +4,7 @@
 use core::str::FromStr;
 use std::{env, path::PathBuf};
 
-use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
+use crate::{Error, LIB_EXT, LIB_PREFIX, ToolWrapper};
 
 /// Wrap Clang
 #[expect(clippy::struct_excessive_bools)]

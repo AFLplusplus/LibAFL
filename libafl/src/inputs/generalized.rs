@@ -6,10 +6,10 @@ use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata,
     corpus::Testcase,
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
-    Error, HasMetadata,
 };
 
 /// An item of the generalized input

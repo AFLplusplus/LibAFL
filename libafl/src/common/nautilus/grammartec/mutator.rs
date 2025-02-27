@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use core::{mem, num::NonZero};
 
 use hashbrown::HashSet;
-use libafl_bolts::{rands::Rand, Error};
+use libafl_bolts::{Error, rands::Rand};
 
 use crate::common::nautilus::grammartec::{
     chunkstore::ChunkStore,

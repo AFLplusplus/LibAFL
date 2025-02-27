@@ -1,9 +1,9 @@
 //! An input composed of multiple parts identified by a key.
 
+use alloc::{string::String, vec::Vec};
 use core::{fmt::Debug, hash::Hash};
-use alloc::{ string::String, vec::Vec};
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
     corpus::CorpusId,

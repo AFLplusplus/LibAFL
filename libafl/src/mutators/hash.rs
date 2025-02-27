@@ -3,7 +3,7 @@
 use alloc::borrow::Cow;
 use core::hash::Hash;
 
-use libafl_bolts::{generic_hash_std, Error, Named};
+use libafl_bolts::{Error, Named, generic_hash_std};
 
 use super::{MutationResult, Mutator};
 

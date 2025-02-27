@@ -7,14 +7,14 @@ use alloc::{collections::VecDeque, rc::Rc};
 use core::{cell::RefCell, fmt::Debug, marker::PhantomData, time::Duration};
 
 use libafl_bolts::Error;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
+    Evaluator, HasMetadata,
     executors::{Executor, HasObservers, HasTimeout},
     inputs::BytesInput,
     observers::ObserversTuple,
     stages::{Restartable, Stage},
-    Evaluator, HasMetadata,
 };
 
 /// Stage that re-runs inputs deemed as timeouts with double the timeout to assert that they are

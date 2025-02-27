@@ -21,6 +21,7 @@ use libafl_bolts::Named;
 pub use mutational::StdMutationalPushStage;
 
 use crate::{
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasScheduler,
     common::HasNamedMetadata,
     corpus::{CorpusId, HasCurrentCorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
@@ -29,7 +30,6 @@ use crate::{
     schedulers::Scheduler,
     stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 
 // The shared state for all [`PushStage`]s

@@ -2,20 +2,20 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
+use libafl_bolts::{
+    ClientId,
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
+};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
-use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
-    ClientId,
-};
 use serde::de::DeserializeOwned;
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
-    events::{llmp::LLMP_TAG_EVENT_TO_BOTH, BrokerEventResult, Event},
-    monitors::{stats::ClientStatsManager, Monitor},
     Error,
+    events::{BrokerEventResult, Event, llmp::LLMP_TAG_EVENT_TO_BOTH},
+    monitors::{Monitor, stats::ClientStatsManager},
 };
 
 /// centralized hook

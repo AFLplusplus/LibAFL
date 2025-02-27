@@ -6,11 +6,11 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use hashbrown::{hash_map::Entry, HashMap};
+use hashbrown::{HashMap, hash_map::Entry};
 use libafl::{
     corpus::{
-        inmemory::{TestcaseStorage, TestcaseStorageMap},
         Corpus, CorpusId, Testcase,
+        inmemory::{TestcaseStorage, TestcaseStorageMap},
     },
     inputs::Input,
 };

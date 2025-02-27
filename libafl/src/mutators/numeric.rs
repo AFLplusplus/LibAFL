@@ -4,9 +4,9 @@ use alloc::borrow::Cow;
 use core::marker::PhantomData;
 
 use libafl_bolts::{
+    Error, Named,
     rands::Rand,
     tuples::{Map as _, Merge},
-    Error, Named,
 };
 use tuple_list::{tuple_list, tuple_list_type};
 
@@ -442,7 +442,7 @@ mod tests {
     };
     use serde::{Deserialize, Serialize};
 
-    use super::{int_mutators, Numeric};
+    use super::{Numeric, int_mutators};
     use crate::{
         corpus::{Corpus as _, InMemoryCorpus, Testcase},
         inputs::value::I16Input,

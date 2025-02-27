@@ -242,7 +242,9 @@ fn fuzz(
     // The coverage map shared between observer and executor
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     // let the forkserver know the shmid
-    shmem.write_to_env("__AFL_SHM_ID").unwrap();
+    unsafe {
+        shmem.write_to_env("__AFL_SHM_ID").unwrap();
+    }
     let shmem_buf = shmem.as_slice_mut();
     // To let know the AFL++ binary that we have a big map
     std::env::set_var("AFL_MAP_SIZE", format!("{}", MAP_SIZE));
@@ -348,7 +350,9 @@ fn fuzz(
         // The cmplog map shared between observer and executor
         let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
         // let the forkserver know the shmid
-        cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
+        unsafe {
+            cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
+        }
         let cmpmap = unsafe { OwnedRefMut::<AFLppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
