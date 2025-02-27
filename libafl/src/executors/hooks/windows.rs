@@ -35,13 +35,13 @@ pub mod windows_asan_handler {
     {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
-            let in_handler = (*data).set_in_handler(true);
+            let (max_depth_reached, signal_depth) = (*data).signal_handler_enter(true);
 
-            if in_handler {
+            if max_depth_reached  {
                 log::error!(
                     "We crashed inside a asan death handler, but this should never happen!"
                 );
-                ExitProcess(56);
+                ExitProcess(SIGNAL_RECURSION_EXIT);
             }
 
             // Have we set a timer_before?
@@ -168,18 +168,18 @@ pub mod windows_exception_handler {
         ) {
             unsafe {
                 let data = &raw mut GLOBAL_STATE;
-                let in_handler = (*data).set_in_handler(true);
+                let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
 
-                if in_handler {
+                if max_depth_reached {
                     log::error!("We crashed inside a crash handler, but this should never happen!");
-                    ExitProcess(56);
+                    ExitProcess(SIGNAL_RECURSION_EXIT);
                 }
 
                 if !(*data).crash_handler.is_null() {
                     let func: HandlerFuncPtr = transmute((*data).crash_handler);
                     (func)(exception_pointers, data);
                 }
-                (*data).set_in_handler(in_handler);
+                (*data).signal_handler_exit(in_handler);
             }
         }
 
@@ -208,11 +208,11 @@ pub mod windows_exception_handler {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
             let data = &raw mut GLOBAL_STATE;
-            let in_handler = (*data).set_in_handler(true);
+            let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
 
-            if in_handler {
+            if max_depth_reached {
                 log::error!("We crashed inside a crash handler, but this should never happen!");
-                ExitProcess(56);
+                ExitProcess(SIGNAL_RECURSION_EXIT);
             }
 
             // Have we set a timer_before?
@@ -252,7 +252,7 @@ pub mod windows_exception_handler {
                 ExitProcess(1);
             }
             old_hook(panic_info);
-            (*data).set_in_handler(in_handler);
+            (*data).signal_handler_exit(in_handler);
         }));
     }
 

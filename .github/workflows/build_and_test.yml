@@ -63,10 +63,6 @@ jobs:
         run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
       - name: Run tests
         run: cargo test
-      - name: Run libafl_qemu usermode tests
-        run: cd libafL_qemu && cargo tes
-      - name: Run libafl_qemu systemmode tests
-        run: cd libafL_qemu && cargo test --no-default-features --features x86_64,systemmode
       - name: Test libafl no_std
         run: cd libafl && cargo test --no-default-features
       - name: Test libafl_bolts no_std no_alloc
@@ -124,6 +120,10 @@ jobs:
       # ---- build normal and examples ----
       - name: Run a normal build
         run: cargo build --verbose
+      - name: Run libafl_qemu usermode tests
+        run: cd libafL_qemu && cargo test
+      - name: Run libafl_qemu systemmode tests
+        run: cd libafL_qemu && cargo test --no-default-features --features x86_64,systemmode
       - name: Build examples
         run: cargo build --examples --verbose
 
