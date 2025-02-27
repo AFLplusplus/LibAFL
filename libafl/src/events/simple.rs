@@ -8,10 +8,10 @@ use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use libafl_bolts::ClientId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", not(miri)))]
-use libafl_bolts::{os::unix_signals::setup_signal_handler, SIGNAL_RECURSION_EXIT};
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{ForkResult, fork};
+#[cfg(all(unix, feature = "std", not(miri)))]
+use libafl_bolts::{SIGNAL_RECURSION_EXIT, os::unix_signals::setup_signal_handler};
 #[cfg(feature = "std")]
 use libafl_bolts::{
     os::CTRL_C_EXIT,
