@@ -59,9 +59,13 @@ test_inner: harness build
     ./tests/injection/test.sh || exit 1
 
     # complie again with simple mgr
-    export CUSTOM_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so
     cargo build --profile={{PROFILE}} --features="simplemgr,{{ARCH}}" --target-dir={{ TARGET_DIR }} || exit 1
-    ./tests/qasan/test.sh || exit 1
+
+    export CUSTOM_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so
+    ./tests/qasan/test_qasan.sh || exit 1
+
+    export CUSTOM_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libgasan.so
+    ./tests/qasan/test_gasan.sh || exit 1
 
 [unix]
 test:
@@ -90,10 +94,13 @@ asan: harness build
         -- \
         {{ HARNESS }}
 
-asan_guest: harness build
+asan_guest: build
     #!/bin/bash
 
     source {{ DOTENV }}
+    RUST_BACKTRACE=full \
+    xLIBAFL_DEBUG_OUTPUT=1 \
+    RUST_LOG=trace \
     CUSTOM_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libgasan.so \
     {{ FUZZER }} \
         --input ./corpus \
@@ -101,6 +108,8 @@ asan_guest: harness build
         --log {{ TARGET_DIR }}/output/log.txt \
         --cores 0 \
         --asan-guest-cores 0 \
+        --snapshots \
+        --iterations 1000 \
         -- \
         {{ HARNESS }}
 
