@@ -145,7 +145,7 @@ impl Configuration {
     }
 }
 
-impl std::str::FromStr for Configuration {
+impl str::FromStr for Configuration {
     type Err = ();
     fn from_str(input: &str) -> Result<Configuration, Self::Err> {
         Ok(match input {
@@ -159,8 +159,8 @@ impl std::str::FromStr for Configuration {
     }
 }
 
-impl std::fmt::Display for Configuration {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl core::fmt::Display for Configuration {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
             Configuration::Default => write!(f, ""),
             Configuration::AddressSanitizer => write!(f, "asan"),

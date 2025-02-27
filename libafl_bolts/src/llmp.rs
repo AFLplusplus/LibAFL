@@ -3776,7 +3776,8 @@ impl<SHM, SP> LlmpClient<SHM, SP> {
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 mod tests {
 
-    use std::{thread::sleep, time::Duration};
+    use core::time::Duration;
+    use std::thread::sleep;
 
     use serial_test::serial;
 

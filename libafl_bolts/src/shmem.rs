@@ -1873,11 +1873,11 @@ mod tests {
     #[cfg(unix)]
     #[cfg_attr(miri, ignore)]
     fn test_persist_shmem() -> Result<(), Error> {
+        use alloc::string::ToString;
         use core::ffi::CStr;
         use std::{
             env,
             process::{Command, Stdio},
-            string::ToString,
         };
 
         use crate::shmem::{MmapShMemProvider, ShMem as _, ShMemId};

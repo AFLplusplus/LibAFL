@@ -1,9 +1,9 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
 use alloc::{string::ToString, vec::Vec};
-use core::{fmt::Debug, time::Duration};
 #[cfg(feature = "std")]
-use std::hash::Hash;
+use core::hash::Hash;
+use core::{fmt::Debug, time::Duration};
 
 #[cfg(feature = "std")]
 use fastbloom::BloomFilter;

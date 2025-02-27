@@ -138,8 +138,8 @@ where
 mod tests {
     #[cfg(feature = "std")]
     use {
-        super::ValueInput, crate::mutators::numeric::Numeric, alloc::fmt::Debug,
-        std::any::type_name,
+        super::ValueInput, crate::mutators::numeric::Numeric, core::fmt::Debug,
+        core::any::type_name,
     };
 
     #[cfg(feature = "std")]

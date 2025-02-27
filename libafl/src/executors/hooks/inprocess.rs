@@ -463,7 +463,7 @@ impl InProcessExecutorHandlerData {
                 );
 
                 if let Ok(bsod) = bsod {
-                    if let Ok(r) = std::str::from_utf8(&bsod) {
+                    if let Ok(r) = core::str::from_utf8(&bsod) {
                         log::error!("{}", r);
                     }
                 }

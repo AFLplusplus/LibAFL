@@ -2128,7 +2128,7 @@ token2="B"
         let taint_len = 0;
         let input_len = 0;
         let hshape = 0;
-        let mut vec = std::vec::Vec::new();
+        let mut vec = alloc::vec::Vec::new();
 
         let _res = rq.cmp_extend_encoding(
             pattern,

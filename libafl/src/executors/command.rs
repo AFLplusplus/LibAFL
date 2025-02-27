@@ -4,6 +4,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     ops::IndexMut,
+    time::Duration,
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use std::{
@@ -16,7 +17,6 @@ use std::{
     os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    time::Duration,
 };
 
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]

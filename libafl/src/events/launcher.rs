@@ -12,12 +12,13 @@
 //! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
+use alloc::string::String;
 use core::{
     fmt::{self, Debug, Formatter},
+    net::SocketAddr,
     num::NonZeroUsize,
     time::Duration,
 };
-use std::{net::SocketAddr, string::String};
 
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
@@ -32,13 +33,13 @@ use {
         events::{centralized::CentralizedEventManager, CentralizedLlmpHook, StdLlmpEventHook},
         inputs::Input,
     },
+    alloc::boxed::Box,
     alloc::string::ToString,
     libafl_bolts::{
         core_affinity::get_core_ids,
         llmp::{Broker, Brokers, LlmpBroker},
         os::{fork, ForkResult},
     },
-    std::boxed::Box,
 };
 #[cfg(unix)]
 use {

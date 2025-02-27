@@ -1,7 +1,8 @@
 //! Libtool Wrapper from `LibAFL`
 // call make passing LIBTOOL=/path/to/target/release/libafl_libtool
 
-use std::{env, path::PathBuf, str::FromStr};
+use core::str::FromStr;
+use std::{env, path::PathBuf};
 
 use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
 

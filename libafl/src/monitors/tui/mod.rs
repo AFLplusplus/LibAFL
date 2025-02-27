@@ -2,17 +2,21 @@
 //!
 //! It's based on [ratatui](https://ratatui.rs/)
 
-use alloc::{borrow::Cow, boxed::Box, string::ToString};
-use std::{
+use alloc::{
+    borrow::Cow,
+    boxed::Box,
     collections::VecDeque,
-    fmt::Write as _,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use core::{fmt::Write as _, time::Duration};
+use std::{
     io::{self, BufRead, Write},
     panic,
-    string::String,
-    sync::{Arc, RwLock},
+    sync::RwLock,
     thread,
-    time::{Duration, Instant},
-    vec::Vec,
+    time::Instant,
 };
 
 use crossterm::{

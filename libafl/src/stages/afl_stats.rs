@@ -1,9 +1,7 @@
 //! Stage to compute and report AFL++ stats
-use alloc::{string::String, vec::Vec};
-use core::{marker::PhantomData, time::Duration};
+use alloc::{borrow::Cow, string::String, vec::Vec};
+use core::{fmt::Display, marker::PhantomData, time::Duration};
 use std::{
-    borrow::Cow,
-    fmt::Display,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
@@ -563,7 +561,7 @@ where
 }
 
 impl Display for AFLPlotData<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{},", self.relative_time)?;
         write!(f, "{},", self.cycles_done)?;
         write!(f, "{},", self.cur_item)?;
@@ -586,7 +584,7 @@ impl AFLPlotData<'_> {
     }
 }
 impl Display for AFLFuzzerStats<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "start_time        : {}", &self.start_time)?;
         writeln!(f, "start_time        : {}", &self.start_time)?;
         writeln!(f, "last_update       : {}", &self.last_update)?;

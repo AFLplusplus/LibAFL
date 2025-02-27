@@ -42,10 +42,8 @@
 //!
 //! ... making for a total of 5 bytes.
 
-use std::{
-    fmt::{self, Debug, Formatter},
-    io::{self, Cursor, Read, Seek, SeekFrom, Write},
-};
+use core::fmt::{self, Debug, Formatter};
+use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
 use bincode::{DefaultOptions, Options};
 pub use bincode::{ErrorKind, Result};

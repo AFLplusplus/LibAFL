@@ -29,10 +29,13 @@ pub mod prometheus;
 #[cfg(feature = "statsd_monitor")]
 pub mod statsd;
 
-use alloc::fmt::Debug;
 #[cfg(feature = "std")]
 use alloc::vec::Vec;
-use core::{fmt, fmt::Write, time::Duration};
+use core::{
+    fmt,
+    fmt::{Debug, Write},
+    time::Duration,
+};
 
 use libafl_bolts::ClientId;
 #[cfg(feature = "prometheus_monitor")]

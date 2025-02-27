@@ -1,10 +1,7 @@
 //! LLVM compiler Wrapper from `LibAFL`
 
-use std::{
-    env,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use core::{env, str::FromStr};
+use std::path::{Path, PathBuf};
 
 use crate::{CompilerWrapper, Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
 

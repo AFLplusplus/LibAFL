@@ -1,9 +1,7 @@
 //! The UI-specific parts of [`super::TuiMonitor`]
-use alloc::{string::ToString, vec::Vec};
-use std::{
-    cmp::{max, min},
-    sync::{Arc, RwLock},
-};
+use alloc::{string::ToString, sync::Arc, vec::Vec};
+use core::cmp::{max, min};
+use std::sync::RwLock;
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},

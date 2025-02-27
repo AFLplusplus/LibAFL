@@ -1,5 +1,5 @@
 //! Stage that wraps another stage and tracks it's execution time in `State`
-use std::{marker::PhantomData, time::Duration};
+use core::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::{current_time, Error};
 

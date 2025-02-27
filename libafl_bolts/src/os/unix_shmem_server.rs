@@ -17,6 +17,7 @@ use alloc::{
 use core::{
     cell::RefCell,
     fmt::Debug,
+    marker::PhantomData,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
@@ -25,7 +26,6 @@ use std::fs;
 use std::{
     env,
     io::{Read, Write},
-    marker::PhantomData,
     os::fd::{AsFd, BorrowedFd},
     sync::{Condvar, Mutex},
     thread::JoinHandle,

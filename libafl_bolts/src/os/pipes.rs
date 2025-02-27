@@ -1,9 +1,10 @@
 //! Unix `pipe` wrapper for `LibAFL`
 #[cfg(feature = "std")]
-use alloc::{borrow::Borrow, rc::Rc};
+use alloc::rc::Rc;
+#[cfg(feature = "std")]
+use core::{borrow::Borrow, cell::RefCell};
 #[cfg(feature = "std")]
 use std::{
-    cell::RefCell,
     io::{self, ErrorKind, Read, Write},
     os::{
         fd::{AsFd, AsRawFd, OwnedFd},
