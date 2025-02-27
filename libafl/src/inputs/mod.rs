@@ -22,6 +22,10 @@ pub use bytessub::BytesSubInput;
 pub mod multi;
 #[cfg(feature = "multipart_inputs")]
 pub use multi::*;
+#[cfg(feature = "multipart_inputs")]
+pub mod list;
+#[cfg(feature = "multipart_inputs")]
+pub use list::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
@@ -44,10 +48,9 @@ use std::{fs::File, io::Read, path::Path};
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
 use libafl_bolts::{
-    generic_hash_std,
+    Error, HasLen, generic_hash_std,
     ownedref::{OwnedMutSlice, OwnedSlice},
     subrange::{SubRangeMutSlice, SubRangeSlice},
-    Error, HasLen,
 };
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;

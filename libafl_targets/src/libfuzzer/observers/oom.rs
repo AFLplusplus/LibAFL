@@ -1,18 +1,21 @@
 use alloc::borrow::Cow;
-use core::{ffi::c_void, fmt::Debug};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::{
+    ffi::c_void,
+    fmt::Debug,
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+};
 
 use libafl::{
+    Error,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
-    Error,
 };
 use libafl_bolts::Named;
 use libc::SIGABRT;
 use serde::{Deserialize, Serialize};
 
-extern "C" {
+unsafe extern "C" {
     fn libafl_check_malloc_size(ptr: *const c_void) -> usize;
 }
 
@@ -29,7 +32,7 @@ static MALLOC_SIZE: AtomicUsize = AtomicUsize::new(0);
 ///
 /// # Safety
 /// Is only safe to call with valid freshly allocated pointers backed by allocations of `size`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = match unsafe { libafl_check_malloc_size(ptr) } {
@@ -54,7 +57,7 @@ pub unsafe extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize
 ///
 /// # Safety
 /// Is only safe to call with valid allocated pointers, about to be freed.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = unsafe { libafl_check_malloc_size(ptr) };

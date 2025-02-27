@@ -1,13 +1,18 @@
 use std::sync::OnceLock;
 
-use enum_map::{enum_map, EnumMap};
+use enum_map::{EnumMap, enum_map};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::mips::*;
 
-use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
+use crate::{CallingConvention, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
+
+#[expect(non_upper_case_globals)]
+impl CallingConvention {
+    pub const Default: CallingConvention = CallingConvention::MipsO32;
+}
 
 /// Registers for the MIPS instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
@@ -91,12 +96,12 @@ impl crate::ArchExtras for crate::CPU {
         self.write_reg(Regs::Ra, val)
     }
 
-    fn read_function_argument(
+    fn read_function_argument_with_cc(
         &self,
-        conv: CallingConvention,
         idx: u8,
+        conv: CallingConvention,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::MipsO32, conv)?;
 
         let reg_id = match idx {
             0 => Regs::A0,
@@ -104,32 +109,30 @@ impl crate::ArchExtras for crate::CPU {
             2 => Regs::A2,
             3 => Regs::A3,
             // 4.. would be on the stack, let's not do this for now
-            r => {
-                return Err(QemuRWError::new_argument_error(
-                    QemuRWErrorKind::Read,
-                    i32::from(r),
-                ))
-            }
+            r => return Err(QemuRWError::new_argument_error(QemuRWErrorKind::Read, r)),
         };
 
         self.read_reg(reg_id)
     }
 
-    fn write_function_argument<T>(
+    fn write_function_argument_with_cc<T>(
         &self,
-        conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         val: T,
+        conv: CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::MipsO32, conv)?;
 
         let val: GuestReg = val.into();
         match idx {
             0 => self.write_reg(Regs::A0, val),
             1 => self.write_reg(Regs::A1, val),
+            2 => self.write_reg(Regs::A2, val),
+            3 => self.write_reg(Regs::A3, val),
+            // 4.. would be on the stack, let's not do this for now
             r => Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
         }
     }

@@ -12,14 +12,14 @@ use libafl_qemu_sys::{GuestAddr, MapInfo};
 #[cfg(not(feature = "clippy"))]
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
+    QemuParams,
     emu::EmulatorModules,
     modules::{
-        utils::filters::{HasAddressFilter, StdAddressFilter},
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        utils::filters::{HasAddressFilter, StdAddressFilter},
     },
     qemu::{Hook, MemAccessInfo, Qemu},
     sys::TCGTemp,
-    QemuParams,
 };
 
 #[derive(Clone)]

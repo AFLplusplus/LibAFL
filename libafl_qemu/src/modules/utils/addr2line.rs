@@ -2,7 +2,7 @@
 
 use std::{borrow::Cow, fmt::Write, fs};
 
-use addr2line::{fallible_iterator::FallibleIterator, Loader};
+use addr2line::{Loader, fallible_iterator::FallibleIterator};
 use goblin::elf::dynamic::{DF_1_PIE, DT_FLAGS_1};
 use hashbrown::HashMap;
 use libafl_qemu_sys::GuestAddr;

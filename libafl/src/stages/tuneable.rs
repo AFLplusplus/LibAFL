@@ -9,16 +9,15 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    mark_feature_time,
+    Error, Evaluator, HasMetadata, HasNamedMetadata, mark_feature_time,
     mutators::{MutationResult, Mutator},
     nonzero,
     stages::{
-        mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
         ExecutionCountRestartHelper, MutationalStage, Restartable, Stage,
+        mutational::{DEFAULT_MUTATIONAL_MAX_ITERATIONS, MutatedTransform, MutatedTransformPost},
     },
     start_timer,
     state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
-    Error, Evaluator, HasMetadata, HasNamedMetadata,
 };
 
 #[cfg_attr(
@@ -210,12 +209,7 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager);
-
-        #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().finish_stage();
-
-        ret
+        self.perform_mutational(fuzzer, executor, state, manager)
     }
 }
 

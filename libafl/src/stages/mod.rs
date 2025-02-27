@@ -25,9 +25,8 @@ pub use dump::*;
 pub use generalization::GeneralizationStage;
 use hashbrown::HashSet;
 use libafl_bolts::{
-    impl_serdeany,
+    Named, impl_serdeany,
     tuples::{HasConstLen, IntoVec},
-    Named,
 };
 pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
@@ -47,10 +46,10 @@ pub use unicode::*;
 pub use verify_timeouts::{TimeoutsToVerify, VerifyTimeoutsStage};
 
 use crate::{
+    Error, HasNamedMetadata,
     corpus::{CorpusId, HasCurrentCorpusId},
     events::SendExiting,
-    state::{HasCurrentStageId, HasExecutions, Stoppable},
-    Error, HasNamedMetadata,
+    state::{HasCurrentStageId, HasExecutions, MaybeHasClientPerfMonitor, Stoppable},
 };
 
 /// Mutational stage is the normal fuzzing stage.
@@ -151,7 +150,7 @@ impl<Head, Tail, E, EM, S, Z> StagesTuple<E, EM, S, Z> for (Head, Tail)
 where
     Head: Stage<E, EM, S, Z> + Restartable<S>,
     Tail: StagesTuple<E, EM, S, Z> + HasConstLen,
-    S: HasCurrentStageId + Stoppable,
+    S: HasCurrentStageId + Stoppable + MaybeHasClientPerfMonitor,
     EM: SendExiting,
 {
     /// Performs all stages in the tuple,
@@ -191,6 +190,10 @@ where
                 state.clear_stage_id()?;
             }
         }
+
+        // Mark the elapsed time for the scheduler
+        #[cfg(feature = "introspection")]
+        state.introspection_stats_mut().finish_stage();
 
         if state.stop_requested() {
             state.discard_stop_request();
@@ -518,7 +521,10 @@ impl ExecutionCountRestartHelper {
     {
         self.started_at_execs = None;
         let _metadata = state.remove_named_metadata::<ExecutionCountRestartHelperMetadata>(name);
-        debug_assert!(_metadata.is_some(), "Called clear_progress, but should_restart was not called before (or did mutational stages get nested?)");
+        debug_assert!(
+            _metadata.is_some(),
+            "Called clear_progress, but should_restart was not called before (or did mutational stages get nested?)"
+        );
         Ok(())
     }
 }

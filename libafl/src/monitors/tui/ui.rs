@@ -1,11 +1,10 @@
 //! The UI-specific parts of [`super::TuiMonitor`]
-use alloc::{string::ToString, vec::Vec};
-use std::{
-    cmp::{max, min},
-    sync::{Arc, RwLock},
-};
+use alloc::{string::ToString, sync::Arc, vec::Vec};
+use core::cmp::{max, min};
+use std::sync::RwLock;
 
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     symbols,
@@ -13,12 +12,11 @@ use ratatui::{
     widgets::{
         Axis, Block, Borders, Cell, Chart, Dataset, List, ListItem, Paragraph, Row, Table, Tabs,
     },
-    Frame,
 };
 
 use super::{
-    current_time, format_duration_hms, Duration, ItemGeometry, ProcessTiming, String, TimedStats,
-    TuiContext,
+    Duration, ItemGeometry, ProcessTiming, String, TimedStats, TuiContext, current_time,
+    format_duration_hms,
 };
 
 #[derive(Default, Debug)]
@@ -368,19 +366,21 @@ impl TuiUi {
 
         //log::trace!("max_x: {}, len: {}", max_x, self.graph_data.len());
 
-        let datasets = vec![Dataset::default()
-            //.name("data")
-            .marker(if self.enhanced_graphics {
-                symbols::Marker::Braille
-            } else {
-                symbols::Marker::Dot
-            })
-            .style(
-                Style::default()
-                    .fg(Color::LightYellow)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .data(&self.graph_data)];
+        let datasets = vec![
+            Dataset::default()
+                //.name("data")
+                .marker(if self.enhanced_graphics {
+                    symbols::Marker::Braille
+                } else {
+                    symbols::Marker::Dot
+                })
+                .style(
+                    Style::default()
+                        .fg(Color::LightYellow)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .data(&self.graph_data),
+        ];
         let chart = Chart::new(datasets)
             .block(
                 Block::default()

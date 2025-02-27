@@ -1,5 +1,4 @@
 //! A libfuzzer-like fuzzer using qemu for binary-only coverage
-//!
 #[cfg(feature = "i386")]
 use core::mem::size_of;
 use core::time::Duration;
@@ -30,8 +29,8 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     modules::{drcov::DrCovModule, SnapshotModule},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
-    QemuExitReason, QemuMappingsViewer, QemuRWError, QemuShutdownCause, Regs,
+    ArchExtras, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor, QemuExitReason,
+    QemuMappingsViewer, QemuRWError, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -180,8 +179,8 @@ pub fn fuzz() {
                 qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
                 qemu.write_reg(Regs::Sp, stack_ptr)?;
                 qemu.write_return_address(ret_addr)?;
-                qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
-                qemu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
+                qemu.write_function_argument(0, input_addr)?;
+                qemu.write_function_argument(1, len)?;
 
                 match qemu.run() {
                     Ok(QemuExitReason::Breakpoint(_)) => {}

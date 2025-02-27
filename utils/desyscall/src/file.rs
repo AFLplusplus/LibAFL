@@ -2,7 +2,7 @@ use libc::{c_int, size_t, ssize_t};
 
 use crate::{Context, Pointer};
 
-extern "C" {
+unsafe extern "C" {
     // ssize_t __libafl_raw_write(int fd, const void *buf, size_t count);
     fn __libafl_raw_write(fd: c_int, buf: Pointer, count: size_t) -> ssize_t;
     // ssize_t __libafl_raw_read(int fd, void *buf, size_t count)
@@ -12,7 +12,7 @@ extern "C" {
 /// # Safety
 /// Call to functions using syscalls
 #[expect(clippy::cast_possible_wrap)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn write(fd: c_int, buf: Pointer, count: size_t) -> ssize_t {
     let ctx = Context::get();
 
@@ -25,7 +25,7 @@ pub unsafe extern "C" fn write(fd: c_int, buf: Pointer, count: size_t) -> ssize_
 
 /// # Safety
 /// Call to functions using syscalls
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn read(fd: c_int, buf: Pointer, count: size_t) -> ssize_t {
     let ctx = Context::get();
 

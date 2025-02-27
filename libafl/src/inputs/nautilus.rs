@@ -1,15 +1,16 @@
 //! Input for the [`Nautilus`](https://github.com/RUB-SysSec/nautilus) grammar fuzzer methods
-//!
-//!
 use alloc::{rc::Rc, vec::Vec};
-use core::cell::RefCell;
-use std::hash::{Hash, Hasher};
+use core::{
+    cell::RefCell,
+    hash::{Hash, Hasher},
+};
 
-use libafl_bolts::{ownedref::OwnedSlice, HasLen};
+use libafl_bolts::{HasLen, ownedref::OwnedSlice};
 use serde::{Deserialize, Serialize};
 
 use super::TargetBytesConverter;
 use crate::{
+    Error,
     common::nautilus::grammartec::{
         newtypes::NodeId,
         rule::RuleIdOrCustom,
@@ -17,7 +18,6 @@ use crate::{
     },
     generators::nautilus::NautilusContext,
     inputs::{BytesInput, Input, InputConverter},
-    Error,
 };
 
 /// An [`Input`] implementation for `Nautilus` grammar.

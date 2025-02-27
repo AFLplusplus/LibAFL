@@ -10,15 +10,15 @@
 // Use this since clippy thinks we should use `StatsD` instead of StatsD.
 #![allow(clippy::doc_markdown)]
 
-use alloc::string::String;
-use std::{borrow::ToOwned, net::UdpSocket};
+use alloc::{borrow::Cow, string::String, vec::Vec};
+use std::net::UdpSocket;
 
 use cadence::{BufferedUdpMetricSink, Gauged, QueuingMetricSink, StatsdClient};
 use libafl_bolts::ClientId;
 
 use super::{
-    stats::{manager::GlobalStats, ClientStatsManager, EdgeCoverage, ItemGeometry},
     Monitor,
+    stats::{ClientStatsManager, EdgeCoverage, ItemGeometry, manager::GlobalStats},
 };
 
 const METRIC_PREFIX: &str = "fuzzing";
@@ -29,7 +29,12 @@ pub enum StatsdMonitorTagFlavor {
     /// [Datadog](https://docs.datadoghq.com/developers/dogstatsd/) style tag
     DogStatsd {
         /// Identifier to distinguish this fuzzing instance with others.
-        tag_identifier: String,
+        tag_identifier: Cow<'static, str>,
+        /// Other custom tags (key, value) pairs.
+        ///
+        /// Key should not be one of "afl_version", "banner", "instance", "job"
+        /// and "type", which are reserved for internal usage.
+        custom_tags: Vec<(Cow<'static, str>, Cow<'static, str>)>,
     },
     /// No tag
     None,
@@ -38,7 +43,8 @@ pub enum StatsdMonitorTagFlavor {
 impl Default for StatsdMonitorTagFlavor {
     fn default() -> Self {
         Self::DogStatsd {
-            tag_identifier: "default".to_owned(),
+            tag_identifier: "default".into(),
+            custom_tags: vec![],
         }
     }
 }
@@ -98,10 +104,17 @@ impl StatsdMonitor {
             })
             .build(udp_sink);
         let mut client_builder = StatsdClient::builder(METRIC_PREFIX, queuing_sink);
-        if let StatsdMonitorTagFlavor::DogStatsd { tag_identifier } = &self.tag_flavor {
+        if let StatsdMonitorTagFlavor::DogStatsd {
+            tag_identifier,
+            custom_tags,
+        } = &self.tag_flavor
+        {
             client_builder = client_builder
-                .with_tag("banner", tag_identifier)
+                .with_tag("banner", tag_identifier.as_ref())
                 .with_tag("afl_version", env!("CARGO_PKG_VERSION"));
+            for (tag_key, tag_value) in custom_tags {
+                client_builder = client_builder.with_tag(tag_key.as_ref(), tag_value.as_ref());
+            }
         }
         let client = client_builder.build();
         self.statsd_client = Some(client);

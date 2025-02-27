@@ -16,47 +16,46 @@ use std::{
 
 use clap::{Arg, Command};
 use libafl::{
+    Error, HasMetadata,
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{ExitKind, inprocess::InProcessExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
-        StdScheduledMutator, Tokens,
+        StdMOptMutator, StdScheduledMutator, Tokens, havoc_mutations,
+        token_mutations::I2SRandReplace, tokens_mutations,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
+        IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage,
+        StdMutationalStage, TracingStage, calibrate::CalibrationStage,
+        power::StdPowerMutationalStage,
     },
     state::{HasCorpus, StdState},
-    Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_time,
+    AsSlice, current_time,
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice,
+    tuples::{Merge, tuple_list},
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
+    CmpLogObserver, libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
 
 /// The fuzzer main (as `no_mangle` C function)
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std

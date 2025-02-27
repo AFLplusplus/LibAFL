@@ -5,23 +5,22 @@ use core::{
     marker::PhantomData,
     mem::transmute,
     ptr::null,
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
 };
 
 #[cfg(not(miri))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
-use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
+use libafl_bolts::os::unix_signals::{Signal, SignalHandler, ucontext_t};
 use libc::siginfo_t;
 
 use crate::{
+    Error,
     executors::{
-        common_signals,
+        HasObservers, common_signals,
         hooks::ExecutorHook,
-        inprocess_fork::{child_signal_handlers, ForkHandlerFuncPtr},
-        HasObservers,
+        inprocess_fork::{ForkHandlerFuncPtr, child_signal_handlers},
     },
     observers::ObserversTuple,
-    Error,
 };
 
 /// The inmem fork executor's hooks.

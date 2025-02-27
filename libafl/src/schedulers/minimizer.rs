@@ -5,18 +5,18 @@ use alloc::vec::Vec;
 use core::{any::type_name, cmp::Ordering, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
-use libafl_bolts::{rands::Rand, serdeany::SerdeAny, tuples::MatchName, AsIter, HasRefCnt};
+use libafl_bolts::{AsIter, HasRefCnt, rands::Rand, serdeany::SerdeAny, tuples::MatchName};
 use serde::{Deserialize, Serialize};
 
 use super::HasQueueCycles;
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     observers::CanTrack,
     require_index_tracking,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand},
-    Error, HasMetadata,
 };
 
 /// Default probability to skip the non-favored values
@@ -129,30 +129,33 @@ where
                 let mut entry = e_iter.next();
                 let mut map_entry = map_iter.next();
                 while let Some(e) = entry {
-                    if let Some(ref me) = map_entry {
-                        match e.cmp(me) {
-                            Ordering::Less => {
-                                entry = e_iter.next();
-                            }
-                            Ordering::Equal => {
-                                // if we found a better factor, prefer it
-                                map.entry(*e)
-                                    .and_modify(|(f, id)| {
-                                        if *f > factor {
-                                            *f = factor;
-                                            *id = current_id;
-                                        }
-                                    })
-                                    .or_insert((factor, current_id));
-                                entry = e_iter.next();
-                                map_entry = map_iter.next();
-                            }
-                            Ordering::Greater => {
-                                map_entry = map_iter.next();
+                    match map_entry {
+                        Some(ref me) => {
+                            match e.cmp(me) {
+                                Ordering::Less => {
+                                    entry = e_iter.next();
+                                }
+                                Ordering::Equal => {
+                                    // if we found a better factor, prefer it
+                                    map.entry(*e)
+                                        .and_modify(|(f, id)| {
+                                            if *f > factor {
+                                                *f = factor;
+                                                *id = current_id;
+                                            }
+                                        })
+                                        .or_insert((factor, current_id));
+                                    entry = e_iter.next();
+                                    map_entry = map_iter.next();
+                                }
+                                Ordering::Greater => {
+                                    map_entry = map_iter.next();
+                                }
                             }
                         }
-                    } else {
-                        break;
+                        _ => {
+                            break;
+                        }
                     }
                 }
             }

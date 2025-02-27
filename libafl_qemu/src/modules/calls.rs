@@ -4,7 +4,7 @@ use capstone::prelude::*;
 use libafl::{
     executors::ExitKind,
     inputs::Input,
-    observers::{stacktrace::BacktraceObserver, ObserversTuple},
+    observers::{ObserversTuple, stacktrace::BacktraceObserver},
 };
 use libafl_bolts::tuples::{Handle, Handled, MatchFirstType, MatchNameRef};
 use libafl_qemu_sys::GuestAddr;
@@ -12,15 +12,14 @@ use thread_local::ThreadLocal;
 
 use super::utils::filters::HasAddressFilter;
 #[cfg(feature = "systemmode")]
-use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
-    capstone,
+    Qemu, capstone,
     modules::{
-        utils::filters::StdAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
-        EmulatorModules,
+        AddressFilter, EmulatorModule, EmulatorModuleTuple, EmulatorModules,
+        utils::filters::StdAddressFilter,
     },
     qemu::{ArchExtras, Hook},
-    Qemu,
 };
 
 pub trait CallTraceCollector: 'static {
@@ -362,9 +361,7 @@ where
                 iaddr += insn.bytes().len() as GuestAddr;
 
                 #[cfg(feature = "usermode")]
-                unsafe {
-                    code = std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
-                }
+                code = unsafe { std::slice::from_raw_parts(qemu.g2h(iaddr), 512) };
                 #[cfg(feature = "systemmode")]
                 if let Err(err) = qemu.read_mem(pc, code) {
                     // TODO handle faults

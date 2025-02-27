@@ -43,30 +43,32 @@ do
         continue
     fi
 
-    cd "$fuzzer" || exit 1
-    # Clippy checks
-    if [ "$1" != "--no-clippy" ]; then
-        echo "[*] Running clippy for $fuzzer"
-        cargo clippy || exit 1
-    else
-        echo "[+] Skipping fmt and clippy for $fuzzer (--no-clippy specified)"
-    fi
-    
-    if [ -e ./Makefile.toml ] && grep -qF "skip_core_tasks = true" Makefile.toml; then
-        echo "[*] Building $fuzzer (running tests is not supported in this context)"
-        just build || exit 1
-        echo "[+] Done building $fuzzer"
-    elif [ -e ./Makefile.toml ]; then
-        echo "[*] Testing $fuzzer"
-        just test || exit 1
-        echo "[+] Done testing $fuzzer"
-    elif [ -e ./Justfile ]; then
-        echo "[*] Testing $fuzzer"
-        just test || exit 1
-        echo "[+] Done testing $fuzzer"
-    else
-        echo "[*] Building $fuzzer"
-        cargo build || exit 1
-        echo "[+] Done building $fuzzer"
-    fi
+    (
+        cd "$fuzzer" || exit 1
+        # Clippy checks
+        if [ "$1" != "--no-clippy" ]; then
+            echo "[*] Running clippy for $fuzzer"
+            cargo clippy || exit 1
+        else
+            echo "[+] Skipping fmt and clippy for $fuzzer (--no-clippy specified)"
+        fi
+
+        if [ -e ./Makefile.toml ] && grep -qF "skip_core_tasks = true" Makefile.toml; then
+            echo "[*] Building $fuzzer (running tests is not supported in this context)"
+            just build || exit 1
+            echo "[+] Done building $fuzzer"
+        elif [ -e ./Makefile.toml ]; then
+            echo "[*] Testing $fuzzer"
+            just test || exit 1
+            echo "[+] Done testing $fuzzer"
+        elif [ -e ./Justfile ]; then
+            echo "[*] Testing $fuzzer"
+            just test || exit 1
+            echo "[+] Done testing $fuzzer"
+        else
+            echo "[*] Building $fuzzer"
+            cargo build || exit 1
+            echo "[+] Done building $fuzzer"
+        fi
+    )
 done

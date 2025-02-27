@@ -3,11 +3,11 @@ use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     ptr::{self, null, write_volatile},
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
     time::Duration,
 };
 
-use libafl_bolts::tuples::{tuple_list, Merge, RefIndexable};
+use libafl_bolts::tuples::{Merge, RefIndexable, tuple_list};
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
@@ -16,21 +16,21 @@ use crate::executors::hooks::inprocess::HasTimeout;
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::hooks::inprocess::HasTimeout;
 use crate::{
+    Error,
     events::{EventFirer, EventRestarter},
     executors::{
+        Executor, HasObservers,
         hooks::{
-            inprocess::{InProcessHooks, GLOBAL_STATE},
             ExecutorHooksTuple,
+            inprocess::{GLOBAL_STATE, InProcessHooks},
         },
         inprocess::HasInProcessHooks,
-        Executor, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
-    Error,
 };
 
 /// The internal state of `GenericInProcessExecutor`.

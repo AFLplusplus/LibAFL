@@ -12,15 +12,15 @@ use core::{
     ops::Range,
 };
 
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{Named, rands::Rand};
 
 use crate::{
+    Error,
     corpus::Corpus,
     inputs::{HasMutatorBytes, ResizableMutator},
     mutators::{MutationResult, Mutator},
     nonzero, random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
-    Error,
 };
 
 /// Mem move in the own vec
@@ -403,7 +403,7 @@ add_mutator_impl!(QwordAddMutator, u64);
 ///////////////////////////
 
 macro_rules! interesting_mutator_impl {
-    ($name: ident, $size: ty, $interesting: ident) => {
+    ($name:ident, $size:ty, $interesting:ident) => {
         /// Inserts an interesting value at a random place in the input vector
         #[derive(Default, Debug)]
         pub struct $name;
@@ -1628,13 +1628,13 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
 mod tests {
     use libafl_bolts::{
         rands::StdRand,
-        tuples::{tuple_list, tuple_list_type, HasConstLen},
+        tuples::{HasConstLen, tuple_list, tuple_list_type},
     };
 
     use super::*;
     use crate::{
-        corpus::InMemoryCorpus, feedbacks::ConstFeedback, inputs::BytesInput,
-        mutators::MutatorsTuple, state::StdState, HasMetadata,
+        HasMetadata, corpus::InMemoryCorpus, feedbacks::ConstFeedback, inputs::BytesInput,
+        mutators::MutatorsTuple, state::StdState,
     };
 
     type TestMutatorsTupleType = tuple_list_type!(
@@ -1796,11 +1796,13 @@ mod tests {
         }
 
         let average = counts.iter().copied().sum::<usize>() / counts.len();
-        assert!(counts.into_iter().all(|count| count
-            .checked_sub(average)
-            .or_else(|| average.checked_sub(count))
-            .unwrap()
-            < 500));
+        assert!(counts.into_iter().all(|count| {
+            count
+                .checked_sub(average)
+                .or_else(|| average.checked_sub(count))
+                .unwrap()
+                < 500
+        }));
         Ok(())
     }
 
@@ -1844,11 +1846,13 @@ mod tests {
         }
 
         let average = counts.iter().copied().sum::<usize>() / counts.len();
-        assert!(counts.into_iter().all(|count| count
-            .checked_sub(average)
-            .or_else(|| average.checked_sub(count))
-            .unwrap()
-            < 500));
+        assert!(counts.into_iter().all(|count| {
+            count
+                .checked_sub(average)
+                .or_else(|| average.checked_sub(count))
+                .unwrap()
+                < 500
+        }));
         Ok(())
     }
 
@@ -1888,17 +1892,21 @@ mod tests {
         }
 
         let average = counts.iter().copied().sum::<usize>() / counts.len();
-        assert!(counts.into_iter().all(|count| count
-            .checked_sub(average)
-            .or_else(|| average.checked_sub(count))
-            .unwrap()
-            < 500));
+        assert!(counts.into_iter().all(|count| {
+            count
+                .checked_sub(average)
+                .or_else(|| average.checked_sub(count))
+                .unwrap()
+                < 500
+        }));
         let average = insertions.iter().copied().sum::<usize>() / insertions.len();
-        assert!(insertions.into_iter().all(|count| count
-            .checked_sub(average)
-            .or_else(|| average.checked_sub(count))
-            .unwrap()
-            < 500));
+        assert!(insertions.into_iter().all(|count| {
+            count
+                .checked_sub(average)
+                .or_else(|| average.checked_sub(count))
+                .unwrap()
+                < 500
+        }));
         Ok(())
     }
 
@@ -1941,17 +1949,21 @@ mod tests {
         }
 
         let average = counts.iter().copied().sum::<usize>() / counts.len();
-        assert!(counts.iter().all(|&count| count
-            .checked_sub(average)
-            .or_else(|| average.checked_sub(count))
-            .unwrap()
-            < 500),);
+        assert!(counts.iter().all(|&count| {
+            count
+                .checked_sub(average)
+                .or_else(|| average.checked_sub(count))
+                .unwrap()
+                < 500
+        }),);
         let average = insertions.iter().copied().sum::<usize>() / insertions.len();
-        assert!(insertions.into_iter().all(|count| count
-            .checked_sub(average)
-            .or_else(|| average.checked_sub(count))
-            .unwrap()
-            < 500));
+        assert!(insertions.into_iter().all(|count| {
+            count
+                .checked_sub(average)
+                .or_else(|| average.checked_sub(count))
+                .unwrap()
+                < 500
+        }));
         Ok(())
     }
 }

@@ -319,15 +319,15 @@ pub(crate) static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::n
 
 #[cfg(all(feature = "systemmode", test))]
 mod tests {
-    use libafl::{inputs::NopInput, state::NopState, HasMetadata};
+    use libafl::{HasMetadata, inputs::NopInput, state::NopState};
     use libafl_bolts::tuples::tuple_list;
 
     use crate::modules::{
+        EmulatorModule,
         utils::filters::{
             AddressFilter, NopAddressFilter, NopPageFilter, PageFilter, StdAddressFilter,
             StdPageFilter,
         },
-        EmulatorModule, EmulatorModuleTuple,
     };
 
     #[derive(Clone, Debug)]

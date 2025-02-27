@@ -1,23 +1,25 @@
 //! The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk to e.g. allow AFL to sync
 
-use alloc::vec::Vec;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{clone::Clone, marker::PhantomData};
 use std::{
     fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
-    string::{String, ToString},
 };
 
 use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, Testcase},
     inputs::Input,
     stages::{Restartable, Stage},
     state::{HasCorpus, HasRand, HasSolutions},
-    Error, HasMetadata,
 };
 
 /// Metadata used to store information about disk dump indexes for names

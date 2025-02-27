@@ -2,7 +2,6 @@
 //!
 //! It wraps two executors that will be run after each other with the same input.
 //! In comparison to the [`crate::executors::CombinedExecutor`] it also runs the secondary executor in `run_target`.
-//!
 use core::{
     cell::UnsafeCell,
     fmt::Debug,
@@ -19,9 +18,9 @@ use serde::{Deserialize, Serialize};
 
 use super::HasTimeout;
 use crate::{
+    Error,
     executors::{Executor, ExitKind, HasObservers},
     observers::{DifferentialObserversTuple, ObserversTuple},
-    Error,
 };
 
 /// A [`DiffExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
@@ -201,23 +200,23 @@ where
 {
     #[expect(deprecated)]
     fn match_name<T>(&self, name: &str) -> Option<&T> {
-        if let Some(t) = self.primary.as_ref().match_name::<T>(name) {
-            Some(t)
-        } else if let Some(t) = self.secondary.as_ref().match_name::<T>(name) {
-            Some(t)
-        } else {
-            self.differential.match_name::<T>(name)
+        match self.primary.as_ref().match_name::<T>(name) {
+            Some(t) => Some(t),
+            _ => match self.secondary.as_ref().match_name::<T>(name) {
+                Some(t) => Some(t),
+                _ => self.differential.match_name::<T>(name),
+            },
         }
     }
 
     #[expect(deprecated)]
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
-        if let Some(t) = self.primary.as_mut().match_name_mut::<T>(name) {
-            Some(t)
-        } else if let Some(t) = self.secondary.as_mut().match_name_mut::<T>(name) {
-            Some(t)
-        } else {
-            self.differential.match_name_mut::<T>(name)
+        match self.primary.as_mut().match_name_mut::<T>(name) {
+            Some(t) => Some(t),
+            _ => match self.secondary.as_mut().match_name_mut::<T>(name) {
+                Some(t) => Some(t),
+                _ => self.differential.match_name_mut::<T>(name),
+            },
         }
     }
 }

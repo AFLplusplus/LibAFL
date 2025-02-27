@@ -1,7 +1,7 @@
 [package]
 name = "libnoaslr"
 version = "0.15.1"
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "noaslr"
@@ -12,7 +12,7 @@ crate-type = ["dylib"]
 
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
-ctor = { version = "0.2.9", default-features = false }
+ctor = "0.4.0"
 nix = { version = "0.29", default-features = false, features = [
   "process",
   "personality",

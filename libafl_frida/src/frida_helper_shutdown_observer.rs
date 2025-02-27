@@ -1,10 +1,11 @@
-use std::{borrow::Cow, cell::RefCell, fmt, rc::Rc};
+use alloc::{borrow::Cow, rc::Rc};
+use core::{cell::RefCell, fmt};
 
 use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::Observer};
 use libafl_bolts::{Error, Named};
 use serde::{
-    de::{self, Deserialize, Deserializer, MapAccess, Visitor},
     Serialize,
+    de::{self, Deserialize, Deserializer, MapAccess, Visitor},
 };
 
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
@@ -65,7 +66,7 @@ impl<'de, RT> Deserialize<'de> for FridaHelperObserver<'_, RT> {
     {
         struct FridaHelperObserverVisitor<'a, RT> {
             // marker: std::marker::PhantomData<&'b mut FridaInstrumentationHelper<'a, RT>>,
-            marker: std::marker::PhantomData<&'a RT>,
+            marker: core::marker::PhantomData<&'a RT>,
         }
 
         impl<'de, 'a, RT> Visitor<'de> for FridaHelperObserverVisitor<'a, RT> {
@@ -90,7 +91,7 @@ impl<'de, RT> Deserialize<'de> for FridaHelperObserver<'_, RT> {
             "FridaHelperObserver",
             &[], // No fields to deserialize
             FridaHelperObserverVisitor {
-                marker: std::marker::PhantomData,
+                marker: core::marker::PhantomData,
             },
         )
     }

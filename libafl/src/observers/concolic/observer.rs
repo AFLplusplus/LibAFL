@@ -4,8 +4,8 @@ use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
 use crate::observers::{
-    concolic::{serialization_format::MessageFileReader, ConcolicMetadata},
     Observer,
+    concolic::{ConcolicMetadata, serialization_format::MessageFileReader},
 };
 
 /// A standard [`ConcolicObserver`] observer, observing constraints written into a memory buffer.

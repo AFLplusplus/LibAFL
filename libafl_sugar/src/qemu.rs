@@ -1,11 +1,11 @@
 //! In-memory fuzzer with `QEMU`-based binary-only instrumentation
-//!
 use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
+    HasMetadata,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
     executors::{ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -14,31 +14,30 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
-        havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, StdScheduledMutator},
-        token_mutations::Tokens,
         I2SRandReplace,
+        havoc_mutations::havoc_mutations,
+        scheduled::{StdScheduledMutator, tokens_mutations},
+        token_mutations::Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
-    HasMetadata,
 };
 use libafl_bolts::{
+    AsSlice,
     core_affinity::Cores,
     nonzero,
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
-    AsSlice,
+    tuples::{Handled, Merge, tuple_list},
 };
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::modules::CmpLogModule;
 pub use libafl_qemu::qemu::Qemu;
-use libafl_qemu::{modules::edges::StdEdgeCoverageModule, Emulator, QemuExecutor};
-use libafl_targets::{edges_map_mut_ptr, CmpLogObserver, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
+use libafl_qemu::{Emulator, QemuExecutor, modules::edges::StdEdgeCoverageModule};
+use libafl_targets::{CmpLogObserver, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND, edges_map_mut_ptr};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -224,10 +223,12 @@ where
                     }
                     #[cfg(any(feature = "mips", feature = "hexagon"))]
                     {
-                        tuple_list!(StdEdgeCoverageModule::builder()
-                            .map_observer(edges_observer.as_mut())
-                            .build()
-                            .unwrap())
+                        tuple_list!(
+                            StdEdgeCoverageModule::builder()
+                                .map_observer(edges_observer.as_mut())
+                                .build()
+                                .unwrap()
+                        )
                     }
                 };
 
@@ -347,10 +348,12 @@ where
                     }
                 }
             } else {
-                let modules = tuple_list!(StdEdgeCoverageModule::builder()
-                    .map_observer(edges_observer.as_mut())
-                    .build()
-                    .unwrap());
+                let modules = tuple_list!(
+                    StdEdgeCoverageModule::builder()
+                        .map_observer(edges_observer.as_mut())
+                        .build()
+                        .unwrap()
+                );
 
                 let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>,
                                    _state: &mut _,

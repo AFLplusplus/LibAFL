@@ -1,4 +1,4 @@
-use unicorn_engine::{unicorn_const::Arch, RegisterARM, RegisterARM64, RegisterX86};
+use unicorn_engine::{RegisterARM, RegisterARM64, RegisterX86, unicorn_const::Arch};
 
 pub fn get_stack_pointer(emu: &unicorn_engine::Unicorn<()>) -> u64 {
     match emu.get_arch() {

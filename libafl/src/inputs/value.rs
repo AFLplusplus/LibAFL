@@ -8,7 +8,7 @@ use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use {
-    libafl_bolts::{fs::write_file_atomic, Error},
+    libafl_bolts::{Error, fs::write_file_atomic},
     std::{fs::File, io::Read, path::Path},
 };
 
@@ -138,8 +138,8 @@ where
 mod tests {
     #[cfg(feature = "std")]
     use {
-        super::ValueInput, crate::mutators::numeric::Numeric, alloc::fmt::Debug,
-        std::any::type_name,
+        super::ValueInput, crate::mutators::numeric::Numeric, core::any::type_name,
+        core::fmt::Debug,
     };
 
     #[cfg(feature = "std")]

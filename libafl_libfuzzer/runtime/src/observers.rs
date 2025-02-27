@@ -6,10 +6,10 @@ use std::{
 };
 
 use libafl::{
+    Error,
     executors::ExitKind,
     observers::{MapObserver, Observer, TimeObserver},
     state::HasCorpus,
-    Error,
 };
 use libafl_bolts::{AsIter, HasLen, Named};
 use num_traits::Bounded;

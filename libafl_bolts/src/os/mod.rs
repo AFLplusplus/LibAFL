@@ -1,5 +1,4 @@
 //! Operating System specific abstractions
-//!
 
 #[cfg(any(unix, all(windows, feature = "std")))]
 use crate::Error;
@@ -16,15 +15,17 @@ pub use unix_signals::CTRL_C_EXIT;
 pub mod pipes;
 
 #[cfg(all(unix, feature = "std"))]
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, ffi::CString};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::CStr;
 #[cfg(feature = "std")]
 use std::{env, process::Command};
 #[cfg(all(unix, feature = "std"))]
-use std::{ffi::CString, os::fd::RawFd};
-#[cfg(all(unix, feature = "std"))]
-use std::{fs::File, os::fd::AsRawFd, sync::OnceLock};
+use std::{
+    fs::File,
+    os::fd::{AsRawFd, RawFd},
+    sync::OnceLock,
+};
 
 // Allow a few extra features we need for the whole module
 #[cfg(all(windows, feature = "std"))]
@@ -76,19 +77,21 @@ pub enum ForkResult {
 /// A Normal fork. Runs on in two processes. Should be memory safe in general.
 #[cfg(unix)]
 pub unsafe fn fork() -> Result<ForkResult, Error> {
-    match libc::fork() {
-        pid if pid > 0 => Ok(ForkResult::Parent(ChildHandle { pid })),
-        pid if pid < 0 => {
-            // Getting errno from rust is hard, we'll just let the libc print to stderr for now.
-            // In any case, this should usually not happen.
-            #[cfg(feature = "std")]
-            {
-                let err_str = CString::new("Fork failed").unwrap();
-                libc::perror(err_str.as_ptr());
+    unsafe {
+        match libc::fork() {
+            pid if pid > 0 => Ok(ForkResult::Parent(ChildHandle { pid })),
+            pid if pid < 0 => {
+                // Getting errno from rust is hard, we'll just let the libc print to stderr for now.
+                // In any case, this should usually not happen.
+                #[cfg(feature = "std")]
+                {
+                    let err_str = CString::new("Fork failed").unwrap();
+                    libc::perror(err_str.as_ptr());
+                }
+                Err(Error::unknown(format!("Fork failed ({pid})")))
             }
-            Err(Error::unknown(format!("Fork failed ({pid})")))
+            _ => Ok(ForkResult::Child),
         }
-        _ => Ok(ForkResult::Child),
     }
 }
 
@@ -124,7 +127,7 @@ pub fn peak_rss_mb_child_processes() -> Result<i64, Error> {
     use core::mem;
     use std::io;
 
-    use libc::{rusage, RUSAGE_CHILDREN};
+    use libc::{RUSAGE_CHILDREN, rusage};
 
     let rss = unsafe {
         let mut rusage = mem::MaybeUninit::<rusage>::uninit();

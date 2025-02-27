@@ -1,6 +1,6 @@
 /*!
-* Welcome to `LibAFL_bolts`
-*/
+ * Welcome to `LibAFL_bolts`
+ */
 #![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
@@ -62,9 +62,7 @@ type String = &'static str;
 /// Good enough for simple errors, for anything else, use the `alloc` feature.
 #[cfg(not(feature = "alloc"))]
 macro_rules! format {
-    ($fmt:literal) => {{
-        $fmt
-    }};
+    ($fmt:literal) => {{ $fmt }};
 }
 
 #[cfg(feature = "std")]
@@ -77,7 +75,7 @@ pub extern crate alloc;
 
 #[cfg(feature = "ctor")]
 #[doc(hidden)]
-pub use ctor::ctor;
+pub use ctor;
 #[cfg(feature = "alloc")]
 pub mod anymap;
 #[cfg(feature = "std")]
@@ -147,13 +145,14 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::{Hash, Hasher};
+#[cfg(all(unix, feature = "std"))]
+use core::mem;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
 use std::{
     fs::File,
-    io::{stderr, stdout, Write},
-    mem,
+    io::{Write, stderr, stdout},
     os::fd::{AsRawFd, FromRawFd, RawFd},
     panic,
 };
@@ -305,6 +304,8 @@ pub enum Error {
     EmptyOptional(String, ErrorBacktrace),
     /// Key not in Map
     KeyNotFound(String, ErrorBacktrace),
+    /// Key already exists and should not overwrite
+    KeyExists(String, ErrorBacktrace),
     /// No elements in the current item
     Empty(String, ErrorBacktrace),
     /// End of iteration
@@ -363,6 +364,15 @@ impl Error {
         S: Into<String>,
     {
         Error::KeyNotFound(arg.into(), ErrorBacktrace::new())
+    }
+
+    /// Key already exists in Map
+    #[must_use]
+    pub fn key_exists<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::KeyExists(arg.into(), ErrorBacktrace::new())
     }
 
     /// No elements in the current item
@@ -506,6 +516,10 @@ impl Display for Error {
             }
             Self::KeyNotFound(s, b) => {
                 write!(f, "Key: `{0}` - not found", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::KeyExists(s, b) => {
+                write!(f, "Key: `{0}` - already exists", &s)?;
                 display_error_backtrace(f, b)
             }
             Self::Empty(s, b) => {
@@ -685,7 +699,7 @@ pub mod prelude {
 
 #[cfg(all(any(doctest, test), not(feature = "std")))]
 /// Provide custom time in `no_std` tests.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn external_current_millis() -> u64 {
     // TODO: use "real" time here
     1000
@@ -895,8 +909,8 @@ pub fn current_time() -> time::Duration {
 // Define your own `external_current_millis()` function via `extern "C"`
 // which is linked into the binary and called from here.
 #[cfg(all(not(any(doctest, test)), not(feature = "std")))]
-extern "C" {
-    //#[no_mangle]
+unsafe extern "C" {
+    //#[unsafe(no_mangle)]
     fn external_current_millis() -> u64;
 }
 
@@ -999,7 +1013,7 @@ pub fn get_thread_id() -> u64 {
 #[allow(clippy::cast_sign_loss)]
 /// Return thread ID without using TLS
 pub fn get_thread_id() -> u64 {
-    use libc::{syscall, SYS_gettid};
+    use libc::{SYS_gettid, syscall};
 
     unsafe { syscall(SYS_gettid) as u64 }
 }
@@ -1352,7 +1366,7 @@ macro_rules! nonnull_raw_mut {
 #[allow(missing_docs)] // expect somehow breaks here
 pub mod pybind {
 
-    use pyo3::{pymodule, types::PyModule, Bound, PyResult};
+    use pyo3::{Bound, PyResult, pymodule, types::PyModule};
 
     #[macro_export]
     macro_rules! unwrap_me_body {
@@ -1503,12 +1517,14 @@ pub unsafe fn vec_init<E, F, T>(nb_elts: usize, init_fn: F) -> Result<Vec<T>, E>
 where
     F: FnOnce(&mut Vec<T>) -> Result<(), E>,
 {
-    let mut new_vec: Vec<T> = Vec::with_capacity(nb_elts);
-    new_vec.set_len(nb_elts);
+    unsafe {
+        let mut new_vec: Vec<T> = Vec::with_capacity(nb_elts);
+        new_vec.set_len(nb_elts);
 
-    init_fn(&mut new_vec)?;
+        init_fn(&mut new_vec)?;
 
-    Ok(new_vec)
+        Ok(new_vec)
+    }
 }
 
 #[cfg(test)]

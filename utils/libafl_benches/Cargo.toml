@@ -5,7 +5,7 @@ authors = [
 ]
 name = "libafl_benches"
 version.workspace = true
-edition = "2021"
+edition = "2024"
 description = "LibAFL Benchmarks"
 documentation = "https://docs.rs/libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"

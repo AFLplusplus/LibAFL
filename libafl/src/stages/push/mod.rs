@@ -4,7 +4,6 @@
 //! A push stage instead returns an iterator that generates a new result for each time it gets called.
 //! With the new testcase, you will have to take care about testcase execution, manually.
 //! The push stage relies on internal mutability of the supplied `Observers`.
-//!
 
 /// Mutational stage is the normal fuzzing stage.
 pub mod mutational;
@@ -22,6 +21,7 @@ use libafl_bolts::Named;
 pub use mutational::StdMutationalPushStage;
 
 use crate::{
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasScheduler,
     common::HasNamedMetadata,
     corpus::{CorpusId, HasCurrentCorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
@@ -30,7 +30,6 @@ use crate::{
     schedulers::Scheduler,
     stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 
 // The shared state for all [`PushStage`]s
@@ -238,7 +237,6 @@ static mut PUSH_STAGE_ADAPTER_ID: usize = 0;
 pub static PUSH_STAGE_ADAPTER_NAME: &str = "pushstageadapter";
 
 impl<CS, EM, I, OT, PS, Z> Named for PushStageAdapter<CS, EM, I, OT, PS, Z> {
-    #[must_use]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

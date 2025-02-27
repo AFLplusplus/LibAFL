@@ -5,6 +5,9 @@ pub use multi::MultiMonitor;
 
 pub mod stats;
 
+pub mod logics;
+pub use logics::{IfElseMonitor, IfMonitor, OptionalMonitor, WhileMonitor};
+
 #[cfg(feature = "std")]
 pub mod disk;
 #[cfg(feature = "std")]
@@ -26,10 +29,13 @@ pub mod prometheus;
 #[cfg(feature = "statsd_monitor")]
 pub mod statsd;
 
-use alloc::fmt::Debug;
 #[cfg(feature = "std")]
 use alloc::vec::Vec;
-use core::{fmt, fmt::Write, time::Duration};
+use core::{
+    fmt,
+    fmt::{Debug, Write},
+    time::Duration,
+};
 
 use libafl_bolts::ClientId;
 #[cfg(feature = "prometheus_monitor")]
@@ -294,7 +300,7 @@ mod test {
     use libafl_bolts::ClientId;
     use tuple_list::tuple_list;
 
-    use super::{stats::ClientStatsManager, Monitor, NopMonitor, SimpleMonitor};
+    use super::{Monitor, NopMonitor, SimpleMonitor, stats::ClientStatsManager};
 
     #[test]
     fn test_monitor_tuple_list() {

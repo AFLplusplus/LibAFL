@@ -8,7 +8,7 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "frida", "instrumentation"]
-edition = "2021"
+edition = "2024"
 categories = [
   "development-tools::testing",
   "emulators",

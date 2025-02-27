@@ -4,9 +4,9 @@ use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 
 use crate::{
+    Qemu, QemuParams,
     emu::EmulatorModules,
     modules::utils::filters::{AddressFilter, PageFilter},
-    Qemu, QemuParams,
 };
 
 #[cfg(feature = "usermode")]
@@ -362,12 +362,16 @@ where
     }
 
     unsafe fn on_crash_all(&mut self) {
-        self.0.on_crash();
-        self.1.on_crash_all();
+        unsafe {
+            self.0.on_crash();
+            self.1.on_crash_all();
+        }
     }
 
     unsafe fn on_timeout_all(&mut self) {
-        self.0.on_timeout();
-        self.1.on_timeout_all();
+        unsafe {
+            self.0.on_timeout();
+            self.1.on_timeout_all();
+        }
     }
 }

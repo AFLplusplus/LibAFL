@@ -12,22 +12,22 @@ use core::{
 #[rustversion::nightly]
 use libafl_bolts::AsSlice;
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchName, MatchNameRef},
     AsIter, HasRefCnt, Named,
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 use num_traits::PrimInt;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver},
-    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
@@ -103,11 +103,7 @@ where
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
-        if first > second {
-            first
-        } else {
-            second
-        }
+        if first > second { first } else { second }
     }
 }
 
@@ -121,11 +117,7 @@ where
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
-        if first < second {
-            first
-        } else {
-            second
-        }
+        if first < second { first } else { second }
     }
 }
 
@@ -271,7 +263,6 @@ libafl_bolts::impl_serdeany!(MapNoveltiesMetadata);
 impl Deref for MapNoveltiesMetadata {
     type Target = [usize];
     /// Convert to a slice
-    #[must_use]
     fn deref(&self) -> &[usize] {
         &self.list
     }
@@ -279,7 +270,6 @@ impl Deref for MapNoveltiesMetadata {
 
 impl DerefMut for MapNoveltiesMetadata {
     /// Convert to a slice
-    #[must_use]
     fn deref_mut(&mut self) -> &mut [usize] {
         &mut self.list
     }
@@ -386,7 +376,7 @@ where
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
         // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
-        state.add_named_metadata(&self.name, MapFeedbackMetadata::<O::Entry>::default());
+        state.add_named_metadata_checked(&self.name, MapFeedbackMetadata::<O::Entry>::default())?;
         Ok(())
     }
 }

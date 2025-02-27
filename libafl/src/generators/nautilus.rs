@@ -10,9 +10,8 @@ use libafl_bolts::rands::Rand;
 
 pub use crate::common::nautilus::grammartec::newtypes::NTermId;
 use crate::{
-    common::nautilus::grammartec::context::Context, generators::Generator,
+    Error, common::nautilus::grammartec::context::Context, generators::Generator,
     inputs::nautilus::NautilusInput, nautilus::grammartec::python_grammar_loader, state::HasRand,
-    Error,
 };
 
 /// The nautilus context for a generator
@@ -22,7 +21,7 @@ pub struct NautilusContext {
 }
 
 impl Debug for NautilusContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "NautilusContext {{}}",)
     }
 }
@@ -115,7 +114,7 @@ pub struct NautilusGenerator<'a> {
 }
 
 impl Debug for NautilusGenerator<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "NautilusGenerator {{}}",)
     }
 }

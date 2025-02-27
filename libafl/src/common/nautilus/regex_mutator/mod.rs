@@ -59,7 +59,7 @@ fn append_unicode_range<R: Rand>(
     let a = u32::from_le_bytes(chr_a_buf);
     let b = u32::from_le_bytes(chr_b_buf);
     let c = scr.get_range(rand, a as usize, (b + 1) as usize) as u32;
-    append_char(res, std::char::from_u32(c).unwrap());
+    append_char(res, core::char::from_u32(c).unwrap());
 }
 
 fn append_byte_range<R: Rand>(

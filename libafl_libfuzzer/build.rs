@@ -1,5 +1,5 @@
+use core::error::Error;
 use std::{
-    error::Error,
     fs,
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
@@ -202,9 +202,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     drop(redefinitions_file);
 
     assert!(
-            nm_child.wait().is_ok_and(|s| s.success()),
-            "Couldn't link runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
-        );
+        nm_child.wait().is_ok_and(|s| s.success()),
+        "Couldn't link runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
+    );
 
     let mut objcopy_command = Command::new(rust_objcopy);
 
@@ -245,9 +245,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .args([&archive_path, &redefined_archive_path]);
 
     assert!(
-            objcopy_command.status().is_ok_and(|s| s.success()),
-            "Couldn't rename allocators in the runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
-        );
+        objcopy_command.status().is_ok_and(|s| s.success()),
+        "Couldn't rename allocators in the runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
+    );
 
     #[cfg(feature = "embed-runtime")]
     {

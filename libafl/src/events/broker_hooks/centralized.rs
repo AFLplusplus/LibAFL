@@ -1,17 +1,17 @@
 use alloc::vec::Vec;
 use core::{fmt::Debug, marker::PhantomData};
 
+use libafl_bolts::{
+    ClientId, Error,
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
+};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
-use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
-    ClientId, Error,
-};
 use serde::de::DeserializeOwned;
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::COMPRESS_THRESHOLD;
-use crate::events::{BrokerEventResult, Event, _LLMP_TAG_TO_MAIN};
+use crate::events::{_LLMP_TAG_TO_MAIN, BrokerEventResult, Event};
 
 /// An LLMP-backed event manager for scalable multi-processed fuzzing
 pub struct CentralizedLlmpHook<I> {

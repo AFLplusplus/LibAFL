@@ -3,9 +3,9 @@
 use core::marker::PhantomData;
 
 use crate::{
+    Error,
     stages::{Restartable, Stage, StageId, StagesTuple},
     state::HasNestedStage,
-    Error,
 };
 
 /// Progress for nested stages. This merely enters/exits the inner stage's scope.
@@ -247,10 +247,9 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        if let Some(stages) = &mut self.stages {
-            stages.perform_all(fuzzer, executor, state, manager)
-        } else {
-            Ok(())
+        match &mut self.stages {
+            Some(stages) => stages.perform_all(fuzzer, executor, state, manager),
+            _ => Ok(()),
         }
     }
 }
@@ -303,15 +302,15 @@ mod test {
     use core::{cell::RefCell, marker::PhantomData};
 
     use libafl_bolts::{
-        impl_serdeany,
+        Error, impl_serdeany,
         tuples::{tuple_list, tuple_list_type},
-        Error,
     };
     use serde::{Deserialize, Serialize};
 
     #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
     use crate::stages::RetryCountRestartHelper;
     use crate::{
+        HasMetadata, NopFuzzer,
         events::NopEventManager,
         executors::test::NopExecutor,
         stages::{
@@ -319,7 +318,6 @@ mod test {
             StagesTuple, WhileStage,
         },
         state::{HasCurrentStageId, StdState},
-        HasMetadata, NopFuzzer,
     };
 
     #[derive(Debug)]

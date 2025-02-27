@@ -94,7 +94,7 @@ clap = "4.5.18"
 cc = "1.1.21"
 cmake = "0.1.51"
 document-features = "0.2.10"
-fastbloom = { version = "0.8.0", default-features = false }
+fastbloom = { version = "0.9.0", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false } # A faster hashmap, nostd compatible
 libc = "0.2.159" # For (*nix) libc
 libipt = "0.3.0"
@@ -147,6 +147,10 @@ incomplete_features = "allow"
 all = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
 cargo_common_metadata = "deny"
+
+alloc_instead_of_core = "deny"
+std_instead_of_alloc = "deny"
+std_instead_of_core = "deny"
 
 # Warn
 cargo = { level = "warn", priority = -1 }

@@ -1,29 +1,29 @@
 #[cfg(feature = "usermode")]
-use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
+use capstone::{Capstone, InsnDetail, arch::BuildsCapstone};
 use hashbrown::HashMap;
 use libafl::HasMetadata;
 use libafl_bolts::hash_64_fast;
 use libafl_qemu_sys::GuestAddr;
 pub use libafl_targets::{
+    CMPLOG_MAP_H, CMPLOG_MAP_PTR, CMPLOG_MAP_SIZE, CMPLOG_MAP_W, CmpLogMap, CmpLogObserver,
     cmps::{
         __libafl_targets_cmplog_instructions, __libafl_targets_cmplog_routines, CMPLOG_ENABLED,
     },
-    CmpLogMap, CmpLogObserver, CMPLOG_MAP_H, CMPLOG_MAP_PTR, CMPLOG_MAP_SIZE, CMPLOG_MAP_W,
 };
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "systemmode")]
-use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
 #[cfg(feature = "usermode")]
-use crate::{capstone, qemu::ArchExtras, CallingConvention};
+use crate::capstone;
+#[cfg(feature = "systemmode")]
+use crate::modules::utils::filters::{NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
+    Qemu,
     emu::EmulatorModules,
     modules::{
-        utils::filters::{HasAddressFilter, StdAddressFilter},
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        utils::filters::{HasAddressFilter, StdAddressFilter},
     },
     qemu::Hook,
-    Qemu,
 };
 
 #[cfg_attr(
@@ -301,12 +301,8 @@ impl CmpLogRoutinesModule {
 
         let qemu = Qemu::get().unwrap();
 
-        let a0: GuestAddr = qemu
-            .read_function_argument(CallingConvention::Cdecl, 0)
-            .unwrap_or(0);
-        let a1: GuestAddr = qemu
-            .read_function_argument(CallingConvention::Cdecl, 1)
-            .unwrap_or(0);
+        let a0: GuestAddr = qemu.read_function_argument(0).unwrap_or(0);
+        let a1: GuestAddr = qemu.read_function_argument(1).unwrap_or(0);
 
         if a0 == 0 || a1 == 0 {
             return;
@@ -350,7 +346,7 @@ impl CmpLogRoutinesModule {
             let mut code = {
                 #[cfg(feature = "usermode")]
                 unsafe {
-                    std::slice::from_raw_parts(qemu.g2h(pc), 512)
+                    std::slice::from_raw_parts(qemu.g2h(pc), 512);
                 }
                 #[cfg(feature = "systemmode")]
                 &mut [0; 512]
@@ -393,9 +389,7 @@ impl CmpLogRoutinesModule {
                 iaddr += insn.bytes().len() as GuestAddr;
 
                 #[cfg(feature = "usermode")]
-                unsafe {
-                    code = std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
-                }
+                code = unsafe { std::slice::from_raw_parts(qemu.g2h(iaddr), 512) };
                 #[cfg(feature = "systemmode")]
                 unsafe {
                     qemu.read_mem(pc, code);

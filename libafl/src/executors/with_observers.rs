@@ -5,9 +5,9 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::tuples::RefIndexable;
 
 use crate::{
+    Error,
     executors::{Executor, ExitKind, HasObservers},
     observers::ObserversTuple,
-    Error,
 };
 
 /// A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].

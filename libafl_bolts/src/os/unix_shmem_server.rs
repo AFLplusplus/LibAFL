@@ -5,26 +5,29 @@ Hence, the `unix_shmem_server` keeps track of existing maps, creates new maps fo
 and forwards them over unix domain sockets.
 */
 
+use alloc::{
+    rc::{Rc, Weak},
+    sync::Arc,
+};
 #[cfg(feature = "std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::{
+    cell::RefCell,
     fmt::Debug,
+    marker::PhantomData,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
 #[cfg(target_vendor = "apple")]
 use std::fs;
 use std::{
-    cell::RefCell,
     env,
     io::{Read, Write},
-    marker::PhantomData,
     os::fd::{AsFd, BorrowedFd},
-    rc::{Rc, Weak},
-    sync::{Arc, Condvar, Mutex},
+    sync::{Condvar, Mutex},
     thread::JoinHandle,
 };
 #[cfg(all(feature = "std", unix))]
@@ -39,14 +42,14 @@ use std::{
 use hashbrown::HashMap;
 use nix::poll::PollTimeout;
 #[cfg(all(feature = "std", unix))]
-use nix::poll::{poll, PollFd, PollFlags};
+use nix::poll::{PollFd, PollFlags, poll};
 use serde::{Deserialize, Serialize};
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
 use crate::{
-    shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
+    shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
 };
 
 /// The default server name for our abstract shmem server
@@ -130,7 +133,9 @@ impl<SP> ServedShMemProvider<SP> {
         let (slice_size, fd_count) = self.stream.recv_fds(&mut shm_slice, &mut fd_buf)?;
         //.expect("Did not receive a response");
         if slice_size == 0 && fd_count == 0 {
-            return Err(Error::illegal_state(format!("Tried to receive 20 bytes and one fd via unix shmem socket, but got {slice_size} bytes and {fd_count} fds.")));
+            return Err(Error::illegal_state(format!(
+                "Tried to receive 20 bytes and one fd via unix shmem socket, but got {slice_size} bytes and {fd_count} fds."
+            )));
         }
 
         let server_id = ShMemId::from_array(&shm_slice);
@@ -368,7 +373,8 @@ impl Drop for ShMemServiceThread {
             #[cfg(target_vendor = "apple")]
             fs::remove_file(UNIX_SERVER_NAME).unwrap();
 
-            env::remove_var(AFL_SHMEM_SERVICE_STARTED);
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe { env::remove_var(AFL_SHMEM_SERVICE_STARTED) };
         }
     }
 }
@@ -404,11 +410,12 @@ where
                     return Err(e);
                 }
             };
-            if let Err(e) = worker.listen(UNIX_SERVER_NAME, &childsyncpair) {
-                log::error!("Error spawning ShMemService: {e:?}");
-                Err(e)
-            } else {
-                Ok(())
+            match worker.listen(UNIX_SERVER_NAME, &childsyncpair) {
+                Err(e) => {
+                    log::error!("Error spawning ShMemService: {e:?}");
+                    Err(e)
+                }
+                _ => Ok(()),
             }
         });
 
@@ -420,7 +427,8 @@ where
 
         // Optimization: Following calls or even child processe don't need to try to start a service anymore.
         // It's either running at this point, or we won't be able to spawn it anyway.
-        env::set_var(AFL_SHMEM_SERVICE_STARTED, "true");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var(AFL_SHMEM_SERVICE_STARTED, "true") };
 
         let status = *success;
         match status {
@@ -532,21 +540,25 @@ where
                 let client = self.clients.get_mut(&client_id).unwrap();
 
                 if description.id.is_empty() {
-                    return Err(Error::illegal_state("Received empty ShMemId from unix shmem client. Are the shmem limits set correctly? Did a client crash?"));
+                    return Err(Error::illegal_state(
+                        "Received empty ShMemId from unix shmem client. Are the shmem limits set correctly? Did a client crash?",
+                    ));
                 }
 
                 let description_id: i32 = description.id.into();
 
                 if !self.all_shmems.contains_key(&description_id) {
                     // We should never get here, but it may happen if the OS ran out of shmem pages at some point//reached limits.
-                    return Err(Error::illegal_state(format!("Client wanted to read from existing map with id {description_id}/{description:?}, but it was not allocated by this shmem server. Are the shmem limits set correctly? Did a client crash?")));
+                    return Err(Error::illegal_state(format!(
+                        "Client wanted to read from existing map with id {description_id}/{description:?}, but it was not allocated by this shmem server. Are the shmem limits set correctly? Did a client crash?"
+                    )));
                 }
 
                 if client.maps.contains_key(&description_id) {
                     // Using let else here as self needs to be accessed in the else branch.
                     #[expect(clippy::option_if_let_else)]
                     Ok(ServedShMemResponse::Mapping(
-                        if let Some(map) = client
+                        match client
                             .maps
                             .get_mut(&description_id)
                             .as_mut()
@@ -554,9 +566,8 @@ where
                             .first()
                             .as_mut()
                         {
-                            map.clone()
-                        } else {
-                            self.upgrade_shmem_with_id(description_id)
+                            Some(map) => map.clone(),
+                            _ => self.upgrade_shmem_with_id(description_id),
                         },
                     ))
                 } else {
@@ -645,7 +656,8 @@ where
                 cvar.notify_one();
 
                 return Err(Error::unknown(format!(
-                    "The ShMem server appears to already be running. We are probably a client. Error: {err:?}")));
+                    "The ShMem server appears to already be running. We are probably a client. Error: {err:?}"
+                )));
             }
         };
 

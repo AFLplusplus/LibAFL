@@ -43,7 +43,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data::Struct, DeriveInput, Field, Fields::Named, Type};
+use syn::{Data::Struct, DeriveInput, Field, Fields::Named, Type, parse_macro_input};
 
 /// Derive macro to implement `SerdeAny`, to use a type in a `SerdeAnyMap`
 #[proc_macro_derive(SerdeAny)]

@@ -1,11 +1,11 @@
 //! Allowing mixing and matching between [`Mutator`] and [`crate::inputs::Input`] types.
 use alloc::borrow::Cow;
 
-use libafl_bolts::{tuples::MappingFunctor, Named};
+use libafl_bolts::{Named, tuples::MappingFunctor};
 
 use crate::{
-    mutators::{MutationResult, Mutator},
     Error,
+    mutators::{MutationResult, Mutator},
 };
 
 /// Mapping [`Mutator`] using a function returning a reference.
