@@ -6,8 +6,7 @@ use crate::{asan_alloc, asan_page_size, size_t};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_valloc"))]
+#[unsafe(export_name = "patch_valloc")]
 pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
     unsafe {
         trace!("valloc - size: {:#x}", size);

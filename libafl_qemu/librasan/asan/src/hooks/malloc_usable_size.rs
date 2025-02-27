@@ -6,8 +6,7 @@ use crate::{asan_get_size, size_t};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_malloc_usable_size"))]
+#[unsafe(export_name = "patch_malloc_usable_size")]
 pub unsafe extern "C" fn malloc_usable_size(ptr: *mut c_void) -> size_t {
     unsafe {
         trace!("malloc_usable_size - ptr: {:p}", ptr);

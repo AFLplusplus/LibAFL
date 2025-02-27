@@ -31,11 +31,53 @@ fix_qasan:
 		--allow-dirty
 
 [unix]
-link_qasan: compile_qasan build_dummy
+rel_qasan: compile_qasan build_dummy
 	#!/bin/bash
 	source {{ DOTENV }}
 	${CROSS_CC} \
 		${LIBRASAN_CFLAGS} \
+		-r \
+		-nodefaultlibs \
+		-nostartfiles \
+		-nostdlib \
+		-g \
+		-u patch_aligned_alloc \
+		-u patch_atoi \
+		-u patch_atol \
+		-u patch_atoll \
+		-u patch_calloc \
+		-u patch_free \
+		-u patch_malloc \
+		-u patch_malloc_usable_size \
+		-u patch_memalign \
+		-u patch_memset \
+		-u patch_mmap \
+		-u patch_munmap \
+		-u patch_posix_memalign \
+		-u patch_pvalloc \
+		-u patch_read \
+		-u patch_realloc \
+		-u patch_reallocarray \
+		-u patch_valloc \
+		-u patch_write \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.rel \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.a
+
+[unix]
+rename_qasan: rel_qasan
+	#!/bin/bash
+	source {{ DOTENV }}
+	${CROSS_OBJCOPY} \
+		--redefine-sym memset=old_memset \
+		--redefine-syms={{ QASAN_SOURCE_DIR }}/rename.syms \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.rel \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.renamed
+
+[unix]
+link_qasan: rename_qasan
+	#!/bin/bash
+	source {{ DOTENV }}
+	${CROSS_CC} \
 		-shared \
 		-nodefaultlibs \
 		-nostartfiles \
@@ -60,13 +102,13 @@ link_qasan: compile_qasan build_dummy
 		-u reallocarray \
 		-u valloc \
 		-u write \
-		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libqasan.so \
 		-Wl,--version-script={{ QASAN_SOURCE_DIR }}/qasan.map \
 		-Wl,--gc-sections \
 		-Wl,--no-undefined \
-		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.a \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libqasan.so \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.renamed \
 		-L {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }} \
-		"-ldummy_libc"
+		"-ldummy_libc" \
 
 [unix]
 strip_qasan: link_qasan

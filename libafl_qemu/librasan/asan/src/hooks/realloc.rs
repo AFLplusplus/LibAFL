@@ -9,8 +9,7 @@ use crate::{asan_alloc, asan_dealloc, asan_get_size, asan_load, size_t};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_realloc"))]
+#[unsafe(export_name = "patch_realloc")]
 pub unsafe extern "C" fn realloc(p: *mut c_void, size: size_t) -> *mut c_void {
     unsafe {
         trace!("realloc - p: {:p}, size: {:#x}", p, size);

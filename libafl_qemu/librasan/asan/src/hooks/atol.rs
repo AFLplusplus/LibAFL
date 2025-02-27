@@ -9,8 +9,7 @@ use crate::{asan_load, asan_panic};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_atol"))]
+#[unsafe(export_name = "patch_atol")]
 pub unsafe extern "C" fn atol(s: *const c_char) -> c_long {
     unsafe {
         trace!("atol - s: {:p}", s);

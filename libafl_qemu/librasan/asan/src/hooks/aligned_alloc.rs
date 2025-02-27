@@ -10,8 +10,7 @@ use crate::{GuestAddr, asan_alloc, asan_panic, size_t};
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_aligned_alloc"))]
+#[unsafe(export_name = "patch_aligned_alloc")]
 pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
     unsafe {
         trace!(

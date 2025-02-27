@@ -20,8 +20,7 @@ static SYSCALL_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 
 /// # Safety
 /// See man pages
-#[cfg_attr(not(feature = "test"), unsafe(no_mangle))]
-#[cfg_attr(feature = "test", unsafe(export_name = "patch_read"))]
+#[unsafe(export_name = "patch_read")]
 pub unsafe extern "C" fn read(fd: c_int, buf: *mut c_void, count: size_t) -> ssize_t {
     unsafe {
         trace!("read - fd: {:#x}, buf: {:p}, count: {:#x}", fd, buf, count);
