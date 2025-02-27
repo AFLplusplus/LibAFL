@@ -1,9 +1,7 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
-use core::{
-    borrow::Cow,
-    fmt::Debug,
+use core::{borrow::Cow, fmt::Debug, marker::PhantomData};
+use std::{
     io::Write,
-    marker::PhantomData,
     sync::{Mutex, MutexGuard},
 };
 
