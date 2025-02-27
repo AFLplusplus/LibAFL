@@ -376,7 +376,7 @@ unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
 impl InProcessExecutorHandlerData {
-    const SIGNAL_HANDLER_MAX_DEPTH: usize = 2;
+    const SIGNAL_HANDLER_MAX_DEPTH: usize = 3;
 
     /// # Safety
     /// Only safe if not called twice and if the executor is not used from another borrow after this.
