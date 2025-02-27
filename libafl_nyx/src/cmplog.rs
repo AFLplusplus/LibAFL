@@ -4,17 +4,17 @@
 use std::borrow::Cow;
 
 use libafl::{
+    Error, HasMetadata,
     executors::ExitKind,
     observers::{CmpValues, CmpValuesMetadata, Observer},
     state::HasExecutions,
-    Error, HasMetadata,
 };
 use libafl_bolts::Named;
 pub use libafl_targets::{
+    CMPLOG_MAP_H, CMPLOG_MAP_PTR, CMPLOG_MAP_SIZE, CMPLOG_MAP_W, CmpLogMap, CmpLogObserver,
     cmps::{
         __libafl_targets_cmplog_instructions, __libafl_targets_cmplog_routines, CMPLOG_ENABLED,
     },
-    CmpLogMap, CmpLogObserver, CMPLOG_MAP_H, CMPLOG_MAP_PTR, CMPLOG_MAP_SIZE, CMPLOG_MAP_W,
 };
 use serde::{Deserialize, Serialize};
 

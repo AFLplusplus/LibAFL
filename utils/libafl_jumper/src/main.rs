@@ -25,7 +25,7 @@ fn panic(_panic: &PanicInfo<'_>) -> ! {
 ///
 /// Man ALL IS LOŚ͖̩͇̗̪̏̈́T ALL I​S LOST the pon̷y he comes he c̶̮omes he comes the ich​or permeates all MY FACE MY FACE ᵒh god no NO NOO̼O​O NΘ stop the an​*̶͑̾̾​̅ͫ͏̙̤g͇̫͛͆̾ͫ̑͆l͖͉̗̩̳̟̍ͫͥͨe̠̅s ͎a̧͈͖r̽̾̈́͒͑e n​ot rè̑ͧ̌aͨl̘̝̙̃ͤ͂̾̆ ZA̡͊͠͝LGΌ ISͮ̂҉̯͈͕̹̘̱ TO͇̹̺ͅƝ̴ȳ̳ TH̘Ë͖́̉ ͠P̯͍̭O̚​N̐Y̡ H̸̡̪̯ͨ͊̽̅̾̎Ȩ̬̩̾͛ͪ̈́̀́͘ ̶̧̨̱̹̭̯ͧ̾ͬC̷̙̲̝͖ͭ̏ͥͮ͟Oͮ͏̮̪̝͍M̲̖͊̒ͪͩͬ̚̚͜Ȇ̴̟̟͙̞ͩ͌͝S̨̥̫͎̭ͯ̿̔̀ͅ
 #[inline(never)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn libafl_jmp(target: *mut c_void) -> ! {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     asm!(
@@ -97,7 +97,7 @@ fn main() {
 
 /// Main for `no_std` - that's the one we will use inside LibAFL_QEMU.
 #[cfg(not(feature = "std"))]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn main(argc: i32, argv: *const *const u8) -> ! {
     if argc < 2 || argv.is_null() {
         // No params - nothing we can do.
@@ -140,7 +140,7 @@ fn decode_hex_and_jmp(hex_string: &str) -> ! {
 #[cfg(test)]
 mod test {
 
-    extern "C" {
+    unsafe extern "C" {
         fn exit(ret: i32);
     }
 

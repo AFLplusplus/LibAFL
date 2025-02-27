@@ -35,10 +35,10 @@ use libafl_bolts::{
 pub use tuneable::*;
 
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     random_corpus_id,
     state::{HasCorpus, HasRand},
-    Error, HasMetadata,
 };
 
 /// The scheduler also implements `on_remove` and `on_replace` if it implements this stage.

@@ -3,32 +3,32 @@ use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     ptr::{self, null_mut, write_volatile},
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
     time::Duration,
 };
 
 use libafl_bolts::{
     os::unix_signals::Signal,
     shmem::ShMemProvider,
-    tuples::{tuple_list, Merge, RefIndexable},
+    tuples::{Merge, RefIndexable, tuple_list},
 };
 use nix::{
-    sys::wait::{waitpid, WaitStatus},
+    sys::wait::{WaitStatus, waitpid},
     unistd::Pid,
 };
 
 #[cfg(all(unix, not(target_os = "linux")))]
-use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval, ITIMER_REAL};
+use crate::executors::hooks::timer::{ITIMER_REAL, Itimerval, Timeval, setitimer};
 use crate::{
+    Error,
     executors::{
-        hooks::{
-            inprocess_fork::{InChildProcessHooks, FORK_EXECUTOR_GLOBAL_DATA},
-            ExecutorHooksTuple,
-        },
         ExitKind, HasObservers,
+        hooks::{
+            ExecutorHooksTuple,
+            inprocess_fork::{FORK_EXECUTOR_GLOBAL_DATA, InChildProcessHooks},
+        },
     },
     observers::ObserversTuple,
-    Error,
 };
 
 /// Inner state of GenericInProcessExecutor-like structures.
@@ -117,32 +117,34 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<(), Error> {
-        self.shmem_provider.post_fork(true)?;
+        unsafe {
+            self.shmem_provider.post_fork(true)?;
 
-        self.enter_target(fuzzer, state, mgr, input);
-        self.hooks.pre_exec_all(state, input);
+            self.enter_target(fuzzer, state, mgr, input);
+            self.hooks.pre_exec_all(state, input);
 
-        self.observers
-            .pre_exec_child_all(state, input)
-            .expect("Failed to run post_exec on observers");
+            self.observers
+                .pre_exec_child_all(state, input)
+                .expect("Failed to run post_exec on observers");
 
-        #[cfg(target_os = "linux")]
-        {
-            let mut timerid: libc::timer_t = null_mut();
-            // creates a new per-process interval timer
-            // we can't do this from the parent, timerid is unique to each process.
-            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &raw mut timerid);
+            #[cfg(target_os = "linux")]
+            {
+                let mut timerid: libc::timer_t = null_mut();
+                // creates a new per-process interval timer
+                // we can't do this from the parent, timerid is unique to each process.
+                libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &raw mut timerid);
 
-            // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-            let _: i32 = libc::timer_settime(timerid, 0, &raw mut self.itimerspec, null_mut());
+                // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
+                let _: i32 = libc::timer_settime(timerid, 0, &raw mut self.itimerspec, null_mut());
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+            }
+            // log::trace!("{v:#?} {}", nix::errno::errno());
+
+            Ok(())
         }
-        #[cfg(not(target_os = "linux"))]
-        {
-            setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
-        }
-        // log::trace!("{v:#?} {}", nix::errno::errno());
-
-        Ok(())
     }
 
     pub(super) unsafe fn post_run_target_child(
@@ -152,14 +154,16 @@ where
         mgr: &mut EM,
         input: &I,
     ) {
-        self.observers
-            .post_exec_child_all(state, input, &ExitKind::Ok)
-            .expect("Failed to run post_exec on observers");
+        unsafe {
+            self.observers
+                .post_exec_child_all(state, input, &ExitKind::Ok)
+                .expect("Failed to run post_exec on observers");
 
-        self.hooks.post_exec_all(state, input);
-        self.leave_target(fuzzer, state, mgr, input);
+            self.hooks.post_exec_all(state, input);
+            self.leave_target(fuzzer, state, mgr, input);
 
-        libc::_exit(0);
+            libc::_exit(0);
+        }
     }
 
     pub(super) fn parent(&mut self, child: Pid) -> Result<ExitKind, Error> {

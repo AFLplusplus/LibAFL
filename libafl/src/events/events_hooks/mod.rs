@@ -4,7 +4,7 @@
 //! other clients
 use libafl_bolts::ClientId;
 
-use crate::{events::Event, Error};
+use crate::{Error, events::Event};
 
 /// The `broker_hooks` that are run before and after the event manager calls `try_receive`
 pub trait EventManagerHook<I, S> {

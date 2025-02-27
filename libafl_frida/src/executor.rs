@@ -4,19 +4,19 @@ use std::process::abort;
 use std::{cell::RefCell, ffi::c_void, marker::PhantomData, rc::Rc};
 
 use frida_gum::{
-    stalker::{NoneEventSink, Stalker},
     Gum, MemoryRange, NativePointer,
+    stalker::{NoneEventSink, Stalker},
 };
 #[cfg(windows)]
 use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks};
 use libafl::{
+    Error,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{Input, NopTargetBytesConverter, TargetBytesConverter},
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
-    Error,
 };
-use libafl_bolts::{tuples::RefIndexable, AsSlice};
+use libafl_bolts::{AsSlice, tuples::RefIndexable};
 
 #[cfg(not(test))]
 use crate::asan::errors::AsanErrors;

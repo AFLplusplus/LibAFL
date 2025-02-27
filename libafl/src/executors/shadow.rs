@@ -10,9 +10,9 @@ use libafl_bolts::tuples::RefIndexable;
 
 use super::HasTimeout;
 use crate::{
+    Error,
     executors::{Executor, ExitKind, HasObservers},
     observers::ObserversTuple,
-    Error,
 };
 
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers

@@ -7,8 +7,8 @@ use core::any::type_name;
 pub mod nautilus;
 
 use libafl_bolts::{
-    serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     Error,
+    serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
 };
 /// Trait for elements offering metadata
 pub trait HasMetadata {

@@ -34,9 +34,9 @@ pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal, SignalHandler};
-#[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::CTRL_C_EXIT;
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::os::unix_signals::{Signal, SignalHandler, siginfo_t, ucontext_t};
 #[cfg(feature = "std")]
 use libafl_bolts::tuples::MatchNameRef;
 use libafl_bolts::{current_time, tuples::Handle};
@@ -45,11 +45,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
+    Error, HasMetadata,
     executors::ExitKind,
     inputs::Input,
     monitors::stats::UserStats,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
-    Error, HasMetadata,
 };
 
 /// Multi-machine mode
@@ -871,7 +871,7 @@ pub trait AdaptiveSerializer {
 #[cfg(test)]
 mod tests {
 
-    use libafl_bolts::{current_time, tuples::tuple_list, Named};
+    use libafl_bolts::{Named, current_time, tuples::tuple_list};
     use tuple_list::tuple_list_type;
 
     use crate::{

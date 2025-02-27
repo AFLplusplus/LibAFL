@@ -3,13 +3,13 @@
 #[cfg(feature = "stable_anymap")]
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
-#[cfg(feature = "stable_anymap")]
-use core::any::type_name;
 #[cfg(not(feature = "stable_anymap"))]
 use core::any::TypeId;
+#[cfg(feature = "stable_anymap")]
+use core::any::type_name;
 use core::{any::Any, fmt::Debug};
 
-use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeSeed};
 pub use serdeany_registry::*;
 
 #[cfg(not(feature = "stable_anymap"))]
@@ -121,17 +121,17 @@ pub mod serdeany_registry {
     use core::{any::TypeId, fmt, hash::BuildHasherDefault};
 
     use hashbrown::{
-        hash_map::{Values, ValuesMut},
         HashMap,
+        hash_map::{Values, ValuesMut},
     };
-    use serde::{de, Deserialize, Serialize};
+    use serde::{Deserialize, Serialize, de};
 
     use crate::{
-        serdeany::{
-            type_repr, type_repr_owned, DeserializeCallback, DeserializeCallbackSeed, SerdeAny,
-            TypeRepr,
-        },
         Error,
+        serdeany::{
+            DeserializeCallback, DeserializeCallbackSeed, SerdeAny, TypeRepr, type_repr,
+            type_repr_owned,
+        },
     };
 
     /// A [`HashMap`] that maps from [`TypeRepr`] to a deserializer and its [`TypeRepr`].
@@ -197,7 +197,12 @@ pub mod serdeany_registry {
             // We assert that only one element with the given TypeId is in the map.
             // This is only necessary for stable_anymap where we don't directly use the TypeId, but the type_name instead.
             #[cfg(feature = "stable_anymap")]
-            assert_eq!(_entry.1, TypeId::of::<T>(), "Fatal safety error: TypeId of type {} is not equal to the deserializer's TypeId for this type! Two registered types have the same type_name!", type_repr::<T>());
+            assert_eq!(
+                _entry.1,
+                TypeId::of::<T>(),
+                "Fatal safety error: TypeId of type {} is not equal to the deserializer's TypeId for this type! Two registered types have the same type_name!",
+                type_repr::<T>()
+            );
         }
 
         pub fn finalize(&mut self) {
@@ -349,7 +354,11 @@ pub mod serdeany_registry {
             match self.map.try_insert(type_repr_owned::<T>(), value) {
                 Ok(_) => (), // then it's fine
                 Err(hashbrown::hash_map::OccupiedError { entry: _, value }) => {
-                    return Err(Error::key_exists(format!("Tried to add a metadata of type {:?}. But this will overwrite the existing metadata value {:?}", core::any::type_name::<T>(), value)));
+                    return Err(Error::key_exists(format!(
+                        "Tried to add a metadata of type {:?}. But this will overwrite the existing metadata value {:?}",
+                        core::any::type_name::<T>(),
+                        value
+                    )));
                 }
             }
             Ok(())
@@ -375,18 +384,18 @@ pub mod serdeany_registry {
 
             let registry = &raw const REGISTRY;
             assert!(
-                        unsafe {
-                            (*registry)
-                                .deserializers
-                                .as_ref()
-                                .expect(super::ERR_EMPTY_TYPES_REGISTER)
-                                .get(type_repr)
-                                .is_some()
-                        },
-                        "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serdeany_autoreg.",
-                        core::any::type_name::<T>(),
-                        core::any::type_name::<T>()
-                    );
+                unsafe {
+                    (*registry)
+                        .deserializers
+                        .as_ref()
+                        .expect(super::ERR_EMPTY_TYPES_REGISTER)
+                        .get(type_repr)
+                        .is_some()
+                },
+                "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serdeany_autoreg.",
+                core::any::type_name::<T>(),
+                core::any::type_name::<T>()
+            );
             self.map.raw_entry_mut().from_key(type_repr)
         }
 
@@ -635,7 +644,12 @@ pub mod serdeany_registry {
             match outer.try_insert(name.into(), Box::new(val)) {
                 Ok(_) => (), // then it's fine
                 Err(hashbrown::hash_map::OccupiedError { entry, value }) => {
-                    return Err(Error::key_exists(format!("Tried to add a metadata of type {:?} named {:?}. But this will overwrite the existing metadata value {:?}", core::any::type_name::<T>(), entry.key(), value)));
+                    return Err(Error::key_exists(format!(
+                        "Tried to add a metadata of type {:?} named {:?}. But this will overwrite the existing metadata value {:?}",
+                        core::any::type_name::<T>(),
+                        entry.key(),
+                        value
+                    )));
                 }
             }
             Ok(())
@@ -655,18 +669,18 @@ pub mod serdeany_registry {
             let type_repr = &type_repr;
             let registry = &raw const REGISTRY;
             assert!(
-                        unsafe {
-                            (*registry)
-                                .deserializers
-                                .as_ref()
-                                .expect(super::ERR_EMPTY_TYPES_REGISTER)
-                                .get(type_repr)
-                                .is_some()
-                        },
-                        "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serdeany_autoreg.",
-                        core::any::type_name::<T>(),
-                        core::any::type_name::<T>()
-                    );
+                unsafe {
+                    (*registry)
+                        .deserializers
+                        .as_ref()
+                        .expect(super::ERR_EMPTY_TYPES_REGISTER)
+                        .get(type_repr)
+                        .is_some()
+                },
+                "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serdeany_autoreg.",
+                core::any::type_name::<T>(),
+                core::any::type_name::<T>()
+            );
             self.map
                 .raw_entry_mut()
                 .from_key(type_repr)
@@ -840,17 +854,17 @@ impl<'de> Deserialize<'de> for Box<dyn crate::serdeany::SerdeAny> {
 #[macro_export]
 macro_rules! create_register {
     ($struct_type:ty) => {
-        const _: () = {
+        $crate::ctor::declarative::ctor! {
             /// Automatically register this type
-            #[$crate::ctor]
-            fn register() {
+            #[ctor(anonymous)]
+            unsafe fn register() {
                 // # Safety
                 // This `register` call will always run at startup and never in parallel.
                 unsafe {
                     $crate::serdeany::RegistryBuilder::register::<$struct_type>();
                 }
             }
-        };
+        }
     };
 }
 

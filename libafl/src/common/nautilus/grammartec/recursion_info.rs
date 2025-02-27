@@ -3,8 +3,8 @@ use std::fmt;
 
 use hashbrown::HashMap;
 use libafl_bolts::{
-    rands::{loaded_dice::LoadedDiceSampler, Rand},
     Error,
+    rands::{Rand, loaded_dice::LoadedDiceSampler},
 };
 
 use crate::common::nautilus::grammartec::{

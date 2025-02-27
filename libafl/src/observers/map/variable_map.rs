@@ -8,14 +8,14 @@ use core::{
 };
 
 use libafl_bolts::{
-    ownedref::{OwnedMutPtr, OwnedMutSlice},
     AsSlice, AsSliceMut, HasLen, Named,
+    ownedref::{OwnedMutPtr, OwnedMutSlice},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    observers::{map::MapObserver, Observer, VarLenMapObserver},
     Error,
+    observers::{Observer, VarLenMapObserver, map::MapObserver},
 };
 
 /// Overlooking a variable bitmap
@@ -212,10 +212,12 @@ where
         max_len: usize,
         size: *mut usize,
     ) -> Self {
-        Self::from_mut_slice(
-            name,
-            OwnedMutSlice::from_raw_parts_mut(map_ptr, max_len),
-            size,
-        )
+        unsafe {
+            Self::from_mut_slice(
+                name,
+                OwnedMutSlice::from_raw_parts_mut(map_ptr, max_len),
+                size,
+            )
+        }
     }
 }

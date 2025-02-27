@@ -40,7 +40,9 @@ pub fn main() {
 
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
-    shmem.write_to_env("__AFL_SHM_ID").unwrap();
+    unsafe {
+        shmem.write_to_env("__AFL_SHM_ID").unwrap();
+    }
     let shmem_map: &mut [u8; MAP_SIZE] = shmem
         .as_slice_mut()
         .try_into()

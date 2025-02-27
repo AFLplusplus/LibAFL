@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::{
     marker::PhantomData,
     num::NonZeroUsize,
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
     time::Duration,
 };
 use std::{
@@ -21,38 +21,38 @@ use libafl_bolts::os::startable_self;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "fork", unix))]
-use libafl_bolts::os::{fork, ForkResult};
+use libafl_bolts::os::{ForkResult, fork};
 use libafl_bolts::{
+    ClientId,
     core_affinity::CoreId,
     os::CTRL_C_EXIT,
     shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     staterestore::StateRestorer,
     tuples::tuple_list,
-    ClientId,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::{broadcast, broadcast::error::RecvError, mpsc},
-    task::{spawn, JoinHandle},
+    task::{JoinHandle, spawn},
 };
 use typed_builder::TypedBuilder;
 
-use super::{std_maybe_report_progress, std_report_progress, AwaitRestartSafe, SendExiting};
+use super::{AwaitRestartSafe, SendExiting, std_maybe_report_progress, std_report_progress};
 #[cfg(all(unix, not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
+    Error, HasMetadata,
     events::{
-        std_on_restart, BrokerEventResult, Event, EventConfig, EventFirer, EventManagerHooksTuple,
-        EventManagerId, EventReceiver, EventRestarter, HasEventManagerId, ProgressReporter,
+        BrokerEventResult, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
+        EventReceiver, EventRestarter, HasEventManagerId, ProgressReporter, std_on_restart,
     },
     inputs::Input,
-    monitors::{stats::ClientStatsManager, Monitor},
+    monitors::{Monitor, stats::ClientStatsManager},
     state::{
         HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime,
         HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
-    Error, HasMetadata,
 };
 
 /// Tries to create (synchronously) a [`TcpListener`] that is `nonblocking` (for later use in tokio).
@@ -244,8 +244,9 @@ where
                         }
 
                         if buf[..4] == this_client_id_bytes {
-                            log::debug!("TCP Manager - Not forwarding message from this very client ({this_client_id:?})."
-                        );
+                            log::debug!(
+                                "TCP Manager - Not forwarding message from this very client ({this_client_id:?})."
+                            );
                             continue;
                         }
 
@@ -573,8 +574,13 @@ where
     S: HasExecutions + HasMetadata + HasImported + Stoppable,
 {
     /// Write the client id for a client `EventManager` to env vars
-    pub fn to_env(&self, env_name: &str) {
-        env::set_var(env_name, format!("{}", self.client_id.0));
+    ///
+    /// # Safety
+    /// This writes to env variables, and may only be done single-threaded
+    pub unsafe fn to_env(&self, env_name: &str) {
+        unsafe {
+            env::set_var(env_name, format!("{}", self.client_id.0));
+        }
     }
 }
 
@@ -684,7 +690,9 @@ where
                                 forward_id,
                                 ..
                             } => {
-                                log::info!("Received new Testcase from {other_client_id:?} ({client_config:?}, forward {forward_id:?})");
+                                log::info!(
+                                    "Received new Testcase from {other_client_id:?} ({client_config:?}, forward {forward_id:?})"
+                                );
                                 if client_config.match_with(&self.configuration)
                                     && observers_buf.is_some()
                                 {
@@ -704,7 +712,7 @@ where
                                 return Err(Error::unknown(format!(
                                     "Received illegal message that message should not have arrived: {:?}.",
                                     event.name()
-                                )))
+                                )));
                             }
                         }
                     }
@@ -1118,7 +1126,9 @@ where
                     )?;
 
                     broker_things(event_broker, self.remote_broker_addr)?;
-                    unreachable!("The broker may never return normally, only on errors or when shutting down.");
+                    unreachable!(
+                        "The broker may never return normally, only on errors or when shutting down."
+                    );
                 }
                 TcpManagerKind::Client { cpu_core } => {
                     // We are a client
@@ -1137,7 +1147,11 @@ where
             }
 
             // We are the fuzzer respawner in a tcp client
-            mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+            // # Safety
+            // There should only ever be one thread doing launcher things.
+            unsafe {
+                mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+            }
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]
@@ -1147,8 +1161,14 @@ where
             #[cfg(not(unix))]
             let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
+
             // Store the information to a map.
-            staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            // # Safety
+            // It's reasonable to assume launcher only gets called on a single thread.
+            // If not, nothing too bad will happen.
+            unsafe {
+                staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            }
 
             let mut ctr: u64 = 0;
             // Client->parent loop
@@ -1206,11 +1226,15 @@ where
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
-                        panic!("Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver).");
+                        panic!(
+                            "Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver)."
+                        );
                     }
 
                     // Storing state in the last round did not work
-                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
+                    panic!(
+                        "Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})"
+                    );
                 }
 
                 ctr = ctr.wrapping_add(1);

@@ -46,7 +46,7 @@ pub mod cpp_runtime {
 }
 
 #[doc(hidden)]
-pub use ctor::ctor;
+pub use ctor;
 use libafl::observers::concolic;
 pub use libafl_bolts::shmem::StdShMem;
 #[doc(hidden)]
@@ -333,12 +333,15 @@ macro_rules! export_runtime {
         // mean that this is 'safe'.
         static mut GLOBAL_DATA: Option<$rt> = None;
 
-        #[cfg_attr(not(test), $crate::ctor)]
-        fn init() {
-            // See comment on GLOBAL_DATA declaration.
-            unsafe {
-                GLOBAL_DATA = Some($constructor);
-                $crate::atexit(fini);
+        #[cfg(not(test))]
+        $crate::ctor::declarative::ctor! {
+            #[ctor]
+            fn init() {
+                // See comment on GLOBAL_DATA declaration.
+                unsafe {
+                    GLOBAL_DATA = Some($constructor);
+                    $crate::atexit(fini);
+                }
             }
         }
 

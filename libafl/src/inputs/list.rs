@@ -13,9 +13,9 @@ use core::num::NonZero;
 
 use arrayvec::ArrayVec;
 use libafl_bolts::{
+    Error, Named,
     rands::Rand as _,
     tuples::{Map, MappingFunctor},
-    Error, Named,
 };
 use serde::{Deserialize, Serialize};
 
@@ -326,7 +326,7 @@ mod tests {
     use super::ListInput;
     use crate::{
         inputs::ValueInput,
-        mutators::{numeric::IncMutator, MutationResult, MutatorsTuple as _},
+        mutators::{MutationResult, MutatorsTuple as _, numeric::IncMutator},
         state::NopState,
     };
 

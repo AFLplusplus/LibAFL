@@ -6,7 +6,7 @@ use clap::Parser;
 
 use crate::args::Args;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn run_test(num: usize) {
     println!("OUT - test: {num:}");
     if num & 1 == 0 {
@@ -14,7 +14,7 @@ extern "C" fn run_test(num: usize) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn test(num: usize) {
     for i in 0..num {
         run_test(i);

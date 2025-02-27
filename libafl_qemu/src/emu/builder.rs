@@ -1,19 +1,19 @@
 use std::marker::PhantomData;
 
 use libafl::{inputs::HasTargetBytes, state::HasExecutions};
-use libafl_bolts::tuples::{tuple_list, Append, Prepend};
+use libafl_bolts::tuples::{Append, Prepend, tuple_list};
 
 #[cfg(feature = "systemmode")]
 use crate::FastSnapshotManager;
 use crate::{
+    Emulator, NopEmulatorDriver, NopSnapshotManager, QemuInitError, QemuParams, StdEmulatorDriver,
+    StdSnapshotManager,
     command::{NopCommandManager, StdCommandManager},
     config::QemuConfigBuilder,
     modules::{EmulatorModule, EmulatorModuleTuple},
-    Emulator, NopEmulatorDriver, NopSnapshotManager, QemuInitError, QemuParams, StdEmulatorDriver,
-    StdSnapshotManager,
 };
 #[cfg(doc)]
-use crate::{config::QemuConfig, Qemu};
+use crate::{Qemu, config::QemuConfig};
 
 /// An [`Emulator`] Builder.
 ///

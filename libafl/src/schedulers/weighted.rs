@@ -7,23 +7,23 @@ use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::HashMap;
 use libafl_bolts::{
+    Named,
     rands::Rand,
     tuples::{Handle, Handled, MatchName},
-    Named,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     random_corpus_id,
     schedulers::{
-        on_add_metadata_default, on_evaluation_metadata_default, on_next_metadata_default,
+        AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler, on_add_metadata_default,
+        on_evaluation_metadata_default, on_next_metadata_default,
         powersched::{BaseSchedule, PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
-        AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
     state::{HasCorpus, HasRand},
-    Error, HasMetadata,
 };
 
 /// The Metadata for `WeightedScheduler`

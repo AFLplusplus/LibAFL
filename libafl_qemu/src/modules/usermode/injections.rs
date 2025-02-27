@@ -21,14 +21,14 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::SYS_execve;
 use crate::{
+    CallingConvention, Qemu,
     elf::EasyElf,
     emu::EmulatorModules,
     modules::{
-        utils::filters::{HasAddressFilter, NopAddressFilter, NOP_ADDRESS_FILTER},
         EmulatorModule, EmulatorModuleTuple,
+        utils::filters::{HasAddressFilter, NOP_ADDRESS_FILTER, NopAddressFilter},
     },
     qemu::{ArchExtras, Hook, SyscallHookResult},
-    CallingConvention, Qemu,
 };
 
 #[cfg(cpu_target = "hexagon")]
@@ -451,7 +451,7 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 mod tests {
     use hashbrown::HashMap;
 
-    use super::{yaml_entries_to_definition, InjectionDefinition, YamlInjectionEntry};
+    use super::{InjectionDefinition, YamlInjectionEntry, yaml_entries_to_definition};
 
     #[test]
     fn test_yaml_parsing() {

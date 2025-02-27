@@ -19,21 +19,21 @@ use crossterm::{
     cursor::{EnableBlinking, Show},
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use hashbrown::HashMap;
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
-use ratatui::{backend::CrosstermBackend, Terminal};
+use libafl_bolts::{ClientId, current_time, format_duration_hms};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::perf_stats::{ClientPerfStats, PerfFeature};
 use crate::monitors::{
-    stats::{
-        manager::ClientStatsManager, user_stats::UserStats, ClientStats, EdgeCoverage,
-        ItemGeometry, ProcessTiming,
-    },
     Monitor,
+    stats::{
+        ClientStats, EdgeCoverage, ItemGeometry, ProcessTiming, manager::ClientStatsManager,
+        user_stats::UserStats,
+    },
 };
 
 #[expect(missing_docs)]
@@ -568,7 +568,9 @@ fn run_tui_thread<W: Write + Send + Sync + 'static>(
                 )?;
                 terminal.show_cursor()?;
 
-                println!("\nPress Control-C to stop the fuzzers, otherwise press Enter to resume the visualization\n");
+                println!(
+                    "\nPress Control-C to stop the fuzzers, otherwise press Enter to resume the visualization\n"
+                );
 
                 let mut line = String::new();
                 io::stdin().lock().read_line(&mut line)?;

@@ -5,22 +5,22 @@ use core::{
 };
 
 use libafl_bolts::{
-    os::unix_signals::{ucontext_t, Signal},
+    os::unix_signals::{Signal, ucontext_t},
     shmem::ShMemProvider,
-    tuples::{tuple_list, RefIndexable},
+    tuples::{RefIndexable, tuple_list},
 };
 use libc::siginfo_t;
-use nix::unistd::{fork, ForkResult};
+use nix::unistd::{ForkResult, fork};
 
 use super::hooks::ExecutorHooksTuple;
 use crate::{
+    Error,
     executors::{
-        hooks::inprocess_fork::InProcessForkExecutorGlobalData,
-        inprocess_fork::inner::GenericInProcessForkExecutorInner, Executor, ExitKind, HasObservers,
+        Executor, ExitKind, HasObservers, hooks::inprocess_fork::InProcessForkExecutorGlobalData,
+        inprocess_fork::inner::GenericInProcessForkExecutorInner,
     },
     observers::ObserversTuple,
     state::HasExecutions,
-    Error,
 };
 
 /// The signature of the crash handler function
@@ -206,13 +206,13 @@ pub mod child_signal_handlers {
     use alloc::boxed::Box;
     use std::panic;
 
-    use libafl_bolts::os::unix_signals::{ucontext_t, Signal};
+    use libafl_bolts::os::unix_signals::{Signal, ucontext_t};
     use libc::siginfo_t;
 
     use crate::{
         executors::{
-            hooks::inprocess_fork::{InProcessForkExecutorGlobalData, FORK_EXECUTOR_GLOBAL_DATA},
             ExitKind, HasObservers,
+            hooks::inprocess_fork::{FORK_EXECUTOR_GLOBAL_DATA, InProcessForkExecutorGlobalData},
         },
         observers::ObserversTuple,
     };
@@ -259,17 +259,19 @@ pub mod child_signal_handlers {
         E: HasObservers,
         E::Observers: ObserversTuple<I, S>,
     {
-        if data.is_valid() {
-            let executor = data.executor_mut::<E>();
-            let mut observers = executor.observers_mut();
-            let state = data.state_mut::<S>();
-            let input = data.take_current_input::<I>();
-            observers
-                .post_exec_child_all(state, input, &ExitKind::Crash)
-                .expect("Failed to run post_exec on observers");
-        }
+        unsafe {
+            if data.is_valid() {
+                let executor = data.executor_mut::<E>();
+                let mut observers = executor.observers_mut();
+                let state = data.state_mut::<S>();
+                let input = data.take_current_input::<I>();
+                observers
+                    .post_exec_child_all(state, input, &ExitKind::Crash)
+                    .expect("Failed to run post_exec on observers");
+            }
 
-        libc::_exit(128 + (_signal as i32));
+            libc::_exit(128 + (_signal as i32));
+        }
     }
 
     #[cfg(unix)]
@@ -283,16 +285,18 @@ pub mod child_signal_handlers {
         E: HasObservers,
         E::Observers: ObserversTuple<I, S>,
     {
-        if data.is_valid() {
-            let executor = data.executor_mut::<E>();
-            let mut observers = executor.observers_mut();
-            let state = data.state_mut::<S>();
-            let input = data.take_current_input::<I>();
-            observers
-                .post_exec_child_all(state, input, &ExitKind::Timeout)
-                .expect("Failed to run post_exec on observers");
+        unsafe {
+            if data.is_valid() {
+                let executor = data.executor_mut::<E>();
+                let mut observers = executor.observers_mut();
+                let state = data.state_mut::<S>();
+                let input = data.take_current_input::<I>();
+                observers
+                    .post_exec_child_all(state, input, &ExitKind::Timeout)
+                    .expect("Failed to run post_exec on observers");
+            }
+            libc::_exit(128 + (_signal as i32));
         }
-        libc::_exit(128 + (_signal as i32));
     }
 }
 
@@ -303,7 +307,7 @@ mod tests {
     use serial_test::serial;
 
     use crate::{
-        executors::{inprocess_fork::GenericInProcessForkExecutorInner, Executor, ExitKind},
+        executors::{Executor, ExitKind, inprocess_fork::GenericInProcessForkExecutorInner},
         inputs::NopInput,
     };
 

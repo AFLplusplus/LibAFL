@@ -34,12 +34,12 @@ use std::time::Instant;
 
 #[cfg(not(feature = "std"))]
 use libafl_bolts::current_time;
-use libafl_bolts::{tuples::MatchName, Named};
+use libafl_bolts::{Named, tuples::MatchName};
 pub use list::*;
 use serde::{Deserialize, Serialize};
 pub use value::*;
 
-use crate::{executors::ExitKind, Error};
+use crate::{Error, executors::ExitKind};
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
@@ -402,9 +402,9 @@ impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for TimeObserver {}
 mod tests {
 
     use libafl_bolts::{
+        Named,
         ownedref::OwnedMutSlice,
         tuples::{tuple_list, tuple_list_type},
-        Named,
     };
 
     use crate::observers::{StdMapObserver, TimeObserver};

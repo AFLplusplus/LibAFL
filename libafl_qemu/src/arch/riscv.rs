@@ -2,7 +2,7 @@ use core::ffi::c_long;
 use std::sync::OnceLock;
 
 use capstone::arch::BuildsCapstone;
-use enum_map::{enum_map, EnumMap};
+use enum_map::{EnumMap, enum_map};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -20,7 +20,7 @@ pub const SYS_riscv_flush_icache: c_long = SYS_arch_specific_syscall + 15;
 #[expect(non_upper_case_globals)]
 pub const SYS_riscv_hwprobe: c_long = SYS_arch_specific_syscall + 14;
 
-use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
+use crate::{CallingConvention, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
 
 #[expect(non_upper_case_globals)]
 impl CallingConvention {

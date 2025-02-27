@@ -7,13 +7,13 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named, Truncate};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use libafl_bolts::{AsSlice, AsSliceMut, HasLen, Named, Truncate, ownedref::OwnedMutSlice};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
+    Error,
     executors::ExitKind,
     observers::{DifferentialObserver, Observer},
-    Error,
 };
 
 pub mod const_map;
@@ -57,7 +57,7 @@ pub use owned_map::*;
 /// # #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
 /// # unsafe { MapFeedbackMetadata::<u8>::register() }
 /// # #[cfg(not(feature = "std"))]
-/// # #[no_mangle]
+/// # #[unsafe(no_mangle)]
 /// # pub extern "C" fn external_current_millis() -> u64 { 0 }
 ///
 /// use libafl_bolts::ownedref::OwnedMutSlice;
@@ -203,7 +203,7 @@ impl<T, const ITH: bool, const NTH: bool> AsMut<T> for ExplicitTracking<T, ITH, 
 /// [`crate::require_index_tracking`] and [`crate::require_novelties_tracking`].
 pub mod macros {
     pub use const_format::{concatcp, str_repeat};
-    pub use const_panic::{concat_panic, FmtArg};
+    pub use const_panic::{FmtArg, concat_panic};
 
     /// Use in the constructor of your component which requires index tracking of a
     /// [`super::MapObserver`]. See [`super::CanTrack`] for details.
@@ -595,9 +595,11 @@ where
     where
         S: Into<Cow<'static, str>>,
     {
-        let len = map.len();
-        let ptr = map.as_mut_ptr();
-        Self::maybe_differential_from_mut_ptr(name, ptr, len)
+        unsafe {
+            let len = map.len();
+            let ptr = map.as_mut_ptr();
+            Self::maybe_differential_from_mut_ptr(name, ptr, len)
+        }
     }
 
     /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`]
@@ -650,10 +652,12 @@ where
     where
         S: Into<Cow<'static, str>>,
     {
-        Self::maybe_differential_from_mut_slice(
-            name,
-            OwnedMutSlice::from_raw_parts_mut(map_ptr, len),
-        )
+        unsafe {
+            Self::maybe_differential_from_mut_slice(
+                name,
+                OwnedMutSlice::from_raw_parts_mut(map_ptr, len),
+            )
+        }
     }
 
     /// Gets the initial value for this map, mutably
@@ -686,7 +690,7 @@ where
     where
         S: Into<Cow<'static, str>>,
     {
-        Self::maybe_differential(name, map)
+        unsafe { Self::maybe_differential(name, map) }
     }
 
     /// Creates a new [`MapObserver`] from an [`OwnedMutSlice`]
@@ -726,7 +730,7 @@ where
     where
         S: Into<Cow<'static, str>>,
     {
-        Self::maybe_differential_from_mut_ptr(name, map_ptr, len)
+        unsafe { Self::maybe_differential_from_mut_ptr(name, map_ptr, len) }
     }
 }
 
@@ -744,7 +748,7 @@ where
     where
         S: Into<Cow<'static, str>>,
     {
-        Self::maybe_differential(name, map)
+        unsafe { Self::maybe_differential(name, map) }
     }
 
     /// Creates a new [`MapObserver`] with an owned map in differential mode
@@ -776,7 +780,7 @@ where
     where
         S: Into<Cow<'static, str>>,
     {
-        Self::maybe_differential_from_mut_ptr(name, map_ptr, len)
+        unsafe { Self::maybe_differential_from_mut_ptr(name, map_ptr, len) }
     }
 }
 

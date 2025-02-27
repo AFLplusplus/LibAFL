@@ -297,7 +297,7 @@ mod test {
     use libafl_bolts::ClientId;
     use tuple_list::tuple_list;
 
-    use super::{stats::ClientStatsManager, Monitor, NopMonitor, SimpleMonitor};
+    use super::{Monitor, NopMonitor, SimpleMonitor, stats::ClientStatsManager};
 
     #[test]
     fn test_monitor_tuple_list() {

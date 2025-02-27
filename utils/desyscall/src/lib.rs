@@ -87,14 +87,14 @@ impl Context {
 }
 
 #[cfg(target_os = "linux")]
-extern "C" {
+unsafe extern "C" {
     fn __libafl_raw_exit_group(status: c_int);
 }
 
 // void _exit(int status);
 /// # Safety
 /// Call to function using syscalls
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[cfg(target_os = "linux")]
 pub unsafe extern "C" fn _exit(status: c_int) {
     let ctx = Context::get();

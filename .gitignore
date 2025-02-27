@@ -74,6 +74,5 @@ libafl_nyx/packer
 harness
 program
 fuzzer_libpng*
-forkserver_simple
 
 *.patch

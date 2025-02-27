@@ -11,16 +11,16 @@ use alloc::{string::String, vec::Vec};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use std::process;
 
+use libafl_bolts::{
+    ClientId,
+    llmp::{LlmpClient, LlmpClientDescription, Tag},
+    shmem::{ShMem, ShMemProvider},
+    tuples::{Handle, MatchNameRef},
+};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
-};
-use libafl_bolts::{
-    llmp::{LlmpClient, LlmpClientDescription, Tag},
-    shmem::{ShMem, ShMemProvider},
-    tuples::{Handle, MatchNameRef},
-    ClientId,
 };
 use serde::Serialize;
 
@@ -28,17 +28,16 @@ use super::{AwaitRestartSafe, RecordSerializationTime};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
+    Error,
     common::HasMetadata,
     events::{
-        serialize_observers_adaptive, std_maybe_report_progress, std_report_progress,
         AdaptiveSerializer, CanSerializeObserver, Event, EventConfig, EventFirer, EventManagerId,
         EventReceiver, EventRestarter, HasEventManagerId, LogSeverity, ProgressReporter,
-        SendExiting,
+        SendExiting, serialize_observers_adaptive, std_maybe_report_progress, std_report_progress,
     },
     inputs::Input,
     observers::TimeObserver,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
-    Error,
 };
 
 pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
@@ -389,8 +388,13 @@ where
 
     /// Write the config for a client `EventManager` to env vars, a new
     /// client can reattach using [`CentralizedEventManagerBuilder::build_existing_client_from_env()`].
-    pub fn to_env(&self, env_name: &str) {
-        self.client.to_env(env_name).unwrap();
+    ///
+    /// # Safety
+    /// Writes to env variables and may only be done single-threaded.
+    pub unsafe fn to_env(&self, env_name: &str) {
+        unsafe {
+            self.client.to_env(env_name).unwrap();
+        }
     }
 
     /// Know if this instance is main or secondary

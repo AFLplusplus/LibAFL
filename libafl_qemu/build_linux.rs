@@ -110,7 +110,9 @@ pub fn build() {
     };
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
-    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))");
+    println!(
+        "cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))"
+    );
 
     let cross_cc = if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
@@ -161,10 +163,7 @@ pub fn build() {
     )
     .expect("Could not copy libafl_qemu_impl.h to out directory.");
 
-    fs::copy(
-        nyx_hdr.clone(),
-        include_dir.join(nyx_hdr_name),
-    )
+    fs::copy(nyx_hdr.clone(), include_dir.join(nyx_hdr_name))
         .expect("Could not copy libafl_qemu_impl.h to out directory.");
 
     bindgen::Builder::default()
@@ -176,6 +175,7 @@ pub fn build() {
             is_global: true,
             is_bitfield: true,
         })
+        // .rust_edition(bindgen::RustEdition::Edition2024)
         .header(libafl_qemu_hdr.display().to_string())
         .generate()
         .expect("Exit bindings generation failed.")
@@ -191,6 +191,7 @@ pub fn build() {
             is_global: true,
             is_bitfield: true,
         })
+        // .rust_edition(bindgen::RustEdition::Edition2024)
         .header(nyx_hdr.display().to_string())
         .generate()
         .expect("Exit bindings generation failed.")
@@ -220,14 +221,15 @@ pub fn build() {
         if cfg!(debug_assertions) {
             make.env("CFLAGS", "-DDEBUG=1");
         }
-        assert!(make
-            .current_dir(&out_dir)
-            .env("CC", &cross_cc)
-            .env("OUT_DIR", &target_dir)
-            .arg("-C")
-            .arg(&qasan_dir)
-            .status()
-            .expect("make failed")
-            .success());
+        assert!(
+            make.current_dir(&out_dir)
+                .env("CC", &cross_cc)
+                .env("OUT_DIR", &target_dir)
+                .arg("-C")
+                .arg(&qasan_dir)
+                .status()
+                .expect("make failed")
+                .success()
+        );
     }
 }

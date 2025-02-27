@@ -6,10 +6,10 @@ use core::{
 };
 use std::{fs::OpenOptions, io::Write, path::PathBuf};
 
-use libafl_bolts::{current_time, ClientId};
+use libafl_bolts::{ClientId, current_time};
 use serde_json::json;
 
-use crate::monitors::{stats::ClientStatsManager, Monitor};
+use crate::monitors::{Monitor, stats::ClientStatsManager};
 
 /// A monitor that logs aggregated stats to a JSON file.
 #[derive(Clone)]

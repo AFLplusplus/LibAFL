@@ -3,7 +3,7 @@
 use alloc::{fmt::Debug, string::String, vec::Vec};
 use core::hash::Hash;
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
     corpus::CorpusId,

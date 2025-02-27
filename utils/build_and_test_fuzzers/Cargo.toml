@@ -1,7 +1,7 @@
 [package]
 name = "build_and_test_fuzzers"
 version.workspace = true
-edition = "2021"
+edition = "2024"
 description = "Get diffing fuzzers from the last commit"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 license = "MIT OR Apache-2.0"

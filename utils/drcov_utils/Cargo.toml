@@ -1,6 +1,6 @@
 [package]
 name = "drcov_utils"
-edition = "2021"
+edition = "2024"
 version.workspace = true
 description = "Utility functions to work with DrCov coverage files"
 repository = "https://github.com/AFLplusplus/LibAFL/"

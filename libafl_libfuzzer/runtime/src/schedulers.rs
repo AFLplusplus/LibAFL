@@ -2,12 +2,12 @@ use std::{collections::BTreeSet, marker::PhantomData};
 
 use hashbrown::HashMap;
 use libafl::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapNoveltiesMetadata,
     inputs::Input,
     schedulers::{RemovableScheduler, Scheduler},
     state::HasCorpus,
-    Error, HasMetadata,
 };
 
 #[derive(Clone, Debug)]

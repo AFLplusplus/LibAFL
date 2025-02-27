@@ -21,14 +21,14 @@ use crate::SYS_mmap2;
 )))]
 use crate::SYS_newfstatat;
 use crate::{
+    Qemu, SYS_brk, SYS_mprotect, SYS_mremap, SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat,
     emu::EmulatorModules,
     modules::{
-        asan::AsanModule,
-        utils::filters::{HasAddressFilter, NopAddressFilter, NOP_ADDRESS_FILTER},
         EmulatorModule, EmulatorModuleTuple,
+        asan::AsanModule,
+        utils::filters::{HasAddressFilter, NOP_ADDRESS_FILTER, NopAddressFilter},
     },
     qemu::{Hook, SyscallHookResult},
-    Qemu, SYS_brk, SYS_mprotect, SYS_mremap, SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat,
 };
 #[cfg(not(cpu_target = "riscv32"))]
 use crate::{SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_statfs};
@@ -406,7 +406,13 @@ impl SnapshotModule {
                 // The next for loop will restore their content if needed.
                 let aligned_new_brk = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as GuestAddr))
                     & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
-                log::debug!("New brk ({:#x?}) < snapshotted brk ({:#x?})! Mapping back in the target {:#x?} - {:#x?}", new_brk, self.brk, aligned_new_brk, aligned_new_brk + (self.brk - aligned_new_brk));
+                log::debug!(
+                    "New brk ({:#x?}) < snapshotted brk ({:#x?})! Mapping back in the target {:#x?} - {:#x?}",
+                    new_brk,
+                    self.brk,
+                    aligned_new_brk,
+                    aligned_new_brk + (self.brk - aligned_new_brk)
+                );
                 qemu.map_fixed(
                     aligned_new_brk,
                     (self.brk - aligned_new_brk) as usize,

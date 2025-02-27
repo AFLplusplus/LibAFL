@@ -8,12 +8,12 @@ use std::fmt::Debug;
 use libafl_qemu_sys::TCGTemp;
 
 use crate::{
+    EmulatorModules, GuestAddr, Hook, MemAccessInfo,
     modules::{
-        utils::filters::{AddressFilter, NopAddressFilter, NopPageFilter},
         EmulatorModule, EmulatorModuleTuple,
+        utils::filters::{AddressFilter, NopAddressFilter, NopPageFilter},
     },
     qemu::Qemu,
-    EmulatorModules, GuestAddr, Hook, MemAccessInfo,
 };
 
 /// A builder for [`LoggerModule`].
@@ -235,7 +235,7 @@ where
     let kind = if IS_WRITE { "write" } else { "read" };
 
     let size = info.size();
-    log::info!("[PC {pc:#x}] gen {kind} of {size} bytes");
+    log::info!("[PC {pc:#x}] generator {kind} of {size} bytes");
 
     Some(0)
 }

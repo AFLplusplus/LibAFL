@@ -3,15 +3,15 @@
 
 use alloc::borrow::Cow;
 
-use libafl_bolts::{impl_serdeany, Error, Named};
+use libafl_bolts::{Error, Named, impl_serdeany};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
+    HasMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
-    HasMetadata,
 };
 
 /// Constant name of the [`TransferringMetadata`].
