@@ -8,9 +8,9 @@ use clap::Parser;
 #[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
-use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
+use libafl::events::{EventConfig, Launcher, LlmpEventManagerBuilder, MonitorTypedEventManager};
 use libafl::{
-    events::{ClientDescription, LlmpEventManagerBuilder},
+    events::ClientDescription,
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };

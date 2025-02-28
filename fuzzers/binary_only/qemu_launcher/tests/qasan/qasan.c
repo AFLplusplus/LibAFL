@@ -71,13 +71,7 @@ int main(int argc, char **argv) {
 
   char input = '\0';
 
-  // if (read(STDIN_FILENO, &input, 1) < 0) {
-
-  //   LOG("Failed to read stdin\n");
-  //   return 1;
-
-  // }
-
+  if (argc > 1) { input = argv[1][0]; }
   LLVMFuzzerTestOneInput(&input, 1);
 
   LOG("DONE\n");

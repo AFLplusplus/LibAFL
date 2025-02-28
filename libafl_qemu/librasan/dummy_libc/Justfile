@@ -1,0 +1,62 @@
+import "../../../just/libafl-qemu.just"
+import "../fuzzer_name.just"
+
+DUMMY_SOURCE_DIR := source_directory()
+
+[unix]
+compile_dummy:
+  #!/bin/bash
+  source {{ DOTENV }}
+  cargo \
+    +nightly \
+    build \
+    --package dummy_libc \
+    --target $CROSS_TARGET \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }}
+
+[unix]
+fix_dummy:
+  #!/bin/bash
+  source {{ DOTENV }}
+  cargo \
+    +nightly \
+    fix \
+    --package dummy_libc \
+    --target ${CROSS_TARGET} \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }} \
+    --features test \
+    --allow-dirty
+
+[unix]
+link_dummy: compile_dummy
+  #!/bin/bash
+  source {{ DOTENV }}
+  ${CROSS_CC} \
+    ${LIBRASAN_CFLAGS} \
+    -shared \
+    -nodefaultlibs \
+    -nostartfiles \
+    -nostdlib \
+    -g \
+    -u dlsym \
+    -u dlerror \
+    -o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libdummy_libc.so \
+    -Wl,-hlibc.so.6 \
+    -Wl,--version-script={{ DUMMY_SOURCE_DIR }}/dummy_libc.map \
+    -Wl,--gc-sections \
+    -Wl,--no-undefined \
+    {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libdummy_libc.a \
+
+[unix]
+strip_dummy: link_dummy
+	#!/bin/bash
+	source {{ DOTENV }}
+	${CROSS_STRIP} \
+		--strip-unneeded \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libdummy_libc.so \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libdummy_libc.so
+
+[unix]
+build_dummy: strip_dummy

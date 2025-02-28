@@ -2,12 +2,9 @@ import "libafl-qemu.just"
 
 # Useful rules to build libpng for multiple architecture.
 
-ARCH := env("ARCH", "x86_64")
 OPTIMIZATIONS := env("OPTIMIZATIONS", if ARCH == "ppc" { "no" } else { "yes" })
 
 DEPS_DIR := TARGET_DIR / "deps"
-
-DOTENV := source_directory() / "envs" / ".env." + ARCH
 
 [unix]
 target_dir:

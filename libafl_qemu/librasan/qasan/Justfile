@@ -1,0 +1,123 @@
+import "../../../just/libafl-qemu.just"
+import "../dummy_libc/Justfile"
+import "../fuzzer_name.just"
+
+QASAN_SOURCE_DIR := source_directory()
+
+[unix]
+compile_qasan:
+	#!/bin/bash
+	source {{ DOTENV }}
+	cargo \
+		+nightly \
+		build \
+		--package qasan \
+		--target ${CROSS_TARGET} \
+		--profile {{ PROFILE }} \
+		--target-dir {{ TARGET_DIR }}
+
+[unix]
+fix_qasan:
+	#!/bin/bash
+	source {{ DOTENV }}
+	cargo \
+		+nightly \
+		fix \
+		--package qasan \
+		--target ${CROSS_TARGET} \
+		--profile {{ PROFILE }} \
+		--target-dir {{ TARGET_DIR }} \
+		--features test \
+		--allow-dirty
+
+[unix]
+rel_qasan: compile_qasan build_dummy
+	#!/bin/bash
+	source {{ DOTENV }}
+	${CROSS_CC} \
+		${LIBRASAN_CFLAGS} \
+		-r \
+		-nodefaultlibs \
+		-nostartfiles \
+		-nostdlib \
+		-g \
+		-u patch_aligned_alloc \
+		-u patch_atoi \
+		-u patch_atol \
+		-u patch_atoll \
+		-u patch_calloc \
+		-u patch_free \
+		-u patch_malloc \
+		-u patch_malloc_usable_size \
+		-u patch_memalign \
+		-u patch_memset \
+		-u patch_mmap \
+		-u patch_munmap \
+		-u patch_posix_memalign \
+		-u patch_pvalloc \
+		-u patch_read \
+		-u patch_realloc \
+		-u patch_reallocarray \
+		-u patch_valloc \
+		-u patch_write \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.rel \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.a
+
+[unix]
+rename_qasan: rel_qasan
+	#!/bin/bash
+	source {{ DOTENV }}
+	${CROSS_OBJCOPY} \
+		--redefine-syms={{ GASAN_SOURCE_DIR }}/rename_real.syms \
+		--redefine-syms={{ GASAN_SOURCE_DIR }}/rename_patch.syms \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.rel \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.renamed
+
+[unix]
+link_qasan: rename_qasan
+	#!/bin/bash
+	source {{ DOTENV }}
+	${CROSS_CC} \
+		-shared \
+		-nodefaultlibs \
+		-nostartfiles \
+		-nostdlib \
+		-g \
+		-u aligned_alloc \
+		-u atoi \
+		-u atol \
+		-u atoll \
+		-u calloc \
+		-u free \
+		-u malloc \
+		-u malloc_usable_size \
+		-u memalign \
+		-u memset \
+		-u mmap \
+		-u munmap \
+		-u posix_memalign \
+		-u pvalloc \
+		-u read \
+		-u realloc \
+		-u reallocarray \
+		-u valloc \
+		-u write \
+		-Wl,--version-script={{ QASAN_SOURCE_DIR }}/qasan.map \
+		-Wl,--gc-sections \
+		-Wl,--no-undefined \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libqasan.so \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.renamed \
+		-L {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }} \
+		"-ldummy_libc" \
+
+[unix]
+strip_qasan: link_qasan
+	#!/bin/bash
+	source {{ DOTENV }}
+	${CROSS_STRIP} \
+		--strip-unneeded \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libqasan.so
+
+[unix]
+build_qasan: strip_qasan

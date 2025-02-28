@@ -1,0 +1,8 @@
+{
+  global:
+    dlsym;
+    dlerror;
+
+  local:
+    *;
+};

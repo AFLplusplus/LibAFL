@@ -1,0 +1,14 @@
+[package]
+name = "dummy_libc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib"]
+
+[features]
+default = []
+test = []
+
+[dependencies]
