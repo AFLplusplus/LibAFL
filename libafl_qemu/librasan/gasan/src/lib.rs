@@ -40,7 +40,7 @@ pub type GasanSyms = DlSymSymbols<LookupTypeNext>;
 const PAGE_SIZE: usize = 4096;
 
 static FRONTEND: Lazy<Mutex<GasanFrontend>> = Lazy::new(|| {
-    LibcLogger::initialize::<GasanSyms>(Level::Trace);
+    LibcLogger::initialize::<GasanSyms>(Level::Info);
     info!("init");
     let backend = GasanBackend::new(GlobalAllocator::new(DlmallocBackend::new(PAGE_SIZE)));
     let shadow = GuestShadow::<GasanMmap, DefaultShadowLayout>::new().unwrap();
