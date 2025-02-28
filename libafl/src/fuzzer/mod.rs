@@ -685,7 +685,7 @@ where
                 state,
                 Event::Objective {
                     #[cfg(feature = "share_objectives")]
-                    input.clone(),
+                    input: input.clone(),
 
                     objective_size: state.solutions().count(),
                     time: current_time(),
