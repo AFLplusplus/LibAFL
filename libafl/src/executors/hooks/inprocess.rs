@@ -219,6 +219,7 @@ impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
         // We're calling this only once per execution, in a single thread.
         #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
         self.timer_mut().unset_timer();
+        #[cfg(feature = "std")]
         unsafe {
             let data = &raw mut GLOBAL_STATE;
             (*data).crash_handler = null();
