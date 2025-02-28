@@ -71,9 +71,7 @@ int main(int argc, char **argv) {
 
   char input = '\0';
 
-  if (argc > 1) {
-    input = argv[1][0];
-  }
+  if (argc > 1) { input = argv[1][0]; }
   LLVMFuzzerTestOneInput(&input, 1);
 
   LOG("DONE\n");
