@@ -41,7 +41,7 @@ use libafl_qemu::{
     executor::QemuExecutor,
     modules::{
         cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
-        utils::filters::HasAddressFilterTuples, CmpLogModule, EmulatorModuleTuple,
+        utils::filters::HasAddressFilterTuple, CmpLogModule, EmulatorModuleTuple,
     },
     FastSnapshotManager, NopSnapshotManager, QemuInitError, QemuSnapshotManager,
 };
@@ -78,12 +78,12 @@ fn get_emulator<C, ET, I, S>(
     QemuInitError,
 >
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuple,
     I: HasTargetBytes + Unpin,
     S: HasExecutions + Unpin,
 {
     // Allow linux process address space addresses as feedback
-    modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);
+    modules.allow_address_range_all(&LINUX_PROCESS_ADDRESS_RANGE);
 
     Emulator::builder()
         .qemu_parameters(args)

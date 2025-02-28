@@ -775,12 +775,12 @@ where
 }
 
 impl HasAddressFilter for SnapshotModule {
-    type ModuleAddressFilter = NopAddressFilter;
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    type AddressFilter = NopAddressFilter;
+    fn address_filter(&self) -> &Self::AddressFilter {
         &NopAddressFilter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         unsafe { (&raw mut NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }
