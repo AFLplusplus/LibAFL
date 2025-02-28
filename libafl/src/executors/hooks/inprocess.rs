@@ -263,10 +263,10 @@ impl<I, S> InProcessHooks<I, S> {
         compiler_fence(Ordering::SeqCst);
         Ok(Self {
             #[cfg(feature = "std")]
-            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, I, OF, S, Z>
+            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, F, I, OF, S, Z>
                 as *const c_void,
             #[cfg(feature = "std")]
-            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, I, OF, S, Z>
+            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, F, I, OF, S, Z>
                 as *const _,
             #[cfg(feature = "std")]
             timer: TimerStruct::new(exec_tmout),
