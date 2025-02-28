@@ -79,3 +79,9 @@ fuzzer_libpng*
 
 # Sometimes this happens
 rustc-ice-*
+
+# perf files
+*.mm_profdata
+
+# backup files
+*.bak
