@@ -715,15 +715,15 @@ where
             Ok(input) => input,
             Err(err) => {
                 log::error!("Skipping input that we could not load from {path:?}: {err:?}");
-                return Ok(ExecuteInputResult::None);
+                return Ok(ExecuteInputResult::default());
             }
         };
         if config.forced {
-            let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
-            Ok(ExecuteInputResult::Corpus)
+            let (_id, result) = fuzzer.add_input(self, executor, manager, input)?;
+            Ok(result)
         } else {
             let (res, _) = fuzzer.evaluate_input(self, executor, manager, &input)?;
-            if res == ExecuteInputResult::None {
+            if !(res.is_corpus() || res.is_solution()) {
                 fuzzer.add_disabled_input(self, input)?;
                 log::warn!("input {:?} was not interesting, adding as disabled.", &path);
             }
@@ -748,7 +748,7 @@ where
             match self.next_file() {
                 Ok(path) => {
                     let res = self.load_file(&path, manager, fuzzer, executor, &mut config)?;
-                    if config.exit_on_solution && matches!(res, ExecuteInputResult::Solution) {
+                    if config.exit_on_solution && res.is_solution() {
                         return Err(Error::invalid_corpus(format!(
                             "Input {} resulted in a solution.",
                             path.display()
@@ -1052,11 +1052,11 @@ where
         for _ in 0..num {
             let input = generator.generate(self)?;
             if forced {
-                let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
+                let (_, _) = fuzzer.add_input(self, executor, manager, input)?;
                 added += 1;
             } else {
                 let (res, _) = fuzzer.evaluate_input(self, executor, manager, &input)?;
-                if res != ExecuteInputResult::None {
+                if res.is_corpus() {
                     added += 1;
                 }
             }
