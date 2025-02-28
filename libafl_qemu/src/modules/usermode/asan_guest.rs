@@ -342,13 +342,13 @@ impl<F> HasAddressFilter for AsanGuestModule<F>
 where
     F: AddressFilter,
 {
-    type ModuleAddressFilter = F;
+    type AddressFilter = F;
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.filter
     }
 }

@@ -1118,12 +1118,12 @@ where
 }
 
 impl HasAddressFilter for AsanModule {
-    type ModuleAddressFilter = StdAddressFilter;
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    type AddressFilter = StdAddressFilter;
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.filter
     }
 }
