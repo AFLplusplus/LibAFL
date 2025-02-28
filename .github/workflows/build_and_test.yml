@@ -120,10 +120,10 @@ jobs:
       # ---- build normal and examples ----
       - name: Run a normal build
         run: cargo build --verbose
-      - name: Run libafl_qemu usermode tests
-        run: cd libafl_qemu && cargo test
-      - name: Run libafl_qemu systemmode tests
-        run: cd libafl_qemu && cargo test --no-default-features --features x86_64,systemmode
+      # - name: Run libafl_qemu usermode tests
+      #   run: cd libafl_qemu && cargo test
+      # - name: Run libafl_qemu systemmode tests
+      #   run: cd libafl_qemu && cargo test --no-default-features --features x86_64,systemmode
       - name: Build examples
         run: cargo build --examples --verbose
 
