@@ -94,13 +94,10 @@ asan: harness build
         -- \
         {{ HARNESS }}
 
-asan_guest: build
+asan_guest: harness build
     #!/bin/bash
 
     source {{ DOTENV }}
-    RUST_BACKTRACE=full \
-    xLIBAFL_DEBUG_OUTPUT=1 \
-    RUST_LOG=trace \
     CUSTOM_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libgasan.so \
     {{ FUZZER }} \
         --input ./corpus \
@@ -108,8 +105,6 @@ asan_guest: build
         --log {{ TARGET_DIR }}/output/log.txt \
         --cores 0 \
         --asan-guest-cores 0 \
-        --snapshots \
-        --iterations 1000 \
         -- \
         {{ HARNESS }}
 
