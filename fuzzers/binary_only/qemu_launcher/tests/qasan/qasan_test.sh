@@ -39,6 +39,9 @@ tests_not_expected=(
   "Context:"
 )
 
+# We don't want any core dumps. They can potentially be quite large
+ulimit -c 0
+
 for i in "${!tests[@]}"
 do
   test="${tests[i]}"
