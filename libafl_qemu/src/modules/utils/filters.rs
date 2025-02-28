@@ -131,14 +131,10 @@ where
 }
 
 #[cfg(feature = "usermode")]
-impl<M> HasStdFilters for M
-where
-    M: HasAddressFilter {}
+impl<M> HasStdFilters for M where M: HasAddressFilter {}
 
 #[cfg(feature = "systemmode")]
-impl<M> HasStdFilters for M
-where
-    M: HasAddressFilter + HasPageFilter {}
+impl<M> HasStdFilters for M where M: HasAddressFilter + HasPageFilter {}
 
 impl HasStdFiltersTuple for () {}
 
@@ -146,7 +142,8 @@ impl<Head, Tail> HasStdFiltersTuple for (Head, Tail)
 where
     Head: HasStdFilters,
     Tail: HasStdFiltersTuple,
-{}
+{
+}
 
 /// Offers accessors to modules' page filters.
 #[cfg(feature = "systemmode")]
