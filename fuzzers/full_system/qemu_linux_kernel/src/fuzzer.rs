@@ -83,7 +83,7 @@ where
     S: HasExecutions + Unpin,
 {
     // Allow linux process address space addresses as feedback
-    modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);
+    modules.allow_address_range_all(&LINUX_PROCESS_ADDRESS_RANGE);
 
     Emulator::builder()
         .qemu_parameters(args)

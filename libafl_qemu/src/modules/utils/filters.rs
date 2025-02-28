@@ -114,6 +114,7 @@ impl HasAddressFilterTuple for () {
         true
     }
 }
+
 impl<Head, Tail> HasAddressFilterTuple for (Head, Tail)
 where
     Head: HasAddressFilter,
@@ -128,6 +129,24 @@ where
         self.0.allowed_address(address) && self.1.allowed_address_all(address)
     }
 }
+
+#[cfg(feature = "usermode")]
+impl<M> HasStdFilters for M
+where
+    M: HasAddressFilter {}
+
+#[cfg(feature = "systemmode")]
+impl<M> HasStdFilters for M
+where
+    M: HasAddressFilter + HasPageFilter {}
+
+impl HasStdFiltersTuple for () {}
+
+impl<Head, Tail> HasStdFiltersTuple for (Head, Tail)
+where
+    Head: HasStdFilters,
+    Tail: HasStdFiltersTuple,
+{}
 
 /// Offers accessors to modules' page filters.
 #[cfg(feature = "systemmode")]
