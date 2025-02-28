@@ -62,10 +62,10 @@ test_inner: harness build
     cargo build --profile={{PROFILE}} --features="simplemgr,{{ARCH}}" --target-dir={{ TARGET_DIR }} || exit 1
 
     export CUSTOM_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so
-    ./tests/qasan/test_qasan.sh || exit 1
+    ./tests/qasan/qasan_test.sh || exit 1
 
     export CUSTOM_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libgasan.so
-    ./tests/qasan/test_gasan.sh || exit 1
+    ./tests/qasan/gasan_test.sh || exit 1
 
 [unix]
 test:

@@ -304,7 +304,7 @@ where
                 .collect::<Vec<MapInfo>>();
             asan_mappings
                 .iter()
-                .for_each(|m| println!("asan mapping: {m:}"));
+                .for_each(|m| log::info!("asan mapping: {m:}"));
             self.asan_mappings = Some(asan_mappings);
         }
 
