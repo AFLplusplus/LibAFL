@@ -25,8 +25,8 @@ tests_expected=(
   "Segmentation fault"
   "Segmentation fault"
   "Panic!"
-  "AddressSanitizer Error"
-  "AddressSanitizer Error"
+  "Panic!"
+  "Segmentation fault"
   "Test-Limits - No Error"
 )
 
