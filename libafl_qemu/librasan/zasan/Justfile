@@ -67,8 +67,8 @@ rename_zasan: rel_zasan
 	#!/bin/bash
 	source {{ DOTENV }}
 	${CROSS_OBJCOPY} \
-		--redefine-sym memset=old_memset \
-		--redefine-syms={{ ZASAN_SOURCE_DIR }}/rename.syms \
+		--redefine-syms={{ GASAN_SOURCE_DIR }}/rename_real.syms \
+		--redefine-syms={{ GASAN_SOURCE_DIR }}/rename_patch.syms \
 		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libzasan.rel \
 		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libzasan.renamed
 
