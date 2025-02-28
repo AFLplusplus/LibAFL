@@ -480,38 +480,18 @@ impl SnapshotModule {
                 }
             }
 
-            let modify_mapping = |maps: &mut MappingInfo, page: GuestAddr| -> bool {
-                let mut found = false;
-                for entry in maps
-                    .tree
-                    .query_mut(page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
-                {
-                    if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
-                        drop(qemu.mprotect(
-                            entry.interval.start,
-                            (entry.interval.end - entry.interval.start) as usize,
-                            MmapPerms::ReadWrite,
-                        ));
-                        entry.value.changed = true;
-                        entry.value.perms = Some(MmapPerms::ReadWrite);
-                    }
-                    found = true;
-                }
-                found
-            };
-
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
                         if self.interval_filter.to_skip(*page).is_some() {
-                            if !modify_mapping(new_maps, *page) {
+                            if !Self::modify_mapping(&qemu, new_maps, *page) {
                                 return true; // Restore later
                             }
                             unsafe { qemu.write_mem_unchecked(*page, &SNAPSHOT_PAGE_ZEROES) };
                         } else if let Some(data) = info.data.as_ref() {
                             // TODO avoid duplicated memcpy
                             // Change segment perms to RW if not writeable in current mapping
-                            if !modify_mapping(new_maps, *page) {
+                            if !Self::modify_mapping(&qemu, new_maps, *page) {
                                 return true; // Restore later
                             }
 
@@ -581,6 +561,26 @@ impl SnapshotModule {
         self.check_snapshot(qemu);
 
         log::debug!("End restore");
+    }
+
+    fn modify_mapping(qemu: &Qemu, maps: &mut MappingInfo, page: GuestAddr) -> bool {
+        let mut found = false;
+        for entry in maps
+            .tree
+            .query_mut(page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
+        {
+            if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
+                drop(qemu.mprotect(
+                    entry.interval.start,
+                    (entry.interval.end - entry.interval.start) as usize,
+                    MmapPerms::ReadWrite,
+                ));
+                entry.value.changed = true;
+                entry.value.perms = Some(MmapPerms::ReadWrite);
+            }
+            found = true;
+        }
+        found
     }
 
     pub fn is_unmap_allowed(&mut self, start: GuestAddr, mut size: usize) -> bool {
