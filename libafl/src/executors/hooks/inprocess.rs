@@ -24,7 +24,7 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 #[cfg(feature = "std")]
 use crate::executors::hooks::timer::TimerStruct;
 use crate::{
-    Error, HasObjective,
+    Error, HasFeedback, HasObjective,
     events::{EventFirer, EventRestarter},
     executors::{Executor, HasObservers, hooks::ExecutorHook, inprocess::HasInProcessHooks},
     feedbacks::Feedback,
@@ -207,14 +207,15 @@ impl<I, S> InProcessHooks<I, S> {
     /// Create new [`InProcessHooks`].
     #[cfg(unix)]
     #[allow(unused_variables)] // for `exec_tmout` without `std`
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<E, EM, F, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
+        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
         I: Input + Clone,
     {
         // # Safety
@@ -224,7 +225,7 @@ impl<I, S> InProcessHooks<I, S> {
         #[cfg(all(not(miri), unix, feature = "std"))]
         let data = unsafe { &raw mut GLOBAL_STATE };
         #[cfg(feature = "std")]
-        unix_signal_handler::setup_panic_hook::<E, EM, I, OF, S, Z>();
+        unix_signal_handler::setup_panic_hook::<E, EM, F, I, OF, S, Z>();
         // # Safety
         // Setting up the signal handlers with a pointer to the `GLOBAL_STATE` which should not be NULL at this point.
         // We are the sole users of `GLOBAL_STATE` right now, and only dereference it in case of Segfault/Panic.
@@ -238,9 +239,9 @@ impl<I, S> InProcessHooks<I, S> {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
             (*data).crash_handler =
-                unix_signal_handler::inproc_crash_handler::<E, EM, I, OF, S, Z> as *const c_void;
+                unix_signal_handler::inproc_crash_handler::<E, EM, F, I, OF, S, Z> as *const c_void;
             (*data).timeout_handler =
-                unix_signal_handler::inproc_timeout_handler::<E, EM, I, OF, S, Z> as *const _;
+                unix_signal_handler::inproc_timeout_handler::<E, EM, F, I, OF, S, Z> as *const _;
         }
 
         compiler_fence(Ordering::SeqCst);
@@ -432,7 +433,7 @@ impl InProcessExecutorHandlerData {
     ///
     /// Should only be called to signal a crash in the target
     #[cfg(all(unix, feature = "std"))]
-    pub unsafe fn maybe_report_crash<E, EM, I, OF, S, Z>(
+    pub unsafe fn maybe_report_crash<E, EM, F, I, OF, S, Z>(
         &mut self,
         bsod_info: Option<BsodInfo>,
     ) -> bool
@@ -440,9 +441,10 @@ impl InProcessExecutorHandlerData {
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
+        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
         I: Input + Clone,
     {
         unsafe {
@@ -470,7 +472,7 @@ impl InProcessExecutorHandlerData {
                     }
                 }
 
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
                     executor,
                     state,
                     input,

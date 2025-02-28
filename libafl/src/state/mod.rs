@@ -26,6 +26,8 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 mod stack;
 pub use stack::StageStack;
 
+#[cfg(feature = "std")]
+use crate::fuzzer::ExecuteInputResult;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::ClientPerfStats;
 use crate::{
@@ -33,7 +35,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::StateInitializer,
-    fuzzer::{Evaluator, ExecuteInputResult},
+    fuzzer::Evaluator,
     generators::Generator,
     inputs::{Input, NopInput},
     stages::StageId,
