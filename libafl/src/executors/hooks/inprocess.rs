@@ -43,6 +43,12 @@ use crate::{inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase}
 /// The inmem executor's handlers.
 #[expect(missing_debug_implementations)]
 pub struct InProcessHooks<I, S> {
+    /// On crash C function pointer
+    #[cfg(feature = "std")]
+    pub crash_handler: *const c_void,
+    /// On timeout C function pointer
+    #[cfg(feature = "std")]
+    pub timeout_handler: *const c_void,
     /// `TImer` struct
     #[cfg(feature = "std")]
     pub timer: TimerStruct,
@@ -190,6 +196,13 @@ impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
     fn init(&mut self, _state: &mut S) {}
     /// Call before running a target.
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {
+        #[cfg(feature = "std")]
+        unsafe {
+            let data = &raw mut GLOBAL_STATE;
+            (*data).crash_handler = self.crash_handler;
+            (*data).timeout_handler = self.timeout_handler;
+        }
+
         #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
         self.timer_mut().set_timer();
     }
@@ -234,17 +247,14 @@ impl<I, S> InProcessHooks<I, S> {
             setup_signal_handler(data)?;
         }
 
-        #[cfg(feature = "std")]
-        unsafe {
-            let data = &raw mut GLOBAL_STATE;
-            (*data).crash_handler =
-                unix_signal_handler::inproc_crash_handler::<E, EM, I, OF, S, Z> as *const c_void;
-            (*data).timeout_handler =
-                unix_signal_handler::inproc_timeout_handler::<E, EM, I, OF, S, Z> as *const _;
-        }
-
         compiler_fence(Ordering::SeqCst);
         Ok(Self {
+            #[cfg(feature = "std")]
+            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, I, OF, S, Z>
+                as *const c_void,
+            #[cfg(feature = "std")]
+            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, I, OF, S, Z>
+                as *const _,
             #[cfg(feature = "std")]
             timer: TimerStruct::new(exec_tmout),
             phantom: PhantomData,
@@ -278,7 +288,7 @@ impl<I, S> InProcessHooks<I, S> {
             >();
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
-            (*data).crash_handler =
+            let crash_handler =
                 crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<
                     E,
                     EM,
@@ -296,9 +306,10 @@ impl<I, S> InProcessHooks<I, S> {
                     S,
                     Z,
                 > as *const c_void;
-            (*data).timeout_handler = timeout_handler;
             let timer = TimerStruct::new(exec_tmout, timeout_handler);
             ret = Ok(Self {
+                crash_handler,
+                timeout_handler,
                 timer,
                 phantom: PhantomData,
             });
@@ -336,6 +347,10 @@ impl<I, S> InProcessHooks<I, S> {
     #[cfg(not(windows))]
     pub fn nop() -> Self {
         Self {
+            #[cfg(feature = "std")]
+            crash_handler: ptr::null(),
+            #[cfg(feature = "std")]
+            timeout_handler: ptr::null(),
             #[cfg(feature = "std")]
             timer: TimerStruct::new(Duration::from_millis(5000)),
             phantom: PhantomData,
