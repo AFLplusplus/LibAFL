@@ -327,7 +327,7 @@ class DDGInstrModulePass : public PassInfoMixin<DDGInstrModulePass> {
                           // GEP)
 
       BasicBlock  &EntryBB = F.getEntryBlock();
-      Instruction *FirstInst = EntryBB.getFirstNonPHIOrDbg();
+      Instruction *FirstInst = &*EntryBB.getFirstNonPHIOrDbg();
 
       // First we add the function params to track the dataflow
       for (Function::arg_iterator arg_it = F.arg_begin(); arg_it != F.arg_end();

@@ -12,7 +12,7 @@ use thread_local::ThreadLocal;
 
 use super::utils::filters::HasAddressFilter;
 #[cfg(feature = "systemmode")]
-use crate::modules::utils::filters::{NOP_PAGE_FILTER, NopPageFilter};
+use crate::modules::utils::filters::{HasPageFilter, NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
     Qemu, capstone,
     modules::{
@@ -361,14 +361,18 @@ where
                 iaddr += insn.bytes().len() as GuestAddr;
 
                 #[cfg(feature = "usermode")]
-                code = unsafe { std::slice::from_raw_parts(qemu.g2h(iaddr), 512) };
+                {
+                    code = unsafe { std::slice::from_raw_parts(qemu.g2h(iaddr), 512) };
+                }
                 #[cfg(feature = "systemmode")]
-                if let Err(err) = qemu.read_mem(pc, code) {
-                    // TODO handle faults
-                    log::error!(
-                        "gen_block_calls error 2: Failed to read mem at pc {pc:#x}: {err:?}"
-                    );
-                    return None;
+                {
+                    if let Err(err) = qemu.read_mem(pc, code) {
+                        // TODO handle faults
+                        log::error!(
+                            "gen_block_calls error 2: Failed to read mem at pc {pc:#x}: {err:?}"
+                        );
+                        return None;
+                    }
                 }
             }
         }
@@ -459,24 +463,29 @@ impl<T> HasAddressFilter for CallTracerModule<T>
 where
     T: CallTraceCollectorTuple,
 {
-    type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    type AddressFilter = StdAddressFilter;
+
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.filter
     }
+}
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter(&self) -> &Self::ModulePageFilter {
+#[cfg(feature = "systemmode")]
+impl<T> HasPageFilter for CallTracerModule<T>
+where
+    T: CallTraceCollectorTuple,
+{
+    type PageFilter = NopPageFilter;
+
+    fn page_filter(&self) -> &Self::PageFilter {
         &NopPageFilter
     }
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+    fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
         unsafe { (&raw mut NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }

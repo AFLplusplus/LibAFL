@@ -381,7 +381,9 @@ pub struct InProcessExecutorHandlerData {
     /// the pointer to the executor
     pub executor_ptr: *const c_void,
     pub(crate) current_input_ptr: *const c_void,
-    pub(crate) in_handler: bool,
+
+    #[cfg(feature = "std")]
+    pub(crate) signal_handler_depth: usize,
 
     /// The timeout handler
     #[cfg(feature = "std")]
@@ -402,6 +404,9 @@ unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
 impl InProcessExecutorHandlerData {
+    #[cfg(feature = "std")]
+    const SIGNAL_HANDLER_MAX_DEPTH: usize = 3;
+
     /// # Safety
     /// Only safe if not called twice and if the executor is not used from another borrow after this.
     #[cfg(all(feature = "std", any(unix, windows)))]
@@ -444,11 +449,19 @@ impl InProcessExecutorHandlerData {
         !self.current_input_ptr.is_null()
     }
 
+    /// Returns true if signal handling max depth has been reached, false otherwise
     #[cfg(all(feature = "std", any(unix, windows)))]
-    pub(crate) fn set_in_handler(&mut self, v: bool) -> bool {
-        let old = self.in_handler;
-        self.in_handler = v;
-        old
+    pub(crate) fn signal_handler_enter(&mut self) -> (bool, usize) {
+        self.signal_handler_depth += 1;
+        (
+            self.signal_handler_depth >= Self::SIGNAL_HANDLER_MAX_DEPTH,
+            self.signal_handler_depth,
+        )
+    }
+
+    #[cfg(all(feature = "std", any(unix, windows)))]
+    pub(crate) fn signal_handler_exit(&mut self) {
+        self.signal_handler_depth -= 1;
     }
 
     /// if data is valid, safely report a crash and return true.
@@ -526,7 +539,8 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     // The current input for signal handling
     current_input_ptr: null(),
 
-    in_handler: false,
+    #[cfg(feature = "std")]
+    signal_handler_depth: 0,
 
     // The crash handler fn
     #[cfg(feature = "std")]
@@ -585,12 +599,4 @@ pub unsafe fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
 #[must_use]
 pub unsafe fn inprocess_get_input<'a, I>() -> Option<&'a I> {
     unsafe { (GLOBAL_STATE.current_input_ptr as *const I).as_ref() }
-}
-
-/// Returns if we are executing in a crash/timeout handler
-#[must_use]
-pub fn inprocess_in_handler() -> bool {
-    // # Safety
-    // Safe because the state is set up and the handler is a single bool. Worst case we read an old value.
-    unsafe { GLOBAL_STATE.in_handler }
 }
