@@ -16,7 +16,7 @@ use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
         Executor, ExitKind, HasObservers,
-        hooks::inprocess::{GLOBAL_STATE, InProcessExecutorHandlerData},
+        hooks::inprocess::InProcessExecutorHandlerData,
         inprocess::{HasInProcessHooks, stateful::StatefulInProcessExecutor},
         inprocess_fork::stateful::StatefulInProcessForkExecutor,
     },
@@ -258,40 +258,28 @@ where
             + ExecutionProcessor<EM, I, OT, S>
             + HasFeedback<Feedback = F>,
     {
-        let inner = StatefulInProcessExecutor::with_timeout(
+        let mut inner = StatefulInProcessExecutor::with_timeout(
             harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,
         )?;
 
-        let data = &raw mut GLOBAL_STATE;
+        // rewrite the crash handler pointer
         #[cfg(feature = "usermode")]
-        unsafe {
-            // rewrite the crash handler pointer
-            (*data).crash_handler =
+        {
+            inner.inprocess_hooks_mut().crash_handler =
                 inproc_qemu_crash_handler::<Self, EM, ET, F, I, OF, S, Z> as *const c_void;
         }
 
-        unsafe {
-            // rewrite the timeout handler pointer
-            (*data).timeout_handler = inproc_qemu_timeout_handler::<
-                StatefulInProcessExecutor<
-                    'a,
-                    EM,
-                    Emulator<C, CM, ED, ET, I, S, SM>,
-                    H,
-                    I,
-                    OT,
-                    S,
-                    Z,
-                >,
-                EM,
-                ET,
-                F,
-                I,
-                OF,
-                S,
-                Z,
-            > as *const c_void;
-        }
+        // rewrite the timeout handler pointer
+        inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<
+            StatefulInProcessExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, Z>,
+            EM,
+            ET,
+            F,
+            I,
+            OF,
+            S,
+            Z,
+        > as *const c_void;
 
         Ok(Self {
             inner,
