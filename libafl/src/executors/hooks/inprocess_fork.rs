@@ -47,7 +47,13 @@ impl<I, S> ExecutorHook<I, S> for InChildProcessHooks<I, S> {
         }
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &I) {}
+    fn post_exec(&mut self, _state: &mut S, _input: &I) {
+        unsafe {
+            let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
+            (*data).crash_handler = null();
+            (*data).timeout_handler = null();
+        }
+    }
 }
 
 impl<I, S> InChildProcessHooks<I, S> {
