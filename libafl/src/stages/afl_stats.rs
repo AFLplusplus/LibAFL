@@ -274,22 +274,20 @@ where
         let corpus_idx_value = corpus_idx.0; // Extract `usize` value from `CorpusId`
 
         // Fire the UpdateUserStats event with the corpus index
-        if self.report_current_corpus_idx {
-            if self.last_sent_corpus_idx != Some(corpus_idx_value) {
-                manager.fire(
-                    state,
-                    Event::UpdateUserStats {
-                        name: Cow::Borrowed("Current Testcase Index"),
-                        value: UserStats::new(
-                            UserStatsValue::Number(corpus_idx_value as u64),
-                            AggregatorOps::Sum,
-                        ),
-                        phantom: PhantomData,
-                    },
-                )?;
-                // Update the last_sent_corpus_idx to the current value
-                self.last_sent_corpus_idx = Some(corpus_idx_value);
-            }
+        if self.report_current_corpus_idx && self.last_sent_corpus_idx != Some(corpus_idx_value) {
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: Cow::Borrowed("Current Testcase Index"),
+                    value: UserStats::new(
+                        UserStatsValue::Number(corpus_idx_value as u64),
+                        AggregatorOps::Sum,
+                    ),
+                    phantom: PhantomData,
+                },
+            )?;
+            // Update the last_sent_corpus_idx to the current value
+            self.last_sent_corpus_idx = Some(corpus_idx_value);
         }
         let testcase = state.corpus().get(corpus_idx)?.borrow();
 

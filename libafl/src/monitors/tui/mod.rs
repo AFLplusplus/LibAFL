@@ -393,11 +393,6 @@ impl Monitor for TuiMonitor {
             exec_sec
         );
 
-        // Display "Current Testcase Index" if available
-        if let Some(stat) = client.get_user_stats("Current Testcase Index") {
-            write!(fmt, ", Testcase Index: {}", stat.value()).unwrap();
-        }
-
         for (key, val) in client.user_stats() {
             write!(fmt, ", {key}: {val}").unwrap();
         }
