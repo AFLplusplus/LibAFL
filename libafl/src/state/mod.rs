@@ -96,6 +96,8 @@ pub trait HasSolutions<I> {
     fn solutions(&self) -> &Self::Solutions;
     /// The solutions corpus (mutable)
     fn solutions_mut(&mut self) -> &mut Self::Solutions;
+    /// Whether to share objective testcases among nodes
+    fn should_share_objectives(&self) -> bool;
 }
 
 /// Trait for elements offering a rand
@@ -248,6 +250,8 @@ pub struct StdState<C, I, R, SC> {
     stop_requested: bool,
     stage_stack: StageStack,
     phantom: PhantomData<I>,
+    /// Whether to share objective testcases among nodes
+    share_objectives: bool,
 }
 
 impl<C, I, R, SC> HasRand for StdState<C, I, R, SC>
@@ -321,6 +325,12 @@ where
     #[inline]
     fn solutions_mut(&mut self) -> &mut SC {
         &mut self.solutions
+    }
+
+    /// Returns whether to share objective testcases among nodes
+    #[inline]
+    fn should_share_objectives(&self) -> bool {
+        self.share_objectives
     }
 }
 
@@ -1144,10 +1154,16 @@ where
             phantom: PhantomData,
             #[cfg(feature = "std")]
             multicore_inputs_processed: None,
+            share_objectives: false,
         };
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;
         Ok(state)
+    }
+
+    /// Enables sharing of objective testcases among nodes
+    pub fn share_objectives(&mut self) {
+        self.share_objectives = true;
     }
 }
 
