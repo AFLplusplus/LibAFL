@@ -264,6 +264,7 @@ where
     ) -> Result<(), Error>
     where
         ICB: InputConverter<To = I, From = DI>,
+        S: HasSolutions<I>,
         Z: EvaluatorObservers<E, EM, I, S>,
     {
         match event {
@@ -292,8 +293,7 @@ where
                 Ok(())
             }
 
-            // #[cfg(feature = "share_objectives")]
-            Event::Objective { input, .. } => {
+            Event::Objective { input, .. } if state.should_share_objectives() => {
                 log::debug!("Received new Objective");
 
                 let Some(converter) = self.converter_back.as_mut() else {
