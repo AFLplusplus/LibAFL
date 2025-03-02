@@ -475,9 +475,7 @@ where
                     manager.fire(
                         state,
                         Event::Objective {
-                            // #[cfg(feature = "share_objectives")]
                             input: input.clone(),
-
                             objective_size: state.solutions().count(),
                             time: current_time(),
                         },
@@ -667,9 +665,7 @@ where
             manager.fire(
                 state,
                 Event::Objective {
-                    // #[cfg(feature = "share_objectives")]
                     input,
-
                     objective_size: state.solutions().count(),
                     time: current_time(),
                 },
@@ -796,8 +792,7 @@ where
                         )?;
                         res.1
                     }
-                    // #[cfg(feature = "share_objectives")]
-                    Event::Objective { ref input, .. } => {
+                    Event::Objective { ref input, .. } if state.should_share_objectives() => {
                         let res = self.evaluate_input_with_observers(
                             state, executor, manager, input, false,
                         )?;
