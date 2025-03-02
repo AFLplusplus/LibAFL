@@ -292,24 +292,25 @@ where
                 Ok(())
             }
 
-            #[cfg(feature = "share_objectives")]
             Event::Objective { input, .. } => {
-                log::debug!("Received new Objective");
+                if fuzzer.share_objectives {
+                    log::debug!("Received new Objective");
 
-                let Some(converter) = self.converter_back.as_mut() else {
-                    return Ok(());
-                };
+                    let Some(converter) = self.converter_back.as_mut() else {
+                        return Ok(());
+                    };
 
-                let res = fuzzer.evaluate_input_with_observers(
-                    state,
-                    executor,
-                    manager,
-                    &converter.convert(input)?,
-                    false,
-                )?;
+                    let res = fuzzer.evaluate_input_with_observers(
+                        state,
+                        executor,
+                        manager,
+                        &converter.convert(input)?,
+                        false,
+                    )?;
 
-                if let Some(item) = res.1 {
-                    log::info!("Added received Objective as item #{item}");
+                    if let Some(item) = res.1 {
+                        log::info!("Added received Objective as item #{item}");
+                    }
                 }
                 Ok(())
             }
