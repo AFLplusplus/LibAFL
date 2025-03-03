@@ -263,6 +263,7 @@ pub struct StdFuzzer<CS, F, IF, OF> {
     feedback: F,
     objective: OF,
     input_filter: IF,
+    // Handles whether to share objective testcases among nodes
     share_objectives: bool,
 }
 
@@ -476,9 +477,7 @@ where
                     manager.fire(
                         state,
                         Event::Objective {
-                            // #[cfg(feature = "share_objectives")]
                             input: input.clone(),
-
                             objective_size: state.solutions().count(),
                             time: current_time(),
                         },
@@ -668,9 +667,7 @@ where
             manager.fire(
                 state,
                 Event::Objective {
-                    // #[cfg(feature = "share_objectives")]
                     input,
-
                     objective_size: state.solutions().count(),
                     time: current_time(),
                 },
@@ -797,8 +794,7 @@ where
                         )?;
                         res.1
                     }
-                    // #[cfg(feature = "share_objectives")]
-                    Event::Objective { ref input, .. } => {
+                    Event::Objective { ref input, .. } if self.share_objectives => {
                         let res = self.evaluate_input_with_observers(
                             state, executor, manager, input, false,
                         )?;
@@ -955,21 +951,26 @@ where
 
 impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
     /// Create a new [`StdFuzzer`] with standard behavior and the provided duplicate input execution filter.
-    pub fn with_input_filter(scheduler: CS, feedback: F, objective: OF, input_filter: IF, share_objectives: bool) -> Self {
+    pub fn with_input_filter(scheduler: CS, feedback: F, objective: OF, input_filter: IF) -> Self {
         Self {
             scheduler,
             feedback,
             objective,
             input_filter,
-            share_objectives,
+            share_objectives: false,
         }
+    }
+    /// Sharing of objective testcases among nodes is disabled by default. Call this method to
+    /// enable sharing
+    pub fn share_objectives(&mut self) {
+        self.share_objectives = true;
     }
 }
 
 impl<CS, F, OF> StdFuzzer<CS, F, NopInputFilter, OF> {
     /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
-    pub fn new(scheduler: CS, feedback: F, objective: OF, share_objectives: bool) -> Self {
-        Self::with_input_filter(scheduler, feedback, objective, NopInputFilter, share_objectives)
+    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
+        Self::with_input_filter(scheduler, feedback, objective, NopInputFilter)
     }
 }
 
@@ -986,10 +987,9 @@ impl<CS, F, OF> StdFuzzer<CS, F, BloomInputFilter, OF> {
         objective: OF,
         items_count: usize,
         fp_p: f64,
-        share_objectives: bool,
     ) -> Self {
         let input_filter = BloomInputFilter::new(items_count, fp_p);
-        Self::with_input_filter(scheduler, feedback, objective, input_filter, share_objectives)
+        Self::with_input_filter(scheduler, feedback, objective, input_filter)
     }
 }
 
