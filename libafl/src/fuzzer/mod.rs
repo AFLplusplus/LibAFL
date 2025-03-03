@@ -674,7 +674,7 @@ where
             manager.fire(
                 state,
                 Event::Objective {
-                    input: self.share_objectives.then(|| input),
+                    input: self.share_objectives.then_some(input),
                     objective_size: state.solutions().count(),
                     time: current_time(),
                 },
@@ -801,9 +801,16 @@ where
                         )?;
                         res.1
                     }
-                    Event::Objective { input: Some(ref unwrapped_input), .. } => {
+                    Event::Objective {
+                        input: Some(ref unwrapped_input),
+                        ..
+                    } => {
                         let res = self.evaluate_input_with_observers(
-                            state, executor, manager, unwrapped_input, false,
+                            state,
+                            executor,
+                            manager,
+                            unwrapped_input,
+                            false,
                         )?;
                         res.1
                     }

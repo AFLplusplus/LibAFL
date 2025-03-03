@@ -15,7 +15,11 @@ use libafl_bolts::{
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    events::{Event, EventFirer}, fuzzer::EvaluatorObservers, inputs::{Input, InputConverter, NopInput, NopInputConverter}, state::{HasCurrentTestcase, HasSolutions, NopState}, Error, HasObjective
+    Error, HasObjective,
+    events::{Event, EventFirer},
+    fuzzer::EvaluatorObservers,
+    inputs::{Input, InputConverter, NopInput, NopInputConverter},
+    state::{HasCurrentTestcase, HasSolutions, NopState},
 };
 
 /// The llmp restarting manager
