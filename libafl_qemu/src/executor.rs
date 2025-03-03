@@ -189,6 +189,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, F, I, OF, S, Z>(
             libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
                 E,
                 EM,
+                F,
                 I,
                 OF,
                 S,
