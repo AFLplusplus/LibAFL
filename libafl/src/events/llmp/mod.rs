@@ -15,11 +15,7 @@ use libafl_bolts::{
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    Error,
-    events::{Event, EventFirer},
-    fuzzer::EvaluatorObservers,
-    inputs::{Input, InputConverter, NopInput, NopInputConverter},
-    state::{HasCurrentTestcase, HasSolutions, NopState},
+    events::{Event, EventFirer}, fuzzer::EvaluatorObservers, inputs::{Input, InputConverter, NopInput, NopInputConverter}, state::{HasCurrentTestcase, HasSolutions, NopState}, Error, HasObjective
 };
 
 /// The llmp restarting manager
@@ -264,7 +260,7 @@ where
     ) -> Result<(), Error>
     where
         ICB: InputConverter<To = I, From = DI>,
-        Z: EvaluatorObservers<E, EM, I, S>,
+        Z: EvaluatorObservers<E, EM, I, S> + HasObjective,
     {
         match event {
             Event::NewTestcase {
@@ -291,9 +287,7 @@ where
                 }
                 Ok(())
             }
-
-            // #[cfg(feature = "share_objectives")]
-            Event::Objective { input, .. } => {
+            Event::Objective { input, .. } if fuzzer.should_share_objectives() => {
                 log::debug!("Received new Objective");
 
                 let Some(converter) = self.converter_back.as_mut() else {
@@ -333,7 +327,7 @@ where
         ICB: InputConverter<To = I, From = DI>,
         DI: DeserializeOwned + Input,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
-        Z: EvaluatorObservers<E, EM, I, S>,
+        Z: EvaluatorObservers<E, EM, I, S> + HasObjective,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
