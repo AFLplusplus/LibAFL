@@ -7,6 +7,7 @@ ZASAN_SOURCE_DIR := source_directory()
 compile_zasan:
 	#!/bin/bash
 	source {{ DOTENV }}
+	RUSTFLAGS="--cfg rustix_use_experimental_asm" \
 	cargo \
 		+nightly \
 		build \

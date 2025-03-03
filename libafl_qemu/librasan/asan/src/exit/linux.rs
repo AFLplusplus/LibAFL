@@ -4,7 +4,7 @@ use rustix::process::{Signal, kill_current_process_group};
 use syscalls::{Sysno, syscall1};
 
 pub fn abort() -> ! {
-    kill_current_process_group(Signal::Abort).unwrap();
+    kill_current_process_group(Signal::ABORT).unwrap();
     unreachable!();
 }
 

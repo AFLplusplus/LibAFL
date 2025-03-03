@@ -39,7 +39,7 @@ itertools = { version = "0.14.0", default-features = false }
 log = { version = "0.4.22", default-features = false }
 libc = { version = "0.2.169", default-features = false, optional = true }
 readonly = { version = "0.2.12", default-features = false }
-rustix = { version = "0.38.38", default-features = false, features = [
+rustix = { version = "1.0.0", default-features = false, features = [
   "fs",
   "mm",
   "process",
