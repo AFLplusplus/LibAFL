@@ -143,7 +143,7 @@ where
                         It needs to be at least {} bytes. 
                         The tmpfile was written to {}.",
                     len,
-                    temp_dir().join(&filename)
+                    temp_dir().join(&filename).display()
                 )));
             }
 
