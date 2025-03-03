@@ -300,7 +300,7 @@ pub enum Event<I> {
     /// A new objective was found
     Objective {
         /// Input of newly found Objective
-        input: I,
+        input: Option<I>,
         /// Objective corpus size
         objective_size: usize,
         /// The time when this event was created

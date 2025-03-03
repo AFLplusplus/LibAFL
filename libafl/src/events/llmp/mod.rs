@@ -293,12 +293,15 @@ where
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
                 };
+                let Some(unwrapped_input) = input else {
+                    return Ok(());
+                };
 
                 let res = fuzzer.evaluate_input_with_observers(
                     state,
                     executor,
                     manager,
-                    &converter.convert(input)?,
+                    &converter.convert(unwrapped_input)?,
                     false,
                 )?;
 
