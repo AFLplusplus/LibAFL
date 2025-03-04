@@ -28,6 +28,11 @@ build flavor="breakpoint": target_dir
         --target-dir {{TARGET_DIR}}
 
 run flavor="breakpoint": (target flavor) (build flavor)
+    #!/bin/bash
+
+    export KERNEL={{ KERNEL }}
+    export TARGET_DIR={{ TARGET_DIR }}
+
     {{BUILD_DIR / "qemu_baremetal"}} \
         -icount shift=auto,align=off,sleep=off \
         -machine mps2-an385 \

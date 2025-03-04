@@ -37,20 +37,21 @@ use libafl_qemu::{
     StdEmulatorDriver,
 };
 use libafl_qemu::{
-    emu::Emulator,
-    executor::QemuExecutor,
-    modules::{
+    parameters::{config::{QemuConfig, RamSize}, AugmentedCli}, emu::Emulator, executor::QemuExecutor, modules::{
         cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
         utils::filters::HasAddressFilterTuple, CmpLogModule, EmulatorModuleTuple,
-    },
-    FastSnapshotManager, NopSnapshotManager, QemuInitError,
+    }, FastSnapshotManager, NopSnapshotManager, QemuInitError
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
+use libafl_bolts::core_affinity::CoreId;
+use libafl::events::ClientDescription;
 
 #[cfg(feature = "nyx")]
 fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     modules: ET,
+    workdir: PathBuf,
+    core_id: CoreId,
 ) -> Result<
     Emulator<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, NopSnapshotManager>,
     QemuInitError,
@@ -61,7 +62,7 @@ where
     S: Unpin,
 {
     Emulator::empty()
-        .qemu_parameters(args)
+        .qemu_parameters(AugmentedCli::new(args, workdir, core_id))
         .modules(modules)
         .driver(NyxEmulatorDriver::builder().build())
         .command_manager(NyxCommandManager::default())
@@ -73,6 +74,8 @@ where
 fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     mut modules: ET,
+    workdir: PathBuf,
+    core_id: CoreId,
 ) -> Result<
     Emulator<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, FastSnapshotManager>,
     QemuInitError,
@@ -86,7 +89,7 @@ where
     modules.allow_address_range_all(&LINUX_PROCESS_ADDRESS_RANGE);
 
     Emulator::builder()
-        .qemu_parameters(args)
+        .qemu_parameters(AugmentedCli::new(args, workdir, core_id))
         .modules(modules)
         .build()
 }
@@ -117,11 +120,12 @@ pub fn fuzz() {
     // Hardcoded parameters
     let timeout = Duration::from_secs(60000);
     let broker_port = 1337;
-    let cores = Cores::from_cmdline("1").unwrap();
+    let cores = Cores::from(vec![1,2]);
     let corpus_dirs = [PathBuf::from("./corpus")];
     let objective_dir = PathBuf::from("./crashes");
+    let workdir = PathBuf::from("./workdir");
 
-    let mut run_client = |state: Option<_>, mut mgr, _client_description| {
+    let mut run_client = |state: Option<_>, mut mgr, client_description: ClientDescription| {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
 
@@ -143,7 +147,7 @@ pub fn fuzz() {
             CmpLogModule::default(),
         );
 
-        let emu = get_emulator(args, modules)?;
+        let emu = get_emulator(args, modules, workdir.clone(), client_description.core_id())?;
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);

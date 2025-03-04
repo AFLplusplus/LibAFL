@@ -24,8 +24,11 @@ update_files api="": target_dir linux_builder_dir (build api)
 
     cp {{ BUILD_DIR }}/include/* "{{ LINUX_BUILDER_DIR }}/setup/"
 
-target api="": linux_builder_dir update_files
+target api="": linux_builder_dir (update_files api)
     {{LINUX_BUILDER_DIR}}/build.sh
+
+update api="": (update_files api)
+    {{LINUX_BUILDER_DIR}}/update.sh
 
 build api="":
     cargo build \
@@ -45,18 +48,14 @@ run api="": (build api)
       LIBAFL_QEMU_BIOS_DIR={{ LIBAFL_QEMU_DIR_DEFAULT }}/build/qemu-bundle/usr/local/share/qemu
     fi
 
-    qemu-img create -f qcow2 -o backing_file={{ LINUX_BUILDER_OUT }}/OVMF_CODE.4m.fd -F raw {{ LINUX_BUILDER_OUT }}/OVMF_CODE.4m.qcow2
-    qemu-img create -f qcow2 -o backing_file={{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.fd -F raw {{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.qcow2
-    qemu-img create -f qcow2 -o backing_file={{ LINUX_BUILDER_OUT }}/linux.qcow2 -F qcow2 {{ LINUX_BUILDER_OUT }}/linux.tmp.qcow2
-
     {{FUZZER}} \
       -accel tcg \
       -m 4G \
-      -drive if=pflash,format=qcow2,file="{{ LINUX_BUILDER_OUT }}/OVMF_CODE.4m.qcow2" `# OVMF code pflash` \
-      -drive if=pflash,format=qcow2,file="{{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.qcow2" `# OVMF vars pflash` \
+      -drive if=pflash,format=qcow2,readonly=on,file="{{ LINUX_BUILDER_OUT }}/OVMF_CODE.4m.qcow2" `# OVMF code pflash` \
+      -drive if=pflash,format=qcow2,file="lqemu(mdisk,{{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.fd)" `# OVMF vars pflash` \
       -device ahci,id=ahci,bus=pci.0,addr=4 \
       -device ide-hd,bus=ahci.0,drive=disk,bootindex=1 \
-      -blockdev driver=file,filename="{{ LINUX_BUILDER_OUT }}/linux.tmp.qcow2",node-name=storage `# Backend file of "disk"` \
+      -blockdev driver=file,filename="lqemu(mdisk,{{ LINUX_BUILDER_OUT }}/linux.qcow2)",node-name=storage `# Backend file of "disk"` \
       -blockdev driver=qcow2,file=storage,node-name=disk `# QCOW2 "disk"` \
       -L "${LIBAFL_QEMU_BIOS_DIR}" \
       -nographic \

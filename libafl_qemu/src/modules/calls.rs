@@ -1,6 +1,6 @@
 use core::{cell::UnsafeCell, fmt::Debug};
 
-use capstone::prelude::*;
+use capstone::{Capstone, InsnDetail, arch::BuildsCapstone};
 use libafl::{
     executors::ExitKind,
     inputs::Input,
@@ -303,9 +303,9 @@ where
 
             #[cfg(cpu_target = "arm")]
             h.cs.set_mode(if pc & 1 == 1 {
-                arch::arm::ArchMode::Thumb.into()
+                capstone::arch::arm::ArchMode::Thumb.into()
             } else {
-                arch::arm::ArchMode::Arm.into()
+                capstone::arch::arm::ArchMode::Arm.into()
             })
             .unwrap();
         }
