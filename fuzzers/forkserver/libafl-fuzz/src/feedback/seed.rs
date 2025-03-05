@@ -100,12 +100,6 @@ where
         Ok(())
     }
 
-    /// Discard the stored metadata in case that the testcase is not added to the corpus
-    #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.inner.discard_metadata(state, input)?;
-        Ok(())
-    }
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         self.inner.last_result()

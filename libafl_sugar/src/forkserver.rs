@@ -1,6 +1,7 @@
 //! An `afl`-style forkserver fuzzer.
 //! Use this if your target has complex state that needs to be reset.
-use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
+use core::{net::SocketAddr, time::Duration};
+use std::{fs, path::PathBuf};
 
 use libafl::{
     Error, HasMetadata,

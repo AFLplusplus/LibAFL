@@ -269,7 +269,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "aarch64")]
                 let insts = disas_count(
                     &decoder,
-                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                    unsafe { core::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
                     11,
                 );
 
@@ -540,7 +540,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "aarch64")]
                 let insts = disas_count(
                     &decoder,
-                    unsafe { std::slice::from_raw_parts(*start_pc as *mut u8, 4 * 11) },
+                    unsafe { core::slice::from_raw_parts(*start_pc as *mut u8, 4 * 11) },
                     11,
                 );
 
@@ -688,11 +688,6 @@ where
             testcase.add_metadata(errors.clone());
         }
 
-        Ok(())
-    }
-
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.errors = None;
         Ok(())
     }
 

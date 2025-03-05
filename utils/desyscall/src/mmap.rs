@@ -1,6 +1,6 @@
 //! Stub out syscalls. Linux only.
 
-use std::ptr;
+use core::ptr;
 
 use libc::{c_int, c_void, off_t, size_t};
 use meminterval::Interval;

@@ -148,12 +148,6 @@ pub trait Feedback<EM, I, OT, S>: StateInitializer<S> + Named {
     ) -> Result<(), Error> {
         Ok(())
     }
-
-    /// Discard the stored metadata in case that the testcase is not added to the corpus
-    #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        Ok(())
-    }
 }
 
 /// Has an associated observer name (mostly used to retrieve the observer with `MatchName` from an `ObserverTuple`)
@@ -305,12 +299,6 @@ where
             .append_metadata(state, manager, observers, testcase)?;
         self.second
             .append_metadata(state, manager, observers, testcase)
-    }
-
-    #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.first.discard_metadata(state, input)?;
-        self.second.discard_metadata(state, input)
     }
 }
 
@@ -669,11 +657,6 @@ where
     ) -> Result<(), Error> {
         self.inner
             .append_metadata(state, manager, observers, testcase)
-    }
-
-    #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.inner.discard_metadata(state, input)
     }
 }
 

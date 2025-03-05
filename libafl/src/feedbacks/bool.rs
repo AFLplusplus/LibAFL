@@ -91,10 +91,6 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        Ok(())
-    }
-
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         self.last_result.ok_or_else(|| Error::illegal_state("No last result set in `BoolValuefeedback`. Either `is_interesting` has never been called or the fuzzer restarted in the meantime."))
