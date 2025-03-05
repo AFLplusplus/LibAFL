@@ -1,8 +1,8 @@
 //! `LibAFL` functionality for filesystem interaction
 
-use alloc::rc::Rc;
 #[cfg(feature = "std")]
 use alloc::{borrow::ToOwned, vec::Vec};
+use alloc::{rc::Rc, string::String};
 use core::cell::RefCell;
 #[cfg(feature = "std")]
 use core::time::Duration;
@@ -11,10 +11,9 @@ use std::os::unix::prelude::{AsRawFd, RawFd};
 #[cfg(feature = "std")]
 use std::time::SystemTime;
 use std::{
-    fs::{self, remove_file, File, OpenOptions},
+    fs::{self, File, OpenOptions, remove_file},
     io::{Seek, Write},
     path::{Path, PathBuf},
-    string::String,
 };
 
 use crate::Error;
@@ -138,10 +137,9 @@ impl InputFile {
     /// Rewinds the file to the beginning
     #[inline]
     pub fn rewind(&mut self) -> Result<(), Error> {
-        if let Err(err) = self.file.rewind() {
-            Err(err.into())
-        } else {
-            Ok(())
+        match self.file.rewind() {
+            Err(err) => Err(err.into()),
+            _ => Ok(()),
         }
     }
 }
@@ -201,7 +199,7 @@ impl Drop for InputFile {
 mod test {
     use std::fs;
 
-    use crate::fs::{write_file_atomic, InputFile};
+    use crate::fs::{InputFile, write_file_atomic};
 
     #[test]
     fn test_atomic_file_write() {

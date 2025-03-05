@@ -5,15 +5,15 @@ use alloc::borrow::Cow;
 use core::fmt::Debug;
 
 use libafl::{
-    executors::ExitKind,
-    observers::{cmp::CmpValuesMetadata, CmpMap, CmpObserver, Observer},
     Error, HasMetadata,
+    executors::ExitKind,
+    observers::{CmpMap, CmpObserver, Observer, cmp::CmpValuesMetadata},
 };
-use libafl_bolts::{ownedref::OwnedMutPtr, Named};
+use libafl_bolts::{Named, ownedref::OwnedMutPtr};
 
 #[cfg(feature = "cmplog")]
 use crate::cmps::libafl_cmplog_map_ptr;
-use crate::cmps::{CmpLogMap, CMPLOG_ENABLED};
+use crate::cmps::{CMPLOG_ENABLED, CmpLogMap};
 /// A [`CmpObserver`] observer for `CmpLog`
 #[derive(Debug)]
 pub struct CmpLogObserver {

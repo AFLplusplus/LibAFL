@@ -15,22 +15,22 @@ use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::GuestAddr;
 use libc::{
-    c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
+    MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE, c_void,
 };
 use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
+    Qemu, QemuParams, Regs,
     emu::EmulatorModules,
     modules::{
+        AddressFilter, EmulatorModule, EmulatorModuleTuple,
         calls::FullBacktraceCollector,
         snapshot::SnapshotModule,
         utils::filters::{HasAddressFilter, StdAddressFilter},
-        AddressFilter, EmulatorModule, EmulatorModuleTuple,
     },
     qemu::{Hook, MemAccessInfo, QemuHooks, SyscallHookResult},
     sys::TCGTemp,
-    Qemu, QemuParams, Regs,
 };
 
 // TODO at some point, merge parts with libafl_frida
@@ -171,7 +171,7 @@ impl AsanErrorCallback {
     /// The `ASan` error report accesses [`FullBacktraceCollector`]
     #[must_use]
     pub unsafe fn report() -> Self {
-        Self::new(Box::new(|rt, qemu, pc, err| {
+        Self::new(Box::new(|rt, qemu, pc, err| unsafe {
             asan_report(rt, qemu, pc, &err);
         }))
     }
@@ -330,7 +330,7 @@ impl AsanModuleBuilder {
             self.detect_leaks,
             self.snapshot,
             self.filter,
-            Some(AsanErrorCallback::report()),
+            Some(unsafe { AsanErrorCallback::report() }),
             self.target_crash,
         )
     }
@@ -478,41 +478,43 @@ impl AsanModule {
 
 impl AsanGiovese {
     unsafe fn init(self: &mut Pin<Box<Self>>, qemu_hooks: QemuHooks) {
-        assert_ne!(
-            libc::mmap(
-                HIGH_SHADOW_ADDR,
-                HIGH_SHADOW_SIZE,
-                PROT_READ | PROT_WRITE,
-                MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
-                -1,
-                0
-            ),
-            MAP_FAILED
-        );
-        assert_ne!(
-            libc::mmap(
-                LOW_SHADOW_ADDR,
-                LOW_SHADOW_SIZE,
-                PROT_READ | PROT_WRITE,
-                MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
-                -1,
-                0
-            ),
-            MAP_FAILED
-        );
-        assert_ne!(
-            libc::mmap(
-                GAP_SHADOW_ADDR,
-                GAP_SHADOW_SIZE,
-                PROT_READ | PROT_WRITE,
-                MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
-                -1,
-                0
-            ),
-            MAP_FAILED
-        );
+        unsafe {
+            assert_ne!(
+                libc::mmap(
+                    HIGH_SHADOW_ADDR,
+                    HIGH_SHADOW_SIZE,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
+                    -1,
+                    0
+                ),
+                MAP_FAILED
+            );
+            assert_ne!(
+                libc::mmap(
+                    LOW_SHADOW_ADDR,
+                    LOW_SHADOW_SIZE,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
+                    -1,
+                    0
+                ),
+                MAP_FAILED
+            );
+            assert_ne!(
+                libc::mmap(
+                    GAP_SHADOW_ADDR,
+                    GAP_SHADOW_SIZE,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
+                    -1,
+                    0
+                ),
+                MAP_FAILED
+            );
 
-        qemu_hooks.add_pre_syscall_hook(self.as_mut(), Self::fake_syscall);
+            qemu_hooks.add_pre_syscall_hook(self.as_mut(), Self::fake_syscall);
+        }
     }
 
     #[must_use]
@@ -1116,12 +1118,12 @@ where
 }
 
 impl HasAddressFilter for AsanModule {
-    type ModuleAddressFilter = StdAddressFilter;
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    type AddressFilter = StdAddressFilter;
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.filter
     }
 }

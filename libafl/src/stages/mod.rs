@@ -25,9 +25,8 @@ pub use dump::*;
 pub use generalization::GeneralizationStage;
 use hashbrown::HashSet;
 use libafl_bolts::{
-    impl_serdeany,
+    Named, impl_serdeany,
     tuples::{HasConstLen, IntoVec},
-    Named,
 };
 pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
@@ -47,10 +46,10 @@ pub use unicode::*;
 pub use verify_timeouts::{TimeoutsToVerify, VerifyTimeoutsStage};
 
 use crate::{
+    Error, HasNamedMetadata,
     corpus::{CorpusId, HasCurrentCorpusId},
     events::SendExiting,
     state::{HasCurrentStageId, HasExecutions, MaybeHasClientPerfMonitor, Stoppable},
-    Error, HasNamedMetadata,
 };
 
 /// Mutational stage is the normal fuzzing stage.
@@ -522,7 +521,10 @@ impl ExecutionCountRestartHelper {
     {
         self.started_at_execs = None;
         let _metadata = state.remove_named_metadata::<ExecutionCountRestartHelperMetadata>(name);
-        debug_assert!(_metadata.is_some(), "Called clear_progress, but should_restart was not called before (or did mutational stages get nested?)");
+        debug_assert!(
+            _metadata.is_some(),
+            "Called clear_progress, but should_restart was not called before (or did mutational stages get nested?)"
+        );
         Ok(())
     }
 }

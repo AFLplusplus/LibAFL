@@ -12,14 +12,14 @@ use libafl_qemu_sys::{GuestAddr, MapInfo};
 #[cfg(not(feature = "clippy"))]
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
+    QemuParams,
     emu::EmulatorModules,
     modules::{
-        utils::filters::{HasAddressFilter, StdAddressFilter},
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        utils::filters::{HasAddressFilter, StdAddressFilter},
     },
     qemu::{Hook, MemAccessInfo, Qemu},
     sys::TCGTemp,
-    QemuParams,
 };
 
 #[derive(Clone)]
@@ -342,13 +342,13 @@ impl<F> HasAddressFilter for AsanGuestModule<F>
 where
     F: AddressFilter,
 {
-    type ModuleAddressFilter = F;
+    type AddressFilter = F;
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.filter
     }
 }

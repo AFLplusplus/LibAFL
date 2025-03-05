@@ -1,28 +1,27 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
+use alloc::borrow::Cow;
+use core::{fmt::Debug, marker::PhantomData};
 use std::{
-    borrow::Cow,
-    fmt::Debug,
     io::Write,
-    marker::PhantomData,
     sync::{Mutex, MutexGuard},
 };
 
 use backtrace::Backtrace;
-use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
+use color_backtrace::{BacktracePrinter, Verbosity, default_output_stream};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
 use frida_gum::{Gum, Process};
 use libafl::{
+    Error, HasMetadata,
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
-    Error, HasMetadata,
 };
 use libafl_bolts::{
+    Named, SerdeAny,
     ownedref::OwnedPtr,
     tuples::{Handle, Handled, MatchNameRef},
-    Named, SerdeAny,
 };
 use mmap_rs::MmapOptions;
 use serde::{Deserialize, Serialize};
@@ -38,7 +37,7 @@ use yaxpeax_x86::amd64::InstDecoder;
 #[cfg(target_arch = "x86_64")]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 use crate::{
-    alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, utils::disas_count,
+    allocator::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, utils::disas_count,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -263,7 +262,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 let insts = disas_count(
                     &decoder,
-                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
+                    unsafe { core::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
                     11,
                 );
 
@@ -534,7 +533,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 let insts = disas_count(
                     &decoder,
-                    unsafe { std::slice::from_raw_parts(*start_pc as *mut u8, 15 * 11) },
+                    unsafe { core::slice::from_raw_parts(*start_pc as *mut u8, 15 * 11) },
                     11,
                 );
 

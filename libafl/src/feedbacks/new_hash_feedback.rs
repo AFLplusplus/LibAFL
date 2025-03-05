@@ -1,22 +1,22 @@
 //! The [`NewHashFeedback`] uses the backtrace hash and a hashset to only keep novel cases
 
 use alloc::{borrow::Cow, string::ToString};
-use std::fmt::Debug;
+use core::fmt::Debug;
 
 use hashbrown::HashSet;
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
+    Error, HasNamedMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     observers::ObserverWithHashField,
-    Error, HasNamedMetadata,
 };
 
 /// The prefix of the metadata names

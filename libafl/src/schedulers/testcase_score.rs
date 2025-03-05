@@ -4,6 +4,7 @@ use alloc::string::{String, ToString};
 use libafl_bolts::{HasLen, HasRefCnt};
 
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, SchedulerTestcaseMetadata, Testcase},
     feedbacks::MapIndexesMetadata,
     schedulers::{
@@ -11,7 +12,6 @@ use crate::{
         powersched::{BaseSchedule, SchedulerMetadata},
     },
     state::HasCorpus,
-    Error, HasMetadata,
 };
 
 /// Compute the favor factor of a [`Testcase`]. Higher is better.
@@ -317,7 +317,7 @@ where
             Err(e) => {
                 return Err(Error::key_not_found(format!(
                     "{e:?} You have to use Minimizer scheduler with this.",
-                )))
+                )));
             }
         };
 

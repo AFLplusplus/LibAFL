@@ -2,10 +2,10 @@ use alloc::{borrow::Cow, string::String};
 use std::{fs::File, io::BufReader, path::Path};
 
 use hashbrown::HashMap;
-use libafl_bolts::{ownedref::OwnedMutPtr, Named};
+use libafl_bolts::{Named, ownedref::OwnedMutPtr};
 use serde::{Deserialize, Serialize};
 
-use crate::{observers::Observer, Error};
+use crate::{Error, observers::Observer};
 #[derive(Debug, Serialize, Deserialize)]
 /// The json data
 pub struct FunctionData {

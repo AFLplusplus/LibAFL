@@ -1,12 +1,13 @@
 //! An example for TUI that uses the TUI without any real data.
 //! This is mainly to fix the UI without having to run a real fuzzer.
 
-use std::{thread::sleep, time::Duration};
+use core::time::Duration;
+use std::thread::sleep;
 
 use libafl::monitors::{
-    stats::{manager::ClientStatsManager, ClientStats},
-    tui::TuiMonitor,
     Monitor,
+    stats::{ClientStats, manager::ClientStatsManager},
+    tui::TuiMonitor,
 };
 use libafl_bolts::ClientId;
 

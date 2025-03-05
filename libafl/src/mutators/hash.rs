@@ -1,8 +1,9 @@
 //! A wrapper around a [`Mutator`] that ensures an input really changed [`MutationResult::Mutated`]
 //! by hashing pre- and post-mutation
-use std::{borrow::Cow, hash::Hash};
+use alloc::borrow::Cow;
+use core::hash::Hash;
 
-use libafl_bolts::{generic_hash_std, Error, Named};
+use libafl_bolts::{Error, Named, generic_hash_std};
 
 use super::{MutationResult, Mutator};
 

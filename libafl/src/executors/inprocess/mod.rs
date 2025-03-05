@@ -12,22 +12,22 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::tuples::{tuple_list, RefIndexable};
+use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
     executors::{
-        hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
-        inprocess::inner::GenericInProcessExecutorInner,
         Executor, ExitKind, HasObservers,
+        hooks::{ExecutorHooksTuple, inprocess::InProcessHooks},
+        inprocess::inner::GenericInProcessExecutorInner,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
-    Error, HasMetadata,
 };
 
 /// The inner structure of `InProcessExecutor`.
@@ -271,7 +271,6 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -440,6 +439,7 @@ mod tests {
     use libafl_bolts::{rands::XkcdRand, tuples::tuple_list};
 
     use crate::{
+        StdFuzzer,
         corpus::InMemoryCorpus,
         events::NopEventManager,
         executors::{Executor, ExitKind, InProcessExecutor},
@@ -447,7 +447,6 @@ mod tests {
         inputs::NopInput,
         schedulers::RandScheduler,
         state::{NopState, StdState},
-        StdFuzzer,
     };
 
     #[test]

@@ -13,7 +13,7 @@ type pthread_introspection_hook_t = extern "C" fn(
     size: libc::size_t,
 );
 
-extern "C" {
+unsafe extern "C" {
     fn pthread_introspection_hook_install(
         hook: *const pthread_introspection_hook_t,
     ) -> *const pthread_introspection_hook_t;

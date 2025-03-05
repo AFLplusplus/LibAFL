@@ -1,17 +1,17 @@
+use core::marker::PhantomData;
 use std::{
     io::{Read, Seek},
-    marker::PhantomData,
     os::fd::AsRawFd,
 };
 
 use libafl::{
+    Error,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdOutObserver},
     state::HasExecutions,
-    Error,
 };
-use libafl_bolts::{tuples::RefIndexable, AsSlice};
+use libafl_bolts::{AsSlice, tuples::RefIndexable};
 use libnyx::NyxReturnValue;
 
 use crate::{cmplog::CMPLOG_ENABLED, helper::NyxHelper};
@@ -135,11 +135,11 @@ where
 }
 
 impl<S, OT> HasTimeout for NyxExecutor<S, OT> {
-    fn timeout(&self) -> std::time::Duration {
+    fn timeout(&self) -> core::time::Duration {
         self.helper.timeout
     }
 
-    fn set_timeout(&mut self, timeout: std::time::Duration) {
+    fn set_timeout(&mut self, timeout: core::time::Duration) {
         let micros = 1000000;
         let mut timeout_secs = timeout.as_secs();
         let mut timeout_micros = timeout.as_micros() - u128::from(timeout.as_secs() * micros);
@@ -163,7 +163,7 @@ impl<S, OT> NyxExecutor<S, OT> {
     /// Mutable borrow may only be used once at a time.
     pub unsafe fn trace_bits(self) -> &'static mut [u8] {
         unsafe {
-            std::slice::from_raw_parts_mut(self.helper.bitmap_buffer, self.helper.bitmap_size)
+            core::slice::from_raw_parts_mut(self.helper.bitmap_buffer, self.helper.bitmap_size)
         }
     }
 }

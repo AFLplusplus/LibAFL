@@ -1,5 +1,5 @@
+use core::cell::RefCell;
 use std::{
-    cell::RefCell,
     env,
     fs::File,
     io::Write,

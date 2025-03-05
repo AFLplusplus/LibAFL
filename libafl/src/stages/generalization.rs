@@ -7,13 +7,14 @@ use alloc::{
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::{
-    tuples::{Handle, Handled},
     AsSlice, Named,
+    tuples::{Handle, Handled},
 };
 
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
@@ -26,7 +27,6 @@ use crate::{
     stages::{Restartable, RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor},
-    Error, HasMetadata, HasNamedMetadata,
 };
 
 const MAX_GENERALIZED_LEN: usize = 8192;

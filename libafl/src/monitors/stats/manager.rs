@@ -6,15 +6,15 @@ use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::time::Duration;
 
 use hashbrown::HashMap;
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
+use libafl_bolts::{ClientId, current_time, format_duration_hms};
 #[cfg(feature = "std")]
 use serde_json::Value;
 
-use super::{user_stats::UserStatsValue, ClientStats, EdgeCoverage, ProcessTiming};
+use super::{ClientStats, EdgeCoverage, ProcessTiming, user_stats::UserStatsValue};
 #[cfg(feature = "std")]
 use super::{
-    user_stats::{AggregatorOps, UserStats},
     ItemGeometry,
+    user_stats::{AggregatorOps, UserStats},
 };
 
 /// Manager of all client's statistics

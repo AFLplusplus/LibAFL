@@ -11,7 +11,7 @@ use crate::cargo_add_rpath;
 
 pub const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 pub const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-pub const QEMU_REVISION: &str = "59ce9daf5456d08b3908ac4a1151f7cfd961aa5d";
+pub const QEMU_REVISION: &str = "3c60ef9b83107a160021075b485831edecb5a1c3";
 
 pub struct BuildResult {
     pub qemu_path: PathBuf,
@@ -300,7 +300,9 @@ pub fn build(
 
     let libafl_qemu_dir = if let Some(qemu_dir) = libafl_qemu_dir.as_ref() {
         if libafl_qemu_clone_dir.is_some() {
-            println!("cargo:warning=LIBAFL_QEMU_DIR and LIBAFL_QEMU_CLONE_DIR are both set. LIBAFL_QEMU_DIR will be considered in priority");
+            println!(
+                "cargo:warning=LIBAFL_QEMU_DIR and LIBAFL_QEMU_CLONE_DIR are both set. LIBAFL_QEMU_DIR will be considered in priority"
+            );
         }
 
         Path::new(&qemu_dir).to_path_buf()
@@ -321,38 +323,46 @@ pub fn build(
         if !qemu_path.is_dir() {
             println!("cargo:warning=Qemu not found, cloning with git ({QEMU_REVISION})...");
             fs::create_dir_all(&qemu_path).unwrap();
-            assert!(Command::new("git")
-                .current_dir(&qemu_path)
-                .arg("init")
-                .status()
-                .unwrap()
-                .success());
-            assert!(Command::new("git")
-                .current_dir(&qemu_path)
-                .arg("remote")
-                .arg("add")
-                .arg("origin")
-                .arg(QEMU_URL)
-                .status()
-                .unwrap()
-                .success());
-            assert!(Command::new("git")
-                .current_dir(&qemu_path)
-                .arg("fetch")
-                .arg("--depth")
-                .arg("1")
-                .arg("origin")
-                .arg(QEMU_REVISION)
-                .status()
-                .unwrap()
-                .success());
-            assert!(Command::new("git")
-                .current_dir(&qemu_path)
-                .arg("checkout")
-                .arg("FETCH_HEAD")
-                .status()
-                .unwrap()
-                .success());
+            assert!(
+                Command::new("git")
+                    .current_dir(&qemu_path)
+                    .arg("init")
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            assert!(
+                Command::new("git")
+                    .current_dir(&qemu_path)
+                    .arg("remote")
+                    .arg("add")
+                    .arg("origin")
+                    .arg(QEMU_URL)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            assert!(
+                Command::new("git")
+                    .current_dir(&qemu_path)
+                    .arg("fetch")
+                    .arg("--depth")
+                    .arg("1")
+                    .arg("origin")
+                    .arg(QEMU_REVISION)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            assert!(
+                Command::new("git")
+                    .current_dir(&qemu_path)
+                    .arg("checkout")
+                    .arg("FETCH_HEAD")
+                    .status()
+                    .unwrap()
+                    .success()
+            );
             fs::write(&qemu_rev, QEMU_REVISION).unwrap();
         }
 

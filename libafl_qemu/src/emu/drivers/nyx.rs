@@ -5,11 +5,11 @@ use libafl_bolts::os::CTRL_C_EXIT;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    command::{nyx::bindings, CommandManager, IsCommand},
-    modules::EmulatorModuleTuple,
     Emulator, EmulatorDriver, EmulatorDriverError, EmulatorDriverResult, EmulatorExitError,
     EmulatorExitResult, InputLocation, IsSnapshotManager, Qemu, QemuError, QemuShutdownCause, Regs,
     SnapshotId,
+    command::{CommandManager, IsCommand, nyx::bindings},
+    modules::EmulatorModuleTuple,
 };
 
 #[derive(Clone, Debug, TypedBuilder)]
@@ -180,7 +180,7 @@ where
                     return Err(EmulatorDriverError::UnhandledSignal(*signal));
                 }
                 QemuShutdownCause::GuestPanic => {
-                    return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)))
+                    return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)));
                 }
                 QemuShutdownCause::GuestShutdown | QemuShutdownCause::HostQmpQuit => {
                     log::warn!("Guest shutdown. Stopping fuzzing...");
@@ -189,7 +189,7 @@ where
                 _ => panic!("Unhandled QEMU shutdown cause: {shutdown_cause:?}."),
             },
             EmulatorExitResult::Timeout => {
-                return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Timeout)))
+                return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Timeout)));
             }
             EmulatorExitResult::Breakpoint(bp) => (bp.trigger(qemu), None),
             EmulatorExitResult::CustomInsn(sync_backdoor) => {

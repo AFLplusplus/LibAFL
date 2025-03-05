@@ -7,8 +7,8 @@ use core::{
 };
 
 use crate::{
-    ownedref::{OwnedMutSlice, OwnedSlice},
     HasLen,
+    ownedref::{OwnedMutSlice, OwnedSlice},
 };
 
 /// An immutable contiguous subslice of a byte slice.

@@ -3,7 +3,7 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
-use libafl::{observers::ObserversTuple, HasMetadata};
+use libafl::{HasMetadata, observers::ObserversTuple};
 pub use libafl_intelpt::SectionInfo;
 use libafl_intelpt::{Image, IntelPT, IntelPTBuilder};
 use libafl_qemu_sys::{CPUArchStatePtr, GuestAddr};
@@ -11,8 +11,8 @@ use num_traits::SaturatingAdd;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, ExitKind},
     EmulatorModules, NewThreadHook, Qemu, QemuParams,
+    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, ExitKind},
 };
 
 #[derive(Debug, TypedBuilder)]

@@ -4,8 +4,8 @@ use hashbrown::HashMap;
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
-    emu::{IsSnapshotManager, QemuSnapshotCheckResult},
     DeviceSnapshotFilter, Emulator, Qemu, SnapshotId, SnapshotManagerError,
+    emu::{IsSnapshotManager, QemuSnapshotCheckResult},
 };
 
 #[derive(Debug, Clone)]
@@ -168,13 +168,17 @@ impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
     /// Write a value to a phsical guest address, including ROM areas.
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {
-        self.qemu.write_phys_mem(paddr, buf);
+        unsafe {
+            self.qemu.write_phys_mem(paddr, buf);
+        }
     }
 
     /// Read a value from a physical guest address.
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn read_phys_mem(&self, paddr: GuestPhysAddr, buf: &mut [u8]) {
-        self.qemu.read_phys_mem(paddr, buf);
+        unsafe {
+            self.qemu.read_phys_mem(paddr, buf);
+        }
     }
 
     pub fn save_snapshot(&self, name: &str, sync: bool) {
@@ -201,7 +205,9 @@ impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
 
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn restore_fast_snapshot(&self, snapshot: FastSnapshotPtr) {
-        self.qemu.restore_fast_snapshot(snapshot);
+        unsafe {
+            self.qemu.restore_fast_snapshot(snapshot);
+        }
     }
 
     pub fn list_devices(&self) -> Vec<String> {

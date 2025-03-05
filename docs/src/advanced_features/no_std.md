@@ -31,7 +31,7 @@ Here, we use it in Rust. `external_current_millis` is then called from LibAFL.
 Note that it needs to be `no_mangle` in order to get picked up by LibAFL at linktime:
 
 ```rust,ignore
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn external_current_millis() -> u64 {
     unsafe { my_real_seconds()*1000 }
 }

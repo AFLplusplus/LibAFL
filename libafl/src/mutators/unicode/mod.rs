@@ -7,20 +7,19 @@ use core::{
     ops::Range,
 };
 
-use libafl_bolts::{rands::Rand, Error, HasLen, Named};
+use libafl_bolts::{Error, HasLen, Named, rands::Rand};
 
 use crate::{
+    HasMetadata,
     corpus::{CorpusId, HasTestcase, Testcase},
     inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
-    mutators::{rand_range, MutationResult, Mutator, Tokens},
+    mutators::{MutationResult, Mutator, Tokens, rand_range},
     nonzero,
     stages::{
-        extract_metadata,
+        UnicodeIdentificationMetadata, extract_metadata,
         mutational::{MutatedTransform, MutatedTransformPost},
-        UnicodeIdentificationMetadata,
     },
     state::{HasCorpus, HasMaxSize, HasRand},
-    HasMetadata,
 };
 
 /// Unicode category data, as used by string analysis and mutators.
@@ -508,7 +507,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use libafl_bolts::{rands::StdRand, Error};
+    use libafl_bolts::{Error, rands::StdRand};
 
     use crate::{
         corpus::NopCorpus,

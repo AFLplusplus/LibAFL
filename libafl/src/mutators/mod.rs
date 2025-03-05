@@ -48,12 +48,12 @@ pub mod nautilus;
 
 use alloc::{borrow::Cow, boxed::Box, vec::Vec};
 
-use libafl_bolts::{tuples::IntoVec, HasLen, Named};
+use libafl_bolts::{HasLen, Named, tuples::IntoVec};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use tuple_list::NonEmptyTuple;
 
-use crate::{corpus::CorpusId, Error};
+use crate::{Error, corpus::CorpusId};
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event
 // We can use it to report which mutations generated the testcase in the broker logs

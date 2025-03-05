@@ -5,8 +5,8 @@ use std::{
 };
 use std::{path::PathBuf, sync::Mutex};
 
-use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{executors::ExitKind, observers::ObserversTuple, HasMetadata};
+use hashbrown::{HashMap, hash_map::Entry};
+use libafl::{HasMetadata, executors::ExitKind, observers::ObserversTuple};
 use libafl_qemu_sys::{GuestAddr, GuestUsize};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
@@ -14,14 +14,14 @@ use serde::{Deserialize, Serialize};
 
 use super::utils::filters::HasAddressFilter;
 #[cfg(feature = "systemmode")]
-use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{HasPageFilter, NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
+    Qemu,
     emu::EmulatorModules,
     modules::{
-        utils::filters::NopAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        AddressFilter, EmulatorModule, EmulatorModuleTuple, utils::filters::NopAddressFilter,
     },
     qemu::Hook,
-    Qemu,
 };
 
 /// Trace of `block_id`s met at runtime
@@ -522,25 +522,26 @@ impl<F> HasAddressFilter for DrCovModule<F>
 where
     F: AddressFilter,
 {
-    type ModuleAddressFilter = F;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
+    type AddressFilter = F;
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.filter
     }
+}
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter(&self) -> &Self::ModulePageFilter {
+#[cfg(feature = "systemmode")]
+impl<F> HasPageFilter for DrCovModule<F> {
+    type PageFilter = NopPageFilter;
+
+    fn page_filter(&self) -> &Self::PageFilter {
         &NopPageFilter
     }
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+    fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
         unsafe { (&raw mut NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }

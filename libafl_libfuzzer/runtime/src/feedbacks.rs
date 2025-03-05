@@ -3,15 +3,14 @@ use core::{cell::RefCell, fmt::Debug};
 use std::borrow::Cow;
 
 use libafl::{
-    alloc,
+    Error, HasMetadata, alloc,
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, MinMapFeedback, StateInitializer},
     inputs::{BytesInput, Input},
     state::HasCorpus,
-    Error, HasMetadata,
 };
-use libafl_bolts::{impl_serdeany, tuples::MatchNameRef, Named};
+use libafl_bolts::{Named, impl_serdeany, tuples::MatchNameRef};
 use libafl_targets::OomFeedback;
 use serde::{Deserialize, Serialize};
 

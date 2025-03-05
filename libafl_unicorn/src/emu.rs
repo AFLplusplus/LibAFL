@@ -1,11 +1,11 @@
 use capstone::{
-    arch::{self, BuildsCapstone, BuildsCapstoneSyntax},
     Capstone,
+    arch::{self, BuildsCapstone, BuildsCapstoneSyntax},
 };
 pub use libafl_targets::{EDGES_MAP, EDGES_MAP_PTR};
 use unicorn_engine::{
-    unicorn_const::{Arch, Permission},
     RegisterARM, RegisterARM64, RegisterX86, Unicorn,
+    unicorn_const::{Arch, Permission},
 };
 
 use crate::helper::get_stack_pointer;

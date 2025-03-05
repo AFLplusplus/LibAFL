@@ -29,11 +29,11 @@ pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 
+use crate::Error;
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 use crate::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
 pub use crate::os::unix_shmem_server::{ServedShMem, ServedShMemProvider, ShMemService};
-use crate::Error;
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -194,7 +194,7 @@ impl ShMemId {
     #[cfg(feature = "alloc")]
     #[must_use]
     pub fn as_str(&self) -> &str {
-        alloc::str::from_utf8(&self.id[..self.null_pos()]).unwrap()
+        core::str::from_utf8(&self.id[..self.null_pos()]).unwrap()
     }
 }
 
@@ -256,12 +256,17 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
     }
 
     /// Write this map's config to env
+    ///
+    /// # Safety
+    /// Writes to env variables and may only be done single-threaded.
     #[cfg(feature = "std")]
-    fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
+    unsafe fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
         let map_size = self.len();
         let map_size_env = format!("{env_name}_SIZE");
-        env::set_var(env_name, self.id().to_string());
-        env::set_var(map_size_env, format!("{map_size}"));
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var(env_name, self.id().to_string()) };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { env::set_var(map_size_env, format!("{map_size}")) };
         Ok(())
     }
 }
@@ -642,14 +647,14 @@ impl<SP> RcShMemProvider<ServedShMemProvider<SP>> {
 
 /// A Unix sharedmem implementation.
 ///
-/// On Android, this is partially reused to wrap [`unix_shmem::ashmem::AshmemShMem`],
+/// On Android, this is partially reused to wrap `AshmemShMem`,
 /// Although for an [`ServedShMemProvider`] using a unix domain socket
 /// Is needed on top.
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 pub mod unix_shmem {
     /// Mmap [`ShMem`] for Unix
     #[cfg(not(target_os = "android"))]
-    pub use default::{MmapShMem, MmapShMemProvider, MAX_MMAP_FILENAME_LEN};
+    pub use default::{MAX_MMAP_FILENAME_LEN, MmapShMem, MmapShMemProvider};
 
     #[cfg(doc)]
     use crate::shmem::{ShMem, ShMemProvider};
@@ -684,9 +689,9 @@ pub mod unix_shmem {
         };
 
         use crate::{
+            Error,
             rands::{Rand, StdRand},
             shmem::{ShMem, ShMemId, ShMemProvider},
-            Error,
         };
 
         /// The max number of bytes used when generating names for [`MmapShMem`]s.
@@ -1051,7 +1056,9 @@ pub mod unix_shmem {
                     );
 
                     if os_id < 0_i32 {
-                        return Err(Error::unknown(format!("Failed to allocate a shared mapping of size {map_size} - check OS limits (i.e shmall, shmmax)")));
+                        return Err(Error::unknown(format!(
+                            "Failed to allocate a shared mapping of size {map_size} - check OS limits (i.e shmall, shmmax)"
+                        )));
                     }
 
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
@@ -1158,21 +1165,20 @@ pub mod unix_shmem {
     /// Module containing `ashmem` shared memory support, commonly used on Android.
     #[cfg(all(any(target_os = "linux", target_os = "android"), feature = "std"))]
     pub mod ashmem {
-        use alloc::string::ToString;
+        use alloc::{ffi::CString, string::ToString};
         use core::{
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::ffi::CString;
 
         use libc::{
-            c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
-            PROT_WRITE,
+            MAP_SHARED, O_RDWR, PROT_READ, PROT_WRITE, c_uint, c_ulong, c_void, close, ioctl, mmap,
+            open,
         };
 
         use crate::{
-            shmem::{ShMem, ShMemId, ShMemProvider},
             Error,
+            shmem::{ShMem, ShMemId, ShMemProvider},
         };
 
         /// An ashmem based impl for linux/android
@@ -1379,21 +1385,21 @@ pub mod unix_shmem {
         any(target_os = "linux", target_os = "android", target_os = "freebsd")
     ))]
     pub mod memfd {
-        use alloc::string::ToString;
+        use alloc::{ffi::CString, string::ToString};
         use core::{
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::{ffi::CString, os::fd::IntoRawFd};
+        use std::os::fd::IntoRawFd;
 
         use libc::{
-            c_void, close, fstat, ftruncate, mmap, munmap, MAP_SHARED, PROT_READ, PROT_WRITE,
+            MAP_SHARED, PROT_READ, PROT_WRITE, c_void, close, fstat, ftruncate, mmap, munmap,
         };
-        use nix::sys::memfd::{memfd_create, MemFdCreateFlag};
+        use nix::sys::memfd::{MemFdCreateFlag, memfd_create};
 
         use crate::{
-            shmem::{ShMem, ShMemId, ShMemProvider},
             Error,
+            shmem::{ShMem, ShMemId, ShMemProvider},
         };
 
         /// An memfd based impl for linux/android
@@ -1447,7 +1453,7 @@ pub mod unix_shmem {
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 let fd = i32::from(id);
                 unsafe {
-                    let mut stat = std::mem::zeroed();
+                    let mut stat = core::mem::zeroed();
                     if fstat(fd, &mut stat) == -1 {
                         return Err(Error::unknown(
                             "Failed to map the memfd mapping".to_string(),
@@ -1567,19 +1573,19 @@ pub mod win32_shmem {
 
     use uuid::Uuid;
     use windows::{
-        core::PCSTR,
         Win32::{
             Foundation::{CloseHandle, HANDLE},
             System::Memory::{
-                CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
-                FILE_MAP_ALL_ACCESS, MEMORY_MAPPED_VIEW_ADDRESS, PAGE_READWRITE,
+                CreateFileMappingA, FILE_MAP_ALL_ACCESS, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile,
+                OpenFileMappingA, PAGE_READWRITE, UnmapViewOfFile,
             },
         },
+        core::PCSTR,
     };
 
     use crate::{
-        shmem::{ShMem, ShMemId, ShMemProvider},
         Error,
+        shmem::{ShMem, ShMemId, ShMemProvider},
     };
 
     const INVALID_HANDLE_VALUE: *mut c_void = -1isize as *mut c_void;
@@ -1854,8 +1860,8 @@ mod tests {
     use serial_test::serial;
 
     use crate::{
-        shmem::{ShMemProvider, StdShMemProvider},
         AsSlice, AsSliceMut, Error,
+        shmem::{ShMemProvider, StdShMemProvider},
     };
 
     #[test]
@@ -1873,11 +1879,11 @@ mod tests {
     #[cfg(unix)]
     #[cfg_attr(miri, ignore)]
     fn test_persist_shmem() -> Result<(), Error> {
+        use alloc::string::ToString;
         use core::ffi::CStr;
         use std::{
             env,
             process::{Command, Stdio},
-            string::ToString,
         };
 
         use crate::shmem::{MmapShMemProvider, ShMem as _, ShMemId};

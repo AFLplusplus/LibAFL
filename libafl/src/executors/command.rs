@@ -1,30 +1,31 @@
 //! The command executor executes a sub program for each run
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use alloc::ffi::CString;
 use alloc::vec::Vec;
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use core::ffi::CStr;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     ops::IndexMut,
+    time::Duration,
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use std::{
-    ffi::{CStr, CString},
-    os::fd::AsRawFd,
-};
+use std::os::fd::AsRawFd;
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
     os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    time::Duration,
 };
 
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
-    fs::{get_unique_std_input_file, InputFile},
-    tuples::{Handle, MatchName, RefIndexable},
     AsSlice,
+    fs::{InputFile, get_unique_std_input_file},
+    tuples::{Handle, MatchName, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libc::STDIN_FILENO;
@@ -36,8 +37,9 @@ use nix::{
         signal::Signal,
         wait::WaitStatus,
         wait::{
-            waitpid, WaitPidFlag,
+            WaitPidFlag,
             WaitStatus::{Exited, PtraceEvent, Signaled, Stopped},
+            waitpid,
         },
     },
     unistd::Pid,
@@ -49,12 +51,12 @@ use super::HasTimeout;
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
+    Error,
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::HasExecutions,
     std::borrow::ToOwned,
-    Error,
 };
 
 /// How to deliver input to an external program
@@ -151,13 +153,18 @@ where
             InputLocation::StdIn => {
                 let mut handle = self.command.stdin(Stdio::piped()).spawn()?;
                 let mut stdin = handle.stdin.take().unwrap();
-                if let Err(err) = stdin.write_all(input.target_bytes().as_slice()) {
-                    if err.kind() != std::io::ErrorKind::BrokenPipe {
-                        return Err(err.into());
+                match stdin.write_all(input.target_bytes().as_slice()) {
+                    Err(err) => {
+                        if err.kind() != std::io::ErrorKind::BrokenPipe {
+                            return Err(err.into());
+                        }
                     }
-                } else if let Err(err) = stdin.flush() {
-                    if err.kind() != std::io::ErrorKind::BrokenPipe {
-                        return Err(err.into());
+                    _ => {
+                        if let Err(err) = stdin.flush() {
+                            if err.kind() != std::io::ErrorKind::BrokenPipe {
+                                return Err(err.into());
+                            }
+                        }
                     }
                 }
                 drop(stdin);
@@ -208,9 +215,9 @@ where
         use nix::{
             sys::{
                 personality, ptrace,
-                signal::{raise, Signal},
+                signal::{Signal, raise},
             },
-            unistd::{alarm, dup2, execve, fork, pipe, write, ForkResult},
+            unistd::{ForkResult, alarm, dup2, execve, fork, pipe, write},
         };
 
         match unsafe { fork() } {
@@ -482,9 +489,9 @@ where
             // Stopped(pid, Signal::SIGKILL) if pid == child => ExitKind::Oom,
             s => {
                 // TODO other cases?
-                return Err(Error::unsupported(
-                    format!("Target program returned an unexpected state when waiting on it. {s:?} (waiting for pid {child})")
-                ));
+                return Err(Error::unsupported(format!(
+                    "Target program returned an unexpected state when waiting on it. {s:?} (waiting for pid {child})"
+                )));
             }
         };
 
@@ -746,11 +753,11 @@ impl CommandExecutorBuilder {
 /// };
 ///
 /// use libafl::{
+///     Error,
 ///     corpus::Corpus,
-///     executors::{command::CommandConfigurator, Executor},
+///     executors::{Executor, command::CommandConfigurator},
 ///     inputs::{BytesInput, HasTargetBytes, Input},
 ///     state::HasExecutions,
-///     Error,
 /// };
 /// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
@@ -861,8 +868,8 @@ mod tests {
     use crate::{
         events::SimpleEventManager,
         executors::{
-            command::{CommandExecutor, InputLocation},
             Executor,
+            command::{CommandExecutor, InputLocation},
         },
         fuzzer::NopFuzzer,
         inputs::{BytesInput, NopInput},

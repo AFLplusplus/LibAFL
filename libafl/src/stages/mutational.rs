@@ -7,11 +7,12 @@ use alloc::{
 };
 use core::{marker::PhantomData, num::NonZeroUsize};
 
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{Named, rands::Rand};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, Testcase},
     fuzzer::Evaluator,
     inputs::Input,
@@ -21,7 +22,6 @@ use crate::{
     stages::{Restartable, RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
-    Error, HasMetadata, HasNamedMetadata,
 };
 
 // TODO multi mutators stage

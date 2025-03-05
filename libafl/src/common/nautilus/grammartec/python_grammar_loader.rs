@@ -1,6 +1,6 @@
 #![allow(clippy::useless_conversion)] // This seems to be a false-positive(?)
 
-use std::{ffi::CString, string::String, vec::Vec};
+use alloc::{ffi::CString, string::String, vec::Vec};
 
 use pyo3::{prelude::*, pyclass, types::IntoPyDict};
 

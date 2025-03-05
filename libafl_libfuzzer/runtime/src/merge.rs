@@ -1,12 +1,13 @@
 use std::{
     env::temp_dir,
     ffi::c_int,
-    fs::{rename, File},
+    fs::{File, rename},
     io::Write,
     os::fd::{AsRawFd, FromRawFd},
 };
 
 use libafl::{
+    Error, HasScheduler, StdFuzzer,
     corpus::Corpus,
     events::{SendExiting, SimpleRestartingEventManager},
     executors::{ExitKind, InProcessExecutor},
@@ -17,15 +18,14 @@ use libafl::{
     observers::{MultiMapObserver, TimeObserver},
     schedulers::RemovableScheduler,
     state::{HasCorpus, HasRand, StdState},
-    Error, HasScheduler, StdFuzzer,
 };
 use libafl_bolts::{
+    AsSlice,
     rands::{Rand, StdRand},
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsSlice,
 };
-use libafl_targets::{OomFeedback, OomObserver, COUNTERS_MAPS};
+use libafl_targets::{OomFeedback, OomObserver, counters_maps_ptr_mut};
 
 use crate::{
     corpus::{ArtifactCorpus, LibfuzzerCorpus},
@@ -41,7 +41,9 @@ pub fn merge(
     harness: &extern "C" fn(*const u8, usize) -> c_int,
 ) -> Result<(), Error> {
     if options.dirs().is_empty() {
-        return Err(Error::illegal_argument("Missing corpora to minimize; you should provide one directory to minimize into and one-to-many from which the inputs are loaded."));
+        return Err(Error::illegal_argument(
+            "Missing corpora to minimize; you should provide one directory to minimize into and one-to-many from which the inputs are loaded.",
+        ));
     }
 
     let crash_corpus = ArtifactCorpus::new();
@@ -93,7 +95,7 @@ pub fn merge(
         }
     }
 
-    let edges = unsafe { core::mem::take(&mut COUNTERS_MAPS) };
+    let edges = unsafe { core::mem::take(&mut *(counters_maps_ptr_mut())) };
     let edges_observer = MultiMapObserver::new("edges", edges);
 
     let time = TimeObserver::new("time");

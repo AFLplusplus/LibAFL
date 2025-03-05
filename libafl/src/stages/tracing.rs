@@ -11,6 +11,7 @@ use libafl_bolts::Named;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, HasNamedMetadata,
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers, ShadowExecutor},
     inputs::Input,
@@ -19,7 +20,6 @@ use crate::{
     stages::{Restartable, RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
-    Error, HasNamedMetadata,
 };
 
 /// A stage that runs a tracer executor

@@ -74,6 +74,14 @@ libafl_nyx/packer
 harness
 program
 fuzzer_libpng*
-forkserver_simple
 
 *.patch
+
+# Sometimes this happens
+rustc-ice-*
+
+# perf files
+*.mm_profdata
+
+# backup files
+*.bak

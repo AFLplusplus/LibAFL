@@ -4,19 +4,19 @@ use alloc::vec::Vec;
 use core::{hash::Hash, marker::PhantomData, time::Duration};
 
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchName},
     Named,
+    tuples::{Handle, Handled, MatchName},
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     schedulers::{
-        on_add_metadata_default, on_evaluation_metadata_default, on_next_metadata_default,
-        AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
+        AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler, on_add_metadata_default,
+        on_evaluation_metadata_default, on_next_metadata_default,
     },
     state::HasCorpus,
-    Error, HasMetadata,
 };
 
 /// The n fuzz size

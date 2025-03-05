@@ -18,21 +18,21 @@ use std::{
 };
 
 use hashbrown::HashSet;
-use libafl_bolts::{rands::Rand, AsSlice, HasLen};
+use libafl_bolts::{AsSlice, HasLen, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
 use crate::{
+    Error, HasMetadata,
     corpus::{CorpusId, HasCurrentCorpusId},
     inputs::{HasMutatorBytes, ResizableMutator},
     mutators::{
-        buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
+        MultiMutator, MutationResult, Mutator, Named, buffer_self_copy, mutations::buffer_copy,
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
     state::{HasCorpus, HasMaxSize, HasRand},
-    Error, HasMetadata,
 };
 
 /// A state metadata holding a list of tokens
@@ -113,23 +113,25 @@ impl Tokens {
         token_start: *const u8,
         token_stop: *const u8,
     ) -> Result<Self, Error> {
-        let mut ret = Self::default();
-        if token_start.is_null() || token_stop.is_null() {
-            return Ok(Self::new());
-        }
-        if token_stop < token_start {
-            return Err(Error::illegal_argument(format!(
-                "Tried to create tokens from illegal section: stop < start ({token_stop:?} < {token_start:?})"
-            )));
-        }
-        let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
-        // log::info!("size: {}", section_size);
-        let slice = from_raw_parts(token_start, section_size);
+        unsafe {
+            let mut ret = Self::default();
+            if token_start.is_null() || token_stop.is_null() {
+                return Ok(Self::new());
+            }
+            if token_stop < token_start {
+                return Err(Error::illegal_argument(format!(
+                    "Tried to create tokens from illegal section: stop < start ({token_stop:?} < {token_start:?})"
+                )));
+            }
+            let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
+            // log::info!("size: {}", section_size);
+            let slice = from_raw_parts(token_start, section_size);
 
-        // Now we know the beginning and the end of the token section.. let's parse them into tokens
-        ret.parse_autodict(slice, section_size);
+            // Now we know the beginning and the end of the token section.. let's parse them into tokens
+            ret.parse_autodict(slice, section_size);
 
-        Ok(ret)
+            Ok(ret)
+        }
     }
 
     /// Creates a new instance from a file
@@ -195,7 +197,7 @@ impl Tokens {
                 Err(_) => {
                     return Err(Error::illegal_argument(format!(
                         "Illegal line (hex decoding): {line}"
-                    )))
+                    )));
                 }
             };
 
@@ -2128,7 +2130,7 @@ token2="B"
         let taint_len = 0;
         let input_len = 0;
         let hshape = 0;
-        let mut vec = std::vec::Vec::new();
+        let mut vec = alloc::vec::Vec::new();
 
         let _res = rq.cmp_extend_encoding(
             pattern,

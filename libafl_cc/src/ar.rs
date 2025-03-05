@@ -1,9 +1,10 @@
 //! Ar Wrapper from `LibAFL`
 // pass to e.g. cmake with -DCMAKE_AR=/path/to/fuzzer/target/release/libafl_ar
 
-use std::{env, path::PathBuf, str::FromStr};
+use core::str::FromStr;
+use std::{env, path::PathBuf};
 
-use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
+use crate::{Error, LIB_EXT, LIB_PREFIX, ToolWrapper};
 
 include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 

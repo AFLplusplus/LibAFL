@@ -1,14 +1,14 @@
 //! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
-use alloc::{borrow::Cow, string::String, vec::Vec};
 #[cfg(feature = "casr")]
+use alloc::string::ToString;
+use alloc::{borrow::Cow, string::String, vec::Vec};
+use core::fmt::Debug;
+#[cfg(feature = "casr")]
+use core::hash::{Hash, Hasher};
+#[cfg(feature = "casr")]
+use std::collections::hash_map::DefaultHasher;
 use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-    string::ToString,
-};
-use std::{
-    fmt::Debug,
     fs::{self, File},
     io::Read,
     path::Path,
@@ -16,7 +16,7 @@ use std::{
 };
 
 use backtrace::Backtrace;
-use libafl_bolts::{ownedref::OwnedRefMut, Named};
+use libafl_bolts::{Named, ownedref::OwnedRefMut};
 #[allow(unused_imports)] // expect breaks here for some reason
 #[cfg(feature = "casr")]
 use libcasr::{
@@ -30,8 +30,8 @@ use libcasr::{
     },
     init_ignored_frames,
     stacktrace::{
-        Filter, ParseStacktrace, Stacktrace, StacktraceEntry, STACK_FRAME_FILEPATH_IGNORE_REGEXES,
-        STACK_FRAME_FUNCTION_IGNORE_REGEXES,
+        Filter, ParseStacktrace, STACK_FRAME_FILEPATH_IGNORE_REGEXES,
+        STACK_FRAME_FUNCTION_IGNORE_REGEXES, Stacktrace, StacktraceEntry,
     },
 };
 #[cfg(not(feature = "casr"))]
@@ -39,7 +39,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use super::ObserverWithHashField;
-use crate::{executors::ExitKind, observers::Observer, Error};
+use crate::{Error, executors::ExitKind, observers::Observer};
 
 #[cfg(not(feature = "casr"))]
 /// Collects the backtrace via [`Backtrace`] and [`Debug`]

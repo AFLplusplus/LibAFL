@@ -7,6 +7,7 @@ use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata,
     common::nautilus::grammartec::{chunkstore::ChunkStore, context::Context},
     corpus::{Corpus, Testcase},
     executors::ExitKind,
@@ -14,7 +15,6 @@ use crate::{
     generators::NautilusContext,
     inputs::NautilusInput,
     state::HasCorpus,
-    Error, HasMetadata,
 };
 
 /// Metadata for Nautilus grammar mutator chunks
@@ -25,7 +25,7 @@ pub struct NautilusChunksMetadata {
 }
 
 impl Debug for NautilusChunksMetadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
             "NautilusChunksMetadata {{ {} }}",

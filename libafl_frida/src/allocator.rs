@@ -7,7 +7,17 @@
         target_os = "android"
     )
 ))]
-use std::{collections::BTreeMap, ffi::c_void};
+use alloc::collections::BTreeMap;
+#[cfg(any(
+    windows,
+    target_os = "linux",
+    target_vendor = "apple",
+    all(
+        any(target_arch = "aarch64", target_arch = "x86_64"),
+        target_os = "android"
+    )
+))]
+use core::ffi::c_void;
 
 use backtrace::Backtrace;
 use frida_gum::{PageProtection, RangeDetails};
@@ -183,12 +193,12 @@ impl Allocator {
                 panic!("ASAN: Allocation is too large: 0x{size:x}");
             }
 
-            return std::ptr::null_mut();
+            return core::ptr::null_mut();
         }
         let rounded_up_size = self.round_up_to_page(size) + 2 * self.page_size;
 
         if self.total_allocation_size + rounded_up_size > self.max_total_allocation {
-            return std::ptr::null_mut();
+            return core::ptr::null_mut();
         }
         self.total_allocation_size += rounded_up_size;
 
@@ -212,7 +222,7 @@ impl Allocator {
                 Ok(mapping) => mapping,
                 Err(err) => {
                     log::error!("An error occurred while mapping memory: {err:?}");
-                    return std::ptr::null_mut();
+                    return core::ptr::null_mut();
                 }
             };
             self.current_mapping_addr += ((rounded_up_size
@@ -222,7 +232,7 @@ impl Allocator {
 
             self.map_shadow_for_region(
                 mapping.as_ptr() as usize,
-                mapping.as_ptr().add(rounded_up_size) as usize,
+                unsafe { mapping.as_ptr().add(rounded_up_size) as usize },
                 false,
             );
             let address = mapping.as_ptr() as usize;
@@ -241,12 +251,14 @@ impl Allocator {
             metadata
         };
 
-        self.largest_allocation = std::cmp::max(self.largest_allocation, metadata.actual_size);
+        self.largest_allocation = core::cmp::max(self.largest_allocation, metadata.actual_size);
         // unpoison the shadow memory for the allocation itself
-        Self::unpoison(
-            map_to_shadow!(self, metadata.address + self.page_size),
-            size,
-        );
+        unsafe {
+            Self::unpoison(
+                map_to_shadow!(self, metadata.address + self.page_size),
+                size,
+            );
+        }
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
@@ -285,7 +297,9 @@ impl Allocator {
         }
 
         // poison the shadow memory for the allocation
-        Self::poison(shadow_mapping_start, metadata.size);
+        unsafe {
+            Self::poison(shadow_mapping_start, metadata.size);
+        }
     }
 
     /// Finds the metadata for the allocation at the given address.
@@ -304,7 +318,7 @@ impl Allocator {
             let new_offset = if hint_base == metadata.address {
                 (ptr - address).abs()
             } else {
-                std::cmp::min(offset_to_closest, (ptr - address).abs())
+                core::cmp::min(offset_to_closest, (ptr - address).abs())
             };
             if new_offset < offset_to_closest {
                 offset_to_closest = new_offset;
@@ -366,7 +380,7 @@ impl Allocator {
     /// start needs to be a valid address, We need to be able to fill `size / 8` bytes.
     unsafe fn unpoison(start: usize, size: usize) {
         unsafe {
-            std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0xff);
+            core::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0xff);
 
             let remainder = size % 8;
             if remainder > 0 {
@@ -383,7 +397,7 @@ impl Allocator {
     /// start needs to be a valid address, We need to be able to fill `size / 8` bytes.
     pub unsafe fn poison(start: usize, size: usize) {
         unsafe {
-            std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0x0);
+            core::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0x0);
 
             let remainder = size % 8;
             if remainder > 0 {
@@ -481,7 +495,7 @@ impl Allocator {
 
         let shadow_addr = map_to_shadow!(self, (address as usize));
         let shadow_size = size >> 3;
-        let buf = unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
+        let buf = unsafe { core::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
         let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
         if !prefix.iter().all(|&x| x == 0xff)
             || !suffix.iter().all(|&x| x == 0xff)
@@ -601,7 +615,7 @@ impl Allocator {
                 unsafe {
                     println!(
                         "{:x?}",
-                        std::slice::from_raw_parts(metadata.address as *const u8, metadata.size)
+                        core::slice::from_raw_parts(metadata.address as *const u8, metadata.size)
                     );
                 };
                 panic!("ASAN: Crashing target!");
@@ -798,7 +812,9 @@ impl Allocator {
                         self.using_pre_allocated_shadow_mapping = true;
                         break;
                     }
-                    log::warn!("shadow_bit {try_shadow_bit:} is not suitable - failed to allocate shadow memory");
+                    log::warn!(
+                        "shadow_bit {try_shadow_bit:} is not suitable - failed to allocate shadow memory"
+                    );
                 }
             }
         }

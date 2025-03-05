@@ -6,9 +6,9 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::{current_time, ClientId};
+use libafl_bolts::{ClientId, current_time};
 
-use crate::monitors::{stats::ClientStatsManager, Monitor};
+use crate::monitors::{Monitor, stats::ClientStatsManager};
 
 /// Tracking monitor during fuzzing and display both per-client and cumulative info.
 #[derive(Clone)]

@@ -8,9 +8,8 @@ use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{
-    generic_hash_std,
+    HasLen, Named, generic_hash_std,
     tuples::{Handle, Handled, MatchName, MatchNameRef},
-    HasLen, Named,
 };
 use serde::Serialize;
 
@@ -19,6 +18,8 @@ use crate::feedbacks::premature_last_result_err;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
+    HasScheduler,
     corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
     executors::{ExitKind, HasObservers},
@@ -29,16 +30,14 @@ use crate::{
     observers::ObserversTuple,
     schedulers::RemovableScheduler,
     stages::{
-        mutational::{MutatedTransform, MutatedTransformPost},
         ExecutionCountRestartHelper, Restartable, Stage,
+        mutational::{MutatedTransform, MutatedTransformPost},
     },
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions,
         MaybeHasClientPerfMonitor,
     },
-    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
-    HasScheduler,
 };
 
 /// The default corpus entry minimising mutational stage

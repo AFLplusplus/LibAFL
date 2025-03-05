@@ -8,10 +8,10 @@ use std::{
     path::PathBuf,
 };
 
-use libafl_bolts::{current_time, ClientId};
+use libafl_bolts::{ClientId, current_time};
 use serde_json::json;
 
-use crate::monitors::{stats::ClientStatsManager, Monitor};
+use crate::monitors::{Monitor, stats::ClientStatsManager};
 
 /// Wrap a monitor and log the current state of the monitor into a Toml file.
 #[derive(Debug, Clone)]

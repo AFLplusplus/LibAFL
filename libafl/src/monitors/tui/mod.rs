@@ -2,38 +2,42 @@
 //!
 //! It's based on [ratatui](https://ratatui.rs/)
 
-use alloc::{borrow::Cow, boxed::Box, string::ToString};
-use std::{
+use alloc::{
+    borrow::Cow,
+    boxed::Box,
     collections::VecDeque,
-    fmt::Write as _,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use core::{fmt::Write as _, time::Duration};
+use std::{
     io::{self, BufRead, Write},
     panic,
-    string::String,
-    sync::{Arc, RwLock},
+    sync::RwLock,
     thread,
-    time::{Duration, Instant},
-    vec::Vec,
+    time::Instant,
 };
 
 use crossterm::{
     cursor::{EnableBlinking, Show},
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use hashbrown::HashMap;
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
-use ratatui::{backend::CrosstermBackend, Terminal};
+use libafl_bolts::{ClientId, current_time, format_duration_hms};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::perf_stats::{ClientPerfStats, PerfFeature};
 use crate::monitors::{
-    stats::{
-        manager::ClientStatsManager, user_stats::UserStats, ClientStats, EdgeCoverage,
-        ItemGeometry, ProcessTiming,
-    },
     Monitor,
+    stats::{
+        ClientStats, EdgeCoverage, ItemGeometry, ProcessTiming, manager::ClientStatsManager,
+        user_stats::UserStats,
+    },
 };
 
 #[expect(missing_docs)]
@@ -568,7 +572,9 @@ fn run_tui_thread<W: Write + Send + Sync + 'static>(
                 )?;
                 terminal.show_cursor()?;
 
-                println!("\nPress Control-C to stop the fuzzers, otherwise press Enter to resume the visualization\n");
+                println!(
+                    "\nPress Control-C to stop the fuzzers, otherwise press Enter to resume the visualization\n"
+                );
 
                 let mut line = String::new();
                 io::stdin().lock().read_line(&mut line)?;

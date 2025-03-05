@@ -120,6 +120,10 @@ jobs:
       # ---- build normal and examples ----
       - name: Run a normal build
         run: cargo build --verbose
+      # - name: Run libafl_qemu usermode tests
+      #   run: cd libafl_qemu && cargo test
+      # - name: Run libafl_qemu systemmode tests
+      #   run: cd libafl_qemu && cargo test --no-default-features --features x86_64,systemmode
       - name: Build examples
         run: cargo build --examples --verbose
 
@@ -223,6 +227,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@cargo-hack
+      - run: rustup upgrade
       # Note: We currently only specify minimum rust versions for the default workspace members
       - run: cargo hack check --rust-version -p libafl -p libafl_bolts -p libafl_derive -p libafl_cc -p libafl_targets
 
@@ -378,10 +383,11 @@ jobs:
           - ./fuzzers/binary_only/qemu_coverage
           - ./fuzzers/binary_only/qemu_launcher
         arch:
-          - aarch64
-          - arm
-          - i386
-          - ppc
+          # unless somebody pays us for the servers.
+          # - aarch64
+          # - arm
+          # - i386
+          # - ppc
           - x86_64
 
     runs-on: [ self-hosted, qemu ]

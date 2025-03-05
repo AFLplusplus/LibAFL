@@ -3,13 +3,13 @@
 use alloc::borrow::Cow;
 use core::num::NonZero;
 
-use libafl_bolts::{rands::Rand, Error, Named};
+use libafl_bolts::{Error, Named, rands::Rand};
 use tuple_list::{tuple_list, tuple_list_type};
 
 use crate::{
     corpus::Corpus,
     generators::Generator,
-    inputs::{multi::MultipartInput, Input, ListInput},
+    inputs::{Input, ListInput, multi::MultipartInput},
     mutators::{MutationResult, Mutator},
     random_corpus_id,
     state::{HasCorpus, HasMaxSize, HasRand},

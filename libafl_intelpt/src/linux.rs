@@ -1,25 +1,28 @@
-use std::{
+extern crate alloc;
+
+use alloc::{
     borrow::ToOwned,
     boxed::Box,
-    ffi::{CStr, CString},
-    fmt::Debug,
-    format, fs,
-    ops::RangeInclusive,
+    ffi::CString,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{ffi::CStr, fmt::Debug, ops::RangeInclusive, ptr};
+use std::{
+    fs,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
         raw::c_void,
     },
     path::Path,
-    ptr,
-    string::{String, ToString},
     sync::LazyLock,
-    vec::Vec,
 };
 
 use arbitrary_int::u4;
 use bitbybit::bitfield;
 use caps::{CapSet, Capability};
-use libafl_bolts::{hash_64_fast, Error};
+use libafl_bolts::{Error, hash_64_fast};
 pub use libipt::{
     asid::Asid,
     image::{Image, SectionCache, SectionInfo},
@@ -36,13 +39,13 @@ use libipt::{
 use num_enum::TryFromPrimitive;
 use num_traits::{Euclid, SaturatingAdd};
 use perf_event_open_sys::{
-    bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
+    bindings::{PERF_FLAG_FD_CLOEXEC, perf_event_attr, perf_event_mmap_page},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
 use raw_cpuid::CpuId;
 
-use super::{availability, PAGE_SIZE};
+use super::{PAGE_SIZE, availability};
 
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
@@ -424,7 +427,9 @@ impl IntelPT {
                 if trace_entry_iters.0 == offset {
                     trace_entry_iters.1 += 1;
                     if trace_entry_iters.1 > 1000 {
-                        log::warn!("Decoder got stuck at trace offset {offset:x}. Make sure the decoder Image has the right content and offsets.");
+                        log::warn!(
+                            "Decoder got stuck at trace offset {offset:x}. Make sure the decoder Image has the right content and offsets."
+                        );
                         break 'block;
                     }
                 } else {

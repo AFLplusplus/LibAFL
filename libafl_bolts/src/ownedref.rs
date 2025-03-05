@@ -1,24 +1,20 @@
 //! Wrappers that abstracts references (or pointers) and owned data accesses.
 // The serialization is towards owned, allowing to serialize pointers without troubles.
 
-use alloc::{
-    boxed::Box,
-    slice::{Iter, IterMut},
-    vec::Vec,
-};
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     clone::Clone,
     fmt::Debug,
     ops::{Deref, DerefMut, RangeBounds},
     ptr::NonNull,
     slice,
-    slice::SliceIndex,
+    slice::{Iter, IterMut, SliceIndex},
 };
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
-    shmem::ShMem, AsSizedSlice, AsSizedSliceMut, AsSlice, AsSliceMut, IntoOwned, Truncate,
+    AsSizedSlice, AsSizedSliceMut, AsSlice, AsSliceMut, IntoOwned, Truncate, shmem::ShMem,
 };
 
 /// Constant size array visitor for serde deserialization.
@@ -28,8 +24,8 @@ mod arrays {
     use core::{convert::TryInto, marker::PhantomData};
 
     use serde::{
-        de::{SeqAccess, Visitor},
         Deserialize, Deserializer,
+        de::{SeqAccess, Visitor},
     };
 
     struct ArrayVisitor<T, const N: usize>(PhantomData<T>);
@@ -155,11 +151,13 @@ where
     /// The pointer needs to point to a valid object of type `T`.
     /// Any use of this [`OwnedRef`] will dereference the pointer accordingly.
     pub unsafe fn from_ptr(ptr: *const T) -> Self {
-        assert!(
-            !ptr.is_null(),
-            "Null pointer passed to OwnedRef::ref_raw constructor!"
-        );
-        Self::RefRaw(ptr, UnsafeMarker::new())
+        unsafe {
+            assert!(
+                !ptr.is_null(),
+                "Null pointer passed to OwnedRef::ref_raw constructor!"
+            );
+            Self::RefRaw(ptr, UnsafeMarker::new())
+        }
     }
 
     /// Returns true if the inner ref is a raw pointer, false otherwise.
@@ -191,7 +189,7 @@ where
     /// The shared memory needs to start with a valid object of type `T`.
     /// Any use of this [`OwnedRef`] will dereference a pointer to the shared memory accordingly.
     pub unsafe fn from_shmem<SHM: ShMem>(shmem: &mut SHM) -> Self {
-        Self::from_ptr(shmem.as_mut_ptr_of().unwrap())
+        unsafe { Self::from_ptr(shmem.as_mut_ptr_of().unwrap()) }
     }
 
     /// Returns a new [`OwnedRef`], owning the given value.
@@ -301,11 +299,13 @@ where
     /// The pointer needs to point to a valid object of type `T`.
     /// Any use of this [`OwnedRefMut`] will dereference the pointer accordingly.
     pub unsafe fn from_mut_ptr(ptr: *mut T) -> Self {
-        assert!(
-            !ptr.is_null(),
-            "Null pointer passed to OwnedRefMut::from_mut_ptr constructor!"
-        );
-        Self::RefRaw(ptr, UnsafeMarker::new())
+        unsafe {
+            assert!(
+                !ptr.is_null(),
+                "Null pointer passed to OwnedRefMut::from_mut_ptr constructor!"
+            );
+            Self::RefRaw(ptr, UnsafeMarker::new())
+        }
     }
 }
 
@@ -322,7 +322,7 @@ where
     /// The shared memory needs to start with a valid object of type `T`.
     /// Any use of this [`OwnedRefMut`] will dereference a pointer to the shared memory accordingly.
     pub unsafe fn from_shmem<SHM: ShMem>(shmem: &mut SHM) -> Self {
-        Self::from_mut_ptr(shmem.as_mut_ptr_of().unwrap())
+        unsafe { Self::from_mut_ptr(shmem.as_mut_ptr_of().unwrap()) }
     }
 
     /// Returns a new [`OwnedRefMut`], owning the given value.
@@ -462,8 +462,10 @@ impl<'a, T> OwnedSlice<'a, T> {
     /// The contents will be dereferenced in subsequent operations.
     #[must_use]
     pub unsafe fn from_raw_parts(ptr: *const T, len: usize) -> Self {
-        Self {
-            inner: OwnedSliceInner::RefRaw(ptr, len, UnsafeMarker::new()),
+        unsafe {
+            Self {
+                inner: OwnedSliceInner::RefRaw(ptr, len, UnsafeMarker::new()),
+            }
         }
     }
 
@@ -694,13 +696,15 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
     /// The contents will be dereferenced in subsequent operations.
     #[must_use]
     pub unsafe fn from_raw_parts_mut(ptr: *mut T, len: usize) -> OwnedMutSlice<'a, T> {
-        if ptr.is_null() || len == 0 {
-            Self {
-                inner: OwnedMutSliceInner::Owned(Vec::new()),
-            }
-        } else {
-            Self {
-                inner: OwnedMutSliceInner::RefRaw(ptr, len, UnsafeMarker::new()),
+        unsafe {
+            if ptr.is_null() || len == 0 {
+                Self {
+                    inner: OwnedMutSliceInner::Owned(Vec::new()),
+                }
+            } else {
+                Self {
+                    inner: OwnedMutSliceInner::RefRaw(ptr, len, UnsafeMarker::new()),
+                }
             }
         }
     }
@@ -933,8 +937,10 @@ impl<'a, T: 'a + Sized, const N: usize> OwnedMutSizedSlice<'a, T, N> {
     /// The content will be dereferenced in subsequent operations.
     #[must_use]
     pub unsafe fn from_raw_mut(ptr: NonNull<[T; N]>) -> OwnedMutSizedSlice<'a, T, N> {
-        Self {
-            inner: OwnedMutSizedSliceInner::RefRaw(ptr.as_ptr(), UnsafeMarker::new()),
+        unsafe {
+            Self {
+                inner: OwnedMutSizedSliceInner::RefRaw(ptr.as_ptr(), UnsafeMarker::new()),
+            }
         }
     }
 

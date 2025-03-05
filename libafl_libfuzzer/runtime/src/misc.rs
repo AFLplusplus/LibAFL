@@ -6,7 +6,7 @@ use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 use utf8_chars::BufReadCharsExt;
 
-use crate::{options::LibfuzzerOptions, CustomMutationStatus};
+use crate::{CustomMutationStatus, options::LibfuzzerOptions};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 pub(crate) struct ShouldUseGrimoireMetadata {
@@ -38,13 +38,17 @@ where
         .unwrap_or_default();
     let grimoire = if let Some(grimoire) = options.grimoire() {
         if grimoire && !mutator_status.std_mutational {
-            eprintln!("WARNING: cowardly refusing to use grimoire after detecting the presence of a custom mutator");
+            eprintln!(
+                "WARNING: cowardly refusing to use grimoire after detecting the presence of a custom mutator"
+            );
         }
         metadata.should = grimoire && mutator_status.std_mutational;
         metadata
     } else if mutator_status.std_mutational {
         if options.dirs().is_empty() {
-            eprintln!("WARNING: cowardly refusing to use grimoire since we cannot determine if the input is primarily text; set -grimoire=1 or provide a corpus directory.");
+            eprintln!(
+                "WARNING: cowardly refusing to use grimoire since we cannot determine if the input is primarily text; set -grimoire=1 or provide a corpus directory."
+            );
             metadata
         } else {
             let mut input_queue = VecDeque::new();
@@ -74,7 +78,11 @@ where
             }
             metadata.should = metadata.utf8 > metadata.non_utf8; // greater-than so zero testcases doesn't enable
             if metadata.should {
-                eprintln!("INFO: inferred grimoire mutator (found {}/{} UTF-8 inputs); if this is undesired, set -grimoire=0", metadata.utf8, metadata.utf8 + metadata.non_utf8);
+                eprintln!(
+                    "INFO: inferred grimoire mutator (found {}/{} UTF-8 inputs); if this is undesired, set -grimoire=0",
+                    metadata.utf8,
+                    metadata.utf8 + metadata.non_utf8
+                );
             }
             metadata
         }
