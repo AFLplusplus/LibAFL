@@ -194,7 +194,11 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(|e| {
-            if *e == self.initial { self.value_obs.default_value() } else { self.value_obs.value() }
+            if *e == self.initial {
+                self.value_obs.default_value()
+            } else {
+                self.value_obs.value()
+            }
         })
     }
 }
