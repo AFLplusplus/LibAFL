@@ -4,6 +4,7 @@
 /// Maintainer: Ziqiao Kong (https://github.com/wtdcode)
 /// Preprint: https://arxiv.org/abs/2402.16497 ICSE'25
 use core::marker::PhantomData;
+#[cfg(feature = "std")]
 use std::vec::Vec;
 
 use libafl_bolts::{
@@ -29,6 +30,7 @@ pub trait ExecutorsTuple<EM, I, S, Z> {
 /// Since in most cases, the executors types can not be determined during compilation
 /// time (for instance, the number of executors might change), this implementation would
 /// act as a small helper.
+#[cfg(feature = "std")]
 impl<E, EM, I, S, Z> ExecutorsTuple<EM, I, S, Z> for Vec<E>
 where
     E: Executor<EM, I, S, Z>,
