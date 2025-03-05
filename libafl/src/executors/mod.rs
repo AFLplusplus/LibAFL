@@ -29,7 +29,7 @@ pub mod differential;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub mod forkserver;
 pub mod inprocess;
-/// SAND(https://github.com/wtdcode/sand-aflpp) implementation
+/// SAND(<https://github.com/wtdcode/sand-aflpp>) implementation
 pub mod sand;
 
 /// The module for inproc fork executor
