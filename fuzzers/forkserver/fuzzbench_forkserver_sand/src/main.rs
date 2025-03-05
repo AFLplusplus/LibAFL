@@ -109,7 +109,7 @@ pub fn main() {
             Arg::new("sand")
                 .short('a')
                 .long("sand")
-                .action(ArgAction::Append)
+                .action(ArgAction::Append),
         )
         .arg(Arg::new("arguments"))
         .try_get_matches()
@@ -194,8 +194,11 @@ pub fn main() {
         .map(|v| v.map(std::string::ToString::to_string).collect::<Vec<_>>())
         .unwrap_or_default();
 
-    let sands = res.get_many::<String>("sand")
-        .map(|t| t.into_iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
+    let sands = res.get_many::<String>("sand").map(|t| {
+        t.into_iter()
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<_>>()
+    });
     fuzz(
         out_dir,
         crashes,
@@ -358,11 +361,21 @@ fn fuzz(
     println!("We imported {} inputs from disk.", state.corpus().count());
 
     let mut sand_executors = vec![];
-    for (idx, sand) in sand_execs.as_ref().map(|t| t.iter()).into_iter().flatten().enumerate() {
+    for (idx, sand) in sand_execs
+        .as_ref()
+        .map(|t| t.iter())
+        .into_iter()
+        .flatten()
+        .enumerate()
+    {
         // The extra binaries doesn't need track coverage
         let buf = Box::leak(Box::new(vec![0; MAP_SIZE]));
         let edges_observer = unsafe {
-            HitcountsMapObserver::new(StdMapObserver::new(format!("dumb_shm_{}", idx), buf.as_mut_slice())).track_indices()
+            HitcountsMapObserver::new(StdMapObserver::new(
+                format!("dumb_shm_{}", idx),
+                buf.as_mut_slice(),
+            ))
+            .track_indices()
         };
         let time_observer = TimeObserver::new(format!("dumb_tm_{}", idx));
         let executor = ForkserverExecutor::builder()
@@ -379,7 +392,6 @@ fn fuzz(
         sand_executors.push(executor);
     }
     let mut executor = SANDExecutor::new_paper(executor, sand_executors, edge_handle);
-
 
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
