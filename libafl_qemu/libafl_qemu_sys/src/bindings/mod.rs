@@ -11,6 +11,7 @@
 #[rustfmt::skip]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
+#[allow(clippy::std_instead_of_core)]
 #[cfg(any(feature = "clippy", not(target_os = "linux")))]
 mod x86_64_stub_bindings;
 #[cfg(any(feature = "clippy", not(target_os = "linux")))]
