@@ -246,23 +246,15 @@ pub trait Fuzzer<E, EM, I, S, ST> {
 }
 
 /// The corpus this input should be added to
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct ExecuteInputResult {
     is_corpus: bool,
     is_solution: bool,
 }
 
-impl Default for ExecuteInputResult {
-    fn default() -> Self {
-        Self {
-            is_corpus: false,
-            is_solution: false,
-        }
-    }
-}
-
 impl ExecuteInputResult {
     /// Constructor
+    #[must_use]
     pub fn new(is_corpus: bool, is_solution: bool) -> Self {
         Self {
             is_corpus,
@@ -271,11 +263,13 @@ impl ExecuteInputResult {
     }
 
     /// if this is corpus worthy
+    #[must_use]
     pub fn is_corpus(&self) -> bool {
         self.is_corpus
     }
 
     /// if this is solution worthy
+    #[must_use]
     pub fn is_solution(&self) -> bool {
         self.is_solution
     }
@@ -431,7 +425,6 @@ where
             self.objective_mut()
                 .append_metadata(state, manager, observers, &mut testcase)?;
             state.solutions_mut().add(testcase)?;
-        } else {
         }
         corpus
     }

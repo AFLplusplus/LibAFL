@@ -590,7 +590,7 @@ where
             ServedShMemRequest::Exit => {
                 log::info!("ShMemService - Exiting");
                 // stopping the server
-                return Err(Error::shutting_down());
+                Err(Error::shutting_down())
             }
         }
         // log::info!("send ashmem client: {}, response: {:?}", client_id, &response);
