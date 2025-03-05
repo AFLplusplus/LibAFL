@@ -124,7 +124,7 @@ where
         (self.bitmap[idx] >> bidx) & 1
     }
 
-    /// Create a new SANDExecutor
+    /// Create a new [SANDExecutor]
     pub fn new(
         executor: E,
         sand_extra_executors: ET,
@@ -142,7 +142,7 @@ where
         }
     }
 
-    /// Create a new SANDExecutor using paper setup
+    /// Create a new [SANDExecutor] using paper setup
     pub fn new_paper(executor: E, sand_extra_executors: ET, observer_handle: Handle<C>) -> Self {
         Self::new(
             executor,
