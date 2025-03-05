@@ -103,7 +103,7 @@ impl LibfuzzerCrashCauseFeedback {
         let base = if let Some(filename) = testcase.filename() {
             filename.clone()
         } else {
-            testcase.input().as_ref().unwrap().generate_name(None);
+            testcase.input().as_ref().unwrap().generate_name(None)
         };
         let file_path = self.artifact_prefix.dir().join(format!(
             "{}{prefix}-{base}",
