@@ -4,8 +4,8 @@
 //! Maintainer: Ziqiao Kong (<https://github.com/wtdcode>)
 //! Preprint: <https://arxiv.org/abs/2402.16497> accepted by ICSE'25
 
-use core::marker::PhantomData;
 use alloc::vec::Vec;
+use core::marker::PhantomData;
 
 use libafl_bolts::{
     AsIter, Error, Named, hash_std,
