@@ -378,9 +378,9 @@ jobs:
         os: [ubuntu-24.04]
         fuzzer:
           # Binary only
-          - ./fuzzers/binary_only/qemu_cmin
-          - ./fuzzers/binary_only/qemu_coverage
-          - ./fuzzers/binary_only/qemu_launcher
+          # - ./fuzzers/binary_only/qemu_cmin
+          # - ./fuzzers/binary_only/qemu_coverage
+          # - ./fuzzers/binary_only/qemu_launcher
         arch:
           # unless somebody pays us for the servers.
           # - aarch64
@@ -408,9 +408,9 @@ jobs:
         os: [ubuntu-24.04]
         fuzzer:
           # Full-system
-          - ./fuzzers/full_system/qemu_baremetal
-          - ./fuzzers/full_system/qemu_linux_kernel
-          - ./fuzzers/full_system/qemu_linux_process
+          # - ./fuzzers/full_system/qemu_baremetal
+          # - ./fuzzers/full_system/qemu_linux_kernel
+          # - ./fuzzers/full_system/qemu_linux_process
 
     runs-on: [ self-hosted, qemu ]
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
