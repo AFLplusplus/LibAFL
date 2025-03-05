@@ -456,7 +456,7 @@ where
                 //spawn clients
                 let mut index = 0;
                 for core_id in core_ids {
-                    if self.cores.ids.iter().any(|&x| x == core_id) {
+                    if self.cores.ids.contains(&core_id) {
                         for overcommit_i in 0..self.overcommit {
                             index += 1;
                             // Forward own stdio to child processes, if requested by user
