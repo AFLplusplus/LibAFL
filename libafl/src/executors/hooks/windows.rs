@@ -9,6 +9,7 @@ pub mod windows_asan_handler {
     };
 
     use crate::{
+        HasFeedback,
         events::{EventFirer, EventRestarter},
         executors::{
             Executor, ExitKind, HasObservers, hooks::inprocess::GLOBAL_STATE,
@@ -23,15 +24,16 @@ pub mod windows_asan_handler {
 
     /// # Safety
     /// ASAN deatch handler
-    pub unsafe extern "C" fn asan_death_handler<E, EM, I, OF, S, Z>()
+    pub unsafe extern "C" fn asan_death_handler<E, EM, F, I, OF, S, Z>()
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
+        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
     {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
@@ -94,7 +96,7 @@ pub mod windows_asan_handler {
                 // Make sure we don't crash in the crash handler forever.
                 let input = (*data).take_current_input::<I>();
 
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -137,6 +139,7 @@ pub mod windows_exception_handler {
     };
 
     use crate::{
+        HasFeedback,
         events::{EventFirer, EventRestarter},
         executors::{
             Executor, ExitKind, HasObservers,
@@ -197,15 +200,16 @@ pub mod windows_exception_handler {
     /// # Safety
     /// Well, exception handling is not safe
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, I, OF, S, Z>()
+    pub fn setup_panic_hook<E, EM, F, I, OF, S, Z>()
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
+        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -242,7 +246,7 @@ pub mod windows_exception_handler {
 
                 let input = (*data).take_current_input::<I>();
 
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -262,7 +266,7 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, I, OF, S, Z>(
+    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, F, I, OF, S, Z>(
         _p0: *mut u8,
         global_state: *mut c_void,
         _p1: *mut u8,
@@ -271,9 +275,10 @@ pub mod windows_exception_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
+        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
     {
         let data: &mut InProcessExecutorHandlerData =
             unsafe { &mut *(global_state as *mut InProcessExecutorHandlerData) };
@@ -313,7 +318,7 @@ pub mod windows_exception_handler {
                 let input = unsafe { (data.current_input_ptr as *const I).as_ref().unwrap() };
                 data.current_input_ptr = ptr::null_mut();
 
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -341,7 +346,7 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    pub unsafe fn inproc_crash_handler<E, EM, I, OF, S, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, F, I, OF, S, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -349,9 +354,10 @@ pub mod windows_exception_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
+        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
     {
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {
@@ -456,7 +462,7 @@ pub mod windows_exception_handler {
                 log::warn!("Running observers and exiting!");
                 // // I want to disable the hooks before doing anything, especially before taking a stack dump
                 let input = unsafe { data.take_current_input::<I>() };
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -473,7 +479,7 @@ pub mod windows_exception_handler {
                             .unwrap();
                         writer.flush().unwrap();
                     }
-                    log::error!("{}", std::str::from_utf8(&bsod).unwrap());
+                    log::error!("{}", core::str::from_utf8(&bsod).unwrap());
                 }
             } else {
                 // This is not worth saving

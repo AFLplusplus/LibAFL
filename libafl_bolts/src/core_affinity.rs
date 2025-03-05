@@ -463,7 +463,7 @@ mod windows {
 
     #[expect(clippy::cast_ptr_alignment)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
-        use std::{ptr, slice};
+        use core::{ptr, slice};
 
         #[expect(non_upper_case_globals)]
         const RelationProcessorCore: u32 = 0;
