@@ -4,7 +4,7 @@ version = "0.15.1"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
-  "Ziqiao Kong <mio@lazym.io>"
+  "Ziqiao Kong <mio@lazym.io>",
 ]
 edition = "2021"
 
