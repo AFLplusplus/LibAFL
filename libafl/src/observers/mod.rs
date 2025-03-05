@@ -330,7 +330,7 @@ mod instant_serializer {
 impl TimeObserver {
     /// Creates a new [`TimeObserver`] with the given name.
     #[must_use]
-    pub fn new<S>(name: S) -> Self 
+    pub fn new<S>(name: S) -> Self
     where
         S: Into<Cow<'static, str>>,
     {

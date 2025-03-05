@@ -6,7 +6,8 @@ use core::marker::PhantomData;
 use std::vec::Vec;
 
 use libafl_bolts::{
-    hash_std, tuples::{Handle, MatchName, MatchNameRef}, AsIter, Error, Named
+    AsIter, Error, Named, hash_std,
+    tuples::{Handle, MatchName, MatchNameRef},
 };
 
 use super::{Executor, ExitKind, HasObservers, HasTimeout};
@@ -26,23 +27,23 @@ pub trait ExecutorsTuple<EM, I, S, Z> {
 
 /// Since in most cases, the executors types can not be determined during compilation
 /// time (for instance, the number of executors might change), this implementation would
-/// act as a small helper. 
-impl<E, EM, I, S, Z> ExecutorsTuple<EM, I, S, Z> for Vec<E> 
-where 
-    E: Executor<EM, I, S, Z>
+/// act as a small helper.
+impl<E, EM, I, S, Z> ExecutorsTuple<EM, I, S, Z> for Vec<E>
+where
+    E: Executor<EM, I, S, Z>,
 {
     fn run_targets(
-            &mut self,
-            fuzzer: &mut Z,
-            state: &mut S,
-            mgr: &mut EM,
-            input: &I,
-        ) -> Result<ExitKind, Error> {
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
         let mut kind = ExitKind::Ok;
         for e in self.iter_mut() {
             kind = e.run_target(fuzzer, state, mgr, input)?;
             if kind == ExitKind::Crash {
-                return Ok(kind)
+                return Ok(kind);
             }
         }
         Ok(kind)
@@ -107,9 +108,9 @@ pub struct SANDExecutor<E, ET, C, O> {
     ph: PhantomData<O>,
 }
 
-impl<E, ET, C, O> SANDExecutor<E, ET, C, O> 
-where 
-    C: Named
+impl<E, ET, C, O> SANDExecutor<E, ET, C, O>
+where
+    C: Named,
 {
     fn bitmap_set(&mut self, idx: usize) {
         let bidx = idx % 8;
@@ -129,7 +130,7 @@ where
         sand_extra_executors: ET,
         observer_handle: Handle<C>,
         bitmap_size: usize,
-        pattern: SANDExecutionPattern
+        pattern: SANDExecutionPattern,
     ) -> Self {
         Self {
             executor,
@@ -137,17 +138,19 @@ where
             bitmap: vec![0; bitmap_size],
             ob_ref: observer_handle,
             pattern,
-            ph: PhantomData::default()
+            ph: PhantomData::default(),
         }
     }
 
     /// Create a new SANDExecutor using paper setup
-    pub fn new_paper(
-        executor: E,
-        sand_extra_executors: ET,
-        observer_handle: Handle<C>,
-    ) -> Self {
-        Self::new(executor, sand_extra_executors, observer_handle, 1 << 29, SANDExecutionPattern::SimplifiedTrace)
+    pub fn new_paper(executor: E, sand_extra_executors: ET, observer_handle: Handle<C>) -> Self {
+        Self::new(
+            executor,
+            sand_extra_executors,
+            observer_handle,
+            1 << 29,
+            SANDExecutionPattern::SimplifiedTrace,
+        )
     }
 }
 
