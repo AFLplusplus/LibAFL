@@ -1,4 +1,5 @@
-/// Reference Implementation for "SAND: Decoupling Sanitization from Fuzzing for Low Overhead"
+/// Implementation for "SAND: Decoupling Sanitization from Fuzzing for Low Overhead"
+/// Reference Implementation: https://github.com/wtdcode/sand-aflpp
 /// Detailed docs: https://github.com/AFLplusplus/AFLplusplus/blob/stable/docs/SAND.md
 /// Maintainer: Ziqiao Kong (https://github.com/wtdcode)
 /// Preprint: https://arxiv.org/abs/2402.16497 ICSE'25
