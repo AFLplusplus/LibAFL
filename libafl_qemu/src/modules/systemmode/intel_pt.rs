@@ -43,9 +43,6 @@ where
     S: Unpin + HasMetadata,
     T: SaturatingAdd + From<u8> + Debug + 'static,
 {
-    // type ModuleAddressFilter = Self;
-    // type ModulePageFilter = NopPageFilter;
-
     fn pre_qemu_init<ET>(
         &mut self,
         emulator_modules: &mut EmulatorModules<ET, I, S>,
@@ -56,7 +53,7 @@ where
         emulator_modules
             .thread_creation(NewThreadHook::Function(intel_pt_new_thread::<ET, I, S, T>))
             .unwrap();
-        // TODO emulator_modules.thread_teradown
+        // fixme: consider implementing a clean emulator_modules.thread_teradown
     }
 
     fn pre_exec<ET>(
@@ -86,17 +83,10 @@ where
     {
         let pt = self.pt.as_mut().expect("Intel PT module not initialized.");
         pt.disable_tracing().unwrap();
-        // TODO handle self modifying code
 
-        // TODO log errors or panic or smth
-        // let _ = pt.decode_with_callback(
-        //     |addr, out_buff| {
-        //         let _ = qemu.read_mem(out_buff, addr.into());
-        //     },
-        //     unsafe { &mut *slice_from_raw_parts_mut(self.map_ptr, self.map_len) },
-        // );
-
-        let _ = pt.decode_traces_into_map(&mut self.image, self.map_ptr, self.map_len);
+        let _ = pt
+            .decode_traces_into_map(&mut self.image, self.map_ptr, self.map_len)
+            .inspect_err(|e| log::warn!("Intel PT trace decode failed: {e}"));
 
         #[cfg(feature = "intel_pt_export_raw")]
         {
@@ -105,22 +95,6 @@ where
                 .inspect_err(|e| log::warn!("Intel PT trace save to file failed: {e}"));
         }
     }
-
-    // fn address_filter(&self) -> &Self::ModuleAddressFilter {
-    //     self
-    // }
-    //
-    // fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
-    //     self
-    // }
-    //
-    // fn page_filter(&self) -> &Self::ModulePageFilter {
-    //     unimplemented!()
-    // }
-    //
-    // fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-    //     unimplemented!()
-    // }
 }
 
 impl<T> AddressFilter for IntelPTModule<T>
@@ -177,6 +151,5 @@ where
 
     intel_pt_module.pt = Some(pt);
 
-    // What does this bool mean? ignore for the moment
     true
 }
