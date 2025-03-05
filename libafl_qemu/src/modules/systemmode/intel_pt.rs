@@ -127,7 +127,7 @@ impl<T> AddressFilter for IntelPTModule<T>
 where
     T: Debug + 'static,
 {
-    fn register(&mut self, address_range: Range<GuestAddr>) {
+    fn register(&mut self, address_range: &Range<GuestAddr>) {
         let pt = self.pt.as_mut().unwrap();
         let mut filters = pt.ip_filters();
         let range_inclusive =

@@ -72,7 +72,7 @@ fn main() {
         .accelerator(Accelerator::Kvm)
         //.snapshot(true) todo: doesnt work
         .default_devices(false)
-        .bios("/home/marco/code/qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu/")
+        .bios("target/debug/qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu/")
         .start_cpu(false)
         .build();
 
@@ -103,7 +103,6 @@ fn main() {
     qemu.set_hw_breakpoint(*BOOTLOADER_CODE.start() as GuestAddr)
         .unwrap();
 
-    // todo: there is smth broken somewhere, QemuExitReason::Breakpoint reports a wrong address
     unsafe {
         match qemu.run() {
             Ok(QemuExitReason::Breakpoint(ba)) => {
