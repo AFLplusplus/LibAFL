@@ -554,7 +554,6 @@ pub mod serdeany_registry {
             #[cfg(not(feature = "stable_anymap"))]
             let type_repr = &type_repr;
 
-            #[expect(clippy::manual_map)]
             match self.map.get(type_repr) {
                 None => None,
                 Some(h) => Some(h.values().map(|x| x.as_any().downcast_ref::<T>().unwrap())),
@@ -580,7 +579,6 @@ pub mod serdeany_registry {
             #[cfg(not(feature = "stable_anymap"))]
             let type_repr = &type_repr;
 
-            #[expect(clippy::manual_map)]
             match self.map.get_mut(type_repr) {
                 None => None,
                 Some(h) => Some(

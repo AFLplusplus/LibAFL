@@ -217,8 +217,8 @@ impl DrCovModuleEntry {
     #[must_use]
     pub fn to_module_line(&self) -> String {
         format!(
-            "{:03}, 0x{:x}, 0x{:x}, 0x{:x}, 0x{:x}, 0x{:x}, {:?}",
-            self.id, self.base, self.end, self.entry, self.checksum, self.timestamp, self.path
+            "{:03}, 0x{:x}, 0x{:x}, 0x{:x}, 0x{:x}, 0x{:x}, {}",
+            self.id, self.base, self.end, self.entry, self.checksum, self.timestamp, self.path.display()
         )
     }
 }
