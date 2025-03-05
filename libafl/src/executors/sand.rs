@@ -1,8 +1,9 @@
-/// Implementation for "SAND: Decoupling Sanitization from Fuzzing for Low Overhead"
-/// Reference Implementation: <https://github.com/wtdcode/sand-aflpp>
-/// Detailed docs: <https://github.com/AFLplusplus/AFLplusplus/blob/stable/docs/SAND.md>
-/// Maintainer: Ziqiao Kong (<https://github.com/wtdcode>)
-/// Preprint: <https://arxiv.org/abs/2402.16497> accepted by ICSE'25
+//! Implementation for "SAND: Decoupling Sanitization from Fuzzing for Low Overhead"
+//! Reference Implementation: <https://github.com/wtdcode/sand-aflpp>
+//! Detailed docs: <https://github.com/AFLplusplus/AFLplusplus/blob/stable/docs/SAND.md>
+//! Maintainer: Ziqiao Kong (<https://github.com/wtdcode>)
+//! Preprint: <https://arxiv.org/abs/2402.16497> accepted by ICSE'25
+
 use core::marker::PhantomData;
 use alloc::vec::Vec;
 
