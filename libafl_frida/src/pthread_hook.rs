@@ -197,11 +197,9 @@ pub unsafe fn reset() {
 /// The following tests fail if they are not run sequentially.
 #[cfg(test)]
 mod test {
-    use core::{
-        sync::{Arc, Mutex},
-        thread,
-        time::Duration,
-    };
+    use alloc::sync::Arc;
+    use core::time::Duration;
+    use std::{sync::Mutex, thread};
 
     use serial_test::serial;
 
