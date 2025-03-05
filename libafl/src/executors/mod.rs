@@ -29,6 +29,8 @@ pub mod differential;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub mod forkserver;
 pub mod inprocess;
+/// SAND reference implementation
+pub mod sand;
 
 /// The module for inproc fork executor
 #[cfg(all(feature = "std", unix))]
