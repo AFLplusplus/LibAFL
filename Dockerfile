@@ -75,7 +75,8 @@ RUN apt-get update && \
 RUN git config --global core.pager cat
 
 # Install a modern version of QEMU
-
+WORKDIR /root
+ENV QEMU_VER=9.2.1
 RUN wget https://download.qemu.org/qemu-${QEMU_VER}.tar.xz && \
     tar xvJf qemu-${QEMU_VER}.tar.xz && \
     cd /root/qemu-${QEMU_VER} && \
