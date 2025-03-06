@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-char* p;
+char *p;
 
 // The following line is needed for shared memory testcase fuzzing
 __AFL_FUZZ_INIT();
