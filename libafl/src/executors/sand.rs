@@ -74,7 +74,9 @@ where
         bitmap_size: usize,
         pattern: SANDExecutionPattern,
     ) -> Self {
-        init_count_class_16();
+        if matches!(pattern, SANDExecutionPattern::UniqueTrace) {
+            init_count_class_16();
+        }
         Self {
             executor,
             sand_executors: sand_extra_executors,
