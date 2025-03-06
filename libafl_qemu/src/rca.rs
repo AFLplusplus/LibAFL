@@ -70,6 +70,12 @@ pub struct RCAStage<I> {
     phantom: PhantomData<I>,
 }
 
+impl<I> Default for RCAStage<I> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<I> core::fmt::Debug for RCAStage<I> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RCAStage")
@@ -433,12 +439,11 @@ impl PredicatesMap {
         for (ty, prob) in &top10 {
             let rip = match ty {
                 PredicateType::HasEdge(Edges(s, _)) => s,
-                PredicateType::MaxGt(addr, _) => addr,
-                PredicateType::MinLt(addr, _) => addr,
+                PredicateType::MaxGt(addr, _) | PredicateType::MinLt(addr, _) => addr,
             };
             let line = resolver.resolve(*rip);
-            let res = format!("{} {ty:?} \n with probability {prob}", line);
-            println!("{}", res);
+            let res = format!("{line} {ty:?} \n with probability {prob}");
+            println!("{res}");
         }
     }
 

@@ -22,6 +22,12 @@ impl PredicateObserver {
     }
 }
 
+impl Default for PredicateObserver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Named for PredicateObserver {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("PredicateObserver");
