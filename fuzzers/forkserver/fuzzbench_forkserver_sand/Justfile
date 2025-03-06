@@ -68,4 +68,5 @@ test: fuzzer fuzzer_asan
 
 clean:
     rm -rf {{FUZZER}}
+    rm -rf vuln_native vuln_asan
     cargo clean
