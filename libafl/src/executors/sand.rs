@@ -90,10 +90,11 @@ where
 /// by iterating the crash corpus.
 #[derive(Debug, Clone, Default, Copy)]
 pub enum SANDExecutionPattern {
-    /// The simplified trace, captures ~92% bug triggering inputs with less than ~5% overhead on average.
+    /// The simplified trace, captures ~92% bug triggering inputs with ~20% overhead
+    /// on overage (less than 5% overhead on most targets during evaluation)
     #[default]
     SimplifiedTrace,
-    /// The unique trace, captures ~99.9% bug-triggering inputs with more than ~50% overhead.
+    /// The unique trace, captures ~99.9% bug-triggering inputs with more than >50% overhead.
     UniqueTrace,
 }
 
