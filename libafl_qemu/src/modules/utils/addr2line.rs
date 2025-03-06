@@ -11,19 +11,17 @@ use rangemap::RangeMap;
 use crate::Qemu;
 // (almost) Copy paste from addr2line/src/bin/addr2line.rs
 fn print_function(name: Option<&str>, language: Option<addr2line::gimli::DwLang>) -> String {
-    let ret = if let Some(name) = name {
+    if let Some(name) = name {
         addr2line::demangle_auto(Cow::from(name), language).to_string()
     } else {
         "??".to_string()
-    };
-    // println!("{ret:?}");
-    ret
+    }
 }
 
 /// check if this binary is pie (for 64bit binary only)
 #[must_use]
 pub fn is_pie(file: object::File<'_>) -> bool {
-    let is_pie = match file {
+    match file {
         object::File::Elf64(elf) => {
             let mut is_pie = false;
             let table = elf.elf_section_table();
@@ -41,9 +39,7 @@ pub fn is_pie(file: object::File<'_>) -> bool {
             is_pie
         }
         _ => false,
-    };
-
-    is_pie
+    }
 }
 
 pub struct AddressResolver {

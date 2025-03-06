@@ -837,7 +837,6 @@ impl AsanRuntime {
 
     #[expect(non_snake_case)]
     #[allow(unknown_lints)] // the compiler is contradicting itself
-    #[expect(clippy::used_underscore_items)]
     #[inline]
     pub fn hook__Znwm(
         &mut self,
@@ -874,7 +873,6 @@ impl AsanRuntime {
 
     #[expect(non_snake_case)]
     #[allow(unknown_lints)] // the compiler is contradicting itself
-    #[expect(clippy::used_underscore_items)]
     #[inline]
     pub fn hook__ZnwmSt11align_val_t(
         &mut self,

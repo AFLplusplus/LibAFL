@@ -1,4 +1,4 @@
-use std::ptr;
+use core::ptr;
 
 /// Generators, responsible for generating block/edge ids
 pub use generators::{gen_hashed_block_ids, gen_hashed_edge_ids, gen_unique_edge_ids};

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use super::utils::filters::HasAddressFilter;
 #[cfg(feature = "systemmode")]
-use crate::modules::utils::filters::{NOP_PAGE_FILTER, NopPageFilter};
+use crate::modules::utils::filters::{HasPageFilter, NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
     Qemu,
     emu::EmulatorModules,
@@ -522,25 +522,26 @@ impl<F> HasAddressFilter for DrCovModule<F>
 where
     F: AddressFilter,
 {
-    type ModuleAddressFilter = F;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
+    type AddressFilter = F;
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.filter
     }
+}
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter(&self) -> &Self::ModulePageFilter {
+#[cfg(feature = "systemmode")]
+impl<F> HasPageFilter for DrCovModule<F> {
+    type PageFilter = NopPageFilter;
+
+    fn page_filter(&self) -> &Self::PageFilter {
         &NopPageFilter
     }
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+    fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
         unsafe { (&raw mut NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }

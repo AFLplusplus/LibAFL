@@ -146,12 +146,10 @@ pub fn check_autoresume(fuzzer_dir: &Path, auto_resume: bool) -> Result<Flock<Fi
 
 pub fn create_dir_if_not_exists(path: &Path) -> io::Result<()> {
     if path.is_file() {
-        return Err(io::Error::new(
-            // TODO: change this to ErrorKind::NotADirectory
-            // when stabilitzed https://github.com/rust-lang/rust/issues/86442
-            io::ErrorKind::Other,
-            format!("{} expected a directory; got a file", path.display()),
-        ));
+        return Err(io::Error::other(format!(
+            "{} expected a directory; got a file",
+            path.display()
+        )));
     }
     match std::fs::create_dir(path) {
         Ok(()) => Ok(()),

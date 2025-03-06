@@ -139,7 +139,7 @@ where
             if !corpus_dir.is_dir() {
                 return Err(Error::os_error(
                     e,
-                    format!("Error creating directory {corpus_dir:?}"),
+                    format!("Error creating directory {}", corpus_dir.display()),
                 ));
             }
         }
@@ -148,7 +148,7 @@ where
             if !solutions_dir.is_dir() {
                 return Err(Error::os_error(
                     e,
-                    format!("Error creating directory {solutions_dir:?}"),
+                    format!("Error creating directory {}", solutions_dir.display()),
                 ));
             }
         }

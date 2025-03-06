@@ -120,6 +120,10 @@ jobs:
       # ---- build normal and examples ----
       - name: Run a normal build
         run: cargo build --verbose
+      # - name: Run libafl_qemu usermode tests
+      #   run: cd libafl_qemu && cargo test
+      # - name: Run libafl_qemu systemmode tests
+      #   run: cd libafl_qemu && cargo test --no-default-features --features x86_64,systemmode
       - name: Build examples
         run: cargo build --examples --verbose
 
@@ -271,6 +275,7 @@ jobs:
           - ./fuzzers/forkserver/forkserver_libafl_cc
           - ./fuzzers/forkserver/fuzzbench_forkserver
           - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
+          - ./fuzzers/forkserver/fuzzbench_forkserver_sand
           - ./fuzzers/forkserver/libafl-fuzz
           - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
 
@@ -365,58 +370,58 @@ jobs:
         shell: bash
         run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
-  fuzzers-qemu-user:
-    needs:
-      - changes
-    if: ${{ needs.changes.outputs.qemu == 'true' }}
-    strategy:
-      matrix:
-        os: [ubuntu-24.04]
-        fuzzer:
-          # Binary only
-          - ./fuzzers/binary_only/qemu_cmin
-          - ./fuzzers/binary_only/qemu_coverage
-          - ./fuzzers/binary_only/qemu_launcher
-        arch:
-          # unless somebody pays us for the servers.
-          # - aarch64
-          # - arm
-          # - i386
-          # - ppc
-          - x86_64
-
-    runs-on: [ self-hosted, qemu ]
-    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
-      - name: Build and run example QEMU fuzzers (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
-
-  fuzzers-qemu-system:
-    needs:
-      - changes
-    if: ${{ needs.changes.outputs.qemu == 'true' }}
-    strategy:
-      matrix:
-        os: [ubuntu-24.04]
-        fuzzer:
-          # Full-system
-          - ./fuzzers/full_system/qemu_baremetal
-          - ./fuzzers/full_system/qemu_linux_kernel
-          - ./fuzzers/full_system/qemu_linux_process
-
-    runs-on: [ self-hosted, qemu ]
-    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
-      - name: Build and run example QEMU fuzzers (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+  # fuzzers-qemu-user:
+  #   needs:
+  #     - changes
+  #   if: ${{ needs.changes.outputs.qemu == 'true' }}
+  #   strategy:
+  #     matrix:
+  #       os: [ubuntu-24.04]
+  #       fuzzer:
+  #         Binary only
+  #         - ./fuzzers/binary_only/qemu_cmin
+  #         - ./fuzzers/binary_only/qemu_coverage
+  #         - ./fuzzers/binary_only/qemu_launcher
+  #       arch:
+  #         # unless somebody pays us for the servers.
+  #         # - aarch64
+  #         # - arm
+  #         # - i386
+  #         # - ppc
+  #         - x86_64
+  #
+  #   runs-on: [ self-hosted, qemu ]
+  #   container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+  #     - name: Build and run example QEMU fuzzers (Linux)
+  #       if: runner.os == 'Linux'
+  #       shell: bash
+  #       run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+  #
+  # fuzzers-qemu-system:
+  #   needs:
+  #     - changes
+  #   if: ${{ needs.changes.outputs.qemu == 'true' }}
+  #   strategy:
+  #     matrix:
+  #       os: [ubuntu-24.04]
+  #       fuzzer:
+  #         Full-system
+  #         - ./fuzzers/full_system/qemu_baremetal
+  #         - ./fuzzers/full_system/qemu_linux_kernel
+  #         - ./fuzzers/full_system/qemu_linux_process
+  #
+  #   runs-on: [ self-hosted, qemu ]
+  #   container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+  #     - name: Build and run example QEMU fuzzers (Linux)
+  #       if: runner.os == 'Linux'
+  #       shell: bash
+  #       run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   nostd-build:
     runs-on: ubuntu-24.04

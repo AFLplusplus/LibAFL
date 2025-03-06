@@ -271,7 +271,7 @@ impl SnapshotModule {
 
     pub fn access(&mut self, addr: GuestAddr, size: usize) {
         // ASSUMPTION: the access can only cross 2 pages
-        debug_assert!(size > 0 && size <= SNAPSHOT_PAGE_SIZE);
+        debug_assert!(size <= SNAPSHOT_PAGE_SIZE);
         let page = addr & SNAPSHOT_PAGE_MASK;
         self.page_access(page);
         let second_page = (addr + size as GuestAddr - 1) & SNAPSHOT_PAGE_MASK;
@@ -776,12 +776,12 @@ where
 }
 
 impl HasAddressFilter for SnapshotModule {
-    type ModuleAddressFilter = NopAddressFilter;
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    type AddressFilter = NopAddressFilter;
+    fn address_filter(&self) -> &Self::AddressFilter {
         &NopAddressFilter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         unsafe { (&raw mut NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }

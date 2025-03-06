@@ -141,12 +141,11 @@ where
         }
         let mut id = self.inner.base_mut().next(state)?;
         while {
-            let has = !state
+            !state
                 .corpus()
                 .get(id)?
                 .borrow()
-                .has_metadata::<IsFavoredMetadata>();
-            has
+                .has_metadata::<IsFavoredMetadata>()
         } && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
             id = self.inner.base_mut().next(state)?;

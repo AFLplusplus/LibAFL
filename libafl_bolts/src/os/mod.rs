@@ -48,6 +48,9 @@ pub struct ChildHandle {
     pub pid: pid_t,
 }
 
+/// The special exit code when the target signal handler is crashing recursively
+pub const SIGNAL_RECURSION_EXIT: i32 = 101;
+
 #[cfg(unix)]
 impl ChildHandle {
     /// Block until the child exited and the status code becomes available

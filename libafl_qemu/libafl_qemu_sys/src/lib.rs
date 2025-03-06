@@ -6,6 +6,7 @@ __Warning__: The documentation is built by default for `x86_64` in `usermode`. T
 */
 
 #![cfg_attr(nightly, feature(used_with_arg))]
+#![allow(clippy::std_instead_of_core)]
 
 use core::ffi::c_void;
 #[cfg(target_os = "linux")]
