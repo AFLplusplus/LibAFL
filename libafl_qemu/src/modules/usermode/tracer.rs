@@ -1,8 +1,8 @@
 use libafl::HasMetadata;
 
 use crate::{
+    EmulatorModules, GuestAddr, Hook, IS_RCA, Qemu, Tracer,
     modules::{EmulatorModule, EmulatorModuleTuple},
-    EmulatorModules, GuestAddr, Hook, Qemu, Tracer, IS_RCA,
 };
 
 #[derive(Debug, Default, Copy, Clone)]

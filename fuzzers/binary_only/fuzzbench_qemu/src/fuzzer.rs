@@ -16,7 +16,7 @@ use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor},
-    feedback_or,
+    feedback_and, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
@@ -55,8 +55,7 @@ use libafl_qemu::{
         tracer::TracerModule,
         SnapshotModule,
     },
-    PredicateObserver,
-    Emulator, GuestReg, MmapPerms, PredicatesMap, Qemu, QemuExecutor,
+    Emulator, GuestReg, MmapPerms, PredicateObserver, PredicatesMap, Qemu, QemuExecutor,
     QemuExitError, QemuExitReason, QemuMappingsCache, QemuMappingsViewer, QemuShutdownCause,
     RCAStage, Regs, Tracer,
 };
@@ -189,7 +188,7 @@ fn fuzz(
         .collect::<Vec<(String, String)>>();
 
     let asan = AsanModuleBuilder::default().build();
-    let mut tracer = TracerModule::default();
+    let tracer = TracerModule::default();
     let snapshot = SnapshotModule::new();
 
     let modules = tuple_list!(
@@ -298,10 +297,9 @@ fn fuzz(
     let predicate = PredicateObserver::new();
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
-
+    let crash_map = MaxMapFeedback::with_name("crash", &edges_observer);
     let calibration = CalibrationStage::new(&map_feedback);
 
-    let qemu_mappings = QemuMappingsViewer::new(&qemu);
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
@@ -310,7 +308,7 @@ fn fuzz(
     );
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_or!(CrashFeedback::new());
+    let mut objective = feedback_and!(CrashFeedback::new(), crash_map);
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -340,7 +338,9 @@ fn fuzz(
     // to move this out of this stage.
     let qemu = Qemu::get().expect("qemu not initialized??");
     let viewer = QemuMappingsViewer::new(&qemu);
-    state.add_metadata(QemuMappingsCache::new(&viewer, text_addr));
+    if !state.has_metadata::<QemuMappingsCache>() {
+        state.add_metadata(QemuMappingsCache::new(&viewer, text_addr));
+    }
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
@@ -404,7 +404,7 @@ fn fuzz(
     let executor = QemuExecutor::new(
         emulator,
         &mut harness,
-        tuple_list!(edges_observer, time_observer),
+        tuple_list!(edges_observer, predicate, time_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,

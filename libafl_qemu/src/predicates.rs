@@ -1,11 +1,11 @@
 use core::fmt;
 use std::borrow::Cow;
 
-use libafl::{executors::ExitKind, observers::Observer, Error, HasMetadata};
+use libafl::{Error, HasMetadata, executors::ExitKind, observers::Observer};
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
-use crate::{Edges, PredicatesMap, QemuMappingsCache, Tracer, IS_RCA};
+use crate::{Edges, IS_RCA, PredicatesMap, QemuMappingsCache, Tracer};
 /// Observe prdicates
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PredicateObserver {}
@@ -20,7 +20,6 @@ impl PredicateObserver {
     pub fn new() -> Self {
         Self {}
     }
-
 }
 
 impl Named for PredicateObserver {

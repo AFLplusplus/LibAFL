@@ -11,7 +11,7 @@ use std::{
 };
 
 use hashbrown::{HashMap, HashSet};
-use libafl::{executors::ExitKind, observers::ObserversTuple, HasMetadata};
+use libafl::{HasMetadata, executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::GuestAddr;
 use libc::{

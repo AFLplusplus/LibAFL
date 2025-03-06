@@ -14,10 +14,10 @@ harness:
 
 [unix]
 tests:
-    cc -c {{PROJECT_DIR}}/libfuzzer_main.c
-    cc -O0 ./tests/test1.c ./libfuzzer_main.o -o test1 -lm -lz
-    cc -O0 ./tests/test2.c ./libfuzzer_main.o -o test2 -lm -lz
-    cc -O0 ./tests/test3.c ./libfuzzer_main.o -o test3 -lm -lz
+    cc -c -g {{PROJECT_DIR}}/libfuzzer_main.c
+    cc -O0 -g ./tests/test1.c ./libfuzzer_main.o -o test1 -lm -lz
+    cc -O0 -g ./tests/test2.c ./libfuzzer_main.o -o test2 -lm -lz
+    cc -O0 -g ./tests/test3.c ./libfuzzer_main.o -o test3 -lm -lz
 
 
 [unix]

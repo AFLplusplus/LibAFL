@@ -3,17 +3,17 @@ use std::{ops::Range, time::Duration};
 
 use hashbrown::{HashMap, HashSet};
 use libafl::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId},
     fuzzer::Evaluator,
     stages::{Restartable, Stage},
     state::{HasCorpus, HasSolutions},
-    Error, HasMetadata,
 };
 use libafl_bolts::{current_time, impl_serdeany};
 use libafl_qemu_sys::libafl_get_image_info;
 use serde::{Deserialize, Serialize};
 
-use crate::{GuestAddr, Qemu, QemuMappingsViewer};
+use crate::{GuestAddr, Qemu, QemuMappingsViewer, modules::utils::AddressResolver};
 
 pub static mut IS_RCA: bool = false;
 
@@ -65,15 +65,26 @@ impl RCARestarterMetadata {
     }
 }
 
-#[derive(Debug, Default)]
 pub struct RCAStage<I> {
+    resolver: AddressResolver,
     phantom: PhantomData<I>,
+}
+
+impl<I> core::fmt::Debug for RCAStage<I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RCAStage")
+            .field("phantom", &self.phantom)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<I> RCAStage<I> {
     #[must_use]
     pub fn new() -> Self {
+        let qemu = unsafe { Qemu::get_unchecked() };
+        let resolver = AddressResolver::new(&qemu);
         Self {
+            resolver,
             phantom: PhantomData,
         }
     }
@@ -109,7 +120,7 @@ where
         // enable rca mode
         let helper = state.metadata::<RCARestarterMetadata>()?;
         if current_time() - helper.last < Duration::from_secs(15) {
-            log::info!("no.. not now..");
+            // log::info!("no.. not now.. {:#?} {:#?} {:#?}", current_time(), helper.last, current_time() - helper.last);
             return Ok(());
         }
 
@@ -160,11 +171,11 @@ where
 
         let map = state.metadata_mut::<PredicatesMap>()?;
         map.synthesize();
-        map.show();
+        map.show(&self.resolver);
 
         // disable rca mode
         unsafe {
-            IS_RCA = true;
+            IS_RCA = false;
         }
 
         let helper = state.metadata_mut::<RCARestarterMetadata>()?;
@@ -414,20 +425,20 @@ impl PredicatesMap {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.edges.clear();
-        self.max.clear();
-        self.min.clear();
-        self.synthesized.clear();
-    }
-
-    pub fn show(&self) {
+    pub fn show(&self, resolver: &AddressResolver) {
         let mut sorted_synthesized: Vec<(PredicateType, f64)> = self.synthesized.clone();
         sorted_synthesized.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         let top10: Vec<(PredicateType, f64)> = sorted_synthesized.into_iter().take(10).collect();
 
         for (ty, prob) in &top10 {
-            println!("{ty:?} \n with probability {prob}");
+            let rip = match ty {
+                PredicateType::HasEdge(Edges(s, _)) => s,
+                PredicateType::MaxGt(addr, _) => addr,
+                PredicateType::MinLt(addr, _) => addr,
+            };
+            let line = resolver.resolve(*rip);
+            let res = format!("{} {ty:?} \n with probability {prob}", line);
+            println!("{}", res);
         }
     }
 
