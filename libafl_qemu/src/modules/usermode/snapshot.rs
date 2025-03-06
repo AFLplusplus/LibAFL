@@ -423,9 +423,9 @@ impl SnapshotModule {
                 // The heap has grown. so we want to drop those
                 // we want to align the addresses before calling unmap
                 // although it is very unlikely that the brk has an unaligned value
-                let new_page_boundary = (new_brk + ((SNAPSHOT_PAGE_MASK - 1) as GuestAddr))
+                let new_page_boundary = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as GuestAddr))
                     & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
-                let old_page_boundary = (self.brk + ((SNAPSHOT_PAGE_MASK - 1) as GuestAddr))
+                let old_page_boundary = (self.brk + ((SNAPSHOT_PAGE_SIZE - 1) as GuestAddr))
                     & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
 
                 if new_page_boundary != old_page_boundary {
