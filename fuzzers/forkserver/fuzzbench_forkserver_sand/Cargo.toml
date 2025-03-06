@@ -1,0 +1,53 @@
+[package]
+name = "fuzzbench_forkserver_sand"
+version = "0.15.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+  "Ziqiao Kong <mio@lazym.io>",
+]
+edition = "2021"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[profile.release-fuzzbench]
+inherits = "release"
+debug = false
+strip = true
+
+[build-dependencies]
+cc = { version = "1.1.22", features = ["parallel"] }
+which = "6.0.3"
+
+[dependencies]
+libafl = { path = "../../../libafl" }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_targets = { path = "../../../libafl_targets", features = [
+  "sancov_pcguard_hitcounts",
+  "libfuzzer",
+  "pointer_maps",
+] }
+libafl_cc = { path = "../../../libafl_cc" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+clap = { version = "4.5.18", features = ["default"] }
+nix = { version = "0.29.0", features = ["signal"] }
+
+[[bin]]
+name = "sand_cc"
+path = "src/cc.rs"
+
+[[bin]]
+name = "sand_cxx"
+path = "src/cxx.rs"
+
+[[bin]]
+name = "fuzzbench_forkserver_sand"
+path = "src/main.rs"
+
+[lib]
+name = "forkserver_sand"
+crate-type = ["staticlib"]
