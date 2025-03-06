@@ -12,77 +12,8 @@ use libafl_bolts::{
     tuples::{Handle, MatchName, MatchNameRef},
 };
 
-use super::{Executor, ExitKind, HasObservers, HasTimeout};
+use super::{Executor, ExecutorsTuple, ExitKind, HasObservers, HasTimeout};
 use crate::{HasNamedMetadata, observers::MapObserver};
-
-/// Like [`crate::observers::ObserversTuple`], a list of executors
-pub trait ExecutorsTuple<EM, I, S, Z> {
-    /// Execute the executors and stop if any of them returns a crash
-    fn run_target_all(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<ExitKind, Error>;
-}
-
-/// Since in most cases, the executors types can not be determined during compilation
-/// time (for instance, the number of executors might change), this implementation would
-/// act as a small helper.
-impl<E, EM, I, S, Z> ExecutorsTuple<EM, I, S, Z> for Vec<E>
-where
-    E: Executor<EM, I, S, Z>,
-{
-    fn run_target_all(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<ExitKind, Error> {
-        let mut kind = ExitKind::Ok;
-        for e in self.iter_mut() {
-            kind = e.run_target(fuzzer, state, mgr, input)?;
-            if kind == ExitKind::Crash {
-                return Ok(kind);
-            }
-        }
-        Ok(kind)
-    }
-}
-
-impl<EM, I, S, Z> ExecutorsTuple<EM, I, S, Z> for () {
-    fn run_target_all(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) -> Result<ExitKind, Error> {
-        Ok(ExitKind::Ok)
-    }
-}
-
-impl<Head, Tail, EM, I, S, Z> ExecutorsTuple<EM, I, S, Z> for (Head, Tail)
-where
-    Head: Executor<EM, I, S, Z>,
-    Tail: ExecutorsTuple<EM, I, S, Z>,
-{
-    fn run_target_all(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<ExitKind, Error> {
-        let kind = self.0.run_target(fuzzer, state, mgr, input)?;
-        if kind == ExitKind::Crash {
-            return Ok(kind);
-        }
-        self.1.run_target_all(fuzzer, state, mgr, input)
-    }
-}
 
 /// The execution pattern of the [`SANDExecutor`]. The default value used in our paper is
 /// [`SANDExecutionPattern::SimplifiedTrace`] and we by design don't include coverage
