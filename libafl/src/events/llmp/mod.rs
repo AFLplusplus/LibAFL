@@ -291,7 +291,10 @@ where
                 }
                 Ok(())
             }
-            Event::Objective { input: Some(unwrapped_input), .. } => {
+            Event::Objective {
+                input: Some(unwrapped_input),
+                ..
+            } => {
                 log::debug!("Received new Objective");
 
                 let Some(converter) = self.converter_back.as_mut() else {
