@@ -218,7 +218,9 @@ where
 
         let ret = if kind == ExitKind::Ok {
             if self.bitmap_read(pattern_hash) == 0 {
-                let sand_kind = self.sand_executors.run_target_all(fuzzer, state, mgr, input)?;
+                let sand_kind = self
+                    .sand_executors
+                    .run_target_all(fuzzer, state, mgr, input)?;
                 if sand_kind == ExitKind::Crash {
                     Ok(sand_kind)
                 } else {
