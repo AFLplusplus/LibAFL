@@ -15,7 +15,7 @@ use libafl_bolts::{
 use super::{Executor, ExitKind, HasObservers, HasTimeout};
 use crate::{HasNamedMetadata, observers::MapObserver};
 
-/// Like [`ObserverTuple`], a list of executors
+/// Like [`crate::observers::ObserversTuple`], a list of executors
 pub trait ExecutorsTuple<EM, I, S, Z> {
     /// Execute the executors and stop if any of them returns a crash
     fn run_target_all(
