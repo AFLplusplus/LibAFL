@@ -15,7 +15,7 @@ use libafl_bolts::{
 use super::{Executor, ExecutorsTuple, ExitKind, HasObservers, HasTimeout};
 use crate::{
     HasNamedMetadata,
-    observers::{COUNT_CLASS_LOOKUP, MapObserver},
+    observers::{MapObserver, classify_counts, init_count_class_16},
 };
 
 /// The execution pattern of the [`SANDExecutor`]. The default value used in our paper is
@@ -74,6 +74,7 @@ where
         bitmap_size: usize,
         pattern: SANDExecutionPattern,
     ) -> Self {
+        init_count_class_16();
         Self {
             executor,
             sand_executors: sand_extra_executors,
@@ -146,17 +147,19 @@ where
         let ot = self.executor.observers();
         let ob = ot.get(&self.ob_ref).unwrap().as_ref();
         let initial = ob.initial();
-        let covs = match self.pattern {
-            SANDExecutionPattern::SimplifiedTrace => ob
-                .as_iter()
-                .map(|x| if *x == initial { 0x1 } else { 0x80 })
-                .collect::<Vec<_>>(),
-            SANDExecutionPattern::UniqueTrace => ob
-                .as_iter()
-                .map(|x| unsafe { *COUNT_CLASS_LOOKUP.get_unchecked(*x as usize) })
-                .collect::<Vec<_>>(),
-            SANDExecutionPattern::UnclassifiedTrace => ob.to_vec(),
-        };
+        let mut covs = ob.to_vec();
+        match self.pattern {
+            SANDExecutionPattern::SimplifiedTrace => {
+                for it in &mut covs {
+                    *it = if *it == initial { 0x1 } else { 0x80 };
+                }
+            }
+            SANDExecutionPattern::UniqueTrace => {
+                classify_counts(covs.as_mut_slice());
+            }
+            SANDExecutionPattern::UnclassifiedTrace => {}
+        }
+
         // Our paper uses xxh32 but it shouldn't have significant collision for most hashing algorithms.
         let pattern_hash = hash_std(&covs) as usize;
 
