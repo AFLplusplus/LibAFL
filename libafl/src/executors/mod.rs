@@ -1,6 +1,5 @@
 //! Executors take input, and run it in the target.
 
-#[cfg(unix)]
 use alloc::vec::Vec;
 use core::{fmt::Debug, time::Duration};
 
