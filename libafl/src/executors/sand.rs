@@ -29,6 +29,7 @@ pub enum SANDExecutionPattern {
     #[default]
     SimplifiedTrace,
     /// The unique trace, captures ~99.9% bug-triggering inputs with more than >50% overhead.
+    /// Only use this pattern if you are really scared of missing any bugs =).
     UniqueTrace,
     /// The unclassified unique trace, captures even more bug-triggering inputs compared to
     /// unique trace. Not discussed in the paper but internally evaluated. Not adopted because
