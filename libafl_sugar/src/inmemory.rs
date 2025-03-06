@@ -1,8 +1,12 @@
 //! In-Memory fuzzing made easy.
 //! Use this sugar for scaling `libfuzzer`-style fuzzers.
 
-use core::fmt::{self, Debug, Formatter};
-use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
+use core::{
+    fmt::{self, Debug, Formatter},
+    net::SocketAddr,
+    time::Duration,
+};
+use std::{fs, path::PathBuf};
 
 use libafl::{
     Error, HasMetadata,

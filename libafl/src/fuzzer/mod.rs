@@ -188,7 +188,7 @@ pub trait Evaluator<E, EM, I, S> {
         executor: &mut E,
         manager: &mut EM,
         input: I,
-    ) -> Result<CorpusId, Error>;
+    ) -> Result<(CorpusId, ExecuteInputResult), Error>;
 
     /// Adds the input to the corpus as a disabled input.
     /// Used during initial corpus loading.
@@ -246,14 +246,43 @@ pub trait Fuzzer<E, EM, I, S, ST> {
 }
 
 /// The corpus this input should be added to
-#[derive(Debug, PartialEq, Eq)]
-pub enum ExecuteInputResult {
-    /// No special input
-    None,
-    /// This input should be stored in the corpus
-    Corpus,
-    /// This input leads to a solution
-    Solution,
+#[derive(Debug, PartialEq, Eq, Default)]
+pub struct ExecuteInputResult {
+    is_corpus: bool,
+    is_solution: bool,
+}
+
+impl ExecuteInputResult {
+    /// Constructor
+    #[must_use]
+    pub fn new(is_corpus: bool, is_solution: bool) -> Self {
+        Self {
+            is_corpus,
+            is_solution,
+        }
+    }
+
+    /// if this is corpus worthy
+    #[must_use]
+    pub fn is_corpus(&self) -> bool {
+        self.is_corpus
+    }
+
+    /// if this is solution worthy
+    #[must_use]
+    pub fn is_solution(&self) -> bool {
+        self.is_solution
+    }
+
+    /// tell that this is corpus
+    pub fn set_is_corpus(&mut self, v: bool) {
+        self.is_corpus = v;
+    }
+
+    /// tell that this is solution
+    pub fn set_is_solution(&mut self, v: bool) {
+        self.is_solution = v;
+    }
 }
 
 /// Your default fuzzer instance, for everyday use.
@@ -326,7 +355,7 @@ where
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<ExecuteInputResult, Error> {
-        let mut res = ExecuteInputResult::None;
+        let mut res = ExecuteInputResult::default();
 
         #[cfg(not(feature = "introspection"))]
         let is_solution = self
@@ -339,26 +368,27 @@ where
             .is_interesting_introspection(state, manager, input, observers, exit_kind)?;
 
         if is_solution {
-            res = ExecuteInputResult::Solution;
-        } else {
-            #[cfg(not(feature = "introspection"))]
-            let corpus_worthy = self
-                .feedback_mut()
-                .is_interesting(state, manager, input, observers, exit_kind)?;
-
-            #[cfg(feature = "introspection")]
-            let corpus_worthy = self
-                .feedback_mut()
-                .is_interesting_introspection(state, manager, input, observers, exit_kind)?;
-
-            if corpus_worthy {
-                res = ExecuteInputResult::Corpus;
-            }
+            res.set_is_solution(true);
         }
+
+        #[cfg(not(feature = "introspection"))]
+        let corpus_worthy = self
+            .feedback_mut()
+            .is_interesting(state, manager, input, observers, exit_kind)?;
+        #[cfg(feature = "introspection")]
+        let corpus_worthy = self
+            .feedback_mut()
+            .is_interesting_introspection(state, manager, input, observers, exit_kind)?;
+
+        if corpus_worthy {
+            res.set_is_corpus(true);
+        }
+
         Ok(res)
     }
 
-    /// Evaluate if a set of observation channels has an interesting state
+    /// Post process a testcase depending the testcase execution results
+    /// returns corpus id if it put something into corpus (not solution)
     fn process_execution(
         &mut self,
         state: &mut S,
@@ -367,48 +397,36 @@ where
         exec_res: &ExecuteInputResult,
         observers: &OT,
     ) -> Result<Option<CorpusId>, Error> {
-        match exec_res {
-            ExecuteInputResult::None => {
-                self.feedback_mut().discard_metadata(state, input)?;
-                self.objective_mut().discard_metadata(state, input)?;
-                Ok(None)
+        let corpus = if exec_res.is_corpus() {
+            // Add the input to the main corpus
+            let mut testcase = Testcase::from(input.clone());
+            #[cfg(feature = "track_hit_feedbacks")]
+            self.feedback_mut()
+                .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
+            self.feedback_mut()
+                .append_metadata(state, manager, observers, &mut testcase)?;
+            let id = state.corpus_mut().add(testcase)?;
+            self.scheduler_mut().on_add(state, id)?;
+            Ok(Some(id))
+        } else {
+            Ok(None)
+        };
+
+        if exec_res.is_solution() {
+            // The input is a solution, add it to the respective corpus
+            let mut testcase = Testcase::from(input.clone());
+            testcase.set_parent_id_optional(*state.corpus().current());
+            if let Ok(mut tc) = state.current_testcase_mut() {
+                tc.found_objective();
             }
-            ExecuteInputResult::Corpus => {
-                // Not a solution
-                self.objective_mut().discard_metadata(state, input)?;
-
-                // Add the input to the main corpus
-                let mut testcase = Testcase::from(input.clone());
-                #[cfg(feature = "track_hit_feedbacks")]
-                self.feedback_mut()
-                    .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
-                self.feedback_mut()
-                    .append_metadata(state, manager, observers, &mut testcase)?;
-                let id = state.corpus_mut().add(testcase)?;
-                self.scheduler_mut().on_add(state, id)?;
-
-                Ok(Some(id))
-            }
-            ExecuteInputResult::Solution => {
-                // Not interesting
-                self.feedback_mut().discard_metadata(state, input)?;
-
-                // The input is a solution, add it to the respective corpus
-                let mut testcase = Testcase::from(input.clone());
-                testcase.set_parent_id_optional(*state.corpus().current());
-                if let Ok(mut tc) = state.current_testcase_mut() {
-                    tc.found_objective();
-                }
-                #[cfg(feature = "track_hit_feedbacks")]
-                self.objective_mut()
-                    .append_hit_feedbacks(testcase.hit_objectives_mut())?;
-                self.objective_mut()
-                    .append_metadata(state, manager, observers, &mut testcase)?;
-                state.solutions_mut().add(testcase)?;
-
-                Ok(None)
-            }
+            #[cfg(feature = "track_hit_feedbacks")]
+            self.objective_mut()
+                .append_hit_feedbacks(testcase.hit_objectives_mut())?;
+            self.objective_mut()
+                .append_metadata(state, manager, observers, &mut testcase)?;
+            state.solutions_mut().add(testcase)?;
         }
+        corpus
     }
 
     fn serialize_and_dispatch(
@@ -421,20 +439,14 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         // Now send off the event
-        let observers_buf = match exec_res {
-            ExecuteInputResult::Corpus => {
-                if manager.should_send() {
-                    // TODO set None for fast targets
-                    if manager.configuration() == EventConfig::AlwaysUnique {
-                        None
-                    } else {
-                        manager.serialize_observers(observers)?
-                    }
-                } else {
-                    None
-                }
-            }
-            _ => None,
+        let observers_buf = if exec_res.is_solution()
+            && manager.should_send()
+            && manager.configuration() != EventConfig::AlwaysUnique
+        {
+            // TODO set None for fast targets
+            manager.serialize_observers(observers)?
+        } else {
+            None
         };
 
         self.dispatch_event(state, manager, input, exec_res, observers_buf, exit_kind)?;
@@ -451,41 +463,38 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         // Now send off the event
-        match exec_res {
-            ExecuteInputResult::Corpus => {
-                if manager.should_send() {
-                    manager.fire(
-                        state,
-                        Event::NewTestcase {
-                            input: input.clone(),
-                            observers_buf,
-                            exit_kind: *exit_kind,
-                            corpus_size: state.corpus().count(),
-                            client_config: manager.configuration(),
-                            time: current_time(),
-                            forward_id: None,
-                            #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                            node_id: None,
-                        },
-                    )?;
-                }
+        if manager.should_send() {
+            if exec_res.is_corpus() {
+                manager.fire(
+                    state,
+                    Event::NewTestcase {
+                        input: input.clone(),
+                        observers_buf,
+                        exit_kind: *exit_kind,
+                        corpus_size: state.corpus().count(),
+                        client_config: manager.configuration(),
+                        time: current_time(),
+                        forward_id: None,
+                        #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                        node_id: None,
+                    },
+                )?;
             }
-            ExecuteInputResult::Solution => {
-                if manager.should_send() {
-                    manager.fire(
-                        state,
-                        Event::Objective {
-                            #[cfg(feature = "share_objectives")]
-                            input: input.clone(),
 
-                            objective_size: state.solutions().count(),
-                            time: current_time(),
-                        },
-                    )?;
-                }
+            if exec_res.is_solution() {
+                manager.fire(
+                    state,
+                    Event::Objective {
+                        #[cfg(feature = "share_objectives")]
+                        input: input.clone(),
+
+                        objective_size: state.solutions().count(),
+                        time: current_time(),
+                    },
+                )?;
             }
-            ExecuteInputResult::None => (),
         }
+
         Ok(())
     }
 
@@ -503,7 +512,7 @@ where
         if send_events {
             self.serialize_and_dispatch(state, manager, input, &exec_res, observers, exit_kind)?;
         }
-        if exec_res != ExecuteInputResult::None {
+        if exec_res.is_corpus() || exec_res.is_solution() {
             *state.last_found_time_mut() = current_time();
         }
         Ok((exec_res, corpus_id))
@@ -610,7 +619,7 @@ where
         if self.input_filter.should_execute(input) {
             self.evaluate_input(state, executor, manager, input)
         } else {
-            Ok((ExecuteInputResult::None, None))
+            Ok((ExecuteInputResult::default(), None))
         }
     }
 
@@ -633,7 +642,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: I,
-    ) -> Result<CorpusId, Error> {
+    ) -> Result<(CorpusId, ExecuteInputResult), Error> {
         *state.last_found_time_mut() = current_time();
 
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
@@ -662,33 +671,30 @@ where
                 .append_hit_feedbacks(testcase.hit_objectives_mut())?;
             self.objective_mut()
                 .append_metadata(state, manager, &*observers, &mut testcase)?;
-            let id = state.solutions_mut().add(testcase)?;
+            // we don't care about solution id
+            let _ = state.solutions_mut().add(testcase.clone())?;
 
             manager.fire(
                 state,
                 Event::Objective {
                     #[cfg(feature = "share_objectives")]
-                    input,
+                    input: input.clone(),
 
                     objective_size: state.solutions().count(),
                     time: current_time(),
                 },
             )?;
-            return Ok(id);
         }
-
-        // Not a solution
-        self.objective_mut().discard_metadata(state, &input)?;
 
         // several is_interesting implementations collect some data about the run, later used in
         // append_metadata; we *must* invoke is_interesting here to collect it
         #[cfg(not(feature = "introspection"))]
-        let _corpus_worthy =
+        let corpus_worthy =
             self.feedback_mut()
                 .is_interesting(state, manager, &input, &*observers, &exit_kind)?;
 
         #[cfg(feature = "introspection")]
-        let _corpus_worthy = self.feedback_mut().is_interesting_introspection(
+        let corpus_worthy = self.feedback_mut().is_interesting_introspection(
             state,
             manager,
             &input,
@@ -724,7 +730,7 @@ where
                 node_id: None,
             },
         )?;
-        Ok(id)
+        Ok((id, ExecuteInputResult::new(corpus_worthy, is_solution)))
     }
 
     fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {

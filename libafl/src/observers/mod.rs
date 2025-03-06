@@ -14,12 +14,6 @@ pub mod stacktrace;
 #[cfg(feature = "regex")]
 pub use stacktrace::*;
 
-/// Profiler observer
-#[cfg(feature = "std")]
-pub mod profiling;
-#[cfg(feature = "std")]
-pub use profiling::*;
-
 pub mod concolic;
 pub mod map;
 pub use map::*;
