@@ -152,6 +152,7 @@ where
         let mut covs = ob.to_vec();
         match self.pattern {
             SANDExecutionPattern::SimplifiedTrace => {
+                // TODO: SIMD Optimizations
                 for it in &mut covs {
                     *it = if *it == initial { 0x1 } else { 0x80 };
                 }
