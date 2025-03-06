@@ -18,7 +18,7 @@ use crate::{HasNamedMetadata, observers::MapObserver};
 /// Like ObserverTuples, a list of executors
 pub trait ExecutorsTuple<EM, I, S, Z> {
     /// Execute the executors and stop if any of them returns a crash
-    fn run_targets(
+    fn run_target_all(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -34,7 +34,7 @@ impl<E, EM, I, S, Z> ExecutorsTuple<EM, I, S, Z> for Vec<E>
 where
     E: Executor<EM, I, S, Z>,
 {
-    fn run_targets(
+    fn run_target_all(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -53,7 +53,7 @@ where
 }
 
 impl<EM, I, S, Z> ExecutorsTuple<EM, I, S, Z> for () {
-    fn run_targets(
+    fn run_target_all(
         &mut self,
         _fuzzer: &mut Z,
         _state: &mut S,
@@ -69,7 +69,7 @@ where
     Head: Executor<EM, I, S, Z>,
     Tail: ExecutorsTuple<EM, I, S, Z>,
 {
-    fn run_targets(
+    fn run_target_all(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -80,7 +80,7 @@ where
         if kind == ExitKind::Crash {
             return Ok(kind);
         }
-        self.1.run_targets(fuzzer, state, mgr, input)
+        self.1.run_target_all(fuzzer, state, mgr, input)
     }
 }
 
@@ -217,7 +217,7 @@ where
 
         let ret = if kind == ExitKind::Ok {
             if self.bitmap_read(pattern_hash) == 0 {
-                let sand_kind = self.sand_executors.run_targets(fuzzer, state, mgr, input)?;
+                let sand_kind = self.sand_executors.run_target_all(fuzzer, state, mgr, input)?;
                 if sand_kind == ExitKind::Crash {
                     Ok(sand_kind)
                 } else {
