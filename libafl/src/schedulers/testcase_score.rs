@@ -306,6 +306,7 @@ where
 
         weight *= avg_exec_us / q_exec_us;
         weight *= if avg_bitmap_size.is_zero() {
+            // This can happen when the bitmap size of the target is as small as 1.
             1.0
         } else {
             libm::log2(q_bitmap_size).max(1.0) / avg_bitmap_size
