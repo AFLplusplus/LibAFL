@@ -418,7 +418,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
             .fire(
                 state,
                 Event::Objective {
-                    input: fuzzer.should_share_objectives().then(|| input.clone()),
+                    input: fuzzer.share_objectives().then(|| input.clone()),
                     objective_size: state.solutions().count(),
                     time: libafl_bolts::current_time(),
                 },

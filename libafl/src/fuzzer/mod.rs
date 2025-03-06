@@ -71,8 +71,11 @@ pub trait HasObjective {
     /// The objective feedback (mutable)
     fn objective_mut(&mut self) -> &mut Self::Objective;
 
-    /// Returns whether to share objectives among nodes
-    fn should_share_objectives(&self) -> bool;
+    /// Whether to share objective testcases among fuzzing nodes
+    fn share_objectives(&self) -> bool;
+
+    /// Sets whether to share objectives among nodes
+    fn set_share_objectives(&mut self, share_objectives: bool);
 }
 
 /// Evaluates if an input is interesting using the feedback
@@ -308,7 +311,11 @@ impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
         &mut self.objective
     }
 
-    fn should_share_objectives(&self) -> bool {
+    fn set_share_objectives(&mut self, share_objectives: bool) {
+        self.share_objectives = share_objectives;
+    }
+
+    fn share_objectives(&self) -> bool {
         self.share_objectives
     }
 }
@@ -973,11 +980,6 @@ impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
             input_filter,
             share_objectives: false,
         }
-    }
-    /// Sharing of objective testcases among nodes is disabled by default. Call this method to
-    /// enable sharing
-    pub fn set_share_objectives(&mut self) {
-        self.share_objectives = true;
     }
 }
 

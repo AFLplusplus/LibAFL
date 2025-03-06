@@ -291,7 +291,7 @@ where
                 }
                 Ok(())
             }
-            Event::Objective { input, .. } if fuzzer.should_share_objectives() => {
+            Event::Objective { input, .. } if fuzzer.share_objectives() => {
                 log::debug!("Received new Objective");
 
                 let Some(converter) = self.converter_back.as_mut() else {
