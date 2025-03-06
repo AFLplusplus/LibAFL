@@ -141,9 +141,9 @@ where
                 return Err(Error::illegal_state(format!(
                     "The state restorer map is too small to fit anything, even the filename! 
                         It needs to be at least {} bytes. 
-                        The tmpfile was written to {:?}.",
+                        The tmpfile was written to {}.",
                     len,
-                    temp_dir().join(&filename)
+                    temp_dir().join(&filename).display()
                 )));
             }
 

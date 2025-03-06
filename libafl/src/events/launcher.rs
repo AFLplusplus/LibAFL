@@ -274,7 +274,7 @@ where
         // Spawn clients
         let mut index = 0_usize;
         for bind_to in core_ids {
-            if self.cores.ids.iter().any(|&x| x == bind_to) {
+            if self.cores.ids.contains(&bind_to) {
                 for overcommit_id in 0..self.overcommit {
                     index += 1;
                     self.shmem_provider.pre_fork()?;
@@ -456,7 +456,7 @@ where
                 //spawn clients
                 let mut index = 0;
                 for core_id in core_ids {
-                    if self.cores.ids.iter().any(|&x| x == core_id) {
+                    if self.cores.ids.contains(&core_id) {
                         for overcommit_i in 0..self.overcommit {
                             index += 1;
                             // Forward own stdio to child processes, if requested by user
@@ -748,7 +748,7 @@ where
         // Spawn clients
         let mut index = 0_usize;
         for bind_to in core_ids {
-            if self.cores.ids.iter().any(|&x| x == bind_to) {
+            if self.cores.ids.contains(&bind_to) {
                 for overcommit_id in 0..self.overcommit {
                     index += 1;
                     self.shmem_provider.pre_fork()?;

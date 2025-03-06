@@ -68,28 +68,33 @@ RUN set -ex &&\
   chmod +x llvm.sh &&\
   ./llvm.sh ${LLVM_VERSION}
 
+RUN apt-get update && \
+  apt-get install -y \
+  clang-format-${LLVM_VERSION}
+
 RUN git config --global core.pager cat
 
 # Install a modern version of QEMU
-
 WORKDIR /root
 ENV QEMU_VER=9.2.1
-RUN wget https://download.qemu.org/qemu-${QEMU_VER}.tar.xz
-RUN tar xvJf qemu-${QEMU_VER}.tar.xz
-WORKDIR /root/qemu-${QEMU_VER}
-RUN ./configure --target-list="\
-    arm-linux-user,\
-    aarch64-linux-user,\
-    i386-linux-user,\
-    ppc-linux-user,\
-    mips-linux-user,\
-    arm-softmmu,\
-    aarch64-softmmu,\
-    i386-softmmu,\
-    ppc-softmmu,\
-    mips-softmmu"
-RUN make -j
-RUN make install
+RUN wget https://download.qemu.org/qemu-${QEMU_VER}.tar.xz && \
+    tar xvJf qemu-${QEMU_VER}.tar.xz && \
+    cd /root/qemu-${QEMU_VER} && \
+   ./configure --target-list="\
+      arm-linux-user,\
+      aarch64-linux-user,\
+      i386-linux-user,\
+      ppc-linux-user,\
+      mips-linux-user,\
+      arm-softmmu,\
+      aarch64-softmmu,\
+      i386-softmmu,\
+      ppc-softmmu,\
+      mips-softmmu" && \
+    make -j && \
+    make install && \
+    cd /root && \
+    rm -rf qemu-${QEMU_VER}
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl

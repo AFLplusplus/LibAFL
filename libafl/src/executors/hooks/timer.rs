@@ -178,7 +178,7 @@ impl TimerStruct {
     pub unsafe fn new(exec_tmout: Duration, timeout_handler: *const c_void) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
 
-        let timeout_handler: PTP_TIMER_CALLBACK = unsafe { std::mem::transmute(timeout_handler) };
+        let timeout_handler: PTP_TIMER_CALLBACK = unsafe { core::mem::transmute(timeout_handler) };
         let ptp_timer = unsafe {
             CreateThreadpoolTimer(
                 Some(timeout_handler),

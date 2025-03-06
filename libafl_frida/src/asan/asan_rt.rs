@@ -1697,7 +1697,7 @@ impl AsanRuntime {
 
         let insn = disas_count(
             &decoder,
-            unsafe { std::slice::from_raw_parts(actual_pc as *mut u8, 4) },
+            unsafe { core::slice::from_raw_parts(actual_pc as *mut u8, 4) },
             1,
         )[0];
 

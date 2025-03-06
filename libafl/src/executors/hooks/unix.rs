@@ -12,6 +12,7 @@ pub mod unix_signal_handler {
     use libc::siginfo_t;
 
     use crate::{
+        HasFeedback,
         events::{EventFirer, EventRestarter},
         executors::{
             Executor, ExitKind, HasObservers, common_signals,
@@ -86,14 +87,15 @@ pub mod unix_signal_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
-    pub fn setup_panic_hook<E, EM, I, OF, S, Z>()
+    pub fn setup_panic_hook<E, EM, F, I, OF, S, Z>()
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
+        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
         I: Input + Clone,
     {
         let old_hook = panic::take_hook();
@@ -117,7 +119,7 @@ pub mod unix_signal_handler {
                 let fuzzer = (*data).fuzzer_mut::<Z>();
                 let event_mgr = (*data).event_mgr_mut::<EM>();
 
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -140,7 +142,7 @@ pub mod unix_signal_handler {
     /// Well, signal handling is not safe
     #[cfg(unix)]
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
-    pub unsafe fn inproc_timeout_handler<E, EM, I, OF, S, Z>(
+    pub unsafe fn inproc_timeout_handler<E, EM, F, I, OF, S, Z>(
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
@@ -149,9 +151,10 @@ pub mod unix_signal_handler {
         E: HasInProcessHooks<I, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
+        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
         I: Input + Clone,
     {
         unsafe {
@@ -178,7 +181,7 @@ pub mod unix_signal_handler {
 
             log::error!("Timeout in fuzz run.");
 
-            run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+            run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
                 executor,
                 state,
                 input,
@@ -198,7 +201,7 @@ pub mod unix_signal_handler {
     /// # Safety
     /// Well, signal handling is not safe
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
-    pub unsafe fn inproc_crash_handler<E, EM, I, OF, S, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, F, I, OF, S, Z>(
         signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
@@ -207,9 +210,10 @@ pub mod unix_signal_handler {
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
+        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
         I: Input + Clone,
     {
         unsafe {
@@ -251,7 +255,7 @@ pub mod unix_signal_handler {
                     }
                 }
 
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
                     executor,
                     state,
                     input,
