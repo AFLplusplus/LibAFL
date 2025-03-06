@@ -472,7 +472,7 @@ where
                 indices.push(i);
             }
             let meta = MapIndexesMetadata::new(indices);
-            testcase.add_metadata(meta);
+            testcase.try_add_metadata(meta)?;
         } else {
             for (i, value) in observer
                 .as_iter()
