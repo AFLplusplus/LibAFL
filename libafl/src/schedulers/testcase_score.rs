@@ -2,6 +2,7 @@
 use alloc::string::{String, ToString};
 
 use libafl_bolts::{HasLen, HasRefCnt};
+use num_traits::Zero;
 
 use crate::{
     Error, HasMetadata,
@@ -273,7 +274,6 @@ where
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 
         let tcmeta = entry.metadata::<SchedulerTestcaseMetadata>()?;
-
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
         // This methoud is called in corpus's on_add() method. Fuzz_level is zero at that time.
@@ -305,7 +305,12 @@ where
         }
 
         weight *= avg_exec_us / q_exec_us;
-        weight *= libm::log2(q_bitmap_size).max(1.0) / avg_bitmap_size;
+        weight *= if avg_bitmap_size.is_zero() {
+            // This can happen when the bitmap size of the target is as small as 1.
+            1.0
+        } else {
+            libm::log2(q_bitmap_size).max(1.0) / avg_bitmap_size
+        };
 
         let tc_ref = match entry.metadata_map().get::<MapIndexesMetadata>() {
             Some(meta) => meta.refcnt() as f64,
