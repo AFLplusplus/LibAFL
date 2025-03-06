@@ -259,6 +259,21 @@ fn main() {
         write!(file, "").unwrap();
     }
 
+    #[cfg(feature = "libfuzzer_interceptors")]
+    {
+        println!("cargo:rerun-if-changed=src/libfuzzer/FuzzerInterceptors.cpp");
+
+        let mut interceptors = cc::Build::new();
+        interceptors.file(src_dir.join("libfuzzer/FuzzerInterceptors.cpp"));
+
+        #[cfg(feature = "whole_archive")]
+        {
+            interceptors.link_lib_modifier("+whole-archive");
+        }
+
+        interceptors.cpp(true).compile("interceptors");
+    }
+
     println!("cargo:rustc-link-search=native={}", &out_dir);
 
     println!("cargo:rerun-if-changed=build.rs");
