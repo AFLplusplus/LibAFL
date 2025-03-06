@@ -13,7 +13,10 @@ use libafl_bolts::{
 };
 
 use super::{Executor, ExecutorsTuple, ExitKind, HasObservers, HasTimeout};
-use crate::{HasNamedMetadata, observers::MapObserver};
+use crate::{
+    HasNamedMetadata,
+    observers::{MapObserver, classify_counts, init_count_class_16},
+};
 
 /// The execution pattern of the [`SANDExecutor`]. The default value used in our paper is
 /// [`SANDExecutionPattern::SimplifiedTrace`] and we by design don't include coverage
@@ -26,7 +29,12 @@ pub enum SANDExecutionPattern {
     #[default]
     SimplifiedTrace,
     /// The unique trace, captures ~99.9% bug-triggering inputs with more than >50% overhead.
+    /// Only use this pattern if you are really scared of missing any bugs =).
     UniqueTrace,
+    /// The unclassified unique trace, captures even more bug-triggering inputs compared to
+    /// unique trace. Not discussed in the paper but internally evaluated. Not adopted because
+    /// incurring tooooo much overhead
+    UnclassifiedTrace,
 }
 
 /// The core executor implementation. It wraps another executor and a list of extra executors.
@@ -58,7 +66,7 @@ where
         (self.bitmap[idx] >> bidx) & 1
     }
 
-    /// Create a new [`SANDExecutor`]
+    /// Create a new [`SANDExecutor`], the observer handle is supposed to be _raw_ edge observer.
     pub fn new(
         executor: E,
         sand_extra_executors: ET,
@@ -66,6 +74,9 @@ where
         bitmap_size: usize,
         pattern: SANDExecutionPattern,
     ) -> Self {
+        if matches!(pattern, SANDExecutionPattern::UniqueTrace) {
+            init_count_class_16();
+        }
         Self {
             executor,
             sand_executors: sand_extra_executors,
@@ -76,7 +87,8 @@ where
         }
     }
 
-    /// Create a new [`SANDExecutor`] using paper setup
+    /// Create a new [`SANDExecutor`] using paper setup, the observer handle is supposed to be
+    /// _raw_ edge observer.
     pub fn new_paper(executor: E, sand_extra_executors: ET, observer_handle: Handle<C>) -> Self {
         Self::new(
             executor,
@@ -137,13 +149,20 @@ where
         let ot = self.executor.observers();
         let ob = ot.get(&self.ob_ref).unwrap().as_ref();
         let initial = ob.initial();
-        let covs = match self.pattern {
-            SANDExecutionPattern::SimplifiedTrace => ob
-                .as_iter()
-                .map(|x| if *x == initial { 0x1 } else { 0x80 })
-                .collect::<Vec<_>>(),
-            SANDExecutionPattern::UniqueTrace => ob.to_vec(),
-        };
+        let mut covs = ob.to_vec();
+        match self.pattern {
+            SANDExecutionPattern::SimplifiedTrace => {
+                // TODO: SIMD Optimizations
+                for it in &mut covs {
+                    *it = if *it == initial { 0x1 } else { 0x80 };
+                }
+            }
+            SANDExecutionPattern::UniqueTrace => {
+                classify_counts(covs.as_mut_slice());
+            }
+            SANDExecutionPattern::UnclassifiedTrace => {}
+        }
+
         // Our paper uses xxh32 but it shouldn't have significant collision for most hashing algorithms.
         let pattern_hash = hash_std(&covs) as usize;
 
