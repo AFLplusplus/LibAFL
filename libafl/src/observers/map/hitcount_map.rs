@@ -63,6 +63,7 @@ pub(crate) fn init_count_class_16() {
 }
 
 /// AFL-style classify counts
+#[inline]
 #[expect(clippy::cast_ptr_alignment)]
 pub(crate) fn classify_counts(map: &mut [u8]) {
     let mut len = map.len();
