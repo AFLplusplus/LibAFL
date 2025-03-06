@@ -15,6 +15,12 @@ impl PredicateObserver {
     fn is_rca(&self) -> bool {
         unsafe { IS_RCA }
     }
+
+    #[must_use]
+    pub fn new() -> Self {
+        Self {}
+    }
+
 }
 
 impl Named for PredicateObserver {

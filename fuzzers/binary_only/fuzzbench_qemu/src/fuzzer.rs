@@ -55,7 +55,8 @@ use libafl_qemu::{
         tracer::TracerModule,
         SnapshotModule,
     },
-    Emulator, GuestReg, MmapPerms, PredicateFeedback, PredicatesMap, Qemu, QemuExecutor,
+    PredicateObserver,
+    Emulator, GuestReg, MmapPerms, PredicatesMap, Qemu, QemuExecutor,
     QemuExitError, QemuExitReason, QemuMappingsCache, QemuMappingsViewer, QemuShutdownCause,
     RCAStage, Regs, Tracer,
 };
@@ -294,6 +295,8 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
+    let predicate = PredicateObserver::new();
+
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
     let calibration = CalibrationStage::new(&map_feedback);
@@ -304,12 +307,10 @@ fn fuzz(
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
-        // Time feedback, this one does not need a feedback state
-        PredicateFeedback::new(),
     );
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_or!(CrashFeedback::new(), PredicateFeedback::new());
+    let mut objective = feedback_or!(CrashFeedback::new());
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {
