@@ -54,6 +54,7 @@ run: fuzzer fuzzer_asan
 [macos]
 test: fuzzer fuzzer_asan
     #!/bin/bash
+    mkdir -p input && echo "a" >> input/a
     timeout 10s {{FUZZER}} -i input -o /tmp/out -a ./vuln_asan -t 1000 ./vuln_native | tee fuzz_stdout.log || true
     if grep -qa "objectives: 1" fuzz_stdout.log; then
         echo "Fuzzer is working"
