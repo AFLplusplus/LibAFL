@@ -15,7 +15,7 @@ use libafl_bolts::{
 use super::{Executor, ExitKind, HasObservers, HasTimeout};
 use crate::{HasNamedMetadata, observers::MapObserver};
 
-/// Like ObserverTuples, a list of executors
+/// Like [`ObserverTuple`], a list of executors
 pub trait ExecutorsTuple<EM, I, S, Z> {
     /// Execute the executors and stop if any of them returns a crash
     fn run_target_all(
@@ -84,8 +84,8 @@ where
     }
 }
 
-/// The execution pattern of the SANDExecutor. The default value used in our paper is
-/// [SANDExecutionPattern::SimplifiedTrace] and we by design don't include coverage
+/// The execution pattern of the [`SANDExecutor`]. The default value used in our paper is
+/// [`SANDExecutionPattern::SimplifiedTrace`] and we by design don't include coverage
 /// increasing pattern here as it will miss at least 25% bugs and easy enough to implement
 /// by iterating the crash corpus.
 #[derive(Debug, Clone, Default, Copy)]
@@ -98,7 +98,7 @@ pub enum SANDExecutionPattern {
     UniqueTrace,
 }
 
-/// The core SANDExecutor. It wraps another executor and a list of extra executors.
+/// The core executor implementation. It wraps another executor and a list of extra executors.
 /// Please refer to [SAND.md](https://github.com/AFLplusplus/AFLplusplus/blob/stable/docs/SAND.md) for
 /// how to build `sand_executors`.
 #[derive(Debug, Clone)]
@@ -127,7 +127,7 @@ where
         (self.bitmap[idx] >> bidx) & 1
     }
 
-    /// Create a new [SANDExecutor]
+    /// Create a new [`SANDExecutor`]
     pub fn new(
         executor: E,
         sand_extra_executors: ET,
@@ -141,11 +141,11 @@ where
             bitmap: vec![0; bitmap_size],
             ob_ref: observer_handle,
             pattern,
-            ph: PhantomData::default(),
+            ph: PhantomData,
         }
     }
 
-    /// Create a new [SANDExecutor] using paper setup
+    /// Create a new [`SANDExecutor`] using paper setup
     pub fn new_paper(executor: E, sand_extra_executors: ET, observer_handle: Handle<C>) -> Self {
         Self::new(
             executor,
