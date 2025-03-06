@@ -377,7 +377,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04]
         fuzzer:
-          Binary only
+          # Binary only
           - ./fuzzers/binary_only/qemu_cmin
           - ./fuzzers/binary_only/qemu_coverage
           - ./fuzzers/binary_only/qemu_launcher
@@ -407,7 +407,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04]
         fuzzer:
-          Full-system
+          # Full-system
           - ./fuzzers/full_system/qemu_baremetal
           - ./fuzzers/full_system/qemu_linux_kernel
           - ./fuzzers/full_system/qemu_linux_process
