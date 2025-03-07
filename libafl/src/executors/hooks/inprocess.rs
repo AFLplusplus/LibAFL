@@ -351,7 +351,7 @@ impl<I, S> InProcessHooks<I, S> {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         #[cfg_attr(miri, allow(unused_variables))]
         let ret = Self {
