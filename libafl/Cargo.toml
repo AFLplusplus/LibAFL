@@ -142,9 +142,6 @@ unicode = ["libafl_bolts/alloc", "ahash/std", "serde/rc", "bitvec"]
 ## Enable multi-part input formats and mutators
 multipart_inputs = ["arrayvec", "rand_trait"]
 
-## Share objectives across nodes
-share_objectives = []
-
 #! ## LibAFL-Bolts Features
 
 ## Provide the `#[derive(SerdeAny)]` macro.
