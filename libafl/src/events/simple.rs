@@ -18,7 +18,6 @@ use libafl_bolts::{
     shmem::{ShMem, ShMemProvider},
     staterestore::StateRestorer,
 };
-use serde::Serialize;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 
