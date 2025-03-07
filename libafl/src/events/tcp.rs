@@ -700,7 +700,6 @@ where
                                 }
                                 return Ok(Some((event, false)));
                             }
-                            #[cfg(feature = "share_objectives")]
                             Event::Objective { .. } => {
                                 log::info!("Received new Objective");
                                 return Ok(Some((event, false)));

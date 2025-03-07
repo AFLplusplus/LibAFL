@@ -70,6 +70,12 @@ pub trait HasObjective {
 
     /// The objective feedback (mutable)
     fn objective_mut(&mut self) -> &mut Self::Objective;
+
+    /// Whether to share objective testcases among fuzzing nodes
+    fn share_objectives(&self) -> bool;
+
+    /// Sets whether to share objectives among nodes
+    fn set_share_objectives(&mut self, share_objectives: bool);
 }
 
 /// Evaluates if an input is interesting using the feedback
@@ -292,6 +298,8 @@ pub struct StdFuzzer<CS, F, IF, OF> {
     feedback: F,
     objective: OF,
     input_filter: IF,
+    // Handles whether to share objective testcases among nodes
+    share_objectives: bool,
 }
 
 impl<CS, F, I, IF, OF, S> HasScheduler<I, S> for StdFuzzer<CS, F, IF, OF>
@@ -330,6 +338,14 @@ impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
 
     fn objective_mut(&mut self) -> &mut OF {
         &mut self.objective
+    }
+
+    fn set_share_objectives(&mut self, share_objectives: bool) {
+        self.share_objectives = share_objectives;
+    }
+
+    fn share_objectives(&self) -> bool {
+        self.share_objectives
     }
 }
 
@@ -480,14 +496,11 @@ where
                     },
                 )?;
             }
-
             if exec_res.is_solution() {
                 manager.fire(
                     state,
                     Event::Objective {
-                        #[cfg(feature = "share_objectives")]
-                        input: input.clone(),
-
+                        input: self.share_objectives.then_some(input.clone()),
                         objective_size: state.solutions().count(),
                         time: current_time(),
                     },
@@ -677,9 +690,7 @@ where
             manager.fire(
                 state,
                 Event::Objective {
-                    #[cfg(feature = "share_objectives")]
-                    input: input.clone(),
-
+                    input: self.share_objectives.then_some(input.clone()),
                     objective_size: state.solutions().count(),
                     time: current_time(),
                 },
@@ -802,10 +813,16 @@ where
                         )?;
                         res.1
                     }
-                    #[cfg(feature = "share_objectives")]
-                    Event::Objective { ref input, .. } => {
+                    Event::Objective {
+                        input: Some(ref unwrapped_input),
+                        ..
+                    } => {
                         let res = self.evaluate_input_with_observers(
-                            state, executor, manager, input, false,
+                            state,
+                            executor,
+                            manager,
+                            unwrapped_input,
+                            false,
                         )?;
                         res.1
                     }
@@ -966,6 +983,7 @@ impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
             feedback,
             objective,
             input_filter,
+            share_objectives: false,
         }
     }
 }

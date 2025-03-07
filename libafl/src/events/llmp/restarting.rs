@@ -377,8 +377,6 @@ where
 
                     return Ok(Some((event, false)));
                 }
-
-                #[cfg(feature = "share_objectives")]
                 Event::Objective { .. } => {
                     #[cfg(feature = "std")]
                     log::debug!("[{}] Received new Objective", std::process::id());
