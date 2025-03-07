@@ -472,7 +472,7 @@ where
                 indices.push(i);
             }
             let meta = MapIndexesMetadata::new(indices);
-            if let Err(_) = testcase.try_add_metadata(meta) {
+            if testcase.try_add_metadata(meta).is_err() {
                 return Err(Error::key_exists(
                     "MapIndexesMetadata is already attached to this testcase. You should not have more than one observer with tracking.",
                 ));
