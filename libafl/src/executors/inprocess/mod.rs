@@ -352,7 +352,8 @@ pub fn run_observers_and_save_state<E, EM, F, I, OF, S, Z>(
         #[cfg(feature = "track_hit_feedbacks")]
         fuzzer
             .feedback_mut()
-            .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
+            .append_hit_feedbacks(testcase.hit_feedbacks_mut())
+            .expect("Failed to append hit feedbacks");
         testcase.set_parent_id_optional(*state.corpus().current());
         fuzzer
             .feedback_mut()

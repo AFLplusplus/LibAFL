@@ -29,7 +29,7 @@ use libafl_bolts::{
     nonzero,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{Handled, Merge, tuple_list},
+    tuples::{Merge, tuple_list},
 };
 use typed_builder::TypedBuilder;
 

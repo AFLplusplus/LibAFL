@@ -36,7 +36,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{Handled, Merge, tuple_list},
+    tuples::{Merge, tuple_list},
 };
 use libafl_targets::{CmpLogObserver, edges_map_mut_ptr};
 use typed_builder::TypedBuilder;
