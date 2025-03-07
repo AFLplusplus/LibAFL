@@ -286,7 +286,7 @@ impl<I, S> InProcessHooks<I, S> {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         let ret;
         #[cfg(feature = "std")]

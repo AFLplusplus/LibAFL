@@ -16,7 +16,7 @@ pub mod windows_asan_handler {
             inprocess::run_observers_and_save_state,
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
+        fuzzer::{HasObjective, HasScheduler},
         inputs::Input,
         observers::ObserversTuple,
         state::{HasCurrentTestcase, HasExecutions, HasSolutions},
@@ -33,7 +33,7 @@ pub mod windows_asan_handler {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
@@ -147,7 +147,7 @@ pub mod windows_exception_handler {
             inprocess::{HasInProcessHooks, run_observers_and_save_state},
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
+        fuzzer::{HasObjective, HasScheduler},
         inputs::Input,
         observers::ObserversTuple,
         state::{HasCurrentTestcase, HasExecutions, HasSolutions},
@@ -209,7 +209,7 @@ pub mod windows_exception_handler {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -278,7 +278,7 @@ pub mod windows_exception_handler {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         let data: &mut InProcessExecutorHandlerData =
             unsafe { &mut *(global_state as *mut InProcessExecutorHandlerData) };
@@ -357,7 +357,7 @@ pub mod windows_exception_handler {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {
