@@ -19,6 +19,8 @@ use libafl_bolts::{
     staterestore::StateRestorer,
 };
 #[cfg(feature = "std")]
+use serde::Serialize;
+#[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 
 use super::{AwaitRestartSafe, ProgressReporter, std_on_restart};
