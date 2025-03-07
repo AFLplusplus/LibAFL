@@ -66,7 +66,7 @@ jobs:
         run: cargo test -- --test-threads 1
       - name: Run tests (Linux)
         if: runner.os != 'Windows' 
-        run: cargo test
+        run: cargo test -- --test-threads 1
       - name: Test libafl no_std
         run: cd libafl && cargo test --no-default-features
       - name: Test libafl_bolts no_std no_alloc
@@ -556,8 +556,6 @@ jobs:
         run: cargo build --verbose
       - name: Increase map sizes
         run: ./scripts/shmem_limits_macos.sh
-      - name: Run Tests
-        run: cargo test
       - name: Clippy
         run: cargo +nightly clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
 
