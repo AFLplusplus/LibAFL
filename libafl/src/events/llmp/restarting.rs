@@ -41,7 +41,7 @@ use libafl_bolts::{
     os::CTRL_C_EXIT,
     shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     staterestore::StateRestorer,
-    tuples::{Handle, MatchNameRef, tuple_list},
+    tuples::tuple_list,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use typed_builder::TypedBuilder;
@@ -54,16 +54,14 @@ use crate::{
     Error,
     common::HasMetadata,
     events::{
-        _LLMP_TAG_EVENT_TO_BROKER, AdaptiveSerializer, AwaitRestartSafe, CanSerializeObserver,
-        Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventReceiver,
-        EventRestarter, HasEventManagerId, LLMP_TAG_EVENT_TO_BOTH, LlmpShouldSaveState,
-        ProgressReporter, RecordSerializationTime, SendExiting, StdLlmpEventHook,
-        launcher::ClientDescription, serialize_observers_adaptive, std_maybe_report_progress,
+        _LLMP_TAG_EVENT_TO_BROKER, AwaitRestartSafe, Event, EventConfig, EventFirer,
+        EventManagerHooksTuple, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
+        LLMP_TAG_EVENT_TO_BOTH, LlmpShouldSaveState, ProgressReporter, SendExiting,
+        StdLlmpEventHook, launcher::ClientDescription, std_maybe_report_progress,
         std_report_progress,
     },
     inputs::Input,
     monitors::Monitor,
-    observers::TimeObserver,
     state::{
         HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime,
         HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
@@ -87,11 +85,6 @@ pub struct LlmpRestartingEventManager<EMH, I, S, SHM, SP> {
     /// A node will not re-use the observer values sent over LLMP
     /// from nodes with other configurations.
     configuration: EventConfig,
-    serialization_time: Duration,
-    deserialization_time: Duration,
-    serializations_cnt: usize,
-    should_serialize_cnt: usize,
-    pub(crate) time_ref: Option<Handle<TimeObserver>>,
     event_buffer: Vec<u8>,
     /// The staterestorer to serialize the state for the next runner
     /// If this is Some, this event manager can restart. Else it does not.
@@ -99,50 +92,6 @@ pub struct LlmpRestartingEventManager<EMH, I, S, SHM, SP> {
     /// Decide if the state restorer must save the serialized state
     save_state: LlmpShouldSaveState,
     phantom: PhantomData<(I, S)>,
-}
-
-impl<EMH, I, S, SHM, SP> RecordSerializationTime for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
-where
-    SHM: ShMem,
-{
-    fn set_deserialization_time(&mut self, dur: Duration) {
-        self.deserialization_time = dur;
-    }
-}
-
-impl<EMH, I, S, SHM, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
-where
-    SHM: ShMem,
-{
-    fn serialization_time(&self) -> Duration {
-        self.serialization_time
-    }
-    fn deserialization_time(&self) -> Duration {
-        self.deserialization_time
-    }
-    fn serializations_cnt(&self) -> usize {
-        self.serializations_cnt
-    }
-    fn should_serialize_cnt(&self) -> usize {
-        self.should_serialize_cnt
-    }
-
-    fn serialization_time_mut(&mut self) -> &mut Duration {
-        &mut self.serialization_time
-    }
-    fn deserialization_time_mut(&mut self) -> &mut Duration {
-        &mut self.deserialization_time
-    }
-    fn serializations_cnt_mut(&mut self) -> &mut usize {
-        &mut self.serializations_cnt
-    }
-    fn should_serialize_cnt_mut(&mut self) -> &mut usize {
-        &mut self.should_serialize_cnt
-    }
-
-    fn time_ref(&self) -> &Option<Handle<TimeObserver>> {
-        &self.time_ref
-    }
 }
 
 impl<EMH, I, S, SHM, SP> ProgressReporter<S> for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
@@ -234,18 +183,6 @@ where
         } else {
             true
         }
-    }
-}
-
-#[cfg(feature = "std")]
-impl<EMH, I, OT, S, SHM, SP> CanSerializeObserver<OT>
-    for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
-where
-    OT: MatchNameRef + Serialize,
-    SHM: ShMem,
-{
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        serialize_observers_adaptive::<Self, OT>(self, observers, 2, 80)
     }
 }
 
@@ -479,7 +416,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         self,
         llmp: LlmpClient<SHM, SP>,
         configuration: EventConfig,
-        time_ref: Option<Handle<TimeObserver>>,
         staterestorer: Option<StateRestorer<SHM, SP>>,
     ) -> Result<LlmpRestartingEventManager<EMH, I, S, SHM, SP>, Error> {
         Ok(LlmpRestartingEventManager {
@@ -490,11 +426,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             configuration,
-            serialization_time: Duration::ZERO,
-            deserialization_time: Duration::ZERO,
-            serializations_cnt: 0,
-            should_serialize_cnt: 0,
-            time_ref,
             event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
             staterestorer,
             save_state: LlmpShouldSaveState::OnRestart,
@@ -510,7 +441,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         shmem_provider: SP,
         port: u16,
         configuration: EventConfig,
-        time_ref: Option<Handle<TimeObserver>>,
         staterestorer: Option<StateRestorer<SHM, SP>>,
     ) -> Result<LlmpRestartingEventManager<EMH, I, S, SHM, SP>, Error>
     where
@@ -518,7 +448,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         SP: ShMemProvider<ShMem = SHM>,
     {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Self::build_from_client(self, llmp, configuration, time_ref, staterestorer)
+        Self::build_from_client(self, llmp, configuration, staterestorer)
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
@@ -529,7 +459,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         shmem_provider: SP,
         env_name: &str,
         configuration: EventConfig,
-        time_ref: Option<Handle<TimeObserver>>,
         staterestorer: Option<StateRestorer<SHM, SP>>,
     ) -> Result<LlmpRestartingEventManager<EMH, I, S, SHM, SP>, Error>
     where
@@ -537,7 +466,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         SP: ShMemProvider<ShMem = SHM>,
     {
         let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
-        Self::build_from_client(self, llmp, configuration, time_ref, staterestorer)
+        Self::build_from_client(self, llmp, configuration, staterestorer)
     }
 
     /// Create an existing client from description
@@ -546,7 +475,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         shmem_provider: SP,
         description: &LlmpClientDescription,
         configuration: EventConfig,
-        time_ref: Option<Handle<TimeObserver>>,
         staterestorer: Option<StateRestorer<SHM, SP>>,
     ) -> Result<LlmpRestartingEventManager<EMH, I, S, SHM, SP>, Error>
     where
@@ -554,7 +482,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         SP: ShMemProvider<ShMem = SHM>,
     {
         let llmp = LlmpClient::existing_client_from_description(shmem_provider, description)?;
-        Self::build_from_client(self, llmp, configuration, time_ref, staterestorer)
+        Self::build_from_client(self, llmp, configuration, staterestorer)
     }
 }
 
@@ -697,7 +625,6 @@ pub fn setup_restarting_mgr_std_adaptive<I, MT, S>(
     monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
-    time_obs: Handle<TimeObserver>,
 ) -> Result<
     (
         Option<S>,
@@ -716,7 +643,6 @@ where
         .broker_port(broker_port)
         .configuration(configuration)
         .hooks(tuple_list!())
-        .time_ref(Some(time_obs))
         .build()
         .launch()
 }
@@ -758,8 +684,6 @@ pub struct RestartingMgr<EMH, I, MT, S, SP> {
     serialize_state: LlmpShouldSaveState,
     /// The hooks passed to event manager:
     hooks: EMH,
-    #[builder(default = None)]
-    time_ref: Option<Handle<TimeObserver>>,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(EMH, I, S)>,
 }
@@ -830,12 +754,7 @@ where
                             let mgr: LlmpRestartingEventManager<EMH, I, S, SP::ShMem, SP> =
                                 LlmpEventManagerBuilder::builder()
                                     .hooks(self.hooks)
-                                    .build_from_client(
-                                        client,
-                                        self.configuration,
-                                        self.time_ref.clone(),
-                                        None,
-                                    )?;
+                                    .build_from_client(client, self.configuration, None)?;
                             (mgr, None)
                         }
                     }
@@ -862,7 +781,6 @@ where
                             self.shmem_provider.clone(),
                             self.broker_port,
                             self.configuration,
-                            self.time_ref.clone(),
                             None,
                         )?;
 
@@ -1010,7 +928,6 @@ where
                             new_shmem_provider,
                             &mgr_description,
                             self.configuration,
-                            self.time_ref.clone(),
                             Some(staterestorer),
                         )?,
                 )
@@ -1026,7 +943,6 @@ where
                             new_shmem_provider,
                             _ENV_FUZZER_BROKER_CLIENT_INITIAL,
                             self.configuration,
-                            self.time_ref.clone(),
                             Some(staterestorer),
                         )?,
                 )
@@ -1058,7 +974,7 @@ mod tests {
         rands::StdRand,
         shmem::{ShMemProvider, StdShMem, StdShMemProvider},
         staterestore::StateRestorer,
-        tuples::{Handled, tuple_list},
+        tuples::tuple_list,
     };
     use serial_test::serial;
 
@@ -1091,7 +1007,6 @@ mod tests {
         let rand = StdRand::with_seed(0);
 
         let time = TimeObserver::new("time");
-        let time_ref = time.handle();
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
         let testcase = Testcase::new(vec![0; 4].into());
@@ -1120,7 +1035,7 @@ mod tests {
         }
 
         let mut llmp_mgr = LlmpEventManagerBuilder::builder()
-            .build_from_client(llmp_client, "fuzzer".into(), Some(time_ref.clone()), None)
+            .build_from_client(llmp_client, "fuzzer".into(), None)
             .unwrap();
 
         let scheduler = RandScheduler::new();
@@ -1172,7 +1087,6 @@ mod tests {
                 shmem_provider,
                 &mgr_description,
                 "fuzzer".into(),
-                Some(time_ref),
                 None,
             )
             .unwrap();

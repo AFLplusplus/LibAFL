@@ -15,10 +15,7 @@ use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    events::{
-        CanSerializeObserver, Event, EventConfig, EventFirer, EventReceiver, ProgressReporter,
-        RecordSerializationTime, SendExiting,
-    },
+    events::{Event, EventConfig, EventFirer, EventReceiver, ProgressReporter, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
@@ -336,7 +333,7 @@ impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
 impl<CS, EM, F, I, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
-    EM: EventFirer<I, S> + CanSerializeObserver<OT>,
+    EM: EventFirer<I, S>,
     F: Feedback<EM, I, OT, S>,
     I: Input,
     OF: Feedback<EM, I, OT, S>,
@@ -439,12 +436,12 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         // Now send off the event
-        let observers_buf = if exec_res.is_solution()
+        let observers_buf = if exec_res.is_corpus()
             && manager.should_send()
             && manager.configuration() != EventConfig::AlwaysUnique
         {
             // TODO set None for fast targets
-            manager.serialize_observers(observers)?
+            Some(postcard::to_allocvec(observers)?)
         } else {
             None
         };
@@ -524,7 +521,7 @@ where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
     E::Observers: MatchName + ObserversTuple<I, S> + Serialize,
-    EM: EventFirer<I, S> + CanSerializeObserver<E::Observers>,
+    EM: EventFirer<I, S>,
     F: Feedback<EM, I, E::Observers, S>,
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasCorpus<I>
@@ -597,7 +594,7 @@ where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
     E::Observers: MatchName + ObserversTuple<I, S> + Serialize,
-    EM: EventFirer<I, S> + CanSerializeObserver<E::Observers>,
+    EM: EventFirer<I, S>,
     F: Feedback<EM, I, E::Observers, S>,
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasCorpus<I>
@@ -714,7 +711,7 @@ where
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
         } else {
-            manager.serialize_observers(&*observers)?
+            Some(postcard::to_allocvec(&*observers)?)
         };
         manager.fire(
             state,
@@ -747,10 +744,7 @@ where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
     E::Observers: DeserializeOwned + Serialize + ObserversTuple<I, S>,
-    EM: EventReceiver<I, S>
-        + RecordSerializationTime
-        + CanSerializeObserver<E::Observers>
-        + EventFirer<I, S>,
+    EM: EventReceiver<I, S> + EventFirer<I, S>,
     F: Feedback<EM, I, E::Observers, S>,
     I: Input,
     OF: Feedback<EM, I, E::Observers, S>,
@@ -780,13 +774,8 @@ where
                         exit_kind,
                         ..
                     } => {
-                        let start = current_time();
                         let observers: E::Observers =
                             postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                        {
-                            let dur = current_time() - start;
-                            manager.set_deserialization_time(dur);
-                        }
                         let res = self.evaluate_execution(
                             state, manager, input, &observers, &exit_kind, false,
                         )?;
@@ -831,7 +820,7 @@ where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
     E::Observers: DeserializeOwned + Serialize + ObserversTuple<I, S>,
-    EM: CanSerializeObserver<E::Observers> + EventFirer<I, S> + RecordSerializationTime,
+    EM: EventFirer<I, S>,
     I: Input,
     F: Feedback<EM, I, E::Observers, S>,
     OF: Feedback<EM, I, E::Observers, S>,

@@ -260,8 +260,7 @@ fn fuzz(
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
-        // Time feedback, this one does not need a feedback state
-        TimeFeedback::new(&time_observer)
+        CrashFeedback::new(),
     );
 
     // A feedback to choose if an input is a solution or not
@@ -391,9 +390,9 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
+        // dup2(null_fd, io::stdout().as_raw_fd())?;
         if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
-            dup2(null_fd, io::stderr().as_raw_fd())?;
+            // dup2(null_fd, io::stderr().as_raw_fd())?;
         }
     }
     // reopen file to make sure we're at the end
