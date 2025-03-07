@@ -61,6 +61,8 @@ jobs:
       - name: Test the book (MacOS)
         if: runner.os == 'MacOS'
         run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Run tests
         run: cargo test
       - name: Test libafl no_std
