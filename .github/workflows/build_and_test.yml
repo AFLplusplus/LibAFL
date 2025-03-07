@@ -61,8 +61,12 @@ jobs:
       - name: Test the book (MacOS)
         if: runner.os == 'MacOS'
         run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
-      - name: Run tests
-        run: cargo test -- --nocapture
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows' 
+        run: cargo test -- --test-threads 1
+      - name: Run tests (Linux)
+        if: runner.os != 'Windows' 
+        run: cargo test
       - name: Test libafl no_std
         run: cd libafl && cargo test --no-default-features
       - name: Test libafl_bolts no_std no_alloc
