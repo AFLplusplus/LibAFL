@@ -17,7 +17,7 @@ First, verify that your stdout and stderr are not redirected to `/dev/null`. If 
 
 ## Q. I don't see any output from my fuzzer (println!() or logging)
 First, check that you are not redirecting things to `/dev/null` else you will see nothing.
-To see the log that you added with `log::trace!();`, you need initialize the logger (any logger, `env_logger` or `SimpleStdoutLogger` from `libafl_bolts`) before the fuzzer starts.
+To see the log that you added with `log::trace!();`, you need to initialize the logger (any logger, `env_logger` or `SimpleStdoutLogger` from `libafl_bolts`) before the fuzzer starts.
 Also you have to make sure that you are runing with `RUST_LOG=<log_level>` and you are *NOT* using `release_max_level_info` feature of `log` crate in your `Cargo.toml` of your fuzzer
 
 ## Q. My fuzzer is slow.
