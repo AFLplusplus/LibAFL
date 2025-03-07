@@ -197,8 +197,9 @@ where
                 .unwrap()
                 .join("libgasan.so");
 
-            let asan_lib = env::var_os("CUSTOM_ASAN_PATH")
-                .map_or(asan_lib, |x| PathBuf::from(x.to_string_lossy().to_string()));
+            let asan_lib = env::var_os("CUSTOM_ASAN_PATH").map_or(asan_lib, |x| {
+                fs::canonicalize(PathBuf::from(x.to_string_lossy().to_string())).unwrap()
+            });
 
             assert!(
                 asan_lib.as_path().exists(),
