@@ -396,6 +396,7 @@ impl Monitor for TuiMonitor {
             client.executions(),
             exec_sec
         );
+
         for (key, val) in client.user_stats() {
             write!(fmt, ", {key}: {val}").unwrap();
         }
