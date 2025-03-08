@@ -24,7 +24,7 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 #[cfg(feature = "std")]
 use crate::executors::hooks::timer::TimerStruct;
 use crate::{
-    Error, HasFeedback, HasObjective,
+    Error, HasFeedback, HasObjective, HasScheduler,
     events::{EventFirer, EventRestarter},
     executors::{Executor, HasObservers, hooks::ExecutorHook, inprocess::HasInProcessHooks},
     feedbacks::Feedback,
@@ -240,7 +240,7 @@ impl<I, S> InProcessHooks<I, S> {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
         I: Input + Clone,
     {
         // # Safety
@@ -286,7 +286,7 @@ impl<I, S> InProcessHooks<I, S> {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         let ret;
         #[cfg(feature = "std")]
@@ -351,7 +351,7 @@ impl<I, S> InProcessHooks<I, S> {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         #[cfg_attr(miri, allow(unused_variables))]
         let ret = Self {
@@ -489,7 +489,7 @@ impl InProcessExecutorHandlerData {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
         I: Input + Clone,
     {
         unsafe {

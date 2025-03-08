@@ -443,7 +443,7 @@ where
             let meta = MapNoveltiesMetadata::new(novelties);
             testcase.add_metadata(meta);
         }
-        let observer = observers.get(&self.map_ref).unwrap().as_ref();
+        let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
         let initial = observer.initial();
         let map_state = state
             .named_metadata_map_mut()
@@ -472,7 +472,11 @@ where
                 indices.push(i);
             }
             let meta = MapIndexesMetadata::new(indices);
-            testcase.try_add_metadata(meta)?;
+            if testcase.try_add_metadata(meta).is_err() {
+                return Err(Error::key_exists(
+                    "MapIndexesMetadata is already attached to this testcase. You should not have more than one observer with tracking.",
+                ));
+            }
         } else {
             for (i, value) in observer
                 .as_iter()

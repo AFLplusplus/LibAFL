@@ -11,8 +11,6 @@ use libafl_bolts::tuples::{Merge, RefIndexable, tuple_list};
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
-#[cfg(all(feature = "std", target_os = "linux"))]
-use crate::executors::hooks::inprocess::HasTimeout;
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::hooks::inprocess::HasTimeout;
 use crate::{
@@ -27,7 +25,7 @@ use crate::{
         inprocess::HasInProcessHooks,
     },
     feedbacks::Feedback,
-    fuzzer::HasObjective,
+    fuzzer::{HasObjective, HasScheduler},
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
@@ -147,7 +145,7 @@ where
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         Self::with_timeout_generic::<E, F, OF>(
             user_hooks,
@@ -157,33 +155,6 @@ where
             event_mgr,
             Duration::from_millis(5000),
         )
-    }
-
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
-    #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout_generic<E, F, OF>(
-        user_hooks: HT,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        exec_tmout: Duration,
-    ) -> Result<Self, Error>
-    where
-        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
-        E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        I: Input + Clone,
-        F: Feedback<EM, I, E::Observers, S>,
-        OF: Feedback<EM, I, E::Observers, S>,
-        S: HasCurrentTestcase<I> + HasSolutions<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
-    {
-        let mut me = Self::with_timeout_generic::<E, F, OF>(
-            user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
-        )?;
-        me.hooks_mut().0.timer_mut().batch_mode = true;
-        Ok(me)
     }
 
     /// Create a new in mem executor.
@@ -209,7 +180,7 @@ where
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
         I: Input + Clone,
     {
         let default = InProcessHooks::new::<E, EM, F, OF, Z>(timeout)?;

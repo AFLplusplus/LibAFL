@@ -1,7 +1,7 @@
 //! Setup asan death callbback
 
 use libafl::{
-    HasFeedback, HasObjective,
+    HasFeedback, HasObjective, HasScheduler,
     events::{EventFirer, EventRestarter},
     executors::{Executor, HasObservers, hooks::windows::windows_asan_handler::asan_death_handler},
     feedbacks::Feedback,
@@ -40,7 +40,7 @@ pub unsafe fn setup_asan_callback<E, EM, F, I, OF, S, Z>(
     F: Feedback<EM, I, E::Observers, S>,
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-    Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+    Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     I: Input + Clone,
 {
     unsafe {

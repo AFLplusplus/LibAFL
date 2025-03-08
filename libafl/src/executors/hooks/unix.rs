@@ -12,7 +12,7 @@ pub mod unix_signal_handler {
     use libc::siginfo_t;
 
     use crate::{
-        HasFeedback,
+        HasFeedback, HasScheduler,
         events::{EventFirer, EventRestarter},
         executors::{
             Executor, ExitKind, HasObservers, common_signals,
@@ -95,7 +95,7 @@ pub mod unix_signal_handler {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
         I: Input + Clone,
     {
         let old_hook = panic::take_hook();
@@ -154,7 +154,7 @@ pub mod unix_signal_handler {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
         I: Input + Clone,
     {
         unsafe {
@@ -213,7 +213,7 @@ pub mod unix_signal_handler {
         F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
         I: Input + Clone,
     {
         unsafe {

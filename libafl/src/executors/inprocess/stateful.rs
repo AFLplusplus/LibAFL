@@ -19,7 +19,7 @@ use crate::{
         inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
     },
     feedbacks::Feedback,
-    fuzzer::HasObjective,
+    fuzzer::{HasObjective, HasScheduler},
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
@@ -143,7 +143,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         Self::with_timeout_generic(
             tuple_list!(),
@@ -155,40 +155,6 @@ where
             event_mgr,
             Duration::from_millis(5000),
         )
-    }
-
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
-    #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout<F, OF>(
-        harness_fn: &'a mut H,
-        exposed_executor_state: ES,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        exec_tmout: Duration,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
-        OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
-    {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, F, OF>(
-            tuple_list!(),
-            observers,
-            fuzzer,
-            state,
-            event_mgr,
-            exec_tmout,
-        )?;
-
-        Ok(Self {
-            harness_fn,
-            exposed_executor_state,
-            inner,
-            phantom: PhantomData,
-        })
     }
 
     /// Create a new in mem executor.
@@ -212,7 +178,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, F, OF>(
             tuple_list!(),
@@ -270,7 +236,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         Self::with_timeout_generic(
             user_hooks,
@@ -282,37 +248,6 @@ where
             event_mgr,
             Duration::from_millis(5000),
         )
-    }
-
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
-    #[cfg(all(feature = "std", target_os = "linux"))]
-    #[expect(clippy::too_many_arguments)]
-    pub fn batched_timeout_generic<F, OF>(
-        user_hooks: HT,
-        harness_fn: HB,
-        exposed_executor_state: ES,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        exec_tmout: Duration,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
-        OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
-    {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, F, OF>(
-            user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
-        )?;
-
-        Ok(Self {
-            harness_fn,
-            exposed_executor_state,
-            inner,
-            phantom: PhantomData,
-        })
     }
 
     /// Create a new in mem executor.
@@ -338,7 +273,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, F, OF>(
             user_hooks, observers, fuzzer, state, event_mgr, timeout,

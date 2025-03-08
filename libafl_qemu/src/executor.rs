@@ -73,7 +73,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, F, I, OF, S, Z>(
     F: Feedback<EM, I, E::Observers, S>,
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I> + Unpin,
-    Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+    Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
     I: Input + Clone + Unpin,
 {
     log::debug!("QEMU signal handler has been triggered (signal {signal})");
@@ -179,7 +179,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, F, I, OF, S, Z>(
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasExecutions + HasSolutions<I> + Unpin + HasCurrentTestcase<I>,
     I: Input,
-    Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+    Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
 {
     #[cfg(feature = "systemmode")]
     unsafe {

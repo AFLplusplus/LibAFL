@@ -35,7 +35,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{Handled, Merge, tuple_list},
+    tuples::{Merge, tuple_list},
 };
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::modules::CmpLogModule;
@@ -150,7 +150,6 @@ where
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
-        let time_ref = time_observer.handle();
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
@@ -476,8 +475,8 @@ where
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
-            .remote_broker_addr(self.remote_broker_addr)
-            .time_ref(Some(time_ref));
+            .remote_broker_addr(self.remote_broker_addr);
+
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
 

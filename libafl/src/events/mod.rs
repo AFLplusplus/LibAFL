@@ -33,13 +33,11 @@ use ahash::RandomState;
 pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
+use libafl_bolts::current_time;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::CTRL_C_EXIT;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{Signal, SignalHandler, siginfo_t, ucontext_t};
-#[cfg(feature = "std")]
-use libafl_bolts::tuples::MatchNameRef;
-use libafl_bolts::{current_time, tuples::Handle};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
@@ -108,7 +106,7 @@ pub struct EventManagerId(
 use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::ClientPerfStats;
-use crate::{observers::TimeObserver, state::HasCurrentStageId};
+use crate::state::HasCurrentStageId;
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -409,58 +407,6 @@ pub trait EventFirer<I, S> {
     fn should_send(&self) -> bool;
 }
 
-/// Serialize all observers for this type and manager
-/// Serialize the observer using the `time_factor` and `percentage_threshold`.
-/// These parameters are unique to each of the different types of `EventManager`
-#[cfg(feature = "std")]
-pub(crate) fn serialize_observers_adaptive<EM, OT>(
-    manager: &mut EM,
-    observers: &OT,
-    time_factor: u32,
-    percentage_threshold: usize,
-) -> Result<Option<Vec<u8>>, Error>
-where
-    EM: AdaptiveSerializer,
-    OT: MatchNameRef + Serialize,
-{
-    match manager.time_ref() {
-        Some(t) => {
-            let exec_time = observers
-                .get(t)
-                .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
-                .unwrap();
-
-            let mut must_ser = (manager.serialization_time() + manager.deserialization_time())
-                * time_factor
-                < exec_time;
-            if must_ser {
-                *manager.should_serialize_cnt_mut() += 1;
-            }
-
-            if manager.serializations_cnt() > 32 {
-                must_ser = (manager.should_serialize_cnt() * 100 / manager.serializations_cnt())
-                    > percentage_threshold;
-            }
-
-            if manager.serialization_time() == Duration::ZERO
-                || must_ser
-                || manager.serializations_cnt().trailing_zeros() >= 8
-            {
-                let start = current_time();
-                let ser = postcard::to_allocvec(observers)?;
-                *manager.serialization_time_mut() = current_time() - start;
-
-                *manager.serializations_cnt_mut() += 1;
-                Ok(Some(ser))
-            } else {
-                *manager.serializations_cnt_mut() += 1;
-                Ok(None)
-            }
-        }
-        None => Ok(None),
-    }
-}
-
 /// Default implementation of [`ProgressReporter::maybe_report_progress`] for implementors with the
 /// given constraints
 pub fn std_maybe_report_progress<PR, S>(
@@ -571,12 +517,6 @@ where
     Ok(())
 }
 
-/// The class that implements this must be able to serialize an observer.
-pub trait CanSerializeObserver<OT> {
-    /// Do serialize the observer
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>;
-}
-
 /// Send that we're about to exit
 pub trait SendExiting {
     /// Send information that this client is exiting.
@@ -625,8 +565,6 @@ impl NopEventManager {
     }
 }
 
-impl RecordSerializationTime for NopEventManager {}
-
 impl<I, S> EventFirer<I, S> for NopEventManager {
     fn should_send(&self) -> bool {
         true
@@ -673,15 +611,6 @@ impl<I, S> EventReceiver<I, S> for NopEventManager {
     }
 }
 
-impl<OT> CanSerializeObserver<OT> for NopEventManager
-where
-    OT: Serialize,
-{
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        Ok(Some(postcard::to_allocvec(observers)?))
-    }
-}
-
 impl<S> ProgressReporter<S> for NopEventManager {
     fn maybe_report_progress(
         &mut self,
@@ -710,8 +639,6 @@ pub struct MonitorTypedEventManager<EM, M> {
     phantom: PhantomData<M>,
 }
 
-impl<EM, M> RecordSerializationTime for MonitorTypedEventManager<EM, M> {}
-
 impl<EM, M> MonitorTypedEventManager<EM, M> {
     /// Creates a new `EventManager` that wraps another manager, but captures a `monitor` type as well.
     #[must_use]
@@ -720,15 +647,6 @@ impl<EM, M> MonitorTypedEventManager<EM, M> {
             inner,
             phantom: PhantomData,
         }
-    }
-}
-
-impl<EM, M, OT> CanSerializeObserver<OT> for MonitorTypedEventManager<EM, M>
-where
-    OT: Serialize,
-{
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 
@@ -835,36 +753,6 @@ where
     fn mgr_id(&self) -> EventManagerId {
         self.inner.mgr_id()
     }
-}
-
-/// Record the deserialization time for this event manager
-pub trait RecordSerializationTime {
-    /// Set the deserialization time (mut)
-    fn set_deserialization_time(&mut self, _dur: Duration) {}
-}
-
-/// Collected stats to decide if observers must be serialized or not
-pub trait AdaptiveSerializer {
-    /// Expose the collected observers serialization time
-    fn serialization_time(&self) -> Duration;
-    /// Expose the collected observers deserialization time
-    fn deserialization_time(&self) -> Duration;
-    /// How many times observers were serialized
-    fn serializations_cnt(&self) -> usize;
-    /// How many times shoukd have been serialized an observer
-    fn should_serialize_cnt(&self) -> usize;
-
-    /// Expose the collected observers serialization time (mut)
-    fn serialization_time_mut(&mut self) -> &mut Duration;
-    /// Expose the collected observers deserialization time (mut)
-    fn deserialization_time_mut(&mut self) -> &mut Duration;
-    /// How many times observers were serialized (mut)
-    fn serializations_cnt_mut(&mut self) -> &mut usize;
-    /// How many times shoukd have been serialized an observer (mut)
-    fn should_serialize_cnt_mut(&mut self) -> &mut usize;
-
-    /// A [`Handle`] to the time observer to determine the `time_factor`
-    fn time_ref(&self) -> &Option<Handle<TimeObserver>>;
 }
 
 #[cfg(test)]
