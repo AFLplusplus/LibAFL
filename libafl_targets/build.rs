@@ -103,6 +103,11 @@ fn main() {
             common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
         }
 
+        #[cfg(feature = "whole_archive")]
+        {
+            common.link_lib_modifier("+whole-archive");
+        }
+
         common.file(src_dir.join("common.c")).compile("common");
     }
 
@@ -130,6 +135,11 @@ fn main() {
             println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_weak_hook_strncasecmp");
             println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_weak_hook_strcmp");
             println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_weak_hook_strcasecmp");
+        }
+
+        #[cfg(feature = "whole_archive")]
+        {
+            sancov_cmp.link_lib_modifier("+whole-archive");
         }
 
         sancov_cmp
@@ -164,14 +174,27 @@ fn main() {
         #[cfg(feature = "libfuzzer_define_run_driver")]
         libfuzzer.define("FUZZER_DEFINE_RUN_DRIVER", "1");
 
+        #[cfg(feature = "whole_archive")]
+        {
+            libfuzzer.link_lib_modifier("+whole-archive");
+        }
+
         libfuzzer.compile("libfuzzer");
+
     }
 
     #[cfg(feature = "coverage")]
     {
         println!("cargo:rerun-if-changed=src/coverage.c");
 
-        cc::Build::new()
+        let mut coverage = cc::Build::new();
+
+        #[cfg(feature = "whole_archive")]
+        {
+            coverage.link_lib_modifier("+whole-archive");
+        }
+
+        coverage
             .file(src_dir.join("coverage.c"))
             .define(
                 "EDGES_MAP_ALLOCATED_SIZE",
@@ -189,12 +212,17 @@ fn main() {
 
         #[cfg(unix)]
         {
-            let mut cc = cc::Build::new();
+            let mut cmplog = cc::Build::new();
 
             #[cfg(feature = "cmplog_extended_instrumentation")]
-            cc.define("CMPLOG_EXTENDED", Some("1"));
+            cmplog.define("CMPLOG_EXTENDED", Some("1"));
 
-            cc.flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
+            #[cfg(feature = "whole_archive")]
+            {
+                cmplog.link_lib_modifier("+whole-archive");
+            }
+
+            cmplog.flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
                 .flag("-Wno-sign-compare")
                 .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
                 .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
@@ -205,7 +233,14 @@ fn main() {
 
         #[cfg(not(unix))]
         {
-            cc::Build::new()
+            let mut cmplog = cc::Build::new();
+
+            #[cfg(feature = "whole_archive")]
+            {
+                cmplog.link_lib_modifier("+whole-archive");
+            }
+
+            cmplog
                 .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
                 .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
                 .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
@@ -222,7 +257,14 @@ fn main() {
         if target_family == "unix" {
             println!("cargo:rerun-if-changed=src/forkserver.c");
 
-            cc::Build::new()
+            let mut forkserver = cc::Build::new();
+
+            #[cfg(feature = "whole_archive")]
+            {
+                forkserver.link_lib_modifier("+whole-archive");
+            }
+
+            forkserver
                 .file(src_dir.join("forkserver.c"))
                 .compile("forkserver");
         }
@@ -232,7 +274,14 @@ fn main() {
     if target_family == "windows" {
         println!("cargo:rerun-if-changed=src/windows_asan.c");
 
-        cc::Build::new()
+        let mut windows_asan = cc::Build::new();
+
+        #[cfg(feature = "whole_archive")]
+        {
+            windows_asan.link_lib_modifier("+whole-archive");
+        }
+
+        windows_asan
             .file(src_dir.join("windows_asan.c"))
             .compile("windows_asan");
     }
@@ -257,6 +306,21 @@ fn main() {
         let mut file = File::create(Path::new(&out_dir).join("sanitizer_interfaces.rs"))
             .expect("Could not create file");
         write!(file, "").unwrap();
+    }
+
+    #[cfg(feature = "libfuzzer_interceptors")]
+    {
+        println!("cargo:rerun-if-changed=src/libfuzzer/FuzzerInterceptors.cpp");
+
+        let mut libfuzzer_interceptors = cc::Build::new();
+        libfuzzer_interceptors.file(src_dir.join("libfuzzer/FuzzerInterceptors.cpp"));
+
+        #[cfg(feature = "whole_archive")]
+        {
+            libfuzzer_interceptors.link_lib_modifier("+whole-archive");
+        }
+
+        libfuzzer_interceptors.cpp(true).compile("interceptors");
     }
 
     println!("cargo:rustc-link-search=native={}", &out_dir);
