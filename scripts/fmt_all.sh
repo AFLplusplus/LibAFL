@@ -7,8 +7,16 @@ cd "${LIBAFL_DIR}" || exit 1
 
 if [ "$1" = "check" ]; then
   cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- -c --verbose || exit 1
-else
+elif [ "$1" = "lockfiles" ]; then
+  cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- --generate-lockfiles --verbose || exit 1
+  exit 0
+elif [ -z "$1" ]; then
   cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- --verbose || exit 1
+else
+  >&2 echo "Error: invalid command."
+  >&2 echo "Usage:"
+  >&2 echo "    $0 [check | lockfiles]"
+  exit 1
 fi
 
 if python3 -m black --version > /dev/null; then
