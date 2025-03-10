@@ -9,14 +9,13 @@ pub mod windows_asan_handler {
     };
 
     use crate::{
-        HasFeedback,
         events::{EventFirer, EventRestarter},
         executors::{
             Executor, ExitKind, HasObservers, hooks::inprocess::GLOBAL_STATE,
             inprocess::run_observers_and_save_state,
         },
         feedbacks::Feedback,
-        fuzzer::{HasObjective, HasScheduler},
+        fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
         state::{HasCurrentTestcase, HasExecutions, HasSolutions},
