@@ -35,10 +35,7 @@ use libafl::{
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
-    stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage,
-    },
+    stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
@@ -348,7 +345,7 @@ fn fuzz(
 
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
     // Setup a tracing stage in which we log comparisons
-    let tracing = ShadownTracingStage::new();
+    let tracing = ShadowTracingStage::new();
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = HookableInProcessExecutor::with_timeout_generic(

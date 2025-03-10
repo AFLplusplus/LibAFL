@@ -1,6 +1,27 @@
 //! A stage that runs the shadow executor using also the shadow observers. Unlike tracing stage, this
 //! stage *CAN* be used with inprocess executor.
 
+use alloc::{
+    borrow::{Cow, ToOwned},
+    string::ToString,
+};
+use core::{fmt::Debug, marker::PhantomData};
+
+use libafl_bolts::Named;
+
+#[cfg(feature = "introspection")]
+use crate::monitors::stats::PerfFeature;
+use crate::{
+    Error, HasNamedMetadata,
+    corpus::HasCurrentCorpusId,
+    executors::{Executor, HasObservers, ShadowExecutor},
+    mark_feature_time,
+    observers::ObserversTuple,
+    stages::{Restartable, RetryCountRestartHelper, Stage},
+    start_timer,
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
+};
+
 /// A stage that runs the shadow executor using also the shadow observers
 #[derive(Clone, Debug)]
 pub struct ShadowTracingStage<E, EM, I, SOT, S, Z> {

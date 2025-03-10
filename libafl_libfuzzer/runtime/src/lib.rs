@@ -166,7 +166,7 @@ macro_rules! fuzz_with {
             },
             stages::{
                 CalibrationStage, GeneralizationStage, IfStage, StdMutationalStage,
-                StdPowerMutationalStage, UnicodeIdentificationStage, TracingStage,
+                StdPowerMutationalStage, UnicodeIdentificationStage
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
@@ -488,14 +488,9 @@ macro_rules! fuzz_with {
                 }
             }
 
+            let executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
             // Setup a tracing stage in which we log comparisons
-            let tracing = IfStage::new(|_, _, _, _| Ok(!$options.skip_tracing()), (TracingStage::new(InProcessExecutor::new(
-                &mut tracing_harness,
-                tuple_list!(cmplog_observer),
-                &mut fuzzer,
-                &mut state,
-                &mut mgr,
-            )?), ()));
+            let tracing = IfStage::new(|_, _, _, _| Ok(!$options.skip_tracing()), (ShadowTracingStage::new(), ()));
 
             // The order of the stages matter!
             let mut stages = tuple_list!(

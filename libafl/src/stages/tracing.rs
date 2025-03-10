@@ -13,7 +13,7 @@ use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasNamedMetadata,
     corpus::HasCurrentCorpusId,
-    executors::{Executor, HasObservers, ShadowExecutor},
+    executors::{Executor, HasObservers},
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
@@ -25,7 +25,7 @@ use crate::{
 /// A stage that runs a tracer executor
 /// This should *NOT* be used with inprocess executor
 #[derive(Clone, Debug)]
-pub struct TracerStage<EM, I, TE, S, Z> {
+pub struct TracingStage<EM, I, TE, S, Z> {
     name: Cow<'static, str>,
     tracer_executor: TE,
     phantom: PhantomData<(EM, I, TE, S, Z)>,

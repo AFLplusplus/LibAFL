@@ -40,7 +40,7 @@ use libafl::{
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
-        StdMutationalStage, TracingStage,
+        StdMutationalStage,
     },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
@@ -415,7 +415,7 @@ fn fuzz_binary(
     // Setup a tracing stage in which we log comparisons
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
-    let tracing = ShadownTracingStage::new();
+    let tracing = ShadowTracingStage::new();
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
@@ -642,7 +642,7 @@ fn fuzz_text(
     )?;
     // Setup a tracing stage in which we log comparisons
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
-    let tracing = ShadownTracingStage::new();
+    let tracing = ShadowTracingStage::new();
 
     // The order of the stages matter!
     let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);

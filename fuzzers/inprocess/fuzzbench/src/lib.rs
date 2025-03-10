@@ -19,7 +19,7 @@ use libafl::{
     Error, HasMetadata,
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{ExitKind, inprocess::InProcessExecutor},
+    executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -34,7 +34,7 @@ use libafl::{
         IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
     },
     stages::{
-        StdMutationalStage, TracingStage, calibrate::CalibrationStage,
+        ShadowTracingStage, StdMutationalStage, calibrate::CalibrationStage,
         power::StdPowerMutationalStage,
     },
     state::{HasCorpus, StdState},
@@ -260,7 +260,7 @@ fn fuzz(
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
-        // CrashFeedback::new(),
+        CrashFeedback::new(),
     );
 
     // A feedback to choose if an input is a solution or not
@@ -346,7 +346,7 @@ fn fuzz(
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
     // Setup a tracing stage in which we log comparisons
-    let tracing = ShadownTracingStage::new();
+    let tracing = ShadowTracingStage::new();
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
@@ -382,9 +382,9 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
+        // dup2(null_fd, io::stdout().as_raw_fd())?;
         if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
-            dup2(null_fd, io::stderr().as_raw_fd())?;
+            // dup2(null_fd, io::stderr().as_raw_fd())?;
         }
     }
     // reopen file to make sure we're at the end

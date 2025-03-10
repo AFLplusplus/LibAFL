@@ -37,7 +37,7 @@ pub use sync::*;
 #[cfg(feature = "std")]
 pub use time_tracker::TimeTrackingStageWrapper;
 pub use tmin::{ObserverEqualityFactory, ObserverEqualityFeedback, StdTMinMutationalStage};
-pub use tracing::{ShadowTracingStage, TracingStage};
+pub use tracing::TracingStage;
 pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
 #[cfg(feature = "unicode")]
