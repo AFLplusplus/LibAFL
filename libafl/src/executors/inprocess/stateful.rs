@@ -11,7 +11,7 @@ use core::{
 use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
-    Error, HasFeedback,
+    Error,
     events::{EventFirer, EventRestarter},
     executors::{
         Executor, ExitKind, HasObservers,
@@ -19,7 +19,7 @@ use crate::{
         inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
     },
     feedbacks::Feedback,
-    fuzzer::{HasObjective, HasScheduler},
+    fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
@@ -131,7 +131,7 @@ where
     I: Clone + Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn new<F, OF>(
+    pub fn new<OF>(
         harness_fn: &'a mut H,
         exposed_executor_state: ES,
         observers: OT,
@@ -141,9 +141,8 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
+        Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic(
             tuple_list!(),
@@ -165,7 +164,7 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
-    pub fn with_timeout<F, OF>(
+    pub fn with_timeout<OF>(
         harness_fn: &'a mut H,
         exposed_executor_state: ES,
         observers: OT,
@@ -176,11 +175,10 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
+        Z: HasObjective<Objective = OF>,
     {
-        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, F, OF>(
+        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
             tuple_list!(),
             observers,
             fuzzer,
@@ -223,7 +221,7 @@ where
     S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn generic<F, OF>(
+    pub fn generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
         exposed_executor_state: ES,
@@ -234,9 +232,8 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
+        Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic(
             user_hooks,
@@ -259,7 +256,7 @@ where
     ///
     /// This may return an error on unix, if signal handler setup fails
     #[expect(clippy::too_many_arguments)]
-    pub fn with_timeout_generic<F, OF>(
+    pub fn with_timeout_generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
         exposed_executor_state: ES,
@@ -271,11 +268,10 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
+        Z: HasObjective<Objective = OF>,
     {
-        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, F, OF>(
+        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
             user_hooks, observers, fuzzer, state, event_mgr, timeout,
         )?;
 
