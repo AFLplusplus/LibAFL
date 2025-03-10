@@ -343,18 +343,10 @@ fn fuzz(
         timeout,
     )?;
 
+    let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(
-        InProcessExecutor::with_timeout(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            timeout * 10,
-        )?,
-        // Give it more time!
-    );
+    let tracing = ShadownTracingStage::new();
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);

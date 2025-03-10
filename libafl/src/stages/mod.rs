@@ -57,6 +57,9 @@ pub mod mutational;
 pub mod push;
 pub mod tmin;
 
+pub mod shadow;
+pub use shadow::*;
+
 pub mod replay;
 pub use replay::*;
 
