@@ -148,7 +148,7 @@ macro_rules! fuzz_with {
         };
         use libafl::{
             corpus::Corpus,
-            executors::{ExitKind, InProcessExecutor},
+            executors::{ExitKind, InProcessExecutor, ShadowExecutor},
             feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,
             feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
             generators::RandBytesGenerator,
@@ -166,7 +166,7 @@ macro_rules! fuzz_with {
             },
             stages::{
                 CalibrationStage, GeneralizationStage, IfStage, StdMutationalStage,
-                StdPowerMutationalStage, UnicodeIdentificationStage
+                StdPowerMutationalStage, UnicodeIdentificationStage, ShadowTracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
