@@ -10,7 +10,7 @@ keywords = ["ci"]
 categories = ["development-tools::testing"]
 
 [dependencies]
-cargo_toml = "0.21.0"
+cargo_toml = "0.22.0"
 walkdir = "2.5.0"
 
 [lints]
