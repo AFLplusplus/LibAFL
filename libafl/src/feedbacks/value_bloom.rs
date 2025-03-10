@@ -82,12 +82,16 @@ impl<EM, I, OT: ObserversTuple<I, S>, S: HasNamedMetadata, T: Hash> Feedback<EM,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        let Some(observer) = observers.get(&self.observer_hnd) else {
-            return Err(Error::illegal_state(format!(
-                "Observer {:?} not found",
-                self.observer_hnd
-            )));
+        let observer = match observers.get(&self.observer_handle) {
+            Some(ob) => ob,
+            None => {
+                return Err(Error::key_not_found(format!(
+                    "Observer {:?} not found",
+                    self.observer_handle
+                )));
+            }
         };
+
         let val = observer.value.as_ref();
 
         let metadata = state.named_metadata_mut::<ValueBloomFeedbackMetadata>(&self.name)?;

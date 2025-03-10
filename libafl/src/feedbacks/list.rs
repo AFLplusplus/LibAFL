@@ -78,12 +78,17 @@ where
         &mut self,
         state: &mut S,
         observers: &OT,
-    ) -> bool
+    ) -> Result<bool, Error>
     where
         OT: MatchName,
         S: HasNamedMetadata,
     {
-        let observer = observers.get(&self.observer_handle).unwrap();
+        let Some(observer) = observers.get(&self.observer_handle) else {
+            return Err(Error::key_not_found(format!(
+                "Observer {:?} not found",
+                self.observer_handle
+            )));
+        };
         // TODO register the list content in a testcase metadata
         self.novelty.clear();
         // can't fail
@@ -96,7 +101,7 @@ where
                 self.novelty.insert(*v);
             }
         }
-        !self.novelty.is_empty()
+        Ok(!self.novelty.is_empty())
     }
 
     fn append_list_observer_metadata<S: HasNamedMetadata>(&mut self, state: &mut S) {
@@ -136,7 +141,8 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        Ok(self.has_interesting_list_observer_feedback(state, observers))
+        let res = self.has_interesting_list_observer_feedback(state, observers)?;
+        Ok(res)
     }
 
     #[cfg(feature = "track_hit_feedbacks")]

@@ -260,7 +260,7 @@ fn fuzz(
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
-        // CrashFeedback::new(),
+        CrashFeedback::new(),
     );
 
     // A feedback to choose if an input is a solution or not

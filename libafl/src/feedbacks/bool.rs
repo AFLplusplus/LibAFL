@@ -70,7 +70,7 @@ where
         _exit_kind: &crate::executors::ExitKind,
     ) -> Result<bool, Error> {
         let Some(observer) = observers.get(&self.observer_hnd) else {
-            return Err(Error::illegal_state(format!(
+            return Err(Error::key_not_found(format!(
                 "Observer {:?} not found",
                 self.observer_hnd
             )));

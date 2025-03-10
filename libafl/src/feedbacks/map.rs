@@ -401,7 +401,7 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        let res = self.is_interesting_default(state, observers);
+        let res = self.is_interesting_default(state, observers)?;
         #[cfg(feature = "track_hit_feedbacks")]
         {
             self.last_result = Some(res);
@@ -443,7 +443,16 @@ where
             let meta = MapNoveltiesMetadata::new(novelties);
             testcase.add_metadata(meta);
         }
-        let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
+        let observer = match observers.get(&self.map_ref) {
+            Some(ob) => ob.as_ref(),
+            None => {
+                return Err(Error::key_not_found(format!(
+                    "Observer {:?} not found",
+                    self.map_ref
+                )));
+            }
+        };
+
         let initial = observer.initial();
         let map_state = state
             .named_metadata_map_mut()
@@ -544,7 +553,8 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        Ok(self.is_interesting_u8_simd_optimized(state, observers))
+        let res = self.is_interesting_u8_simd_optimized(state, observers)?;
+        Ok(res)
     }
 }
 
@@ -607,7 +617,11 @@ where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     C: CanTrack + AsRef<O>,
 {
-    fn is_interesting_u8_simd_optimized<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
+    fn is_interesting_u8_simd_optimized<S, OT>(
+        &mut self,
+        state: &mut S,
+        observers: &OT,
+    ) -> Result<bool, Error>
     where
         S: HasNamedMetadata,
         OT: MatchName,
@@ -617,7 +631,15 @@ where
 
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
-        let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
+        let observer = match observers.get(&self.map_ref) {
+            Some(ob) => ob.as_ref(),
+            None => {
+                return Err(Error::key_not_found(format!(
+                    "Observer {:?} not found",
+                    self.map_ref
+                )));
+            }
+        };
 
         let map_state = state
             .named_metadata_map_mut()
@@ -707,7 +729,7 @@ where
         {
             self.last_result = Some(interesting);
         }
-        interesting
+        Ok(interesting)
     }
 }
 
@@ -728,14 +750,27 @@ where
     N: IsNovel<O::Entry>,
     C: AsRef<O>,
 {
-    fn is_interesting_default<OT, S>(&mut self, state: &mut S, observers: &OT) -> bool
+    fn is_interesting_default<OT, S>(
+        &mut self,
+        state: &mut S,
+        observers: &OT,
+    ) -> Result<bool, Error>
     where
         S: HasNamedMetadata,
         OT: MatchName,
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
-        let observer = observers.get(&self.map_ref).unwrap().as_ref();
+
+        let observer = match observers.get(&self.map_ref) {
+            Some(ob) => ob.as_ref(),
+            None => {
+                return Err(Error::key_not_found(format!(
+                    "Observer {:?} not found",
+                    self.map_ref
+                )));
+            }
+        };
 
         let map_state = state
             .named_metadata_map_mut()
@@ -781,7 +816,7 @@ where
             }
         }
 
-        interesting
+        Ok(interesting)
     }
 }
 

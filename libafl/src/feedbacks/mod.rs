@@ -607,6 +607,90 @@ pub type EagerOrFeedback<A, B> = CombinedFeedback<A, B, LogicEagerOr>;
 /// `TimeFeedback`
 pub type FastOrFeedback<A, B> = CombinedFeedback<A, B, LogicFastOr>;
 
+/// This feedback hides the error of the inner feedback
+#[derive(Debug)]
+pub struct FallibleFeedback<A> {
+    /// The feedback to invert
+    pub inner: A,
+    /// The name
+    name: Cow<'static, str>,
+}
+
+impl<A> Named for FallibleFeedback<A> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
+impl<A> FallibleFeedback<A>
+where
+    A: Named,
+{
+    /// Creates a new [`NotFeedback`].
+    pub fn new(inner: A) -> Self {
+        let name = Cow::from(format!("Fallible({})", inner.name()));
+        Self { inner, name }
+    }
+}
+
+impl<A, S> StateInitializer<S> for FallibleFeedback<A>
+where
+    A: StateInitializer<S>,
+{
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        self.inner.init_state(state)
+    }
+}
+
+impl<A, EM, I, OT, S> Feedback<EM, I, OT, S> for FallibleFeedback<A>
+where
+    A: Feedback<EM, I, OT, S>,
+{
+    fn is_interesting(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error> {
+        if let Ok(ret) = self
+            .inner
+            .is_interesting(state, manager, input, observers, exit_kind)
+        {
+            Ok(ret)
+        } else {
+            println!("inner guy is failing!");
+            Ok(false)
+        }
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        if let Ok(ret) = self
+            .inner
+            .last_result(state, manager, input, observers, exit_kind)
+        {
+            Ok(ret)
+        } else {
+            Ok(false)
+        }
+    }
+
+    #[inline]
+    fn append_metadata(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        observers: &OT,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
+        self.inner
+            .append_metadata(state, manager, observers, testcase)?;
+        Ok(())
+    }
+}
+
 /// Compose feedbacks with an `NOT` operation
 #[derive(Clone, Debug)]
 pub struct NotFeedback<A> {
@@ -923,9 +1007,10 @@ where
         testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
         let Some(observer) = observers.get(&self.observer_handle) else {
-            return Err(Error::illegal_state(
-                "Observer referenced by TimeFeedback is not found in observers given to the fuzzer",
-            ));
+            return Err(Error::key_not_found(format!(
+                "Observer {:?} not found",
+                self.observer_handle
+            )));
         };
 
         *testcase.exec_time_mut() = *observer.last_runtime();
