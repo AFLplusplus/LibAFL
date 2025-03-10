@@ -23,7 +23,7 @@ use asan::{
     },
     tracking::{Tracking, guest::GuestTracking},
 };
-use log::{Level, info, trace};
+use log::{Level, debug, trace};
 use spin::{Lazy, mutex::Mutex};
 
 type Syms = DlSymSymbols<LookupTypeNext>;
@@ -41,7 +41,7 @@ const PAGE_SIZE: usize = 4096;
 
 static FRONTEND: Lazy<Mutex<GasanFrontend>> = Lazy::new(|| {
     LibcLogger::initialize::<GasanSyms>(Level::Info);
-    info!("init");
+    debug!("init");
     let backend = GasanBackend::new(DlmallocBackend::new(PAGE_SIZE));
     let shadow = GuestShadow::<GasanMmap, DefaultShadowLayout>::new().unwrap();
     let tracking = GuestTracking::new().unwrap();

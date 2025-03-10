@@ -6,6 +6,8 @@ use crate::{
     maps::{MapReader, decode::MapDecode, entry::MapEntry},
 };
 
+const BUFFER_SIZE: usize = 4096;
+
 #[derive(Debug)]
 enum MapState {
     Base,
@@ -17,8 +19,6 @@ enum MapState {
     Inode,
     Path,
 }
-
-const BUFFER_SIZE: usize = 4096;
 
 #[derive(Debug)]
 pub struct MapIterator<R: MapReader> {
