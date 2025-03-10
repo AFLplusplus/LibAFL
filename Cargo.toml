@@ -109,7 +109,7 @@ postcard = { version = "1.0.10", features = [
   "alloc",
 ], default-features = false } # no_std compatible serde serialization format
 pyo3 = "0.23.2"
-pyo3-build-config = "0.23.2"
+pyo3-build-config = "0.24.0"
 rangemap = "1.5.1"
 regex = "1.10.6"
 rustversion = "1.0.17"
