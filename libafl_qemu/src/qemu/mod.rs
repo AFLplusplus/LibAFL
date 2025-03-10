@@ -32,11 +32,10 @@ use libafl_qemu_sys::{
 use libafl_qemu_sys::{libafl_qemu_remove_hw_breakpoint, libafl_qemu_set_hw_breakpoint};
 use num_traits::Num;
 use strum::IntoEnumIterator;
+use crate::{parameters::AugmentedCli, GuestAddrKind, GuestReg, Regs};
 
-use crate::{GuestAddrKind, GuestReg, Regs};
-
-pub mod config;
-use config::QemuConfig;
+pub mod parameters;
+pub use parameters::{QemuParams, QemuConfig};
 
 pub mod error;
 pub use error::{
@@ -56,6 +55,9 @@ pub use systemmode::*;
 mod hooks;
 pub use hooks::*;
 use libafl_bolts::{AsSliceMut, vec_init};
+
+mod drive;
+pub use drive::*;
 
 static mut QEMU_IS_INITIALIZED: bool = false;
 static mut QEMU_IS_RUNNING: bool = false;
@@ -111,13 +113,6 @@ pub enum QemuExitReason {
 #[derive(Clone, Copy, Debug)]
 pub struct Qemu {
     _private: (),
-}
-
-#[derive(Clone, Debug)]
-pub enum QemuParams {
-    // QemuConfig is quite big, at least 240 bytes so we use a Box
-    Config(Box<QemuConfig>),
-    Cli(Vec<String>),
 }
 
 #[derive(Debug, Clone)]
@@ -195,6 +190,12 @@ impl From<QemuConfig> for QemuParams {
     }
 }
 
+impl From<AugmentedCli> for QemuParams {
+    fn from(cli: AugmentedCli) -> Self {
+        QemuParams::AugmentedCli(cli)
+    }
+}
+
 // impl TryFrom<QemuConfigBuilder> for QemuParams {
 //     type Error = QemuInitError;
 //
@@ -243,6 +244,7 @@ impl QemuParams {
                 .map(ToString::to_string)
                 .collect(),
             QemuParams::Cli(cli) => cli.clone(),
+            QemuParams::AugmentedCli(augmented_cli) => augmented_cli.parse(),
         }
     }
 }
@@ -556,7 +558,7 @@ impl Qemu {
                     .map_err(|_| unreachable!("QEMU_CONFIG was already set but Qemu was not init!"))
                     .expect("Could not set QEMU Config.");
             }
-            QemuParams::Cli(_) => {}
+            QemuParams::Cli(_) | QemuParams::AugmentedCli(_) => {}
         }
 
         let args = params.to_cli();
