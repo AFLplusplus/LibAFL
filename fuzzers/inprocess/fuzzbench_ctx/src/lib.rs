@@ -35,7 +35,10 @@ use libafl::{
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
-    stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage},
+    stages::{
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
+        StdMutationalStage,
+    },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
