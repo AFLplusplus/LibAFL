@@ -1,5 +1,6 @@
 #[cfg(feature = "python")]
 use core::convert::Infallible;
+#[cfg(target_os = "linux")]
 use core::fmt::{self, Display, Formatter};
 #[cfg(target_os = "linux")]
 use core::{slice::from_raw_parts, str::from_utf8_unchecked};
