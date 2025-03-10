@@ -22,7 +22,9 @@ asan = { path = "../asan", default-features = false, features = [
 ] }
 dummy_libc = { path = "../dummy_libc", default-features = false }
 libc = { version = "0.2.169", default-features = false }
-log = { version = "0.4.22", default-features = false }
+log = { version = "0.4.22", default-features = false, features = [
+  "release_max_level_info",
+] }
 spin = { version = "0.9.8", default-features = false, features = [
   "lazy",
   "mutex",

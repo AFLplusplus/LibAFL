@@ -36,7 +36,9 @@ baby-mimalloc = { version = "0.2.1", default-features = false, features = [
 bitflags = { version = "2.8.0", default-features = false }
 dlmalloc = { version = "0.2.7", default-features = false, optional = true }
 itertools = { version = "0.14.0", default-features = false }
-log = { version = "0.4.22", default-features = false }
+log = { version = "0.4.22", default-features = false, features = [
+  "release_max_level_info",
+] }
 libc = { version = "0.2.169", default-features = false, optional = true }
 readonly = { version = "0.2.12", default-features = false }
 rustix = { version = "1.0.0", default-features = false, features = [
