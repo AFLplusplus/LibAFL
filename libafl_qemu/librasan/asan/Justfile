@@ -1,0 +1,43 @@
+import "../../../just/libafl-qemu.just"
+import "../fuzzer_name.just"
+
+ASAN_SOURCE_DIR := source_directory()
+
+[unix]
+compile_asan:
+  #!/bin/bash
+  source {{ DOTENV }}
+  cargo \
+    +nightly \
+    build \
+    --package asan \
+    --target ${CROSS_TARGET} \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }}
+
+[unix]
+fix_asan:
+  #!/bin/bash
+  source {{ DOTENV }}
+  cargo \
+    +nightly \
+    fix \
+    --package asan \
+    --target ${CROSS_TARGET} \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }} \
+    --allow-dirty
+
+[unix]
+test_asan:
+  #!/bin/bash
+  source {{ DOTENV }}
+  cd {{ ASAN_SOURCE_DIR }}
+  cargo \
+    +nightly \
+    nextest \
+    run \
+    --target ${CROSS_TARGET}
+
+[unix]
+build_asan: compile_asan

@@ -1,0 +1,55 @@
+[package]
+name = "fuzz"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { version = "1.4.1" }
+asan = { path = "../asan", default-features = false, features = [
+  "dlmalloc",
+  "guest",
+  "host",
+  "libc",
+  "linux",
+  "test",
+  "tracking",
+] }
+env_logger = { version = "0.11.6" }
+libfuzzer-sys = { version = "0.4" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+mockall = { version = "0.13.1" }
+thiserror = { version = "2.0.11" }
+
+[[bin]]
+name = "guest_shadow"
+path = "fuzz_targets/guest_shadow.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "guest_tracking"
+path = "fuzz_targets/guest_tracking.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "default_frontend_mock"
+path = "fuzz_targets/default_frontend_mock.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "default_frontend_dlmalloc"
+path = "fuzz_targets/default_frontend_dlmalloc.rs"
+test = false
+doc = false
+bench = false

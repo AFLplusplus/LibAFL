@@ -1,0 +1,32 @@
+import "../../../just/libafl-qemu.just"
+import "../fuzzer_name.just"
+
+[unix]
+compile_runner:
+  #!/bin/bash
+  source {{ DOTENV }}
+  cargo \
+    +nightly \
+    build \
+    --package runner \
+    --target x86_64-unknown-linux-gnu \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }} \
+    --features {{ ARCH }}
+
+[unix]
+fix_runner:
+  #!/bin/bash
+  source {{ DOTENV }}
+  cargo \
+    +nightly \
+    fix \
+    --package runner \
+    --target x86_64-unknown-linux-gnu \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }} \
+    --features {{ ARCH }} \
+    --allow-dirty
+
+[unix]
+build_runner: compile_runner

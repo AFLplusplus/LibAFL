@@ -1,0 +1,140 @@
+import "../../just/libafl-qemu.just"
+import "asan/Justfile"
+import "dummy_libc/Justfile"
+import "fuzz/Justfile"
+import "gasan/Justfile"
+import "qasan/Justfile"
+import "runner/Justfile"
+import "zasan/Justfile"
+import "fuzzer_name.just"
+
+build: build_asan build_dummy build_fuzz build_gasan build_qasan build_runner build_zasan
+
+test: test_asan
+
+pretty_rust:
+  #!/bin/bash
+  MAIN_LLVM_VERSION=$LLVM_VERSION cargo run --manifest-path ../../utils/libafl_fmt/Cargo.toml --release -- -v
+
+pretty_toml:
+  #!/bin/bash
+  taplo fmt
+
+pretty: pretty_rust pretty_toml
+
+fix: fix_asan fix_dummy fix_fuzz fix_gasan fix_qasan fix_runner fix_zasan
+
+clippy:
+  #!/bin/bash
+  cargo clippy
+
+doc:
+  #!/bin/bash
+  cargo doc
+
+all: fix pretty build test clippy doc
+
+build_arm_dev:
+  #!/bin/bash
+  ARCH=arm PROFILE=dev just build
+
+build_aarch64_dev:
+  #!/bin/bash
+  ARCH=aarch64 PROFILE=dev just build
+
+build_x86_64_dev:
+  #!/bin/bash
+  ARCH=x86_64 PROFILE=dev just build
+
+build_i386_dev:
+  #!/bin/bash
+  ARCH=i386 PROFILE=dev just build
+
+build_ppc_dev:
+  #!/bin/bash
+  ARCH=ppc PROFILE=dev just build
+
+build_arm_release:
+  #!/bin/bash
+  ARCH=arm PROFILE=release just build
+
+build_aarch64_release:
+  #!/bin/bash
+  ARCH=aarch64 PROFILE=release just build
+
+build_x86_64_release:
+  #!/bin/bash
+  ARCH=x86_64 PROFILE=release just build
+
+build_i386_release:
+  #!/bin/bash
+  ARCH=i386 PROFILE=release just build
+
+build_ppc_release:
+  #!/bin/bash
+  ARCH=ppc PROFILE=release just build
+
+build_everything_dev: \
+  build_arm_dev \
+  build_aarch64_dev \
+  build_x86_64_dev \
+  build_i386_dev \
+  build_ppc_dev \
+
+build_everything_release: \
+  build_arm_dev \
+  build_aarch64_dev \
+  build_x86_64_dev \
+  build_i386_dev \
+  build_ppc_dev \
+
+build_everything: build_everything_dev build_everything_release
+
+test_arm:
+  #!/bin/bash
+  ARCH=arm \
+  PROFILE=dev \
+  RUSTLOG=debug \
+  RUST_BACKTRACE=full \
+  just test
+
+test_aarch64:
+  #!/bin/bash
+  ARCH=aarch64 \
+  PROFILE=dev \
+  RUSTLOG=debug \
+  RUST_BACKTRACE=full \
+  just test
+
+test_x86_64:
+  #!/bin/bash
+  ARCH=x86_64 \
+  PROFILE=dev \
+  RUSTLOG=debug \
+  RUST_BACKTRACE=full \
+  just test
+
+test_i386:
+  #!/bin/bash
+  ARCH=i386 \
+  PROFILE=dev \
+  RUSTLOG=debug \
+  RUST_BACKTRACE=full \
+  just test
+
+test_ppc:
+  #!/bin/bash
+  ARCH=ppc \
+  PROFILE=dev \
+  RUSTLOG=debug \
+  RUST_BACKTRACE=full \
+  just test
+
+test_everything: \
+  test_arm \
+  test_aarch64 \
+  test_x86_64 \
+  test_i386 \
+  test_ppc
+
+everything: build_everything test_everything clippy

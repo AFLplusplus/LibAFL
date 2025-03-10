@@ -35,6 +35,7 @@ use crate::{SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_statfs};
 
 // TODO use the functions provided by Qemu
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
+pub const SNAPSHOT_PAGE_ZEROES: [u8; SNAPSHOT_PAGE_SIZE] = [0; SNAPSHOT_PAGE_SIZE];
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
 
 pub type StopExecutionCallback = Box<dyn FnMut(&mut SnapshotModule, Qemu)>;
@@ -79,10 +80,67 @@ pub struct MappingInfo {
 /// It is supposed to be used primarily for debugging, its usage is discouraged.
 /// If you end up needing it, you most likely have an issue with the snapshot system.
 /// If this is the case, please [fill in an issue on the main repository](https://github.com/AFLplusplus/LibAFL/issues).
+#[derive(Clone, Debug)]
 pub enum IntervalSnapshotFilter {
     All,
     AllowList(Vec<Range<GuestAddr>>),
     DenyList(Vec<Range<GuestAddr>>),
+    ZeroList(Vec<Range<GuestAddr>>),
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct IntervalSnapshotFilters {
+    filters: Vec<IntervalSnapshotFilter>,
+}
+
+impl From<Vec<IntervalSnapshotFilter>> for IntervalSnapshotFilters {
+    fn from(filters: Vec<IntervalSnapshotFilter>) -> Self {
+        Self { filters }
+    }
+}
+
+impl IntervalSnapshotFilters {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            filters: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn to_skip(&self, addr: GuestAddr) -> Option<&Range<GuestAddr>> {
+        for filter in &self.filters {
+            match filter {
+                IntervalSnapshotFilter::All => return None,
+                IntervalSnapshotFilter::AllowList(allow_list) => {
+                    if allow_list.iter().any(|range| range.contains(&addr)) {
+                        return None;
+                    }
+                }
+                IntervalSnapshotFilter::DenyList(deny_list) => {
+                    let deny = deny_list.iter().find(|range| range.contains(&addr));
+                    if deny.is_some() {
+                        return deny;
+                    }
+                }
+                IntervalSnapshotFilter::ZeroList(_) => {}
+            }
+        }
+        None
+    }
+
+    #[must_use]
+    pub fn to_zero(&self, addr: GuestAddr) -> Option<&Range<GuestAddr>> {
+        for filter in &self.filters {
+            if let IntervalSnapshotFilter::ZeroList(zero_list) = filter {
+                let zero = zero_list.iter().find(|range| range.contains(&addr));
+                if zero.is_some() {
+                    return zero;
+                }
+            }
+        }
+        None
+    }
 }
 
 pub struct SnapshotModule {
@@ -97,7 +155,7 @@ pub struct SnapshotModule {
     pub stop_execution: Option<StopExecutionCallback>,
     pub empty: bool,
     pub accurate_unmap: bool,
-    pub interval_filter: Vec<IntervalSnapshotFilter>,
+    pub interval_filter: IntervalSnapshotFilters,
     auto_reset: bool,
 }
 
@@ -130,13 +188,13 @@ impl SnapshotModule {
             stop_execution: None,
             empty: true,
             accurate_unmap: false,
-            interval_filter: Vec::<IntervalSnapshotFilter>::new(),
+            interval_filter: IntervalSnapshotFilters::new(),
             auto_reset: true,
         }
     }
 
     #[must_use]
-    pub fn with_filters(interval_filter: Vec<IntervalSnapshotFilter>) -> Self {
+    pub fn with_filters(interval_filter: IntervalSnapshotFilters) -> Self {
         Self {
             accesses: ThreadLocal::new(),
             maps: MappingInfo::default(),
@@ -168,7 +226,7 @@ impl SnapshotModule {
             stop_execution: Some(stop_execution),
             empty: true,
             accurate_unmap: false,
-            interval_filter: Vec::<IntervalSnapshotFilter>::new(),
+            interval_filter: IntervalSnapshotFilters::new(),
             auto_reset: true,
         }
     }
@@ -181,25 +239,6 @@ impl SnapshotModule {
         self.auto_reset = false;
     }
 
-    pub fn to_skip(&self, addr: GuestAddr) -> bool {
-        for filter in &self.interval_filter {
-            match filter {
-                IntervalSnapshotFilter::All => return false,
-                IntervalSnapshotFilter::AllowList(allow_list) => {
-                    if allow_list.iter().any(|range| range.contains(&addr)) {
-                        return false;
-                    }
-                }
-                IntervalSnapshotFilter::DenyList(deny_list) => {
-                    if deny_list.iter().any(|range| range.contains(&addr)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
-    }
-
     pub fn snapshot(&mut self, qemu: Qemu) {
         log::info!("Start snapshot");
         self.brk = qemu.get_brk();
@@ -209,8 +248,10 @@ impl SnapshotModule {
         for map in qemu.mappings() {
             let mut addr = map.start();
             while addr < map.end() {
-                if self.to_skip(addr) {
-                    addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
+                let zero = self.interval_filter.to_zero(addr);
+                let skip = self.interval_filter.to_skip(addr);
+                if let Some(range) = zero.or(skip) {
+                    addr = range.end;
                     continue;
                 }
                 let mut info = SnapshotPageInfo {
@@ -291,8 +332,10 @@ impl SnapshotModule {
             let mut addr = map.start();
             // assert_eq!(addr & SNAPSHOT_PAGE_MASK, 0);
             while addr < map.end() {
-                if self.to_skip(addr) {
-                    addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
+                let zero = self.interval_filter.to_zero(addr);
+                let skip = self.interval_filter.to_skip(addr);
+                if let Some(range) = zero.or(skip) {
+                    addr = range.end;
                     continue;
                 }
                 if let Some(saved_page) = saved_pages_list.remove(&addr) {
@@ -440,28 +483,15 @@ impl SnapshotModule {
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
-                        // TODO avoid duplicated memcpy
-                        if let Some(data) = info.data.as_ref() {
-                            // Change segment perms to RW if not writeable in current mapping
-                            let mut found = false;
-                            for entry in new_maps
-                                .tree
-                                .query_mut(*page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
-                            {
-                                if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
-                                    qemu.mprotect(
-                                        entry.interval.start,
-                                        (entry.interval.end - entry.interval.start) as usize,
-                                        MmapPerms::ReadWrite,
-                                    )
-                                    .unwrap();
-                                    entry.value.changed = true;
-                                    entry.value.perms = Some(MmapPerms::ReadWrite);
-                                }
-                                found = true;
+                        if self.interval_filter.to_skip(*page).is_some() {
+                            if !Self::modify_mapping(qemu, new_maps, *page) {
+                                return true; // Restore later
                             }
-
-                            if !found {
+                            unsafe { qemu.write_mem_unchecked(*page, &SNAPSHOT_PAGE_ZEROES) };
+                        } else if let Some(data) = info.data.as_ref() {
+                            // TODO avoid duplicated memcpy
+                            // Change segment perms to RW if not writeable in current mapping
+                            if !Self::modify_mapping(qemu, new_maps, *page) {
                                 return true; // Restore later
                             }
 
@@ -498,7 +528,9 @@ impl SnapshotModule {
                     }
                 }
 
-                if let Some(info) = self.pages.get_mut(page) {
+                if self.interval_filter.to_skip(*page).is_some() {
+                    unsafe { qemu.write_mem_unchecked(*page, &SNAPSHOT_PAGE_ZEROES) };
+                } else if let Some(info) = self.pages.get_mut(page) {
                     // TODO avoid duplicated memcpy
                     if let Some(data) = info.data.as_ref() {
                         unsafe { qemu.write_mem_unchecked(*page, &data[..]) };
@@ -529,6 +561,26 @@ impl SnapshotModule {
         self.check_snapshot(qemu);
 
         log::debug!("End restore");
+    }
+
+    fn modify_mapping(qemu: Qemu, maps: &mut MappingInfo, page: GuestAddr) -> bool {
+        let mut found = false;
+        for entry in maps
+            .tree
+            .query_mut(page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
+        {
+            if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
+                drop(qemu.mprotect(
+                    entry.interval.start,
+                    (entry.interval.end - entry.interval.start) as usize,
+                    MmapPerms::ReadWrite,
+                ));
+                entry.value.changed = true;
+                entry.value.perms = Some(MmapPerms::ReadWrite);
+            }
+            found = true;
+        }
+        found
     }
 
     pub fn is_unmap_allowed(&mut self, start: GuestAddr, mut size: usize) -> bool {

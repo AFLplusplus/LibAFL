@@ -1,6 +1,8 @@
 #[cfg(feature = "python")]
 use core::convert::Infallible;
 #[cfg(target_os = "linux")]
+use core::fmt::{self, Display, Formatter};
+#[cfg(target_os = "linux")]
 use core::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(target_os = "linux")]
@@ -32,6 +34,46 @@ pub struct MapInfo {
     path: Option<String>,
     flags: i32,
     is_priv: i32,
+}
+
+#[cfg(target_os = "linux")]
+impl Display for MapInfo {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{:016x}-{:016x} , ", self.start, self.end)?;
+        write!(
+            f,
+            "{}",
+            if self.flags & i32::from(MmapPerms::Read) == i32::from(MmapPerms::Read) {
+                "r"
+            } else {
+                "-"
+            }
+        )?;
+        write!(
+            f,
+            "{}",
+            if self.flags & i32::from(MmapPerms::Write) == i32::from(MmapPerms::Write) {
+                "w"
+            } else {
+                "-"
+            }
+        )?;
+        write!(
+            f,
+            "{}",
+            if self.flags & i32::from(MmapPerms::Execute) == i32::from(MmapPerms::Execute) {
+                "x"
+            } else {
+                "-"
+            }
+        )?;
+        write!(f, "{}", if self.is_priv == 0 { "s" } else { "p" })?;
+        write!(f, " {:10}", self.offset)?;
+        if let Some(path) = &self.path {
+            write!(f, " {path}")?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(target_os = "linux")]
