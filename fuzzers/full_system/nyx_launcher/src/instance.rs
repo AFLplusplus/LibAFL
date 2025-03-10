@@ -192,7 +192,7 @@ impl<M: Monitor> Instance<'_, M> {
                 I2SRandReplace::new()
             )));
 
-            let tracing = ShadowTracingStage::new(&mut executor);
+            let tracing = ShadowTracingStage::new();
 
             // Setup a MOPT mutator
             let mutator = StdMOptMutator::new(

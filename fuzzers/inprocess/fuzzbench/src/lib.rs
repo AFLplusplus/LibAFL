@@ -19,7 +19,7 @@ use libafl::{
     Error, HasMetadata,
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{ExitKind, inprocess::InProcessExecutor},
+    executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -34,7 +34,7 @@ use libafl::{
         IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
     },
     stages::{
-        StdMutationalStage, TracingStage, calibrate::CalibrationStage,
+        ShadowTracingStage, StdMutationalStage, calibrate::CalibrationStage,
         power::StdPowerMutationalStage,
     },
     state::{HasCorpus, StdState},
@@ -343,18 +343,10 @@ fn fuzz(
         timeout,
     )?;
 
+    let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(
-        InProcessExecutor::with_timeout(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            timeout * 10,
-        )?,
-        // Give it more time!
-    );
+    let tracing = ShadowTracingStage::new();
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);

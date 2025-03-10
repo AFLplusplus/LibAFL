@@ -19,7 +19,7 @@ use content_inspector::inspect;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -40,7 +40,7 @@ use libafl::{
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
-        StdMutationalStage, TracingStage,
+        ShadowTracingStage, StdMutationalStage,
     },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
@@ -413,14 +413,9 @@ fn fuzz_binary(
     )?;
 
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(InProcessExecutor::with_timeout(
-        &mut tracing_harness,
-        tuple_list!(cmplog_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout * 10,
-    )?);
+    let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+
+    let tracing = ShadowTracingStage::new();
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
@@ -646,15 +641,8 @@ fn fuzz_text(
         timeout,
     )?;
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(InProcessExecutor::with_timeout(
-        &mut tracing_harness,
-        tuple_list!(cmplog_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        // Give it more time!
-        timeout * 10,
-    )?);
+    let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+    let tracing = ShadowTracingStage::new();
 
     // The order of the stages matter!
     let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);

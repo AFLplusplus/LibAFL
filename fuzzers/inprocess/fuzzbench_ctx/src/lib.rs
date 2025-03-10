@@ -20,7 +20,7 @@ use libafl::{
     events::SimpleRestartingEventManager,
     executors::{
         inprocess::{HookableInProcessExecutor, InProcessExecutor},
-        ExitKind,
+        ExitKind, ShadowExecutor,
     },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
@@ -36,8 +36,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
+        StdMutationalStage,
     },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
@@ -346,18 +346,9 @@ fn fuzz(
     let mut tracing_harness = harness;
     let ctx_hook = CtxHook::new();
 
+    let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(
-        InProcessExecutor::with_timeout(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            timeout * 10,
-        )?,
-        // Give it more time!
-    );
+    let tracing = ShadowTracingStage::new();
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = HookableInProcessExecutor::with_timeout_generic(
