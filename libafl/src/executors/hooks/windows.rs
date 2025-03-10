@@ -24,16 +24,15 @@ pub mod windows_asan_handler {
 
     /// # Safety
     /// ASAN deatch handler
-    pub unsafe extern "C" fn asan_death_handler<E, EM, F, I, OF, S, Z>()
+    pub unsafe extern "C" fn asan_death_handler<E, EM, I, OF, S, Z>()
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
-        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
+        Z: HasObjective<Objective = OF>,
     {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
@@ -200,16 +199,15 @@ pub mod windows_exception_handler {
     /// # Safety
     /// Well, exception handling is not safe
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, F, I, OF, S, Z>()
+    pub fn setup_panic_hook<E, EM, I, OF, S, Z>()
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
-        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
+        Z: HasObjective<Objective = OF>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -266,7 +264,7 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, F, I, OF, S, Z>(
+    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, I, OF, S, Z>(
         _p0: *mut u8,
         global_state: *mut c_void,
         _p1: *mut u8,
@@ -275,10 +273,9 @@ pub mod windows_exception_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
-        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
+        Z: HasObjective<Objective = OF>,
     {
         let data: &mut InProcessExecutorHandlerData =
             unsafe { &mut *(global_state as *mut InProcessExecutorHandlerData) };
@@ -346,7 +343,7 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    pub unsafe fn inproc_crash_handler<E, EM, F, I, OF, S, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, I, OF, S, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -354,10 +351,9 @@ pub mod windows_exception_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
-        F: Feedback<EM, I, E::Observers, S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F> + HasScheduler<I, S>,
+        Z: HasObjective<Objective = OF>,
     {
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {
