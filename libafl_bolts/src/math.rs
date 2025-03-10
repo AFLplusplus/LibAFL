@@ -47,7 +47,7 @@ pub const fn integer_sqrt(val: u64) -> u64 {
     let mut m;
 
     while ret != i - 1 {
-        m = (ret + i) / 2;
+        m = u64::midpoint(ret, i);
 
         if m.saturating_mul(m) <= val {
             ret = m;

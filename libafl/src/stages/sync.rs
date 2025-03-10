@@ -19,7 +19,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{Event, EventConfig, EventFirer, llmp::LlmpEventConverter},
     executors::{Executor, ExitKind, HasObservers},
-    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
+    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor, HasObjective},
     inputs::{Input, InputConverter},
     stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{
@@ -248,7 +248,7 @@ where
         + MaybeHasClientPerfMonitor,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
-    Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
+    Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S> + HasObjective,
 {
     #[inline]
     fn perform(

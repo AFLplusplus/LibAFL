@@ -311,7 +311,7 @@ impl SnapshotModule {
 
     pub fn access(&mut self, addr: GuestAddr, size: usize) {
         // ASSUMPTION: the access can only cross 2 pages
-        debug_assert!(size > 0 && size <= SNAPSHOT_PAGE_SIZE);
+        debug_assert!(size <= SNAPSHOT_PAGE_SIZE);
         let page = addr & SNAPSHOT_PAGE_MASK;
         self.page_access(page);
         let second_page = (addr + size as GuestAddr - 1) & SNAPSHOT_PAGE_MASK;
@@ -466,9 +466,9 @@ impl SnapshotModule {
                 // The heap has grown. so we want to drop those
                 // we want to align the addresses before calling unmap
                 // although it is very unlikely that the brk has an unaligned value
-                let new_page_boundary = (new_brk + ((SNAPSHOT_PAGE_MASK - 1) as GuestAddr))
+                let new_page_boundary = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as GuestAddr))
                     & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
-                let old_page_boundary = (self.brk + ((SNAPSHOT_PAGE_MASK - 1) as GuestAddr))
+                let old_page_boundary = (self.brk + ((SNAPSHOT_PAGE_SIZE - 1) as GuestAddr))
                     & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
 
                 if new_page_boundary != old_page_boundary {
@@ -827,12 +827,12 @@ where
 }
 
 impl HasAddressFilter for SnapshotModule {
-    type ModuleAddressFilter = NopAddressFilter;
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    type AddressFilter = NopAddressFilter;
+    fn address_filter(&self) -> &Self::AddressFilter {
         &NopAddressFilter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         unsafe { (&raw mut NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }

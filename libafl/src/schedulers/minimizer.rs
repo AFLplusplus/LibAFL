@@ -107,12 +107,10 @@ where
         self.base.on_remove(state, id, testcase)?;
         let mut entries =
             if let Some(meta) = state.metadata_map_mut().get_mut::<TopRatedsMetadata>() {
-                let entries = meta
-                    .map
+                meta.map
                     .extract_if(|_, other_id| *other_id == id)
                     .map(|(entry, _)| entry)
-                    .collect::<Vec<_>>();
-                entries
+                    .collect::<Vec<_>>()
             } else {
                 return Ok(());
             };
@@ -215,12 +213,11 @@ where
         self.cull(state)?;
         let mut id = self.base.next(state)?;
         while {
-            let has = !state
+            !state
                 .corpus()
                 .get(id)?
                 .borrow()
-                .has_metadata::<IsFavoredMetadata>();
-            has
+                .has_metadata::<IsFavoredMetadata>()
         } && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
             id = self.base.next(state)?;

@@ -291,9 +291,10 @@ where
                 }
                 Ok(())
             }
-
-            #[cfg(feature = "share_objectives")]
-            Event::Objective { input, .. } => {
+            Event::Objective {
+                input: Some(unwrapped_input),
+                ..
+            } => {
                 log::debug!("Received new Objective");
 
                 let Some(converter) = self.converter_back.as_mut() else {
@@ -304,7 +305,7 @@ where
                     state,
                     executor,
                     manager,
-                    &converter.convert(input)?,
+                    &converter.convert(unwrapped_input)?,
                     false,
                 )?;
 

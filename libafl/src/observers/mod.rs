@@ -14,12 +14,6 @@ pub mod stacktrace;
 #[cfg(feature = "regex")]
 pub use stacktrace::*;
 
-/// Profiler observer
-#[cfg(feature = "std")]
-pub mod profiling;
-#[cfg(feature = "std")]
-pub use profiling::*;
-
 pub mod concolic;
 pub mod map;
 pub use map::*;
@@ -330,9 +324,12 @@ mod instant_serializer {
 impl TimeObserver {
     /// Creates a new [`TimeObserver`] with the given name.
     #[must_use]
-    pub fn new(name: &'static str) -> Self {
+    pub fn new<S>(name: S) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
         Self {
-            name: Cow::from(name),
+            name: name.into(),
 
             #[cfg(feature = "std")]
             start_time: Instant::now(),

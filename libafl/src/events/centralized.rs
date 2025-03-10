@@ -7,7 +7,7 @@
 // 3. The "main evaluator", the evaluator node that will evaluate all the testcases pass by the centralized event manager to see if the testcases are worth propagating
 // 4. The "main broker", the gathers the stats from the fuzzer clients and broadcast the newly found testcases from the main evaluator.
 
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use std::process;
 
@@ -15,28 +15,25 @@ use libafl_bolts::{
     ClientId,
     llmp::{LlmpClient, LlmpClientDescription, Tag},
     shmem::{ShMem, ShMemProvider},
-    tuples::{Handle, MatchNameRef},
 };
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
-use serde::Serialize;
 
-use super::{AwaitRestartSafe, RecordSerializationTime};
+use super::AwaitRestartSafe;
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
     Error,
     common::HasMetadata,
     events::{
-        AdaptiveSerializer, CanSerializeObserver, Event, EventConfig, EventFirer, EventManagerId,
-        EventReceiver, EventRestarter, HasEventManagerId, LogSeverity, ProgressReporter,
-        SendExiting, serialize_observers_adaptive, std_maybe_report_progress, std_report_progress,
+        Event, EventConfig, EventFirer, EventManagerId, EventReceiver, EventRestarter,
+        HasEventManagerId, LogSeverity, ProgressReporter, SendExiting, std_maybe_report_progress,
+        std_report_progress,
     },
     inputs::Input,
-    observers::TimeObserver,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
 };
 
@@ -50,7 +47,6 @@ pub struct CentralizedEventManager<EM, I, S, SHM, SP> {
     client: LlmpClient<SHM, SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
-    time_ref: Option<Handle<TimeObserver>>,
     is_main: bool,
     phantom: PhantomData<(I, S)>,
 }
@@ -93,7 +89,6 @@ impl CentralizedEventManagerBuilder {
         self,
         inner: EM,
         client: LlmpClient<SP::ShMem, SP>,
-        time_obs: Option<Handle<TimeObserver>>,
     ) -> Result<CentralizedEventManager<EM, I, S, SP::ShMem, SP>, Error>
     where
         SP: ShMemProvider,
@@ -103,7 +98,6 @@ impl CentralizedEventManagerBuilder {
             client,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            time_ref: time_obs,
             is_main: self.is_main,
             phantom: PhantomData,
         })
@@ -118,14 +112,13 @@ impl CentralizedEventManagerBuilder {
         inner: EM,
         shmem_provider: SP,
         port: u16,
-        time_obs: Option<Handle<TimeObserver>>,
     ) -> Result<CentralizedEventManager<EM, I, S, SHM, SP>, Error>
     where
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Self::build_from_client(self, inner, client, time_obs)
+        Self::build_from_client(self, inner, client)
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
@@ -135,14 +128,13 @@ impl CentralizedEventManagerBuilder {
         inner: EM,
         shmem_provider: SP,
         env_name: &str,
-        time_obs: Option<Handle<TimeObserver>>,
     ) -> Result<CentralizedEventManager<EM, I, S, SHM, SP>, Error>
     where
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
-        Self::build_from_client(self, inner, client, time_obs)
+        Self::build_from_client(self, inner, client)
     }
 
     /// Create an existing client from description
@@ -151,59 +143,13 @@ impl CentralizedEventManagerBuilder {
         inner: EM,
         shmem_provider: SP,
         description: &LlmpClientDescription,
-        time_obs: Option<Handle<TimeObserver>>,
     ) -> Result<CentralizedEventManager<EM, I, S, SHM, SP>, Error>
     where
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::existing_client_from_description(shmem_provider, description)?;
-        Self::build_from_client(self, inner, client, time_obs)
-    }
-}
-
-impl<EM, I, S, SHM, SP> RecordSerializationTime for CentralizedEventManager<EM, I, S, SHM, SP>
-where
-    EM: RecordSerializationTime,
-{
-    /// Set the deserialization time (mut)
-    fn set_deserialization_time(&mut self, dur: Duration) {
-        self.inner.set_deserialization_time(dur);
-    }
-}
-
-impl<EM, I, S, SHM, SP> AdaptiveSerializer for CentralizedEventManager<EM, I, S, SHM, SP>
-where
-    EM: AdaptiveSerializer,
-{
-    fn serialization_time(&self) -> Duration {
-        self.inner.serialization_time()
-    }
-    fn deserialization_time(&self) -> Duration {
-        self.inner.deserialization_time()
-    }
-    fn serializations_cnt(&self) -> usize {
-        self.inner.serializations_cnt()
-    }
-    fn should_serialize_cnt(&self) -> usize {
-        self.inner.should_serialize_cnt()
-    }
-
-    fn serialization_time_mut(&mut self) -> &mut Duration {
-        self.inner.serialization_time_mut()
-    }
-    fn deserialization_time_mut(&mut self) -> &mut Duration {
-        self.inner.deserialization_time_mut()
-    }
-    fn serializations_cnt_mut(&mut self) -> &mut usize {
-        self.inner.serializations_cnt_mut()
-    }
-    fn should_serialize_cnt_mut(&mut self) -> &mut usize {
-        self.inner.should_serialize_cnt_mut()
-    }
-
-    fn time_ref(&self) -> &Option<Handle<TimeObserver>> {
-        &self.time_ref
+        Self::build_from_client(self, inner, client)
     }
 }
 
@@ -275,21 +221,6 @@ where
         self.client.await_safe_to_unmap_blocking();
         self.inner.on_restart(state)?;
         Ok(())
-    }
-}
-
-impl<EM, I, OT, S, SHM, SP> CanSerializeObserver<OT> for CentralizedEventManager<EM, I, S, SHM, SP>
-where
-    EM: AdaptiveSerializer,
-    OT: MatchNameRef + Serialize,
-{
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        serialize_observers_adaptive::<EM, OT>(
-            &mut self.inner,
-            observers,
-            4, // twice as much as the normal llmp em's value cuz it does this job twice.
-            80,
-        )
     }
 }
 

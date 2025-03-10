@@ -39,7 +39,7 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 static mut COUNT_CLASS_LOOKUP_16: Vec<u16> = vec![];
 
 /// Initialize the 16-byte hitcounts map
-fn init_count_class_16() {
+pub(crate) fn init_count_class_16() {
     // # Safety
     //
     // Calling this from multiple threads may be racey and hence leak 65k mem or even create a broken lookup vec.
@@ -58,6 +58,50 @@ fn init_count_class_16() {
                 count_class_lookup_16[(i << 8) + j] =
                     (u16::from(COUNT_CLASS_LOOKUP[i]) << 8) | u16::from(COUNT_CLASS_LOOKUP[j]);
             }
+        }
+    }
+}
+
+/// AFL-style classify counts
+#[inline]
+#[expect(clippy::cast_ptr_alignment)]
+pub(crate) fn classify_counts(map: &mut [u8]) {
+    let mut len = map.len();
+    let align_offset = map.as_ptr().align_offset(size_of::<u16>());
+
+    // if len == 1, the next branch will already do this lookup
+    if len > 1 && align_offset != 0 {
+        debug_assert_eq!(
+            align_offset, 1,
+            "Aligning u8 to u16 should always be offset of 1?"
+        );
+        unsafe {
+            *map.get_unchecked_mut(0) =
+                *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(0) as usize);
+        }
+        len -= 1;
+    }
+
+    // Fix the last element
+    if (len & 1) != 0 {
+        unsafe {
+            *map.get_unchecked_mut(len - 1) =
+                *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(len - 1) as usize);
+        }
+    }
+
+    let cnt = len / 2;
+
+    let map16 =
+        unsafe { slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt) };
+    let count_class_lookup_16 = &raw mut COUNT_CLASS_LOOKUP_16;
+
+    // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
+    #[expect(clippy::unused_enumerate_index)]
+    for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
+        unsafe {
+            let count_class_lookup_16 = &mut *count_class_lookup_16;
+            *item = *(*count_class_lookup_16).get_unchecked(*item as usize);
         }
     }
 }
@@ -95,51 +139,8 @@ where
     }
 
     #[inline]
-    #[expect(clippy::cast_ptr_alignment)]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
-        let mut map = self.as_slice_mut();
-        let mut len = map.len();
-        let align_offset = map.as_ptr().align_offset(size_of::<u16>());
-
-        // if len == 1, the next branch will already do this lookup
-        if len > 1 && align_offset != 0 {
-            debug_assert_eq!(
-                align_offset, 1,
-                "Aligning u8 to u16 should always be offset of 1?"
-            );
-            unsafe {
-                *map.get_unchecked_mut(0) =
-                    *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(0) as usize);
-            }
-            len -= 1;
-        }
-
-        // Fix the last element
-        if (len & 1) != 0 {
-            unsafe {
-                *map.get_unchecked_mut(len - 1) =
-                    *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(len - 1) as usize);
-            }
-        }
-
-        let cnt = len / 2;
-
-        let map16 = unsafe {
-            slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt)
-        };
-        let count_class_lookup_16 = &raw mut COUNT_CLASS_LOOKUP_16;
-
-        // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
-        #[expect(clippy::unused_enumerate_index)]
-        for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
-            unsafe {
-                let count_class_lookup_16 = &mut *count_class_lookup_16;
-                *item = *(*count_class_lookup_16).get_unchecked(*item as usize);
-            }
-        }
-
-        drop(map);
-
+        classify_counts(&mut self.as_slice_mut());
         self.base.post_exec(state, input, exit_kind)
     }
 }

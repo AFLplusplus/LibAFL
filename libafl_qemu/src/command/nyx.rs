@@ -34,7 +34,7 @@ use crate::{
         },
     },
     get_exit_arch_regs,
-    modules::{EmulatorModuleTuple, utils::filters::HasAddressFilterTuples},
+    modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
     sync_exit::ExitArgs,
 };
 
@@ -99,7 +99,7 @@ macro_rules! define_nyx_command_manager {
 
             impl<C, ET, I, S, SM> CommandManager<C, NyxEmulatorDriver, ET, I, S, SM> for $name<S>
             where
-                ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+                ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
                 I: HasTargetBytes + Unpin,
                 S: Unpin,
                 SM: IsSnapshotManager,
@@ -134,7 +134,7 @@ macro_rules! define_nyx_command_manager {
 
             impl<C, ET, I, S, SM> IsCommand<C, $name<S>, NyxEmulatorDriver, ET, I, S, SM> for [<$name Commands>]
             where
-                ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+                ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
                 I: HasTargetBytes + Unpin,
                 S: Unpin,
                 SM: IsSnapshotManager,
@@ -296,7 +296,7 @@ pub struct NextPayloadCommand;
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for NextPayloadCommand
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -360,7 +360,7 @@ pub struct SubmitCR3Command;
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for SubmitCR3Command
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -408,7 +408,7 @@ impl RangeSubmitCommand {
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for RangeSubmitCommand
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -440,7 +440,7 @@ where
 
         emu.modules_mut()
             .modules_mut()
-            .allow_address_range_all(self.allowed_range.clone());
+            .allow_address_range_all(&self.allowed_range);
         Ok(None)
     }
 }

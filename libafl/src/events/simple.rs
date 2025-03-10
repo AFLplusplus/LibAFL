@@ -8,29 +8,29 @@ use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use libafl_bolts::ClientId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", not(miri)))]
-use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{ForkResult, fork};
+#[cfg(all(unix, feature = "std", not(miri)))]
+use libafl_bolts::os::{SIGNAL_RECURSION_EXIT, unix_signals::setup_signal_handler};
 #[cfg(feature = "std")]
 use libafl_bolts::{
     os::CTRL_C_EXIT,
     shmem::{ShMem, ShMemProvider},
     staterestore::StateRestorer,
 };
+#[cfg(feature = "std")]
 use serde::Serialize;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 
-use super::{AwaitRestartSafe, ProgressReporter, RecordSerializationTime, std_on_restart};
+use super::{AwaitRestartSafe, ProgressReporter, std_on_restart};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     Error, HasMetadata,
     events::{
-        BrokerEventResult, CanSerializeObserver, Event, EventFirer, EventManagerId, EventReceiver,
-        EventRestarter, HasEventManagerId, SendExiting, std_maybe_report_progress,
-        std_report_progress,
+        BrokerEventResult, Event, EventFirer, EventManagerId, EventReceiver, EventRestarter,
+        HasEventManagerId, SendExiting, std_maybe_report_progress, std_report_progress,
     },
     monitors::{Monitor, stats::ClientStatsManager},
     state::{
@@ -72,8 +72,6 @@ where
             .finish_non_exhaustive()
     }
 }
-
-impl<I, MT, S> RecordSerializationTime for SimpleEventManager<I, MT, S> {}
 
 impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S>
 where
@@ -140,15 +138,6 @@ where
     }
     fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
         Ok(())
-    }
-}
-
-impl<I, MT, OT, S> CanSerializeObserver<OT> for SimpleEventManager<I, MT, S>
-where
-    OT: Serialize,
-{
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 
@@ -296,12 +285,6 @@ pub struct SimpleRestartingEventManager<I, MT, S, SHM, SP> {
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SHM, SP> RecordSerializationTime
-    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
-{
-}
-
-#[cfg(feature = "std")]
 impl<I, MT, S, SHM, SP> EventFirer<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
@@ -336,17 +319,6 @@ where
             self.inner.client_stats_manager.start_time(),
             self.inner.client_stats_manager.client_stats(),
         ))
-    }
-}
-
-#[cfg(feature = "std")]
-impl<I, MT, OT, S, SHM, SP> CanSerializeObserver<OT>
-    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
-where
-    OT: Serialize,
-{
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 
@@ -508,6 +480,13 @@ where
 
                 if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     return Err(Error::shutting_down());
+                }
+
+                #[cfg(all(unix, feature = "std"))]
+                if child_status == SIGNAL_RECURSION_EXIT {
+                    return Err(Error::illegal_state(
+                        "The client is stuck in an unexpected signal handler recursion. It is most likely a fuzzer bug.",
+                    ));
                 }
 
                 #[expect(clippy::manual_assert)]
