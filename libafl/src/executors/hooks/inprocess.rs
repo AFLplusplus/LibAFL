@@ -475,7 +475,7 @@ impl InProcessExecutorHandlerData {
     ///
     /// Should only be called to signal a crash in the target
     #[cfg(all(unix, feature = "std"))]
-    pub unsafe fn maybe_report_crash<E, EM, F, I, OF, S, Z>(
+    pub unsafe fn maybe_report_crash<E, EM, I, OF, S, Z>(
         &mut self,
         bsod_info: Option<BsodInfo>,
     ) -> bool

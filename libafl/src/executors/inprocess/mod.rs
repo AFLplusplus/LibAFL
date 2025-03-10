@@ -132,7 +132,7 @@ where
     I: Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn new<F, OF>(
+    pub fn new<OF>(
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -141,7 +141,6 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -380,14 +379,7 @@ mod tests {
     use libafl_bolts::{rands::XkcdRand, tuples::tuple_list};
 
     use crate::{
-        StdFuzzer,
-        corpus::InMemoryCorpus,
-        events::NopEventManager,
-        executors::{Executor, ExitKind, InProcessExecutor},
-        feedbacks::CrashFeedback,
-        inputs::NopInput,
-        schedulers::RandScheduler,
-        state::StdState,
+        corpus::InMemoryCorpus, events::NopEventManager, executors::{Executor, ExitKind, InProcessExecutor}, feedbacks::CrashFeedback, inputs::NopInput, schedulers::RandScheduler, state::{NopState, StdState}, StdFuzzer
     };
 
     #[test]
@@ -398,7 +390,7 @@ mod tests {
         let solutions = InMemoryCorpus::new();
         let mut objective = CrashFeedback::new();
         let mut feedback = tuple_list!();
-        let sche = RandScheduler::new();
+        let sche: RandScheduler<NopState<NopInput>> = RandScheduler::new();
         let mut mgr = NopEventManager::new();
         let mut state =
             StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();

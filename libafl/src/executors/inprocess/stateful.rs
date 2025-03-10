@@ -131,7 +131,7 @@ where
     I: Clone + Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn new<F, OF>(
+    pub fn new<OF>(
         harness_fn: &'a mut H,
         exposed_executor_state: ES,
         observers: OT,
@@ -141,7 +141,6 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -165,7 +164,7 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
-    pub fn with_timeout<F, OF>(
+    pub fn with_timeout<OF>(
         harness_fn: &'a mut H,
         exposed_executor_state: ES,
         observers: OT,
@@ -222,7 +221,7 @@ where
     S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn generic<F, OF>(
+    pub fn generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
         exposed_executor_state: ES,
@@ -233,7 +232,6 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {

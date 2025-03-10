@@ -95,7 +95,7 @@ pub mod windows_asan_handler {
                 // Make sure we don't crash in the crash handler forever.
                 let input = (*data).take_current_input::<I>();
 
-                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -244,7 +244,7 @@ pub mod windows_exception_handler {
 
                 let input = (*data).take_current_input::<I>();
 
-                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -315,7 +315,7 @@ pub mod windows_exception_handler {
                 let input = unsafe { (data.current_input_ptr as *const I).as_ref().unwrap() };
                 data.current_input_ptr = ptr::null_mut();
 
-                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -458,7 +458,7 @@ pub mod windows_exception_handler {
                 log::warn!("Running observers and exiting!");
                 // // I want to disable the hooks before doing anything, especially before taking a stack dump
                 let input = unsafe { data.take_current_input::<I>() };
-                run_observers_and_save_state::<E, EM, F, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                     executor,
                     state,
                     input,
