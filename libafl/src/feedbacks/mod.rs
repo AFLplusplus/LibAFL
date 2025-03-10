@@ -660,7 +660,6 @@ where
         {
             Ok(ret)
         } else {
-            println!("inner guy is failing!");
             Ok(false)
         }
     }
@@ -685,8 +684,8 @@ where
         observers: &OT,
         testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
-        self.inner
-            .append_metadata(state, manager, observers, testcase)?;
+        // just ignore
+        let _ = self.inner.append_metadata(state, manager, observers, testcase);
         Ok(())
     }
 }
@@ -769,6 +768,14 @@ where
         let name = Cow::from(format!("Not({})", inner.name()));
         Self { inner, name }
     }
+}
+
+/// Macro to create [`FallibleFeedback`]
+#[macro_export]
+macro_rules! fallible {
+    ($feedback:expr) => {
+        $crate::feedbacks::FallibleFeedback::new($feedback)
+    };
 }
 
 /// Variadic macro to create a chain of [`AndFeedback`](EagerAndFeedback)
