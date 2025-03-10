@@ -488,7 +488,7 @@ macro_rules! fuzz_with {
                 }
             }
 
-            let executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+            let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
             // Setup a tracing stage in which we log comparisons
             let tracing = IfStage::new(|_, _, _, _| Ok(!$options.skip_tracing()), (ShadowTracingStage::new(), ()));
 

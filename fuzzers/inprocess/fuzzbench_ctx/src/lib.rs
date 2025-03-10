@@ -20,7 +20,7 @@ use libafl::{
     events::SimpleRestartingEventManager,
     executors::{
         inprocess::{HookableInProcessExecutor, InProcessExecutor},
-        ExitKind,
+        ExitKind, ShadowExecutor,
     },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
