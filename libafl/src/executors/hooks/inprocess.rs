@@ -276,7 +276,7 @@ impl<I, S> InProcessHooks<I, S> {
     /// Create new [`InProcessHooks`].
     #[cfg(windows)]
     #[allow(unused_variables)] // for `exec_tmout` without `std`
-    pub fn new<E, EM, F, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
@@ -293,7 +293,6 @@ impl<I, S> InProcessHooks<I, S> {
             crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
                 E,
                 EM,
-                F,
                 I,
                 OF,
                 S,
@@ -305,7 +304,6 @@ impl<I, S> InProcessHooks<I, S> {
                 crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<
                     E,
                     EM,
-                    F,
                     I,
                     OF,
                     S,
@@ -315,7 +313,6 @@ impl<I, S> InProcessHooks<I, S> {
                 crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<
                     E,
                     EM,
-                    F,
                     I,
                     OF,
                     S,
@@ -342,7 +339,7 @@ impl<I, S> InProcessHooks<I, S> {
     /// Create a new [`InProcessHooks`]
     #[cfg(all(not(unix), not(windows)))]
     #[expect(unused_variables)]
-    pub fn new<E, EM, F, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
