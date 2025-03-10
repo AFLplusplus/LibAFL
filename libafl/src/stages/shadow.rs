@@ -29,6 +29,17 @@ pub struct ShadowTracingStage<E, EM, I, SOT, S, Z> {
     phantom: PhantomData<(E, EM, I, SOT, S, Z)>,
 }
 
+impl<E, EM, I, SOT, S, Z> Default for ShadowTracingStage<E, EM, I, SOT, S, Z>
+where
+    E: Executor<EM, I, S, Z> + HasObservers,
+    S: HasExecutions + HasCorpus<I>,
+    SOT: ObserversTuple<I, S>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The counter for giving this stage unique id
 static mut SHADOW_TRACING_STAGE_ID: usize = 0;
 /// Name for shadow tracing stage

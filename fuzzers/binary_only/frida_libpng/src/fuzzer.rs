@@ -218,7 +218,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
-        let tracing = ShadowTracingStage::new(&mut executor);
+        let tracing = ShadowTracingStage::new();
 
         // Setup a randomic Input2State stage
         let i2s =
