@@ -40,7 +40,7 @@ use libafl::{
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
-        StdMutationalStage,
+        ShadowTracingStage, StdMutationalStage,
     },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
