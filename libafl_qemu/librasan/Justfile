@@ -74,17 +74,21 @@ build_ppc_release:
   #!/bin/bash
   ARCH=ppc PROFILE=release just build
 
-build_everything: \
+build_everything_dev: \
   build_arm_dev \
-  build_arm_release \
   build_aarch64_dev \
-  build_aarch64_release \
   build_x86_64_dev \
-  build_x86_64_release \
   build_i386_dev \
-  build_i386_release \
   build_ppc_dev \
-  build_ppc_release
+
+build_everything_release: \
+  build_arm_dev \
+  build_aarch64_dev \
+  build_x86_64_dev \
+  build_i386_dev \
+  build_ppc_dev \
+
+build_everything: build_everything_dev build_everything_release
 
 test_arm:
   #!/bin/bash

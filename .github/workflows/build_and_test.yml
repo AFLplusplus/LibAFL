@@ -62,10 +62,10 @@ jobs:
         if: runner.os == 'MacOS'
         run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
       - name: Run tests (Windows)
-        if: runner.os == 'Windows' 
+        if: runner.os == 'Windows'
         run: cargo test -- --test-threads 1
       - name: Run tests (Linux)
-        if: runner.os != 'Windows' 
+        if: runner.os != 'Windows'
         run: cargo test -- --test-threads 1
       - name: Test libafl no_std
         run: cd libafl && cargo test --no-default-features
@@ -420,7 +420,8 @@ jobs:
             LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
             just \
               -f ./libafl_qemu/librasan/Justfile \
-              build_everything
+              build_everything_dev \
+              build_x86_64_release
 
   librasan-test:
       runs-on: ubuntu-24.04
