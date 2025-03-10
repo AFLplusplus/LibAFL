@@ -238,27 +238,38 @@ pub fn build() {
     if cfg!(feature = "usermode") && rasan {
         let rasan_dir = Path::new("librasan");
         let rasan_dir = fs::canonicalize(rasan_dir).unwrap();
+        let just_file = rasan_dir.join("Justfile");
         println!("cargo:rerun-if-changed={}", rasan_dir.display());
+        println!("cargo:rerun-if-changed={}", just_file.display());
 
-        let mut just = Command::new("just");
-        just.env("ARCH", cpu_target);
-        just.env("TARGET_DIR", &target_dir);
-        if cfg!(debug_assertions) {
-            just.env("PROFILE", "dev");
+        let rasan_dir_str = rasan_dir.to_str().unwrap();
+        let just_file_str = just_file.to_str().unwrap();
+        let target_dir_str = target_dir.to_str().unwrap();
+
+        let profile = if cfg!(debug_assertions) {
+            "dev"
         } else {
-            just.env("PROFILE", "release");
-        }
-        assert!(just
-            .current_dir(&rasan_dir)
-            .arg("build_gasan")
-            .status()
-            .expect("just build failed")
-            .success());
-        assert!(just
-            .current_dir(&rasan_dir)
-            .arg("build_qasan")
-            .status()
-            .expect("just build failed")
-            .success());
+            "release"
+        };
+
+        let gasan_args = [
+            "just",
+            "-d", rasan_dir_str,
+            "-f", just_file_str,
+            "--set", "ARCH", &cpu_target,
+            "--set", "PROFILE", &profile,
+            "--set", "TARGET_DIR", &target_dir_str,
+            "build_gasan"];
+        just::run(gasan_args.iter()).expect("Failed to build rust guest address sanitizer library");
+
+        let qasan_args = [
+            "just",
+            "-d", rasan_dir_str,
+            "-f", just_file_str,
+            "--set", "ARCH", &cpu_target,
+            "--set", "PROFILE", &profile,
+            "--set", "TARGET_DIR", &target_dir_str,
+            "build_qasan"];
+        just::run(qasan_args.iter()).expect("Failed to build rust address sanitizer library");
     }
 }

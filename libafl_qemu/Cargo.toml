@@ -52,6 +52,7 @@ fork = ["libafl/fork"]
 ## Build libqasan for address sanitization
 build_libgasan = []
 build_libqasan = []
+## Use Address Sanitizer implementation written in rust (rather than the older C version)
 rasan = []
 
 #! ## The following architecture features are mutually exclusive.
@@ -141,6 +142,7 @@ pyo3-build-config = { workspace = true, optional = true }
 rustversion = { workspace = true }
 bindgen = { workspace = true }
 cc = { workspace = true }
+just = { workspace = true }
 
 [lib]
 name = "libafl_qemu"

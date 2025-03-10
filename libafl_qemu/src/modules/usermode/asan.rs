@@ -989,7 +989,7 @@ where
                 .unwrap()
                 .join("libqasan.so");
 
-            let asan_lib = env::var_os("CUSTOM_ASAN_PATH")
+            let asan_lib = env::var_os("CUSTOM_QASAN_PATH")
                 .map_or(asan_lib, |x| PathBuf::from(x.to_string_lossy().to_string()));
 
             assert!(
