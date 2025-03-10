@@ -303,9 +303,9 @@ where
                     None => false,
                 })
                 .collect::<Vec<MapInfo>>();
-            asan_mappings
-                .iter()
-                .for_each(|m| log::info!("asan mapping: {m:}"));
+            for m in &asan_mappings {
+                log::info!("asan mapping: {m:}");
+            }
             self.asan_mappings = Some(asan_mappings);
         }
 

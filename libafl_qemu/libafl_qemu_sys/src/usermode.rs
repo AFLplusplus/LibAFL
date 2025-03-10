@@ -1,8 +1,8 @@
 #[cfg(feature = "python")]
 use core::convert::Infallible;
+use core::fmt::{self, Display, Formatter};
 #[cfg(target_os = "linux")]
 use core::{slice::from_raw_parts, str::from_utf8_unchecked};
-use std::fmt::{self, Display, Formatter};
 
 #[cfg(target_os = "linux")]
 use libc::{c_char, strlen};
@@ -35,6 +35,7 @@ pub struct MapInfo {
     is_priv: i32,
 }
 
+#[cfg(target_os = "linux")]
 impl Display for MapInfo {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{:016x}-{:016x} , ", self.start, self.end)?;
@@ -68,7 +69,7 @@ impl Display for MapInfo {
         write!(f, "{}", if self.is_priv == 0 { "s" } else { "p" })?;
         write!(f, " {:10}", self.offset)?;
         if let Some(path) = &self.path {
-            write!(f, " {}", path)?;
+            write!(f, " {path}")?;
         }
         Ok(())
     }

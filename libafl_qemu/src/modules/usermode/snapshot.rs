@@ -484,14 +484,14 @@ impl SnapshotModule {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
                         if self.interval_filter.to_skip(*page).is_some() {
-                            if !Self::modify_mapping(&qemu, new_maps, *page) {
+                            if !Self::modify_mapping(qemu, new_maps, *page) {
                                 return true; // Restore later
                             }
                             unsafe { qemu.write_mem_unchecked(*page, &SNAPSHOT_PAGE_ZEROES) };
                         } else if let Some(data) = info.data.as_ref() {
                             // TODO avoid duplicated memcpy
                             // Change segment perms to RW if not writeable in current mapping
-                            if !Self::modify_mapping(&qemu, new_maps, *page) {
+                            if !Self::modify_mapping(qemu, new_maps, *page) {
                                 return true; // Restore later
                             }
 
@@ -563,7 +563,7 @@ impl SnapshotModule {
         log::debug!("End restore");
     }
 
-    fn modify_mapping(qemu: &Qemu, maps: &mut MappingInfo, page: GuestAddr) -> bool {
+    fn modify_mapping(qemu: Qemu, maps: &mut MappingInfo, page: GuestAddr) -> bool {
         let mut found = false;
         for entry in maps
             .tree

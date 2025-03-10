@@ -257,8 +257,8 @@ pub fn build() {
             "-d", rasan_dir_str,
             "-f", just_file_str,
             "--set", "ARCH", &cpu_target,
-            "--set", "PROFILE", &profile,
-            "--set", "TARGET_DIR", &target_dir_str,
+            "--set", "PROFILE", profile,
+            "--set", "TARGET_DIR", target_dir_str,
             "build_gasan"];
         just::run(gasan_args.iter()).expect("Failed to build rust guest address sanitizer library");
 
@@ -267,8 +267,8 @@ pub fn build() {
             "-d", rasan_dir_str,
             "-f", just_file_str,
             "--set", "ARCH", &cpu_target,
-            "--set", "PROFILE", &profile,
-            "--set", "TARGET_DIR", &target_dir_str,
+            "--set", "PROFILE", profile,
+            "--set", "TARGET_DIR", target_dir_str,
             "build_qasan"];
         just::run(qasan_args.iter()).expect("Failed to build rust address sanitizer library");
     }
