@@ -6,7 +6,7 @@ use core::ffi::{CStr, c_char, c_void};
 use asan::{
     GuestAddr,
     allocator::{
-        backend::{GlobalAllocator, dlmalloc::DlmallocBackend, mimalloc::MimallocBackend},
+        backend::{dlmalloc::DlmallocBackend, mimalloc::MimallocBackend},
         frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
     host::{Host, libc::LibcHost},
@@ -28,7 +28,7 @@ type Syms = DlSymSymbols<LookupTypeNext>;
 
 type QasanMmap = LibcMmap<Syms>;
 
-type QasanBackend = MimallocBackend<GlobalAllocator<DlmallocBackend<QasanMmap>>>;
+type QasanBackend = MimallocBackend<DlmallocBackend<QasanMmap>>;
 
 type QasanHost = LibcHost<Syms>;
 
@@ -41,7 +41,7 @@ const PAGE_SIZE: usize = 4096;
 
 static FRONTEND: Lazy<Mutex<QasanFrontend>> = Lazy::new(|| {
     LibcLogger::initialize::<QasanSyms>(Level::Info);
-    let backend = QasanBackend::new(GlobalAllocator::new(DlmallocBackend::new(PAGE_SIZE)));
+    let backend = QasanBackend::new(DlmallocBackend::new(PAGE_SIZE));
     let shadow = HostShadow::<QasanHost>::new().unwrap();
     let tracking = HostTracking::<QasanHost>::new().unwrap();
     let frontend = QasanFrontend::new(

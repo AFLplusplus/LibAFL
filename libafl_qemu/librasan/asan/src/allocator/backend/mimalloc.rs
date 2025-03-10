@@ -1,62 +1,26 @@
-use alloc::fmt::{self, Debug, Formatter};
-use core::alloc::{GlobalAlloc, Layout, LayoutError};
+use alloc::alloc::{GlobalAlloc, Layout};
 
 use baby_mimalloc::Mimalloc;
-use thiserror::Error;
+use spin::Mutex;
 
-use crate::{GuestAddr, allocator::backend::AllocatorBackend};
-
-pub struct MimallocBackend<G: GlobalAlloc + Debug> {
-    mimalloc: Mimalloc<G>,
+pub struct MimallocBackend<G: GlobalAlloc> {
+    mimalloc: Mutex<Mimalloc<G>>,
 }
 
-impl<G: GlobalAlloc + Debug> MimallocBackend<G> {
+impl<G: GlobalAlloc> MimallocBackend<G> {
     pub const fn new(global_allocator: G) -> Self {
         MimallocBackend {
-            mimalloc: Mimalloc::with_os_allocator(global_allocator),
+            mimalloc: Mutex::new(Mimalloc::with_os_allocator(global_allocator)),
         }
     }
 }
 
-impl<G: GlobalAlloc + Debug> Debug for MimallocBackend<G> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "MimallocBackend")
-    }
-}
-
-impl<G: GlobalAlloc + Debug> AllocatorBackend for MimallocBackend<G> {
-    type Error = MimallocBackendError;
-
-    fn alloc(&mut self, len: usize, align: usize) -> Result<GuestAddr, Self::Error> {
-        let layout =
-            Layout::from_size_align(len, align).map_err(MimallocBackendError::LayoutError)?;
-        let ptr = unsafe { self.mimalloc.alloc(layout) };
-        if ptr.is_null() {
-            Err(MimallocBackendError::NullAllocationError)?;
-        }
-        Ok(ptr as GuestAddr)
+unsafe impl<G: GlobalAlloc> GlobalAlloc for MimallocBackend<G> {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        unsafe { self.mimalloc.lock().alloc(layout) }
     }
 
-    fn dealloc(
-        &mut self,
-        addr: crate::GuestAddr,
-        len: usize,
-        align: usize,
-    ) -> Result<(), Self::Error> {
-        let layout =
-            Layout::from_size_align(len, align).map_err(MimallocBackendError::LayoutError)?;
-        let ptr = addr as *mut u8;
-        unsafe {
-            self.mimalloc.dealloc(ptr, layout);
-        }
-        Ok(())
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe { self.mimalloc.lock().dealloc(ptr, layout) }
     }
-}
-
-#[derive(Error, Debug, PartialEq)]
-pub enum MimallocBackendError {
-    #[error("Layout error: {0:?}")]
-    LayoutError(LayoutError),
-    #[error("Null allocation")]
-    NullAllocationError,
 }

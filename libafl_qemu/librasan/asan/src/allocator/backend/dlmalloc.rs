@@ -2,14 +2,17 @@
 //! This allocator makes use of the `dlmalloc` crate to manage memory. It in
 //! turn uses pages of memory allocated by one of the implementations of the
 //! `Mmap` trait described in the `mmap` module.
-use alloc::fmt::{self, Debug, Formatter};
+use alloc::{
+    alloc::{GlobalAlloc, Layout},
+    fmt::{self, Debug, Formatter},
+};
 use core::{marker::PhantomData, mem::forget, ptr::null_mut};
 
 use dlmalloc::{Allocator, Dlmalloc};
 use log::debug;
-use thiserror::Error;
+use spin::Mutex;
 
-use crate::{GuestAddr, allocator::backend::AllocatorBackend, mmap::Mmap};
+use crate::mmap::Mmap;
 
 pub struct DlmallocBackendMap<M: Mmap> {
     page_size: usize,
@@ -68,7 +71,17 @@ impl<M: Mmap> DlmallocBackendMap<M> {
 }
 
 pub struct DlmallocBackend<M: Mmap> {
-    dlmalloc: Dlmalloc<DlmallocBackendMap<M>>,
+    dlmalloc: Mutex<Dlmalloc<DlmallocBackendMap<M>>>,
+}
+
+impl<M: Mmap + Send> DlmallocBackend<M> {
+    pub const fn new(page_size: usize) -> DlmallocBackend<M> {
+        let backend = DlmallocBackendMap::new(page_size);
+        let dlmalloc = Dlmalloc::<DlmallocBackendMap<M>>::new_with_allocator(backend);
+        Self {
+            dlmalloc: Mutex::new(dlmalloc),
+        }
+    }
 }
 
 impl<M: Mmap + Send> Debug for DlmallocBackend<M> {
@@ -77,33 +90,16 @@ impl<M: Mmap + Send> Debug for DlmallocBackend<M> {
     }
 }
 
-impl<M: Mmap + Send> AllocatorBackend for DlmallocBackend<M> {
-    type Error = DlmallocBackendError;
+unsafe impl<M: Mmap> GlobalAlloc for DlmallocBackend<M> {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        unsafe { self.dlmalloc.lock().malloc(layout.size(), layout.align()) }
+    }
 
-    fn alloc(&mut self, size: usize, align: usize) -> Result<GuestAddr, DlmallocBackendError> {
-        let ptr = unsafe { self.dlmalloc.malloc(size, align) };
-        if ptr.is_null() {
-            Err(DlmallocBackendError::FailedToAllocate(size, align))?;
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe {
+            self.dlmalloc
+                .lock()
+                .free(ptr, layout.size(), layout.align())
         }
-        Ok(ptr as GuestAddr)
     }
-
-    fn dealloc(&mut self, addr: GuestAddr, size: usize, align: usize) -> Result<(), Self::Error> {
-        unsafe { self.dlmalloc.free(addr as *mut u8, size, align) }
-        Ok(())
-    }
-}
-
-impl<M: Mmap + Send> DlmallocBackend<M> {
-    pub const fn new(page_size: usize) -> DlmallocBackend<M> {
-        let backend = DlmallocBackendMap::new(page_size);
-        let dlmalloc = Dlmalloc::<DlmallocBackendMap<M>>::new_with_allocator(backend);
-        Self { dlmalloc }
-    }
-}
-
-#[derive(Error, Debug, PartialEq)]
-pub enum DlmallocBackendError {
-    #[error("Failed to allocate - size: {0}, align: {1}")]
-    FailedToAllocate(usize, usize),
 }

@@ -9,6 +9,7 @@
 //! quarantine (whose size is configurable) to prevent user buffers from being
 //! re-used for a period of time.
 use alloc::{
+    alloc::{GlobalAlloc, Layout, LayoutError},
     collections::{BTreeMap, VecDeque},
     fmt::Debug,
 };
@@ -19,7 +20,7 @@ use thiserror::Error;
 
 use crate::{
     GuestAddr,
-    allocator::{backend::AllocatorBackend, frontend::AllocatorFrontend},
+    allocator::frontend::AllocatorFrontend,
     shadow::{PoisonType, Shadow},
     tracking::Tracking,
 };
@@ -31,7 +32,7 @@ struct Allocation {
     backend_align: usize,
 }
 
-pub struct DefaultFrontend<B: AllocatorBackend, S: Shadow, T: Tracking> {
+pub struct DefaultFrontend<B: GlobalAlloc + Send, S: Shadow, T: Tracking> {
     backend: B,
     shadow: S,
     tracking: T,
@@ -42,8 +43,8 @@ pub struct DefaultFrontend<B: AllocatorBackend, S: Shadow, T: Tracking> {
     quaratine_used: usize,
 }
 
-impl<B: AllocatorBackend, S: Shadow, T: Tracking> AllocatorFrontend for DefaultFrontend<B, S, T> {
-    type Error = DefaultFrontendError<B, S, T>;
+impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for DefaultFrontend<B, S, T> {
+    type Error = DefaultFrontendError<S, T>;
 
     fn alloc(&mut self, len: usize, align: usize) -> Result<GuestAddr, Self::Error> {
         debug!("alloc - len: 0x{:x}, align: 0x{:x}", len, align);
@@ -53,10 +54,18 @@ impl<B: AllocatorBackend, S: Shadow, T: Tracking> AllocatorFrontend for DefaultF
         let size = len + align;
         let allocated_size = (self.red_zone_size * 2) + Self::align_up(size);
         assert!(allocated_size % Self::ALLOC_ALIGN_SIZE == 0);
-        let orig = self
-            .backend
-            .alloc(allocated_size, Self::ALLOC_ALIGN_SIZE)
-            .map_err(|e| DefaultFrontendError::AllocatorError(e))?;
+        let ptr = unsafe {
+            self.backend.alloc(
+                Layout::from_size_align(allocated_size, Self::ALLOC_ALIGN_SIZE)
+                    .map_err(DefaultFrontendError::LayoutError)?,
+            )
+        };
+
+        if ptr.is_null() {
+            Err(DefaultFrontendError::AllocatorError)?;
+        }
+
+        let orig = ptr as GuestAddr;
 
         debug!(
             "alloc - buffer: 0x{:x}, len: 0x{:x}, align: 0x{:x}",
@@ -139,7 +148,7 @@ impl<B: AllocatorBackend, S: Shadow, T: Tracking> AllocatorFrontend for DefaultF
     }
 }
 
-impl<B: AllocatorBackend, S: Shadow, T: Tracking> DefaultFrontend<B, S, T> {
+impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> DefaultFrontend<B, S, T> {
     #[cfg(target_pointer_width = "32")]
     const ALLOC_ALIGN_SIZE: usize = 8;
 
@@ -155,7 +164,7 @@ impl<B: AllocatorBackend, S: Shadow, T: Tracking> DefaultFrontend<B, S, T> {
         tracking: T,
         red_zone_size: usize,
         quarantine_size: usize,
-    ) -> Result<DefaultFrontend<B, S, T>, DefaultFrontendError<B, S, T>> {
+    ) -> Result<DefaultFrontend<B, S, T>, DefaultFrontendError<S, T>> {
         if red_zone_size % Self::ALLOC_ALIGN_SIZE != 0 {
             Err(DefaultFrontendError::InvalidRedZoneSize(red_zone_size))?;
         }
@@ -171,15 +180,19 @@ impl<B: AllocatorBackend, S: Shadow, T: Tracking> DefaultFrontend<B, S, T> {
         })
     }
 
-    fn purge_quarantine(&mut self) -> Result<(), DefaultFrontendError<B, S, T>> {
+    fn purge_quarantine(&mut self) -> Result<(), DefaultFrontendError<S, T>> {
         while self.quaratine_used > self.quarantine_size {
             let alloc = self
                 .quarantine
                 .pop_front()
                 .ok_or(DefaultFrontendError::QuarantineCorruption)?;
-            self.backend
-                .dealloc(alloc.backend_addr, alloc.backend_len, alloc.backend_align)
-                .map_err(|e| DefaultFrontendError::AllocatorError(e))?;
+            unsafe {
+                self.backend.dealloc(
+                    alloc.backend_addr as *mut u8,
+                    Layout::from_size_align(alloc.backend_len, alloc.backend_align)
+                        .map_err(DefaultFrontendError::LayoutError)?,
+                )
+            };
             self.quaratine_used -= alloc.backend_len;
         }
         Ok(())
@@ -213,13 +226,15 @@ impl<B: AllocatorBackend, S: Shadow, T: Tracking> DefaultFrontend<B, S, T> {
 }
 
 #[derive(Error, Debug, PartialEq)]
-pub enum DefaultFrontendError<B: AllocatorBackend, S: Shadow, T: Tracking> {
+pub enum DefaultFrontendError<S: Shadow, T: Tracking> {
     #[error("Invalid red_zone_size: {0}")]
     InvalidRedZoneSize(usize),
     #[error("Invalid alignment: {0}")]
     InvalidAlignment(usize),
-    #[error("Allocator error: {0:?}")]
-    AllocatorError(B::Error),
+    #[error("Allocator error")]
+    AllocatorError,
+    #[error("Layout error: {0:?}")]
+    LayoutError(LayoutError),
     #[error("Shadow error: {0:?}")]
     ShadowError(S::Error),
     #[error("Tracking error: {0:?}")]

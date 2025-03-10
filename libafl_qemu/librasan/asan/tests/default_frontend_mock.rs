@@ -1,13 +1,13 @@
+extern crate alloc;
+
 #[cfg(test)]
 #[cfg(all(feature = "linux"))]
 mod tests {
+    use alloc::alloc::{GlobalAlloc, Layout};
 
     use asan::{
         GuestAddr,
-        allocator::{
-            backend::AllocatorBackend,
-            frontend::{AllocatorFrontend, default::DefaultFrontend},
-        },
+        allocator::frontend::{AllocatorFrontend, default::DefaultFrontend},
         mmap::{Mmap, linux::LinuxMmap},
         shadow::{
             Shadow,
@@ -22,14 +22,31 @@ mod tests {
 
     const MAX_ADDR: GuestAddr = 64 << 20;
 
+    // We can't mock GlobalAlloc since `*mut u8` isn't Send and Sync, so we will
+    // create a trivial implementation of it which converts the types and calls this
+    // substititue mockable trait instead.
+    trait BackendTrait {
+        fn do_alloc(&self, layout: Layout) -> GuestAddr;
+        fn do_dealloc(&self, addr: GuestAddr, layout: Layout);
+    }
+
     mock! {
         #[derive(Debug)]
         pub Backend {}
 
-        impl AllocatorBackend for Backend {
-            type Error = MockBackendError;
-            fn alloc(&mut self, len: usize, align: usize) -> Result<GuestAddr, MockBackendError>;
-            fn dealloc(&mut self, addr: GuestAddr, len: usize, align: usize) -> Result<(), MockBackendError>;
+        impl BackendTrait for Backend {
+            fn do_alloc(&self, layout: Layout) -> GuestAddr;
+            fn do_dealloc(&self, addr: GuestAddr, layout: Layout);
+        }
+    }
+
+    unsafe impl GlobalAlloc for MockBackend {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            self.do_alloc(layout) as *mut u8
+        }
+
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            self.do_dealloc(ptr as GuestAddr, layout)
         }
     }
 
@@ -73,20 +90,25 @@ mod tests {
         for [len, align, addr] in inputs {
             frontend
                 .backend_mut()
-                .expect_alloc()
-                .returning(move |len, align| {
-                    debug!("mock - len: 0x{:x}, align: 0x{:x}", len, align);
-                    Ok(base + addr)
+                .expect_do_alloc()
+                .returning(move |layout| {
+                    debug!(
+                        "mock - len: 0x{:x}, align: 0x{:x}",
+                        layout.size(),
+                        layout.align()
+                    );
+                    base + addr
                 });
             frontend
                 .backend_mut()
-                .expect_dealloc()
-                .returning(|addr, len, align| {
+                .expect_do_dealloc()
+                .returning(|addr, layout| {
                     debug!(
                         "mock - addr: 0x{:x}, len: 0x{:x}, align: 0x{:x}",
-                        addr, len, align
+                        addr,
+                        layout.size(),
+                        layout.align()
                     );
-                    Ok(())
                 });
 
             let buf = frontend.alloc(len, align).unwrap();

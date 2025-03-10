@@ -2,12 +2,12 @@
 #[cfg(all(feature = "linux", feature = "dlmalloc"))]
 mod tests {
 
-    use std::sync::Mutex;
-
-    use asan::{
-        allocator::backend::{AllocatorBackend, dlmalloc::DlmallocBackend},
-        mmap::linux::LinuxMmap,
+    use std::{
+        alloc::{GlobalAlloc, Layout},
+        sync::Mutex,
     };
+
+    use asan::{allocator::backend::dlmalloc::DlmallocBackend, mmap::linux::LinuxMmap};
     use spin::Lazy;
 
     static INIT_ONCE: Lazy<Mutex<()>> = Lazy::new(|| {
@@ -26,8 +26,10 @@ mod tests {
 
     #[test]
     fn test_allocate() {
-        let mut allocator = allocator();
-        let buf = allocator.alloc(16, 8).unwrap();
-        allocator.dealloc(buf, 16, 8).unwrap();
+        let allocator = allocator();
+        let layout = Layout::from_size_align(16, 8).unwrap();
+        let buf = unsafe { allocator.alloc(layout) };
+        assert!(!buf.is_null());
+        unsafe { allocator.dealloc(buf, layout) };
     }
 }
