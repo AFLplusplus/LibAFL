@@ -379,7 +379,14 @@ mod tests {
     use libafl_bolts::{rands::XkcdRand, tuples::tuple_list};
 
     use crate::{
-        corpus::InMemoryCorpus, events::NopEventManager, executors::{Executor, ExitKind, InProcessExecutor}, feedbacks::CrashFeedback, inputs::NopInput, schedulers::RandScheduler, state::{NopState, StdState}, StdFuzzer
+        StdFuzzer,
+        corpus::InMemoryCorpus,
+        events::NopEventManager,
+        executors::{Executor, ExitKind, InProcessExecutor},
+        feedbacks::CrashFeedback,
+        inputs::NopInput,
+        schedulers::RandScheduler,
+        state::{NopState, StdState},
     };
 
     #[test]
