@@ -19,7 +19,7 @@ build:
 [unix]
 run: build harness
     {{ FUZZER }} \
-      --libafl-in ./corpus \
+      --libafl-in ../../inprocess/libfuzzer_libpng/corpus \
       --libafl-out ./out \
       ./{{ HARNESS_NAME }} \
       -- \
