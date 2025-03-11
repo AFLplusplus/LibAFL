@@ -316,7 +316,7 @@ impl<M: Monitor> Instance<'_, M> {
 
             let mut shadow_executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
-            let tracing = ShadowTracingStage::new(&mut shadow_executor);
+            let tracing = ShadowTracingStage::new();
 
             // Setup a randomic Input2State stage
             let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(

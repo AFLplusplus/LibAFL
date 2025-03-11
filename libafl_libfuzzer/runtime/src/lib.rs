@@ -148,7 +148,7 @@ macro_rules! fuzz_with {
         };
         use libafl::{
             corpus::Corpus,
-            executors::{ExitKind, InProcessExecutor},
+            executors::{ExitKind, InProcessExecutor, ShadowExecutor},
             feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,
             feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
             generators::RandBytesGenerator,
@@ -166,7 +166,7 @@ macro_rules! fuzz_with {
             },
             stages::{
                 CalibrationStage, GeneralizationStage, IfStage, StdMutationalStage,
-                StdPowerMutationalStage, UnicodeIdentificationStage, TracingStage,
+                StdPowerMutationalStage, UnicodeIdentificationStage, ShadowTracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
@@ -438,8 +438,6 @@ macro_rules! fuzz_with {
                 }
             };
 
-            let mut tracing_harness = harness;
-
             let add_extra_observer = $extra_obsv;
             let observers = add_extra_observer(
                 tuple_list!(edges_observer, size_edges_observer, time_observer, backtrace_observer, oom_observer),
@@ -488,14 +486,9 @@ macro_rules! fuzz_with {
                 }
             }
 
+            let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
             // Setup a tracing stage in which we log comparisons
-            let tracing = IfStage::new(|_, _, _, _| Ok(!$options.skip_tracing()), (TracingStage::new(InProcessExecutor::new(
-                &mut tracing_harness,
-                tuple_list!(cmplog_observer),
-                &mut fuzzer,
-                &mut state,
-                &mut mgr,
-            )?), ()));
+            let tracing = IfStage::new(|_, _, _, _| Ok(!$options.skip_tracing()), (ShadowTracingStage::new(), ()));
 
             // The order of the stages matter!
             let mut stages = tuple_list!(
