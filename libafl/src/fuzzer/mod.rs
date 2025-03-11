@@ -402,6 +402,7 @@ where
 
     /// Post process a testcase depending the testcase execution results
     /// returns corpus id if it put something into corpus (not solution)
+    /// This code will not be reached by inprocess executor if crash happened.
     fn process_execution(
         &mut self,
         state: &mut S,
@@ -646,6 +647,8 @@ where
     }
 
     /// Adds an input, even if it's not considered `interesting` by any of the executors
+    /// If you are using inprocess executor, be careful.
+    /// Your crash-causing testcase will *NOT* be added into the corpus (only to solution)
     fn add_input(
         &mut self,
         state: &mut S,

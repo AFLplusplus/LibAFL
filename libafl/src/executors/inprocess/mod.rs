@@ -312,6 +312,9 @@ impl<EM, H, HB, HT, I, OT, S, Z> HasInProcessHooks<I, S>
 
 #[inline]
 /// Save state if it is an objective
+/// Note that unlike the logic in fuzzer/mod.rs
+/// This will *NOT* put any testcase into the corpus.
+/// As it totally does not make any sense to put when we use inprocess executor or its descendants.
 pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
     executor: &mut E,
     state: &mut S,
