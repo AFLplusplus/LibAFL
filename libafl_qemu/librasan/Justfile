@@ -13,11 +13,11 @@ build: build_asan build_dummy build_fuzz build_gasan build_qasan build_runner bu
 test: test_asan
 
 pretty_rust:
-  #!/bin/bash
+  #!/bin/sh
   MAIN_LLVM_VERSION=$LLVM_VERSION cargo run --manifest-path ../../utils/libafl_fmt/Cargo.toml --release -- -v
 
 pretty_toml:
-  #!/bin/bash
+  #!/bin/sh
   taplo fmt
 
 pretty: pretty_rust pretty_toml
@@ -25,53 +25,53 @@ pretty: pretty_rust pretty_toml
 fix: fix_asan fix_dummy fix_fuzz fix_gasan fix_qasan fix_runner fix_zasan
 
 clippy:
-  #!/bin/bash
+  #!/bin/sh
   cargo clippy
 
 doc:
-  #!/bin/bash
+  #!/bin/sh
   cargo doc
 
 all: fix pretty build test clippy doc
 
 build_arm_dev:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=arm PROFILE=dev just build
 
 build_aarch64_dev:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=aarch64 PROFILE=dev just build
 
 build_x86_64_dev:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=x86_64 PROFILE=dev just build
 
 build_i386_dev:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=i386 PROFILE=dev just build
 
 build_ppc_dev:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=ppc PROFILE=dev just build
 
 build_arm_release:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=arm PROFILE=release just build
 
 build_aarch64_release:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=aarch64 PROFILE=release just build
 
 build_x86_64_release:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=x86_64 PROFILE=release just build
 
 build_i386_release:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=i386 PROFILE=release just build
 
 build_ppc_release:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=ppc PROFILE=release just build
 
 build_everything_dev: \
@@ -91,7 +91,7 @@ build_everything_release: \
 build_everything: build_everything_dev build_everything_release
 
 test_arm:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=arm \
   PROFILE=dev \
   RUSTLOG=debug \
@@ -99,7 +99,7 @@ test_arm:
   just test
 
 test_aarch64:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=aarch64 \
   PROFILE=dev \
   RUSTLOG=debug \
@@ -107,7 +107,7 @@ test_aarch64:
   just test
 
 test_x86_64:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=x86_64 \
   PROFILE=dev \
   RUSTLOG=debug \
@@ -115,7 +115,7 @@ test_x86_64:
   just test
 
 test_i386:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=i386 \
   PROFILE=dev \
   RUSTLOG=debug \
@@ -123,7 +123,7 @@ test_i386:
   just test
 
 test_ppc:
-  #!/bin/bash
+  #!/bin/sh
   ARCH=ppc \
   PROFILE=dev \
   RUSTLOG=debug \

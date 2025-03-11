@@ -7,8 +7,8 @@ FUZZ_JOBS := if PROFILE == "dev" { "" } else { "-jobs=8" }
 
 [unix]
 build_fuzz:
-  #!/bin/bash
-  source {{ DOTENV }}
+  #!/bin/sh
+  . {{ DOTENV }}
   cargo \
     +nightly \
     build \
@@ -19,8 +19,8 @@ build_fuzz:
 
 [unix]
 fix_fuzz:
-  #!/bin/bash
-  source {{ DOTENV }}
+  #!/bin/sh
+  . {{ DOTENV }}
   cargo \
     +nightly \
     fix \
@@ -32,8 +32,8 @@ fix_fuzz:
 
 [unix]
 run_fuzz:
-  #!/bin/bash
-  source {{ DOTENV }}
+  #!/bin/sh
+  . {{ DOTENV }}
   cargo \
     +nightly \
     fuzz \
@@ -48,24 +48,24 @@ run_fuzz:
 
 [unix]
 fuzz_guest_shadow:
-  #!/bin/bash
-  source {{ DOTENV }}
+  #!/bin/sh
+  . {{ DOTENV }}
   HARNESS=guest_shadow just run_fuzz
 
 [unix]
 fuzz_guest_tracking:
-  #!/bin/bash
-  source {{ DOTENV }}
+  #!/bin/sh
+  . {{ DOTENV }}
   HARNESS=guest_tracking just run_fuzz
 
 [unix]
 fuzz_default_frontend_mock:
-  #!/bin/bash
-  source {{ DOTENV }}
+  #!/bin/sh
+  . {{ DOTENV }}
   HARNESS=default_frontend_mock just run_fuzz
 
 [unix]
 fuzz_default_frontend_dlmalloc:
-  #!/bin/bash
-  source {{ DOTENV }}
+  #!/bin/sh
+  . {{ DOTENV }}
   HARNESS=default_frontend_dlmalloc just run_fuzz
