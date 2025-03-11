@@ -768,7 +768,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "rand_trait"))]
+    #[cfg(feature = "rand_trait")]
     fn test_rand_trait() {
         use rand_core::{RngCore, SeedableRng};
         use serde::{Deserialize, Serialize};
