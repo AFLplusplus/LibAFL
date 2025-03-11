@@ -8,7 +8,9 @@ use core::{
     num::{NonZero, NonZeroUsize},
 };
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+#[cfg(feature = "rand_trait")]
+use rand_core::{RngCore, SeedableRng};
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "alloc")]
 pub mod loaded_dice;
@@ -103,7 +105,7 @@ fn fast_bound_usize(rand: u64, n: usize) -> usize {
 /// Ways to get random around here.
 /// Please note that these are not cryptographically secure.
 /// Or, even if some might be by accident, at least they are not seeded in a cryptographically secure fashion.
-pub trait Rand: Debug + Serialize + DeserializeOwned {
+pub trait Rand {
     /// Sets the seed of this Rand
     fn set_seed(&mut self, seed: u64);
 
@@ -217,6 +219,20 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
             lower = hint.0;
             upper = hint.1;
         }
+    }
+}
+
+#[cfg(feature = "rand_trait")]
+impl<T> Rand for T
+where
+    T: RngCore + SeedableRng + Serialize + for<'de> Deserialize<'de> + Debug,
+{
+    fn set_seed(&mut self, seed: u64) {
+        *self = Self::seed_from_u64(seed);
+    }
+
+    fn next(&mut self) -> u64 {
+        self.next_u64()
     }
 }
 
@@ -540,6 +556,92 @@ impl XkcdRand {
     }
 }
 
+#[cfg(feature = "python")]
+/// `Rand` Python bindings
+pub mod pybind {
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    use super::{Rand, StdRand, random_seed};
+
+    #[pyclass(unsendable, name = "StdRand")]
+    #[expect(clippy::unsafe_derive_deserialize)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Python class for StdRand
+    pub struct PythonStdRand {
+        /// Rust wrapped StdRand object
+        pub inner: StdRand,
+    }
+
+    #[pymethods]
+    impl PythonStdRand {
+        #[staticmethod]
+        fn with_random_seed() -> Self {
+            Self {
+                inner: StdRand::with_seed(random_seed()),
+            }
+        }
+
+        #[staticmethod]
+        fn with_seed(seed: u64) -> Self {
+            Self {
+                inner: StdRand::with_seed(seed),
+            }
+        }
+
+        fn as_rand(slf: Py<Self>) -> PythonRand {
+            PythonRand::new_std(slf)
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    enum PythonRandWrapper {
+        Std(Py<PythonStdRand>),
+    }
+
+    /// Rand Trait binding
+    #[pyclass(unsendable, name = "Rand")]
+    #[expect(clippy::unsafe_derive_deserialize)]
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct PythonRand {
+        wrapper: PythonRandWrapper,
+    }
+
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonRandWrapper, { Std })
+        };
+    }
+
+    #[pymethods]
+    impl PythonRand {
+        #[staticmethod]
+        fn new_std(py_std_rand: Py<PythonStdRand>) -> Self {
+            Self {
+                wrapper: PythonRandWrapper::Std(py_std_rand),
+            }
+        }
+    }
+
+    impl Rand for PythonRand {
+        fn set_seed(&mut self, seed: u64) {
+            unwrap_me_mut!(self.wrapper, r, { r.set_seed(seed) });
+        }
+
+        #[inline]
+        fn next(&mut self) -> u64 {
+            unwrap_me_mut!(self.wrapper, r, { r.next() })
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+        m.add_class::<PythonStdRand>()?;
+        m.add_class::<PythonRand>()?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -664,90 +766,40 @@ mod tests {
             assert_eq!(v, u);
         }
     }
-}
 
-#[cfg(feature = "python")]
-/// `Rand` Python bindings
-pub mod pybind {
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
+    #[test]
+    #[cfg(feature = "rand_trait")]
+    fn test_rand_trait() {
+        use rand_core::{RngCore, SeedableRng};
+        use serde::{Deserialize, Serialize};
 
-    use super::{Rand, StdRand, random_seed};
+        #[derive(Debug, Serialize, Deserialize)]
+        struct CountingRng(u64);
 
-    #[pyclass(unsendable, name = "StdRand")]
-    #[expect(clippy::unsafe_derive_deserialize)]
-    #[derive(Serialize, Deserialize, Debug, Clone)]
-    /// Python class for StdRand
-    pub struct PythonStdRand {
-        /// Rust wrapped StdRand object
-        pub inner: StdRand,
-    }
+        impl RngCore for CountingRng {
+            fn next_u32(&mut self) -> u32 {
+                self.next_u64() as u32
+            }
 
-    #[pymethods]
-    impl PythonStdRand {
-        #[staticmethod]
-        fn with_random_seed() -> Self {
-            Self {
-                inner: StdRand::with_seed(random_seed()),
+            fn next_u64(&mut self) -> u64 {
+                self.0 += 1;
+                self.0
+            }
+
+            fn fill_bytes(&mut self, dst: &mut [u8]) {
+                rand_core::impls::fill_bytes_via_next(self, dst);
             }
         }
 
-        #[staticmethod]
-        fn with_seed(seed: u64) -> Self {
-            Self {
-                inner: StdRand::with_seed(seed),
+        impl SeedableRng for CountingRng {
+            type Seed = [u8; 8];
+
+            fn from_seed(seed: Self::Seed) -> Self {
+                Self(u64::from_le_bytes(seed))
             }
         }
 
-        fn as_rand(slf: Py<Self>) -> PythonRand {
-            PythonRand::new_std(slf)
-        }
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    enum PythonRandWrapper {
-        Std(Py<PythonStdRand>),
-    }
-
-    /// Rand Trait binding
-    #[pyclass(unsendable, name = "Rand")]
-    #[expect(clippy::unsafe_derive_deserialize)]
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct PythonRand {
-        wrapper: PythonRandWrapper,
-    }
-
-    macro_rules! unwrap_me_mut {
-        ($wrapper:expr, $name:ident, $body:block) => {
-            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonRandWrapper, { Std })
-        };
-    }
-
-    #[pymethods]
-    impl PythonRand {
-        #[staticmethod]
-        fn new_std(py_std_rand: Py<PythonStdRand>) -> Self {
-            Self {
-                wrapper: PythonRandWrapper::Std(py_std_rand),
-            }
-        }
-    }
-
-    impl Rand for PythonRand {
-        fn set_seed(&mut self, seed: u64) {
-            unwrap_me_mut!(self.wrapper, r, { r.set_seed(seed) });
-        }
-
-        #[inline]
-        fn next(&mut self) -> u64 {
-            unwrap_me_mut!(self.wrapper, r, { r.next() })
-        }
-    }
-
-    /// Register the classes to the python module
-    pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-        m.add_class::<PythonStdRand>()?;
-        m.add_class::<PythonRand>()?;
-        Ok(())
+        // LibAFL's Rand trait is auto-implemented for all SeedableRng + RngCore types.
+        assert!(CountingRng(0).coinflip(0.1));
     }
 }

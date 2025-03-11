@@ -127,6 +127,16 @@ impl Client<'_> {
                     );
 
                     instance_builder.build().run(args, modules, state)
+                } else if is_asan_guest {
+                    let modules = tuple_list!(
+                        DrCovModule::builder()
+                            .filename(drcov.clone())
+                            .full_trace(true)
+                            .build(),
+                        AsanGuestModule::default(&env),
+                    );
+
+                    instance_builder.build().run(args, modules, state)
                 } else {
                     let modules = tuple_list!(DrCovModule::builder()
                         .filename(drcov.clone())
@@ -138,6 +148,10 @@ impl Client<'_> {
             } else if is_asan {
                 let modules =
                     tuple_list!(unsafe { AsanModule::builder().env(&env).asan_report().build() });
+
+                instance_builder.build().run(args, modules, state)
+            } else if is_asan_guest {
+                let modules = tuple_list!(AsanGuestModule::default(&env));
 
                 instance_builder.build().run(args, modules, state)
             } else {

@@ -61,8 +61,12 @@ jobs:
       - name: Test the book (MacOS)
         if: runner.os == 'MacOS'
         run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
-      - name: Run tests
-        run: cargo test
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: cargo test -- --test-threads 1
+      - name: Run tests (Linux)
+        if: runner.os != 'Windows'
+        run: cargo test -- --test-threads 1
       - name: Test libafl no_std
         run: cd libafl && cargo test --no-default-features
       - name: Test libafl_bolts no_std no_alloc
@@ -370,58 +374,95 @@ jobs:
         shell: bash
         run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
-  # fuzzers-qemu-user:
-  #   needs:
-  #     - changes
-  #   if: ${{ needs.changes.outputs.qemu == 'true' }}
-  #   strategy:
-  #     matrix:
-  #       os: [ubuntu-24.04]
-  #       fuzzer:
-  #         Binary only
-  #         - ./fuzzers/binary_only/qemu_cmin
-  #         - ./fuzzers/binary_only/qemu_coverage
-  #         - ./fuzzers/binary_only/qemu_launcher
-  #       arch:
-  #         # unless somebody pays us for the servers.
-  #         # - aarch64
-  #         # - arm
-  #         # - i386
-  #         # - ppc
-  #         - x86_64
-  #
-  #   runs-on: [ self-hosted, qemu ]
-  #   container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
-  #     - name: Build and run example QEMU fuzzers (Linux)
-  #       if: runner.os == 'Linux'
-  #       shell: bash
-  #       run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
-  #
-  # fuzzers-qemu-system:
-  #   needs:
-  #     - changes
-  #   if: ${{ needs.changes.outputs.qemu == 'true' }}
-  #   strategy:
-  #     matrix:
-  #       os: [ubuntu-24.04]
-  #       fuzzer:
-  #         Full-system
-  #         - ./fuzzers/full_system/qemu_baremetal
-  #         - ./fuzzers/full_system/qemu_linux_kernel
-  #         - ./fuzzers/full_system/qemu_linux_process
-  #
-  #   runs-on: [ self-hosted, qemu ]
-  #   container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
-  #     - name: Build and run example QEMU fuzzers (Linux)
-  #       if: runner.os == 'Linux'
-  #       shell: bash
-  #       run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+  fuzzers-qemu-user:
+    needs:
+      - changes
+    if: ${{ needs.changes.outputs.qemu == 'true' }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04]
+        fuzzer:
+          # Binary only
+          - ./fuzzers/binary_only/qemu_cmin
+          - ./fuzzers/binary_only/qemu_coverage
+          - ./fuzzers/binary_only/qemu_launcher
+        arch:
+          # unless somebody pays us for the servers.
+          # - aarch64
+          # - arm
+          # - i386
+          # - ppc
+          - x86_64
+
+    runs-on: [ self-hosted, qemu ]
+    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Build and run example QEMU fuzzers (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+
+  librasan-build:
+      runs-on: ubuntu-24.04
+      needs:
+        - changes
+      if: ${{ needs.changes.outputs.qemu == 'true' }}
+      steps:
+        - uses: actions/checkout@v4
+        - uses: ./.github/workflows/librasan-prepare
+        - name: Build
+          if: runner.os == 'Linux'
+          shell: bash
+          run: |
+            RUN_ON_CI=1 \
+            LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+            just \
+              -f ./libafl_qemu/librasan/Justfile \
+              build_everything_dev \
+              build_x86_64_release
+
+  librasan-test:
+      runs-on: ubuntu-24.04
+      needs:
+        - changes
+      if: ${{ needs.changes.outputs.qemu == 'true' }}
+      steps:
+        - uses: actions/checkout@v4
+        - uses: ./.github/workflows/librasan-prepare
+        - name: Build
+          if: runner.os == 'Linux'
+          shell: bash
+          run: |
+            RUN_ON_CI=1 \
+            LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+            just \
+              -f ./libafl_qemu/librasan/Justfile \
+              test_everything
+
+  fuzzers-qemu-system:
+    needs:
+      - changes
+    if: ${{ needs.changes.outputs.qemu == 'true' }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04]
+        fuzzer:
+          # Full-system
+          - ./fuzzers/full_system/qemu_baremetal
+          - ./fuzzers/full_system/qemu_linux_kernel
+          - ./fuzzers/full_system/qemu_linux_process
+
+    runs-on: [ self-hosted, qemu ]
+    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Build and run example QEMU fuzzers (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   nostd-build:
     runs-on: ubuntu-24.04
@@ -552,8 +593,6 @@ jobs:
         run: cargo build --verbose
       - name: Increase map sizes
         run: ./scripts/shmem_limits_macos.sh
-      - name: Run Tests
-        run: cargo test
       - name: Clippy
         run: cargo +nightly clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
 

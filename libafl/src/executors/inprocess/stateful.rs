@@ -11,7 +11,7 @@ use core::{
 use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
-    Error, HasFeedback,
+    Error,
     events::{EventFirer, EventRestarter},
     executors::{
         Executor, ExitKind, HasObservers,
@@ -131,7 +131,7 @@ where
     I: Clone + Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn new<F, OF>(
+    pub fn new<OF>(
         harness_fn: &'a mut H,
         exposed_executor_state: ES,
         observers: OT,
@@ -141,9 +141,8 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic(
             tuple_list!(),
@@ -157,40 +156,6 @@ where
         )
     }
 
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
-    #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout<F, OF>(
-        harness_fn: &'a mut H,
-        exposed_executor_state: ES,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        exec_tmout: Duration,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
-        OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
-    {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, F, OF>(
-            tuple_list!(),
-            observers,
-            fuzzer,
-            state,
-            event_mgr,
-            exec_tmout,
-        )?;
-
-        Ok(Self {
-            harness_fn,
-            exposed_executor_state,
-            inner,
-            phantom: PhantomData,
-        })
-    }
-
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
@@ -199,7 +164,7 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
-    pub fn with_timeout<F, OF>(
+    pub fn with_timeout<OF>(
         harness_fn: &'a mut H,
         exposed_executor_state: ES,
         observers: OT,
@@ -210,11 +175,10 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF>,
     {
-        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, F, OF>(
+        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
             tuple_list!(),
             observers,
             fuzzer,
@@ -257,7 +221,7 @@ where
     S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn generic<F, OF>(
+    pub fn generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
         exposed_executor_state: ES,
@@ -268,9 +232,8 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic(
             user_hooks,
@@ -284,37 +247,6 @@ where
         )
     }
 
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
-    #[cfg(all(feature = "std", target_os = "linux"))]
-    #[expect(clippy::too_many_arguments)]
-    pub fn batched_timeout_generic<F, OF>(
-        user_hooks: HT,
-        harness_fn: HB,
-        exposed_executor_state: ES,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        exec_tmout: Duration,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
-        OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
-    {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, F, OF>(
-            user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
-        )?;
-
-        Ok(Self {
-            harness_fn,
-            exposed_executor_state,
-            inner,
-            phantom: PhantomData,
-        })
-    }
-
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
@@ -324,7 +256,7 @@ where
     ///
     /// This may return an error on unix, if signal handler setup fails
     #[expect(clippy::too_many_arguments)]
-    pub fn with_timeout_generic<F, OF>(
+    pub fn with_timeout_generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
         exposed_executor_state: ES,
@@ -336,11 +268,10 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF>,
     {
-        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, F, OF>(
+        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
             user_hooks, observers, fuzzer, state, event_mgr, timeout,
         )?;
 

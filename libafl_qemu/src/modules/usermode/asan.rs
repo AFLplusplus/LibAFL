@@ -6,6 +6,7 @@ use std::{
     env,
     fmt::{Debug, Display},
     fs,
+    path::PathBuf,
     pin::Pin,
     sync::Mutex,
 };
@@ -978,45 +979,61 @@ where
     {
         let mut args: Vec<String> = qemu_params.to_cli();
 
-        let current = env::current_exe().unwrap();
-        let asan_lib = fs::canonicalize(current)
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("libqasan.so");
-        let asan_lib = asan_lib
-            .to_str()
-            .expect("The path to the asan lib is invalid")
-            .to_string();
-        let add_asan =
-            |e: &str| "LD_PRELOAD=".to_string() + &asan_lib + " " + &e["LD_PRELOAD=".len()..];
+        // Let the use skip preloading the ASAN DSO. Maybe they want to use
+        // their own implementation.
+        if env::var_os("SKIP_ASAN_LD_PRELOAD").is_none() {
+            let current = env::current_exe().unwrap();
+            let asan_lib = fs::canonicalize(current)
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join("libqasan.so");
 
-        // TODO: adapt since qemu does not take envp anymore as parameter
-        let mut added = false;
-        for (k, v) in &mut self.env {
-            if k == "QEMU_SET_ENV" {
-                let mut new_v = vec![];
-                for e in v.split(',') {
-                    if e.starts_with("LD_PRELOAD=") {
-                        added = true;
-                        new_v.push(add_asan(e));
-                    } else {
-                        new_v.push(e.to_string());
+            let asan_lib = env::var_os("CUSTOM_QASAN_PATH")
+                .map_or(asan_lib, |x| PathBuf::from(x.to_string_lossy().to_string()));
+
+            assert!(
+                asan_lib.as_path().exists(),
+                "The ASAN library doesn't exist: {asan_lib:#?}"
+            );
+
+            let asan_lib = asan_lib
+                .to_str()
+                .expect("The path to the asan lib is invalid")
+                .to_string();
+
+            println!("Loading ASAN: {asan_lib:}");
+
+            let add_asan =
+                |e: &str| "LD_PRELOAD=".to_string() + &asan_lib + " " + &e["LD_PRELOAD=".len()..];
+
+            // TODO: adapt since qemu does not take envp anymore as parameter
+            let mut added = false;
+            for (k, v) in &mut self.env {
+                if k == "QEMU_SET_ENV" {
+                    let mut new_v = vec![];
+                    for e in v.split(',') {
+                        if e.starts_with("LD_PRELOAD=") {
+                            added = true;
+                            new_v.push(add_asan(e));
+                        } else {
+                            new_v.push(e.to_string());
+                        }
                     }
+                    *v = new_v.join(",");
                 }
-                *v = new_v.join(",");
             }
-        }
-        for i in 0..args.len() {
-            if args[i] == "-E" && i + 1 < args.len() && args[i + 1].starts_with("LD_PRELOAD=") {
-                added = true;
-                args[i + 1] = add_asan(&args[i + 1]);
+            for i in 0..args.len() {
+                if args[i] == "-E" && i + 1 < args.len() && args[i + 1].starts_with("LD_PRELOAD=") {
+                    added = true;
+                    args[i + 1] = add_asan(&args[i + 1]);
+                }
             }
-        }
 
-        if !added {
-            args.insert(1, "LD_PRELOAD=".to_string() + &asan_lib);
-            args.insert(1, "-E".into());
+            if !added {
+                args.insert(1, "LD_PRELOAD=".to_string() + &asan_lib);
+                args.insert(1, "-E".into());
+            }
         }
 
         unsafe {

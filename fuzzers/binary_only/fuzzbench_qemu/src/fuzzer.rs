@@ -431,8 +431,9 @@ fn fuzz(
         println!("We imported {} input(s) from disk.", state.corpus().count());
     }
 
-    let tracing = ShadowTracingStage::new(&mut executor);
     let rca = RCAStage::new();
+    let tracing = ShadowTracingStage::new();
+
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power, rca);
 
