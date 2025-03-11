@@ -400,8 +400,6 @@ fn fuzz_binary(
         ExitKind::Ok
     };
 
-    let mut tracing_harness = harness;
-
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = InProcessExecutor::with_timeout(
         &mut harness,
@@ -626,8 +624,6 @@ fn fuzz_text(
         }
         ExitKind::Ok
     };
-
-    let mut tracing_harness = harness;
 
     let generalization = GeneralizationStage::new(&edges_observer);
 

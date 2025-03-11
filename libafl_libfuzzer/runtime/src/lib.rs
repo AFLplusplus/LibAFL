@@ -438,8 +438,6 @@ macro_rules! fuzz_with {
                 }
             };
 
-            let mut tracing_harness = harness;
-
             let add_extra_observer = $extra_obsv;
             let observers = add_extra_observer(
                 tuple_list!(edges_observer, size_edges_observer, time_observer, backtrace_observer, oom_observer),
