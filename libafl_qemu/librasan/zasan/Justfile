@@ -5,7 +5,7 @@ ZASAN_SOURCE_DIR := source_directory()
 
 [unix]
 compile_zasan:
-	#!/bin/bash
+	#!/bin/sh
 	source {{ DOTENV }}
 	RUSTFLAGS="--cfg rustix_use_experimental_asm" \
 	cargo \
@@ -18,7 +18,7 @@ compile_zasan:
 
 [unix]
 fix_zasan:
-	#!/bin/bash
+	#!/bin/sh
 	source {{ DOTENV }}
 	cargo \
 		+nightly \
@@ -32,7 +32,7 @@ fix_zasan:
 
 [unix]
 rel_zasan: compile_zasan build_dummy
-	#!/bin/bash
+	#!/bin/sh
 	source {{ DOTENV }}
 	${CROSS_CC} \
 		${LIBRASAN_CFLAGS} \
@@ -65,7 +65,7 @@ rel_zasan: compile_zasan build_dummy
 
 [unix]
 rename_zasan: rel_zasan
-	#!/bin/bash
+	#!/bin/sh
 	source {{ DOTENV }}
 	${CROSS_OBJCOPY} \
 		--redefine-syms={{ GASAN_SOURCE_DIR }}/rename_real.syms \
@@ -75,7 +75,7 @@ rename_zasan: rel_zasan
 
 [unix]
 link_zasan: rename_zasan
-	#!/bin/bash
+	#!/bin/sh
 	source {{ DOTENV }}
 	${CROSS_CC} \
 		-shared \
@@ -110,7 +110,7 @@ link_zasan: rename_zasan
 
 [unix]
 strip_zasan: link_zasan
-	#!/bin/bash
+	#!/bin/sh
 	source {{ DOTENV }}
 	${CROSS_STRIP} \
 		--strip-unneeded \

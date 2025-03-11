@@ -3,7 +3,7 @@ import "../fuzzer_name.just"
 
 [unix]
 compile_runner:
-  #!/bin/bash
+  #!/bin/sh
   source {{ DOTENV }}
   cargo \
     +nightly \
@@ -16,7 +16,7 @@ compile_runner:
 
 [unix]
 fix_runner:
-  #!/bin/bash
+  #!/bin/sh
   source {{ DOTENV }}
   cargo \
     +nightly \

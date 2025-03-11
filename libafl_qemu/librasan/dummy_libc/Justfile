@@ -5,7 +5,7 @@ DUMMY_SOURCE_DIR := source_directory()
 
 [unix]
 compile_dummy:
-  #!/bin/bash
+  #!/bin/sh
   source {{ DOTENV }}
   cargo \
     +nightly \
@@ -17,7 +17,7 @@ compile_dummy:
 
 [unix]
 fix_dummy:
-  #!/bin/bash
+  #!/bin/sh
   source {{ DOTENV }}
   cargo \
     +nightly \
@@ -31,7 +31,7 @@ fix_dummy:
 
 [unix]
 link_dummy: compile_dummy
-  #!/bin/bash
+  #!/bin/sh
   source {{ DOTENV }}
   ${CROSS_CC} \
     ${LIBRASAN_CFLAGS} \
@@ -51,7 +51,7 @@ link_dummy: compile_dummy
 
 [unix]
 strip_dummy: link_dummy
-	#!/bin/bash
+	#!/bin/sh
 	source {{ DOTENV }}
 	${CROSS_STRIP} \
 		--strip-unneeded \

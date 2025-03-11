@@ -5,7 +5,7 @@ ASAN_SOURCE_DIR := source_directory()
 
 [unix]
 compile_asan:
-  #!/bin/bash
+  #!/bin/sh
   source {{ DOTENV }}
   cargo \
     +nightly \
@@ -17,7 +17,7 @@ compile_asan:
 
 [unix]
 fix_asan:
-  #!/bin/bash
+  #!/bin/sh
   source {{ DOTENV }}
   cargo \
     +nightly \
@@ -30,7 +30,7 @@ fix_asan:
 
 [unix]
 test_asan:
-  #!/bin/bash
+  #!/bin/sh
   source {{ DOTENV }}
   cd {{ ASAN_SOURCE_DIR }}
   cargo \
