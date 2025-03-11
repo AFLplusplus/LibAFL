@@ -227,7 +227,7 @@ where
     T: RngCore + SeedableRng + Serialize + for<'de> Deserialize<'de> + Debug,
 {
     fn set_seed(&mut self, seed: u64) {
-        *self = Self::seed_from_u64(seed)
+        *self = Self::seed_from_u64(seed);
     }
 
     fn next(&mut self) -> u64 {
@@ -786,7 +786,7 @@ mod tests {
             }
 
             fn fill_bytes(&mut self, dst: &mut [u8]) {
-                rand_core::impls::fill_bytes_via_next(self, dst)
+                rand_core::impls::fill_bytes_via_next(self, dst);
             }
         }
 
@@ -799,6 +799,6 @@ mod tests {
         }
 
         // LibAFL's Rand trait is auto-implemented for all SeedableRng + RngCore types.
-        assert_eq!(true, CountingRng(0).coinflip(0.1));
+        assert!(CountingRng(0).coinflip(0.1));
     }
 }
