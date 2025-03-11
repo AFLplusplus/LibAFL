@@ -76,7 +76,7 @@ trait State:
 impl<C, I, R, SC> State for StdState<C, I, R, SC>
 where
     C: Serialize + DeserializeOwned,
-    R: Rand,
+    R: Rand + Serialize + for<'de> Deserialize<'de>,
     SC: Serialize + DeserializeOwned,
 {
 }

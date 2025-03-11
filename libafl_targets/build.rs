@@ -180,7 +180,6 @@ fn main() {
         }
 
         libfuzzer.compile("libfuzzer");
-
     }
 
     #[cfg(feature = "coverage")]
@@ -222,7 +221,8 @@ fn main() {
                 cmplog.link_lib_modifier("+whole-archive");
             }
 
-            cmplog.flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
+            cmplog
+                .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
                 .flag("-Wno-sign-compare")
                 .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
                 .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
