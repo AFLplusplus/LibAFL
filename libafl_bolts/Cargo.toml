@@ -27,6 +27,7 @@ all-features = true
 
 [features]
 default = [
+  "rand_trait",
   "std",
   "derive",
   "llmp_compression",
@@ -60,7 +61,7 @@ alloc = ["serde/alloc", "hashbrown", "postcard", "erased-serde/alloc", "ahash"]
 ## Provide the `#[derive(SerdeAny)]` macro.
 derive = ["libafl_derive"]
 
-## If set, libafl_bolt's `rand` implementations will implement `rand::Rng`
+## If set, libafl_bolt's `rand` implementations
 rand_trait = ["rand_core"]
 
 ## Will build the `pyo3` bindings
