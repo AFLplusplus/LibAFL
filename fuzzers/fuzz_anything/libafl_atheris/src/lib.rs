@@ -28,7 +28,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{StdMutationalStage, TracingStage},
+    stages::{ShadowTracingStage, StdMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
