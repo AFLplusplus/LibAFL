@@ -9,6 +9,7 @@ fn main() {
 
     cc::Build::new()
         .define("_GNU_SOURCE", None)
+        .opt_level(3)
         .flag("-Werror")
         .flag("-fno-stack-protector")
         .flag("-ffunction-sections")
@@ -18,6 +19,7 @@ fn main() {
 
     cc::Build::new()
         .define("_GNU_SOURCE", None)
+        .opt_level(3)
         .flag("-Werror")
         .flag("-fno-stack-protector")
         .flag("-ffunction-sections")
@@ -27,6 +29,7 @@ fn main() {
 
     cc::Build::new()
         .define("_GNU_SOURCE", None)
+        .opt_level(3)
         .flag("-Werror")
         .flag("-fno-stack-protector")
         .flag("-ffunction-sections")
@@ -36,6 +39,7 @@ fn main() {
 
     cc::Build::new()
         .define("_GNU_SOURCE", None)
+        .opt_level(3)
         .flag("-Werror")
         .flag("-fno-stack-protector")
         .flag("-ffunction-sections")
