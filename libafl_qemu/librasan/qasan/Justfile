@@ -7,7 +7,7 @@ QASAN_SOURCE_DIR := source_directory()
 [unix]
 compile_qasan:
 	#!/bin/sh
-	source {{ DOTENV }}
+	. {{ DOTENV }}
 	cargo \
 		+nightly \
 		build \
@@ -19,7 +19,7 @@ compile_qasan:
 [unix]
 fix_qasan:
 	#!/bin/sh
-	source {{ DOTENV }}
+	. {{ DOTENV }}
 	cargo \
 		+nightly \
 		fix \
@@ -33,7 +33,7 @@ fix_qasan:
 [unix]
 rel_qasan: compile_qasan build_dummy
 	#!/bin/sh
-	source {{ DOTENV }}
+	. {{ DOTENV }}
 	${CROSS_CC} \
 		${LIBRASAN_CFLAGS} \
 		-r \
@@ -66,7 +66,7 @@ rel_qasan: compile_qasan build_dummy
 [unix]
 rename_qasan: rel_qasan
 	#!/bin/sh
-	source {{ DOTENV }}
+	. {{ DOTENV }}
 	${CROSS_OBJCOPY} \
 		--redefine-syms={{ GASAN_SOURCE_DIR }}/rename_real.syms \
 		--redefine-syms={{ GASAN_SOURCE_DIR }}/rename_patch.syms \
@@ -76,7 +76,7 @@ rename_qasan: rel_qasan
 [unix]
 link_qasan: rename_qasan
 	#!/bin/sh
-	source {{ DOTENV }}
+	. {{ DOTENV }}
 	${CROSS_CC} \
 		-shared \
 		-nodefaultlibs \
@@ -113,7 +113,7 @@ link_qasan: rename_qasan
 [unix]
 strip_qasan: link_qasan
 	#!/bin/sh
-	source {{ DOTENV }}
+	. {{ DOTENV }}
 	${CROSS_STRIP} \
 		--strip-unneeded \
 		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so \

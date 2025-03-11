@@ -6,7 +6,7 @@ DUMMY_SOURCE_DIR := source_directory()
 [unix]
 compile_dummy:
   #!/bin/sh
-  source {{ DOTENV }}
+  . {{ DOTENV }}
   cargo \
     +nightly \
     build \
@@ -18,7 +18,7 @@ compile_dummy:
 [unix]
 fix_dummy:
   #!/bin/sh
-  source {{ DOTENV }}
+  . {{ DOTENV }}
   cargo \
     +nightly \
     fix \
@@ -32,7 +32,7 @@ fix_dummy:
 [unix]
 link_dummy: compile_dummy
   #!/bin/sh
-  source {{ DOTENV }}
+  . {{ DOTENV }}
   ${CROSS_CC} \
     ${LIBRASAN_CFLAGS} \
     -shared \
@@ -52,7 +52,7 @@ link_dummy: compile_dummy
 [unix]
 strip_dummy: link_dummy
 	#!/bin/sh
-	source {{ DOTENV }}
+	. {{ DOTENV }}
 	${CROSS_STRIP} \
 		--strip-unneeded \
 		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libdummy_libc.so \

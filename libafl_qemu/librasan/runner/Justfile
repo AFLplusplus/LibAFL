@@ -4,7 +4,7 @@ import "../fuzzer_name.just"
 [unix]
 compile_runner:
   #!/bin/sh
-  source {{ DOTENV }}
+  . {{ DOTENV }}
   cargo \
     +nightly \
     build \
@@ -17,7 +17,7 @@ compile_runner:
 [unix]
 fix_runner:
   #!/bin/sh
-  source {{ DOTENV }}
+  . {{ DOTENV }}
   cargo \
     +nightly \
     fix \
