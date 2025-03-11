@@ -27,7 +27,6 @@ all-features = true
 
 [features]
 default = [
-  "rand_trait",
   "std",
   "derive",
   "llmp_compression",
