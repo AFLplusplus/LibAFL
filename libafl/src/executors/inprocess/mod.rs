@@ -15,7 +15,7 @@ use core::{
 use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
-    Error,
+    Error, HasMetadata,
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
     executors::{
@@ -345,6 +345,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
 
     if is_solution {
         let mut new_testcase = Testcase::from(input.clone());
+        new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
 
         if let Ok(mut tc) = state.current_testcase_mut() {
