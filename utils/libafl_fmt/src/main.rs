@@ -96,12 +96,38 @@ fn is_workspace_toml(path: &Path) -> bool {
     false
 }
 
+fn is_binary_crate(crate_path: &Path) -> Result<bool, io::Error> {
+    if !crate_path.is_dir() {
+        return Err(io::Error::new(
+            ErrorKind::NotADirectory,
+            "Should be a directory.",
+        ));
+    }
+
+    let main_path = crate_path.to_path_buf().join("src/main.rs");
+
+    Ok(main_path.is_file())
+}
+
 async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) -> io::Result<()> {
     // Make sure we parse the correct file
     assert_eq!(
         cargo_file_path.file_name().unwrap().to_str().unwrap(),
         "Cargo.toml"
     );
+
+    let mut cargo_file_dir = cargo_file_path.clone();
+    cargo_file_dir.pop();
+
+    if !is_binary_crate(cargo_file_dir.as_path())? {
+        if verbose {
+            println!(
+                "[*] \tSkipping Lockfile for {}...",
+                cargo_file_path.as_path().display()
+            );
+        }
+        return Ok(());
+    }
 
     let mut fmt_command = Command::new("cargo");
 
@@ -126,7 +152,8 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
         return Err(io::Error::new(
             ErrorKind::Other,
             format!(
-                "Cargo generate-lockfile failed. Run cargo fmt for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}"),
+                "Cargo generate-lockfile failed. Run cargo fmt for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}"
+            ),
         ));
     }
 
