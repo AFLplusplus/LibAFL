@@ -94,6 +94,7 @@ pub trait ExecutionProcessor<EM, I, OT, S> {
         manager: &mut EM,
         input: &I,
         exec_res: &ExecuteInputResult,
+        exit_kind: &ExitKind,
         observers: &OT,
     ) -> Result<Option<CorpusId>, Error>;
 
@@ -409,6 +410,7 @@ where
         manager: &mut EM,
         input: &I,
         exec_res: &ExecuteInputResult,
+        exit_kind: &ExitKind,
         observers: &OT,
     ) -> Result<Option<CorpusId>, Error> {
         let corpus = if exec_res.is_corpus() {
@@ -429,6 +431,7 @@ where
         if exec_res.is_solution() {
             // The input is a solution, add it to the respective corpus
             let mut testcase = Testcase::from(input.clone());
+            testcase.add_metadata(*exit_kind);
             testcase.set_parent_id_optional(*state.corpus().current());
             if let Ok(mut tc) = state.current_testcase_mut() {
                 tc.found_objective();
@@ -519,7 +522,8 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         let exec_res = self.check_results(state, manager, input, observers, exit_kind)?;
-        let corpus_id = self.process_execution(state, manager, input, &exec_res, observers)?;
+        let corpus_id =
+            self.process_execution(state, manager, input, &exec_res, exit_kind, observers)?;
         if send_events {
             self.serialize_and_dispatch(state, manager, input, &exec_res, observers, exit_kind)?;
         }
