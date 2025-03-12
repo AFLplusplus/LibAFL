@@ -28,6 +28,8 @@
 //! name = "SymRuntime"
 //! ```
 
+#![allow(clippy::std_instead_of_core)]
+
 pub mod filter;
 pub mod tracing;
 

@@ -14,7 +14,7 @@ use clap::{Arg, ArgAction, Command};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -28,7 +28,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{StdMutationalStage, TracingStage},
+    stages::{ShadowTracingStage, StdMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
@@ -216,14 +216,9 @@ pub extern "C" fn LLVMFuzzerRunDriver(
             ExitKind::Ok
         };
 
+        let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
         // Setup a tracing stage in which we log comparisons
-        let tracing = TracingStage::new(InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?);
+        let tracing = ShadowTracingStage::new();
 
         // Setup a randomic Input2State stage
         let i2s =

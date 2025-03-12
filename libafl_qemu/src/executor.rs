@@ -12,7 +12,7 @@ use std::{ptr, str};
 #[cfg(feature = "usermode")]
 use libafl::state::HasCorpus;
 use libafl::{
-    Error, ExecutionProcessor, HasScheduler,
+    Error, ExecutionProcessor,
     events::{EventFirer, EventRestarter},
     executors::{
         Executor, ExitKind, HasObservers,
@@ -249,7 +249,7 @@ where
         ED: EmulatorDriver<C, CM, ET, I, S, SM>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF> + HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
+        Z: HasObjective<Objective = OF> + ExecutionProcessor<EM, I, OT, S>,
     {
         let mut inner = StatefulInProcessExecutor::with_timeout(
             harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,

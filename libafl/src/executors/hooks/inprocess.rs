@@ -202,7 +202,7 @@ impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
         // Imagine there are two executors, you have to set the correct crash handlers for each of the executor.
         unsafe {
             let data = &raw mut GLOBAL_STATE;
-            assert!((*data).crash_handler == null());
+            assert!((*data).crash_handler.is_null());
             // usually timeout handler and crash handler is set together
             // so no check for timeout handler is null or not
             (*data).crash_handler = self.crash_handler;

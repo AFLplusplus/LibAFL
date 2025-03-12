@@ -21,7 +21,7 @@ run: build harness
       --profile {{ PROFILE }} \
       ./{{ FUZZER_NAME }} \
       -- \
-      --libafl-in ./corpus \
+      --libafl-in ../../inprocess/libfuzzer_libpng/corpus \
       --libafl-out ./out \
       ./{{ FUZZER_NAME }}
 

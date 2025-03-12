@@ -990,7 +990,7 @@ impl SimpleStdoutLogger {
 #[must_use]
 /// Return thread ID without using TLS
 pub fn get_thread_id() -> u64 {
-    use std::arch::asm;
+    use core::arch::asm;
     #[cfg(target_arch = "x86_64")]
     unsafe {
         let teb: *const u8;
@@ -1031,7 +1031,7 @@ pub fn get_thread_id() -> u64 {
 #[cfg(feature = "std")]
 #[cfg(target_os = "windows")]
 mod windows_logging {
-    use std::ptr;
+    use core::ptr;
 
     use once_cell::sync::OnceCell;
     use winapi::um::{
@@ -1291,7 +1291,7 @@ struct TEB {
 #[inline(always)]
 #[cfg(target_os = "windows")]
 fn nt_current_teb() -> *mut TEB {
-    use std::arch::asm;
+    use core::arch::asm;
     let teb: *mut TEB;
     unsafe {
         asm!("mov {}, gs:0x30", out(reg) teb);

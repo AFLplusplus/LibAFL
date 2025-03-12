@@ -18,19 +18,19 @@ use libafl_bolts::{
     shmem::{ShMem, ShMemProvider},
     staterestore::StateRestorer,
 };
+#[cfg(feature = "std")]
 use serde::Serialize;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 
-use super::{AwaitRestartSafe, ProgressReporter, RecordSerializationTime, std_on_restart};
+use super::{AwaitRestartSafe, ProgressReporter, std_on_restart};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     Error, HasMetadata,
     events::{
-        BrokerEventResult, CanSerializeObserver, Event, EventFirer, EventManagerId, EventReceiver,
-        EventRestarter, HasEventManagerId, SendExiting, std_maybe_report_progress,
-        std_report_progress,
+        BrokerEventResult, Event, EventFirer, EventManagerId, EventReceiver, EventRestarter,
+        HasEventManagerId, SendExiting, std_maybe_report_progress, std_report_progress,
     },
     monitors::{Monitor, stats::ClientStatsManager},
     state::{
@@ -72,8 +72,6 @@ where
             .finish_non_exhaustive()
     }
 }
-
-impl<I, MT, S> RecordSerializationTime for SimpleEventManager<I, MT, S> {}
 
 impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S>
 where
@@ -140,15 +138,6 @@ where
     }
     fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
         Ok(())
-    }
-}
-
-impl<I, MT, OT, S> CanSerializeObserver<OT> for SimpleEventManager<I, MT, S>
-where
-    OT: Serialize,
-{
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 
@@ -296,12 +285,6 @@ pub struct SimpleRestartingEventManager<I, MT, S, SHM, SP> {
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SHM, SP> RecordSerializationTime
-    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
-{
-}
-
-#[cfg(feature = "std")]
 impl<I, MT, S, SHM, SP> EventFirer<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
@@ -336,17 +319,6 @@ where
             self.inner.client_stats_manager.start_time(),
             self.inner.client_stats_manager.client_stats(),
         ))
-    }
-}
-
-#[cfg(feature = "std")]
-impl<I, MT, OT, S, SHM, SP> CanSerializeObserver<OT>
-    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
-where
-    OT: Serialize,
-{
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 

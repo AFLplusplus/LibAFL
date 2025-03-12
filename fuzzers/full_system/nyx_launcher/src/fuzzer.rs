@@ -115,7 +115,6 @@ impl Fuzzer {
                         shmem_provider.clone(),
                         broker_port,
                         EventConfig::AlwaysUnique,
-                        None,
                         Some(StateRestorer::new(
                             shmem_provider.new_shmem(0x1000).unwrap(),
                         )),

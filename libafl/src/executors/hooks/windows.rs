@@ -473,7 +473,7 @@ pub mod windows_exception_handler {
                             .unwrap();
                         writer.flush().unwrap();
                     }
-                    log::error!("{}", std::str::from_utf8(&bsod).unwrap());
+                    log::error!("{}", core::str::from_utf8(&bsod).unwrap());
                 }
             } else {
                 // This is not worth saving

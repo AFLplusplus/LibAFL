@@ -31,6 +31,10 @@ harness: libpng
 
 [unix]
 run: harness build
+    #!/bin/bash
+
+    source {{ DOTENV }}
+    CUSTOM_QASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so \
     {{ FUZZER }} \
         --input ./corpus \
         --output {{ TARGET_DIR }}/output/ \
@@ -56,7 +60,12 @@ test_inner: harness build
 
     # complie again with simple mgr
     cargo build --profile={{PROFILE}} --features="simplemgr,{{ARCH}}" --target-dir={{ TARGET_DIR }} || exit 1
-    ./tests/qasan/test.sh || exit 1
+
+    export CUSTOM_QASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so
+    ./tests/qasan/qasan_test.sh || exit 1
+
+    export CUSTOM_GASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libgasan.so
+    ./tests/qasan/gasan_test.sh || exit 1
 
 [unix]
 test:
@@ -72,6 +81,10 @@ single: harness build
         {{ HARNESS }}
 
 asan: harness build
+    #!/bin/bash
+
+    source {{ DOTENV }}
+    CUSTOM_QASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so \
     {{ FUZZER }} \
         --input ./corpus \
         --output {{ TARGET_DIR }}/output/ \
@@ -82,6 +95,10 @@ asan: harness build
         {{ HARNESS }}
 
 asan_guest: harness build
+    #!/bin/bash
+
+    source {{ DOTENV }}
+    CUSTOM_GASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libgasan.so \
     {{ FUZZER }} \
         --input ./corpus \
         --output {{ TARGET_DIR }}/output/ \
