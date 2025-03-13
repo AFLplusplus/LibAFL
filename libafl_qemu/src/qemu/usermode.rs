@@ -5,16 +5,16 @@ use std::{
 
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{
-    GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
     libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run,
-    libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps,
+    libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps, GuestAddr, GuestUsize,
+    IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
 };
 use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
-use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
+use pyo3::{pyclass, pymethods, IntoPyObject, Py, PyRef, PyRefMut, Python};
 
-use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
+use crate::{qemu::QEMU_IS_RUNNING, Qemu, CPU};
 
 /// Choose how QEMU target signals should be handled.
 /// It's main use is to describe how crashes and timeouts should be treated.
@@ -23,6 +23,10 @@ pub enum TargetSignalHandling {
     /// The snapshot mechanism should make sure to recover correctly from the crash.
     /// For instance, snapshots do not take into account side effects related to file descriptors.
     /// If it could have an impact in case of a crash, prefer the other policy.
+    ///
+    /// *Warning*: this policy should be used with [`SnapshotModule`]. It can be used without
+    /// snapshotting, but it is up to the user to make sure the recovery is possible without
+    /// corrupting the target.
     ReturnToHarness,
     /// Propagate target signal to host (following QEMU target to host signal translation) by
     /// raising the proper signal.
@@ -145,7 +149,11 @@ impl Iterator for GuestMaps {
 
             let ret = ret.assume_init();
 
-            if ret.is_valid { Some(ret.into()) } else { None }
+            if ret.is_valid {
+                Some(ret.into())
+            } else {
+                None
+            }
         }
     }
 }
@@ -458,11 +466,11 @@ impl Qemu {
 pub mod pybind {
     use libafl_qemu_sys::{GuestAddr, MmapPerms};
     use pyo3::{
-        Bound, PyObject, PyResult, Python,
         conversion::FromPyObject,
         exceptions::PyValueError,
         pymethods,
         types::{PyAnyMethods, PyInt},
+        Bound, PyObject, PyResult, Python,
     };
 
     use crate::{pybind::Qemu, qemu::hooks::SyscallHookResult};
