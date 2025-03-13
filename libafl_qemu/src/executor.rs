@@ -64,7 +64,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
     signal: Signal,
     info: &mut siginfo_t,
     mut context: Option<&mut ucontext_t>,
-    data: &mut InProcessExecutorHandlerData,
+    _data: &mut InProcessExecutorHandlerData,
 ) where
     ET: EmulatorModuleTuple<I, S>,
     E: Executor<EM, I, S, Z> + HasObservers,
@@ -126,11 +126,17 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
                     log::debug!("Running crash hooks.");
                     run_target_crash_hooks::<ET, I, S>(signal.into());
 
-                    assert!(unsafe { data.maybe_report_crash::<E, EM, I, OF, S, Z>(None) });
+                    // assert!(unsafe { data.maybe_report_crash::<E, EM, F, I, OF, S, Z>(None) });
 
                     if let Some(cpu) = qemu.current_cpu() {
                         eprint!("QEMU Context:\n{}", cpu.display_context());
                     }
+
+                    unsafe {
+                        libafl_qemu_sys::libafl_exit_request_crash();
+                    }
+
+                    return;
                 }
             }
         } else {

@@ -359,13 +359,15 @@ fn fuzz(
                 qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
                 qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
-                match qemu.run() {
+                let qemu_ret = qemu.run();
+
+                match qemu_ret {
                     Ok(QemuExitReason::Breakpoint(_)) => {}
-                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(signal))) => {
-                        signal.handle();
-                    }
+                    Ok(QemuExitReason::Crash) => return ExitKind::Crash,
+                    Ok(QemuExitReason::Timeout) => return ExitKind::Timeout,
+
                     Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                    _ => panic!("Unexpected QEMU exit."),
+                    _ => panic!("Unexpected QEMU exit: {qemu_ret:?}"),
                 }
             }
 
