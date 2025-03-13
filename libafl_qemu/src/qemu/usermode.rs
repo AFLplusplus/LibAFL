@@ -17,11 +17,12 @@ use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
 
 /// Choose how QEMU target signals should be handled.
-/// Most useful to configure how crashes and timeouts should be treated.
+/// It's main use is to configure how crashes and timeouts should be treated.
 pub enum TargetSignalHandling {
-    /// Return to harness with the associated exit request on target signal.
+    /// Return to harness with the associated exit request on target crashing or timeout signal.
     ReturnToHarness,
-    /// Propagate target signal to host (following QEMU target to host signal translation).
+    /// Propagate target signal to host (following QEMU target to host signal translation) by
+    /// raising the proper signal.
     RaiseSignal,
 }
 

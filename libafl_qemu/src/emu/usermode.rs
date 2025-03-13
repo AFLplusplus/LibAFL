@@ -89,6 +89,8 @@ impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
         self.qemu.unmap(addr, size)
     }
 
+    /// Set how QEMU should handle crashing signals:
+    /// Check [`TargetSignalHandling`] documentation for more details.
     pub fn set_target_crash_handling(&self, handling: &TargetSignalHandling) {
         unsafe {
             self.qemu.set_target_crash_handling(handling);
