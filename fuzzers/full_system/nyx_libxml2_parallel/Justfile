@@ -1,0 +1,32 @@
+import "../../../just/libafl.just"
+FUZZER_NAME := "nyx_libxml2_parallel"
+
+[unix]
+libxml2:
+    ./setup_libxml2.sh
+
+[unix]
+enable_kvm_vmware_hypercall:
+    #!/bin/bash
+    if [ ! -e /sys/module/kvm/parameters/enable_vmware_backdoor ] ||
+      ! grep -qF Y /sys/module/kvm/parameters/enable_vmware_backdoor; then
+        sudo modprobe -r kvm-intel # or kvm-amd for AMD
+        sudo modprobe -r kvm
+        sudo modprobe kvm enable_vmware_backdoor=y
+        sudo modprobe kvm-intel
+    fi;
+
+[unix]
+build: libxml2
+
+[unix]
+run: libxml2 enable_kvm_vmware_hypercall
+    cargo run
+
+[unix]
+test: build
+
+[unix]
+clean:
+    make -C libxml2 clean
+    cargo clean

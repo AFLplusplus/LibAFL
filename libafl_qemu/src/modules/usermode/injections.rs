@@ -21,14 +21,14 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::SYS_execve;
 use crate::{
+    CallingConvention, Qemu,
     elf::EasyElf,
     emu::EmulatorModules,
     modules::{
-        utils::filters::{HasAddressFilter, NopAddressFilter, NOP_ADDRESS_FILTER},
         EmulatorModule, EmulatorModuleTuple,
+        utils::filters::{HasAddressFilter, NOP_ADDRESS_FILTER, NopAddressFilter},
     },
     qemu::{ArchExtras, Hook, SyscallHookResult},
-    CallingConvention, Qemu,
 };
 
 #[cfg(cpu_target = "hexagon")]
@@ -228,7 +228,7 @@ impl InjectionModule {
         let reg: GuestAddr = qemu
             .current_cpu()
             .unwrap()
-            .read_function_argument(CallingConvention::Cdecl, parameter)
+            .read_function_argument_with_cc(parameter, CallingConvention::Default)
             .unwrap_or_default();
 
         let module = emulator_modules.get_mut::<Self>().unwrap();
@@ -346,13 +346,13 @@ where
 }
 
 impl HasAddressFilter for InjectionModule {
-    type ModuleAddressFilter = NopAddressFilter;
+    type AddressFilter = NopAddressFilter;
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &NopAddressFilter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         unsafe { (&raw mut NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }
@@ -451,7 +451,7 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 mod tests {
     use hashbrown::HashMap;
 
-    use super::{yaml_entries_to_definition, InjectionDefinition, YamlInjectionEntry};
+    use super::{InjectionDefinition, YamlInjectionEntry, yaml_entries_to_definition};
 
     #[test]
     fn test_yaml_parsing() {

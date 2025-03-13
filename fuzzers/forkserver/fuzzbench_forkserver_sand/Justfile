@@ -1,0 +1,73 @@
+FUZZER_NAME := 'fuzzbench_forkserver_sand'
+FORKSERVER_NAME := 'fuzzbench_forkserver_sand'
+CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
+PROFILE := env("PROFILE", "release")
+PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
+LIBAFL_CC := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "sand_cc"
+LIBAFL_CXX := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "sand_cxx"
+FUZZER := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
+FORKSERVER := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / FORKSERVER_NAME
+PROJECT_DIR := absolute_path(".")
+
+
+alias cc := cxx
+
+[linux]
+[macos]
+cxx:
+    cargo build --profile {{PROFILE}}
+
+[windows]
+cxx:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+fuzzer: cxx
+    {{LIBAFL_CC}} {{PROJECT_DIR}}/src/vuln.c -o vuln_native -lm -lz
+
+[windows]
+fuzzer:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+fuzzer_asan: cxx
+    AFL_SAN_NO_INST=1 {{LIBAFL_CC}} {{PROJECT_DIR}}/src/vuln.c -fsanitize=address -o vuln_asan -lm -lz
+
+[windows]
+fuzzer_asan:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+run: fuzzer fuzzer_asan
+    #!/bin/bash
+    mkdir -p input && echo "a" >> input/a
+    taskset -c 1 {{FUZZER}} -i input -o /tmp/out -a ./vuln_asan -t 1000 ./vuln_native
+
+[windows]
+run: fuzzer fuzzer_asan
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+test: fuzzer fuzzer_asan
+    #!/bin/bash
+    mkdir -p input && echo "a" >> input/a
+    timeout 10s {{FUZZER}} -i input -o /tmp/out -a ./vuln_asan -t 1000 ./vuln_native | tee fuzz_stdout.log || true
+    if grep -qa "objectives: 1" fuzz_stdout.log; then
+        echo "Fuzzer is working"
+    else
+        echo "Fuzzer does not generate any testcases or any crashes"
+        exit 1
+    fi
+
+[windows]
+test: fuzzer fuzzer_asan
+    echo "Unsupported on this platform"
+
+clean:
+    rm -rf {{FUZZER}}
+    rm -rf vuln_native vuln_asan
+    cargo clean

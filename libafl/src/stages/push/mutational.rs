@@ -12,8 +12,9 @@ use serde::Serialize;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, ExecutionProcessor, HasMetadata, HasScheduler,
     corpus::{Corpus, CorpusId},
     events::{EventFirer, ProgressReporter},
     executors::ExitKind,
@@ -26,7 +27,6 @@ use crate::{
     schedulers::Scheduler,
     start_timer,
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, MaybeHasClientPerfMonitor},
-    Error, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 
 /// The default maximum number of mutations to perform per input.

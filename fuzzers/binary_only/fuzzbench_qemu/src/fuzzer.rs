@@ -48,18 +48,11 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
-    // asan::{init_with_asan, QemuAsanHelper},
-    modules::cmplog::{CmpLogModule, CmpLogObserver},
-    modules::edges::StdEdgeCoverageModule,
-    modules::AsanModule,
-    Emulator,
-    GuestReg,
-    //snapshot::QemuSnapshotHelper,
-    MmapPerms,
-    QemuExecutor,
-    QemuExitError,
-    QemuExitReason,
-    QemuShutdownCause,
+    modules::{
+        cmplog::{CmpLogModule, CmpLogObserver},
+        edges::StdEdgeCoverageModule,
+    },
+    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
     Regs,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
@@ -410,7 +403,7 @@ fn fuzz(
         println!("We imported {} input(s) from disk.", state.corpus().count());
     }
 
-    let tracing = ShadowTracingStage::new(&mut executor);
+    let tracing = ShadowTracingStage::new();
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);

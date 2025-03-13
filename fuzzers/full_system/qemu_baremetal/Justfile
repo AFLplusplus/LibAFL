@@ -1,0 +1,69 @@
+import "../../../just/libafl-qemu.just"
+FUZZER_NAME := "qemu_baremetal"
+
+KERNEL := TARGET_DIR / "example.elf"
+DUMMY_IMG := TARGET_DIR / "dummy.qcow2"
+
+target_dir:
+    mkdir -p "{{TARGET_DIR}}"
+
+image: target_dir
+    qemu-img create -f qcow2 {{DUMMY_IMG}} 32M
+
+target flavor: image target_dir
+    arm-none-eabi-gcc -ggdb -ffreestanding -nostartfiles -lgcc \
+        -T example/mps2_m3.ld \
+        -mcpu=cortex-m3 \
+        -D "TARGET_{{ uppercase(flavor) }}" \
+        -I {{BUILD_DIR / "include"}} \
+        example/main.c \
+        example/startup.c \
+        -o {{TARGET_DIR}}/example.elf
+
+build flavor="breakpoint": target_dir
+    cargo build \
+        --profile {{PROFILE}} \
+        --no-default-features \
+        --features std,{{flavor}} \
+        --target-dir {{TARGET_DIR}}
+
+run flavor="breakpoint": (target flavor) (build flavor)
+    {{BUILD_DIR / "qemu_baremetal"}} \
+        -icount shift=auto,align=off,sleep=off \
+        -machine mps2-an385 \
+        -monitor null \
+        -kernel {{KERNEL}} \
+        -drive if=none,format=qcow2,file={{DUMMY_IMG}} \
+        -serial null \
+        -nographic \
+        -snapshot \
+        -S
+
+test_flavor flavor: (target flavor) (build flavor)
+    #!/bin/bash
+    export KERNEL={{ KERNEL }}
+    export TARGET_DIR={{ TARGET_DIR }}
+
+    TMP_DIR=$(mktemp -d)
+
+    timeout 20s {{ FUZZER }} \
+        -icount shift=auto,align=off,sleep=off \
+        -machine mps2-an385 \
+        -monitor null \
+        -kernel {{ KERNEL }} -serial null \
+        -drive if=none,format=qcow2,file={{ DUMMY_IMG }} \
+        -nographic \
+        -snapshot \
+        -S | tee "$TMP_DIR/fuzz.log" 2>&1 || true
+
+    if [ -z "$(grep 'Objective' $TMP_DIR/fuzz.log)" ]; then
+        echo "qemu_baremetal ${FEATURE}: Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
+        exit 1
+    else
+        echo "qemu_baremetal ${FEATURE}: Objective found."
+    fi
+
+test: (test_flavor "low_level") (test_flavor "breakpoint") (test_flavor "sync_exit")
+
+clean:
+    cargo clean

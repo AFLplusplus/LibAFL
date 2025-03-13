@@ -7,18 +7,17 @@ use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
-    mark_feature_time,
+    Error, Evaluator, HasMetadata, HasNamedMetadata, mark_feature_time,
     mutators::{MutationResult, Mutator},
     nonzero,
     stages::{
-        mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
-        ExecutionCountRestartHelper, MutationalStage, Stage,
+        ExecutionCountRestartHelper, MutationalStage, Restartable, Stage,
+        mutational::{DEFAULT_MUTATIONAL_MAX_ITERATIONS, MutatedTransform, MutatedTransformPost},
     },
     start_timer,
     state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
-    Error, Evaluator, HasMetadata, HasNamedMetadata,
 };
 
 #[cfg_attr(
@@ -210,14 +209,14 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let ret = self.perform_mutational(fuzzer, executor, state, manager);
-
-        #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
-
-        ret
+        self.perform_mutational(fuzzer, executor, state, manager)
     }
+}
 
+impl<E, EM, I, M, S, Z> Restartable<S> for TuneableMutationalStage<E, EM, I, M, S, Z>
+where
+    S: HasNamedMetadata + HasExecutions,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         self.restart_helper.should_restart(state, &self.name)
     }

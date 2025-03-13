@@ -2,55 +2,29 @@
 
 #[cfg(feature = "alloc")]
 use alloc::{borrow::Cow, vec::Vec};
+use core::{any::TypeId, mem::transmute};
 #[cfg(feature = "alloc")]
 use core::{
     any::type_name,
     fmt::{Debug, Formatter},
+    marker::PhantomData,
     ops::{Deref, DerefMut, Index, IndexMut},
 };
-use core::{any::TypeId, cell::Cell, marker::PhantomData, mem::transmute};
 
 #[cfg(feature = "alloc")]
 use serde::{Deserialize, Serialize};
-pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
+pub use tuple_list::{TupleList, tuple_list, tuple_list_type};
 
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
-use crate::hash_std;
 use crate::HasLen;
 #[cfg(feature = "alloc")]
 use crate::Named;
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+use crate::hash_std;
 
 /// Returns if the type `T` is equal to `U`, ignoring lifetimes.
-#[inline] // this entire call gets optimized away :)
 #[must_use]
 pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
-    // decider struct: hold a cell (which we will update if the types are unequal) and some
-    // phantom data using a function pointer to allow for Copy to be implemented
-    struct W<'a, T: ?Sized, U: ?Sized>(&'a Cell<bool>, PhantomData<fn() -> (&'a T, &'a U)>);
-
-    // default implementation: if the types are unequal, we will use the clone implementation
-    impl<T: ?Sized, U: ?Sized> Clone for W<'_, T, U> {
-        #[inline]
-        fn clone(&self) -> Self {
-            // indicate that the types are unequal
-            // unfortunately, use of interior mutability (Cell) makes this not const-compatible
-            // not really possible to get around at this time
-            self.0.set(false);
-            W(self.0, self.1)
-        }
-    }
-
-    // specialized implementation: Copy is only implemented if the types are the same
-    #[expect(clippy::mismatching_type_param_order)]
-    impl<T: ?Sized> Copy for W<'_, T, T> {}
-
-    let detected = Cell::new(true);
-    // [].clone() is *specialized* in core.
-    // Types which implement copy will have their copy implementations used, falling back to clone.
-    // If the types are the same, then our clone implementation (which sets our Cell to false)
-    // will never be called, meaning that our Cell's content remains true.
-    let res = [W::<T, U>(&detected, PhantomData)].clone();
-    res[0].0.get()
+    typeid::of::<T>() == typeid::of::<U>()
 }
 
 /// Borrow each member of the tuple
@@ -835,7 +809,7 @@ macro_rules! tuple_for_each_mut {
 /// ```rust
 /// use libafl_bolts::{
 ///     map_tuple_list_type,
-///     tuples::{MappingFunctor, Map, tuple_list, tuple_list_type}
+///     tuples::{Map, MappingFunctor, tuple_list, tuple_list_type},
 /// };
 ///
 /// struct Wrapper<T>(T);
@@ -868,7 +842,10 @@ macro_rules! map_tuple_list_type {
 /// Merges the types of two merged [`tuple_list!`]s
 ///
 /// ```rust
-/// use libafl_bolts::{merge_tuple_list_type, tuples::{Merge, tuple_list, tuple_list_type}};
+/// use libafl_bolts::{
+///     merge_tuple_list_type,
+///     tuples::{Merge, tuple_list, tuple_list_type},
+/// };
 ///
 /// struct A;
 /// struct B;
@@ -942,7 +919,7 @@ mod test {
 
     #[cfg(feature = "alloc")]
     use crate::ownedref::OwnedMutSlice;
-    use crate::tuples::{type_eq, Map, MappingFunctor, Merge};
+    use crate::tuples::{Map, MappingFunctor, Merge, type_eq};
 
     #[test]
     // for type name tests
@@ -955,8 +932,6 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "alloc")]
-    #[expect(unused_qualifications)] // for type name tests
     fn test_type_eq() {
         // An alias for equality testing
         type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
@@ -976,15 +951,6 @@ mod test {
         // test weirder lifetime things
         assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSlice<u8>>());
         assert!(!type_eq::<OwnedMutSlice<u8>, OwnedMutSlice<u32>>());
-
-        assert!(type_eq::<
-            OwnedMutSlice<u8>,
-            crate::ownedref::OwnedMutSlice<u8>,
-        >());
-        assert!(!type_eq::<
-            OwnedMutSlice<u8>,
-            crate::ownedref::OwnedMutSlice<u32>,
-        >());
     }
 
     #[test]
@@ -1048,11 +1014,11 @@ mod test {
     fn test_macros() {
         let mut t = tuple_list!(1, "a");
 
-        tuple_for_each!(f1, std::fmt::Display, t, |x| {
+        tuple_for_each!(f1, core::fmt::Display, t, |x| {
             log::info!("{x}");
         });
 
-        tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
+        tuple_for_each_mut!(f2, core::fmt::Display, t, |x| {
             log::info!("{x}");
         });
     }

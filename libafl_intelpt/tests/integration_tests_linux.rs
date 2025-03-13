@@ -2,16 +2,16 @@
 #![cfg(feature = "libipt")]
 #![cfg(target_os = "linux")]
 
-use std::{arch::asm, process};
+use core::arch::asm;
+use std::process;
 
-use libafl_intelpt::{availability, IntelPT};
-use libipt::Image;
+use libafl_intelpt::{Image, IntelPT, availability};
 use nix::{
     sys::{
-        signal::{kill, raise, Signal},
-        wait::{waitpid, WaitPidFlag},
+        signal::{Signal, kill, raise},
+        wait::{WaitPidFlag, waitpid},
     },
-    unistd::{fork, ForkResult},
+    unistd::{ForkResult, fork},
 };
 use proc_maps::get_process_maps;
 
@@ -69,11 +69,7 @@ fn intel_pt_trace_fork() {
                 None,
                 map.start() as u64,
             ) {
-                Err(e) => println!(
-                    "Error adding mapping for {:?}: {:?}, skipping",
-                    map.filename().unwrap(),
-                    e
-                ),
+                Err(e) => println!("skipping mapping of {:?}: {:?}", map.filename().unwrap(), e),
                 Ok(()) => println!(
                     "mapping for {:?} added successfully {:#x} - {:#x}",
                     map.filename().unwrap(),
@@ -85,7 +81,8 @@ fn intel_pt_trace_fork() {
     }
 
     let mut map = vec![0u16; 0x10_00];
-    pt.decode_traces_into_map(&mut image, &mut map).unwrap();
+    pt.decode_traces_into_map(&mut image, map.as_mut_ptr(), map.len())
+        .unwrap();
 
     let assembly_jump_id = map.iter().position(|count| *count >= 254);
     assert!(

@@ -1,9 +1,10 @@
 //! Libtool Wrapper from `LibAFL`
 // call make passing LIBTOOL=/path/to/target/release/libafl_libtool
 
-use std::{env, path::PathBuf, str::FromStr};
+use core::str::FromStr;
+use std::{env, path::PathBuf};
 
-use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
+use crate::{Error, LIB_EXT, LIB_PREFIX, ToolWrapper};
 
 /// Wrap Clang
 #[expect(clippy::struct_excessive_bools)]
@@ -251,7 +252,6 @@ impl ToolWrapper for LibtoolWrapper {
 
 impl Default for LibtoolWrapper {
     /// Create a new Clang Wrapper
-    #[must_use]
     fn default() -> Self {
         Self::new()
     }

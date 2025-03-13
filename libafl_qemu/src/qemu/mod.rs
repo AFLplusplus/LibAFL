@@ -9,15 +9,17 @@ use core::{
 };
 use std::{
     ffi::{c_void, CString},
-    fmt::{Display, Formatter},
+    fmt::{Display, Formatter, Write},
     mem::{transmute, MaybeUninit},
-    ops::Range,
+    ops::{Deref, Range},
     pin::Pin,
     ptr::copy_nonoverlapping,
     sync::OnceLock,
 };
 
 use libafl_bolts::os::unix_signals::Signal;
+#[cfg(feature = "systemmode")]
+use libafl_bolts::Error;
 use libafl_qemu_sys::{
     libafl_flush_jit, libafl_get_exit_reason, libafl_page_from_addr, libafl_qemu_add_gdb_cmd,
     libafl_qemu_cpu_index, libafl_qemu_current_cpu, libafl_qemu_gdb_reply, libafl_qemu_get_cpu,
@@ -26,6 +28,8 @@ use libafl_qemu_sys::{
     libafl_qemu_write_reg, CPUArchState, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestUsize,
     GuestVirtAddr,
 };
+#[cfg(feature = "systemmode")]
+use libafl_qemu_sys::{libafl_qemu_remove_hw_breakpoint, libafl_qemu_set_hw_breakpoint};
 use num_traits::Num;
 use strum::IntoEnumIterator;
 
@@ -70,16 +74,17 @@ pub trait ArchExtras {
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>;
-    fn read_function_argument(
+    fn read_function_argument_with_cc(
         &self,
-        conv: CallingConvention,
         idx: u8,
-    ) -> Result<GuestReg, QemuRWError>;
-    fn write_function_argument<T>(
-        &self,
         conv: CallingConvention,
-        idx: i32,
+    ) -> Result<GuestReg, QemuRWError>;
+
+    fn write_function_argument_with_cc<T>(
+        &self,
+        idx: u8,
         val: T,
+        conv: CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>;
@@ -110,7 +115,8 @@ pub struct Qemu {
 
 #[derive(Clone, Debug)]
 pub enum QemuParams {
-    Config(QemuConfig),
+    // QemuConfig is quite big, at least 240 bytes so we use a Box
+    Config(Box<QemuConfig>),
     Cli(Vec<String>),
 }
 
@@ -150,7 +156,14 @@ pub struct CPU {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CallingConvention {
+    SystemV,
     Cdecl,
+    Aapcs64,
+    Aapcs,
+    Hexagon,
+    MipsO32,
+    Ppc32,
+    RiscVilp32,
 }
 
 #[derive(Debug)]
@@ -159,7 +172,7 @@ pub struct HookData(u64);
 unsafe extern "C" fn gdb_cmd(data: *mut c_void, buf: *mut u8, len: usize) -> bool {
     unsafe {
         let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(Qemu, &'r str) -> bool>);
-        let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
+        let cmd = core::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
         let qemu = Qemu::get_unchecked();
         closure(qemu, cmd)
     }
@@ -178,7 +191,7 @@ impl Display for QemuExitReason {
 
 impl From<QemuConfig> for QemuParams {
     fn from(config: QemuConfig) -> Self {
-        QemuParams::Config(config)
+        QemuParams::Config(Box::new(config))
     }
 }
 
@@ -457,7 +470,7 @@ impl CPU {
         for (i, r) in Regs::iter().enumerate() {
             let v: GuestAddr = self.read_reg(r).unwrap();
             let sr = format!("{r:#?}");
-            display += &format!("{sr:>maxl$}: {v:#016x} ");
+            let _ = write!(&mut display, "{sr:>maxl$}: {v:#016x} ");
             if (i + 1) % 4 == 0 {
                 display += "\n";
             }
@@ -540,7 +553,7 @@ impl Qemu {
         match &params {
             QemuParams::Config(cfg) => {
                 QEMU_CONFIG
-                    .set(cfg.clone())
+                    .set(cfg.deref().clone())
                     .map_err(|_| unreachable!("QEMU_CONFIG was already set but Qemu was not init!"))
                     .expect("Could not set QEMU Config.");
             }
@@ -633,9 +646,11 @@ impl Qemu {
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run(&self) -> Result<QemuExitReason, QemuExitError> {
-        QEMU_IS_RUNNING = true;
-        self.run_inner();
-        QEMU_IS_RUNNING = false;
+        unsafe {
+            QEMU_IS_RUNNING = true;
+            self.run_inner();
+            QEMU_IS_RUNNING = false;
+        }
 
         let exit_reason = unsafe { libafl_get_exit_reason() };
         if exit_reason.is_null() {
@@ -782,11 +797,13 @@ impl Qemu {
     /// No checked is performed to check whether the returned object makes sense or not.
     // TODO: Use sized array when const generics are stabilized.
     pub unsafe fn read_mem_val<T>(&self, addr: GuestAddr) -> Result<T, QemuRWError> {
-        // let mut val_buf: [u8; size_of::<T>()] = [0; size_of::<T>()];
+        unsafe {
+            // let mut val_buf: [u8; size_of::<T>()] = [0; size_of::<T>()];
 
-        let val_buf: Vec<u8> = vec_init(size_of::<T>(), |buf| self.read_mem(addr, buf))?;
+            let val_buf: Vec<u8> = vec_init(size_of::<T>(), |buf| self.read_mem(addr, buf))?;
 
-        Ok(ptr::read(val_buf.as_ptr() as *const T))
+            Ok(ptr::read(val_buf.as_ptr() as *const T))
+        }
     }
 
     /// Write a value to memory at a guest addr, taking into account the potential indirections with the current CPU.
@@ -795,10 +812,13 @@ impl Qemu {
     ///
     /// val will be used as parameter of [`slice::from_raw_parts`], and thus must enforce the same requirements.
     pub unsafe fn write_mem_val<T>(&self, addr: GuestAddr, val: &T) -> Result<(), QemuRWError> {
-        let val_buf: &[u8] = slice::from_raw_parts(ptr::from_ref(val) as *const u8, size_of::<T>());
-        self.write_mem(addr, val_buf)?;
+        unsafe {
+            let val_buf: &[u8] =
+                slice::from_raw_parts(ptr::from_ref(val) as *const u8, size_of::<T>());
+            self.write_mem(addr, val_buf)?;
 
-        Ok(())
+            Ok(())
+        }
     }
 
     /// Read a value from a guest address.
@@ -811,9 +831,11 @@ impl Qemu {
     /// Also, the there must be a current CPU (or a CPU at index 0).
     /// Please refer to [`CPU::read_mem`] for more details.
     pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
-        self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index_unchecked(0))
-            .read_mem_unchecked(addr, buf);
+        unsafe {
+            self.current_cpu()
+                .unwrap_or_else(|| self.cpu_from_index_unchecked(0))
+                .read_mem_unchecked(addr, buf);
+        }
     }
 
     /// Write a value to a guest address.
@@ -827,9 +849,11 @@ impl Qemu {
     /// Also, the there must be a current CPU (or a CPU at index 0).
     /// Please refer to [`CPU::write_mem`] for more details.
     pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
-        self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index_unchecked(0))
-            .write_mem_unchecked(addr, buf);
+        unsafe {
+            self.current_cpu()
+                .unwrap_or_else(|| self.cpu_from_index_unchecked(0))
+                .write_mem_unchecked(addr, buf);
+        }
     }
 
     #[must_use]
@@ -882,6 +906,28 @@ impl Qemu {
         }
     }
 
+    #[cfg(feature = "systemmode")]
+    pub fn set_hw_breakpoint(&self, addr: GuestAddr) -> Result<(), Error> {
+        let ret = unsafe { libafl_qemu_set_hw_breakpoint(addr.into()) };
+        match ret {
+            0 => Ok(()),
+            errno => Err(Error::unsupported(format!(
+                "Failed to set hw breakpoint errno: {errno}"
+            ))),
+        }
+    }
+
+    #[cfg(feature = "systemmode")]
+    pub fn remove_hw_breakpoint(&self, addr: GuestAddr) -> Result<(), Error> {
+        let ret = unsafe { libafl_qemu_remove_hw_breakpoint(addr.into()) };
+        match ret {
+            0 => Ok(()),
+            errno => Err(Error::unsupported(format!(
+                "Failed to set hw breakpoint errno: {errno}"
+            ))),
+        }
+    }
+
     pub fn entry_break(&self, addr: GuestAddr) {
         self.set_breakpoint(addr);
         unsafe {
@@ -909,13 +955,15 @@ impl Qemu {
     /// Calling this multiple times concurrently will access static variables and is unsafe.
     #[expect(clippy::type_complexity)]
     pub unsafe fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
-        let fat: Box<FatPtr> = Box::new(transmute::<
-            Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
-            FatPtr,
-        >(callback));
-        libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
-        let commands_ptr = &raw mut GDB_COMMANDS;
-        (*commands_ptr).push(fat);
+        unsafe {
+            let fat: Box<FatPtr> = Box::new(transmute::<
+                Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
+                FatPtr,
+            >(callback));
+            libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
+            let commands_ptr = &raw mut GDB_COMMANDS;
+            (*commands_ptr).push(fat);
+        }
     }
 
     pub fn gdb_reply(&self, output: &str) {
@@ -930,6 +978,65 @@ impl Qemu {
     #[must_use]
     pub fn is_running(&self) -> bool {
         unsafe { QEMU_IS_RUNNING }
+    }
+
+    /// Write the function arguments by following default calling convention.
+    /// Assume that every arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    /// If you need to specify a calling convention, use [`Self::write_function_arguments_with_cc`].
+    pub fn write_function_arguments<T>(&mut self, val: &[T]) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg> + Copy,
+    {
+        self.write_function_arguments_with_cc(val, &CallingConvention::Default)
+    }
+
+    /// Write the function arguments by following calling convention `conv`.
+    /// Assume that every arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    pub fn write_function_arguments_with_cc<T>(
+        &mut self,
+        val: &[T],
+        conv: &CallingConvention,
+    ) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg> + Copy,
+    {
+        for (idx, elem) in val.iter().enumerate() {
+            self.write_function_argument_with_cc(idx as u8, elem.to_owned(), conv.clone())?;
+        }
+        Ok(())
+    }
+
+    /// Read the function `idx` argument by following default calling convention.
+    /// Assume that this argument and every prior arguments has integer/pointer type, otherwise
+    /// it may return a wrong value because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the value is in the stack.
+    /// Support downward-growing stack only.
+    /// If you need to specify a calling convention, use [`Self::read_function_argument_with_cc`].
+    pub fn read_function_argument(&self, idx: u8) -> Result<GuestReg, QemuRWError> {
+        self.read_function_argument_with_cc(idx, CallingConvention::Default)
+    }
+
+    /// Write the function `val` into `idx` argument by following default calling convention.
+    /// Assume that `val` and every prior arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    /// If you need to specify a calling convention, use [`Self::write_function_argument_with_cc`].
+    pub fn write_function_argument<T>(&self, idx: u8, val: T) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg>,
+    {
+        self.write_function_argument_with_cc(idx, val, CallingConvention::Default)
     }
 }
 
@@ -949,28 +1056,40 @@ impl ArchExtras for Qemu {
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument(
+    /// Read the function `idx` argument by following calling convention `conv`.
+    /// Assume that this argument and every prior arguments has integer/pointer type, otherwise
+    /// it may return a wrong value because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the value is in the stack.
+    /// Support downward-growing stack only.
+    fn read_function_argument_with_cc(
         &self,
-        conv: CallingConvention,
         idx: u8,
+        conv: CallingConvention,
     ) -> Result<GuestReg, QemuRWError> {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
-            .read_function_argument(conv, idx)
+            .read_function_argument_with_cc(idx, conv)
     }
 
-    fn write_function_argument<T>(
+    /// Write the function `val` into `idx` argument by following calling convention `conv`.
+    /// Assume that `val` and every prior arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    fn write_function_argument_with_cc<T>(
         &self,
-        conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         val: T,
+        conv: CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
-            .write_function_argument::<T>(conv, idx, val)
+            .write_function_argument_with_cc::<T>(idx, val, conv)
     }
 }
 

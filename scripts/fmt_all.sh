@@ -6,9 +6,14 @@ LIBAFL_DIR=$(realpath "$SCRIPT_DIR/..")
 cd "${LIBAFL_DIR}" || exit 1
 
 if [ "$1" = "check" ]; then
-  cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- -c --verbose || exit 1
+  cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_repo_tools/Cargo.toml" --release -- -c --verbose || exit 1
+elif [ -z "$1" ]; then
+  cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_repo_tools/Cargo.toml" --release -- --verbose || exit 1
 else
-  cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- --verbose || exit 1
+  >&2 echo "Error: invalid command."
+  >&2 echo "Usage:"
+  >&2 echo "    $0 [check]"
+  exit 1
 fi
 
 if python3 -m black --version > /dev/null; then

@@ -6,9 +6,9 @@
 //! related to the input.
 //! Read the [`RedQueen`](https://www.ndss-symposium.org/ndss-paper/redqueen-fuzzing-with-input-to-state-correspondence/) paper for the general concepts.
 
+use alloc::rc::Rc;
 #[cfg(target_arch = "aarch64")]
 use core::ffi::c_void;
-use std::rc::Rc;
 
 use dynasmrt::dynasm;
 #[cfg(target_arch = "aarch64")]
@@ -30,7 +30,7 @@ use iced_x86::{
     OpKind, Register,
 };
 use libafl::Error;
-use libafl_targets::{cmps::__libafl_targets_cmplog_instructions, CMPLOG_MAP_W};
+use libafl_targets::{CMPLOG_MAP_W, cmps::__libafl_targets_cmplog_instructions};
 use rangemap::RangeMap;
 
 use crate::helper::FridaRuntime;

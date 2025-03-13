@@ -73,7 +73,6 @@
 //! This crate links to a (separately built) internal crate which affords the actual functionality.
 //! The internal crate must be built separately to ensure flags from dependent crates are not leaked
 //! to the runtime (e.g., to prevent coverage being collected on the runtime).
-//!
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -112,11 +111,11 @@
     )
 )]
 
-use std::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int};
 
 pub use libfuzzer_sys::*;
 
-extern "C" {
+unsafe extern "C" {
     /// `LLVMFuzzerRunDriver` allows for harnesses which specify their own main. See: <https://llvm.org/docs/LibFuzzer.html#using-libfuzzer-as-a-library>
     ///
     /// You can call this function inside of a main function in your harness, or specify `#![no_main]`

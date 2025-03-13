@@ -7,7 +7,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{
         command::{CommandConfigurator, PTraceCommandConfigurator},
-        hooks::intel_pt::{IntelPTHook, Section},
+        hooks::intel_pt::{IntelPTHook, SectionInfo},
     },
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -105,9 +105,9 @@ pub fn main() {
         .build()
         .unwrap();
 
-    let sections = [Section {
-        file_path: target_path.to_string_lossy().to_string(),
-        file_offset: 0x14000,
+    let sections = [SectionInfo {
+        filename: target_path.to_string_lossy().to_string(),
+        offset: 0x14000,
         size: (*code_memory_addresses.end() - *code_memory_addresses.start() + 1) as u64,
         virtual_address: *code_memory_addresses.start() as u64,
     }];

@@ -1,22 +1,22 @@
 //! The [`NewHashFeedback`] uses the backtrace hash and a hashset to only keep novel cases
 
 use alloc::{borrow::Cow, string::ToString};
-use std::fmt::Debug;
+use core::fmt::Debug;
 
 use hashbrown::HashSet;
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
+    Error, HasNamedMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     observers::ObserverWithHashField,
-    Error, HasNamedMetadata,
 };
 
 /// The prefix of the metadata names
@@ -76,7 +76,6 @@ impl NewHashFeedbackMetadata {
 
 impl HashSetState<u64> for NewHashFeedbackMetadata {
     /// Create new [`NewHashFeedbackMetadata`] using a name and a hash set.
-    #[must_use]
     fn with_hash_set(hash_set: HashSet<u64>) -> Self {
         Self { hash_set }
     }
@@ -141,10 +140,10 @@ where
     S: HasNamedMetadata,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(
+        state.add_named_metadata_checked(
             &self.name,
             NewHashFeedbackMetadata::with_capacity(self.capacity),
-        );
+        )?;
         Ok(())
     }
 }

@@ -1,0 +1,54 @@
+import "../../../just/libafl-cc-libpng.just"
+
+FUZZER_NAME := 'fuzzer_libpng'
+
+[unix]
+cc feat:
+    cargo build --profile {{PROFILE}} --features="{{feat}}"
+
+[unix]
+cxx feat:
+    cargo build --profile {{PROFILE}} --features="{{feat}}"
+
+[unix]
+lib feat: (libpng feat) (cxx feat)
+
+# Feat is either nothing or "crash"
+[unix]
+fuzzer feat="": (lib feat) (cxx feat)
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc \
+        "{{LIBPNG_BUILD}}/.libs/libpng16.a" \
+        "{{ZLIB_BUILD}}/libz.a" \
+        -I"{{LIBPNG_INCLUDE}}" \
+        -I"{{LIBPNG_BUILD}}" \
+        -I"{{ZLIB_INCLUDE}}" \
+        -L"{{ZLIB_LIB}}" \
+        -o {{FUZZER_NAME}} \
+        -lm -lz
+
+# Feat is either nothing or "crash"
+[unix]
+run feat="": (fuzzer feat)
+    #!/bin/bash
+    ./{{FUZZER_NAME}} &
+    sleep 0.2
+    ./{{FUZZER_NAME}} 2>/dev/null
+
+[unix]
+test: fuzzer
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    (timeout 31s ./{{FUZZER_NAME}} 2>/dev/null | tee fuzz_stdout.log || true) &
+    sleep 0.2
+    timeout 30s ./{{FUZZER_NAME}} >/dev/null 2>/dev/null || true
+    if grep -qa "corpus: 30" fuzz_stdout.log; then
+        echo "Fuzzer is working"
+    else
+        echo "Fuzzer does not generate any testcases or any crashes"
+        exit 1
+    fi
+
+clean:
+    rm -rf {{FUZZER_NAME}}
+    make -C libpng-1.6.37 clean || true
+    cargo clean

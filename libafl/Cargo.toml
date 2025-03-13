@@ -11,8 +11,8 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
-edition = "2021"
-rust-version = "1.82"
+edition = "2024"
+rust-version = "1.85"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -111,13 +111,7 @@ regex = ["std", "dep:regex"]
 casr = ["libcasr", "std", "regex"]
 
 ## Intel Processor Trace
-intel_pt = [
-  "std",
-  "dep:libafl_intelpt",
-  "dep:libipt",
-  "dep:nix",
-  "dep:num_enum",
-]
+intel_pt = ["std", "dep:libafl_intelpt", "dep:nix", "dep:num_enum"]
 ## Save all the Intel PT raw traces to files, use only for debug
 intel_pt_export_raw = ["intel_pt", "libafl_intelpt/export_raw"]
 
@@ -133,6 +127,9 @@ prometheus_monitor = [
   "futures",
 ]
 
+## Enables the `StatsdMonitor`.
+statsd_monitor = ["std", "cadence"]
+
 ## Include a simple concolic mutator based on z3
 concolic_mutation = ["z3"]
 
@@ -144,9 +141,6 @@ unicode = ["libafl_bolts/alloc", "ahash/std", "serde/rc", "bitvec"]
 
 ## Enable multi-part input formats and mutators
 multipart_inputs = ["arrayvec", "rand_trait"]
-
-## Share objectives across nodes
-share_objectives = []
 
 #! ## LibAFL-Bolts Features
 
@@ -257,6 +251,7 @@ ratatui = { version = "0.29.0", default-features = false, features = [
 ], optional = true } # Commandline rendering, for TUI Monitor
 crossterm = { version = "0.28.1", optional = true }
 
+cadence = { version = "1.5.0", optional = true } # For the statsd monitor
 prometheus-client = { version = "0.23.0", optional = true } # For the prometheus monitor
 tide = { version = "0.16.0", optional = true }
 async-std = { version = "1.13.0", features = ["attributes"], optional = true }
@@ -303,7 +298,6 @@ document-features = { workspace = true, optional = true }
 # Optional
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
-libipt = { workspace = true, optional = true }
 fastbloom = { workspace = true, optional = true }
 
 [lints]
@@ -323,6 +317,12 @@ windows = { workspace = true, features = [
   "Win32_Security",
   "Win32_System_SystemInformation",
 ] }
-
+winapi = { version = "0.3", features = [
+  "dbghelp",
+  "minwindef",
+  "winnt",
+  "errhandlingapi",
+  "processthreadsapi",
+] }
 [target.'cfg(windows)'.build-dependencies]
 windows = { workspace = true }

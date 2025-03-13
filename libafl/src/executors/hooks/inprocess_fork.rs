@@ -5,28 +5,31 @@ use core::{
     marker::PhantomData,
     mem::transmute,
     ptr::null,
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
 };
 
 #[cfg(not(miri))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
-use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
+use libafl_bolts::os::unix_signals::{Signal, SignalHandler, ucontext_t};
 use libc::siginfo_t;
 
 use crate::{
+    Error,
     executors::{
-        common_signals,
+        HasObservers, common_signals,
         hooks::ExecutorHook,
-        inprocess_fork::{child_signal_handlers, ForkHandlerFuncPtr},
-        HasObservers,
+        inprocess_fork::{ForkHandlerFuncPtr, child_signal_handlers},
     },
     observers::ObserversTuple,
-    Error,
 };
 
 /// The inmem fork executor's hooks.
 #[derive(Debug)]
 pub struct InChildProcessHooks<I, S> {
+    /// On crash C function pointer
+    pub crash_handler: *const c_void,
+    /// On timeout C function pointer
+    pub timeout_handler: *const c_void,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -35,9 +38,22 @@ impl<I, S> ExecutorHook<I, S> for InChildProcessHooks<I, S> {
     fn init(&mut self, _state: &mut S) {}
 
     /// Call before running a target.
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) {}
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) {
+        unsafe {
+            let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
+            (*data).crash_handler = self.crash_handler;
+            (*data).timeout_handler = self.timeout_handler;
+            compiler_fence(Ordering::SeqCst);
+        }
+    }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &I) {}
+    fn post_exec(&mut self, _state: &mut S, _input: &I) {
+        unsafe {
+            let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
+            (*data).crash_handler = null();
+            (*data).timeout_handler = null();
+        }
+    }
 }
 
 impl<I, S> InChildProcessHooks<I, S> {
@@ -54,11 +70,11 @@ impl<I, S> InChildProcessHooks<I, S> {
             #[cfg(not(miri))]
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
-            (*data).crash_handler =
-                child_signal_handlers::child_crash_handler::<E, I, S> as *const c_void;
-            (*data).timeout_handler =
-                child_signal_handlers::child_timeout_handler::<E, I, S> as *const c_void;
             Ok(Self {
+                crash_handler: child_signal_handlers::child_crash_handler::<E, I, S>
+                    as *const c_void,
+                timeout_handler: child_signal_handlers::child_timeout_handler::<E, I, S>
+                    as *const c_void,
                 phantom: PhantomData,
             })
         }
@@ -68,6 +84,8 @@ impl<I, S> InChildProcessHooks<I, S> {
     #[must_use]
     pub fn nop() -> Self {
         Self {
+            crash_handler: null(),
+            timeout_handler: null(),
             phantom: PhantomData,
         }
     }

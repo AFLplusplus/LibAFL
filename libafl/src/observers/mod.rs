@@ -14,12 +14,6 @@ pub mod stacktrace;
 #[cfg(feature = "regex")]
 pub use stacktrace::*;
 
-/// Profiler observer
-#[cfg(feature = "std")]
-pub mod profiling;
-#[cfg(feature = "std")]
-pub use profiling::*;
-
 pub mod concolic;
 pub mod map;
 pub use map::*;
@@ -34,12 +28,12 @@ use std::time::Instant;
 
 #[cfg(not(feature = "std"))]
 use libafl_bolts::current_time;
-use libafl_bolts::{tuples::MatchName, Named};
+use libafl_bolts::{Named, tuples::MatchName};
 pub use list::*;
 use serde::{Deserialize, Serialize};
 pub use value::*;
 
-use crate::{executors::ExitKind, Error};
+use crate::{Error, executors::ExitKind};
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
@@ -330,9 +324,12 @@ mod instant_serializer {
 impl TimeObserver {
     /// Creates a new [`TimeObserver`] with the given name.
     #[must_use]
-    pub fn new(name: &'static str) -> Self {
+    pub fn new<S>(name: S) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
         Self {
-            name: Cow::from(name),
+            name: name.into(),
 
             #[cfg(feature = "std")]
             start_time: Instant::now(),
@@ -402,9 +399,9 @@ impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for TimeObserver {}
 mod tests {
 
     use libafl_bolts::{
+        Named,
         ownedref::OwnedMutSlice,
         tuples::{tuple_list, tuple_list_type},
-        Named,
     };
 
     use crate::observers::{StdMapObserver, TimeObserver};

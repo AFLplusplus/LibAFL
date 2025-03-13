@@ -20,7 +20,6 @@ concurrency:
 jobs:
   common:
     strategy:
-      fail-fast: false
       matrix:
         os: [ ubuntu-24.04, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
@@ -62,8 +61,12 @@ jobs:
       - name: Test the book (MacOS)
         if: runner.os == 'MacOS'
         run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
-      - name: Run tests
-        run: cargo test
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: cargo test -- --test-threads 1
+      - name: Run tests (Linux)
+        if: runner.os != 'Windows'
+        run: cargo test -- --test-threads 1
       - name: Test libafl no_std
         run: cd libafl && cargo test --no-default-features
       - name: Test libafl_bolts no_std no_alloc
@@ -121,6 +124,10 @@ jobs:
       # ---- build normal and examples ----
       - name: Run a normal build
         run: cargo build --verbose
+      # - name: Run libafl_qemu usermode tests
+      #   run: cd libafl_qemu && cargo test
+      # - name: Run libafl_qemu systemmode tests
+      #   run: cd libafl_qemu && cargo test --no-default-features --features x86_64,systemmode
       - name: Build examples
         run: cargo build --examples --verbose
 
@@ -224,6 +231,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@cargo-hack
+      - run: rustup upgrade
       # Note: We currently only specify minimum rust versions for the default workspace members
       - run: cargo hack check --rust-version -p libafl -p libafl_bolts -p libafl_derive -p libafl_cc -p libafl_targets
 
@@ -238,7 +246,6 @@ jobs:
     needs:
       - fuzzers-preflight
     strategy:
-      fail-fast: true
       matrix:
         os: [ ubuntu-24.04 ]
         fuzzer:
@@ -260,7 +267,7 @@ jobs:
           # Binary-only
           - ./fuzzers/binary_only/fuzzbench_fork_qemu
           - ./fuzzers/binary_only/frida_executable_libpng
-          - ./fuzzers/binary_only/frida_windows_gdiplus
+          # - ./fuzzers/binary_only/frida_windows_gdiplus
           - ./fuzzers/binary_only/frida_libpng
           - ./fuzzers/binary_only/fuzzbench_qemu
           - ./fuzzers/binary_only/intel_pt_baby_fuzzer
@@ -272,6 +279,7 @@ jobs:
           - ./fuzzers/forkserver/forkserver_libafl_cc
           - ./fuzzers/forkserver/fuzzbench_forkserver
           - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
+          - ./fuzzers/forkserver/fuzzbench_forkserver_sand
           - ./fuzzers/forkserver/libafl-fuzz
           - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
 
@@ -292,7 +300,6 @@ jobs:
 
           # In-process
           - ./fuzzers/fuzz_anything/cargo_fuzz
-          # - ./fuzzers/inprocess/dynamic_analysis
           - ./fuzzers/inprocess/fuzzbench
           - ./fuzzers/inprocess/fuzzbench_text
           - ./fuzzers/inprocess/fuzzbench_ctx
@@ -304,10 +311,10 @@ jobs:
           - ./fuzzers/inprocess/libfuzzer_libpng_cmin
           - ./fuzzers/inprocess/libfuzzer_libpng_norestart
           # - ./fuzzers/inprocess/libfuzzer_libpng_tcp_manager
+          # - ./fuzzers/inprocess/libfuzzer_windows_asan
           - ./fuzzers/inprocess/libfuzzer_stb_image_sugar
           - ./fuzzers/inprocess/libfuzzer_stb_image
           # - ./fuzzers/structure_aware/libfuzzer_stb_image_concolic
-          # - ./fuzzers/inprocess/libfuzzer_windows_asan
           # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
 
           # Fuzz Anything
@@ -345,8 +352,29 @@ jobs:
               - 'libafl_targets/**'
               - 'libafl_qemu/**'
               - 'fuzzers/**/*qemu*/**'
+  fuzzer-unicorn:
+    runs-on: ubuntu-24.04
+    needs:
+      - fuzzers-preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-24.04 ]
+        fuzzer:
+          - ./fuzzers/full_system/unicorn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/fuzzer-tester-prepare
+      - name: "Install dependencies"
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install gcc gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+      - name: Build and run example fuzzers (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
-  fuzzers-qemu:
+  fuzzers-qemu-user:
     needs:
       - changes
     if: ${{ needs.changes.outputs.qemu == 'true' }}
@@ -358,7 +386,69 @@ jobs:
           - ./fuzzers/binary_only/qemu_cmin
           - ./fuzzers/binary_only/qemu_coverage
           - ./fuzzers/binary_only/qemu_launcher
+        arch:
+          # unless somebody pays us for the servers.
+          # - aarch64
+          # - arm
+          # - i386
+          # - ppc
+          - x86_64
 
+    runs-on: [ self-hosted, qemu ]
+    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Build and run example QEMU fuzzers (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+
+  librasan-build:
+      runs-on: ubuntu-24.04
+      needs:
+        - changes
+      if: ${{ needs.changes.outputs.qemu == 'true' }}
+      steps:
+        - uses: actions/checkout@v4
+        - uses: ./.github/workflows/librasan-prepare
+        - name: Build
+          if: runner.os == 'Linux'
+          shell: bash
+          run: |
+            RUN_ON_CI=1 \
+            LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+            just \
+              -f ./libafl_qemu/librasan/Justfile \
+              build_everything_dev \
+              build_x86_64_release
+
+  librasan-test:
+      runs-on: ubuntu-24.04
+      needs:
+        - changes
+      if: ${{ needs.changes.outputs.qemu == 'true' }}
+      steps:
+        - uses: actions/checkout@v4
+        - uses: ./.github/workflows/librasan-prepare
+        - name: Build
+          if: runner.os == 'Linux'
+          shell: bash
+          run: |
+            RUN_ON_CI=1 \
+            LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+            just \
+              -f ./libafl_qemu/librasan/Justfile \
+              test_everything
+
+  fuzzers-qemu-system:
+    needs:
+      - changes
+    if: ${{ needs.changes.outputs.qemu == 'true' }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04]
+        fuzzer:
           # Full-system
           - ./fuzzers/full_system/qemu_baremetal
           - ./fuzzers/full_system/qemu_linux_kernel
@@ -430,9 +520,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/frida_libpng
-        run: cd fuzzers/binary_only/frida_libpng/ && cargo make test
+        run: cd fuzzers/binary_only/frida_libpng/ && just test
 
-  windows-frida-libfuzzer-stb-image:
+  windows-libfuzzer-stb-image:
     runs-on: windows-latest
     needs:
       - common
@@ -442,6 +532,16 @@ jobs:
       - name: Build fuzzers/inprocess/libfuzzer_stb_image
         run: cd fuzzers/inprocess/libfuzzer_stb_image && cargo build --release
 
+  # windows-libfuzzer-asan:
+  #   runs-on: windows-latest
+  #   needs:
+  #     - common
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: ./.github/workflows/windows-tester-prepare
+  #     - name: Build fuzzers/inprocess/libfuzzer_windows_asan
+  #       run: cd fuzzers/inprocess/libfuzzer_windows_asan && just test
+
   windows-frida-gdiplus:
     runs-on: windows-latest
     needs:
@@ -450,7 +550,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/frida_windows_gdiplus
-        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && cargo make test && cargo make test_cmplog
+        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && just test && just test_cmplog
 
   windows-tinyinst-simple:
     runs-on: windows-latest
@@ -462,7 +562,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/tinyinst_simple
-        run: cd fuzzers/binary_only/tinyinst_simple/ && cargo make test
+        run: cd fuzzers/binary_only/tinyinst_simple/ && just test
 
   windows-clippy:
     runs-on: windows-latest
@@ -493,8 +593,6 @@ jobs:
         run: cargo build --verbose
       - name: Increase map sizes
         run: ./scripts/shmem_limits_macos.sh
-      - name: Run Tests
-        run: cargo test
       - name: Clippy
         run: cargo +nightly clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
 

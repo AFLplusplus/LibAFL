@@ -110,7 +110,9 @@ pub fn build() {
     };
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
-    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))");
+    println!(
+        "cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))"
+    );
 
     let cross_cc = if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
@@ -161,10 +163,7 @@ pub fn build() {
     )
     .expect("Could not copy libafl_qemu_impl.h to out directory.");
 
-    fs::copy(
-        nyx_hdr.clone(),
-        include_dir.join(nyx_hdr_name),
-    )
+    fs::copy(nyx_hdr.clone(), include_dir.join(nyx_hdr_name))
         .expect("Could not copy libafl_qemu_impl.h to out directory.");
 
     bindgen::Builder::default()
@@ -176,6 +175,7 @@ pub fn build() {
             is_global: true,
             is_bitfield: true,
         })
+        // .rust_edition(bindgen::RustEdition::Edition2024)
         .header(libafl_qemu_hdr.display().to_string())
         .generate()
         .expect("Exit bindings generation failed.")
@@ -191,6 +191,7 @@ pub fn build() {
             is_global: true,
             is_bitfield: true,
         })
+        // .rust_edition(bindgen::RustEdition::Edition2024)
         .header(nyx_hdr.display().to_string())
         .generate()
         .expect("Exit bindings generation failed.")
@@ -211,7 +212,9 @@ pub fn build() {
         nyx_bindings_file.as_path(),
     );
 
-    if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
+    let rasan = cfg!(feature = "rasan");
+
+    if cfg!(feature = "usermode") && !rasan && (qemu_asan || qemu_asan_guest) {
         let qasan_dir = Path::new("libqasan");
         let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
         println!("cargo:rerun-if-changed={}", qasan_dir.display());
@@ -220,14 +223,53 @@ pub fn build() {
         if cfg!(debug_assertions) {
             make.env("CFLAGS", "-DDEBUG=1");
         }
-        assert!(make
-            .current_dir(&out_dir)
-            .env("CC", &cross_cc)
-            .env("OUT_DIR", &target_dir)
-            .arg("-C")
-            .arg(&qasan_dir)
-            .status()
-            .expect("make failed")
-            .success());
+        assert!(
+            make.current_dir(&out_dir)
+                .env("CC", &cross_cc)
+                .env("OUT_DIR", &target_dir)
+                .arg("-C")
+                .arg(&qasan_dir)
+                .status()
+                .expect("make failed")
+                .success()
+        );
+    }
+
+    if cfg!(feature = "usermode") && rasan {
+        let rasan_dir = Path::new("librasan");
+        let rasan_dir = fs::canonicalize(rasan_dir).unwrap();
+        let just_file = rasan_dir.join("Justfile");
+        println!("cargo:rerun-if-changed={}", rasan_dir.display());
+        println!("cargo:rerun-if-changed={}", just_file.display());
+
+        let rasan_dir_str = rasan_dir.to_str().unwrap();
+        let just_file_str = just_file.to_str().unwrap();
+        let target_dir_str = target_dir.to_str().unwrap();
+
+        let profile = if cfg!(debug_assertions) {
+            "dev"
+        } else {
+            "release"
+        };
+
+        let gasan_args = [
+            "just",
+            "-d", rasan_dir_str,
+            "-f", just_file_str,
+            "--set", "ARCH", &cpu_target,
+            "--set", "PROFILE", profile,
+            "--set", "TARGET_DIR", target_dir_str,
+            "build_gasan"];
+        just::run(gasan_args.iter()).expect("Failed to build rust guest address sanitizer library");
+
+        let qasan_args = [
+            "just",
+            "-d", rasan_dir_str,
+            "-f", just_file_str,
+            "--set", "ARCH", &cpu_target,
+            "--set", "PROFILE", profile,
+            "--set", "TARGET_DIR", target_dir_str,
+            "build_qasan"];
+        just::run(qasan_args.iter()).expect("Failed to build rust address sanitizer library");
     }
 }

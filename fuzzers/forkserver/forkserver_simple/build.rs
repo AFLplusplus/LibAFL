@@ -1,7 +1,7 @@
 use std::{
     env,
     path::Path,
-    process::{exit, Command},
+    process::{Command, exit},
 };
 
 const AFL_URL: &str = "https://github.com/AFLplusplus/AFLplusplus";
@@ -12,7 +12,9 @@ fn main() {
         exit(0);
     }
 
-    env::remove_var("DEBUG");
+    unsafe {
+        env::remove_var("DEBUG");
+    }
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
 
     let afl = format!("{}/AFLplusplus", &cwd);

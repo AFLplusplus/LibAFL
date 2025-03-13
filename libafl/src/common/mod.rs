@@ -7,8 +7,8 @@ use core::any::type_name;
 pub mod nautilus;
 
 use libafl_bolts::{
-    serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     Error,
+    serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
 };
 /// Trait for elements offering metadata
 pub trait HasMetadata {
@@ -24,6 +24,16 @@ pub trait HasMetadata {
         M: SerdeAny,
     {
         self.metadata_map_mut().insert(meta);
+    }
+
+    /// Add a metadata to the metadata map
+    /// Returns error if the metadata is already there
+    #[inline]
+    fn try_add_metadata<M>(&mut self, meta: M) -> Result<(), Error>
+    where
+        M: SerdeAny,
+    {
+        self.metadata_map_mut().try_insert(meta)
     }
 
     /// Gets metadata, or inserts it using the given construction function `default`
@@ -92,6 +102,16 @@ pub trait HasNamedMetadata {
         M: SerdeAny,
     {
         self.named_metadata_map_mut().insert(name, meta);
+    }
+
+    /// Add a metadata to the metadata map
+    /// Return an error if there already is the metadata with the same name
+    #[inline]
+    fn add_named_metadata_checked<M>(&mut self, name: &str, meta: M) -> Result<(), Error>
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_map_mut().try_insert(name, meta)
     }
 
     /// Add a metadata to the metadata map

@@ -7,12 +7,12 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error,
     corpus::{
-        inmemory_ondisk::InMemoryOnDiskCorpus, ondisk::OnDiskMetadataFormat, Corpus, CorpusId,
-        HasTestcase, Testcase,
+        Corpus, CorpusId, HasTestcase, Testcase, inmemory_ondisk::InMemoryOnDiskCorpus,
+        ondisk::OnDiskMetadataFormat,
     },
     inputs::Input,
-    Error,
 };
 
 /// A corpus that keeps a maximum number of [`Testcase`]s in memory

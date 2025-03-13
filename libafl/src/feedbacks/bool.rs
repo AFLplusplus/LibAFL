@@ -3,14 +3,14 @@
 use alloc::borrow::Cow;
 
 use libafl_bolts::{
-    tuples::{Handle, MatchNameRef},
     Error, Named,
+    tuples::{Handle, MatchNameRef},
 };
 
 use crate::{
+    HasNamedMetadata,
     feedbacks::{Feedback, StateInitializer},
     observers::{ObserversTuple, ValueObserver},
-    HasNamedMetadata,
 };
 
 /// This feedback returns `true` or `false` as the `is_interesting` value.
@@ -88,10 +88,6 @@ where
         _observers: &OT,
         _testcase: &mut crate::corpus::Testcase<I>,
     ) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 

@@ -28,6 +28,8 @@
 //! name = "SymRuntime"
 //! ```
 
+#![allow(clippy::std_instead_of_core)]
+
 pub mod filter;
 pub mod tracing;
 
@@ -46,7 +48,7 @@ pub mod cpp_runtime {
 }
 
 #[doc(hidden)]
-pub use ctor::ctor;
+pub use ctor;
 use libafl::observers::concolic;
 pub use libafl_bolts::shmem::StdShMem;
 #[doc(hidden)]
@@ -124,10 +126,10 @@ macro_rules! make_symexpr_optional {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! unwrap_option {
-    ($param_name:ident: RSymExpr) => {
+    ($param_name:ident : RSymExpr) => {
         $param_name?
     };
-    ($param_name:ident: $($type:tt)+) => {
+    ($param_name:ident : $($type:tt)+) => {
         $param_name
     };
 }
@@ -189,12 +191,12 @@ macro_rules! impl_nop_runtime_fn {
     // special case for expression_unreachable, because it has a different signature in our runtime trait than in the c interface.
     (pub fn expression_unreachable(expressions: *mut RSymExpr, num_elements: usize), $c_name:ident;) => {
         // #[expect(clippy::default_trait_access)]
-        fn expression_unreachable(&mut self, _exprs: &[RSymExpr]) {std::default::Default::default()}
+        fn expression_unreachable(&mut self, _exprs: &[RSymExpr]) {core::default::Default::default()}
     };
 
     (pub fn $name:ident($( $arg:ident : $type:ty ),*$(,)?)$( -> $ret:ty)?, $c_name:ident;) => {
         // #[expect(clippy::default_trait_access)]
-        fn $name(&mut self, $( _ : $type),*)$( -> Option<$ret>)? {std::default::Default::default()}
+        fn $name(&mut self, $( _ : $type),*)$( -> Option<$ret>)? {core::default::Default::default()}
     };
 }
 
@@ -333,12 +335,15 @@ macro_rules! export_runtime {
         // mean that this is 'safe'.
         static mut GLOBAL_DATA: Option<$rt> = None;
 
-        #[cfg_attr(not(test), $crate::ctor)]
-        fn init() {
-            // See comment on GLOBAL_DATA declaration.
-            unsafe {
-                GLOBAL_DATA = Some($constructor);
-                $crate::atexit(fini);
+        #[cfg(not(test))]
+        $crate::ctor::declarative::ctor! {
+            #[ctor]
+            fn init() {
+                // See comment on GLOBAL_DATA declaration.
+                unsafe {
+                    GLOBAL_DATA = Some($constructor);
+                    $crate::atexit(fini);
+                }
             }
         }
 

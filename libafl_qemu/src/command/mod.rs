@@ -16,6 +16,8 @@ use num_enum::TryFromPrimitive;
 use paste::paste;
 
 use crate::{
+    CPU, Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
+    IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver,
     command::parser::{
         EndCommandParser, InputPhysCommandParser, InputVirtCommandParser, LoadCommandParser,
         LqprintfCommandParser, NativeCommandParser, SaveCommandParser, StartPhysCommandParser,
@@ -23,10 +25,8 @@ use crate::{
         VersionCommandParser,
     },
     get_exit_arch_regs,
-    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
+    modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
     sync_exit::ExitArgs,
-    Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
-    IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
 
 #[cfg(all(
@@ -37,15 +37,13 @@ pub mod nyx;
 pub mod parser;
 
 mod bindings {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
-    #![allow(improper_ctypes)]
-    #![allow(unused_mut)]
-    #![allow(unused)]
-    #![allow(unused_variables)]
-    #![allow(clippy::all)]
-    #![allow(clippy::pedantic)]
+    #![expect(non_upper_case_globals)]
+    #![expect(non_camel_case_types)]
+    #![expect(non_snake_case)]
+    #![expect(unused)]
+    #![expect(clippy::all)]
+    #![expect(clippy::pedantic)]
+    #![allow(unsafe_op_in_unsafe_fn)]
 
     include!(concat!(env!("OUT_DIR"), "/libafl_qemu_bindings.rs"));
 }
@@ -98,7 +96,7 @@ macro_rules! define_std_command_manager {
 
             impl<C, ET, I, S, SM> CommandManager<C, StdEmulatorDriver, ET, I, S, SM> for $name<S>
             where
-                ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+                ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
                 I: HasTargetBytes + Unpin,
                 S: Unpin,
                 SM: IsSnapshotManager,
@@ -127,7 +125,7 @@ macro_rules! define_std_command_manager {
 
             impl<C, ET, I, S, SM> IsCommand<C, $name<S>, StdEmulatorDriver, ET, I, S, SM> for [<$name Commands>]
             where
-                ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+                ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
                 I: HasTargetBytes + Unpin,
                 S: Unpin,
                 SM: IsSnapshotManager,
@@ -385,7 +383,7 @@ pub struct StartCommand {
 impl<C, ET, I, S, SM> IsCommand<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for StartCommand
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -546,7 +544,7 @@ pub struct PageAllowCommand {
 #[cfg(feature = "systemmode")]
 impl<C, CM, ED, ET, I, S, SM> IsCommand<C, CM, ED, ET, I, S, SM> for PageAllowCommand
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: Unpin,
     S: Unpin,
 {
@@ -574,7 +572,7 @@ pub struct AddressAllowCommand {
 }
 impl<C, CM, ED, ET, I, S, SM> IsCommand<C, CM, ED, ET, I, S, SM> for AddressAllowCommand
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: Unpin,
     S: Unpin,
 {
@@ -591,7 +589,7 @@ where
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         emu.modules_mut()
             .modules_mut()
-            .allow_address_range_all(self.address_range.clone());
+            .allow_address_range_all(&self.address_range);
         Ok(None)
     }
 }

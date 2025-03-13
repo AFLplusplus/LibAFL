@@ -1,16 +1,16 @@
 use libafl::HasMetadata;
 
 use super::{
-    helpers::{gen_hashed_edge_ids, trace_edge_hitcount_ptr, trace_edge_single_ptr},
     EdgeCoverageVariant,
+    helpers::{gen_hashed_edge_ids, trace_edge_hitcount_ptr, trace_edge_single_ptr},
 };
 use crate::{
+    EmulatorModules, Hook,
     modules::{
-        utils::filters::{StdAddressFilter, StdPageFilter},
         AddressFilter, EdgeCoverageModule, EdgeCoverageModuleBuilder, EmulatorModuleTuple,
         PageFilter,
+        utils::filters::{StdAddressFilter, StdPageFilter},
     },
-    EmulatorModules, Hook,
 };
 
 #[derive(Debug)]

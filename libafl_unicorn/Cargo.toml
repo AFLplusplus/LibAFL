@@ -1,0 +1,36 @@
+[package]
+name = "libafl_unicorn"
+version.workspace = true
+authors = [""]
+description = "Unicorn backend library for LibAFL"
+documentation = "https://docs.rs/"
+repository = "https://github.com/AFLplusplus/"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "unicorn"]
+edition = "2024"
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
+
+[dependencies]
+libafl = { path = "../libafl", default-features = false, features = [
+  "std",
+  "derive",
+  "llmp_compression",
+] }
+libafl_targets = { path = "../libafl_targets" }
+
+# External dependencies
+capstone = { workspace = true }
+log = { workspace = true }
+unicorn-engine = { workspace = true }
+
+
+[lib]
+name = "libafl_unicorn"
+crate-type = ["cdylib", "rlib"]

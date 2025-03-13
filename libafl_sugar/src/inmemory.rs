@@ -1,13 +1,18 @@
 //! In-Memory fuzzing made easy.
 //! Use this sugar for scaling `libfuzzer`-style fuzzers.
 
-use core::fmt::{self, Debug, Formatter};
-use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
+use core::{
+    fmt::{self, Debug, Formatter},
+    net::SocketAddr,
+    time::Duration,
+};
+use std::{fs, path::PathBuf};
 
 use libafl::{
+    Error, HasMetadata,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
+    events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
+    executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -16,25 +21,24 @@ use libafl::{
     monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, StdScheduledMutator},
+        scheduled::{StdScheduledMutator, tokens_mutations},
         token_mutations::{I2SRandReplace, Tokens},
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
-    Error, HasMetadata,
 };
 use libafl_bolts::{
+    AsSlice,
     core_affinity::Cores,
     nonzero,
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
-    AsSlice,
+    tuples::{Merge, tuple_list},
 };
-use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
+use libafl_targets::{CmpLogObserver, edges_map_mut_ptr};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -144,7 +148,6 @@ where
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
-        let time_ref = time_observer.handle();
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
@@ -258,7 +261,7 @@ where
             }
 
             // Setup a tracing stage in which we log comparisons
-            let tracing = ShadowTracingStage::new(&mut executor);
+            let tracing = ShadowTracingStage::new();
 
             // Setup a randomic Input2State stage
             let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
@@ -351,8 +354,8 @@ where
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
-            .remote_broker_addr(self.remote_broker_addr)
-            .time_ref(Some(time_ref));
+            .remote_broker_addr(self.remote_broker_addr);
+
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
         match launcher.build().launch() {

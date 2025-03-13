@@ -1,14 +1,19 @@
 use std::sync::OnceLock;
 
 use capstone::arch::BuildsCapstone;
-use enum_map::{enum_map, EnumMap};
+use enum_map::{EnumMap, enum_map};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::arm::*;
 
-use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
+use crate::{CallingConvention, GuestAddr, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
+
+#[expect(non_upper_case_globals)]
+impl CallingConvention {
+    pub const Default: CallingConvention = CallingConvention::Aapcs;
+}
 
 /// Registers for the ARM instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
@@ -91,46 +96,77 @@ impl crate::ArchExtras for crate::CPU {
         self.write_reg(Regs::Lr, val)
     }
 
-    fn read_function_argument(
+    fn read_function_argument_with_cc(
         &self,
-        conv: CallingConvention,
         idx: u8,
+        conv: CallingConvention,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Aapcs, conv)?;
 
-        let reg_id = match idx {
-            0 => Regs::R0,
-            1 => Regs::R1,
-            2 => Regs::R2,
-            3 => Regs::R3,
-            // 4.. would be on the stack, let's not do this for now
-            r => {
-                return Err(QemuRWError::new_argument_error(
-                    QemuRWErrorKind::Read,
-                    i32::from(r),
-                ))
+        match idx {
+            0 => self.read_reg(Regs::R0),
+            1 => self.read_reg(Regs::R1),
+            2 => self.read_reg(Regs::R2),
+            3 => self.read_reg(Regs::R3),
+            _ => {
+                const SIZE: usize = size_of::<GuestReg>();
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+                /*
+                 * Stack is full and descending. SP points to return address, arguments
+                 * are in reverse order above that. 4th argument is at SP + 8.
+                 */
+
+                let offset = (SIZE as GuestAddr) * (GuestAddr::from(idx) - 3);
+                let mut buf = [0; SIZE];
+                self.read_mem(stack_ptr + offset, &mut buf)?;
+
+                #[cfg(feature = "be")]
+                {
+                    Ok(GuestReg::from_le_bytes(buf).into())
+                }
+                #[cfg(not(feature = "be"))]
+                Ok(GuestReg::from_le_bytes(buf).into())
             }
-        };
-
-        self.read_reg(reg_id)
+        }
     }
 
-    fn write_function_argument<T>(
+    fn write_function_argument_with_cc<T>(
         &self,
-        conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         val: T,
+        conv: CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Aapcs, conv)?;
 
         let val: GuestReg = val.into();
         match idx {
             0 => self.write_reg(Regs::R0, val),
             1 => self.write_reg(Regs::R1, val),
-            r => Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
+            2 => self.write_reg(Regs::R2, val),
+            3 => self.write_reg(Regs::R3, val),
+            _ => {
+                let val: GuestReg = val.into();
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+                /*
+                 * Stack is full and descending. SP points to return address, arguments
+                 * are in reverse order above that. 4th argument is at SP + 4.
+                 */
+                let size: GuestAddr = size_of::<GuestReg>() as GuestAddr;
+                let offset = size * (GuestAddr::from(idx) - 3);
+
+                #[cfg(feature = "be")]
+                let arg = val.to_be_bytes();
+
+                #[cfg(not(feature = "be"))]
+                let arg = val.to_le_bytes();
+
+                self.write_mem(stack_ptr + offset, &arg)?;
+
+                Ok(())
+            }
         }
     }
 }

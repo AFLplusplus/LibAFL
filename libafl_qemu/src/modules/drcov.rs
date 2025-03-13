@@ -5,8 +5,8 @@ use std::{
 };
 use std::{path::PathBuf, sync::Mutex};
 
-use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{executors::ExitKind, observers::ObserversTuple, HasMetadata};
+use hashbrown::{HashMap, hash_map::Entry};
+use libafl::{HasMetadata, executors::ExitKind, observers::ObserversTuple};
 use libafl_qemu_sys::{GuestAddr, GuestUsize};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
@@ -14,14 +14,14 @@ use serde::{Deserialize, Serialize};
 
 use super::utils::filters::HasAddressFilter;
 #[cfg(feature = "systemmode")]
-use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{HasPageFilter, NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
+    Qemu,
     emu::EmulatorModules,
     modules::{
-        utils::filters::NopAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        AddressFilter, EmulatorModule, EmulatorModuleTuple, utils::filters::NopAddressFilter,
     },
     qemu::Hook,
-    Qemu,
 };
 
 /// Trace of `block_id`s met at runtime
@@ -152,23 +152,16 @@ where
     match DRCOV_MAP.lock().unwrap().as_mut().unwrap().entry(pc) {
         Entry::Occupied(entry) => {
             let id = *entry.get();
-            if drcov_module.full_trace {
-                Some(id)
-            } else {
-                None
-            }
+            Some(id)
         }
         Entry::Vacant(entry) => {
             let id = meta.current_id;
+
             entry.insert(id);
             meta.current_id = id + 1;
-            if drcov_module.full_trace {
-                // GuestAddress is u32 for 32 bit guests
-                #[expect(clippy::unnecessary_cast)]
-                Some(id as u64)
-            } else {
-                None
-            }
+
+            #[expect(clippy::unnecessary_cast)]
+            Some(id as u64)
         }
     }
 }
@@ -201,7 +194,7 @@ pub fn gen_block_lengths<ET, F, I, S>(
 #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn exec_trace_block<ET, F, I, S>(
     _qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, I, S>,
+    _emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
 ) where
@@ -210,9 +203,7 @@ pub fn exec_trace_block<ET, F, I, S>(
     I: Unpin,
     S: Unpin + HasMetadata,
 {
-    if emulator_modules.get::<DrCovModule<F>>().unwrap().full_trace {
-        DRCOV_IDS.lock().unwrap().as_mut().unwrap().push(id);
-    }
+    DRCOV_IDS.lock().unwrap().as_mut().unwrap().push(id);
 }
 
 impl<F, I, S> EmulatorModule<I, S> for DrCovModule<F>
@@ -285,7 +276,41 @@ where
                 module_range_map.insert(range, (id, path));
             }
 
-            self.module_mapping = Some(module_range_map);
+            // Split ranges larger than 4GiB into smaller ranges, as Drcov max
+            // module size is 4GiB. This also suffices to give each range a
+            // unique id. (Before this loop, any larger ranges split into many
+            // by smaller ranges retain the same id, which isn't unique.)
+            let mut split_module_range_map: RangeMap<u64, (u16, String)> = RangeMap::new();
+            let mut i = 0;
+            for (range, (_, path)) in module_range_map {
+                let mut range_start = range.start;
+                let range_end = range.end;
+                while range_end - range_start - 1 > u64::from(u32::MAX) {
+                    let range_end_short =
+                        (range_start + u64::from(u32::MAX) + 1) & !u64::from(u32::MAX);
+                    split_module_range_map.insert(
+                        Range {
+                            start: range_start,
+                            end: range_end_short,
+                        },
+                        (i, path.clone()),
+                    );
+                    i += 1;
+                    range_start = range_end_short;
+                }
+                split_module_range_map.insert(
+                    Range {
+                        start: range_start,
+                        end: range_end,
+                    },
+                    (i, path.clone()),
+                );
+                i += 1;
+            }
+
+            self.module_mapping = Some(RangeMap::<u64, (u16, String)>::from_iter(
+                split_module_range_map,
+            ));
         } else {
             log::info!("Using user-provided module mapping for DrCov module.");
         }
@@ -395,9 +420,7 @@ impl<F> DrCovModule<F> {
                         unsafe {
                             for module in self.module_mapping.as_ref().unwrap_unchecked().iter() {
                                 let (range, (_, _)) = module;
-                                if *pc >= range.start.try_into().unwrap()
-                                    && *pc <= range.end.try_into().unwrap()
-                                {
+                                if range.contains(&u64::try_from(*pc).unwrap()) {
                                     module_found = true;
                                     break;
                                 }
@@ -499,25 +522,26 @@ impl<F> HasAddressFilter for DrCovModule<F>
 where
     F: AddressFilter,
 {
-    type ModuleAddressFilter = F;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
+    type AddressFilter = F;
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.filter
     }
+}
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter(&self) -> &Self::ModulePageFilter {
+#[cfg(feature = "systemmode")]
+impl<F> HasPageFilter for DrCovModule<F> {
+    type PageFilter = NopPageFilter;
+
+    fn page_filter(&self) -> &Self::PageFilter {
         &NopPageFilter
     }
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+    fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
         unsafe { (&raw mut NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }

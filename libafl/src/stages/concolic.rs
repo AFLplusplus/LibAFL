@@ -1,6 +1,5 @@
 //! This module contains the `concolic` stages, which can trace a target using symbolic execution
 //! and use the results for fuzzer input and mutations.
-//!
 use alloc::borrow::{Cow, ToOwned};
 #[cfg(feature = "concolic_mutation")]
 use alloc::{string::ToString, vec::Vec};
@@ -8,26 +7,27 @@ use alloc::{string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
 use libafl_bolts::{
-    tuples::{Handle, MatchNameRef},
     Named,
+    tuples::{Handle, MatchNameRef},
 };
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
-    observers::{concolic::ConcolicObserver, ObserversTuple},
-    stages::{RetryCountRestartHelper, Stage, TracingStage},
+    observers::{ObserversTuple, concolic::ConcolicObserver},
+    stages::{Restartable, RetryCountRestartHelper, Stage, TracingStage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
-    Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "concolic_mutation")]
 use crate::{
+    Evaluator,
     inputs::HasMutatorBytes,
     mark_feature_time,
     observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
-    start_timer, Evaluator,
+    start_timer,
 };
 
 /// Wraps a [`TracingStage`] to add concolic observing.
@@ -76,7 +76,12 @@ where
         }
         Ok(())
     }
+}
 
+impl<EM, I, TE, S, Z> Restartable<S> for ConcolicTracingStage<'_, EM, I, TE, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
@@ -112,8 +117,8 @@ impl<'a, EM, I, TE, S, Z> ConcolicTracingStage<'a, EM, I, TE, S, Z> {
 fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<Vec<(usize, u8)>> {
     use hashbrown::HashMap;
     use z3::{
-        ast::{Ast, Bool, Dynamic, BV},
         Config, Context, Solver, Symbol,
+        ast::{Ast, BV, Bool, Dynamic},
     };
     fn build_extract<'ctx>(
         bv: &BV<'ctx>,
@@ -418,7 +423,13 @@ where
         }
         Ok(())
     }
+}
 
+#[cfg(feature = "concolic_mutation")]
+impl<I, S, Z> Restartable<S> for SimpleConcolicMutationalStage<I, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage

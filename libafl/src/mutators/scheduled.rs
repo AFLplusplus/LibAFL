@@ -8,22 +8,22 @@ use core::{
 };
 
 use libafl_bolts::{
-    rands::Rand,
-    tuples::{tuple_list, tuple_list_type, HasConstLen, NamedTuple},
     Named,
+    rands::Rand,
+    tuples::{HasConstLen, NamedTuple, tuple_list, tuple_list_type},
 };
 use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId},
     mutators::{
-        token_mutations::{TokenInsert, TokenReplace},
         MutationResult, Mutator, MutatorsTuple,
+        token_mutations::{TokenInsert, TokenReplace},
     },
     nonzero,
     state::{HasCorpus, HasRand},
-    Error, HasMetadata,
 };
 
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
@@ -46,7 +46,6 @@ impl Deref for LogMutationMetadata {
     }
 }
 impl DerefMut for LogMutationMetadata {
-    #[must_use]
     fn deref_mut(&mut self) -> &mut [Cow<'static, str>] {
         &mut self.list
     }
@@ -318,8 +317,8 @@ mod tests {
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasMutatorBytes},
         mutators::{
-            havoc_mutations::havoc_mutations, mutations::SpliceMutator,
-            scheduled::StdScheduledMutator, Mutator,
+            Mutator, havoc_mutations::havoc_mutations, mutations::SpliceMutator,
+            scheduled::StdScheduledMutator,
         },
         state::StdState,
     };

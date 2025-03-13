@@ -15,7 +15,9 @@ edition = "2021"
 debug = true
 
 [features]
-default = ["std"]
+default = ["std", "snapshot"]
+fork = []
+snapshot = []
 std = []
 be = ["libafl_qemu/be"]
 arm = ["libafl_qemu/arm"]

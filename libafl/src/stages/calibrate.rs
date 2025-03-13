@@ -8,23 +8,23 @@ use alloc::{
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
-use libafl_bolts::{current_time, impl_serdeany, tuples::Handle, AsIter, Named};
+use libafl_bolts::{AsIter, Named, current_time, impl_serdeany, tuples::Handle};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
+    feedbacks::{HasObserverHandle, map::MapFeedbackMetadata},
     fuzzer::Evaluator,
     inputs::Input,
-    monitors::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
-    stages::{RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions},
-    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// AFL++'s `CAL_CYCLES_FAST` + 1
@@ -294,18 +294,18 @@ where
             let data = if let Ok(metadata) = testcase.metadata_mut::<SchedulerTestcaseMetadata>() {
                 metadata
             } else {
-                let depth = if let Some(parent_id) = testcase.parent_id() {
-                    if let Some(parent_metadata) = (*state.corpus().get(parent_id)?)
-                        .borrow()
-                        .metadata_map()
-                        .get::<SchedulerTestcaseMetadata>()
-                    {
-                        parent_metadata.depth() + 1
-                    } else {
-                        0
+                let depth = match testcase.parent_id() {
+                    Some(parent_id) => {
+                        match (*state.corpus().get(parent_id)?)
+                            .borrow()
+                            .metadata_map()
+                            .get::<SchedulerTestcaseMetadata>()
+                        {
+                            Some(parent_metadata) => parent_metadata.depth() + 1,
+                            _ => 0,
+                        }
                     }
-                } else {
-                    0
+                    _ => 0,
                 };
                 testcase.add_metadata(SchedulerTestcaseMetadata::new(depth));
                 testcase
@@ -364,7 +364,12 @@ where
 
         Ok(())
     }
+}
 
+impl<C, E, I, O, OT, S> Restartable<S> for CalibrationStage<C, E, I, O, OT, S>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Calibration stage disallow restarts
         // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.

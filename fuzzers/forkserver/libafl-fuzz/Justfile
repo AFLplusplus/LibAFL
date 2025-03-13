@@ -1,0 +1,261 @@
+PROJECT_DIR := absolute_path(".")
+CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
+PROFILE := env("PROFILE", "release")
+PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
+FUZZER_NAME := 'libafl-fuzz'
+FUZZER := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
+LLVM_CONFIG := env("LLVM_CONFIG", "llvm-config-18")
+AFL_VERSION := "5777ceaf23f48ae4ceae60e4f3a79263802633c6"
+AFL_DIR := PROJECT_DIR / "AFLplusplus"
+AFL_CC_PATH := AFL_DIR / "afl-clang-fast"
+CC := "clang"
+
+build_afl:
+    #!/bin/bash
+    if [ ! -d {{AFL_DIR}} ]; then
+        git clone https://github.com/AFLplusplus/AFLplusplus.git
+        cd {{AFL_DIR}}
+        git checkout {{AFL_VERSION}}
+        LLVM_CONFIG={{LLVM_CONFIG}} make 
+    fi
+
+build_frida_mode:
+    #!/bin/bash
+    cd {{AFL_DIR}}
+    cd frida_mode
+    LLVM_CONFIG={{LLVM_CONFIG}} make
+    cd ../..
+
+build_qemuafl: build_afl
+    #!/bin/bash
+    cd {{AFL_DIR}}/qemu_mode
+    ./build_qemu_support.sh
+    cd ../..
+
+build_unicorn_mode: build_afl
+    #!/bin/bash
+    cd {{AFL_DIR}}/unicorn_mode
+    ./build_unicorn_support.sh
+    cd ../..
+
+
+test: build_afl test_instr test_cmplog test_frida test_qemu test_unicorn_mode test_instr_fuzzbench
+    #!/bin/bash
+    echo done
+
+build_libafl_fuzz:
+    #!/bin/bash
+    cargo build --profile {{PROFILE}}
+
+build_libafl_fuzz_fuzzbench:
+    #!/bin/bash
+    cargo build --profile {{PROFILE}} --features fuzzbench
+
+test_instr: build_afl build_libafl_fuzz
+    #!/bin/bash
+    AFL_PATH={{AFL_DIR}} {{AFL_CC_PATH}} -O0 ./test/test-instr.c -o ./test/out-instr
+
+    export LIBAFL_DEBUG_OUTPUT=1 
+    export AFL_CORES=0
+    export AFL_STATS_INTERVAL=1 
+
+    timeout 5 {{FUZZER}} -i ./test/seeds -o ./test/output ./test/out-instr || true
+    test -n "$( ls ./test/output/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+        echo "No new corpus entries found"
+        exit 1
+    }
+    test -n "$( ls ./test/output/fuzzer_main/fuzzer_stats 2>/dev/null )" || {
+        echo "No fuzzer_stats file found"
+        exit 1
+    }
+    test -n "$( ls ./test/output/fuzzer_main/plot_data 2>/dev/null )" || {
+        echo "No plot_data found"
+        exit 1
+    }
+    test -d "./test/output/fuzzer_main/hangs" || {
+        echo "No hangs directory found"
+        exit 1
+    }
+    test -d "./test/output/fuzzer_main/crashes" || {
+        echo "No crashes directory found"
+        exit 1
+    }
+
+test_instr_fuzzbench: build_afl build_libafl_fuzz_fuzzbench
+    #!/bin/bash
+    AFL_PATH={{AFL_DIR}} {{AFL_CC_PATH}} ./test/test-instr.c -o ./test/out-instr
+
+    export LIBAFL_DEBUG_OUTPUT=1 
+    export AFL_CORES=0
+    export AFL_STATS_INTERVAL=1 
+
+    timeout 5 {{FUZZER}} -i ./test/seeds -o ./test/output-fuzzbench ./test/out-instr || true
+    test -n "$( ls ./test/output-fuzzbench/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+        echo "No new corpus entries found"
+        exit 1
+    }
+    test -n "$( ls ./test/output-fuzzbench/fuzzer_main/fuzzer_stats 2>/dev/null )" || {
+        echo "No fuzzer_stats file found"
+        exit 1
+    }
+    test -n "$( ls ./test/output-fuzzbench/fuzzer_main/plot_data 2>/dev/null )" || {
+        echo "No plot_data found"
+        exit 1
+    }
+    test -d "./test/output-fuzzbench/fuzzer_main/hangs" || {
+        echo "No hangs directory found"
+        exit 1
+    }
+    test -d "./test/output-fuzzbench/fuzzer_main/crashes" || {
+        echo "No crashes directory found"
+        exit 1
+    }
+
+test_cmplog: build_afl build_libafl_fuzz
+    #!/bin/bash
+    # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
+    AFL_LLVM_CMPLOG=1 AFL_PATH={{AFL_DIR}} {{AFL_CC_PATH}} ./test/test-cmplog.c -o ./test/out-cmplog
+    LIBAFL_DEBUG_OUTPUT=1 AFL_CORES=0 timeout 15 {{FUZZER}} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
+    test -n "$( ls {{PROJECT_DIR}}/test/output-cmplog/fuzzer_main/hangs/id:0000* {{PROJECT_DIR}}/test/output-cmplog/fuzzer_main/crashes/id:0000*)" || {
+        echo "No crashes found"
+        exit 1
+    }
+
+test_frida: build_afl build_frida_mode build_libafl_fuzz
+    #!/bin/bash
+    {{CC}} -no-pie ./test/test-instr.c -o ./test/out-frida
+
+    export AFL_PATH={{AFL_DIR}}
+    export AFL_CORES=0
+    export AFL_STATS_INTERVAL=1 
+
+    timeout 15 {{FUZZER}} -m 0  -O -i ./test/seeds_frida -o ./test/output-frida -- ./test/out-frida || true
+    test -n "$( ls ./test/output-frida/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+        echo "No new corpus entries found for FRIDA mode"
+        exit 1
+    }
+
+    {{CC}} ./test/test-cmpcov.c -o ./test/out-frida-cmpcov
+    AFL_FRIDA_VERBOSE=1 timeout 15 {{FUZZER}} -m 0  -O -c 0 -l 3 -i ./test/seeds_frida -o ./test/output-frida-cmpcov -- ./test/out-frida-cmpcov || true
+    test -n "$( ls ./test/output-frida-cmpcov/fuzzer_main/queue/id:000003* 2>/dev/null )" || {
+        echo "No new corpus entries found for FRIDA cmplog mode"
+        exit 1
+    }
+    export AFL_FRIDA_PERSISTENT_ADDR=0x`nm ./test/out-frida | grep -Ei "T _main|T main" | awk '{print $1}'`
+    timeout 15 {{FUZZER}} -m 0  -O -i ./test/seeds_frida -o ./test/output-frida-persistent -- ./test/out-frida || true
+
+    test -n "$( ls ./test/output-frida-persistent/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+        echo "No new corpus entries found for FRIDA persistent mode"
+        exit 1
+    }
+
+    RUNTIME_PERSISTENT=`grep execs_done ./test/output-frida-persistent/fuzzer_main/fuzzer_stats | awk '{print$3}'`
+    RUNTIME=`grep execs_done ./test/output-frida/fuzzer_main/fuzzer_stats | awk '{print$3}'`
+    test -n "$RUNTIME" -a -n "$RUNTIME_PERSISTENT" && {
+      DIFF=`expr $RUNTIME_PERSISTENT / $RUNTIME`
+      test "$DIFF" -gt 1 && { # must be at least twice as fast
+        echo "persistent frida_mode was noticeably faster than standard frida_mode"
+      } || {
+        echo "persistent frida_mode" $RUNTIME_PERSISTENT "was not noticeably faster than standard frida_mode" $RUNTIME
+        exit 1
+      }
+    } || {
+      echo "we got no data on executions performed? weird!"
+    }
+
+    unset AFL_FRIDA_PERSISTENT_ADDR
+
+test_qemu: build_afl build_qemuafl build_libafl_fuzz
+    #!/bin/bash
+    {{CC}} -pie -fPIE ./test/test-instr.c -o ./test/out-qemu
+    {{CC}} -o ./test/out-qemu-cmpcov ./test/test-cmpcov.c
+
+    export AFL_PATH={{AFL_DIR}}
+    export AFL_CORES=0
+    export AFL_STATS_INTERVAL=1
+
+    timeout 15 {{FUZZER}} -m 0  -Q -i ./test/seeds_qemu -o ./test/output-qemu -- ./test/out-qemu || true
+    test -n "$( ls ./test/output-qemu/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+        echo "No new corpus entries found for QEMU mode"
+        exit 1
+    }
+
+    export AFL_ENTRYPOINT=`printf 1 | AFL_DEBUG=1 {{AFL_DIR}}/afl-qemu-trace ./test/out-qemu 2>&1 >/dev/null | awk '/forkserver/{print $4; exit}'`
+    timeout 15 {{FUZZER}} -m 0  -Q -i ./test/seeds_qemu -o ./test/output-qemu-entrypoint -- ./test/out-qemu || true
+    test -n "$( ls ./test/output-qemu-entrypoint/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+        echo "No new corpus entries found for QEMU mode with AFL_ENTRYPOINT"
+        exit 1
+    }
+    unset AFL_ENTRYPOINT
+
+    export AFL_PRELOAD={{AFL_DIR}}/libcompcov.so
+    export AFL_COMPCOV_LEVEL=2
+    timeout 15 {{FUZZER}}  -Q -i ./test/seeds_qemu -o ./test/output-qemu-cmpcov -- ./test/out-qemu-cmpcov || true
+    test -n "$( ls ./test/output-qemu-cmpcov/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+        echo "No new corpus entries found for QEMU mode"
+        exit 1
+    }
+
+test_unicorn_mode: build_libafl_fuzz build_afl build_unicorn_mode
+    #!/bin/bash
+    export AFL_PATH={{AFL_DIR}}
+    export AFL_CORES=0
+    export AFL_STATS_INTERVAL=1
+
+    # TODO: test unicorn persistent mode once it's fixed on AFL++
+
+    LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_DEBUG_CHILD=1 timeout 15s {{FUZZER}} -m 0 -U -i ./test/seeds_unicorn -o ./test/output-unicorn-python -- python3 {{AFL_DIR}}/unicorn_mode/samples/python_simple/simple_test_harness.py @@ || true
+    test -n "$( ls ./test/output-unicorn-python/fuzzer_main/queue/id:000003* 2>/dev/null )" || {
+        echo "No new corpus entries found for Unicorn python3 mode"
+        exit 1
+    }
+
+    export AFL_COMPCOV_LEVEL=2
+    LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_DEBUG_CHILD=1 timeout 15s {{FUZZER}} -m 0 -U -i ./test/seeds_unicorn_cmpcov -o ./test/output-unicorn-cmpcov -- python3 {{AFL_DIR}}/unicorn_mode/samples/compcov_x64/compcov_test_harness.py @@ || true
+    test -n "$( ls ./test/output-unicorn-cmpcov/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+        echo "No new corpus entries found for Unicorn cmpcov mode"
+        exit 1
+    }
+
+test_nyx_mode: build_afl build_libafl_fuzz
+    #!/bin/bash
+    export AFL_PATH={{AFL_DIR}}
+    export AFL_CORES=0
+    export AFL_STATS_INTERVAL=1
+    export AFL_DEBUG=1
+    export LIBAFL_DEBUG_OUTPUT=1
+    AFL_PATH={{AFL_DIR}} {{AFL_CC_PATH}} ./test/test-instr.c -o ./test/out-instr
+    rm -rf ./test/nyx-test
+    cd ../../../libafl_nyx
+    rm -rf packer
+    git clone https://github.com/nyx-fuzz/packer.git
+    python3 packer/packer/nyx_packer.py \
+            ../fuzzers/forkserver/libafl-fuzz/test/out-instr \
+            ../fuzzers/forkserver/libafl-fuzz/test/out-nyx \
+            afl \
+            instrumentation \
+            --fast_reload_mode \
+            --purge
+    python3 packer/packer/nyx_config_gen.py ../fuzzers/forkserver/libafl-fuzz/test/out-nyx Kernel
+    cd ../fuzzers/forkserver/libafl-fuzz/
+    timeout 15s {{FUZZER}} -i ./test/seeds_nyx -o ./test/output-nyx  -X -- ./test/out-nyx
+    test -n "$( ls ./test/output-nyx/fuzzer_main/queue/id:000003* 2>/dev/null )" || {
+        echo "No new corpus entries found for Nyx mode!"
+        exit 1
+    }
+
+# since we cannot test nyx mode on CI, let's build it
+build_nyx_mode:
+    #!/bin/bash
+    cargo build --profile {{PROFILE}} --features nyx
+
+clean:
+    #!/bin/bash
+    rm -rf AFLplusplus
+    rm -rf ./test/output
+    rm -rf ./test/cmplog-output
+    rm -rf ./test/output-frida*
+    rm -rf ./test/output-cmplog
+    rm -rf ./test/output-qemu*
+    rm -rf ./test/output-unicorn*
+    rm ./test/out-*

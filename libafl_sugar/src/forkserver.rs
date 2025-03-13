@@ -1,10 +1,12 @@
 //! An `afl`-style forkserver fuzzer.
 //! Use this if your target has complex state that needs to be reset.
-use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
+use core::{net::SocketAddr, time::Duration};
+use std::{fs, path::PathBuf};
 
 use libafl::{
+    Error, HasMetadata,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
     executors::forkserver::ForkserverExecutor,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -13,22 +15,21 @@ use libafl::{
     monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, StdScheduledMutator},
+        scheduled::{StdScheduledMutator, tokens_mutations},
         token_mutations::Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
-    Error, HasMetadata,
 };
 use libafl_bolts::{
+    AsSliceMut,
     core_affinity::Cores,
     nonzero,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
-    AsSliceMut,
+    tuples::{Merge, tuple_list},
 };
 use typed_builder::TypedBuilder;
 
@@ -116,7 +117,6 @@ impl ForkserverBytesCoverageSugar<'_> {
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
-        let time_ref = time_observer.handle();
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
@@ -125,11 +125,15 @@ impl ForkserverBytesCoverageSugar<'_> {
 
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
-            shmem.write_to_env("__AFL_SHM_ID").unwrap();
+            unsafe {
+                shmem.write_to_env("__AFL_SHM_ID").unwrap();
+            }
             let shmem_map = shmem.as_slice_mut();
 
             // To let know the AFL++ binary that we have a big map
-            std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
+            unsafe {
+                std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
+            }
 
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {
@@ -295,8 +299,8 @@ impl ForkserverBytesCoverageSugar<'_> {
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
-            .remote_broker_addr(self.remote_broker_addr)
-            .time_ref(Some(time_ref));
+            .remote_broker_addr(self.remote_broker_addr);
+
         #[cfg(unix)]
         let launcher = launcher.stdout_file(Some("/dev/null"));
         match launcher.build().launch() {

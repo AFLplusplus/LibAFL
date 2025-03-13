@@ -1,6 +1,6 @@
 /*!
-* Welcome to `LibAFL_bolts`
-*/
+ * Welcome to `LibAFL_bolts`
+ */
 #![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
@@ -62,9 +62,7 @@ type String = &'static str;
 /// Good enough for simple errors, for anything else, use the `alloc` feature.
 #[cfg(not(feature = "alloc"))]
 macro_rules! format {
-    ($fmt:literal) => {{
-        $fmt
-    }};
+    ($fmt:literal) => {{ $fmt }};
 }
 
 #[cfg(feature = "std")]
@@ -77,7 +75,7 @@ pub extern crate alloc;
 
 #[cfg(feature = "ctor")]
 #[doc(hidden)]
-pub use ctor::ctor;
+pub use ctor;
 #[cfg(feature = "alloc")]
 pub mod anymap;
 #[cfg(feature = "std")]
@@ -147,13 +145,14 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::{Hash, Hasher};
+#[cfg(all(unix, feature = "std"))]
+use core::mem;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
 use std::{
     fs::File,
-    io::{stderr, stdout, Write},
-    mem,
+    io::{Write, stderr, stdout},
     os::fd::{AsRawFd, FromRawFd, RawFd},
     panic,
 };
@@ -305,6 +304,8 @@ pub enum Error {
     EmptyOptional(String, ErrorBacktrace),
     /// Key not in Map
     KeyNotFound(String, ErrorBacktrace),
+    /// Key already exists and should not overwrite
+    KeyExists(String, ErrorBacktrace),
     /// No elements in the current item
     Empty(String, ErrorBacktrace),
     /// End of iteration
@@ -363,6 +364,15 @@ impl Error {
         S: Into<String>,
     {
         Error::KeyNotFound(arg.into(), ErrorBacktrace::new())
+    }
+
+    /// Key already exists in Map
+    #[must_use]
+    pub fn key_exists<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::KeyExists(arg.into(), ErrorBacktrace::new())
     }
 
     /// No elements in the current item
@@ -506,6 +516,10 @@ impl Display for Error {
             }
             Self::KeyNotFound(s, b) => {
                 write!(f, "Key: `{0}` - not found", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::KeyExists(s, b) => {
+                write!(f, "Key: `{0}` - already exists", &s)?;
                 display_error_backtrace(f, b)
             }
             Self::Empty(s, b) => {
@@ -685,7 +699,7 @@ pub mod prelude {
 
 #[cfg(all(any(doctest, test), not(feature = "std")))]
 /// Provide custom time in `no_std` tests.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn external_current_millis() -> u64 {
     // TODO: use "real" time here
     1000
@@ -895,8 +909,8 @@ pub fn current_time() -> time::Duration {
 // Define your own `external_current_millis()` function via `extern "C"`
 // which is linked into the binary and called from here.
 #[cfg(all(not(any(doctest, test)), not(feature = "std")))]
-extern "C" {
-    //#[no_mangle]
+unsafe extern "C" {
+    //#[unsafe(no_mangle)]
     fn external_current_millis() -> u64;
 }
 
@@ -971,20 +985,139 @@ impl SimpleStdoutLogger {
 }
 
 #[cfg(feature = "std")]
+#[cfg(target_os = "windows")]
+#[allow(clippy::cast_ptr_alignment)]
+#[must_use]
+/// Return thread ID without using TLS
+pub fn get_thread_id() -> u64 {
+    use core::arch::asm;
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let teb: *const u8;
+        asm!("mov {}, gs:[0x30]", out(reg) teb);
+        let thread_id_ptr = teb.add(0x48) as *const u32;
+        u64::from(*thread_id_ptr)
+    }
+
+    #[cfg(target_arch = "x86")]
+    unsafe {
+        let teb: *const u8;
+        asm!("mov {}, fs:[0x18]", out(reg) teb);
+        let thread_id_ptr = teb.add(0x24) as *const u32;
+        *thread_id_ptr as u64
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[must_use]
+#[allow(clippy::cast_sign_loss)]
+/// Return thread ID without using TLS
+pub fn get_thread_id() -> u64 {
+    use libc::{SYS_gettid, syscall};
+
+    unsafe { syscall(SYS_gettid) as u64 }
+}
+
+#[cfg(feature = "std")]
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+#[must_use]
+/// Return thread ID using Rust's `std::thread`
+pub fn get_thread_id() -> u64 {
+    // Fallback for other platforms
+    let thread_id = std::thread::current().id();
+    unsafe { mem::transmute::<_, u64>(thread_id) }
+}
+
+#[cfg(feature = "std")]
+#[cfg(target_os = "windows")]
+mod windows_logging {
+    use core::ptr;
+
+    use once_cell::sync::OnceCell;
+    use winapi::um::{
+        fileapi::WriteFile, handleapi::INVALID_HANDLE_VALUE, processenv::GetStdHandle,
+        winbase::STD_OUTPUT_HANDLE, winnt::HANDLE,
+    };
+
+    // Safe wrapper around HANDLE
+    struct StdOutHandle(HANDLE);
+
+    // Implement Send and Sync for StdOutHandle, assuming it's safe to share
+    unsafe impl Send for StdOutHandle {}
+    unsafe impl Sync for StdOutHandle {}
+
+    static H_STDOUT: OnceCell<StdOutHandle> = OnceCell::new();
+
+    fn get_stdout_handle() -> HANDLE {
+        H_STDOUT
+            .get_or_init(|| {
+                let handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
+                StdOutHandle(handle)
+            })
+            .0
+    }
+    /// A function that writes directly to stdout using `WinAPI`.
+    /// Works much faster than println and does not need TLS
+    pub fn direct_log(message: &str) {
+        // Get the handle to standard output
+        let h_stdout: HANDLE = get_stdout_handle();
+
+        if h_stdout == INVALID_HANDLE_VALUE {
+            eprintln!("Failed to get standard output handle");
+            return;
+        }
+
+        let bytes = message.as_bytes();
+        let mut bytes_written = 0;
+
+        // Write the message to standard output
+        let result = unsafe {
+            WriteFile(
+                h_stdout,
+                bytes.as_ptr() as *const _,
+                bytes.len() as u32,
+                &mut bytes_written,
+                ptr::null_mut(),
+            )
+        };
+
+        if result == 0 {
+            eprintln!("Failed to write to standard output");
+        }
+    }
+}
+
+#[cfg(feature = "std")]
 impl log::Log for SimpleStdoutLogger {
     #[inline]
     fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }
 
+    #[cfg(not(target_os = "windows"))]
     fn log(&self, record: &Record) {
         println!(
-            "[{:?}, {:?}] {}: {}",
+            "[{:?}, {:?}:{:?}] {}: {}",
             current_time(),
             std::process::id(),
+            get_thread_id(),
             record.level(),
             record.args()
         );
+    }
+
+    #[cfg(target_os = "windows")]
+    fn log(&self, record: &Record) {
+        // println is not safe in TLS-less environment
+        let msg = format!(
+            "[{:?}, {:?}:{:?}] {}: {}\n",
+            current_time(),
+            std::process::id(),
+            get_thread_id(),
+            record.level(),
+            record.args()
+        );
+        windows_logging::direct_log(msg.as_str());
     }
 
     fn flush(&self) {}
@@ -1143,6 +1276,65 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
     }));
 }
 
+#[cfg(feature = "std")]
+#[cfg(target_os = "windows")]
+#[repr(C)]
+#[allow(clippy::upper_case_acronyms)]
+struct TEB {
+    reserved1: [u8; 0x58],
+    tls_pointer: *mut *mut u8,
+    reserved2: [u8; 0xC0],
+}
+
+#[cfg(feature = "std")]
+#[cfg(target_arch = "x86_64")]
+#[inline(always)]
+#[cfg(target_os = "windows")]
+fn nt_current_teb() -> *mut TEB {
+    use core::arch::asm;
+    let teb: *mut TEB;
+    unsafe {
+        asm!("mov {}, gs:0x30", out(reg) teb);
+    }
+    teb
+}
+
+/// Some of our hooks can be invoked from threads that do not have TLS yet.
+/// Many Rust and Frida functions require TLS to be set up, so we need to check if we have TLS.
+/// This was observed on Windows, so for now for other platforms we assume that we have TLS.
+#[cfg(feature = "std")]
+#[inline]
+#[allow(unreachable_code)]
+#[must_use]
+pub fn has_tls() -> bool {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        let teb = nt_current_teb();
+        if teb.is_null() {
+            return false;
+        }
+
+        let tls_array = (*teb).tls_pointer;
+        if tls_array.is_null() {
+            return false;
+        }
+        return true;
+    }
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        let mut tid: u64;
+        std::arch::asm!(
+            "mrs {tid}, TPIDRRO_EL0",
+            tid = out(reg) tid,
+        );
+        tid &= 0xffff_ffff_ffff_fff8;
+        let tlsptr = tid as *const u64;
+        return tlsptr.add(0x102).read() != 0u64;
+    }
+    // Default
+    true
+}
+
 /// Zero-cost way to construct [`core::num::NonZeroUsize`] at compile-time.
 #[macro_export]
 macro_rules! nonzero {
@@ -1174,7 +1366,7 @@ macro_rules! nonnull_raw_mut {
 #[allow(missing_docs)] // expect somehow breaks here
 pub mod pybind {
 
-    use pyo3::{pymodule, types::PyModule, Bound, PyResult};
+    use pyo3::{Bound, PyResult, pymodule, types::PyModule};
 
     #[macro_export]
     macro_rules! unwrap_me_body {
@@ -1325,12 +1517,14 @@ pub unsafe fn vec_init<E, F, T>(nb_elts: usize, init_fn: F) -> Result<Vec<T>, E>
 where
     F: FnOnce(&mut Vec<T>) -> Result<(), E>,
 {
-    let mut new_vec: Vec<T> = Vec::with_capacity(nb_elts);
-    new_vec.set_len(nb_elts);
+    unsafe {
+        let mut new_vec: Vec<T> = Vec::with_capacity(nb_elts);
+        new_vec.set_len(nb_elts);
 
-    init_fn(&mut new_vec)?;
+        init_fn(&mut new_vec)?;
 
-    Ok(new_vec)
+        Ok(new_vec)
+    }
 }
 
 #[cfg(test)]

@@ -7,13 +7,14 @@ use alloc::{
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::{
-    tuples::{Handle, Handled},
     AsSlice, Named,
+    tuples::{Handle, Handled},
 };
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
@@ -23,10 +24,9 @@ use crate::{
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
-    stages::{RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor},
-    Error, HasMetadata, HasNamedMetadata,
 };
 
 const MAX_GENERALIZED_LEN: usize = 8192;
@@ -62,6 +62,23 @@ impl<C, EM, I, O, OT, S, Z> Named for GeneralizationStage<C, EM, I, O, OT, S, Z>
     }
 }
 
+impl<C, EM, I, O, OT, S, Z> Restartable<S> for GeneralizationStage<C, EM, I, O, OT, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
+    #[inline]
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryCountRestartHelper::should_restart::<S>(state, &self.name, 3)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryCountRestartHelper::clear_progress::<S>(state, &self.name)
+    }
+}
+
 impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z>
     for GeneralizationStage<C, EM, BytesInput, O, E::Observers, S, Z>
 where
@@ -76,18 +93,6 @@ where
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
 {
-    #[inline]
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        // TODO: We need to be able to resume better if something crashes or times out
-        RetryCountRestartHelper::should_restart::<S>(state, &self.name, 3)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        // TODO: We need to be able to resume better if something crashes or times out
-        RetryCountRestartHelper::clear_progress::<S>(state, &self.name)
-    }
-
     #[inline]
     #[expect(clippy::too_many_lines)]
     fn perform(

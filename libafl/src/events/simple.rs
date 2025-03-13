@@ -2,16 +2,16 @@
 
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
-use core::sync::atomic::{compiler_fence, Ordering};
+use core::sync::atomic::{Ordering, compiler_fence};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
+use libafl_bolts::ClientId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", not(miri)))]
-use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
-use libafl_bolts::os::{fork, ForkResult};
-use libafl_bolts::ClientId;
+use libafl_bolts::os::{ForkResult, fork};
+#[cfg(all(unix, feature = "std", not(miri)))]
+use libafl_bolts::os::{SIGNAL_RECURSION_EXIT, unix_signals::setup_signal_handler};
 #[cfg(feature = "std")]
 use libafl_bolts::{
     os::CTRL_C_EXIT,
@@ -19,26 +19,27 @@ use libafl_bolts::{
     staterestore::StateRestorer,
 };
 #[cfg(feature = "std")]
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+#[cfg(feature = "std")]
+use serde::de::DeserializeOwned;
 
-use super::{std_on_restart, AwaitRestartSafe, ProgressReporter, RecordSerializationTime};
+use super::{AwaitRestartSafe, ProgressReporter, std_on_restart};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
-    events::{
-        std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
-        Event, EventFirer, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
-        SendExiting,
-    },
-    monitors::Monitor,
-    stages::HasCurrentStageId,
-    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
     Error, HasMetadata,
+    events::{
+        BrokerEventResult, Event, EventFirer, EventManagerId, EventReceiver, EventRestarter,
+        HasEventManagerId, SendExiting, std_maybe_report_progress, std_report_progress,
+    },
+    monitors::{Monitor, stats::ClientStatsManager},
+    state::{
+        HasCurrentStageId, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable,
+    },
 };
 #[cfg(feature = "std")]
 use crate::{
-    monitors::{ClientStats, SimplePrintingMonitor},
+    monitors::{SimplePrintingMonitor, stats::ClientStats},
     state::HasSolutions,
 };
 
@@ -55,6 +56,7 @@ pub struct SimpleEventManager<I, MT, S> {
     /// The events that happened since the last `handle_in_broker`
     events: Vec<Event<I>>,
     phantom: PhantomData<S>,
+    client_stats_manager: ClientStatsManager,
 }
 
 impl<I, MT, S> Debug for SimpleEventManager<I, MT, S>
@@ -71,8 +73,6 @@ where
     }
 }
 
-impl<I, MT, S> RecordSerializationTime for SimpleEventManager<I, MT, S> {}
-
 impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
@@ -84,7 +84,7 @@ where
     }
 
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
-        match Self::handle_in_broker(&mut self.monitor, &event)? {
+        match Self::handle_in_broker(&mut self.monitor, &mut self.client_stats_manager, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
         }
@@ -130,7 +130,7 @@ where
                 _ => {
                     return Err(Error::unknown(format!(
                         "Received illegal message that message should not have arrived: {event:?}."
-                    )))
+                    )));
                 }
             }
         }
@@ -138,15 +138,6 @@ where
     }
     fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
         Ok(())
-    }
-}
-
-impl<I, MT, OT, S> CanSerializeObserver<OT> for SimpleEventManager<I, MT, S>
-where
-    OT: Serialize,
-{
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 
@@ -199,65 +190,70 @@ where
         Self {
             monitor,
             events: vec![],
+            client_stats_manager: ClientStatsManager::default(),
             phantom: PhantomData,
         }
     }
 
     /// Handle arriving events in the broker
     #[expect(clippy::unnecessary_wraps)]
-    fn handle_in_broker(monitor: &mut MT, event: &Event<I>) -> Result<BrokerEventResult, Error> {
+    fn handle_in_broker(
+        monitor: &mut MT,
+        client_stats_manager: &mut ClientStatsManager,
+        event: &Event<I>,
+    ) -> Result<BrokerEventResult, Error> {
         match event {
             Event::NewTestcase { corpus_size, .. } => {
-                monitor.client_stats_insert(ClientId(0));
-                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_corpus_size(*corpus_size as u64);
                 });
-                monitor.display(event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateExecStats {
                 time, executions, ..
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor.client_stats_insert(ClientId(0));
-                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_executions(*executions, *time);
                 });
 
-                monitor.display(event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats { name, value, .. } => {
-                monitor.client_stats_insert(ClientId(0));
-                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_user_stats(name.clone(), value.clone());
                 });
-                monitor.aggregate(name);
-                monitor.display(event.name(), ClientId(0));
+                client_stats_manager.aggregate(name);
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor {
                 time,
                 executions,
-                introspection_monitor,
+                introspection_stats,
                 ..
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor.client_stats_insert(ClientId(0));
-                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_executions(*executions, *time);
-                    client_stat.update_introspection_monitor((**introspection_monitor).clone());
+                    client_stat.update_introspection_stats((**introspection_stats).clone());
                 });
-                monitor.display(event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size, .. } => {
-                monitor.client_stats_insert(ClientId(0));
-                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_objective_size(*objective_size as u64);
                 });
-                monitor.display(event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -286,12 +282,6 @@ pub struct SimpleRestartingEventManager<I, MT, S, SHM, SP> {
     inner: SimpleEventManager<I, MT, S>,
     /// [`StateRestorer`] for restarts
     staterestorer: StateRestorer<SHM, SP>,
-}
-
-#[cfg(feature = "std")]
-impl<I, MT, S, SHM, SP> RecordSerializationTime
-    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
-{
 }
 
 #[cfg(feature = "std")]
@@ -326,20 +316,9 @@ where
         self.staterestorer.reset();
         self.staterestorer.save(&(
             state,
-            self.inner.monitor.start_time(),
-            self.inner.monitor.client_stats(),
+            self.inner.client_stats_manager.start_time(),
+            self.inner.client_stats_manager.client_stats(),
         ))
-    }
-}
-
-#[cfg(feature = "std")]
-impl<I, MT, OT, S, SHM, SP> CanSerializeObserver<OT>
-    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
-where
-    OT: Serialize,
-{
-    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 
@@ -431,7 +410,7 @@ where
     /// Launch the simple restarting manager.
     /// This `EventManager` is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
-    pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
+    pub fn launch(monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
         S: DeserializeOwned + Serialize + HasSolutions<I>,
         MT: Debug,
@@ -447,7 +426,12 @@ where
                 StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
-            staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+
+            // # Safety
+            // Launcher is usually running in a single thread.
+            unsafe {
+                staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+            }
 
             let mut ctr: u64 = 0;
             // Client->parent loop
@@ -498,14 +482,25 @@ where
                     return Err(Error::shutting_down());
                 }
 
+                #[cfg(all(unix, feature = "std"))]
+                if child_status == SIGNAL_RECURSION_EXIT {
+                    return Err(Error::illegal_state(
+                        "The client is stuck in an unexpected signal handler recursion. It is most likely a fuzzer bug.",
+                    ));
+                }
+
                 #[expect(clippy::manual_assert)]
                 if !staterestorer.has_content() {
                     #[cfg(unix)]
                     if child_status == 9 {
-                        panic!("Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart");
+                        panic!(
+                            "Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart"
+                        );
                     }
                     // Storing state in the last round did not work
-                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
+                    panic!(
+                        "Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})"
+                    );
                 }
 
                 ctr = ctr.wrapping_add(1);
@@ -542,13 +537,13 @@ where
                 staterestorer.reset();
 
                 // reload the state of the monitor to display the correct stats after restarts
-                monitor.set_start_time(start_time);
-                monitor.update_all_client_stats(clients_stats);
+                let mut this = SimpleRestartingEventManager::launched(monitor, staterestorer);
+                this.inner.client_stats_manager.set_start_time(start_time);
+                this.inner
+                    .client_stats_manager
+                    .update_all_client_stats(clients_stats);
 
-                (
-                    Some(state),
-                    SimpleRestartingEventManager::launched(monitor, staterestorer),
-                )
+                (Some(state), this)
             }
         };
 

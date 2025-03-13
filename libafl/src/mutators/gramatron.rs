@@ -6,19 +6,19 @@ use core::{cmp::max, num::NonZero};
 
 use hashbrown::HashMap;
 use libafl_bolts::{
-    rands::{choose, Rand},
     Named,
+    rands::{Rand, choose},
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata,
     corpus::Corpus,
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
     nonzero, random_corpus_id,
     state::{HasCorpus, HasRand},
-    Error, HasMetadata,
 };
 
 const RECUR_THRESHOLD: usize = 5;
@@ -201,15 +201,18 @@ where
         self.states.clear();
         for i in 0..input.terminals().len() {
             let s = input.terminals()[i].state;
-            if let Some(entry) = self.counters.get_mut(&s) {
-                if entry.0 == 1 {
-                    // Keep track only of states with more than one node
-                    self.states.push(s);
+            match self.counters.get_mut(&s) {
+                Some(entry) => {
+                    if entry.0 == 1 {
+                        // Keep track only of states with more than one node
+                        self.states.push(s);
+                    }
+                    entry.0 += 1;
+                    entry.2 = max(entry.2, i);
                 }
-                entry.0 += 1;
-                entry.2 = max(entry.2, i);
-            } else {
-                self.counters.insert(s, (1, i, i));
+                _ => {
+                    self.counters.insert(s, (1, i, i));
+                }
             }
         }
 

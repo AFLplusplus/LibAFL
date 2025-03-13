@@ -1,15 +1,15 @@
 use std::fmt::Debug;
 
-use libafl::{observers::VarLenMapObserver, HasMetadata};
+use libafl::{HasMetadata, observers::VarLenMapObserver};
 use libafl_bolts::Error;
 use libafl_qemu_sys::GuestAddr;
 #[cfg(feature = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
+    Qemu,
     emu::EmulatorModules,
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, PageFilter},
-    Qemu,
 };
 
 mod helpers;
@@ -35,6 +35,8 @@ pub use child::{
 use libafl::observers::ConstLenMapObserver;
 
 use super::utils::filters::HasAddressFilter;
+#[cfg(feature = "systemmode")]
+use super::utils::filters::HasPageFilter;
 
 /// Standard edge coverage module, adapted to most use cases
 pub type StdEdgeCoverageModule = StdEdgeCoverageFullModule;
@@ -366,27 +368,31 @@ impl<AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize> HasAddressFilte
     for EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>
 where
     AF: AddressFilter,
-    PF: PageFilter,
 {
-    type ModuleAddressFilter = AF;
+    type AddressFilter = AF;
 
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = PF;
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    fn address_filter(&self) -> &Self::AddressFilter {
         &self.address_filter
     }
 
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    fn address_filter_mut(&mut self) -> &mut Self::AddressFilter {
         &mut self.address_filter
     }
+}
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter(&self) -> &Self::ModulePageFilter {
+#[cfg(feature = "systemmode")]
+impl<AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize> HasPageFilter
+    for EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>
+where
+    PF: PageFilter,
+{
+    type PageFilter = PF;
+
+    fn page_filter(&self) -> &Self::PageFilter {
         &self.page_filter
     }
 
-    #[cfg(feature = "systemmode")]
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+    fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
         &mut self.page_filter
     }
 }
@@ -396,7 +402,7 @@ mod tests {
 
     use libafl::observers::{CanTrack, HitcountsMapObserver, VariableMapObserver};
     use libafl_bolts::ownedref::OwnedMutSlice;
-    use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
+    use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND, edges_map_mut_ptr};
 
     use crate::modules::StdEdgeCoverageModule;
 

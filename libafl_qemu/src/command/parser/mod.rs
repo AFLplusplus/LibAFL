@@ -1,19 +1,19 @@
 use std::{ffi::CStr, sync::OnceLock};
 
-use enum_map::{enum_map, EnumMap};
+use enum_map::{EnumMap, enum_map};
 use libafl::{executors::ExitKind, inputs::HasTargetBytes};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 use libc::c_uint;
 
 use crate::{
-    command::{
-        bindings, AddressAllowCommand, CommandError, CommandManager, EndCommand, InputCommand,
-        IsCommand, LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand, StartCommand,
-        StdCommandManager, TestCommand, VersionCommand,
-    },
-    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
-    sync_exit::ExitArgs,
     GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
+    command::{
+        AddressAllowCommand, CommandError, CommandManager, EndCommand, InputCommand, IsCommand,
+        LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand, StartCommand, StdCommandManager,
+        TestCommand, VersionCommand, bindings,
+    },
+    modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
+    sync_exit::ExitArgs,
 };
 
 #[cfg(all(
@@ -92,7 +92,7 @@ pub struct StartPhysCommandParser;
 impl<C, ET, I, S, SM> NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for StartPhysCommandParser
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -121,7 +121,7 @@ pub struct StartVirtCommandParser;
 impl<C, ET, I, S, SM> NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for StartVirtCommandParser
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -242,7 +242,7 @@ pub struct VaddrFilterAllowRangeCommandParser;
 impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
     for VaddrFilterAllowRangeCommandParser
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: Unpin,
     S: Unpin,
 {

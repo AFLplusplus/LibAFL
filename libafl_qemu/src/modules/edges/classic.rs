@@ -1,18 +1,18 @@
 use libafl::HasMetadata;
 
 use super::{
+    EdgeCoverageVariant,
     helpers::{
         gen_hashed_block_ids, trace_block_transition_hitcount, trace_block_transition_single,
     },
-    EdgeCoverageVariant,
 };
 use crate::{
+    EmulatorModules, Hook,
     modules::{
-        utils::filters::{StdAddressFilter, StdPageFilter},
         AddressFilter, EdgeCoverageModule, EdgeCoverageModuleBuilder, EmulatorModuleTuple,
         PageFilter,
+        utils::filters::{StdAddressFilter, StdPageFilter},
     },
-    EmulatorModules, Hook,
 };
 
 #[derive(Debug)]

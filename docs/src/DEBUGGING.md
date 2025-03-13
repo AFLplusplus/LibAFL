@@ -15,6 +15,11 @@ In this case, again, what usually should do is to run the fuzzer with gdb and se
 ## Q. I started the fuzzer but there's no output.
 First, verify that your stdout and stderr are not redirected to `/dev/null`. If you get the log, then it should either fall into the previous 2 cases. Either the fuzzer crashed because you didn't have the initial seeds, or the coverage feedback is not working.
 
+## Q. I don't see any output from my fuzzer (println!() or logging)
+First, check that you are not redirecting things to `/dev/null` else you will see nothing.
+To see the log that you added with `log::trace!();`, you need to initialize the logger (any logger, `env_logger` or `SimpleStdoutLogger` from `libafl_bolts`) before the fuzzer starts.
+Also you have to make sure that you are runing with `RUST_LOG=<log_level>` and you are *NOT* using `release_max_level_info` feature of `log` crate in your `Cargo.toml` of your fuzzer
+
 ## Q. My fuzzer is slow.
 Try running the fuzzer with the `introspection` feature of the `libafl`. This will show how much time is spent on each module of your fuzzer. Also you might be using a wrong size of the coverage map. If you see `2621440` for the size of the coverage map, you are doing it wrong. One possible mistake is the misuse of `libafl_targets::coverage::EDGES_MAP`
 ```

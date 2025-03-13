@@ -1,13 +1,13 @@
 use std::ffi::c_int;
 
 use libafl::{
+    Error, Fuzzer, HasMetadata, HasNamedMetadata,
     events::{EventReceiver, ProgressReporter, SimpleEventManager},
     executors::HasObservers,
     feedbacks::MapFeedbackMetadata,
     monitors::SimpleMonitor,
-    stages::{HasCurrentStageId, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, Stoppable},
-    Error, Fuzzer, HasMetadata, HasNamedMetadata,
+    stages::StagesTuple,
+    state::{HasCurrentStageId, HasExecutions, HasLastReportTime, Stoppable},
 };
 
 use crate::{fuzz_with, options::LibfuzzerOptions};

@@ -13,7 +13,7 @@ mod observers;
 #[cfg(feature = "libfuzzer_oom")]
 pub use observers::*;
 
-extern "C" {
+unsafe extern "C" {
     // int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
 

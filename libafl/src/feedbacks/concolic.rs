@@ -8,15 +8,15 @@ use alloc::borrow::Cow;
 use core::fmt::Debug;
 
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 
 use crate::{
+    Error, HasMetadata,
     corpus::Testcase,
     feedbacks::{Feedback, StateInitializer},
     observers::concolic::ConcolicObserver,
-    Error, HasMetadata,
 };
 
 /// The concolic feedback. It is used to attach concolic tracing metadata to the testcase.

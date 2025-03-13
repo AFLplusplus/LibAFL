@@ -140,9 +140,9 @@ pub extern "C" fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = OnDiskTomlMonitor::new(
-        "./fuzzer_stats.toml",
-        MultiMonitor::new(|s| println!("{s}")),
+    let monitor = tuple_list!(
+        OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
+        MultiMonitor::new(|s| println!("{s}"))
     );
 
     let mut run_client = |state: Option<_>, mut restarting_mgr, _client_description| {
@@ -218,18 +218,6 @@ pub extern "C" fn libafl_main() {
             ExitKind::Ok
         };
 
-        // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        #[cfg(target_os = "linux")]
-        let mut executor = InProcessExecutor::batched_timeout(
-            &mut harness,
-            tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut restarting_mgr,
-            opt.timeout,
-        )?;
-
-        #[cfg(not(target_os = "linux"))]
         let mut executor = InProcessExecutor::with_timeout(
             &mut harness,
             tuple_list!(edges_observer, time_observer),

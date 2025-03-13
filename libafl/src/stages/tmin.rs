@@ -8,17 +8,18 @@ use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{
-    generic_hash_std,
+    HasLen, Named, generic_hash_std,
     tuples::{Handle, Handled, MatchName, MatchNameRef},
-    HasLen, Named,
 };
 use serde::Serialize;
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
+    HasScheduler,
     corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
     executors::{ExitKind, HasObservers},
@@ -29,16 +30,14 @@ use crate::{
     observers::ObserversTuple,
     schedulers::RemovableScheduler,
     stages::{
+        ExecutionCountRestartHelper, Restartable, Stage,
         mutational::{MutatedTransform, MutatedTransformPost},
-        ExecutionCountRestartHelper, Stage,
     },
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions,
         MaybeHasClientPerfMonitor,
     },
-    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
-    HasScheduler,
 };
 
 /// The default corpus entry minimising mutational stage
@@ -82,14 +81,6 @@ where
     M: Mutator<I, S>,
     I: Input + Hash + HasLen,
 {
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        self.restart_helper.should_restart(state, &self.name)
-    }
-
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        self.restart_helper.clear_progress::<S>(state, &self.name)
-    }
-
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -99,10 +90,20 @@ where
     ) -> Result<(), Error> {
         self.perform_minification(fuzzer, executor, state, manager)?;
 
-        #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
-
         Ok(())
+    }
+}
+
+impl<E, EM, F, FF, I, M, S, Z> Restartable<S> for StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z>
+where
+    S: HasNamedMetadata + HasExecutions,
+{
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        self.restart_helper.should_restart(state, &self.name)
+    }
+
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        self.restart_helper.clear_progress::<S>(state, &self.name)
     }
 }
 

@@ -6,18 +6,18 @@ use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::fmt::{self, Debug};
 
 use libafl_bolts::{
+    Named,
     rands::{Rand, StdRand},
     tuples::NamedTuple,
-    Named,
 };
 use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId},
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasRand, HasSolutions},
-    Error, HasMetadata,
 };
 
 /// A Struct for managing MOpt-mutator parameters.

@@ -3,18 +3,18 @@
 //! Note: To capture the timeouts, use in conjunction with `CaptureTimeoutFeedback`
 //! Note: Will NOT work with in process executors due to the potential for restarts/crashes when
 //! running inputs.
-use core::time::Duration;
-use std::{cell::RefCell, collections::VecDeque, fmt::Debug, marker::PhantomData, rc::Rc};
+use alloc::{collections::VecDeque, rc::Rc};
+use core::{cell::RefCell, fmt::Debug, marker::PhantomData, time::Duration};
 
 use libafl_bolts::Error;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
+    Evaluator, HasMetadata,
     executors::{Executor, HasObservers, HasTimeout},
     inputs::BytesInput,
     observers::ObserversTuple,
-    stages::Stage,
-    Evaluator, HasMetadata,
+    stages::{Restartable, Stage},
 };
 
 /// Stage that re-runs inputs deemed as timeouts with double the timeout to assert that they are
@@ -111,6 +111,9 @@ where
         *res = TimeoutsToVerify::<I>::new();
         Ok(())
     }
+}
+
+impl<E, I, S> Restartable<S> for VerifyTimeoutsStage<E, I, S> {
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         Ok(true)
     }

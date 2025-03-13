@@ -6,18 +6,19 @@ use libafl_qemu_sys::GuestVirtAddr;
 use libc::c_uint;
 
 use crate::{
+    IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
     command::{
+        CommandError, NativeExitKind,
         nyx::{
-            bindings, AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand,
+            AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand,
             NyxCommandManager, PanicCommand, PrintfCommand, RangeSubmitCommand, ReleaseCommand,
             SetAgentConfigCommand, SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
+            bindings,
         },
         parser::NativeCommandParser,
-        CommandError, NativeExitKind,
     },
-    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
+    modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
     sync_exit::ExitArgs,
-    IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
 };
 
 fn get_guest_string(qemu: Qemu, string_ptr_reg: Regs) -> Result<String, CommandError> {
@@ -80,7 +81,7 @@ pub struct SubmitCR3CommandParser;
 impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for SubmitCR3CommandParser
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -100,7 +101,7 @@ pub struct RangeSubmitCommandParser;
 impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for RangeSubmitCommandParser
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -188,7 +189,7 @@ pub struct NextPayloadCommandParser;
 impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for NextPayloadCommandParser
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,

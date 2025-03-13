@@ -1,0 +1,69 @@
+import "../../../just/libafl-qemu.just"
+FUZZER_NAME := "qemu_linux_kernel"
+
+LINUX_BUILDER_URL := "git@github.com:AFLplusplus/linux-qemu-image-builder.git"
+LINUX_BUILDER_DIR := TARGET_DIR / "linux_builder"
+LINUX_BUILDER_OUT := LINUX_BUILDER_DIR / "output"
+
+target_dir:
+    mkdir -p "{{TARGET_DIR}}"/runtime
+    mkdir -p "{{TARGET_DIR}}"/setup
+
+linux_builder_dir: target_dir
+    #!/bin/bash
+
+    if [ ! -d {{ LINUX_BUILDER_DIR }} ]; then
+        git clone {{ LINUX_BUILDER_URL }} {{ LINUX_BUILDER_DIR }}
+    else
+        git -C {{ LINUX_BUILDER_DIR }} pull
+    fi
+
+update_files api="": target_dir linux_builder_dir (build api)
+    cp -r setup/* "{{ LINUX_BUILDER_DIR }}/setup/"
+    cp -r runtime/* "{{ LINUX_BUILDER_DIR }}/runtime/"
+
+    cp {{ BUILD_DIR }}/include/* "{{ LINUX_BUILDER_DIR }}/setup/"
+
+target api="": linux_builder_dir update_files
+    {{LINUX_BUILDER_DIR}}/build.sh
+
+build api="":
+    cargo build \
+      --profile {{ PROFILE }} \
+      --target-dir {{ TARGET_DIR }} \
+      --features "{{ api }}"
+
+run api="": (build api)
+    #!/bin/bash
+
+    rm -rf corpus_gen
+
+    # Find the bios dir of LibAFL QEMU
+    if [ ! -z "${LIBAFL_QEMU_DIR}" ]; then
+      LIBAFL_QEMU_BIOS_DIR=${LIBAFL_QEMU_DIR}/build/qemu-bundle/usr/local/share/qemu
+    else
+      LIBAFL_QEMU_BIOS_DIR={{ LIBAFL_QEMU_DIR_DEFAULT }}/build/qemu-bundle/usr/local/share/qemu
+    fi
+
+    qemu-img create -f qcow2 -o backing_file={{ LINUX_BUILDER_OUT }}/OVMF_CODE.4m.fd -F raw {{ LINUX_BUILDER_OUT }}/OVMF_CODE.4m.qcow2
+    qemu-img create -f qcow2 -o backing_file={{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.fd -F raw {{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.qcow2
+    qemu-img create -f qcow2 -o backing_file={{ LINUX_BUILDER_OUT }}/linux.qcow2 -F qcow2 {{ LINUX_BUILDER_OUT }}/linux.tmp.qcow2
+
+    {{FUZZER}} \
+      -accel tcg \
+      -m 4G \
+      -drive if=pflash,format=qcow2,file="{{ LINUX_BUILDER_OUT }}/OVMF_CODE.4m.qcow2" `# OVMF code pflash` \
+      -drive if=pflash,format=qcow2,file="{{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.qcow2" `# OVMF vars pflash` \
+      -device ahci,id=ahci,bus=pci.0,addr=4 \
+      -device ide-hd,bus=ahci.0,drive=disk,bootindex=1 \
+      -blockdev driver=file,filename="{{ LINUX_BUILDER_OUT }}/linux.tmp.qcow2",node-name=storage `# Backend file of "disk"` \
+      -blockdev driver=qcow2,file=storage,node-name=disk `# QCOW2 "disk"` \
+      -L "${LIBAFL_QEMU_BIOS_DIR}" \
+      -nographic \
+      -monitor null \
+      -serial null
+
+test: build (build "nyx")
+
+clean:
+    cargo clean

@@ -2,7 +2,7 @@
 name = "forkserver_simple"
 version = "0.14.1"
 authors = ["tokatoka <tokazerkje@outlook.com>"]
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

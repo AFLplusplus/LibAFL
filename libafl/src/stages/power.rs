@@ -9,21 +9,21 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::Named;
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
+    schedulers::{TestcaseScore, testcase_score::CorpusPowerTestcaseScore},
     stages::{
+        MutationalStage, Restartable, RetryCountRestartHelper, Stage,
         mutational::{MutatedTransform, MutatedTransformPost},
-        MutationalStage, RetryCountRestartHelper, Stage,
     },
     start_timer,
     state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
-    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// The unique id for this stage
@@ -101,7 +101,12 @@ where
         let ret = self.perform_mutational(fuzzer, executor, state, manager);
         ret
     }
+}
 
+impl<E, F, EM, I, M, S, Z> Restartable<S> for PowerMutationalStage<E, F, EM, I, M, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase
         RetryCountRestartHelper::should_restart(state, &self.name, 3)

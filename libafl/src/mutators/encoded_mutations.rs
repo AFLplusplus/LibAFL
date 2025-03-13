@@ -1,5 +1,4 @@
 //! Mutations for [`EncodedInput`]s
-//!
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cmp::{max, min},
@@ -12,15 +11,15 @@ use libafl_bolts::{
 };
 
 use crate::{
+    Error,
     corpus::Corpus,
     inputs::EncodedInput,
     mutators::{
-        mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
         MutationResult, Mutator, Named,
+        mutations::{ARITH_MAX, buffer_copy, buffer_self_copy},
     },
     nonzero, random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
-    Error,
 };
 
 /// Set a code in the input as a random value

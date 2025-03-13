@@ -1,0 +1,32 @@
+[package]
+name = "qasan"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib"]
+
+[features]
+default = []
+test = ["asan/test", "dummy_libc/test"]
+
+[dependencies]
+asan = { path = "../asan", default-features = false, features = [
+  "dlmalloc",
+  "hooks",
+  "host",
+  "libc",
+  "mimalloc",
+  "tracking",
+] }
+dummy_libc = { path = "../dummy_libc", default-features = false }
+libc = { version = "0.2.169", default-features = false }
+log = { version = "0.4.22", default-features = false, features = [
+  "release_max_level_info",
+] }
+spin = { version = "0.9.8", default-features = false, features = [
+  "lazy",
+  "mutex",
+  "spin_mutex",
+] }

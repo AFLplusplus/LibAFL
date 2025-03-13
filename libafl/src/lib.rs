@@ -81,7 +81,7 @@ pub mod stages;
 pub mod state;
 
 pub use fuzzer::*;
-pub use libafl_bolts::{nonzero, Error};
+pub use libafl_bolts::{Error, nonzero};
 
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
@@ -96,7 +96,7 @@ pub mod prelude {
 
 #[cfg(all(any(doctest, test), not(feature = "std")))]
 /// Provide custom time in `no_std` tests.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn external_current_millis() -> u64 {
     // TODO: use "real" time here
     1000
@@ -116,6 +116,7 @@ mod tests {
     #[cfg(miri)]
     use crate::stages::ExecutionCountRestartHelperMetadata;
     use crate::{
+        StdFuzzer,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
@@ -123,11 +124,10 @@ mod tests {
         fuzzer::Fuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
-        mutators::{mutations::BitFlipMutator, StdScheduledMutator},
+        mutators::{StdScheduledMutator, mutations::BitFlipMutator},
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
-        StdFuzzer,
     };
 
     #[test]

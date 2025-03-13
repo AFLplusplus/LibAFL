@@ -5,18 +5,18 @@ use alloc::vec::Vec;
 use core::{any::type_name, cmp::Ordering, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
-use libafl_bolts::{rands::Rand, serdeany::SerdeAny, tuples::MatchName, AsIter, HasRefCnt};
+use libafl_bolts::{AsIter, HasRefCnt, rands::Rand, serdeany::SerdeAny, tuples::MatchName};
 use serde::{Deserialize, Serialize};
 
 use super::HasQueueCycles;
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     observers::CanTrack,
     require_index_tracking,
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand},
-    Error, HasMetadata,
 };
 
 /// Default probability to skip the non-favored values
@@ -107,12 +107,10 @@ where
         self.base.on_remove(state, id, testcase)?;
         let mut entries =
             if let Some(meta) = state.metadata_map_mut().get_mut::<TopRatedsMetadata>() {
-                let entries = meta
-                    .map
+                meta.map
                     .extract_if(|_, other_id| *other_id == id)
                     .map(|(entry, _)| entry)
-                    .collect::<Vec<_>>();
-                entries
+                    .collect::<Vec<_>>()
             } else {
                 return Ok(());
             };
@@ -129,30 +127,33 @@ where
                 let mut entry = e_iter.next();
                 let mut map_entry = map_iter.next();
                 while let Some(e) = entry {
-                    if let Some(ref me) = map_entry {
-                        match e.cmp(me) {
-                            Ordering::Less => {
-                                entry = e_iter.next();
-                            }
-                            Ordering::Equal => {
-                                // if we found a better factor, prefer it
-                                map.entry(*e)
-                                    .and_modify(|(f, id)| {
-                                        if *f > factor {
-                                            *f = factor;
-                                            *id = current_id;
-                                        }
-                                    })
-                                    .or_insert((factor, current_id));
-                                entry = e_iter.next();
-                                map_entry = map_iter.next();
-                            }
-                            Ordering::Greater => {
-                                map_entry = map_iter.next();
+                    match map_entry {
+                        Some(ref me) => {
+                            match e.cmp(me) {
+                                Ordering::Less => {
+                                    entry = e_iter.next();
+                                }
+                                Ordering::Equal => {
+                                    // if we found a better factor, prefer it
+                                    map.entry(*e)
+                                        .and_modify(|(f, id)| {
+                                            if *f > factor {
+                                                *f = factor;
+                                                *id = current_id;
+                                            }
+                                        })
+                                        .or_insert((factor, current_id));
+                                    entry = e_iter.next();
+                                    map_entry = map_iter.next();
+                                }
+                                Ordering::Greater => {
+                                    map_entry = map_iter.next();
+                                }
                             }
                         }
-                    } else {
-                        break;
+                        _ => {
+                            break;
+                        }
                     }
                 }
             }
@@ -212,12 +213,11 @@ where
         self.cull(state)?;
         let mut id = self.base.next(state)?;
         while {
-            let has = !state
+            !state
                 .corpus()
                 .get(id)?
                 .borrow()
-                .has_metadata::<IsFavoredMetadata>();
-            has
+                .has_metadata::<IsFavoredMetadata>()
         } && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
             id = self.base.next(state)?;

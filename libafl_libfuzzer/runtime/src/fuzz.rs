@@ -1,26 +1,19 @@
 use core::ffi::c_int;
 #[cfg(unix)]
-use std::io::{stderr, stdout, Write};
-use std::{
-    fmt::Debug,
-    fs::File,
-    net::TcpListener,
-    os::fd::AsRawFd,
-    str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::io::{Write, stderr, stdout};
+use std::{fmt::Debug, fs::File, net::TcpListener, os::fd::AsRawFd, str::FromStr};
 
 use libafl::{
+    Error, Fuzzer, HasMetadata,
     corpus::Corpus,
     events::{
-        launcher::Launcher, EventConfig, EventReceiver, ProgressReporter, SimpleEventManager,
-        SimpleRestartingEventManager,
+        EventConfig, EventReceiver, ProgressReporter, SimpleEventManager,
+        SimpleRestartingEventManager, launcher::Launcher,
     },
     executors::ExitKind,
-    monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
-    stages::{HasCurrentStageId, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, HasSolutions, Stoppable},
-    Error, Fuzzer, HasMetadata,
+    monitors::{Monitor, MultiMonitor, tui::TuiMonitor},
+    stages::StagesTuple,
+    state::{HasCurrentStageId, HasExecutions, HasLastReportTime, HasSolutions, Stoppable},
 };
 use libafl_bolts::{
     core_affinity::Cores,
@@ -148,7 +141,9 @@ where
         .or_else(|_| {
             TcpListener::bind("127.0.0.1:0").map(|sock| {
                 let port = sock.local_addr().unwrap().port();
-                std::env::set_var(PORT_PROVIDER_VAR, port.to_string());
+                unsafe {
+                    std::env::set_var(PORT_PROVIDER_VAR, port.to_string());
+                }
                 port
             })
         })?;
@@ -208,16 +203,10 @@ pub fn fuzz(
                 .build();
             fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
         } else if forks == 1 {
-            let monitor = MultiMonitor::with_time(
-                create_monitor_closure(),
-                SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
-            );
+            let monitor = MultiMonitor::new(create_monitor_closure());
             fuzz_single_forking(options, harness, shmem_provider, monitor)
         } else {
-            let monitor = MultiMonitor::with_time(
-                create_monitor_closure(),
-                SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
-            );
+            let monitor = MultiMonitor::new(create_monitor_closure());
             fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
         }
     } else if options.tui() {

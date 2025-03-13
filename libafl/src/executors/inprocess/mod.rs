@@ -12,22 +12,22 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::tuples::{tuple_list, RefIndexable};
+use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
     executors::{
-        hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
-        inprocess::inner::GenericInProcessExecutorInner,
         Executor, ExitKind, HasObservers,
+        hooks::{ExecutorHooksTuple, inprocess::InProcessHooks},
+        inprocess::inner::GenericInProcessExecutorInner,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
-    Error, HasMetadata,
 };
 
 /// The inner structure of `InProcessExecutor`.
@@ -155,37 +155,6 @@ where
         )
     }
 
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
-    #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout<OF>(
-        harness_fn: &'a mut H,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        exec_tmout: Duration,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF>,
-    {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, OF>(
-            tuple_list!(),
-            observers,
-            fuzzer,
-            state,
-            event_mgr,
-            exec_tmout,
-        )?;
-
-        Ok(Self {
-            harness_fn,
-            inner,
-            phantom: PhantomData,
-        })
-    }
-
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
@@ -256,34 +225,6 @@ where
             event_mgr,
             Duration::from_millis(5000),
         )
-    }
-
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
-    #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout_generic<OF>(
-        user_hooks: HT,
-        harness_fn: HB,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        exec_tmout: Duration,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I, S> + EventRestarter<S>,
-
-        OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF>,
-    {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, OF>(
-            user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
-        )?;
-
-        Ok(Self {
-            harness_fn,
-            inner,
-            phantom: PhantomData,
-        })
     }
 
     /// Create a new [`InProcessExecutor`].
@@ -371,6 +312,9 @@ impl<EM, H, HB, HT, I, OT, S, Z> HasInProcessHooks<I, S>
 
 #[inline]
 /// Save state if it is an objective
+/// Note that unlike the logic in fuzzer/mod.rs
+/// This will *NOT* put any testcase into the corpus.
+/// As it totally does not make any sense to put when we use inprocess executor or its descendants.
 pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
     executor: &mut E,
     state: &mut S,
@@ -379,7 +323,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
     event_mgr: &mut EM,
     exitkind: ExitKind,
 ) where
-    E: Executor<EM, I, S, Z> + HasObservers,
+    E: HasObservers,
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
     OF: Feedback<EM, I, E::Observers, S>,
@@ -387,18 +331,19 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
     Z: HasObjective<Objective = OF>,
     I: Input + Clone,
 {
+    log::info!("in crash handler!");
     let mut observers = executor.observers_mut();
 
     observers
         .post_exec_all(state, input, &exitkind)
         .expect("Observers post_exec_all failed");
 
-    let interesting = fuzzer
+    let is_solution = fuzzer
         .objective_mut()
         .is_interesting(state, event_mgr, input, &*observers, &exitkind)
         .expect("In run_observers_and_save_state objective failure.");
 
-    if interesting {
+    if is_solution {
         let mut new_testcase = Testcase::from(input.clone());
         new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
@@ -419,14 +364,12 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
             .fire(
                 state,
                 Event::Objective {
-                    #[cfg(feature = "share_objectives")]
-                    input: input.clone(),
-
+                    input: fuzzer.share_objectives().then_some(input.clone()),
                     objective_size: state.solutions().count(),
                     time: libafl_bolts::current_time(),
                 },
             )
-            .expect("Could not save state in run_observers_and_save_state");
+            .expect("Could not send off events in run_observers_and_save_state");
     }
 
     // Serialize the state and wait safely for the broker to read pending messages
@@ -440,6 +383,7 @@ mod tests {
     use libafl_bolts::{rands::XkcdRand, tuples::tuple_list};
 
     use crate::{
+        StdFuzzer,
         corpus::InMemoryCorpus,
         events::NopEventManager,
         executors::{Executor, ExitKind, InProcessExecutor},
@@ -447,7 +391,6 @@ mod tests {
         inputs::NopInput,
         schedulers::RandScheduler,
         state::{NopState, StdState},
-        StdFuzzer,
     };
 
     #[test]

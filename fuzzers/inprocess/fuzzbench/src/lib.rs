@@ -16,47 +16,46 @@ use std::{
 
 use clap::{Arg, Command};
 use libafl::{
+    Error, HasMetadata,
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
-        StdScheduledMutator, Tokens,
+        StdMOptMutator, StdScheduledMutator, Tokens, havoc_mutations,
+        token_mutations::I2SRandReplace, tokens_mutations,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
+        IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage,
+        ShadowTracingStage, StdMutationalStage, calibrate::CalibrationStage,
+        power::StdPowerMutationalStage,
     },
     state::{HasCorpus, StdState},
-    Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_time,
+    AsSlice, current_time,
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice,
+    tuples::{Merge, tuple_list},
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
+    CmpLogObserver, libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
 
 /// The fuzzer main (as `no_mangle` C function)
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -261,8 +260,7 @@ fn fuzz(
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
-        // Time feedback, this one does not need a feedback state
-        TimeFeedback::new(&time_observer)
+        // CrashFeedback::new(),
     );
 
     // A feedback to choose if an input is a solution or not
@@ -333,8 +331,6 @@ fn fuzz(
         ExitKind::Ok
     };
 
-    let mut tracing_harness = harness;
-
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = InProcessExecutor::with_timeout(
         &mut harness,
@@ -345,18 +341,10 @@ fn fuzz(
         timeout,
     )?;
 
+    let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+
     // Setup a tracing stage in which we log comparisons
-    let tracing = TracingStage::new(
-        InProcessExecutor::with_timeout(
-            &mut tracing_harness,
-            tuple_list!(cmplog_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            timeout * 10,
-        )?,
-        // Give it more time!
-    );
+    let tracing = ShadowTracingStage::new();
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);

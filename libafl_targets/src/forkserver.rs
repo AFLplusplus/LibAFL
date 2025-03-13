@@ -1,6 +1,6 @@
 //! Forkserver logic into targets
 
-extern "C" {
+unsafe extern "C" {
     /// Map a shared memory region for the edge coverage map.
     fn __afl_map_shm();
     /// Start the forkserver.

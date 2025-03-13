@@ -1,8 +1,8 @@
-use std::{
-    collections::hash_map::DefaultHasher,
+use core::{
     hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
     marker::PhantomData,
 };
+use std::collections::hash_map::DefaultHasher;
 
 use libafl_bolts::shmem::ShMem;
 

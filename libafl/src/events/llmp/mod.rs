@@ -2,24 +2,24 @@
 
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
+use libafl_bolts::{
+    ClientId,
+    llmp::{LlmpClient, LlmpClientDescription, Tag},
+    shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
+};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
-use libafl_bolts::{
-    llmp::{LlmpClient, LlmpClientDescription, Tag},
-    shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
-    ClientId,
-};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
+    Error,
     events::{Event, EventFirer},
     fuzzer::EvaluatorObservers,
     inputs::{Input, InputConverter, NopInput, NopInputConverter},
     state::{HasCurrentTestcase, HasSolutions, NopState},
-    Error,
 };
 
 /// The llmp restarting manager
@@ -33,7 +33,6 @@ pub(crate) const _LLMP_TAG_EVENT_TO_CLIENT: Tag = Tag(0x2C11E471);
 /// Only handle this in the broker
 pub(crate) const _LLMP_TAG_EVENT_TO_BROKER: Tag = Tag(0x2B80438);
 /// Handle in both
-///
 pub(crate) const LLMP_TAG_EVENT_TO_BOTH: Tag = Tag(0x2B0741);
 pub(crate) const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
 pub(crate) const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
@@ -243,9 +242,14 @@ where
     }
 
     /// Write the config for a client `EventManager` to env vars, a new client can reattach using [`LlmpEventConverterBuilder::build_existing_client_from_env()`].
+    ///
+    /// # Safety
+    /// Writes to env variables and may only be done single-threaded.
     #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) {
-        self.llmp.to_env(env_name).unwrap();
+    pub unsafe fn to_env(&self, env_name: &str) {
+        unsafe {
+            self.llmp.to_env(env_name).unwrap();
+        }
     }
 
     // Handle arriving events in the client
@@ -266,7 +270,9 @@ where
             Event::NewTestcase {
                 input, forward_id, ..
             } => {
-                log::debug!("Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
+                log::debug!(
+                    "Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})"
+                );
 
                 let Some(converter) = self.converter_back.as_mut() else {
                     return Ok(());
@@ -285,9 +291,10 @@ where
                 }
                 Ok(())
             }
-
-            #[cfg(feature = "share_objectives")]
-            Event::Objective { input, .. } => {
+            Event::Objective {
+                input: Some(unwrapped_input),
+                ..
+            } => {
                 log::debug!("Received new Objective");
 
                 let Some(converter) = self.converter_back.as_mut() else {
@@ -298,7 +305,7 @@ where
                     state,
                     executor,
                     manager,
-                    &converter.convert(input)?,
+                    &converter.convert(unwrapped_input)?,
                     false,
                 )?;
 

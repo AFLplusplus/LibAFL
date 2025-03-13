@@ -2,7 +2,7 @@
 //! These will be executed right before and after the executor's harness run.
 
 /// windows crash/timeout handler and asan death callback
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 pub mod windows;
 
 /// *nix crash handler

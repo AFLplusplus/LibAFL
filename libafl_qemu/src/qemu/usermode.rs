@@ -5,16 +5,67 @@ use std::{
 
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{
+    GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
     libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run,
-    libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps, GuestAddr, GuestUsize,
-    IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
+    libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps,
 };
 use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
-use pyo3::{pyclass, pymethods, IntoPyObject, Py, PyRef, PyRefMut, Python};
+use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 
-use crate::{qemu::QEMU_IS_RUNNING, Qemu, CPU};
+use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
+
+pub struct QemuMappingsViewer<'a> {
+    qemu: &'a Qemu,
+    mappings: Vec<MapInfo>,
+}
+
+impl<'a> QemuMappingsViewer<'a> {
+    /// Capture the memory mappings of Qemu at the moment when we create this object
+    /// Thus if qemu make updates to the mappings, they won't be reflected to this object.
+    #[must_use]
+    pub fn new(qemu: &'a Qemu) -> Self {
+        let mut mappings: Vec<MapInfo> = vec![];
+        for m in qemu.mappings() {
+            mappings.push(m);
+        }
+        Self { qemu, mappings }
+    }
+
+    /// Update the mappings
+    pub fn update(&mut self) {
+        let mut mappings: Vec<MapInfo> = vec![];
+        for m in self.qemu.mappings() {
+            mappings.push(m);
+        }
+        self.mappings = mappings;
+    }
+
+    #[must_use]
+    pub fn mappings(&self) -> &[MapInfo] {
+        &self.mappings
+    }
+}
+
+impl core::fmt::Debug for QemuMappingsViewer<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for m in &self.mappings {
+            let flags = format!("Flags: {:?}", m.flags());
+            let padded = format!("{flags:<20}");
+            writeln!(
+                f,
+                "Mapping: 0x{:016x}-0x{:016x}, {:>10} IsPriv: {:?} Path: {}",
+                m.start(),
+                m.end(),
+                padded,
+                m.is_priv(),
+                m.path().unwrap_or(&"<EMPTY>".to_string())
+            )?;
+        }
+        Ok(())
+    }
+}
 
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
@@ -71,11 +122,7 @@ impl Iterator for GuestMaps {
 
             let ret = ret.assume_init();
 
-            if ret.is_valid {
-                Some(ret.into())
-            } else {
-                None
-            }
+            if ret.is_valid { Some(ret.into()) } else { None }
         }
     }
 }
@@ -109,8 +156,10 @@ impl CPU {
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
     pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
-        let host_addr = Qemu::get().unwrap().g2h(addr);
-        copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
+        unsafe {
+            let host_addr = Qemu::get().unwrap().g2h(addr);
+            copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
+        }
     }
 
     /// Write a value to a guest address.
@@ -121,8 +170,10 @@ impl CPU {
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
     pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
-        let host_addr = Qemu::get().unwrap().g2h(addr);
-        copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
+        unsafe {
+            let host_addr = Qemu::get().unwrap().g2h(addr);
+            copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
+        }
     }
 
     #[must_use]
@@ -204,7 +255,9 @@ impl Qemu {
     }
 
     pub(super) unsafe fn run_inner(self) {
-        libafl_qemu_run();
+        unsafe {
+            libafl_qemu_run();
+        }
     }
 
     #[must_use]
@@ -342,7 +395,9 @@ impl Qemu {
         info: *mut siginfo_t,
         puc: *mut c_void,
     ) {
-        libafl_qemu_sys::libafl_qemu_native_signal_handler(host_sig, info, puc);
+        unsafe {
+            libafl_qemu_sys::libafl_qemu_native_signal_handler(host_sig, info, puc);
+        }
     }
 
     /// Emulate a signal coming from the target
@@ -352,9 +407,11 @@ impl Qemu {
     /// This may raise a signal to host. Some signals could have a funky behaviour.
     /// SIGSEGV is safe to use.
     pub unsafe fn target_signal(&self, signal: Signal) {
-        QEMU_IS_RUNNING = true;
-        libafl_qemu_sys::libafl_set_in_target_signal_ctx();
-        libc::raise(signal.into());
+        unsafe {
+            QEMU_IS_RUNNING = true;
+            libafl_qemu_sys::libafl_set_in_target_signal_ctx();
+            libc::raise(signal.into());
+        }
     }
 }
 
@@ -362,11 +419,11 @@ impl Qemu {
 pub mod pybind {
     use libafl_qemu_sys::{GuestAddr, MmapPerms};
     use pyo3::{
+        Bound, PyObject, PyResult, Python,
         conversion::FromPyObject,
         exceptions::PyValueError,
         pymethods,
         types::{PyAnyMethods, PyInt},
-        Bound, PyObject, PyResult, Python,
     };
 
     use crate::{pybind::Qemu, qemu::hooks::SyscallHookResult};

@@ -2,18 +2,18 @@
 #[cfg(all(target_os = "linux", feature = "std"))]
 use core::mem::zeroed;
 #[cfg(any(unix, all(windows, feature = "std")))]
-use core::sync::atomic::{compiler_fence, Ordering};
+use core::sync::atomic::{Ordering, compiler_fence};
 use core::{
     ffi::c_void,
     marker::PhantomData,
-    ptr::{self, null_mut},
+    ptr::{null, null_mut},
     time::Duration,
 };
 
 #[cfg(all(target_os = "linux", feature = "std"))]
 use libafl_bolts::current_time;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::minibsod::{generate_minibsod_to_vec, BsodInfo};
+use libafl_bolts::minibsod::{BsodInfo, generate_minibsod_to_vec};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
@@ -24,16 +24,16 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 #[cfg(feature = "std")]
 use crate::executors::hooks::timer::TimerStruct;
 use crate::{
+    Error, HasObjective,
     events::{EventFirer, EventRestarter},
-    executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
+    executors::{Executor, HasObservers, hooks::ExecutorHook, inprocess::HasInProcessHooks},
     feedbacks::Feedback,
     state::{HasExecutions, HasSolutions},
-    Error, HasObjective,
 };
 #[cfg(all(unix, feature = "std"))]
 use crate::{
     executors::{
-        hooks::unix::unix_signal_handler, inprocess::run_observers_and_save_state, ExitKind,
+        ExitKind, hooks::unix::unix_signal_handler, inprocess::run_observers_and_save_state,
     },
     state::HasCorpus,
 };
@@ -43,6 +43,12 @@ use crate::{inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase}
 /// The inmem executor's handlers.
 #[expect(missing_debug_implementations)]
 pub struct InProcessHooks<I, S> {
+    /// On crash C function pointer
+    #[cfg(feature = "std")]
+    pub crash_handler: *const c_void,
+    /// On timeout C function pointer
+    #[cfg(feature = "std")]
+    pub timeout_handler: *const c_void,
     /// `TImer` struct
     #[cfg(feature = "std")]
     pub timer: TimerStruct,
@@ -190,6 +196,19 @@ impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
     fn init(&mut self, _state: &mut S) {}
     /// Call before running a target.
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {
+        #[cfg(feature = "std")]
+        // This is very important!!!!!
+        // Don't remove these pointer settings.
+        // Imagine there are two executors, you have to set the correct crash handlers for each of the executor.
+        unsafe {
+            let data = &raw mut GLOBAL_STATE;
+            assert!((*data).crash_handler.is_null());
+            // usually timeout handler and crash handler is set together
+            // so no check for timeout handler is null or not
+            (*data).crash_handler = self.crash_handler;
+            (*data).timeout_handler = self.timeout_handler;
+        }
+
         #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
         self.timer_mut().set_timer();
     }
@@ -200,6 +219,12 @@ impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
         // We're calling this only once per execution, in a single thread.
         #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
         self.timer_mut().unset_timer();
+        #[cfg(feature = "std")]
+        unsafe {
+            let data = &raw mut GLOBAL_STATE;
+            (*data).crash_handler = null();
+            (*data).timeout_handler = null();
+        }
     }
 }
 
@@ -234,17 +259,14 @@ impl<I, S> InProcessHooks<I, S> {
             setup_signal_handler(data)?;
         }
 
-        #[cfg(feature = "std")]
-        unsafe {
-            let data = &raw mut GLOBAL_STATE;
-            (*data).crash_handler =
-                unix_signal_handler::inproc_crash_handler::<E, EM, I, OF, S, Z> as *const c_void;
-            (*data).timeout_handler =
-                unix_signal_handler::inproc_timeout_handler::<E, EM, I, OF, S, Z> as *const _;
-        }
-
         compiler_fence(Ordering::SeqCst);
         Ok(Self {
+            #[cfg(feature = "std")]
+            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, I, OF, S, Z>
+                as *const c_void,
+            #[cfg(feature = "std")]
+            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, I, OF, S, Z>
+                as *const _,
             #[cfg(feature = "std")]
             timer: TimerStruct::new(exec_tmout),
             phantom: PhantomData,
@@ -278,7 +300,7 @@ impl<I, S> InProcessHooks<I, S> {
             >();
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
-            (*data).crash_handler =
+            let crash_handler =
                 crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<
                     E,
                     EM,
@@ -296,9 +318,10 @@ impl<I, S> InProcessHooks<I, S> {
                     S,
                     Z,
                 > as *const c_void;
-            (*data).timeout_handler = timeout_handler;
             let timer = TimerStruct::new(exec_tmout, timeout_handler);
             ret = Ok(Self {
+                crash_handler,
+                timeout_handler,
                 timer,
                 phantom: PhantomData,
             });
@@ -337,6 +360,10 @@ impl<I, S> InProcessHooks<I, S> {
     pub fn nop() -> Self {
         Self {
             #[cfg(feature = "std")]
+            crash_handler: null(),
+            #[cfg(feature = "std")]
+            timeout_handler: null(),
+            #[cfg(feature = "std")]
             timer: TimerStruct::new(Duration::from_millis(5000)),
             phantom: PhantomData,
         }
@@ -355,7 +382,9 @@ pub struct InProcessExecutorHandlerData {
     /// the pointer to the executor
     pub executor_ptr: *const c_void,
     pub(crate) current_input_ptr: *const c_void,
-    pub(crate) in_handler: bool,
+
+    #[cfg(feature = "std")]
+    pub(crate) signal_handler_depth: usize,
 
     /// The timeout handler
     #[cfg(feature = "std")]
@@ -376,6 +405,9 @@ unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
 impl InProcessExecutorHandlerData {
+    #[cfg(feature = "std")]
+    const SIGNAL_HANDLER_MAX_DEPTH: usize = 3;
+
     /// # Safety
     /// Only safe if not called twice and if the executor is not used from another borrow after this.
     #[cfg(all(feature = "std", any(unix, windows)))]
@@ -409,7 +441,7 @@ impl InProcessExecutorHandlerData {
     #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
-        self.current_input_ptr = ptr::null();
+        self.current_input_ptr = null();
         r
     }
 
@@ -418,11 +450,19 @@ impl InProcessExecutorHandlerData {
         !self.current_input_ptr.is_null()
     }
 
+    /// Returns true if signal handling max depth has been reached, false otherwise
     #[cfg(all(feature = "std", any(unix, windows)))]
-    pub(crate) fn set_in_handler(&mut self, v: bool) -> bool {
-        let old = self.in_handler;
-        self.in_handler = v;
-        old
+    pub(crate) fn signal_handler_enter(&mut self) -> (bool, usize) {
+        self.signal_handler_depth += 1;
+        (
+            self.signal_handler_depth >= Self::SIGNAL_HANDLER_MAX_DEPTH,
+            self.signal_handler_depth,
+        )
+    }
+
+    #[cfg(all(feature = "std", any(unix, windows)))]
+    pub(crate) fn signal_handler_exit(&mut self) {
+        self.signal_handler_depth -= 1;
     }
 
     /// if data is valid, safely report a crash and return true.
@@ -445,43 +485,45 @@ impl InProcessExecutorHandlerData {
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
-        if self.is_valid() {
-            let executor = self.executor_mut::<E>();
-            // disarms timeout in case of timeout
-            let state = self.state_mut::<S>();
-            let event_mgr = self.event_mgr_mut::<EM>();
-            let fuzzer = self.fuzzer_mut::<Z>();
-            let input = self.take_current_input::<I>();
+        unsafe {
+            if self.is_valid() {
+                let executor = self.executor_mut::<E>();
+                // disarms timeout in case of timeout
+                let state = self.state_mut::<S>();
+                let event_mgr = self.event_mgr_mut::<EM>();
+                let fuzzer = self.fuzzer_mut::<Z>();
+                let input = self.take_current_input::<I>();
 
-            log::error!("Target crashed!");
+                log::error!("Target crashed!");
 
-            if let Some(bsod_info) = bsod_info {
-                let bsod = generate_minibsod_to_vec(
-                    bsod_info.signal,
-                    &bsod_info.siginfo,
-                    bsod_info.ucontext.as_ref(),
-                );
+                if let Some(bsod_info) = bsod_info {
+                    let bsod = generate_minibsod_to_vec(
+                        bsod_info.signal,
+                        &bsod_info.siginfo,
+                        bsod_info.ucontext.as_ref(),
+                    );
 
-                if let Ok(bsod) = bsod {
-                    if let Ok(r) = std::str::from_utf8(&bsod) {
-                        log::error!("{}", r);
+                    if let Ok(bsod) = bsod {
+                        if let Ok(r) = core::str::from_utf8(&bsod) {
+                            log::error!("{}", r);
+                        }
                     }
                 }
+
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
+
+                return true;
             }
 
-            run_observers_and_save_state::<E, EM, I, OF, S, Z>(
-                executor,
-                state,
-                input,
-                fuzzer,
-                event_mgr,
-                ExitKind::Crash,
-            );
-
-            return true;
+            false
         }
-
-        false
     }
 }
 
@@ -494,18 +536,19 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     // The fuzzer ptr for signal handling
     fuzzer_ptr: null_mut(),
     // The executor ptr for signal handling
-    executor_ptr: ptr::null(),
+    executor_ptr: null(),
     // The current input for signal handling
-    current_input_ptr: ptr::null(),
+    current_input_ptr: null(),
 
-    in_handler: false,
+    #[cfg(feature = "std")]
+    signal_handler_depth: 0,
 
     // The crash handler fn
     #[cfg(feature = "std")]
-    crash_handler: ptr::null(),
+    crash_handler: null(),
     // The timeout handler fn
     #[cfg(feature = "std")]
-    timeout_handler: ptr::null(),
+    timeout_handler: null(),
     #[cfg(all(windows, feature = "std"))]
     ptp_timer: None,
     #[cfg(all(windows, feature = "std"))]
@@ -557,12 +600,4 @@ pub unsafe fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
 #[must_use]
 pub unsafe fn inprocess_get_input<'a, I>() -> Option<&'a I> {
     unsafe { (GLOBAL_STATE.current_input_ptr as *const I).as_ref() }
-}
-
-/// Returns if we are executing in a crash/timeout handler
-#[must_use]
-pub fn inprocess_in_handler() -> bool {
-    // # Safety
-    // Safe because the state is set up and the handler is a single bool. Worst case we read an old value.
-    unsafe { GLOBAL_STATE.in_handler }
 }

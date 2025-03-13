@@ -20,13 +20,13 @@ use libafl_bolts::compress::GzipCompressor;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    ondisk::{OnDiskMetadata, OnDiskMetadataFormat},
     HasTestcase,
+    ondisk::{OnDiskMetadata, OnDiskMetadataFormat},
 };
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::Input,
-    Error, HasMetadata,
 };
 
 /// Creates the given `path` and returns an error if it fails.
@@ -362,7 +362,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
             testcase.input().as_ref().unwrap().generate_name(id)
         });
 
-        let mut ctr = String::new();
+        let mut ctr = 1;
         if self.locking {
             let lockfile_name = format!(".{file_name}");
             let lockfile_path = self.dir_path.join(lockfile_name);
@@ -375,15 +375,14 @@ impl<I> InMemoryOnDiskCorpus<I> {
             );
             lockfile.lock_exclusive()?;
 
-            lockfile.read_to_string(&mut ctr)?;
-            ctr = if ctr.is_empty() {
-                String::from("1")
-            } else {
-                (ctr.trim().parse::<u32>()? + 1).to_string()
-            };
+            let mut old_ctr = String::new();
+            lockfile.read_to_string(&mut old_ctr)?;
+            if !old_ctr.is_empty() {
+                ctr = old_ctr.trim().parse::<u32>()? + 1;
+            }
 
             lockfile.seek(SeekFrom::Start(0))?;
-            lockfile.write_all(ctr.as_bytes())?;
+            lockfile.write_all(ctr.to_string().as_bytes())?;
         }
 
         if testcase.file_path().is_none() {
@@ -432,11 +431,18 @@ impl<I> InMemoryOnDiskCorpus<I> {
             *testcase.metadata_path_mut() = Some(metafile_path);
         }
 
-        if let Err(err) = self.store_input_from(testcase) {
-            if self.locking {
-                return Err(err);
+        // Only try to write the data if the counter is 1.
+        // Otherwise we already have a file with this name, and
+        // we can assume the data has already been written.
+        if ctr == 1 {
+            if let Err(err) = self.store_input_from(testcase) {
+                if self.locking {
+                    return Err(err);
+                }
+                log::error!(
+                    "An error occurred when trying to write a testcase without locking: {err}"
+                );
             }
-            log::error!("An error occurred when trying to write a testcase without locking: {err}");
         }
         Ok(())
     }

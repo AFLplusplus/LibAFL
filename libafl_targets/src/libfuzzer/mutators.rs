@@ -1,15 +1,13 @@
 use alloc::{
     borrow::Cow,
+    boxed::Box,
     rc::{Rc, Weak},
+    vec::Vec,
 };
-use std::{
-    cell::RefCell,
-    marker::PhantomData,
-    ops::Deref,
-    prelude::rust_2015::{Box, Vec},
-};
+use core::{cell::RefCell, marker::PhantomData, ops::Deref};
 
 use libafl::{
+    Error,
     corpus::Corpus,
     inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{
@@ -17,11 +15,10 @@ use libafl::{
     },
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
-    Error,
 };
-use libafl_bolts::{rands::Rand, AsSlice, HasLen, Named};
+use libafl_bolts::{AsSlice, HasLen, Named, rands::Rand};
 
-extern "C" {
+unsafe extern "C" {
     fn libafl_targets_has_libfuzzer_custom_mutator() -> bool;
     fn libafl_targets_libfuzzer_custom_mutator(
         data: *mut u8,
@@ -68,7 +65,7 @@ thread_local! {
 /// Mutator which is available for user-defined mutator/crossover
 /// See: [Structure-Aware Fuzzing with libFuzzer](https://github.com/google/fuzzing/blob/master/docs/structure-aware-fuzzing.md)
 #[allow(non_snake_case)] // expect breaks here for some reason
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     MUTATOR.with(|mutator| {
         if let Ok(mut mutator) = mutator.try_borrow_mut() {
@@ -111,7 +108,10 @@ impl<'a, M, S> MutatorProxy<'a, M, S> {
     /// Create a weak version of the proxy, which will become unusable when the custom mutator
     /// is no longer permitted to be executed.
     #[allow(clippy::type_complexity)] // no longer a problem in nightly
-    fn weak(&self) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool, M, S> {
+    fn weak(
+        &self,
+    ) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool + use<M, S>, M, S>
+    {
         let state = Rc::downgrade(&self.state);
         WeakMutatorProxy {
             accessor: move |f: &mut dyn for<'b> FnMut(&'b mut S)| {
@@ -215,8 +215,8 @@ impl<S, SM> LLVMCustomMutator<S, SM, false> {
     /// Will create the specified libfuzzer custom mutator `mutate` fn.
     /// Only safe if the custom mutator implementation is correct.
     pub unsafe fn mutate(mutator: SM) -> Result<Self, Error> {
-        if libafl_targets_has_libfuzzer_custom_mutator() {
-            Ok(Self::mutate_unchecked(mutator))
+        if unsafe { libafl_targets_has_libfuzzer_custom_mutator() } {
+            Ok(unsafe { Self::mutate_unchecked(mutator) })
         } else {
             Err(Error::illegal_state(
                 "Cowardly refusing to create a LLVMFuzzerMutator if a custom mutator is not defined.",
@@ -244,8 +244,8 @@ impl<S, SM> LLVMCustomMutator<S, SM, true> {
     /// Will create the specified libfuzzer custom crossover mutator.
     /// Only safe if the custom mutator crossover implementation is correct.
     pub unsafe fn crossover(mutator: SM) -> Result<Self, Error> {
-        if libafl_targets_has_libfuzzer_custom_crossover() {
-            Ok(Self::crossover_unchecked(mutator))
+        if unsafe { libafl_targets_has_libfuzzer_custom_crossover() } {
+            Ok(unsafe { Self::crossover_unchecked(mutator) })
         } else {
             Err(Error::illegal_state(
                 "Cowardly refusing to create a LLVMFuzzerMutator if a custom crossover is not defined.",
@@ -273,11 +273,15 @@ where
 {
     type Mutations = SM::Mutations;
     fn mutations(&self) -> &Self::Mutations {
-        unimplemented!("It is unsafe to provide reference-based access to the mutators as they are behind a RefCell.")
+        unimplemented!(
+            "It is unsafe to provide reference-based access to the mutators as they are behind a RefCell."
+        )
     }
 
     fn mutations_mut(&mut self) -> &mut Self::Mutations {
-        unimplemented!("It is unsafe to provide reference-based access to the mutators as they are behind a RefCell.")
+        unimplemented!(
+            "It is unsafe to provide reference-based access to the mutators as they are behind a RefCell."
+        )
     }
 }
 
@@ -351,7 +355,9 @@ where
         }
 
         if new_len > max_len {
-            return Err(Error::illegal_state(format!("LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}")));
+            return Err(Error::illegal_state(format!(
+                "LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}"
+            )));
         }
         input.resize(new_len, 0);
         Ok(MutationResult::Mutated)
@@ -447,7 +453,9 @@ where
         }
 
         if new_len > max_len {
-            return Err(Error::illegal_state(format!("LLVMFuzzerCustomCrossOver returned more bytes than allowed. Expected up to {max_len} but got {new_len}")));
+            return Err(Error::illegal_state(format!(
+                "LLVMFuzzerCustomCrossOver returned more bytes than allowed. Expected up to {max_len} but got {new_len}"
+            )));
         }
 
         input.resize(new_len, 0);

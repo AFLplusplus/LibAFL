@@ -12,33 +12,34 @@
 //! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
+use alloc::string::String;
 use core::{
     fmt::{self, Debug, Formatter},
+    net::SocketAddr,
     num::NonZeroUsize,
     time::Duration,
 };
-use std::{net::SocketAddr, string::String};
 
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     shmem::ShMemProvider,
-    tuples::{tuple_list, Handle},
+    tuples::tuple_list,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use typed_builder::TypedBuilder;
 #[cfg(all(unix, feature = "fork"))]
 use {
     crate::{
-        events::{centralized::CentralizedEventManager, CentralizedLlmpHook, StdLlmpEventHook},
+        events::{CentralizedLlmpHook, StdLlmpEventHook, centralized::CentralizedEventManager},
         inputs::Input,
     },
+    alloc::boxed::Box,
     alloc::string::ToString,
     libafl_bolts::{
         core_affinity::get_core_ids,
         llmp::{Broker, Brokers, LlmpBroker},
-        os::{fork, ForkResult},
+        os::{ForkResult, fork},
     },
-    std::boxed::Box,
 };
 #[cfg(unix)]
 use {
@@ -51,13 +52,12 @@ use {libafl_bolts::os::startable_self, std::process::Stdio};
 #[cfg(all(unix, feature = "fork", feature = "multi_machine"))]
 use crate::events::multi_machine::{NodeDescriptor, TcpMultiMachineHooks};
 use crate::{
+    Error,
     events::{
-        llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
         EventConfig, EventManagerHooksTuple,
+        llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
     },
     monitors::Monitor,
-    observers::TimeObserver,
-    Error,
 };
 
 /// The (internal) `env` that indicates we're running as client.
@@ -171,9 +171,6 @@ pub struct Launcher<'a, CF, MT, SP> {
     /// clusters.
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
-    /// The time observer for addaptive serialization
-    #[builder(default = None)]
-    time_ref: Option<Handle<TimeObserver>>,
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
     /// The reason you may not want this is, if you already have a [`Launcher`]
     /// with a different configuration (for the same target) running on this machine.
@@ -273,7 +270,7 @@ where
         // Spawn clients
         let mut index = 0_usize;
         for bind_to in core_ids {
-            if self.cores.ids.iter().any(|&x| x == bind_to) {
+            if self.cores.ids.contains(&bind_to) {
                 for overcommit_id in 0..self.overcommit {
                     index += 1;
                     self.shmem_provider.pre_fork()?;
@@ -300,10 +297,13 @@ where
                             if !debug_output {
                                 if let Some(file) = &self.opened_stdout_file {
                                     dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                    if let Some(stderr) = &self.opened_stderr_file {
-                                        dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                    } else {
-                                        dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                    match &self.opened_stderr_file {
+                                        Some(stderr) => {
+                                            dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
+                                        _ => {
+                                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
                                     }
                                 }
                             }
@@ -321,7 +321,6 @@ where
                                 .configuration(self.configuration)
                                 .serialize_state(self.serialize_state)
                                 .hooks(hooks);
-                            let builder = builder.time_ref(self.time_ref.clone());
                             let (state, mgr) = builder.build().launch()?;
 
                             return (self.run_client.take().unwrap())(
@@ -350,8 +349,6 @@ where
                 .serialize_state(self.serialize_state)
                 .hooks(hooks);
 
-            let builder = builder.time_ref(self.time_ref.clone());
-
             builder.build().launch()?;
 
             // Broker exited. kill all clients.
@@ -365,7 +362,9 @@ where
         } else {
             for handle in &handles {
                 let mut status = 0;
-                log::info!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
+                log::info!(
+                    "Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit..."
+                );
                 unsafe {
                     libc::waitpid(*handle, &mut status, 0);
                     if status != 0 {
@@ -411,8 +410,6 @@ where
                     .serialize_state(self.serialize_state)
                     .hooks(hooks);
 
-                let builder = builder.time_ref(self.time_ref.clone());
-
                 let (state, mgr) = builder.build().launch()?;
 
                 return (self.run_client.take().unwrap())(state, mgr, client_description);
@@ -450,7 +447,7 @@ where
                 //spawn clients
                 let mut index = 0;
                 for core_id in core_ids {
-                    if self.cores.ids.iter().any(|&x| x == core_id) {
+                    if self.cores.ids.contains(&core_id) {
                         for overcommit_i in 0..self.overcommit {
                             index += 1;
                             // Forward own stdio to child processes, if requested by user
@@ -461,7 +458,7 @@ where
                                 if self.stdout_file.is_some() || self.stderr_file.is_some() {
                                     stdout = Stdio::inherit();
                                     stderr = Stdio::inherit();
-                                };
+                                }
                             }
 
                             std::thread::sleep(Duration::from_millis(
@@ -470,10 +467,14 @@ where
 
                             let client_description =
                                 ClientDescription::new(index, overcommit_i, core_id);
-                            std::env::set_var(
-                                _AFL_LAUNCHER_CLIENT,
-                                client_description.to_safe_string(),
-                            );
+                            // # Safety
+                            // This is set only once, in here, for the child.
+                            unsafe {
+                                std::env::set_var(
+                                    _AFL_LAUNCHER_CLIENT,
+                                    client_description.to_safe_string(),
+                                );
+                            }
                             let mut child = startable_self()?;
                             let child = (if debug_output {
                                 &mut child
@@ -513,8 +514,6 @@ where
                 .serialize_state(self.serialize_state)
                 .hooks(hooks);
 
-            let builder = builder.time_ref(self.time_ref.clone());
-
             builder.build().launch()?;
 
             //broker exited. kill all clients.
@@ -522,7 +521,9 @@ where
                 handle.kill()?;
             }
         } else {
-            log::info!("Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit...");
+            log::info!(
+                "Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit..."
+            );
             for handle in &mut handles {
                 let ecode = handle.wait()?;
                 if !ecode.success() {
@@ -561,8 +562,6 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     #[builder(default = 1338_u16)]
     centralized_broker_port: u16,
     /// The time observer by which to adaptively serialize
-    #[builder(default = None)]
-    time_obs: Option<Handle<TimeObserver>>,
     /// The list of cores to run on
     cores: &'a Cores,
     /// The number of clients to spawn on each core
@@ -667,8 +666,6 @@ where
                     .serialize_state(centralized_launcher.serialize_state)
                     .hooks(tuple_list!());
 
-                let builder = builder.time_ref(centralized_launcher.time_obs.clone());
-
                 builder.build().launch()
             };
 
@@ -736,7 +733,7 @@ where
         // Spawn clients
         let mut index = 0_usize;
         for bind_to in core_ids {
-            if self.cores.ids.iter().any(|&x| x == bind_to) {
+            if self.cores.ids.contains(&bind_to) {
                 for overcommit_id in 0..self.overcommit {
                     index += 1;
                     self.shmem_provider.pre_fork()?;
@@ -759,10 +756,13 @@ where
                             if !debug_output {
                                 if let Some(file) = &self.opened_stdout_file {
                                     dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                    if let Some(stderr) = &self.opened_stderr_file {
-                                        dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                    } else {
-                                        dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                    match &self.opened_stderr_file {
+                                        Some(stderr) => {
+                                            dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
+                                        _ => {
+                                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
                                     }
                                 }
                             }
@@ -788,7 +788,6 @@ where
                                     // tuple_list!(multi_machine_event_manager_hook.take().unwrap()),
                                     self.shmem_provider.clone(),
                                     self.centralized_broker_port,
-                                    self.time_obs.clone(),
                                 )?;
 
                                 self.main_run_client.take().unwrap()(
@@ -814,7 +813,6 @@ where
                                     mgr,
                                     self.shmem_provider.clone(),
                                     self.centralized_broker_port,
-                                    self.time_obs.clone(),
                                 )?;
 
                                 self.secondary_run_client.take().unwrap()(

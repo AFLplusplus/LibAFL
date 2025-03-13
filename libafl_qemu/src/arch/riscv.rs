@@ -2,7 +2,7 @@ use core::ffi::c_long;
 use std::sync::OnceLock;
 
 use capstone::arch::BuildsCapstone;
-use enum_map::{enum_map, EnumMap};
+use enum_map::{EnumMap, enum_map};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -20,7 +20,12 @@ pub const SYS_riscv_flush_icache: c_long = SYS_arch_specific_syscall + 15;
 #[expect(non_upper_case_globals)]
 pub const SYS_riscv_hwprobe: c_long = SYS_arch_specific_syscall + 14;
 
-use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
+use crate::{CallingConvention, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
+
+#[expect(non_upper_case_globals)]
+impl CallingConvention {
+    pub const Default: CallingConvention = CallingConvention::RiscVilp32;
+}
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
@@ -106,12 +111,12 @@ impl crate::ArchExtras for crate::CPU {
         self.write_reg(Regs::Ra, val)
     }
 
-    fn read_function_argument(
+    fn read_function_argument_with_cc(
         &self,
-        conv: CallingConvention,
         idx: u8,
+        conv: CallingConvention,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::RiscVilp32, conv)?;
 
         // Note that 64 bit values may be passed in two registers (and are even-odd eg. A0, A2 and A3 where A1 is empty), then this mapping is off.
         // Note: This does not consider the floating point registers.
@@ -125,27 +130,22 @@ impl crate::ArchExtras for crate::CPU {
             5 => Regs::A5, // argument value
             6 => Regs::A6, // argument value
             7 => Regs::A7, // argument value
-            r => {
-                return Err(QemuRWError::new_argument_error(
-                    QemuRWErrorKind::Read,
-                    i32::from(r),
-                ))
-            }
+            r => return Err(QemuRWError::new_argument_error(QemuRWErrorKind::Read, r)),
         };
 
         self.read_reg(reg_id)
     }
 
-    fn write_function_argument<T>(
+    fn write_function_argument_with_cc<T>(
         &self,
-        conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         val: T,
+        conv: CallingConvention,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::RiscVilp32, conv)?;
 
         let val: GuestReg = val.into();
         match idx {

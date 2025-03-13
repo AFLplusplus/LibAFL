@@ -11,7 +11,7 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "qemu", "instrumentation"]
-edition = "2021"
+edition = "2024"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -52,6 +52,8 @@ fork = ["libafl/fork"]
 ## Build libqasan for address sanitization
 build_libgasan = []
 build_libqasan = []
+## Use Address Sanitizer implementation written in rust (rather than the older C version)
+rasan = []
 
 #! ## The following architecture features are mutually exclusive.
 
@@ -111,8 +113,8 @@ num-derive = "0.4.2"
 num_enum = { workspace = true, default-features = true }
 goblin = "0.9.2"
 libc = { workspace = true }
-strum = "0.26.3"
-strum_macros = "0.26.4"
+strum = "0.27.0"
+strum_macros = "0.27.0"
 syscall-numbers = "4.0.0"
 meminterval = { workspace = true }
 thread_local = "1.1.8"
@@ -140,6 +142,7 @@ pyo3-build-config = { workspace = true, optional = true }
 rustversion = { workspace = true }
 bindgen = { workspace = true }
 cc = { workspace = true }
+just = { workspace = true }
 
 [lib]
 name = "libafl_qemu"

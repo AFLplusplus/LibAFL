@@ -21,22 +21,24 @@ use libafl_bolts::{
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 mod stack;
 pub use stack::StageStack;
 
+#[cfg(feature = "std")]
+use crate::fuzzer::ExecuteInputResult;
 #[cfg(feature = "introspection")]
-use crate::monitors::ClientPerfMonitor;
+use crate::monitors::stats::ClientPerfStats;
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::StateInitializer,
-    fuzzer::{Evaluator, ExecuteInputResult},
+    fuzzer::Evaluator,
     generators::Generator,
     inputs::{Input, NopInput},
-    stages::{HasCurrentStageId, HasNestedStageStatus, StageId},
-    Error, HasMetadata, HasNamedMetadata,
+    stages::StageId,
 };
 
 /// The maximum size of a testcase
@@ -74,7 +76,7 @@ trait State:
 impl<C, I, R, SC> State for StdState<C, I, R, SC>
 where
     C: Serialize + DeserializeOwned,
-    R: Rand,
+    R: Rand + Serialize + for<'de> Deserialize<'de>,
     SC: Serialize + DeserializeOwned,
 {
 }
@@ -109,13 +111,13 @@ pub trait HasRand {
 }
 
 #[cfg(feature = "introspection")]
-/// Trait for offering a [`ClientPerfMonitor`]
+/// Trait for offering a [`ClientPerfStats`]
 pub trait HasClientPerfMonitor {
-    /// [`ClientPerfMonitor`] itself
-    fn introspection_monitor(&self) -> &ClientPerfMonitor;
+    /// [`ClientPerfStats`] itself
+    fn introspection_stats(&self) -> &ClientPerfStats;
 
-    /// Mutatable ref to [`ClientPerfMonitor`]
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
+    /// Mutatable ref to [`ClientPerfStats`]
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats;
 }
 
 /// Intermediate trait for `HasClientPerfMonitor`
@@ -225,7 +227,7 @@ pub struct StdState<C, I, R, SC> {
     max_size: usize,
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
-    introspection_monitor: ClientPerfMonitor,
+    introspection_stats: ClientPerfStats,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
@@ -547,7 +549,35 @@ impl<C, I, R, SC> HasCurrentStageId for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasNestedStageStatus for StdState<C, I, R, SC> {
+/// Trait for types which track the current stage
+pub trait HasCurrentStageId {
+    /// Set the current stage; we have started processing this stage
+    fn set_current_stage_id(&mut self, id: StageId) -> Result<(), Error>;
+
+    /// Clear the current stage; we are done processing this stage
+    fn clear_stage_id(&mut self) -> Result<(), Error>;
+
+    /// Fetch the current stage -- typically used after a state recovery or transfer
+    fn current_stage_id(&self) -> Result<Option<StageId>, Error>;
+
+    /// Notify of a reset from which we may recover
+    fn on_restart(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// Trait for types which track nested stages. Stages which themselves contain stage tuples should
+/// ensure that they constrain the state with this trait accordingly.
+pub trait HasNestedStage: HasCurrentStageId {
+    /// Enter a stage scope, potentially resuming to an inner stage status. Returns Ok(true) if
+    /// resumed.
+    fn enter_inner_stage(&mut self) -> Result<(), Error>;
+
+    /// Exit a stage scope
+    fn exit_inner_stage(&mut self) -> Result<(), Error>;
+}
+
+impl<C, I, R, SC> HasNestedStage for StdState<C, I, R, SC> {
     fn enter_inner_stage(&mut self) -> Result<(), Error> {
         self.stage_stack.enter_inner_stage()
     }
@@ -687,15 +717,15 @@ where
             Ok(input) => input,
             Err(err) => {
                 log::error!("Skipping input that we could not load from {path:?}: {err:?}");
-                return Ok(ExecuteInputResult::None);
+                return Ok(ExecuteInputResult::default());
             }
         };
         if config.forced {
-            let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
-            Ok(ExecuteInputResult::Corpus)
+            let (_id, result) = fuzzer.add_input(self, executor, manager, input)?;
+            Ok(result)
         } else {
             let (res, _) = fuzzer.evaluate_input(self, executor, manager, &input)?;
-            if res == ExecuteInputResult::None {
+            if !(res.is_corpus() || res.is_solution()) {
                 fuzzer.add_disabled_input(self, input)?;
                 log::warn!("input {:?} was not interesting, adding as disabled.", &path);
             }
@@ -720,7 +750,7 @@ where
             match self.next_file() {
                 Ok(path) => {
                     let res = self.load_file(&path, manager, fuzzer, executor, &mut config)?;
-                    if config.exit_on_solution && matches!(res, ExecuteInputResult::Solution) {
+                    if config.exit_on_solution && res.is_solution() {
                         return Err(Error::invalid_corpus(format!(
                             "Input {} resulted in a solution.",
                             path.display()
@@ -1024,11 +1054,11 @@ where
         for _ in 0..num {
             let input = generator.generate(self)?;
             if forced {
-                let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
+                let (_, _) = fuzzer.add_input(self, executor, manager, input)?;
                 added += 1;
             } else {
                 let (res, _) = fuzzer.evaluate_input(self, executor, manager, &input)?;
-                if res != ExecuteInputResult::None {
+                if res.is_corpus() {
                     added += 1;
                 }
             }
@@ -1104,7 +1134,7 @@ where
             max_size: DEFAULT_MAX_SIZE,
             stop_requested: false,
             #[cfg(feature = "introspection")]
-            introspection_monitor: ClientPerfMonitor::new(),
+            introspection_stats: ClientPerfStats::new(),
             #[cfg(feature = "std")]
             remaining_initial_files: None,
             #[cfg(feature = "std")]
@@ -1142,12 +1172,12 @@ impl StdState<InMemoryCorpus<NopInput>, NopInput, StdRand, InMemoryCorpus<NopInp
 
 #[cfg(feature = "introspection")]
 impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC> {
-    fn introspection_monitor(&self) -> &ClientPerfMonitor {
-        &self.introspection_monitor
+    fn introspection_stats(&self) -> &ClientPerfStats {
+        &self.introspection_stats
     }
 
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        &mut self.introspection_monitor
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
+        &mut self.introspection_stats
     }
 }
 
@@ -1295,11 +1325,11 @@ impl<I> HasCurrentStageId for NopState<I> {
 
 #[cfg(feature = "introspection")]
 impl<I> HasClientPerfMonitor for NopState<I> {
-    fn introspection_monitor(&self) -> &ClientPerfMonitor {
+    fn introspection_stats(&self) -> &ClientPerfStats {
         unimplemented!();
     }
 
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
         unimplemented!();
     }
 }

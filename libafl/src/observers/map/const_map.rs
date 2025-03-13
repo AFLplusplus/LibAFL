@@ -8,12 +8,12 @@ use core::{
     ptr::NonNull,
 };
 
-use libafl_bolts::{ownedref::OwnedMutSizedSlice, HasLen, Named};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use libafl_bolts::{HasLen, Named, ownedref::OwnedMutSizedSlice};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    observers::{map::MapObserver, ConstLenMapObserver, Observer},
     Error,
+    observers::{ConstLenMapObserver, Observer, map::MapObserver},
 };
 
 /// Use a const size to speedup `Feedback::is_interesting` when the user can
@@ -194,10 +194,12 @@ where
     /// Will dereference the `map_ptr` with up to len elements.
     #[must_use]
     pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: NonNull<[T; N]>) -> Self {
-        ConstMapObserver {
-            map: OwnedMutSizedSlice::from_raw_mut(map_ptr),
-            name: Cow::from(name),
-            initial: T::default(),
+        unsafe {
+            ConstMapObserver {
+                map: OwnedMutSizedSlice::from_raw_mut(map_ptr),
+                name: Cow::from(name),
+                initial: T::default(),
+            }
         }
     }
 

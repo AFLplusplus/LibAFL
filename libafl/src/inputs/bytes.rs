@@ -8,7 +8,7 @@ use alloc::{
 };
 use core::cell::RefCell;
 
-use libafl_bolts::{ownedref::OwnedSlice, HasLen};
+use libafl_bolts::{HasLen, ownedref::OwnedSlice};
 
 use super::ValueInput;
 use crate::inputs::{HasMutatorBytes, HasTargetBytes, ResizableMutator};

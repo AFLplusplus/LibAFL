@@ -147,14 +147,16 @@ impl CPU {
     /// no check is done on the correctness of the operation.
     /// if a problem occurred during the operation, there will be no feedback
     pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
-        // TODO use gdbstub's target_cpu_memory_rw_debug
-        libafl_qemu_sys::cpu_memory_rw_debug(
-            self.cpu_ptr,
-            addr as GuestVirtAddr,
-            buf.as_mut_ptr() as *mut _,
-            buf.len(),
-            false,
-        );
+        unsafe {
+            // TODO use gdbstub's target_cpu_memory_rw_debug
+            libafl_qemu_sys::cpu_memory_rw_debug(
+                self.cpu_ptr,
+                addr as GuestVirtAddr,
+                buf.as_mut_ptr() as *mut _,
+                buf.len(),
+                false,
+            );
+        }
     }
 
     /// Write a value to a guest address, taking into account the potential MMU / MPU.
@@ -163,14 +165,16 @@ impl CPU {
     /// no check is done on the correctness of the operation.
     /// if a problem occurred during the operation, there will be no feedback
     pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
-        // TODO use gdbstub's target_cpu_memory_rw_debug
-        libafl_qemu_sys::cpu_memory_rw_debug(
-            self.cpu_ptr,
-            addr as GuestVirtAddr,
-            buf.as_ptr() as *mut _,
-            buf.len(),
-            true,
-        );
+        unsafe {
+            // TODO use gdbstub's target_cpu_memory_rw_debug
+            libafl_qemu_sys::cpu_memory_rw_debug(
+                self.cpu_ptr,
+                addr as GuestVirtAddr,
+                buf.as_ptr() as *mut _,
+                buf.len(),
+                true,
+            );
+        }
     }
 }
 
@@ -189,12 +193,14 @@ impl Qemu {
     /// Nothing bad will happen if the operation is incorrect, but it will be silently skipped.
     // TODO: use address_space_rw and check for the result MemTxResult
     pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {
-        libafl_qemu_sys::cpu_physical_memory_rw(
-            paddr,
-            buf.as_ptr() as *mut _,
-            buf.len() as u64,
-            true,
-        );
+        unsafe {
+            libafl_qemu_sys::cpu_physical_memory_rw(
+                paddr,
+                buf.as_ptr() as *mut _,
+                buf.len() as u64,
+                true,
+            );
+        }
     }
 
     /// Read a value from a physical guest address, including ROM areas.
@@ -205,18 +211,22 @@ impl Qemu {
     /// Nothing bad will happen if the operation is incorrect, but it will be silently skipped.
     // TODO: use address_space_rw and check for the result MemTxResult
     pub unsafe fn read_phys_mem(&self, paddr: GuestPhysAddr, buf: &mut [u8]) {
-        libafl_qemu_sys::cpu_physical_memory_rw(
-            paddr,
-            buf.as_mut_ptr() as *mut _,
-            buf.len() as u64,
-            false,
-        );
+        unsafe {
+            libafl_qemu_sys::cpu_physical_memory_rw(
+                paddr,
+                buf.as_mut_ptr() as *mut _,
+                buf.len() as u64,
+                false,
+            );
+        }
     }
 
     #[expect(clippy::trivially_copy_pass_by_ref)]
     pub(super) unsafe fn run_inner(&self) {
-        vm_start();
-        qemu_main_loop();
+        unsafe {
+            vm_start();
+            qemu_main_loop();
+        }
     }
 
     pub fn save_snapshot(&self, name: &str, sync: bool) {
@@ -260,7 +270,9 @@ impl Qemu {
 
     #[expect(clippy::missing_safety_doc)]
     pub unsafe fn restore_fast_snapshot(&self, snapshot: FastSnapshotPtr) {
-        libafl_qemu_sys::syx_snapshot_root_restore(snapshot);
+        unsafe {
+            libafl_qemu_sys::syx_snapshot_root_restore(snapshot);
+        }
     }
 
     #[must_use]
@@ -269,7 +281,7 @@ impl Qemu {
         &self,
         ref_snapshot: FastSnapshotPtr,
     ) -> QemuSnapshotCheckResult {
-        let check_result = libafl_qemu_sys::syx_snapshot_check(ref_snapshot);
+        let check_result = unsafe { libafl_qemu_sys::syx_snapshot_check(ref_snapshot) };
 
         QemuSnapshotCheckResult::new(check_result.nb_inconsistencies)
     }

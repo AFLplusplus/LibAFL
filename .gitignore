@@ -1,8 +1,13 @@
 target
 target-bin
 out
-Cargo.lock
 vendor
+
+# cargo lockfiles except from binaries
+**/Cargo.lock
+!fuzzers/**/Cargo.lock
+!utils/**/Cargo.lock
+
 
 .DS_Store
 .env
@@ -74,4 +79,20 @@ libafl_nyx/packer
 harness
 program
 fuzzer_libpng*
-forkserver_simple
+
+*.patch
+
+# Sometimes this happens
+rustc-ice-*
+
+# perf files
+*.mm_profdata
+
+# backup files
+*.bak
+
+# log
+log
+
+# Coredumps
+*.core

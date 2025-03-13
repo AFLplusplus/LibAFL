@@ -1,19 +1,23 @@
-use core::{marker::PhantomData, ptr, time::Duration};
-use std::fmt::{Debug, Formatter};
+use core::{
+    fmt::{Debug, Formatter},
+    marker::PhantomData,
+    ptr,
+    time::Duration,
+};
 
 use libafl::{
+    Error,
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     state::HasExecutions,
-    Error,
 };
 use libafl_bolts::{
-    fs::{InputFile, INPUTFILE_STD},
+    AsSlice, AsSliceMut,
+    fs::{INPUTFILE_STD, InputFile},
     shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
     tuples::RefIndexable,
-    AsSlice, AsSliceMut,
 };
-use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
+use tinyinst::tinyinst::{TinyInst, litecov::RunResult};
 
 /// [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
 pub struct TinyInstExecutor<S, SHM, OT> {
@@ -35,7 +39,7 @@ impl TinyInstExecutor<(), NopShMem, ()> {
 }
 
 impl<S, SHM, OT> Debug for TinyInstExecutor<S, SHM, OT> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         f.debug_struct("TinyInstExecutor")
             .field("timeout", &self.timeout)
             .finish_non_exhaustive()

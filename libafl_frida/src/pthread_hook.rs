@@ -13,7 +13,7 @@ type pthread_introspection_hook_t = extern "C" fn(
     size: libc::size_t,
 );
 
-extern "C" {
+unsafe extern "C" {
     fn pthread_introspection_hook_install(
         hook: *const pthread_introspection_hook_t,
     ) -> *const pthread_introspection_hook_t;
@@ -47,12 +47,12 @@ impl PreviousHook {
         let inner = self.0;
         if inner.is_null() {
             unsafe {
-                pthread_introspection_hook_install(std::ptr::null());
+                pthread_introspection_hook_install(core::ptr::null());
             }
             return;
         }
         unsafe {
-            self.0 = std::ptr::null();
+            self.0 = core::ptr::null();
             pthread_introspection_hook_install(inner);
         }
     }
@@ -64,7 +64,7 @@ unsafe impl Sync for PreviousHook {}
 
 // TODO: This could use a RwLock as well
 /// The previous hook
-static mut PREVIOUS_HOOK: PreviousHook = PreviousHook(std::ptr::null());
+static mut PREVIOUS_HOOK: PreviousHook = PreviousHook(core::ptr::null());
 
 /// The currently set hook
 static CURRENT_HOOK: RwLock<Option<PthreadIntrospectionHook>> = RwLock::new(None);
@@ -131,18 +131,24 @@ impl From<EventType> for libc::c_uint {
 /// Set a `pthread_introspection` hook.
 /// # Example
 /// ```
-///# use libafl_frida::pthread_hook;
-///# use std::time::Duration;
-///# use std::thread;
+/// # use libafl_frida::pthread_hook;
+/// # use std::time::Duration;
+/// # use std::thread;
 /// unsafe {
-///   pthread_hook::install(|event, pthread, addr, size| {
-///     log::trace!("thread id=0x{:x} event={:?} addr={:?} size={:x}", pthread, event, addr, size);
-///   });
+///     pthread_hook::install(|event, pthread, addr, size| {
+///         log::trace!(
+///             "thread id=0x{:x} event={:?} addr={:?} size={:x}",
+///             pthread,
+///             event,
+///             addr,
+///             size
+///         );
+///     });
 /// };
-///# thread::spawn(|| {
-///#     thread::sleep(Duration::from_millis(1));
-///# });
-///# thread::sleep(Duration::from_millis(50));
+/// # thread::spawn(|| {
+/// #     thread::sleep(Duration::from_millis(1));
+/// # });
+/// # thread::sleep(Duration::from_millis(50));
 /// ```
 /// This should output the thread IDs, lifecycle events, addresses and sizes of the corresponding events.
 /// ```no_test
@@ -174,9 +180,9 @@ where
 /// Restore a previously set `pthread_introspection` hook.
 /// # Example
 /// ```
-///# use libafl_frida::pthread_hook;
-///# use std::time::Duration;
-///# use std::thread;
+/// # use libafl_frida::pthread_hook;
+/// # use std::time::Duration;
+/// # use std::thread;
 /// unsafe { pthread_hook::reset() };
 /// ```
 ///
@@ -191,11 +197,9 @@ pub unsafe fn reset() {
 /// The following tests fail if they are not run sequentially.
 #[cfg(test)]
 mod test {
-    use std::{
-        sync::{Arc, Mutex},
-        thread,
-        time::Duration,
-    };
+    use alloc::sync::Arc;
+    use core::time::Duration;
+    use std::{sync::Mutex, thread};
 
     use serial_test::serial;
 

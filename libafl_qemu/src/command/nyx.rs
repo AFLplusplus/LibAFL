@@ -22,32 +22,33 @@ use libc::c_uint;
 use paste::paste;
 
 use crate::{
+    Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
+    IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
     command::{
+        CommandError, CommandManager, IsCommand, NativeCommandParser,
         parser::nyx::{
             AcquireCommandParser, GetHostConfigCommandParser, GetPayloadCommandParser,
             NextPayloadCommandParser, PanicCommandParser, PrintfCommandParser,
             RangeSubmitCommandParser, ReleaseCommandParser, SetAgentConfigCommandParser,
             SubmitCR3CommandParser, SubmitPanicCommandParser, UserAbortCommandParser,
         },
-        CommandError, CommandManager, IsCommand, NativeCommandParser,
     },
     get_exit_arch_regs,
-    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
+    modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
     sync_exit::ExitArgs,
-    Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
-    IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
 };
 
 pub(crate) mod bindings {
-    #![allow(non_upper_case_globals)]
-    #![allow(non_camel_case_types)]
-    #![allow(non_snake_case)]
+    #![expect(non_upper_case_globals)]
+    #![expect(non_camel_case_types)]
+    #![expect(non_snake_case)]
     #![allow(improper_ctypes)]
     #![allow(unused_mut)]
-    #![allow(unused)]
+    #![allow(unsafe_op_in_unsafe_fn)]
+    #![expect(unused)]
     #![allow(unused_variables)]
-    #![allow(clippy::all)]
-    #![allow(clippy::pedantic)]
+    #![expect(clippy::all)]
+    #![expect(clippy::pedantic)]
 
     include!(concat!(env!("OUT_DIR"), "/nyx_bindings.rs"));
 }
@@ -98,7 +99,7 @@ macro_rules! define_nyx_command_manager {
 
             impl<C, ET, I, S, SM> CommandManager<C, NyxEmulatorDriver, ET, I, S, SM> for $name<S>
             where
-                ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+                ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
                 I: HasTargetBytes + Unpin,
                 S: Unpin,
                 SM: IsSnapshotManager,
@@ -133,7 +134,7 @@ macro_rules! define_nyx_command_manager {
 
             impl<C, ET, I, S, SM> IsCommand<C, $name<S>, NyxEmulatorDriver, ET, I, S, SM> for [<$name Commands>]
             where
-                ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+                ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
                 I: HasTargetBytes + Unpin,
                 S: Unpin,
                 SM: IsSnapshotManager,
@@ -295,7 +296,7 @@ pub struct NextPayloadCommand;
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for NextPayloadCommand
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -359,7 +360,7 @@ pub struct SubmitCR3Command;
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for SubmitCR3Command
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -407,7 +408,7 @@ impl RangeSubmitCommand {
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for RangeSubmitCommand
 where
-    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -428,13 +429,18 @@ where
         const EMPTY_RANGE: Range<GuestAddr> = 0..0;
 
         if self.allowed_range == EMPTY_RANGE {
-            log::warn!("The given range is {:#x?}, which is most likely invalid. It is most likely a guest error.", EMPTY_RANGE);
-            log::warn!("Hint: make sure the range is not getting optimized out (the volatile keyword may help you).");
+            log::warn!(
+                "The given range is {:#x?}, which is most likely invalid. It is most likely a guest error.",
+                EMPTY_RANGE
+            );
+            log::warn!(
+                "Hint: make sure the range is not getting optimized out (the volatile keyword may help you)."
+            );
         }
 
         emu.modules_mut()
             .modules_mut()
-            .allow_address_range_all(self.allowed_range.clone());
+            .allow_address_range_all(&self.allowed_range);
         Ok(None)
     }
 }

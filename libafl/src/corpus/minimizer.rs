@@ -6,23 +6,22 @@ use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
 use libafl_bolts::{
-    current_time,
+    AsIter, Named, current_time,
     tuples::{Handle, Handled},
-    AsIter, Named,
 };
 use num_traits::ToPrimitive;
-use z3::{ast::Bool, Config, Context, Optimize};
+use z3::{Config, Context, Optimize, ast::Bool};
 
 use crate::{
+    Error, HasMetadata, HasScheduler,
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
     inputs::Input,
-    monitors::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasExecutions},
-    Error, HasMetadata, HasScheduler,
 };
 
 /// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.

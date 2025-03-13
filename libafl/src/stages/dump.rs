@@ -1,23 +1,25 @@
 //! The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk to e.g. allow AFL to sync
 
-use alloc::vec::Vec;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{clone::Clone, marker::PhantomData};
 use std::{
     fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
-    string::{String, ToString},
 };
 
 use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, Testcase},
     inputs::Input,
-    stages::Stage,
+    stages::{Restartable, Stage},
     state::{HasCorpus, HasRand, HasSolutions},
-    Error, HasMetadata,
 };
 
 /// Metadata used to store information about disk dump indexes for names
@@ -60,7 +62,11 @@ where
     ) -> Result<(), Error> {
         self.dump_state_to_disk(state)
     }
+}
 
+impl<CB1, EM, I, S, Z> Restartable<S>
+    for DumpToDiskStage<CB1, fn(&Testcase<I>, &CorpusId) -> String, EM, I, S, Z>
+{
     #[inline]
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // Not executing the target, so restart safety is not needed
@@ -133,7 +139,7 @@ where
             if !corpus_dir.is_dir() {
                 return Err(Error::os_error(
                     e,
-                    format!("Error creating directory {corpus_dir:?}"),
+                    format!("Error creating directory {}", corpus_dir.display()),
                 ));
             }
         }
@@ -142,7 +148,7 @@ where
             if !solutions_dir.is_dir() {
                 return Err(Error::os_error(
                     e,
-                    format!("Error creating directory {solutions_dir:?}"),
+                    format!("Error creating directory {}", solutions_dir.display()),
                 ));
             }
         }

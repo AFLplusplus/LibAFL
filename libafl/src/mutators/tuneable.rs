@@ -7,18 +7,18 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{fmt::Debug, num::NonZero};
 
 use libafl_bolts::{
-    impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand,
-    tuples::NamedTuple, Named,
+    Named, impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand,
+    tuples::NamedTuple,
 };
 use serde::{Deserialize, Serialize};
 
 pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
+    Error, HasMetadata,
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
     state::HasRand,
-    Error, HasMetadata,
 };
 
 /// Metadata in the state, that controls the behavior of the [`TuneableScheduledMutator`] at runtime
@@ -404,36 +404,52 @@ mod test {
         let input = BytesInput::new(vec![42]);
 
         // Basic tests over the probability distribution.
-        assert!(tuneable
-            .set_mutation_probabilities(&mut state, vec![0.0])
-            .is_err());
-        assert!(tuneable
-            .set_mutation_probabilities(&mut state, vec![1.0; 3])
-            .is_err());
-        assert!(tuneable
-            .set_mutation_probabilities(&mut state, vec![-1.0, 1.0, 1.0])
-            .is_err());
-        assert!(tuneable
-            .set_mutation_probabilities(&mut state, vec![])
-            .is_err());
+        assert!(
+            tuneable
+                .set_mutation_probabilities(&mut state, vec![0.0])
+                .is_err()
+        );
+        assert!(
+            tuneable
+                .set_mutation_probabilities(&mut state, vec![1.0; 3])
+                .is_err()
+        );
+        assert!(
+            tuneable
+                .set_mutation_probabilities(&mut state, vec![-1.0, 1.0, 1.0])
+                .is_err()
+        );
+        assert!(
+            tuneable
+                .set_mutation_probabilities(&mut state, vec![])
+                .is_err()
+        );
 
-        assert!(tuneable
-            .set_mutation_probabilities(&mut state, vec![0.0, 0.0, 1.0])
-            .is_ok());
+        assert!(
+            tuneable
+                .set_mutation_probabilities(&mut state, vec![0.0, 0.0, 1.0])
+                .is_ok()
+        );
         assert_eq!(tuneable.schedule(&mut state, &input), 2.into());
-        assert!(tuneable
-            .set_mutation_probabilities(&mut state, vec![0.0, 1.0, 0.0])
-            .is_ok());
+        assert!(
+            tuneable
+                .set_mutation_probabilities(&mut state, vec![0.0, 1.0, 0.0])
+                .is_ok()
+        );
         assert_eq!(tuneable.schedule(&mut state, &input), 1.into());
-        assert!(tuneable
-            .set_mutation_probabilities(&mut state, vec![1.0, 0.0, 0.0])
-            .is_ok());
+        assert!(
+            tuneable
+                .set_mutation_probabilities(&mut state, vec![1.0, 0.0, 0.0])
+                .is_ok()
+        );
         assert_eq!(tuneable.schedule(&mut state, &input), 0.into());
 
         // We should not choose a mutation with p=0.
-        assert!(tuneable
-            .set_mutation_probabilities(&mut state, vec![0.5, 0.0, 0.5])
-            .is_ok());
+        assert!(
+            tuneable
+                .set_mutation_probabilities(&mut state, vec![0.5, 0.0, 0.5])
+                .is_ok()
+        );
         assert!(tuneable.schedule(&mut state, &input) != 1.into());
     }
 }

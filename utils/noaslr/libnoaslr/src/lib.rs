@@ -47,7 +47,7 @@ fn libnoaslr() -> Result<()> {
 
 #[cfg(target_os = "freebsd")]
 fn libnoaslr() -> Result<()> {
-    extern "C" {
+    unsafe extern "C" {
         fn exect(
             c: *const libc::c_char,
             args: *const *const libc::c_char,

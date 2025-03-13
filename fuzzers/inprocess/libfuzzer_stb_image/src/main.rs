@@ -152,7 +152,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // Setup a tracing stage in which we log comparisons
-    let tracing = ShadowTracingStage::new(&mut executor);
+    let tracing = ShadowTracingStage::new();
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));

@@ -10,7 +10,7 @@ pub(crate) const ITIMER_REAL: core::ffi::c_int = 0;
 use core::{
     ffi::c_void,
     ptr::write_volatile,
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
 };
 
 #[cfg(target_os = "linux")]
@@ -19,9 +19,9 @@ use libafl_bolts::current_time;
 use windows::Win32::{
     Foundation::FILETIME,
     System::Threading::{
-        CreateThreadpoolTimer, EnterCriticalSection, InitializeCriticalSection,
-        LeaveCriticalSection, SetThreadpoolTimer, CRITICAL_SECTION, PTP_CALLBACK_INSTANCE,
-        PTP_TIMER, TP_CALLBACK_ENVIRON_V3,
+        CRITICAL_SECTION, CreateThreadpoolTimer, EnterCriticalSection, InitializeCriticalSection,
+        LeaveCriticalSection, PTP_CALLBACK_INSTANCE, PTP_TIMER, SetThreadpoolTimer,
+        TP_CALLBACK_ENVIRON_V3,
     },
 };
 
@@ -59,7 +59,7 @@ pub(crate) struct Itimerval {
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-extern "C" {
+unsafe extern "C" {
     pub(crate) fn setitimer(
         which: libc::c_int,
         new_value: *mut Itimerval,
@@ -178,7 +178,7 @@ impl TimerStruct {
     pub unsafe fn new(exec_tmout: Duration, timeout_handler: *const c_void) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
 
-        let timeout_handler: PTP_TIMER_CALLBACK = unsafe { std::mem::transmute(timeout_handler) };
+        let timeout_handler: PTP_TIMER_CALLBACK = unsafe { core::mem::transmute(timeout_handler) };
         let ptp_timer = unsafe {
             CreateThreadpoolTimer(
                 Some(timeout_handler),

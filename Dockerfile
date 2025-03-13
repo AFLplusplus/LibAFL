@@ -1,34 +1,100 @@
 # syntax=docker/dockerfile:1.2
-FROM rust:1.76.0 AS libafl
+FROM rust:1.85.0 AS libafl
 LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
 LABEL "about"="LibAFL Docker image"
 
-# Install cargo-binstall to download the sccache build
+# Install cargo-binstall
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-# install sccache to cache subsequent builds of dependencies
-RUN cargo binstall --no-confirm sccache
+
+# We now use just to build things rather than cargo-make
+RUN cargo binstall --no-confirm just
+# Nexttest allows us to run tests which panic in an environment where we can't unwind
+RUN cargo binstall --no-confirm cargo-nextest
+# Cargo fuzz is useful for fuzz testing our implementations
+RUN cargo binstall -y cargo-fuzz
+# Taplo allows us to format toml files
+RUN cargo binstall -y taplo-cli
 
 ENV HOME=/root
-ENV SCCACHE_CACHE_SIZE="1G"
-ENV SCCACHE_DIR=$HOME/.cache/sccache
-ENV RUSTC_WRAPPER="/usr/local/cargo/bin/sccache"
 ENV IS_DOCKER="1"
 RUN sh -c 'echo set encoding=utf-8 > /root/.vimrc' \
-    echo "export PS1='"'[LibAFL \h] \w$(__git_ps1) \$ '"'" >> ~/.bashrc && \
-    mkdir ~/.cargo && \
-    echo "[build]\nrustc-wrapper = \"${RUSTC_WRAPPER}\"" >> ~/.cargo/config
+  echo "export PS1='"'[LibAFL \h] \w$(__git_ps1) \$ '"'" >> ~/.bashrc && \
+  mkdir ~/.cargo && \
+  echo "[build]\nrustc-wrapper = \"${RUSTC_WRAPPER}\"" >> ~/.cargo/config
 
 RUN rustup default nightly
 RUN rustup component add rustfmt clippy
 
+RUN rustup target add armv7-unknown-linux-gnueabi
+RUN rustup target add aarch64-unknown-linux-gnu
+RUN rustup target add i686-unknown-linux-gnu
+RUN rustup target add powerpc-unknown-linux-gnu
+
 # Install clang 18, common build tools
 ENV LLVM_VERSION=18
-RUN apt update && apt install -y build-essential gdb git wget python3-venv ninja-build lsb-release software-properties-common gnupg cmake
+RUN dpkg --add-architecture i386
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential \
+    cmake \
+    curl \
+    g++-aarch64-linux-gnu \
+    g++-arm-linux-gnueabi \
+    g++-i686-linux-gnu \
+    g++-mipsel-linux-gnu \
+    g++-powerpc-linux-gnu \
+    gcc-aarch64-linux-gnu \
+    gcc-arm-linux-gnueabi \
+    gcc-i686-linux-gnu \
+    gcc-mipsel-linux-gnu \
+    gcc-powerpc-linux-gnu \
+    gdb \
+    gdb-multiarch \
+    git \
+    gnupg \
+    libc6-dev:i386 \
+    libclang-dev \
+    libgcc-12-dev:i386 \
+    libglib2.0-dev \
+    lsb-release \
+    ninja-build \
+    python3 \
+    python3-pip \
+    python3-venv \
+    software-properties-common \
+    wget
 RUN set -ex &&\
-    wget https://apt.llvm.org/llvm.sh &&\
-    chmod +x llvm.sh &&\
-    ./llvm.sh ${LLVM_VERSION}
+  wget https://apt.llvm.org/llvm.sh &&\
+  chmod +x llvm.sh &&\
+  ./llvm.sh ${LLVM_VERSION}
 
+RUN apt-get update && \
+  apt-get install -y \
+  clang-format-${LLVM_VERSION}
+
+RUN git config --global core.pager cat
+
+# Install a modern version of QEMU
+WORKDIR /root
+ENV QEMU_VER=9.2.1
+RUN wget https://download.qemu.org/qemu-${QEMU_VER}.tar.xz && \
+    tar xvJf qemu-${QEMU_VER}.tar.xz && \
+    cd /root/qemu-${QEMU_VER} && \
+   ./configure --target-list="\
+      arm-linux-user,\
+      aarch64-linux-user,\
+      i386-linux-user,\
+      ppc-linux-user,\
+      mips-linux-user,\
+      arm-softmmu,\
+      aarch64-softmmu,\
+      i386-softmmu,\
+      ppc-softmmu,\
+      mips-softmmu" && \
+    make -j && \
+    make install && \
+    cd /root && \
+    rm -rf qemu-${QEMU_VER}
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
 WORKDIR /libafl
@@ -54,6 +120,9 @@ COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 
 COPY libafl_intelpt/Cargo.toml libafl_intelpt/README.md libafl_intelpt/
 COPY scripts/dummy.rs libafl_intelpt/src/lib.rs
+
+COPY libafl_unicorn/Cargo.toml libafl_unicorn/
+COPY scripts/dummy.rs libafl_unicorn/src/lib.rs
 
 COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/build_linux.rs libafl_qemu/
 COPY scripts/dummy.rs libafl_qemu/src/lib.rs
@@ -149,6 +218,8 @@ COPY libafl_libfuzzer/build.rs libafl_libfuzzer/build.rs
 RUN touch libafl_libfuzzer/src/lib.rs
 COPY libafl_intelpt/src libafl_intelpt/src
 RUN touch libafl_intelpt/src/lib.rs
+COPY libafl_unicorn/src libafl_unicorn/src
+RUN touch libafl_unicorn/src/lib.rs
 RUN cargo build && cargo build --release
 
 # Copy fuzzers over

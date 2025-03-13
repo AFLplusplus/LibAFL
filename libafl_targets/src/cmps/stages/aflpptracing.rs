@@ -2,17 +2,17 @@ use alloc::borrow::{Cow, ToOwned};
 use core::marker::PhantomData;
 
 use libafl::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     inputs::BytesInput,
     observers::ObserversTuple,
-    stages::{colorization::TaintMetadata, RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage, colorization::TaintMetadata},
     state::{HasCorpus, HasCurrentTestcase},
-    Error, HasMetadata, HasNamedMetadata,
 };
 use libafl_bolts::{
-    tuples::{Handle, MatchNameRef},
     Named,
+    tuples::{Handle, MatchNameRef},
 };
 
 use crate::cmps::observers::AFLppCmpLogObserver;
@@ -111,7 +111,12 @@ where
 
         Ok(())
     }
+}
 
+impl<EM, TE, S, Z> Restartable<S> for AFLppCmplogTracingStage<'_, EM, TE, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Tracing stage is always deterministic
         // don't restart

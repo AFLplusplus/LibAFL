@@ -8,21 +8,21 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::tuples::{tuple_list, RefIndexable};
+use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
+    Error,
     events::{EventFirer, EventRestarter},
     executors::{
-        hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
-        inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
         Executor, ExitKind, HasObservers,
+        hooks::{ExecutorHooksTuple, inprocess::InProcessHooks},
+        inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
-    Error,
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure
@@ -156,39 +156,6 @@ where
         )
     }
 
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
-    #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout<OF>(
-        harness_fn: &'a mut H,
-        exposed_executor_state: ES,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        exec_tmout: Duration,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF>,
-    {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, OF>(
-            tuple_list!(),
-            observers,
-            fuzzer,
-            state,
-            event_mgr,
-            exec_tmout,
-        )?;
-
-        Ok(Self {
-            harness_fn,
-            exposed_executor_state,
-            inner,
-            phantom: PhantomData,
-        })
-    }
-
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
@@ -278,36 +245,6 @@ where
             event_mgr,
             Duration::from_millis(5000),
         )
-    }
-
-    /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
-    #[cfg(all(feature = "std", target_os = "linux"))]
-    #[expect(clippy::too_many_arguments)]
-    pub fn batched_timeout_generic<OF>(
-        user_hooks: HT,
-        harness_fn: HB,
-        exposed_executor_state: ES,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        exec_tmout: Duration,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF>,
-    {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, OF>(
-            user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
-        )?;
-
-        Ok(Self {
-            harness_fn,
-            exposed_executor_state,
-            inner,
-            phantom: PhantomData,
-        })
     }
 
     /// Create a new in mem executor.
