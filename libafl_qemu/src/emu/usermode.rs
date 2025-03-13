@@ -1,6 +1,6 @@
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
-use crate::{Emulator, GuestMaps, NopSnapshotManager};
+use crate::{Emulator, GuestMaps, NopSnapshotManager, TargetSignalHandling};
 
 pub type StdSnapshotManager = NopSnapshotManager;
 
@@ -87,5 +87,11 @@ impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
 
     pub fn unmap(&self, addr: GuestAddr, size: usize) -> Result<(), String> {
         self.qemu.unmap(addr, size)
+    }
+
+    pub fn set_target_crash_handling(&self, handling: &TargetSignalHandling) {
+        unsafe {
+            self.qemu.set_target_crash_handling(handling);
+        }
     }
 }

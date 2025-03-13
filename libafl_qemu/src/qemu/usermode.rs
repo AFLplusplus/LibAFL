@@ -16,9 +16,25 @@ use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 
 use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
 
+/// Choose how QEMU target signals should be handled.
+/// Most useful to configure how crashes and timeouts should be treated.
+pub enum TargetSignalHandling {
+    /// Return to harness with the associated exit request on target signal.
+    ReturnToHarness,
+    /// Propagate target signal to host (following QEMU target to host signal translation).
+    RaiseSignal,
+}
+
 pub struct QemuMappingsViewer<'a> {
     qemu: &'a Qemu,
     mappings: Vec<MapInfo>,
+}
+
+impl Default for TargetSignalHandling {
+    /// Historically, LibAFL QEMU raises the target signal to the host.
+    fn default() -> Self {
+        TargetSignalHandling::RaiseSignal
+    }
 }
 
 impl<'a> QemuMappingsViewer<'a> {
@@ -409,6 +425,17 @@ impl Qemu {
             QEMU_IS_RUNNING = true;
             libafl_qemu_sys::libafl_set_in_target_signal_ctx();
             libc::raise(signal.into());
+        }
+    }
+
+    pub unsafe fn set_target_crash_handling(&self, handling: &TargetSignalHandling) {
+        match handling {
+            TargetSignalHandling::ReturnToHarness => unsafe {
+                libafl_qemu_sys::libafl_set_return_on_crash(true);
+            },
+            TargetSignalHandling::RaiseSignal => unsafe {
+                libafl_qemu_sys::libafl_set_return_on_crash(false);
+            },
         }
     }
 }

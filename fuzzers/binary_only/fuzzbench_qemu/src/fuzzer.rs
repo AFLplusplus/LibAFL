@@ -53,7 +53,7 @@ use libafl_qemu::{
         edges::StdEdgeCoverageModule,
     },
     Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
-    Regs,
+    Regs, TargetSignalHandling,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 #[cfg(unix)]
@@ -193,6 +193,10 @@ fn fuzz(
         .qemu_parameters(args)
         .modules(modules)
         .build()?;
+
+    // return to harness instead of crashing the process.
+    // greatly speeds up crash recovery.
+    emulator.set_target_crash_handling(&TargetSignalHandling::RaiseSignal);
 
     let qemu = emulator.qemu();
 

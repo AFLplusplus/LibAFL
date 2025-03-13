@@ -45,6 +45,9 @@ use crate::{EmulatorModules, Qemu, QemuSignalContext, run_target_crash_hooks};
 type EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> =
     StatefulInProcessExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, Z>;
 
+#[cfg(feature = "systemmode")]
+pub(crate) static BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
+
 pub struct QemuExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
     inner: EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>,
     first_exec: bool,
@@ -64,7 +67,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
     signal: Signal,
     info: &mut siginfo_t,
     mut context: Option<&mut ucontext_t>,
-    _data: &mut InProcessExecutorHandlerData,
+    data: &mut InProcessExecutorHandlerData,
 ) where
     ET: EmulatorModuleTuple<I, S>,
     E: Executor<EM, I, S, Z> + HasObservers,
@@ -99,7 +102,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
                         qemu.run_signal_handler(signal.into(), info, puc);
                     }
 
-                    // if we are there, we can safely to execution
+                    // if we are there, we can safely resume from the signal handler.
                     return;
                 }
                 QemuSignalContext::InQemuSignalHandlerHost => {
@@ -120,23 +123,17 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
                     // run qemu hooks then report the crash.
 
                     log::debug!(
-                        "QEMU Target signal received that should be handled by host. Most likely a target crash."
+                        "QEMU Target signal received that should be handled by host. It is a target crash."
                     );
 
                     log::debug!("Running crash hooks.");
                     run_target_crash_hooks::<ET, I, S>(signal.into());
 
-                    // assert!(unsafe { data.maybe_report_crash::<E, EM, F, I, OF, S, Z>(None) });
+                    assert!(unsafe { data.maybe_report_crash::<E, EM, I, OF, S, Z>(None) });
 
                     if let Some(cpu) = qemu.current_cpu() {
                         eprint!("QEMU Context:\n{}", cpu.display_context());
                     }
-
-                    unsafe {
-                        libafl_qemu_sys::libafl_exit_request_crash();
-                    }
-
-                    return;
                 }
             }
         } else {
@@ -162,9 +159,6 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
         libc::_exit(128 + (signal as i32));
     }
 }
-
-#[cfg(feature = "systemmode")]
-pub(crate) static BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
 
 /// # Safety
 /// Can call through the `unix_signal_handler::inproc_timeout_handler`.
