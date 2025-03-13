@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_void, CStr, CString},
+    ffi::{CStr, CString, c_void},
     marker::PhantomData,
     mem::MaybeUninit,
     ptr::null_mut,
@@ -8,16 +8,16 @@ use std::{
 
 use bytes_utils::SegmentedBuf;
 use libafl_qemu_sys::{
-    libafl_load_qemu_snapshot, libafl_page_from_addr, libafl_qemu_current_paging_id,
-    libafl_save_qemu_snapshot, qemu_cleanup, qemu_main_loop, vm_start, GuestAddr, GuestPhysAddr,
-    GuestUsize, GuestVirtAddr,
+    GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr, libafl_load_qemu_snapshot,
+    libafl_page_from_addr, libafl_qemu_current_paging_id, libafl_save_qemu_snapshot, qemu_cleanup,
+    qemu_main_loop, vm_start,
 };
 use libc::EXIT_SUCCESS;
 use num_traits::Zero;
 
 use crate::{
-    FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuMemoryChunk, QemuSnapshotCheckResult,
-    CPU,
+    CPU, FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuMemoryChunk,
+    QemuSnapshotCheckResult,
 };
 
 pub(super) extern "C" fn qemu_cleanup_atexit() {

@@ -239,6 +239,10 @@ impl Qemu {
         unsafe { (addr as usize - guest_base) as GuestAddr }
     }
 
+    /// Tells whether access to target address @addr of size @size is valid or not.
+    /// The access is checked relatively to `current_cpu` if available, or the CPU at index 0
+    /// otherwise.
+    /// The function returns None if no CPU could be found.
     #[must_use]
     pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> Option<bool> {
         Some(

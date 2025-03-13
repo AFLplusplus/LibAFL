@@ -8,25 +8,25 @@ use core::{
     fmt, ptr, slice,
 };
 use std::{
-    ffi::{c_void, CString},
+    ffi::{CString, c_void},
     fmt::{Display, Formatter, Write},
-    mem::{transmute, MaybeUninit},
+    mem::{MaybeUninit, transmute},
     ops::{Deref, Range},
     pin::Pin,
     ptr::copy_nonoverlapping,
     sync::OnceLock,
 };
 
-use libafl_bolts::os::unix_signals::Signal;
 #[cfg(feature = "systemmode")]
 use libafl_bolts::Error;
+use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{
+    CPUArchState, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr,
     libafl_flush_jit, libafl_get_exit_reason, libafl_page_from_addr, libafl_qemu_add_gdb_cmd,
     libafl_qemu_cpu_index, libafl_qemu_current_cpu, libafl_qemu_gdb_reply, libafl_qemu_get_cpu,
     libafl_qemu_init, libafl_qemu_num_cpus, libafl_qemu_num_regs, libafl_qemu_read_reg,
     libafl_qemu_remove_breakpoint, libafl_qemu_set_breakpoint, libafl_qemu_trigger_breakpoint,
-    libafl_qemu_write_reg, CPUArchState, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestUsize,
-    GuestVirtAddr,
+    libafl_qemu_write_reg,
 };
 #[cfg(feature = "systemmode")]
 use libafl_qemu_sys::{libafl_qemu_remove_hw_breakpoint, libafl_qemu_set_hw_breakpoint};
@@ -55,7 +55,7 @@ pub use systemmode::*;
 
 mod hooks;
 pub use hooks::*;
-use libafl_bolts::{vec_init, AsSliceMut};
+use libafl_bolts::{AsSliceMut, vec_init};
 
 static mut QEMU_IS_INITIALIZED: bool = false;
 static mut QEMU_IS_RUNNING: bool = false;
