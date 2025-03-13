@@ -32,7 +32,7 @@ pub struct QemuMappingsViewer<'a> {
 }
 
 impl Default for TargetSignalHandling {
-    /// Historically, LibAFL QEMU raises the target signal to the host.
+    /// Historically, `LibAFL` QEMU raises the target signal to the host.
     fn default() -> Self {
         TargetSignalHandling::RaiseSignal
     }
