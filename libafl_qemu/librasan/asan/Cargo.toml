@@ -11,6 +11,7 @@ crate-type = ["rlib"]
 default = [
   "dlmalloc",
   "guest",
+  "heap",
   "hooks",
   "host",
   "libc",
@@ -21,6 +22,7 @@ default = [
 ]
 dlmalloc = ["dep:dlmalloc"]
 guest = []
+heap = []
 hooks = []
 host = ["dep:syscalls"]
 libc = ["dep:libc"]

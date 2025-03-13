@@ -15,6 +15,7 @@ test = ["asan/test", "dummy_libc/test"]
 asan = { path = "../asan", default-features = false, features = [
   "dlmalloc",
   "guest",
+  "heap",
   "hooks",
   "libc",
   "mimalloc",
