@@ -5,16 +5,16 @@ use std::{
 
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{
+    GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
     libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run,
-    libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps, GuestAddr, GuestUsize,
-    IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
+    libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps,
 };
 use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
-use pyo3::{pyclass, pymethods, IntoPyObject, Py, PyRef, PyRefMut, Python};
+use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 
-use crate::{qemu::QEMU_IS_RUNNING, Qemu, CPU};
+use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
 
 /// Choose how QEMU target signals should be handled.
 /// It's main use is to describe how crashes and timeouts should be treated.
@@ -149,11 +149,7 @@ impl Iterator for GuestMaps {
 
             let ret = ret.assume_init();
 
-            if ret.is_valid {
-                Some(ret.into())
-            } else {
-                None
-            }
+            if ret.is_valid { Some(ret.into()) } else { None }
         }
     }
 }
@@ -466,11 +462,11 @@ impl Qemu {
 pub mod pybind {
     use libafl_qemu_sys::{GuestAddr, MmapPerms};
     use pyo3::{
+        Bound, PyObject, PyResult, Python,
         conversion::FromPyObject,
         exceptions::PyValueError,
         pymethods,
         types::{PyAnyMethods, PyInt},
-        Bound, PyObject, PyResult, Python,
     };
 
     use crate::{pybind::Qemu, qemu::hooks::SyscallHookResult};
