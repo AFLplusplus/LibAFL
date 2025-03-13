@@ -32,6 +32,7 @@
 //!
 //! ## Features
 //! - `dlmalloc` - Enable support for the dlmalloc allocator backend.
+//! - `global_allocator` - Configure a global allocator (using dlmalloc or mimalloc as configured)
 //! - `guest` - Enable support for shadow memory and tracking in the guest
 //! - `hooks` - Enable support for hooking functions in the guest
 //! - `host` - Enable support for shadow memory and tracking in the host
@@ -39,6 +40,7 @@
 //!   read/write, logging etc (more OS agnostic)
 //! - `linux` - Enable the use of direct syscalls (supported by `rustix`) to
 //!   interact with the operating system (Linux specific).
+//! - `mimalloc` - Enable the `baby_mimalloc` allocator
 //! - `test` - Disable the magic used to support `no_std` environments for
 //!   running unit and integration tests
 //! - `tracking` - Enable support for memory tracking.
