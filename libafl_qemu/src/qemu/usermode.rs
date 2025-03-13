@@ -17,12 +17,18 @@ use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
 
 /// Choose how QEMU target signals should be handled.
-/// It's main use is to configure how crashes and timeouts should be treated.
+/// It's main use is to describe how crashes and timeouts should be treated.
 pub enum TargetSignalHandling {
     /// Return to harness with the associated exit request on target crashing or timeout signal.
+    /// The snapshot mechanism should make sure to recover correctly from the crash.
+    /// For instance, snapshots do not take into account side effects related to file descriptors.
+    /// If it could have an impact in case of a crash, prefer the other policy.
     ReturnToHarness,
     /// Propagate target signal to host (following QEMU target to host signal translation) by
     /// raising the proper signal.
+    /// This the safe policy, since the target is completely reset.
+    /// However, it could make the fuzzer much slower if many crashes are triggered during the
+    /// fuzzing campaign.
     RaiseSignal,
 }
 
@@ -429,6 +435,13 @@ impl Qemu {
         }
     }
 
+    /// Set the target crash handling policy according to [`TargetSignalHandling`]'s documentation.
+    ///
+    /// # Safety
+    ///
+    /// It has an important impact on how crashes are handled by QEMU on target crashing signals.
+    /// Please make sure to read the documentation of [`TargetSignalHandling`] before touching
+    /// this.
     pub unsafe fn set_target_crash_handling(&self, handling: &TargetSignalHandling) {
         match handling {
             TargetSignalHandling::ReturnToHarness => unsafe {
