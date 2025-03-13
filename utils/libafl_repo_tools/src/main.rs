@@ -1,7 +1,7 @@
 /*!
- * # `LibAFL` fmt
+ * # `LibAFL` tools
  *
- * Formatting `LibAFL` since 2024
+ * Taking care of the `LibAFL` repository since 2024
  */
 #![forbid(unexpected_cfgs)]
 #![allow(incomplete_features)]
@@ -129,9 +129,9 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
         return Ok(());
     }
 
-    let mut fmt_command = Command::new("cargo");
+    let mut gen_lockfile_cmd = Command::new("cargo");
 
-    fmt_command
+    gen_lockfile_cmd
         .arg("+nightly")
         .arg("generate-lockfile")
         .arg("--manifest-path")
@@ -144,7 +144,7 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
         );
     }
 
-    let res = fmt_command.output().await?;
+    let res = gen_lockfile_cmd.output().await?;
 
     if !res.status.success() {
         let stdout = from_utf8(&res.stdout).unwrap();
@@ -152,7 +152,7 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
         return Err(io::Error::new(
             ErrorKind::Other,
             format!(
-                "Cargo generate-lockfile failed. Run cargo fmt for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}"
+                "Cargo generate-lockfile failed. Run cargo generate-lockfile for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {gen_lockfile_cmd:?}"
             ),
         ));
     }

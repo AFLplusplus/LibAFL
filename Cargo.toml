@@ -42,7 +42,7 @@ exclude = [
   "libafl_libfuzzer_runtime",
   "utils/noaslr",
   "utils/gdb_qemu",
-  "utils/libafl_fmt",
+  "utils/libafl_repo_tools",
   "utils/desyscall",
   "utils/multi_machine_generator",
   "scripts",

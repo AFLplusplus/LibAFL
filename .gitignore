@@ -95,4 +95,4 @@ rustc-ice-*
 log
 
 # Coredumps
-**/*.core
+*.core
