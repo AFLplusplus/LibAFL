@@ -43,15 +43,11 @@ where
 }
 
 #[expect(clippy::too_many_arguments)]
-#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 fn syscall_read_hook<ET, I, S>(
-    // Our instantiated [`EmulatorModules`]
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
-    // Syscall number
     syscall: i32,
-    // Registers
     x0: GuestAddr,
     x1: GuestAddr,
     x2: GuestAddr,
@@ -66,7 +62,6 @@ where
     I: Unpin,
     S: Unpin,
 {
-    log::trace!("syscall_hook {syscall} {SYS_execve}");
     debug_assert!(i32::try_from(SYS_execve).is_ok());
     let h = emulator_modules.get_mut::<RedirectStdinModule>().unwrap();
     let addr = h.input_addr;
