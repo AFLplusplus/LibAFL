@@ -1,8 +1,13 @@
 target
 target-bin
 out
-Cargo.lock
 vendor
+
+# cargo lockfiles except from binaries
+**/Cargo.lock
+!fuzzers/**/Cargo.lock
+!utils/**/Cargo.lock
+
 
 .DS_Store
 .env
@@ -88,3 +93,6 @@ rustc-ice-*
 
 # log
 log
+
+# Coredumps
+*.core

@@ -15,7 +15,7 @@ use core::{
 use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
-    Error,
+    Error, HasMetadata,
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
     executors::{
@@ -312,6 +312,9 @@ impl<EM, H, HB, HT, I, OT, S, Z> HasInProcessHooks<I, S>
 
 #[inline]
 /// Save state if it is an objective
+/// Note that unlike the logic in fuzzer/mod.rs
+/// This will *NOT* put any testcase into the corpus.
+/// As it totally does not make any sense to put when we use inprocess executor or its descendants.
 pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
     executor: &mut E,
     state: &mut S,
@@ -342,6 +345,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
 
     if is_solution {
         let mut new_testcase = Testcase::from(input.clone());
+        new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
 
         if let Ok(mut tc) = state.current_testcase_mut() {

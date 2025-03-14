@@ -52,6 +52,7 @@ pub fn fuzz() {
     unsafe {
         RegistryBuilder::register::<MapFeedbackMetadata<u8>>();
         RegistryBuilder::register::<RetryCountRestartHelper>();
+        RegistryBuilder::register::<ExitKind>();
     }
 
     let mut signals = [0u8; 64];
