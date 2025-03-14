@@ -29,23 +29,9 @@
 //! The componentized nature of the design is intended to permit the user to
 //! adapt `asan` to their needs with minimal modification by selecting and
 //! combining alternative implementations of the various key components.
-//!
-//! ## Features
-//! - `dlmalloc` - Enable support for the dlmalloc allocator backend.
-//! - `global_allocator` - Configure a global allocator (using dlmalloc or mimalloc as configured)
-//! - `guest` - Enable support for shadow memory and tracking in the guest
-//! - `hooks` - Enable support for hooking functions in the guest
-//! - `host` - Enable support for shadow memory and tracking in the host
-//! - `libc` - Enable use of the `libc` library to support creation of mappings,
-//!   read/write, logging etc (more OS agnostic)
-//! - `linux` - Enable the use of direct syscalls (supported by `rustix`) to
-//!   interact with the operating system (Linux specific).
-//! - `mimalloc` - Enable the `baby_mimalloc` allocator
-//! - `test` - Disable the magic used to support `no_std` environments for
-//!   running unit and integration tests
-//! - `tracking` - Enable support for memory tracking.
 #![cfg_attr(not(feature = "test"), no_std)]
 #![cfg_attr(target_arch = "powerpc", feature(asm_experimental_arch))]
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 
 pub mod allocator;
 
