@@ -315,42 +315,11 @@ const fn fs_opt_get_mapsize(x: i32) -> i32 {
 
 #[expect(clippy::fn_params_excessive_bools)]
 impl Forkserver {
-    /// Create a new [`Forkserver`]
-    #[expect(clippy::too_many_arguments)]
-    pub fn new(
-        target: OsString,
-        args: Vec<OsString>,
-        envs: Vec<(OsString, OsString)>,
-        input_filefd: RawFd,
-        use_stdin: bool,
-        memlimit: u64,
-        is_persistent: bool,
-        is_deferred_frksrv: bool,
-        dump_asan_logs: bool,
-        coverage_map_size: Option<usize>,
-        debug_output: bool,
-    ) -> Result<Self, Error> {
-        Self::with_kill_signal(
-            target,
-            args,
-            envs,
-            input_filefd,
-            use_stdin,
-            memlimit,
-            is_persistent,
-            is_deferred_frksrv,
-            dump_asan_logs,
-            coverage_map_size,
-            debug_output,
-            KILL_SIGNAL_DEFAULT,
-        )
-    }
-
     /// Create a new [`Forkserver`] that will kill child processes
     /// with the given `kill_signal`.
     /// Using `Forkserver::new(..)` will default to [`Signal::SIGTERM`].
     #[expect(clippy::too_many_arguments)]
-    pub fn with_kill_signal(
+    fn new(
         target: OsString,
         args: Vec<OsString>,
         envs: Vec<(OsString, OsString)>,
@@ -992,7 +961,7 @@ where
         };
 
         let mut forkserver = match &self.program {
-            Some(t) => Forkserver::with_kill_signal(
+            Some(t) => Forkserver::new(
                 t.clone(),
                 self.arguments.clone(),
                 self.envs.clone(),
