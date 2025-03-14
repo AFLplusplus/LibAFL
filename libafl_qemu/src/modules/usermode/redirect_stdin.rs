@@ -7,7 +7,7 @@ use crate::{
     qemu::{Hook, SyscallHookResult},
 };
 
-/// This module hijacks any read to buffer from stdin, and instead fill the buffer with the specified input address instead
+/// This module hijacks any read to buffer from stdin, and instead fill the buffer from the specified input address
 /// This is useful when your binary target reads the input from the stdin.
 /// With this you can just fuzz more like afl++
 /// You need to use this with snapshot module!
