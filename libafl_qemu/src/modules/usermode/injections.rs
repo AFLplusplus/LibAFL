@@ -19,7 +19,7 @@ use libafl_qemu_sys::GuestAddr;
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(cpu_target = "hexagon"))]
-use crate::SYS_execve;
+use crate::{SYS_execve, SYS_read};
 use crate::{
     CallingConvention, Qemu,
     elf::EasyElf,
@@ -264,6 +264,44 @@ impl InjectionModule {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct SysReadHookModule {
+    input_addr: GuestAddr,
+}
+
+impl SysReadHookModule {
+    pub fn new() -> Self {
+        Self {
+            input_addr: 0,
+        }
+    }
+
+    pub fn set_input_addr(&mut self, input_addr: GuestAddr) {
+        self.input_addr = input_addr;
+    }
+}
+
+
+impl<I, S> EmulatorModule<I, S> for SysReadHookModule
+where
+    I: Unpin,
+    S: Unpin,
+{
+    fn pre_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        _state: &mut S,
+        _input: &I,
+    )
+    where
+        ET: EmulatorModuleTuple<I, S>,
+    {
+        emulator_modules.pre_syscalls(Hook::Function(syscall_read_hook::<ET, I, S>));
+    }
+}
+
+
 impl<I, S> EmulatorModule<I, S> for InjectionModule
 where
     I: Unpin,
@@ -356,6 +394,57 @@ impl HasAddressFilter for InjectionModule {
         unsafe { (&raw mut NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }
+
+#[expect(clippy::too_many_arguments)]
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
+fn syscall_read_hook<ET, I, S>(
+    // Our instantiated [`EmulatorModules`]
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
+    _state: Option<&mut S>,
+    // Syscall number
+    syscall: i32,
+    // Registers
+    x0: GuestAddr,
+    x1: GuestAddr,
+    x2: GuestAddr,
+    x3: GuestAddr,
+    x4: GuestAddr,
+    x5: GuestAddr,
+    x6: GuestAddr,
+    x7: GuestAddr,
+) -> SyscallHookResult
+where
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
+{
+    log::trace!("syscall_hook {syscall} {SYS_execve}");
+    debug_assert!(i32::try_from(SYS_execve).is_ok());
+    let h = emulator_modules.get_mut::<SysReadHookModule>().unwrap();
+    let addr = h.input_addr;
+
+    if syscall == SYS_read as i32 {
+        println!("Is sys read {} {:x} {:x} {} {} {} {} {}", x0, x1, x2, x3, x4, x5, x6, x7);
+        if x0 == 0 {
+            unsafe {
+                let src = addr as *mut u8;
+                let dst = x1 as *mut u8;
+                let size = x2;
+                println!("copying {:p} {:p} {}", src, dst, size);
+                dst.copy_from(src, size as usize);
+            }
+            println!("is 0");
+            return SyscallHookResult::new(Some(0));
+        }
+        else {
+            println!("others {}", x0);
+            return SyscallHookResult::new(None);
+        }
+    }
+    SyscallHookResult::new(None)
+}
+
 
 #[expect(clippy::too_many_arguments)]
 #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
