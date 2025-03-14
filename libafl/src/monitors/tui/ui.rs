@@ -533,6 +533,10 @@ impl TuiUi {
                 Cell::from(Span::raw(&tup.1.exec_speed)),
             ]),
             Row::new(vec![
+                Cell::from(Span::raw("total execs")),
+                Cell::from(Span::raw(format!("{}", tup.1.total_execs))),
+            ]),
+            Row::new(vec![
                 Cell::from(Span::raw("last new entry")),
                 Cell::from(Span::raw(format_duration_hms(&(tup.1.last_new_entry)))),
             ]),

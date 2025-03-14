@@ -351,6 +351,7 @@ impl Monitor for TuiMonitor {
             let totalexec = global_stats.total_execs;
             let run_time = global_stats.run_time;
             let exec_per_sec_pretty = global_stats.execs_per_sec_pretty.clone();
+            let total_execs = global_stats.total_execs;
             let mut ctx = self.context.write().unwrap();
             ctx.total_corpus_count = global_stats.corpus_size;
             ctx.total_solutions = global_stats.objective_size;
@@ -358,7 +359,8 @@ impl Monitor for TuiMonitor {
                 .add(run_time, global_stats.corpus_size);
             ctx.objective_size_timed
                 .add(run_time, global_stats.objective_size);
-            let total_process_timing = client_stats_manager.process_timing(exec_per_sec_pretty);
+            let total_process_timing =
+                client_stats_manager.process_timing(exec_per_sec_pretty, total_execs);
 
             ctx.total_process_timing = total_process_timing;
             ctx.execs_per_sec_timed.add(run_time, execsec);
