@@ -73,7 +73,7 @@ pub struct PatchedHook {
 }
 
 impl PatchedHook {
-    const fn new<F: Copy>(name: &'static CStr, func: F) -> Self {
+    pub const fn new<F: Copy>(name: &'static CStr, func: F) -> Self {
         let pf = (&func) as *const F as *const GuestAddr;
         let destination = unsafe { *pf };
         Self { name, destination }

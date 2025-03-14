@@ -14,6 +14,7 @@ test = ["asan/test"]
 [dependencies]
 asan = { path = "../asan", default-features = false, features = [
   "dlmalloc",
+  "global_allocator",
   "guest",
   "hooks",
   "host",
