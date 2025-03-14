@@ -17,3 +17,7 @@ pub use asan::AsanModule;
 pub mod asan_guest;
 #[cfg(not(cpu_target = "hexagon"))]
 pub use asan_guest::AsanGuestModule;
+#[cfg(not(cpu_target = "hexagon"))]
+pub mod redirect_stdin;
+#[cfg(not(cpu_target = "hexagon"))]
+pub use redirect_stdin::*;
