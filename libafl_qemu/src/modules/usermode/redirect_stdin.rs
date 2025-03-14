@@ -96,7 +96,7 @@ where
             let mut src = addr as *mut u8;
             src = src.wrapping_add(h.read as usize);
             let dst = x1 as *mut u8;
-            let size = std::cmp::min(x2, (h.total - h.read) as u64);
+            let size = std::cmp::min(x2, (h.total - h.read).try_into().unwrap());
             // println!("copying {:p} {:p} {}", src, dst, size);
             dst.copy_from(src, size as usize);
             size
