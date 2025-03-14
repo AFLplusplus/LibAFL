@@ -94,7 +94,7 @@ where
         */
         let size = unsafe {
             let mut src = addr as *mut u8;
-            src = src.wrapping_add(h.read as usize);
+            src = src.wrapping_add(h.read);
             let dst = x1 as *mut u8;
             let size = std::cmp::min(x2, (h.total - h.read).try_into().unwrap());
             // println!("copying {:p} {:p} {}", src, dst, size);
