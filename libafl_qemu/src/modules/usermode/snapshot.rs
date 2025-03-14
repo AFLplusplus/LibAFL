@@ -818,6 +818,7 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
+        println!("SNAPSHOT RESET");
         if self.empty {
             self.snapshot(qemu);
         } else if self.auto_reset {

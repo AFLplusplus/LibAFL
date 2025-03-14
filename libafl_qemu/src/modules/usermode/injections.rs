@@ -21,14 +21,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::{SYS_execve, SYS_read};
 use crate::{
-    CallingConvention, Qemu,
-    elf::EasyElf,
-    emu::EmulatorModules,
-    modules::{
-        EmulatorModule, EmulatorModuleTuple,
-        utils::filters::{HasAddressFilter, NOP_ADDRESS_FILTER, NopAddressFilter},
-    },
-    qemu::{ArchExtras, Hook, SyscallHookResult},
+    elf::EasyElf, emu::EmulatorModules, modules::{
+        utils::filters::{HasAddressFilter, NopAddressFilter, NOP_ADDRESS_FILTER}, EmulatorModule, EmulatorModuleTuple
+    }, qemu::{ArchExtras, Hook, SyscallHookResult}, CallingConvention, Qemu, Regs
 };
 
 #[cfg(cpu_target = "hexagon")]
@@ -287,13 +282,7 @@ where
     I: Unpin,
     S: Unpin,
 {
-    fn pre_exec<ET>(
-        &mut self,
-        _qemu: Qemu,
-        emulator_modules: &mut EmulatorModules<ET, I, S>,
-        _state: &mut S,
-        _input: &I,
-    )
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         ET: EmulatorModuleTuple<I, S>,
     {
@@ -399,7 +388,7 @@ impl HasAddressFilter for InjectionModule {
 #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 fn syscall_read_hook<ET, I, S>(
     // Our instantiated [`EmulatorModules`]
-    _qemu: Qemu,
+    qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     // Syscall number
@@ -423,22 +412,24 @@ where
     debug_assert!(i32::try_from(SYS_execve).is_ok());
     let h = emulator_modules.get_mut::<SysReadHookModule>().unwrap();
     let addr = h.input_addr;
+    let rip = qemu.read_reg(Regs::Pc).unwrap();
 
     if syscall == SYS_read as i32 {
-        println!("Is sys read {} {:x} {:x} {} {} {} {} {}", x0, x1, x2, x3, x4, x5, x6, x7);
+        println!("Is sys read {:x} {} {:x} {:x} {} {} {} {} {}", rip, x0, x1, x2, x3, x4, x5, x6, x7);
         if x0 == 0 {
-            unsafe {
+            let size = unsafe {
                 let src = addr as *mut u8;
                 let dst = x1 as *mut u8;
                 let size = x2;
                 println!("copying {:p} {:p} {}", src, dst, size);
                 dst.copy_from(src, size as usize);
-            }
-            println!("is 0");
-            return SyscallHookResult::new(Some(0));
+                size
+            };
+            println!("copied {}", size);
+            return SyscallHookResult::new(Some(size));
         }
         else {
-            println!("others {}", x0);
+            // println!("others {}", x0);
             return SyscallHookResult::new(None);
         }
     }
