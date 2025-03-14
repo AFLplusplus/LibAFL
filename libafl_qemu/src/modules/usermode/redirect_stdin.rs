@@ -1,3 +1,4 @@
+use libafl_bolts::HasLen;
 use libafl_qemu_sys::GuestAddr;
 
 use crate::{
@@ -14,13 +15,19 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct RedirectStdinModule {
     input_addr: GuestAddr,
+    read: usize,
+    total: usize,
 }
 
 impl RedirectStdinModule {
     #[must_use]
     /// constuctor
     pub fn new() -> Self {
-        Self { input_addr: 0 }
+        Self {
+            input_addr: 0,
+            read: 0,
+            total: 0,
+        }
     }
 
     /// set where the input is placed
@@ -31,7 +38,7 @@ impl RedirectStdinModule {
 
 impl<I, S> EmulatorModule<I, S> for RedirectStdinModule
 where
-    I: Unpin,
+    I: Unpin + HasLen,
     S: Unpin,
 {
     fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
@@ -39,6 +46,18 @@ where
         ET: EmulatorModuleTuple<I, S>,
     {
         emulator_modules.pre_syscalls(Hook::Function(syscall_read_hook::<ET, I, S>));
+    }
+
+    fn pre_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
+        _state: &mut S,
+        input: &I,
+    ) where
+        ET: EmulatorModuleTuple<I, S>,
+    {
+        self.total = input.len();
     }
 }
 
@@ -59,7 +78,7 @@ fn syscall_read_hook<ET, I, S>(
 ) -> SyscallHookResult
 where
     ET: EmulatorModuleTuple<I, S>,
-    I: Unpin,
+    I: Unpin + HasLen,
     S: Unpin,
 {
     debug_assert!(i32::try_from(SYS_execve).is_ok());
@@ -74,14 +93,16 @@ where
         );
         */
         let size = unsafe {
-            let src = addr as *mut u8;
+            let mut src = addr as *mut u8;
+            src = src.wrapping_add(h.read as usize);
             let dst = x1 as *mut u8;
-            let size = x2;
+            let size = std::cmp::min(x2, (h.total - h.read) as u64);
             // println!("copying {:p} {:p} {}", src, dst, size);
             dst.copy_from(src, size as usize);
             size
         };
         // println!("copied {}", size);
+        h.read += size as usize;
         return SyscallHookResult::new(Some(size));
     }
     SyscallHookResult::new(None)
