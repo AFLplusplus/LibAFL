@@ -26,7 +26,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use hashbrown::HashMap;
-use libafl_bolts::{ClientId, current_time, format_duration_hms};
+use libafl_bolts::{ClientId, current_time, format_big_number, format_duration_hms};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use typed_builder::TypedBuilder;
 
@@ -393,9 +393,9 @@ impl Monitor for TuiMonitor {
         let mut fmt = format!(
             "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
-            client.corpus_size(),
-            client.objective_size(),
-            client.executions(),
+            format_big_number(client.corpus_size()),
+            format_big_number(client.objective_size()),
+            format_big_number(client.executions()),
             exec_sec
         );
         for (key, val) in client.user_stats() {
