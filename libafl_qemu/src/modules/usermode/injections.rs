@@ -18,8 +18,10 @@ use libafl::Error;
 use libafl_qemu_sys::GuestAddr;
 use serde::{Deserialize, Serialize};
 
+#[cfg(not(cpu_target = "hexagon"))]
+use crate::SYS_execve;
 use crate::{
-    CallingConvention, Qemu, SYS_execve,
+    CallingConvention, Qemu,
     elf::EasyElf,
     emu::EmulatorModules,
     modules::{
