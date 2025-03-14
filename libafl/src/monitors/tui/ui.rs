@@ -3,6 +3,7 @@ use alloc::{string::ToString, sync::Arc, vec::Vec};
 use core::cmp::{max, min};
 use std::sync::RwLock;
 
+use libafl_bolts::format_big_number;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -533,6 +534,10 @@ impl TuiUi {
                 Cell::from(Span::raw(&tup.1.exec_speed)),
             ]),
             Row::new(vec![
+                Cell::from(Span::raw("total execs")),
+                Cell::from(Span::raw(format_big_number(tup.1.total_execs))),
+            ]),
+            Row::new(vec![
                 Cell::from(Span::raw("last new entry")),
                 Cell::from(Span::raw(format_duration_hms(&(tup.1.last_new_entry)))),
             ]),
@@ -581,17 +586,17 @@ impl TuiUi {
                     Cell::from(Span::raw("clients")),
                     Cell::from(Span::raw(format!("{}", self.clients))),
                     Cell::from(Span::raw("total execs")),
-                    Cell::from(Span::raw(format!("{}", app.total_execs))),
+                    Cell::from(Span::raw(format_big_number(app.total_execs))),
                     Cell::from(Span::raw("map density")),
                     Cell::from(Span::raw(app.total_map_density.to_string())),
                 ]),
                 Row::new(vec![
                     Cell::from(Span::raw("solutions")),
-                    Cell::from(Span::raw(format!("{}", app.total_solutions))),
+                    Cell::from(Span::raw(format_big_number(app.total_solutions))),
                     Cell::from(Span::raw("cycle done")),
-                    Cell::from(Span::raw(format!("{}", app.total_cycles_done))),
+                    Cell::from(Span::raw(format_big_number(app.total_cycles_done))),
                     Cell::from(Span::raw("corpus count")),
-                    Cell::from(Span::raw(format!("{}", app.total_corpus_count))),
+                    Cell::from(Span::raw(format_big_number(app.total_corpus_count))),
                 ]),
             ]
         };
@@ -680,18 +685,16 @@ impl TuiUi {
             vec![
                 Row::new(vec![
                     Cell::from(Span::raw("corpus count")),
-                    Cell::from(Span::raw(format!(
-                        "{}",
-                        app.clients.get(&self.clients_idx).map_or(0, |x| x.corpus)
+                    Cell::from(Span::raw(format_big_number(
+                        app.clients.get(&self.clients_idx).map_or(0, |x| x.corpus),
                     ))),
                 ]),
                 Row::new(vec![
                     Cell::from(Span::raw("total execs")),
-                    Cell::from(Span::raw(format!(
-                        "{}",
+                    Cell::from(Span::raw(format_big_number(
                         app.clients
                             .get(&self.clients_idx)
-                            .map_or(0, |x| x.executions)
+                            .map_or(0, |x| x.executions),
                     ))),
                 ]),
                 Row::new(vec![

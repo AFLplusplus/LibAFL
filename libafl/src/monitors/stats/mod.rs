@@ -94,6 +94,8 @@ pub struct ProcessTiming {
     pub last_new_entry: Duration,
     /// Timing of the last new solution
     pub last_saved_solution: Duration,
+    /// The total number of executions
+    pub total_execs: u64,
 }
 
 impl ProcessTiming {
@@ -339,12 +341,14 @@ impl ClientStats {
         };
 
         let exec_speed = self.execs_per_sec_pretty(current_time());
+        let total_execs = self.executions;
 
         ProcessTiming {
             client_start_time,
             exec_speed,
             last_new_entry,
             last_saved_solution,
+            total_execs,
         }
     }
 
