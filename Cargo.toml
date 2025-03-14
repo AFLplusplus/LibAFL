@@ -103,6 +103,7 @@ log = "0.4.22"
 meminterval = "0.4.1"
 mimalloc = { version = "0.1.43", default-features = false }
 nix = { version = "0.29.0", default-features = false }
+num-derive = { version = "0.4.2", default-features = false }
 num_enum = { version = "0.7.3", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 paste = "1.0.15"
@@ -126,7 +127,7 @@ typed-builder = "0.20.0" # Implement the builder pattern at compiletime
 typeid = "1.0.0" # Safe type_eq that doesn't rely on std specialization
 unicorn-engine = "2.0.1" # Used in libafl_unicorn
 uuid = { version = "1.10.0", features = ["serde", "v4"] }
-which = "6.0.3"
+which = "7.0.2"
 windows = "0.59.0"
 z3 = "0.12.1"
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking

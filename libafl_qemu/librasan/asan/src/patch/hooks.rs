@@ -23,26 +23,32 @@ impl PatchedHooks {
     pub fn init<S: Symbols, P: Patch, R: MapReader, M: Mmap>()
     -> Result<(), PatchesError<S, P, R, M>> {
         debug!("Installing patches");
-        let reader = R::new().map_err(|e| PatchesError::MapReaderError(e))?;
-        let mappings = MapIterator::new(reader).collect::<Vec<MapEntry>>();
+        let mappings = Self::get_mappings()?;
         mappings.iter().for_each(|m| trace!("{m:?}"));
-        let patches = PatchedHook::all()
-            .into_iter()
-            .map(|p| Self::apply_patch(p, &mappings))
-            .collect::<Result<BTreeMap<GuestAddr, PatchedHook>, PatchesError<S, P, R, M>>>()?;
-        PATCHED.lock().replace(patches);
+        for patch in PatchedHook::all() {
+            Self::patch(patch, &mappings)?;
+        }
         debug!("Patching complete");
         Ok(())
     }
 
-    fn apply_patch<S: Symbols, P: Patch, R: MapReader, M: Mmap>(
-        p: PatchedHook,
+    pub fn get_mappings<S: Symbols, P: Patch, R: MapReader, M: Mmap>()
+    -> Result<Vec<MapEntry>, PatchesError<S, P, R, M>> {
+        let reader = R::new().map_err(|e| PatchesError::MapReaderError(e))?;
+        Ok(MapIterator::new(reader).collect::<Vec<MapEntry>>())
+    }
+
+    pub fn patch<S: Symbols, P: Patch, R: MapReader, M: Mmap>(
+        patch: PatchedHook,
         mappings: &[MapEntry],
-    ) -> Result<(GuestAddr, PatchedHook), PatchesError<S, P, R, M>> {
-        trace!("patch: {:?}, destination: {:#x}", p.name, p.destination);
-        let target = S::lookup(p.name.as_ptr() as *const c_char)
+    ) -> Result<(), PatchesError<S, P, R, M>> {
+        trace!(
+            "patch: {:?}, destination: {:#x}",
+            patch.name, patch.destination
+        );
+        let target = S::lookup(patch.name.as_ptr() as *const c_char)
             .map_err(|e| PatchesError::SymbolsError(e))?;
-        trace!("patching: {:#x} -> {:#x}", target, p.destination);
+        trace!("patching: {:#x} -> {:#x}", target, patch.destination);
         let mapping = mappings
             .iter()
             .filter(|m| m.contains(target))
@@ -51,9 +57,10 @@ impl PatchedHooks {
         let prot = mapping
             .writeable::<M>()
             .map_err(|e| PatchesError::MmapError(e))?;
-        P::patch(target, p.destination).map_err(|e| PatchesError::PatchError(e))?;
+        P::patch(target, patch.destination).map_err(|e| PatchesError::PatchError(e))?;
         drop(prot);
-        Ok((target, p))
+        PATCHED.lock().get_or_insert_default().insert(target, patch);
+        Ok(())
     }
 
     pub fn check_patched(addr: GuestAddr) -> Result<(), PatchesCheckError> {

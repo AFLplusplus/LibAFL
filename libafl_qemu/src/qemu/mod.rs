@@ -101,6 +101,9 @@ pub enum QemuExitReason {
     /// Synchronous exit: The guest triggered a backdoor and should return to `LibAFL`.
     SyncExit,
 
+    // Target crash, and it has been requested to be handled by the harness.
+    Crash,
+
     /// Timeout, and it has been requested to be handled by the harness.
     Timeout,
 }
@@ -184,6 +187,7 @@ impl Display for QemuExitReason {
             QemuExitReason::End(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
             QemuExitReason::Breakpoint(bp) => write!(f, "Breakpoint: {bp}"),
             QemuExitReason::SyncExit => write!(f, "Sync Exit"),
+            QemuExitReason::Crash => write!(f, "Crash"),
             QemuExitReason::Timeout => write!(f, "Timeout"),
         }
     }
@@ -710,6 +714,8 @@ impl Qemu {
 
                 #[cfg(feature = "systemmode")]
                 libafl_qemu_sys::libafl_exit_reason_kind_TIMEOUT => QemuExitReason::Timeout,
+
+                libafl_qemu_sys::libafl_exit_reason_kind_CRASH => QemuExitReason::Crash,
 
                 _ => return Err(QemuExitError::UnknownKind),
             })
