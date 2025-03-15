@@ -398,6 +398,7 @@ impl Monitor for TuiMonitor {
             format_big_number(client.executions()),
             exec_sec
         );
+
         for (key, val) in client.user_stats() {
             write!(fmt, ", {key}: {val}").unwrap();
         }
