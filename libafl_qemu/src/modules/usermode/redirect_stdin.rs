@@ -1,3 +1,6 @@
+use core::fmt::Debug;
+
+use libafl::inputs::HasTargetBytes;
 use libafl_bolts::HasLen;
 use libafl_qemu_sys::GuestAddr;
 
@@ -38,7 +41,7 @@ impl RedirectStdinModule {
 
 impl<I, S> EmulatorModule<I, S> for RedirectStdinModule
 where
-    I: Unpin + HasLen,
+    I: Unpin + HasLen + HasTargetBytes + Debug,
     S: Unpin,
 {
     fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
@@ -58,6 +61,7 @@ where
         ET: EmulatorModuleTuple<I, S>,
     {
         self.total = input.len();
+        self.read = 0;
     }
 }
 
@@ -78,7 +82,7 @@ fn syscall_read_hook<ET, I, S>(
 ) -> SyscallHookResult
 where
     ET: EmulatorModuleTuple<I, S>,
-    I: Unpin + HasLen,
+    I: Unpin + HasLen + HasTargetBytes + Debug,
     S: Unpin,
 {
     debug_assert!(i32::try_from(SYS_execve).is_ok());
@@ -96,10 +100,17 @@ where
             let mut src = addr as *mut u8;
             src = src.wrapping_add(h.read as usize);
             let dst = x1 as *mut u8;
-            let size = std::cmp::min(x2, (h.total - h.read).try_into().unwrap());
-            // println!("copying {:p} {:p} {}", src, dst, size);
-            dst.copy_from(src, size as usize);
-            size
+            if h.total >= h.read {
+                let size = std::cmp::min(x2, (h.total - h.read).try_into().unwrap());
+                println!(
+                    "trying to read {} copying {:p} {:p} size: {} h.total: {} h.read {} ",
+                    x2, src, dst, size, h.total, h.read
+                );
+                dst.copy_from(src, size as usize);
+                size
+            } else {
+                0
+            }
         };
         // println!("copied {}", size);
         h.read += size as usize;
