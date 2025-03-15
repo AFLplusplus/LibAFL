@@ -4,12 +4,20 @@ use libafl::inputs::HasTargetBytes;
 use libafl_bolts::HasLen;
 use libafl_qemu_sys::GuestAddr;
 
+#[cfg(not(cpu_target = "hexagon"))]
+use crate::SYS_read;
 use crate::{
-    Qemu, SYS_execve, SYS_read,
+    Qemu,
     emu::EmulatorModules,
     modules::{EmulatorModule, EmulatorModuleTuple},
     qemu::{Hook, SyscallHookResult},
 };
+
+#[cfg(cpu_target = "hexagon")]
+/// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.
+/// <https://github.com/qemu/qemu/blob/11be70677c70fdccd452a3233653949b79e97908/linux-user/hexagon/syscall_nr.h#L230>
+#[expect(non_upper_case_globals)]
+const SYS_eSYS_readxecve: u8 = 63;
 
 /// This module hijacks any read to buffer from stdin, and instead fill the buffer from the specified input address
 /// This is useful when your binary target reads the input from the stdin.
@@ -85,7 +93,6 @@ where
     I: Unpin + HasLen + HasTargetBytes + Debug,
     S: Unpin,
 {
-    debug_assert!(i32::try_from(SYS_execve).is_ok());
     let h = emulator_modules.get_mut::<RedirectStdinModule>().unwrap();
     let addr = h.input_addr;
 
@@ -102,10 +109,12 @@ where
             let dst = x1 as *mut u8;
             if h.total >= h.read {
                 let size = std::cmp::min(x2, (h.total - h.read).try_into().unwrap());
+                /*
                 println!(
                     "trying to read {} copying {:p} {:p} size: {} h.total: {} h.read {} ",
                     x2, src, dst, size, h.total, h.read
                 );
+                */
                 dst.copy_from(src, size as usize);
                 size
             } else {
