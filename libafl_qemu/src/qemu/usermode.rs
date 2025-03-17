@@ -3,8 +3,7 @@ use std::{
     str::from_utf8_unchecked_mut,
 };
 
-use libafl::Error;
-use libafl_bolts::os::unix_signals::Signal;
+use libafl_bolts::{Error, os::unix_signals::Signal};
 use libafl_qemu_sys::{
     GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
