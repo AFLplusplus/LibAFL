@@ -3,7 +3,7 @@ use core::fmt::Debug;
 use libafl::inputs::HasTargetBytes;
 use libafl_bolts::HasLen;
 use libafl_qemu_sys::GuestAddr;
-
+use libafl_bolts::AsSlice;
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::SYS_read;
 use crate::{
@@ -23,9 +23,9 @@ const SYS_eSYS_readxecve: u8 = 63;
 /// This is useful when your binary target reads the input from the stdin.
 /// With this you can just fuzz more like afl++
 /// You need to use this with snapshot module!
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RedirectStdinModule {
-    input_addr: GuestAddr,
+    input_addr: *const u8,
     read: usize,
     total: usize,
 }
@@ -35,15 +35,10 @@ impl RedirectStdinModule {
     /// constuctor
     pub fn new() -> Self {
         Self {
-            input_addr: 0,
+            input_addr: core::ptr::null(),
             read: 0,
             total: 0,
         }
-    }
-
-    /// set where the input is placed
-    pub fn set_input_addr(&mut self, input_addr: GuestAddr) {
-        self.input_addr = input_addr;
     }
 }
 
@@ -68,6 +63,9 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
+        let target_bytes = input.target_bytes();
+        let buf = target_bytes.as_slice();
+        self.input_addr = buf.as_ptr() as *const u8;
         self.total = input.len();
         self.read = 0;
     }
