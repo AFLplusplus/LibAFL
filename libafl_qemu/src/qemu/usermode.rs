@@ -324,15 +324,16 @@ impl Qemu {
     }
 
     #[expect(clippy::cast_sign_loss)]
-    fn mmap(
+    pub fn mmap(
         self,
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
+        fd: i32,
         flags: c_int,
     ) -> Result<GuestAddr, ()> {
         let res = unsafe {
-            libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, -1, 0)
+            libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, fd, 0)
         };
         if res <= 0 {
             Err(())
@@ -347,9 +348,15 @@ impl Qemu {
         size: usize,
         perms: MmapPerms,
     ) -> Result<GuestAddr, String> {
-        self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
-            .map_err(|()| format!("Failed to map {addr}"))
-            .map(|addr| addr as GuestAddr)
+        self.mmap(
+            addr,
+            size,
+            perms,
+            -1,
+            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+        )
+        .map_err(|()| format!("Failed to map {addr}"))
+        .map(|addr| addr as GuestAddr)
     }
 
     pub fn map_fixed(
@@ -362,6 +369,7 @@ impl Qemu {
             addr,
             size,
             perms,
+            -1,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
         )
         .map_err(|()| format!("Failed to map {addr}"))
