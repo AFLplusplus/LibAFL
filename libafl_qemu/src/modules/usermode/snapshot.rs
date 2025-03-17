@@ -985,7 +985,6 @@ where
 
             #[cfg(not(any(cpu_target = "arm", cpu_target = "riscv32")))]
             if sys_const == SYS_mmap {
-                println!("QEMU: SYS_MMAP {a0:#x?}");
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
                     h.add_mapped(result, a1 as usize, Some(prot));
