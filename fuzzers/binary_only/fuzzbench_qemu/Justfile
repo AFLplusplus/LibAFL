@@ -8,6 +8,7 @@ harness:
     cc -c libfuzzer_main.c
     cc \
         ./fuzz.c \
+        ./libfuzzer_main.o \
         -o {{ HARNESS_NAME }} \
         -lm -lz
 
@@ -17,7 +18,7 @@ build:
 
 [unix]
 run: build harness
-    gdb -q --args {{ FUZZER }} \
+    {{ FUZZER }} \
       --libafl-in ../../inprocess/libfuzzer_libpng/corpus \
       --libafl-out ./out \
       ./{{ HARNESS_NAME }} \
