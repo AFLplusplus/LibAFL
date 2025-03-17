@@ -1,9 +1,9 @@
 use core::fmt::Debug;
 
 use libafl::inputs::HasTargetBytes;
-use libafl_bolts::HasLen;
+use libafl_bolts::{AsSlice, HasLen};
 use libafl_qemu_sys::GuestAddr;
-use libafl_bolts::AsSlice;
+
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::SYS_read;
 use crate::{
