@@ -3,6 +3,7 @@ use std::{
     str::from_utf8_unchecked_mut,
 };
 
+use libafl::Error;
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{
     GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
@@ -329,14 +330,18 @@ impl Qemu {
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
-        fd: i32,
         flags: c_int,
-    ) -> Result<GuestAddr, ()> {
+        fd: i32,
+    ) -> Result<GuestAddr, Error> {
         let res = unsafe {
             libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, fd, 0)
         };
         if res <= 0 {
-            Err(())
+            let errno = std::io::Error::last_os_error().raw_os_error();
+            Err(Error::illegal_argument(format!(
+                "failed to mmap addr: {:x} (size: {:?} prot: {:?} flags: {:?} fd: {:?}). The errno is {:#?}",
+                addr, size, perms, flags, fd, errno
+            )))
         } else {
             Ok(res as GuestAddr)
         }
@@ -347,7 +352,7 @@ impl Qemu {
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
-    ) -> Result<GuestAddr, String> {
+    ) -> Result<GuestAddr, Error> {
         self.mmap(
             addr,
             size,
@@ -355,8 +360,6 @@ impl Qemu {
             -1,
             libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
         )
-        .map_err(|()| format!("Failed to map {addr}"))
-        .map(|addr| addr as GuestAddr)
     }
 
     pub fn map_fixed(
@@ -364,7 +367,7 @@ impl Qemu {
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
-    ) -> Result<GuestAddr, String> {
+    ) -> Result<GuestAddr, Error> {
         self.mmap(
             addr,
             size,
@@ -372,8 +375,6 @@ impl Qemu {
             -1,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
         )
-        .map_err(|()| format!("Failed to map {addr}"))
-        .map(|addr| addr as GuestAddr)
     }
 
     pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
