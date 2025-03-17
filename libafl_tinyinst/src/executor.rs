@@ -19,6 +19,9 @@ use libafl_bolts::{
 };
 use tinyinst::tinyinst::{TinyInst, litecov::RunResult};
 
+use std::collections::HashSet;
+
+
 /// [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
 pub struct TinyInstExecutor<S, SHM, OT> {
     tinyinst: TinyInst,
@@ -28,6 +31,7 @@ pub struct TinyInstExecutor<S, SHM, OT> {
     phantom: PhantomData<S>,
     cur_input: InputFile,
     map: Option<SHM>,
+    hit_offsets: HashSet<u64>,
 }
 
 impl TinyInstExecutor<(), NopShMem, ()> {
@@ -63,12 +67,11 @@ where
         *state.executions_mut() += 1;
         match &self.map {
             Some(_) => {
-                // use shmem to pass testcase
                 let shmem = unsafe { self.map.as_mut().unwrap_unchecked() };
                 let target_bytes = input.target_bytes();
                 let size = target_bytes.as_slice().len();
                 let size_in_bytes = size.to_ne_bytes();
-                // The first four bytes tells the size of the shmem.
+    
                 shmem.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
                     .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
                 shmem.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
@@ -78,7 +81,7 @@ where
                 self.cur_input.write_buf(input.target_bytes().as_slice())?;
             }
         }
-
+    
         #[expect(unused_assignments)]
         let mut status = RunResult::OK;
         unsafe {
@@ -86,6 +89,71 @@ where
             self.tinyinst
                 .vec_coverage(self.coverage_ptr.as_mut().unwrap(), false);
         }
+    
+        // 🔥 디버깅: 커버리지 데이터 출력
+     /*   unsafe {
+            if let Some(coverage_data) = self.coverage_ptr.as_ref() {
+                if coverage_data.is_empty() {
+                    println!("[DEBUG] 커버리지 데이터 없음");
+                } else {
+                    println!("[DEBUG] 현재 커버리지 데이터: {:?}", coverage_data);
+                }
+            } else {
+                println!("[DEBUG] coverage_ptr가 NULL입니다.");
+            }
+        }
+     */
+        
+        // 🔥 커버리지 데이터 누적 저장
+     /*  unsafe {
+            if let Some(coverage_data) = self.coverage_ptr.as_ref() {
+                if coverage_data.is_empty() {
+                  //  println!("[DEBUG] 커버리지 데이터 없음");
+                } else {
+                    // 새로운 offset을 기존 set에 추가
+                    for &addr in coverage_data.iter() {
+                        self.hit_offsets.insert(addr);
+                    }
+                   // println!("[DEBUG] Hit Offsets: {:?}", self.hit_offsets);
+                    println!("[DEBUG] 총 히트된 offset 개수: {}", self.hit_offsets.len());
+                }
+            } else {
+                println!("[DEBUG] coverage_ptr가 NULL입니다.");
+            }
+        } */ 
+
+
+        // 🔥 기존 `hit_offsets`과 비교하여 새로운 offset만 추가
+
+
+        
+        unsafe {
+            if let Some(coverage_data) = self.coverage_ptr.as_ref() {
+                if coverage_data.is_empty() {
+                   // println!("[DEBUG] 커버리지 데이터 없음");
+                } else {
+                    let old_count = self.hit_offsets.len();
+                    let mut new_hits = Vec::new();
+
+                    for &addr in coverage_data.iter() {
+                        if self.hit_offsets.insert(addr) { // 🔥 Set에 추가 시, 중복이면 false 반환
+                            new_hits.push(addr); // 새로운 히트만 저장
+                        }
+                    }
+
+                    let new_count = self.hit_offsets.len() - old_count;
+
+                    if !new_hits.is_empty() {
+                        println!("[DEBUG] 신규 발견된 Offset: {:?}", new_hits);
+                    }
+                    println!("[DEBUG] 이번 실행에서 추가된 offset 개수: {}", new_count);
+                    println!("[DEBUG] 총 히트된 offset 개수: {}", self.hit_offsets.len());
+                }
+            } else {
+                println!("[DEBUG] coverage_ptr가 NULL입니다.");
+            }
+        }
+
 
         match status {
             RunResult::CRASH | RunResult::HANG => Ok(ExitKind::Crash),
@@ -308,6 +376,7 @@ where
             phantom: PhantomData,
             cur_input,
             map,
+            hit_offsets: HashSet::new(), 
         })
     }
 }

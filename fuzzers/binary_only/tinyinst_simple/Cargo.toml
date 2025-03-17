@@ -8,6 +8,8 @@ libafl = { path = "../../../libafl", features = ["introspection"] }
 libafl_bolts = { path = "../../../libafl_bolts" }
 libafl_tinyinst = { path = "../../../libafl_tinyinst" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
+clap = { version = "4.0", features = ["derive"] }
+ctrlc = "3.2"
 
 [profile.release]
 codegen-units = 1

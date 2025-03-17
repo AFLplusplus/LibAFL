@@ -344,7 +344,7 @@ where
 {
     fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
         use wait_timeout::ChildExt;
-
+        println!("CommandExecutor::execute_input_with_command");
         *state.executions_mut() += 1;
         self.observers.pre_exec_child_all(state, input)?;
 
