@@ -49,8 +49,7 @@ use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
     modules::{
-        cmplog::{CmpLogModule, CmpLogObserver},
-        edges::StdEdgeCoverageModule,
+        cmplog::{CmpLogModule, CmpLogObserver}, edges::StdEdgeCoverageModule, RedirectStdinModule, SnapshotModule
     },
     Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
     Regs, TargetSignalHandling,
@@ -185,11 +184,13 @@ fn fuzz(
             .build()
             .unwrap(),
         CmpLogModule::default(),
+        SnapshotModule::new(),
+        RedirectStdinModule::new(),
         // QemuAsanHelper::default(asan),
         //QemuSnapshotHelper::new()
     );
 
-    let emulator = Emulator::empty()
+    let mut emulator = Emulator::empty()
         .qemu_parameters(args)
         .modules(modules)
         .build()?;
@@ -204,9 +205,9 @@ fn fuzz(
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
-        .expect("Symbol LLVMFuzzerTestOneInput not found");
-    println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+        .resolve_symbol("main", qemu.load_addr())
+        .expect("Symbol main not found");
+    println!("main @ {test_one_input_ptr:#x}");
 
     qemu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     unsafe {
@@ -231,11 +232,6 @@ fn fuzz(
 
     qemu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     qemu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
-
-    let input_addr = qemu
-        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
-        .unwrap();
-    println!("Placing input at {input_addr:#x}");
 
     let log = RefCell::new(
         OpenOptions::new()
@@ -341,6 +337,19 @@ fn fuzz(
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+    let input_addr = qemu
+        .map_private(
+            0,
+            MAX_INPUT_SIZE,
+            MmapPerms::ReadWrite,
+        )
+        .unwrap();
+    println!("Placing input at {input_addr:#x}");
+
+
+    let redirect = emulator.modules_mut().get_mut::<RedirectStdinModule>().unwrap();
+    redirect.set_input_addr(input_addr);
+
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness =
         |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
@@ -386,7 +395,7 @@ fn fuzz(
         &mut fuzzer,
         &mut state,
         &mut mgr,
-        timeout,
+        Duration::from_secs(5),
     )?;
 
     // Show the cmplog observer
@@ -418,8 +427,8 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        dup2(null_fd, io::stderr().as_raw_fd())?;
+        // dup2(null_fd, io::stdout().as_raw_fd())?;
+        // dup2(null_fd, io::stderr().as_raw_fd())?;
     }
     // reopen file to make sure we're at the end
     log.replace(

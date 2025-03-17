@@ -1,19 +1,29 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
 
-int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
-  if (Size >= 8 && *(uint32_t *)Data == 0xaabbccdd) { abort(); }
-  char buf[8] = {'a', 'b', 'c', 'd'};
-
-  if (memcmp(Data, buf, 4) == 0) { abort(); }
-  return 0;
-}
-
-/*
 int main() {
+  char buffer[16];
 
-  char buf [10] = {0};
-  LLVMFuzzerTestOneInput(buf, 10);
+  // Read exactly 16 bytes from stdin
+  size_t bytesRead = fread(buffer, 1, 16, stdin);
+  buffer[15] = 0;
+  if (bytesRead != 16) {
+    fprintf(stderr, "Failed to read 16 bytes. Read %zu bytes.\n", bytesRead);
+    printf("%d\n", errno);
+    return 1;
+  }
+  printf("we read %s\n", buffer);
+  // sleep(3);
 
-}*/
+  if (buffer[0] == 'a') {
+    if (buffer[1] == 'b') {
+      if (buffer[2] == 'c') {
+        if (buffer[3] == 'd') { abort(); }
+      }
+    }
+  }
+}

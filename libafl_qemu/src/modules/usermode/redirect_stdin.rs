@@ -109,12 +109,10 @@ where
             let dst = x1 as *mut u8;
             if h.total >= h.read {
                 let size = std::cmp::min(x2, (h.total - h.read).try_into().unwrap());
-                /*
                 println!(
                     "trying to read {} copying {:p} {:p} size: {} h.total: {} h.read {} ",
                     x2, src, dst, size, h.total, h.read
                 );
-                */
                 dst.copy_from(src, size as usize);
                 size
             } else {
