@@ -169,6 +169,7 @@ pub fn generate(
         .allowlist_function("qemu_plugin_hwaddr_phys_addr")
         .allowlist_function("qemu_plugin_get_hwaddr")
         .allowlist_function("qemu_target_page_size")
+        .allowlist_function("qemu_target_page_mask")
         .allowlist_function("syx_.*")
         .allowlist_function("device_list_all")
         .allowlist_function("libafl_.*")

@@ -154,7 +154,6 @@ pub struct SnapshotModule {
     pub mmap_limit: usize,
     pub stop_execution: Option<StopExecutionCallback>,
     pub empty: bool,
-    pub accurate_unmap: bool,
     pub interval_filter: IntervalSnapshotFilters,
     auto_reset: bool,
 }
@@ -187,7 +186,6 @@ impl SnapshotModule {
             mmap_limit: 0,
             stop_execution: None,
             empty: true,
-            accurate_unmap: false,
             interval_filter: IntervalSnapshotFilters::new(),
             auto_reset: true,
         }
@@ -206,7 +204,6 @@ impl SnapshotModule {
             mmap_limit: 0,
             stop_execution: None,
             empty: true,
-            accurate_unmap: false,
             interval_filter,
             auto_reset: true,
         }
@@ -225,14 +222,9 @@ impl SnapshotModule {
             mmap_limit,
             stop_execution: Some(stop_execution),
             empty: true,
-            accurate_unmap: false,
             interval_filter: IntervalSnapshotFilters::new(),
             auto_reset: true,
         }
-    }
-
-    pub fn use_accurate_unmapping(&mut self) {
-        self.accurate_unmap = true;
     }
 
     pub fn use_manual_reset(&mut self) {
@@ -583,10 +575,13 @@ impl SnapshotModule {
         found
     }
 
+    /// Unmap is allowed if it is not part of the pre-snapshot region. maybe check if it's part
+    /// of qemu's guest memory or not?
     pub fn is_unmap_allowed(&mut self, start: GuestAddr, mut size: usize) -> bool {
         if size % SNAPSHOT_PAGE_SIZE != 0 {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
+
         self.maps
             .tree
             .query(start..(start + (size as GuestAddr)))
@@ -803,9 +798,8 @@ where
             );
         }
 
-        if !self.accurate_unmap {
-            emulator_modules.pre_syscalls(Hook::Function(filter_mmap_snapshot::<ET, I, S>));
-        }
+        emulator_modules.pre_syscalls(Hook::Function(filter_mmap_snapshot::<ET, I, S>));
+
         emulator_modules.post_syscalls(Hook::Function(trace_mmap_snapshot::<ET, I, S>));
     }
 
@@ -870,6 +864,7 @@ pub fn trace_write_n_snapshot<ET, I, S>(
     h.access(addr, size);
 }
 
+/// Do not consider munmap syscalls that are not allowed
 #[expect(clippy::too_many_arguments)]
 pub fn filter_mmap_snapshot<ET, I, S>(
     _qemu: Qemu,
@@ -896,6 +891,7 @@ where
             return SyscallHookResult::new(Some(0));
         }
     }
+
     SyscallHookResult::new(None)
 }
 
@@ -1007,7 +1003,7 @@ where
                 }
             } else if sys_const == SYS_munmap {
                 let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-                if !h.accurate_unmap && !h.is_unmap_allowed(a0, a1 as usize) {
+                if h.is_unmap_allowed(a0, a1 as usize) {
                     h.remove_mapped(a0, a1 as usize);
                 }
             }
