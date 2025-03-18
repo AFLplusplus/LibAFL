@@ -109,9 +109,8 @@ static void at_exit(int signal) {
 
 /* SHM fuzzing setup. */
 
-void __afl_map_shm(void) {
-  if (already_initialized_shm) return;
-  already_initialized_shm = 1;
+uint8_t __afl_map_shm(void){
+  if (already_initialized_shm) return 1;
 
   char *id_str = getenv(SHM_ENV_VAR);
 
@@ -161,11 +160,10 @@ void __afl_map_shm(void) {
        our parent doesn't give up on us. */
 
     __afl_area_ptr[0] = 1;
+    already_initialized_shm = 1;
+    return 1;
   } else {
-    fprintf(stderr,
-            "Error: variable for edge coverage shared memory is not set\n");
-    send_forkserver_error(FS_ERROR_SHM_OPEN);
-    exit(1);
+    return 0;
   }
 }
 

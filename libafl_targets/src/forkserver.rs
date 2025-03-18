@@ -2,17 +2,18 @@
 
 unsafe extern "C" {
     /// Map a shared memory region for the edge coverage map.
-    fn __afl_map_shm();
+    fn __afl_map_shm() -> u8;
     /// Start the forkserver.
     fn __afl_start_forkserver();
 }
 
-/// Map a shared memory region for the edge coverage map.
+/// Map a shared memory region for the edge coverage map. Return false
+/// if no AFL shared memory is detected
 ///
 /// # Note
 ///
 /// The function's logic is written in C and this code is a wrapper.
-pub fn map_shared_memory() {
+pub fn map_shared_memory() -> u8 {
     unsafe { __afl_map_shm() }
 }
 
