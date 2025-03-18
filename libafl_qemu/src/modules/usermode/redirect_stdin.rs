@@ -68,7 +68,7 @@ where
     {
         let target_bytes = self.bytes_converter.to_target_bytes(input);
         let buf = target_bytes.as_slice();
-        self.input_addr = buf.as_ptr() as *const u8;
+        self.input_addr = buf.as_ptr();
         self.total = input.len();
         self.read = 0;
     }
@@ -108,7 +108,7 @@ where
         );
         */
         let size = unsafe {
-            let mut src = addr as *mut u8;
+            let mut src = addr.cast_mut();
             src = src.wrapping_add(h.read);
             let dst = x1 as *mut u8;
             if h.total >= h.read {
