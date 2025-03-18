@@ -17,7 +17,7 @@ use crate::{
 /// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.
 /// <https://github.com/qemu/qemu/blob/11be70677c70fdccd452a3233653949b79e97908/linux-user/hexagon/syscall_nr.h#L230>
 #[expect(non_upper_case_globals)]
-const SYS_eSYS_readxecve: u8 = 63;
+const SYS_read: u8 = 63;
 
 /// This module hijacks any read to buffer from stdin, and instead fill the buffer from the specified input address
 /// This is useful when your binary target reads the input from the stdin.
