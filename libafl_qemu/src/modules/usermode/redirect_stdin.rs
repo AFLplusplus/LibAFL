@@ -47,7 +47,6 @@ impl RedirectStdinModule {
     }
 
     /// Tell this module where to look for the input addr
-    #[must_use]
     pub fn set_input_addr(&mut self, addr: GuestAddr) {
         self.input_addr = addr;
     }
