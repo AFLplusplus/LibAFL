@@ -7,15 +7,17 @@ use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus, NopCorpus},
+    corpus::{Corpus, HasCurrentCorpusId, InMemoryOnDiskCorpus, InMemoryCorpus, NopCorpus},
     events::{SendExiting, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
+    mutators::{havoc_mutations, StdScheduledMutator},
     observers::{ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
+    stages::{ObserverEqualityFactory, StagesTuple, StdTMinMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
@@ -74,7 +76,7 @@ impl From<Version> for Str {
 name = format ! ("qemu_tmin-{}", env ! ("CPU_TARGET")),
 version = Version::default(),
 about,
-long_about = "Module for generating minimizing corpus using QEMU instrumentation"
+long_about = "Module for minimizing test cases using QEMU instrumentation"
 )]
 pub struct FuzzerOptions {
     #[arg(long, help = "Output directory")]
@@ -91,6 +93,13 @@ pub struct FuzzerOptions {
 
     #[arg(long, help = "Cpu cores to use", default_value = "all", value_parser = Cores::from_cmdline)]
     cores: Cores,
+
+    #[arg(
+        long,
+        help = "Number of iterations for minimization",
+        default_value_t = 1024_usize
+    )]
+    iterations: usize,
 
     #[clap(short, long, help = "Enable output from the fuzzer clients")]
     verbose: bool,
@@ -114,6 +123,10 @@ pub fn fuzz() -> Result<(), Error> {
         .collect::<Result<Vec<PathBuf>, io::Error>>()
         .expect("Failed to read dir entry");
 
+    let num_files = files.len();
+    let num_cores = options.cores.ids.len();
+    let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
+    
     let program = env::args().next().unwrap();
     log::info!("Program: {program:}");
 
@@ -136,6 +149,8 @@ pub fn fuzz() -> Result<(), Error> {
                 .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
         ))
     };
+
+    let mut feedback = MaxMapFeedback::new(&edges_observer);
 
     #[cfg(feature = "fork")]
     let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
@@ -196,15 +211,13 @@ pub fn fuzz() -> Result<(), Error> {
         },
     };
 
-    let mut feedback = MaxMapFeedback::new(&edges_observer);
-
     let mut objective = ();
 
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             StdRand::new(),
+            InMemoryOnDiskCorpus::new(PathBuf::from(options.output)).unwrap(),
             InMemoryCorpus::new(),
-            NopCorpus::new(),
             &mut feedback,
             &mut objective,
         )
@@ -281,6 +294,35 @@ pub fn fuzz() -> Result<(), Error> {
             ExitKind::Ok
         };
 
+        // let core_id = client_description.core_id();
+        // let core_idx = options
+        //     .cores
+        //     .position(core_id)
+        //     .expect("Failed to get core index");
+
+        // let files = corpus_files
+        //     .iter()
+        //     .skip(files_per_core * core_idx)
+        //     .take(files_per_core)
+        //     .map(|x| x.path())
+        //     .collect::<Vec<PathBuf>>();
+
+        // if files.is_empty() {
+        //     mgr.send_exiting()?;
+        //     Err(Error::ShuttingDown)?
+        // }
+
+        let mut objective = ();
+        
+
+        let minimizer = StdScheduledMutator::new(havoc_mutations());
+        let factory = ObserverEqualityFactory::new(&edges_observer);
+        let mut stages = tuple_list!(StdTMinMutationalStage::new(
+            minimizer,
+            factory,
+            options.iterations
+        ));
+
     #[cfg(feature = "fork")]
     let mut executor = QemuForkExecutor::new(
         emulator,
@@ -304,17 +346,30 @@ pub fn fuzz() -> Result<(), Error> {
         Duration::from_millis(5000),
     )?;
 
-    println!("Importing {} seeds...", files.len());
+    state.load_initial_inputs_by_filenames_forced(
+        &mut fuzzer,
+        &mut executor,
+        &mut mgr,
+        &files,
+    )?;
+    log::info!("Processed {} inputs from disk.", files.len());
 
-    if state.must_load_initial_inputs() {
-        state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &files)
-            .unwrap_or_else(|_| {
-                println!("Failed to load initial corpus");
-                process::exit(0);
-            });
-        println!("Imported {} seeds from disk.", state.corpus().count());
-    }
+    let first_id = state.corpus().first().expect("Empty corpus");
+    state.set_corpus_id(first_id)?;
+    
+    stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
+
+    // Old CMIN
+    // println!("Importing {} seeds...", files.len());
+    // if state.must_load_initial_inputs() {
+    //     state
+    //         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &files)
+    //         .unwrap_or_else(|_| {
+    //             println!("Failed to load initial corpus");
+    //             process::exit(0);
+    //         });
+    //     println!("Imported {} seeds from disk.", state.corpus().count());
+    // }
 
     let size = state.corpus().count();
     println!(
