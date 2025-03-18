@@ -1,7 +1,6 @@
 use core::fmt::Debug;
 
-use libafl::inputs::TargetBytesConverter;
-use libafl_bolts::{AsSlice, HasLen};
+use libafl_bolts::HasLen;
 use libafl_qemu_sys::GuestAddr;
 
 #[cfg(not(cpu_target = "hexagon"))]
@@ -24,37 +23,46 @@ const SYS_read: u8 = 63;
 /// With this you can just fuzz more like afl++
 /// You need to use this with snapshot module!
 #[derive(Debug)]
-pub struct RedirectStdinModule<TC> {
-    bytes_converter: TC,
-    input_addr: *const u8,
+pub struct RedirectStdinModule {
+    input_addr: GuestAddr,
     read: usize,
     total: usize,
 }
 
-impl<TC> RedirectStdinModule<TC> {
+impl RedirectStdinModule {
     #[must_use]
     /// constuctor
-    pub fn new(bytes_converter: TC) -> Self {
+    pub fn new() -> Self {
+        Self::with_input_addr(0)
+    }
+
+    #[must_use]
+    /// Create with specified input address
+    pub fn with_input_addr(addr: GuestAddr) -> Self {
         Self {
-            bytes_converter,
-            input_addr: core::ptr::null(),
+            input_addr: addr,
             read: 0,
             total: 0,
         }
     }
+
+    /// Tell this module where to look for the input addr
+    #[must_use]
+    pub fn set_input_addr(&mut self, addr: GuestAddr) {
+        self.input_addr = addr;
+    }
 }
 
-impl<I, S, TC> EmulatorModule<I, S> for RedirectStdinModule<TC>
+impl<I, S> EmulatorModule<I, S> for RedirectStdinModule
 where
     I: Unpin + HasLen + Debug,
     S: Unpin,
-    TC: 'static + TargetBytesConverter<I> + Debug,
 {
     fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         ET: EmulatorModuleTuple<I, S>,
     {
-        emulator_modules.pre_syscalls(Hook::Function(syscall_read_hook::<ET, I, S, TC>));
+        emulator_modules.pre_syscalls(Hook::Function(syscall_read_hook::<ET, I, S>));
     }
 
     fn pre_exec<ET>(
@@ -66,16 +74,14 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
-        let target_bytes = self.bytes_converter.to_target_bytes(input);
-        let buf = target_bytes.as_slice();
-        self.input_addr = buf.as_ptr();
+        assert!(self.input_addr != 0);
         self.total = input.len();
         self.read = 0;
     }
 }
 
 #[expect(clippy::too_many_arguments)]
-fn syscall_read_hook<ET, I, S, TC>(
+fn syscall_read_hook<ET, I, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
@@ -93,12 +99,8 @@ where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin + HasLen + Debug,
     S: Unpin,
-    TC: 'static + TargetBytesConverter<I> + Debug,
 {
-    let h = emulator_modules
-        .get_mut::<RedirectStdinModule<TC>>()
-        .unwrap();
-    let addr = h.input_addr;
+    let h = emulator_modules.get_mut::<RedirectStdinModule>().unwrap();
 
     if syscall == SYS_read as i32 && x0 == 0 {
         /*
@@ -108,15 +110,17 @@ where
         );
         */
         let size = unsafe {
-            let mut src = addr.cast_mut();
+            let mut src = h.input_addr as *const u8;
             src = src.wrapping_add(h.read);
             let dst = x1 as *mut u8;
             if h.total >= h.read {
                 let size = std::cmp::min(x2, (h.total - h.read).try_into().unwrap());
+                /*
                 println!(
-                    "trying to read {} copying {:p} {:p} size: {} h.total: {} h.read {} ",
+                    "trying to read {} bytes copying src: {:p} {:p} size: {} h.total: {} h.read {} ",
                     x2, src, dst, size, h.total, h.read
                 );
+                */
                 dst.copy_from(src, size as usize);
                 size
             } else {
