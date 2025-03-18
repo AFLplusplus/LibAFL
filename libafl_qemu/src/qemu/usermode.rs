@@ -338,8 +338,7 @@ impl Qemu {
         if res <= 0 {
             let errno = std::io::Error::last_os_error().raw_os_error();
             Err(Error::illegal_argument(format!(
-                "failed to mmap addr: {:x} (size: {:?} prot: {:?} flags: {:?} fd: {:?}). The errno is {:#?}",
-                addr, size, perms, flags, fd, errno
+                "failed to mmap addr: {addr:x} (size: {size:?} prot: {perms:?} flags: {flags:?} fd: {fd:?}). The errno is {errno:?}",
             )))
         } else {
             Ok(res as GuestAddr)
@@ -356,8 +355,8 @@ impl Qemu {
             addr,
             size,
             perms,
-            -1,
             libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+            -1,
         )
     }
 
@@ -371,8 +370,8 @@ impl Qemu {
             addr,
             size,
             perms,
-            -1,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+            -1,
         )
     }
 
@@ -540,7 +539,7 @@ pub mod pybind {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.qemu
                     .map_private(addr, size, p)
-                    .map_err(PyValueError::new_err)
+                    .map_err(|_| PyValueError::new_err("Failed to mmap"))
             } else {
                 Err(PyValueError::new_err("Invalid perms"))
             }
@@ -549,8 +548,8 @@ pub mod pybind {
         fn map_fixed(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<GuestAddr> {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.qemu
-                    .map_fixed(addr, size, p)
-                    .map_err(PyValueError::new_err)
+                    .map_private(addr, size, p)
+                    .map_err(|_| PyValueError::new_err("Failed to mmap"))
             } else {
                 Err(PyValueError::new_err("Invalid perms"))
             }
