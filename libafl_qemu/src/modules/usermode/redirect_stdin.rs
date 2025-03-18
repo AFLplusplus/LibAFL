@@ -104,9 +104,8 @@ where
     S: Unpin,
 {
     let h = emulator_modules.get_mut::<RedirectStdinModule>().unwrap();
-    let addr = match h.input_addr {
-        Some(addr) => addr,
-        None => return SyscallHookResult::new(None),
+    let Some(addr) = h.input_addr else {
+        return SyscallHookResult::new(None);
     };
     if syscall == SYS_read as i32 && x0 == 0 {
         /*
