@@ -1,6 +1,6 @@
 use core::fmt::Debug;
 
-use libafl::inputs::HasTargetBytes;
+use libafl::inputs::TargetBytesConverter;
 use libafl_bolts::{AsSlice, HasLen};
 use libafl_qemu_sys::GuestAddr;
 
@@ -24,17 +24,19 @@ const SYS_eSYS_readxecve: u8 = 63;
 /// With this you can just fuzz more like afl++
 /// You need to use this with snapshot module!
 #[derive(Debug)]
-pub struct RedirectStdinModule {
+pub struct RedirectStdinModule<TC> {
+    bytes_converter: TC,
     input_addr: *const u8,
     read: usize,
     total: usize,
 }
 
-impl RedirectStdinModule {
+impl<TC> RedirectStdinModule<TC> {
     #[must_use]
     /// constuctor
-    pub fn new() -> Self {
+    pub fn new(bytes_converter: TC) -> Self {
         Self {
+            bytes_converter,
             input_addr: core::ptr::null(),
             read: 0,
             total: 0,
@@ -42,16 +44,17 @@ impl RedirectStdinModule {
     }
 }
 
-impl<I, S> EmulatorModule<I, S> for RedirectStdinModule
+impl<I, S, TC> EmulatorModule<I, S> for RedirectStdinModule<TC>
 where
-    I: Unpin + HasLen + HasTargetBytes + Debug,
+    I: Unpin + HasLen + Debug,
     S: Unpin,
+    TC: 'static + TargetBytesConverter<I> + Debug,
 {
     fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         ET: EmulatorModuleTuple<I, S>,
     {
-        emulator_modules.pre_syscalls(Hook::Function(syscall_read_hook::<ET, I, S>));
+        emulator_modules.pre_syscalls(Hook::Function(syscall_read_hook::<ET, I, S, TC>));
     }
 
     fn pre_exec<ET>(
@@ -63,7 +66,7 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
-        let target_bytes = input.target_bytes();
+        let target_bytes = self.bytes_converter.to_target_bytes(input);
         let buf = target_bytes.as_slice();
         self.input_addr = buf.as_ptr() as *const u8;
         self.total = input.len();
@@ -72,7 +75,7 @@ where
 }
 
 #[expect(clippy::too_many_arguments)]
-fn syscall_read_hook<ET, I, S>(
+fn syscall_read_hook<ET, I, S, TC>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
@@ -88,10 +91,13 @@ fn syscall_read_hook<ET, I, S>(
 ) -> SyscallHookResult
 where
     ET: EmulatorModuleTuple<I, S>,
-    I: Unpin + HasLen + HasTargetBytes + Debug,
+    I: Unpin + HasLen + Debug,
     S: Unpin,
+    TC: 'static + TargetBytesConverter<I> + Debug,
 {
-    let h = emulator_modules.get_mut::<RedirectStdinModule>().unwrap();
+    let h = emulator_modules
+        .get_mut::<RedirectStdinModule<TC>>()
+        .unwrap();
     let addr = h.input_addr;
 
     if syscall == SYS_read as i32 && x0 == 0 {
