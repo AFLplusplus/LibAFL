@@ -3,7 +3,7 @@ use std::{
     str::from_utf8_unchecked_mut,
 };
 
-use libafl_bolts::os::unix_signals::Signal;
+use libafl_bolts::{Error, os::unix_signals::Signal};
 use libafl_qemu_sys::{
     GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
@@ -324,18 +324,22 @@ impl Qemu {
     }
 
     #[expect(clippy::cast_sign_loss)]
-    fn mmap(
+    pub fn mmap(
         self,
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
         flags: c_int,
-    ) -> Result<GuestAddr, ()> {
+        fd: i32,
+    ) -> Result<GuestAddr, Error> {
         let res = unsafe {
-            libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, -1, 0)
+            libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, fd, 0)
         };
         if res <= 0 {
-            Err(())
+            let errno = std::io::Error::last_os_error().raw_os_error();
+            Err(Error::illegal_argument(format!(
+                "failed to mmap addr: {addr:x} (size: {size:?} prot: {perms:?} flags: {flags:?} fd: {fd:?}). The errno is {errno:?}",
+            )))
         } else {
             Ok(res as GuestAddr)
         }
@@ -346,10 +350,14 @@ impl Qemu {
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
-    ) -> Result<GuestAddr, String> {
-        self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
-            .map_err(|()| format!("Failed to map {addr}"))
-            .map(|addr| addr as GuestAddr)
+    ) -> Result<GuestAddr, Error> {
+        self.mmap(
+            addr,
+            size,
+            perms,
+            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+            -1,
+        )
     }
 
     pub fn map_fixed(
@@ -357,15 +365,14 @@ impl Qemu {
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
-    ) -> Result<GuestAddr, String> {
+    ) -> Result<GuestAddr, Error> {
         self.mmap(
             addr,
             size,
             perms,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+            -1,
         )
-        .map_err(|()| format!("Failed to map {addr}"))
-        .map(|addr| addr as GuestAddr)
     }
 
     pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
@@ -532,7 +539,7 @@ pub mod pybind {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.qemu
                     .map_private(addr, size, p)
-                    .map_err(PyValueError::new_err)
+                    .map_err(|_| PyValueError::new_err("Failed to mmap"))
             } else {
                 Err(PyValueError::new_err("Invalid perms"))
             }
@@ -541,8 +548,8 @@ pub mod pybind {
         fn map_fixed(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<GuestAddr> {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.qemu
-                    .map_fixed(addr, size, p)
-                    .map_err(PyValueError::new_err)
+                    .map_private(addr, size, p)
+                    .map_err(|_| PyValueError::new_err("Failed to mmap"))
             } else {
                 Err(PyValueError::new_err("Invalid perms"))
             }
