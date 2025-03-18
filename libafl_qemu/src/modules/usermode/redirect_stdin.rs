@@ -24,7 +24,7 @@ const SYS_read: u8 = 63;
 /// You need to use this with snapshot module!
 #[derive(Debug, Default)]
 pub struct RedirectStdinModule {
-    input_addr: GuestAddr,
+    input_addr: Option<GuestAddr>,
     read: usize,
     total: usize,
 }
@@ -33,12 +33,12 @@ impl RedirectStdinModule {
     #[must_use]
     /// constuctor
     pub fn new() -> Self {
-        Self::with_input_addr(0)
+        Self::with_input_addr(None)
     }
 
     #[must_use]
     /// Create with specified input address
-    pub fn with_input_addr(addr: GuestAddr) -> Self {
+    pub fn with_input_addr(addr: Option<GuestAddr>) -> Self {
         Self {
             input_addr: addr,
             read: 0,
@@ -47,7 +47,7 @@ impl RedirectStdinModule {
     }
 
     /// Tell this module where to look for the input addr
-    pub fn set_input_addr(&mut self, addr: GuestAddr) {
+    pub fn set_input_addr(&mut self, addr: Option<GuestAddr>) {
         self.input_addr = addr;
     }
 }
@@ -57,8 +57,12 @@ where
     I: Unpin + HasLen + Debug,
     S: Unpin,
 {
-    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<I, S>,
     {
         emulator_modules.pre_syscalls(Hook::Function(syscall_read_hook::<ET, I, S>));
@@ -73,7 +77,7 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
-        assert!(self.input_addr != 0);
+        assert!(self.input_addr.is_some());
         self.total = input.len();
         self.read = 0;
     }
@@ -100,7 +104,10 @@ where
     S: Unpin,
 {
     let h = emulator_modules.get_mut::<RedirectStdinModule>().unwrap();
-
+    let addr = match h.input_addr {
+        Some(addr) => addr,
+        None => return SyscallHookResult::new(None),
+    };
     if syscall == SYS_read as i32 && x0 == 0 {
         /*
         println!(
@@ -109,7 +116,7 @@ where
         );
         */
         let size = unsafe {
-            let mut src = h.input_addr as *const u8;
+            let mut src = addr as *const u8;
             src = src.wrapping_add(h.read);
             let dst = x1 as *mut u8;
             if h.total >= h.read {
