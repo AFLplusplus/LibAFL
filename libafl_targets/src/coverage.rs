@@ -39,6 +39,10 @@ pub use __afl_acc_memop_ptr_local as ACCOUNTING_MEMOP_MAP;
 pub static mut MAX_EDGES_FOUND: usize = 0;
 
 unsafe extern "C" {
+    /// The pointer points to the length of AFL++ inputs
+    pub static mut __afl_fuzz_len: *mut u8;
+    /// The pointer points to the AFL++ inputs
+    pub static mut __afl_fuzz_ptr: *mut u8;
     /// The area pointer points to the edges map.
     pub static mut __afl_area_ptr: *mut u8;
 
@@ -59,6 +63,8 @@ unsafe extern "C" {
 pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
 pub use __afl_area_ptr as EDGES_MAP_PTR;
 pub use __ddg_area_ptr as DDG_MAP_PTR;
+pub use __afl_fuzz_ptr as INPUT_PTR;
+pub use __afl_fuzz_len as INPUT_LENGTH_PTR;
 
 /// Return Tokens from the compile-time token section
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]

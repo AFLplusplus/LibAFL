@@ -79,8 +79,9 @@ extern size_t   __afl_map_size;
 extern uint8_t *__token_start;
 extern uint8_t *__token_stop;
 
-uint8_t        *__afl_fuzz_ptr;
-static uint32_t __afl_fuzz_len_local;
+static uint8_t  __afl_fuzz_ptr_initial[MAP_INITIAL_SIZE];
+uint8_t        *__afl_fuzz_ptr = NULL;
+static uint32_t __afl_fuzz_len_local = 0;
 uint32_t       *__afl_fuzz_len = &__afl_fuzz_len_local;
 
 int already_initialized_shm;
@@ -178,7 +179,7 @@ uint8_t __afl_map_shm(void){
   }
 }
 
-static void map_input_shared_memory() {
+static uint8_t __afl_map_input_shm() {
   char *id_str = getenv(SHM_FUZZ_ENV_VAR);
 
   if (id_str) {
@@ -215,11 +216,10 @@ static void map_input_shared_memory() {
 
     __afl_fuzz_len = (uint32_t *)map;
     __afl_fuzz_ptr = map + sizeof(uint32_t);
-
+    return 1;
   } else {
-    fprintf(stderr, "Error: variable for fuzzing shared memory is not set\n");
-    send_forkserver_error(FS_ERROR_SHM_OPEN);
-    exit(1);
+    __afl_fuzz_ptr = __afl_fuzz_ptr_initial;
+    return 0;
   }
 }
 
@@ -303,7 +303,7 @@ void __afl_start_forkserver(void) {
   status = version;
   if (write(FORKSRV_FD + 1, msg, 4) != 4) { _exit(1); }
 
-  if (__afl_sharedmem_fuzzing) { map_input_shared_memory(); }
+  if (__afl_sharedmem_fuzzing && !__afl_fuzz_ptr) { __afl_map_input_shm(); }
 
   while (1) {
     int status;
