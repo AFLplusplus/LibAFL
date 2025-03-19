@@ -40,7 +40,7 @@ pub static mut MAX_EDGES_FOUND: usize = 0;
 
 unsafe extern "C" {
     /// The pointer points to the length of AFL++ inputs
-    pub static mut __afl_fuzz_len: *mut u8;
+    pub static mut __afl_fuzz_len: *mut u32;
     /// The pointer points to the AFL++ inputs
     pub static mut __afl_fuzz_ptr: *mut u8;
     /// The area pointer points to the edges map.
