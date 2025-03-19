@@ -29,6 +29,12 @@ pub struct RedirectStdinModule {
     total: usize,
 }
 
+impl Default for RedirectStdinModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RedirectStdinModule {
     #[must_use]
     /// constuctor
@@ -109,7 +115,7 @@ where
     let h = emulator_modules.get_mut::<RedirectStdinModule>().unwrap();
     if h.input_addr.is_null() {
         return SyscallHookResult::new(None);
-    };
+    }
     if syscall == SYS_read as i32 && x0 == 0 {
         /*
         println!(
