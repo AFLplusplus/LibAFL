@@ -1,12 +1,12 @@
-use std::{env, fmt::Write};
+use std::{env, fmt::Write, ops::Range};
 
 use clap::{Parser, builder::Str};
 use libafl_bolts::{Error, tuples::tuple_list};
 use libafl_qemu::{
-    Emulator, NopEmulatorDriver, NopSnapshotManager, QemuExitError, QemuInitError,
+    Emulator, GuestAddr, NopEmulatorDriver, NopSnapshotManager, QemuExitError, QemuInitError,
     command::NopCommandManager,
     elf::EasyElf,
-    modules::{AsanGuestModule, AsanModule, EmulatorModuleTuple},
+    modules::{AsanGuestModule, AsanModule, EmulatorModuleTuple, utils::filters::StdAddressFilter},
 };
 use log::{error, info};
 use thiserror::Error;
@@ -60,8 +60,35 @@ pub struct FuzzerOptions {
     #[clap(short, long, help = "Enable output from the fuzzer clients")]
     pub verbose: bool,
 
+    #[arg(long = "include-asan", help="Include asan address ranges", value_parser = FuzzerOptions::parse_ranges)]
+    pub include_asan: Option<Vec<Range<GuestAddr>>>,
+
+    #[arg(long = "exclude-asan", help="Exclude asan address ranges", value_parser = FuzzerOptions::parse_ranges, conflicts_with="include_asan")]
+    pub exclude_asan: Option<Vec<Range<GuestAddr>>>,
+
     #[arg(last = true, help = "Arguments passed to the target")]
     pub args: Vec<String>,
+}
+
+impl FuzzerOptions {
+    fn parse_ranges(src: &str) -> Result<Range<GuestAddr>, Error> {
+        let parts = src.split('-').collect::<Vec<&str>>();
+        if parts.len() == 2 {
+            let start =
+                GuestAddr::from_str_radix(parts[0].trim_start_matches("0x"), 16).map_err(|e| {
+                    Error::illegal_argument(format!("Invalid start address: {} ({e:})", parts[0]))
+                })?;
+            let end =
+                GuestAddr::from_str_radix(parts[1].trim_start_matches("0x"), 16).map_err(|e| {
+                    Error::illegal_argument(format!("Invalid end address: {} ({e:})", parts[1]))
+                })?;
+            Ok(Range { start, end })
+        } else {
+            Err(Error::illegal_argument(format!(
+                "Invalid range provided: {src:}"
+            )))
+        }
+    }
 }
 
 pub fn fuzz() {
@@ -78,14 +105,25 @@ pub fn fuzz() {
         .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
         .collect::<Vec<(String, String)>>();
 
+    let asan_filter = if let Some(include_asan) = &options.include_asan {
+        info!("ASAN includes: {include_asan:#x?}");
+        StdAddressFilter::allow_list(include_asan.to_vec())
+    } else if let Some(exclude_asan) = &options.exclude_asan {
+        info!("ASAN excludes: {exclude_asan:#x?}");
+        StdAddressFilter::deny_list(exclude_asan.to_vec())
+    } else {
+        info!("ASAN no additional filter");
+        StdAddressFilter::default()
+    };
+
     let ret = if options.asan {
         info!("Enabling ASAN");
-        let modules = tuple_list!(AsanModule::builder().env(&env).build());
+        let modules = tuple_list!(AsanModule::builder().env(&env).filter(asan_filter).build());
         info!("Modules: {:#?}", modules);
         run(options, modules)
     } else if options.gasan {
         info!("Enabling Guest ASAN");
-        let modules = tuple_list!(AsanGuestModule::default(&env));
+        let modules = tuple_list!(AsanGuestModule::new(&env, asan_filter));
         info!("Modules: {:#?}", modules);
         run(options, modules)
     } else {

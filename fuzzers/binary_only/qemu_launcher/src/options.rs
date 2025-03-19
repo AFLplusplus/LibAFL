@@ -68,11 +68,17 @@ pub struct FuzzerOptions {
     #[arg(long = "iterations", help = "Maximum number of iterations")]
     pub iterations: Option<u64>,
 
-    #[arg(long = "include", help="Include address ranges", value_parser = FuzzerOptions::parse_ranges)]
+    #[arg(long = "include", help="Include coverage address ranges", value_parser = FuzzerOptions::parse_ranges)]
     pub include: Option<Vec<Range<GuestAddr>>>,
 
-    #[arg(long = "exclude", help="Exclude address ranges", value_parser = FuzzerOptions::parse_ranges, conflicts_with="include")]
+    #[arg(long = "exclude", help="Exclude coverage address ranges", value_parser = FuzzerOptions::parse_ranges, conflicts_with="include")]
     pub exclude: Option<Vec<Range<GuestAddr>>>,
+
+    #[arg(long = "include-asan", help="Include asan address ranges", value_parser = FuzzerOptions::parse_ranges)]
+    pub include_asan: Option<Vec<Range<GuestAddr>>>,
+
+    #[arg(long = "exclude-asan", help="Exclude asan address ranges", value_parser = FuzzerOptions::parse_ranges, conflicts_with="include_asan")]
+    pub exclude_asan: Option<Vec<Range<GuestAddr>>>,
 
     #[arg(
         short = 'd',

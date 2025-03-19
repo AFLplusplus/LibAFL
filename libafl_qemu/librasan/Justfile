@@ -14,7 +14,7 @@ test: test_asan
 
 pretty_rust:
   #!/bin/sh
-  MAIN_LLVM_VERSION=$LLVM_VERSION cargo run --manifest-path ../../utils/libafl_fmt/Cargo.toml --release -- -v
+  MAIN_LLVM_VERSION=$LLVM_VERSION cargo run --manifest-path ../../utils/libafl_repo_tools/Cargo.toml --release -- -v
 
 pretty_toml:
   #!/bin/sh
