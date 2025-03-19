@@ -18,7 +18,11 @@ unsafe extern "C" {
 ///
 /// The function's logic is written in C and this code is a wrapper.
 pub fn map_shared_memory() -> bool {
-    unsafe { __afl_map_shm() > 0 }
+    let ret = unsafe { __afl_map_shm() > 0 };
+    if !ret {
+        log::debug!("Shared memory for edge coverage map is not detected!");
+    }
+    ret
 }
 
 /// Map the input shared memory region, also referred as [`crate::coverage::INPUT_PTR`].
@@ -30,7 +34,12 @@ pub fn map_shared_memory() -> bool {
 ///
 /// The function's logic is written in C and this code is a wrapper.
 pub fn map_input_shared_memory() -> bool {
-    unsafe { __afl_map_input_shm() > 0}
+    let ret = unsafe { __afl_map_input_shm() > 0};
+
+    if !ret {
+        log::debug!("Shared memory for AFL++ inputs is not detected!");
+    }
+    ret
 }
 
 /// Start the forkserver from this point. Any shared memory must be created before.
