@@ -100,7 +100,7 @@ fn configure_qemu(
     }
 
     if cfg!(feature = "qemu_sanitizers") {
-        cmd.arg("--enable-sanitizers");
+        cmd.arg("--enable-asan");
     }
 
     if is_usermode {
