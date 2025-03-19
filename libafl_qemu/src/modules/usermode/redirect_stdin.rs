@@ -50,6 +50,10 @@ impl RedirectStdinModule {
     pub fn set_input_addr(&mut self, addr: *const u8) {
         self.input_addr = addr;
     }
+
+    pub fn reset_input_addr(&mut self) {
+        self.input_addr = core::ptr::null();
+    }
 }
 
 impl<I, S> EmulatorModule<I, S> for RedirectStdinModule
@@ -77,7 +81,7 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
-        assert!(self.input_addr.is_some());
+        assert!(!self.input_addr.is_null());
         self.total = input.len();
         self.read = 0;
     }
