@@ -17,8 +17,8 @@ unsafe extern "C" {
 /// # Note
 ///
 /// The function's logic is written in C and this code is a wrapper.
-pub fn map_shared_memory() -> u8 {
-    unsafe { __afl_map_shm() }
+pub fn map_shared_memory() -> bool {
+    unsafe { __afl_map_shm() > 0 }
 }
 
 /// Map the input shared memory region, also referred as [`crate::coverage::INPUT_PTR`].
@@ -29,8 +29,8 @@ pub fn map_shared_memory() -> u8 {
 /// # Note
 ///
 /// The function's logic is written in C and this code is a wrapper.
-pub fn map_input_shared_memory() -> u8 {
-    unsafe { __afl_map_input_shm() }
+pub fn map_input_shared_memory() -> bool {
+    unsafe { __afl_map_input_shm() > 0}
 }
 
 /// Start the forkserver from this point. Any shared memory must be created before.
