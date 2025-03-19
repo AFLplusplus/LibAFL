@@ -24,7 +24,7 @@ const SYS_read: u8 = 63;
 /// You need to use this with snapshot module!
 #[derive(Debug, Default)]
 pub struct RedirectStdinModule {
-    input_addr: Option<GuestAddr>,
+    input_addr: *const u8,
     read: usize,
     total: usize,
 }
@@ -33,12 +33,12 @@ impl RedirectStdinModule {
     #[must_use]
     /// constuctor
     pub fn new() -> Self {
-        Self::with_input_addr(None)
+        Self::with_input_addr(core::ptr::null())
     }
 
     #[must_use]
     /// Create with specified input address
-    pub fn with_input_addr(addr: Option<GuestAddr>) -> Self {
+    pub fn with_input_addr(addr: *const u8) -> Self {
         Self {
             input_addr: addr,
             read: 0,
@@ -47,7 +47,7 @@ impl RedirectStdinModule {
     }
 
     /// Tell this module where to look for the input addr
-    pub fn set_input_addr(&mut self, addr: Option<GuestAddr>) {
+    pub fn set_input_addr(&mut self, addr: *const u8) {
         self.input_addr = addr;
     }
 }
@@ -104,7 +104,7 @@ where
     S: Unpin,
 {
     let h = emulator_modules.get_mut::<RedirectStdinModule>().unwrap();
-    let Some(addr) = h.input_addr else {
+    if h.input_addr.is_null() {
         return SyscallHookResult::new(None);
     };
     if syscall == SYS_read as i32 && x0 == 0 {
@@ -115,7 +115,7 @@ where
         );
         */
         let size = unsafe {
-            let mut src = addr as *const u8;
+            let mut src = h.input_addr;
             src = src.wrapping_add(h.read);
             let dst = x1 as *mut u8;
             if h.total >= h.read {
