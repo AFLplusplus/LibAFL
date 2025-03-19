@@ -81,7 +81,6 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
-        assert!(!self.input_addr.is_null());
         self.total = input.len();
         self.read = 0;
     }
