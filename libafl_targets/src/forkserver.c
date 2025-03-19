@@ -27,6 +27,12 @@
 #define SHM_ENV_VAR "__AFL_SHM_ID"
 #define SHM_FUZZ_ENV_VAR "__AFL_SHM_FUZZ_ID"
 #define DEFAULT_PERMISSION 0600
+#define MAP_SIZE (1U << MAP_SIZE_POW2)
+#if MAP_SIZE <= 2097152
+  #define MAP_INITIAL_SIZE (2 << 20)  // = 2097152
+#else
+  #define MAP_INITIAL_SIZE MAP_SIZE
+#endif
 
 /* Reporting errors */
 #define FS_OPT_ERROR 0xf800008f
@@ -63,6 +69,10 @@
 // https://github.com/AFLplusplus/AFLplusplus/blob/stable/src/afl-cc.c#L993
 
 int __afl_sharedmem_fuzzing __attribute__((weak));
+
+static uint8_t  __afl_area_initial[MAP_INITIAL_SIZE];
+static uint8_t *__afl_area_ptr_dummy = __afl_area_initial;
+static uint8_t *__afl_area_ptr_backup = __afl_area_initial;
 
 extern uint8_t *__afl_area_ptr;
 extern size_t   __afl_map_size;
@@ -163,6 +173,7 @@ uint8_t __afl_map_shm(void){
     already_initialized_shm = 1;
     return 1;
   } else {
+    __afl_area_ptr = __afl_area_initial;
     return 0;
   }
 }
