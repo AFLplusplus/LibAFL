@@ -22,7 +22,7 @@ const SYS_read: u8 = 63;
 /// This is useful when your binary target reads the input from the stdin.
 /// With this you can just fuzz more like afl++
 /// You need to use this with snapshot module!
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RedirectStdinModule {
     input_addr: *const u8,
     read: usize,
