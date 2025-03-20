@@ -179,7 +179,7 @@ uint8_t __afl_map_shm(void){
   }
 }
 
-static uint8_t __afl_map_input_shm() {
+uint8_t __afl_map_input_shm() {
   char *id_str = getenv(SHM_FUZZ_ENV_VAR);
 
   if (id_str) {
