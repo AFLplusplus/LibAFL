@@ -51,6 +51,7 @@ use libafl_qemu::{
     modules::{
         cmplog::{CmpLogModule, CmpLogObserver},
         edges::StdEdgeCoverageModule,
+        utils::MainArgsShimBuilder,
     },
     Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
     Regs, TargetSignalHandling,
@@ -204,9 +205,9 @@ fn fuzz(
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
-        .expect("Symbol LLVMFuzzerTestOneInput not found");
-    println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+        .resolve_symbol("main", qemu.load_addr())
+        .expect("Symbol main not found");
+    println!("main @ {test_one_input_ptr:#x}");
 
     qemu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     unsafe {
@@ -341,6 +342,12 @@ fn fuzz(
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+    let main_args = MainArgsShimBuilder::new()
+        .program("./lol")
+        .args(vec!["arg1", "arg2", "arg3"])
+        .arg_input_file_std()
+        .build()?;
+
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness =
         |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
@@ -358,8 +365,8 @@ fn fuzz(
                 // For better error handling, use `write_mem` and handle the returned Result
                 qemu.write_mem_unchecked(input_addr, buf);
 
-                qemu.write_reg(Regs::Rdi, input_addr).unwrap();
-                qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
+                qemu.write_reg(Regs::Rdi, main_args.argc() as u64).unwrap();
+                qemu.write_reg(Regs::Rsi, main_args.argv() as u64).unwrap();
                 qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
                 qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
