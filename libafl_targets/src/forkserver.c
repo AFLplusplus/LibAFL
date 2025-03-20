@@ -78,11 +78,11 @@ extern uint8_t *__afl_area_ptr;
 extern size_t   __afl_map_size;
 extern uint8_t *__token_start;
 extern uint8_t *__token_stop;
+extern uint8_t *__afl_fuzz_ptr;
+extern uint32_t *__afl_fuzz_len;
 
 static uint8_t  __afl_fuzz_ptr_initial[MAP_INITIAL_SIZE];
-uint8_t        *__afl_fuzz_ptr = NULL;
 static uint32_t __afl_fuzz_len_local = 0;
-uint32_t       *__afl_fuzz_len = &__afl_fuzz_len_local;
 
 int already_initialized_shm;
 int already_initialized_forkserver;
@@ -219,6 +219,7 @@ uint8_t __afl_map_input_shm() {
     return 1;
   } else {
     __afl_fuzz_ptr = __afl_fuzz_ptr_initial;
+    __afl_fuzz_len = &__afl_fuzz_len_local;
     return 0;
   }
 }
