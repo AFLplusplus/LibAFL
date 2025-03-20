@@ -2,6 +2,7 @@ use std::{
     ffi::{CString, OsStr, OsString, c_char, c_int},
     os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
+    pin::Pin,
 };
 
 use libafl::Error;
@@ -141,16 +142,16 @@ impl MainArgsShimBuilder {
     }
 
     pub fn build(&self) -> Result<MainArgsShim, libafl_bolts::Error> {
-        let mut argv: Vec<CString> = Vec::new();
+        let mut argv: Vec<Pin<Box<CString>>> = Vec::new();
 
         if let Some(program) = &self.program {
-            argv.push(CString::new(program.as_bytes()).unwrap());
+            argv.push(Box::pin(CString::new(program.as_bytes()).unwrap()));
         } else {
             return Err(Error::illegal_argument("Program not specified"));
         }
 
         for args in &self.args {
-            argv.push(CString::new(args.as_bytes()).unwrap());
+            argv.push(Box::pin(CString::new(args.as_bytes()).unwrap()));
         }
 
         let mut argv_ptr: Vec<*const c_char> = argv.iter().map(|arg| arg.as_ptr()).collect();
@@ -176,7 +177,7 @@ impl MainArgsShimBuilder {
 pub struct MainArgsShim {
     input: InputType,
     /// This guys have to sit here, else Rust will free them
-    argv: Vec<CString>,
+    argv: Vec<Pin<Box<CString>>>,
     argv_ptr: Vec<*const c_char>,
 }
 
