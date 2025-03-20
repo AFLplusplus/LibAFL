@@ -1,18 +1,28 @@
 use std::{
     ffi::{CString, OsStr, OsString, c_char, c_int},
-    os::unix::ffi::OsStrExt,
+    fs::{File, OpenOptions},
+    os::{fd::AsRawFd, unix::ffi::OsStrExt},
     path::{Path, PathBuf},
     pin::Pin,
 };
 
 use libafl::Error;
 use libafl_bolts::fs::get_unique_std_input_file;
+use libc::MAP_SHARED;
+
+use crate::{MmapPerms, Qemu};
 // From https://gist.github.com/TrinityCoder/793c097b5a4ab25b8fabf5cd67e92f05
 pub struct MainArgsShimBuilder {
     use_stdin: bool,
     program: Option<OsString>,
     input_filename: Option<OsString>,
     args: Vec<OsString>,
+}
+
+impl Default for MainArgsShimBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MainArgsShimBuilder {
@@ -158,9 +168,9 @@ impl MainArgsShimBuilder {
         argv_ptr.push(std::ptr::null());
 
         let input = if self.use_stdin {
-            InputType::Stdin
+            InputType::UseStdin
         } else if let Some(input) = &self.input_filename {
-            InputType::File(input.into())
+            InputType::UseFile(input.into())
         } else {
             return Err(Error::illegal_argument("Input not specified"));
         };
@@ -182,29 +192,65 @@ pub struct MainArgsShim {
 }
 
 pub enum InputType {
-    Stdin,
-    File(PathBuf),
+    UseStdin,
+    UseFile(PathBuf),
 }
 
 impl MainArgsShim {
     /// later map this to any memory as you want
+    ///
+    /// You can simply map this to memory to pass input to the fuzzer,
+    /// also is is stdin, you could use `RedirectStdinModule`
+    #[must_use]
     pub fn input(&self) -> &InputType {
         &self.input
     }
 
     /// Returns the C language's `argv` (`*const *const c_char`).
+    #[must_use]
     pub fn argv(&self) -> *const *const c_char {
         println!("{:#?}", self.argv_ptr);
         self.argv_ptr.as_ptr()
     }
 
     /// Returns the C language's `argv[0]` (`*const c_char`).
+    /// On x64 you would pass this to Rsi before starting emulation
+    #[must_use]
     pub fn argv0(&self) -> *const c_char {
         self.argv_ptr[0]
     }
 
     /// Gets total number of args.
+    /// On x64 you would pass this to Rdi before starting emulation
+    #[must_use]
     pub fn argc(&self) -> c_int {
-        (self.argv_ptr.len() - 1) as c_int
+        (self.argv_ptr.len() - 1).try_into().unwrap()
     }
+}
+
+/// With this function you will map the input to the memory (depending on the `InputType`, it changes the behavior a bit)
+/// For the rest, you just have to make sure that your input is copied into the returned address of this function
+pub fn map_input_to_memory(
+    qemu: &Qemu,
+    input: InputType,
+    max_size: usize,
+) -> Result<u64, libafl::Error> {
+    let addr = match input {
+        InputType::UseStdin => {
+            let input = File::create(get_unique_std_input_file())?;
+            let fd = input.as_raw_fd();
+            unsafe {
+                libc::dup2(fd, 0);
+            } // overwrite stdin
+            qemu.mmap(0, max_size, MmapPerms::ReadWrite, MAP_SHARED, fd)
+        }
+        InputType::UseFile(p) => {
+            let input = OpenOptions::new().read(true).write(true).open(p)?;
+            let fd = input.as_raw_fd();
+            qemu.mmap(0, max_size, MmapPerms::ReadWrite, MAP_SHARED, fd)
+        }
+    };
+
+    log::info!("Input will be expected to put on {:?}", addr);
+    addr
 }
