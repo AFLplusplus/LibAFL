@@ -20,6 +20,19 @@ use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_ALLOCATED_SIZE, EDGES_M
 pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_ALLOCATED_SIZE] = [0; EDGES_MAP_ALLOCATED_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
 
+/// The map for input.
+#[unsafe(no_mangle)]
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
+pub static mut __afl_fuzz_ptr_local: [u8; EDGES_MAP_ALLOCATED_SIZE] = [0; EDGES_MAP_ALLOCATED_SIZE];
+pub use __afl_fuzz_ptr_local as INPUT_MAP;
+
+/// The length of input mapping
+#[unsafe(no_mangle)]
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
+pub static mut __afl_fuzz_len_local: u32 = 0;
+pub use __afl_fuzz_len_local as INPUT_LENGTH;
+
+
 /// The map for data dependency
 #[unsafe(no_mangle)]
 #[allow(non_upper_case_globals)] // expect breaks here for some reason
