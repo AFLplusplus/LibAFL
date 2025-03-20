@@ -10,7 +10,10 @@ harness:
         ./fuzz.c \
         -o {{ HARNESS_NAME }} \
         -lm -lz
-
+    cc \
+        ./stdin.c \
+        -o {{ HARNESS_NAME }} \
+        -lm -lz
 [unix]
 build:
     cargo build --profile {{ PROFILE }}

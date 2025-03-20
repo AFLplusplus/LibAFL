@@ -1,6 +1,6 @@
 use std::{
     ffi::{CString, OsStr, OsString, c_char, c_int},
-    fs::{File, OpenOptions},
+    fs::OpenOptions,
     os::{fd::AsRawFd, unix::ffi::OsStrExt},
     path::{Path, PathBuf},
     pin::Pin,
@@ -167,12 +167,10 @@ impl MainArgsShimBuilder {
         let mut argv_ptr: Vec<*const c_char> = argv.iter().map(|arg| arg.as_ptr()).collect();
         argv_ptr.push(std::ptr::null());
 
-        let input = if self.use_stdin {
-            InputType::UseStdin
-        } else if let Some(input) = &self.input_filename {
+        let input = if let Some(input) = &self.input_filename {
             InputType::UseFile(input.into())
         } else {
-            return Err(Error::illegal_argument("Input not specified"));
+            InputType::UseStdin
         };
 
         Ok(MainArgsShim {
@@ -232,12 +230,19 @@ impl MainArgsShim {
 /// For the rest, you just have to make sure that your input is copied into the returned address of this function
 pub fn map_input_to_memory(
     qemu: &Qemu,
-    input: InputType,
+    input: &InputType,
     max_size: usize,
 ) -> Result<u64, libafl::Error> {
     let addr = match input {
         InputType::UseStdin => {
-            let input = File::create(get_unique_std_input_file())?;
+            log::info!("Mapping stdin to memory!");
+            let filename = get_unique_std_input_file();
+            let input = OpenOptions::new()
+                .create_new(true)
+                .read(true)
+                .write(true)
+                .open(filename.clone())?;
+            log::info!("{filename}");
             let fd = input.as_raw_fd();
             unsafe {
                 libc::dup2(fd, 0);
@@ -245,6 +250,7 @@ pub fn map_input_to_memory(
             qemu.mmap(0, max_size, MmapPerms::ReadWrite, MAP_SHARED, fd)
         }
         InputType::UseFile(p) => {
+            log::info!("Mapping input file to memory!");
             let input = OpenOptions::new().read(true).write(true).open(p)?;
             let fd = input.as_raw_fd();
             qemu.mmap(0, max_size, MmapPerms::ReadWrite, MAP_SHARED, fd)

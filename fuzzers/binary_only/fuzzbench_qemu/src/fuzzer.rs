@@ -51,7 +51,7 @@ use libafl_qemu::{
     modules::{
         cmplog::{CmpLogModule, CmpLogObserver},
         edges::StdEdgeCoverageModule,
-        utils::MainArgsShimBuilder,
+        utils::{map_input_to_memory, MainArgsShimBuilder},
     },
     Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
     Regs, TargetSignalHandling,
@@ -60,7 +60,7 @@ use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUN
 #[cfg(unix)]
 use nix::unistd::dup;
 
-pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
+pub const MAX_INPUT_SIZE: usize = 1024; // 1MB
 
 /// The fuzzer main
 pub fn main() {
@@ -233,11 +233,6 @@ fn fuzz(
     qemu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     qemu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = qemu
-        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
-        .unwrap();
-    println!("Placing input at {input_addr:#x}");
-
     let log = RefCell::new(
         OpenOptions::new()
             .append(true)
@@ -345,8 +340,10 @@ fn fuzz(
     let main_args = MainArgsShimBuilder::new()
         .program("./lol")
         .args(vec!["arg1", "arg2", "arg3"])
-        .arg_input_file_std()
         .build()?;
+
+    let input_addr = map_input_to_memory(&qemu, main_args.input(), MAX_INPUT_SIZE)?;
+    println!("Placing input at {input_addr:#x}");
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness =
@@ -357,6 +354,11 @@ fn fuzz(
             if len > MAX_INPUT_SIZE {
                 buf = &buf[0..MAX_INPUT_SIZE];
                 len = MAX_INPUT_SIZE;
+            }
+
+            let dst = input_addr as *mut u8;
+            unsafe {
+                dst.copy_from(buf.as_ptr(), len);
             }
 
             unsafe {
