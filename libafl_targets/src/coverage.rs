@@ -87,6 +87,7 @@ pub fn autotokens() -> Result<Tokens, Error> {
 #[allow(non_upper_case_globals)] // expect breaks here for some reason
 #[unsafe(no_mangle)]
 pub static mut __afl_map_size: usize = EDGES_MAP_DEFAULT_SIZE;
+pub use __afl_map_size as EDGES_MAP_SIZE;
 
 #[cfg(any(
     feature = "sancov_pcguard_edges",
