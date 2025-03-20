@@ -123,7 +123,7 @@ static_assertions = "1.1.0"
 strum = "0.27.0"
 strum_macros = "0.27.0"
 toml = "0.8.19" # For parsing the injections toml file
-typed-builder = "0.20.0" # Implement the builder pattern at compiletime
+typed-builder = "0.21.0" # Implement the builder pattern at compiletime
 typeid = "1.0.0" # Safe type_eq that doesn't rely on std specialization
 unicorn-engine = "2.0.1" # Used in libafl_unicorn
 uuid = { version = "1.10.0", features = ["serde", "v4"] }
