@@ -51,7 +51,6 @@ use libafl_qemu::{
     modules::{
         cmplog::{CmpLogModule, CmpLogObserver},
         edges::StdEdgeCoverageModule,
-        utils::{map_input_to_memory, MainArgsShimBuilder},
     },
     Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
     Regs, TargetSignalHandling,
@@ -60,7 +59,7 @@ use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUN
 #[cfg(unix)]
 use nix::unistd::dup;
 
-pub const MAX_INPUT_SIZE: usize = 1024; // 1MB
+pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
 /// The fuzzer main
 pub fn main() {
@@ -205,9 +204,9 @@ fn fuzz(
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
 
     let test_one_input_ptr = elf
-        .resolve_symbol("main", qemu.load_addr())
-        .expect("Symbol main not found");
-    println!("main @ {test_one_input_ptr:#x}");
+        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
+        .expect("Symbol LLVMFuzzerTestOneInput not found");
+    println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
     qemu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     unsafe {
@@ -232,6 +231,11 @@ fn fuzz(
 
     qemu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     qemu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
+
+    let input_addr = qemu
+        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
+        .unwrap();
+    println!("Placing input at {input_addr:#x}");
 
     let log = RefCell::new(
         OpenOptions::new()
@@ -337,14 +341,6 @@ fn fuzz(
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let main_args = MainArgsShimBuilder::new()
-        .program("./lol")
-        .args(vec!["arg1", "arg2", "arg3"])
-        .build()?;
-
-    let input_addr = map_input_to_memory(&qemu, main_args.input(), MAX_INPUT_SIZE)?;
-    println!("Placing input at {input_addr:#x}");
-
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness =
         |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
@@ -356,19 +352,14 @@ fn fuzz(
                 len = MAX_INPUT_SIZE;
             }
 
-            let dst = input_addr as *mut u8;
-            unsafe {
-                dst.copy_from(buf.as_ptr(), len);
-            }
-
             unsafe {
                 // # Safety
                 // The input buffer size is checked above. We use `write_mem_unchecked` for performance reasons
                 // For better error handling, use `write_mem` and handle the returned Result
                 qemu.write_mem_unchecked(input_addr, buf);
 
-                qemu.write_reg(Regs::Rdi, main_args.argc() as u64).unwrap();
-                qemu.write_reg(Regs::Rsi, main_args.argv() as u64).unwrap();
+                qemu.write_reg(Regs::Rdi, input_addr).unwrap();
+                qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
                 qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
                 qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
