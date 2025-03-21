@@ -1,17 +1,13 @@
 use std::{
     ffi::{CString, OsStr, OsString, c_char, c_int},
-    fs::OpenOptions,
-    os::{fd::AsRawFd, unix::ffi::OsStrExt},
-    path::{Path, PathBuf},
+    os::unix::ffi::OsStrExt,
+    path::Path,
     pin::Pin,
 };
 
 use libafl::Error;
 use libafl_bolts::fs::get_unique_std_input_file;
-use libc::MAP_SHARED;
 
-use crate::{MmapPerms, Qemu};
-// From https://gist.github.com/TrinityCoder/793c097b5a4ab25b8fabf5cd67e92f05
 pub struct MainArgsShimBuilder {
     use_stdin: bool,
     program: Option<OsString>,
@@ -167,14 +163,8 @@ impl MainArgsShimBuilder {
         let mut argv_ptr: Vec<*const c_char> = argv.iter().map(|arg| arg.as_ptr()).collect();
         argv_ptr.push(std::ptr::null());
 
-        let input = if let Some(input) = &self.input_filename {
-            InputType::UseFile(input.into())
-        } else {
-            InputType::UseStdin
-        };
-
         Ok(MainArgsShim {
-            input,
+            use_stdin: self.use_stdin,
             argv,
             argv_ptr,
         })
@@ -183,36 +173,33 @@ impl MainArgsShimBuilder {
 
 #[allow(dead_code)]
 pub struct MainArgsShim {
-    input: InputType,
+    use_stdin: bool,
     /// This guys have to sit here, else Rust will free them
     argv: Vec<Pin<Box<CString>>>,
     argv_ptr: Vec<*const c_char>,
 }
 
-pub enum InputType {
-    UseStdin,
-    UseFile(PathBuf),
-}
-
+// From https://gist.github.com/TrinityCoder/793c097b5a4ab25b8fabf5cd67e92f05
 impl MainArgsShim {
     /// later map this to any memory as you want
     ///
     /// You can simply map this to memory to pass input to the fuzzer,
     /// also is is stdin, you could use `RedirectStdinModule`
     #[must_use]
-    pub fn input(&self) -> &InputType {
-        &self.input
+    pub fn use_stdin(&self) -> bool {
+        self.use_stdin
     }
 
     /// Returns the C language's `argv` (`*const *const c_char`).
     #[must_use]
     pub fn argv(&self) -> *const *const c_char {
-        println!("{:#?}", self.argv_ptr);
+        // println!("{:#?}", self.argv_ptr);
         self.argv_ptr.as_ptr()
     }
 
     /// Returns the C language's `argv[0]` (`*const c_char`).
     /// On x64 you would pass this to Rsi before starting emulation
+    /// Like: `qemu.write_reg(Regs::Rsi, main_args.argv() as u64).unwrap();``
     #[must_use]
     pub fn argv0(&self) -> *const c_char {
         self.argv_ptr[0]
@@ -220,6 +207,7 @@ impl MainArgsShim {
 
     /// Gets total number of args.
     /// On x64 you would pass this to Rdi before starting emulation
+    /// Like: `qemu.write_reg(Regs::Rdi, main_args.argc() as u64).unwrap()`;
     #[must_use]
     pub fn argc(&self) -> c_int {
         (self.argv_ptr.len() - 1).try_into().unwrap()
