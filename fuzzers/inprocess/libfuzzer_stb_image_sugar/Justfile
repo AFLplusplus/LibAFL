@@ -50,8 +50,6 @@ test: fuzzer
         exit 0
     else
         echo "Fuzzer not working!"
-        cat fuzz_stdout.log
-        echo "lol"
         exit 1
     fi
     
