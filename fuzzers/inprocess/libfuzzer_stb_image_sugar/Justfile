@@ -37,10 +37,9 @@ test: fuzzer
     #!/bin/bash
     success=0
     rm -rf libafl_unix_shmem_server || true
-    (timeout 5s ./{{FUZZER_NAME}} >fuzz_stdout.log) &
+    timeout 5s ./{{FUZZER_NAME}} >fuzz_stdout.log
     while read -r line; do
         corpus_number=$(echo "$line" | cut -d' ' -f2)
-        echo "$corpus_number"
         if (( corpus_number > 50 )); then
             success=1
         fi
