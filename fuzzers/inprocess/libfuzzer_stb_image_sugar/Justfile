@@ -24,7 +24,7 @@ fuzzer: cxx
 [macos]
 run: fuzzer
     #!/bin/bash
-    ./{{FUZZER}} &
+    ./{{FUZZER_NAME}} &
     sleep 0.2
 
 [windows]
@@ -37,9 +37,7 @@ test: fuzzer
     #!/bin/bash
     success=0
     rm -rf libafl_unix_shmem_server || true
-    (timeout 5s ./{{FUZZER_NAME}} >fuzz_stdout.log 2>/dev/null || true) &
-    sleep 0.2
-    timeout 5s ./{{FUZZER_NAME}} >/dev/null 2>/dev/null || true
+    timeout 5s ./{{FUZZER_NAME}} >fuzz_stdout.log
     while read -r line; do
         corpus_number=$(echo "$line" | cut -d' ' -f2)
         if (( corpus_number > 50 )); then
