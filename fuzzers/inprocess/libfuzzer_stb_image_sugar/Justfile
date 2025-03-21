@@ -22,7 +22,7 @@ fuzzer: cxx
 
 [linux]
 [macos]
-run:
+run: fuzzer
     #!/bin/bash
     ./{{FUZZER_NAME}} &
     sleep 0.2
