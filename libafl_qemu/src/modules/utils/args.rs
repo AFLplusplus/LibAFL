@@ -199,7 +199,7 @@ impl MainArgsShim {
 
     /// Returns the C language's `argv[0]` (`*const c_char`).
     /// On x64 you would pass this to Rsi before starting emulation
-    /// Like: `qemu.write_reg(Regs::Rsi, main_args.argv() as u64).unwrap();``
+    /// Like: `qemu.write_reg(Regs::Rsi, main_args.argv() as u64).unwrap();`
     #[must_use]
     pub fn argv0(&self) -> *const c_char {
         self.argv_ptr[0]
@@ -207,7 +207,7 @@ impl MainArgsShim {
 
     /// Gets total number of args.
     /// On x64 you would pass this to Rdi before starting emulation
-    /// Like: `qemu.write_reg(Regs::Rdi, main_args.argc() as u64).unwrap()`;
+    /// Like: `qemu.write_reg(Regs::Rdi, main_args.argc() as u64).unwrap();`
     #[must_use]
     pub fn argc(&self) -> c_int {
         (self.argv_ptr.len() - 1).try_into().unwrap()
