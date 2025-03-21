@@ -108,7 +108,6 @@ pub struct ImageInfo {
     pub vdso: GuestAddr,
     pub entry: GuestAddr,
     pub brk: GuestAddr,
-    pub alignment: GuestAddr,
     pub exec_stack: bool,
 }
 
@@ -251,7 +250,6 @@ impl Qemu {
             vdso: image_info.vdso,
             entry: image_info.entry,
             brk: image_info.brk,
-            alignment: image_info.alignment,
             exec_stack: image_info.exec_stack,
         }
     }
