@@ -1,27 +1,31 @@
+use alloc::{boxed::Box, vec::Vec};
 use std::{
+    borrow::ToOwned,
     ffi::{CString, OsStr, OsString, c_char, c_int},
     os::unix::ffi::OsStrExt,
     path::Path,
     pin::Pin,
 };
 
-use libafl::Error;
-use libafl_bolts::fs::get_unique_std_input_file;
+use crate::{Error, fs::get_unique_std_input_file};
 
-pub struct MainArgsShimBuilder {
+/// For creating an C-compatible argument
+#[derive(Debug)]
+pub struct CMainArgsBuilder {
     use_stdin: bool,
     program: Option<OsString>,
     input_filename: Option<OsString>,
     args: Vec<OsString>,
 }
 
-impl Default for MainArgsShimBuilder {
+impl Default for CMainArgsBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MainArgsShimBuilder {
+impl CMainArgsBuilder {
+    /// Constructor
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -147,7 +151,8 @@ impl MainArgsShimBuilder {
         moved
     }
 
-    pub fn build(&self) -> Result<MainArgsShim, libafl_bolts::Error> {
+    /// Build it
+    pub fn build(&self) -> Result<CMainArgs, Error> {
         let mut argv: Vec<Pin<Box<CString>>> = Vec::new();
 
         if let Some(program) = &self.program {
@@ -163,7 +168,7 @@ impl MainArgsShimBuilder {
         let mut argv_ptr: Vec<*const c_char> = argv.iter().map(|arg| arg.as_ptr()).collect();
         argv_ptr.push(std::ptr::null());
 
-        Ok(MainArgsShim {
+        Ok(CMainArgs {
             use_stdin: self.use_stdin,
             argv,
             argv_ptr,
@@ -171,8 +176,10 @@ impl MainArgsShimBuilder {
     }
 }
 
+/// For creating an C-compatible argument
+#[derive(Debug)]
 #[allow(dead_code)]
-pub struct MainArgsShim {
+pub struct CMainArgs {
     use_stdin: bool,
     /// This guys have to sit here, else Rust will free them
     argv: Vec<Pin<Box<CString>>>,
@@ -180,7 +187,7 @@ pub struct MainArgsShim {
 }
 
 // From https://gist.github.com/TrinityCoder/793c097b5a4ab25b8fabf5cd67e92f05
-impl MainArgsShim {
+impl CMainArgs {
     /// later map this to any memory as you want
     ///
     /// You can simply map this to memory to pass input to the fuzzer,
