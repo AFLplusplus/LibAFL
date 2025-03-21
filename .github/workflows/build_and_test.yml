@@ -52,27 +52,13 @@ jobs:
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
-      - name: Build libafl debug
-        run: cargo build -p libafl
-      - name: Test the book (Linux)
-        # TODO: fix books test fail with updated windows-rs
-        if: runner.os == 'Linux'
-        run: cd docs && mdbook test -L ../target/debug/deps
-      - name: Test the book (MacOS)
-        if: runner.os == 'MacOS'
-        run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
-      - name: Run tests (Windows)
-        if: runner.os == 'Windows'
-        run: cargo test -- --test-threads 1
-      - name: Run tests (Linux)
+      - name: Test the book
         if: runner.os != 'Windows'
-        run: cargo test -- --test-threads 1
+        run: just test-docs
+      - name: Run tests
+        run: just test
       - name: Test libafl no_std
-        run: cd libafl && cargo test --no-default-features
-      - name: Test libafl_bolts no_std no_alloc
-        run: cd libafl_bolts && cargo test --no-default-features
-      - name: Test libafl_targets no_std
-        run: cd libafl_targets && cargo test --no-default-features
+        run: just test-no-std
 
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
@@ -82,7 +68,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Build Docs
-        run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
+        run: just doc
 
   ubuntu-doc-test:
     runs-on: ubuntu-24.04
@@ -92,7 +78,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Test Docs
-        run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
+        run: test-docs
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
@@ -105,7 +91,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # --- miri undefined behavior test --
       - name: Run miri tests
-        run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
+        run: just test-miri
 
   ubuntu:
     runs-on: ubuntu-24.04
@@ -120,16 +106,16 @@ jobs:
       - name: Check pcguard edges
         run: cargo check --features=sancov_pcguard_edges
       - name: run shellcheck
-        run: shellcheck ./scripts/*.sh
+        run: just shellcheck
       # ---- build normal and examples ----
       - name: Run a normal build
-        run: cargo build --verbose
+        run: just default
       # - name: Run libafl_qemu usermode tests
       #   run: cd libafl_qemu && cargo test
       # - name: Run libafl_qemu systemmode tests
       #   run: cd libafl_qemu && cargo test --no-default-features --features x86_64,systemmode
       - name: Build examples
-        run: cargo build --examples --verbose
+        run: just examples cargo build --examples --verbose
 
   ubuntu-clippy:
     runs-on: ubuntu-24.04
@@ -143,7 +129,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Run clippy
-        run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/clippy.sh
+        run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} just clippy
     # --- test embedding the libafl_libfuzzer_runtime library
     # Fix me plz
     # - name: Test Build libafl_libfuzzer with embed
@@ -180,7 +166,7 @@ jobs:
       - name: Install smoke test deps
         run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh
       - name: Run smoke test
-        run: ./libafl_concolic/test/smoke_test.sh
+        run: just concolic-smoke-test
 
   python-bindings:
     runs-on: ubuntu-24.04
@@ -194,9 +180,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Run a maturin build
-        run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
+        run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && just build-python
       - name: Run python test
-        run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/binary_only/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
+        run: just test-python-fuzzer
 
   cargo-fmt:
     runs-on: ubuntu-24.04
@@ -212,8 +198,10 @@ jobs:
         with: { shared-key: "ubuntu" }
       - name: Installing black
         run: python3 -m pip install black
+      - name: Install taplo
+        run: curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
       - name: Format Check
-        run: ./scripts/fmt_all.sh check
+        run: just check-fmt
 
   check-md-links:
     # fixme: use ubuntu-latest once this gets fixed https://github.com/UmbrellaDocs/action-linkspector/issues/32
@@ -233,14 +221,14 @@ jobs:
       - uses: taiki-e/install-action@cargo-hack
       - run: rustup upgrade
       # Note: We currently only specify minimum rust versions for the default workspace members
-      - run: cargo hack check --rust-version -p libafl -p libafl_bolts -p libafl_derive -p libafl_cc -p libafl_targets
+      - run: just msrv
 
   fuzzers-preflight:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Fuzzer in CI Check
-        run: ./scripts/check_tested_fuzzers.sh
+        run: just fuzzers-preflight
 
   fuzzers:
     needs:
@@ -331,7 +319,7 @@ jobs:
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} just test-fuzzer ${{ matrix.fuzzer }}
 
   changes:
     runs-on: ubuntu-24.04
@@ -372,7 +360,7 @@ jobs:
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} just test-fuzzer ${{ matrix.fuzzer }}
 
   fuzzers-qemu-user:
     needs:
@@ -402,7 +390,7 @@ jobs:
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+        run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} just test-fuzzer ${{ matrix.fuzzer }}
 
   librasan-build:
       runs-on: ubuntu-24.04
@@ -418,10 +406,7 @@ jobs:
           run: |
             RUN_ON_CI=1 \
             LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
-            just \
-              -f ./libafl_qemu/librasan/Justfile \
-              build_everything_dev \
-              build_x86_64_release
+            just build-librasan
 
   librasan-test:
       runs-on: ubuntu-24.04
@@ -437,9 +422,7 @@ jobs:
           run: |
             RUN_ON_CI=1 \
             LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
-            just \
-              -f ./libafl_qemu/librasan/Justfile \
-              test_everything
+            just test-librasan
 
   fuzzers-qemu-system:
     needs:
@@ -462,7 +445,7 @@ jobs:
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} just test-fuzzer ${{ matrix.fuzzer }}
 
   nostd-build:
     runs-on: ubuntu-24.04
@@ -471,15 +454,13 @@ jobs:
         with:
           components: rust-src
       - name: Add targets
-        run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
+        run: rustup target add arm-linux-androideabi && rustup target add aarch64-unknown-none
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build aarch64-unknown-none
-        run: cd ./fuzzers/fuzz_anything/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+        run: just build-aarch64-unknown-none
       - name: run x86_64 until panic!
-        run: cd ./fuzzers/fuzz_anything/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
-      - name: no_std tests
-        run: cd ./libafl && cargo test --no-default-features
+        run: just test-no-std
 
   nostd-clippy:
     runs-on: ubuntu-24.04
@@ -492,25 +473,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: libafl armv6m-none-eabi (32 bit no_std) clippy
-        run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
-      - name: Build no_std no_alloc bolts
-        run: cd ./libafl_bolts && cargo +nightly build -Zbuild-std=core --target aarch64-unknown-none --no-default-features -v --release && cd ../
-
-  format-toml:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Install taplo
-        run: curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
-      - uses: actions/checkout@v4
-      - name: Run taplo
-        run: taplo format --check
+        run: just clippy-thumbv6m-none-eabi
 
   build-docker:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Build docker
-        run: docker build -t libafl .
+        run: just docker
 
   windows-frida-libpng:
     runs-on: windows-latest
@@ -520,7 +490,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/frida_libpng
-        run: cd fuzzers/binary_only/frida_libpng/ && just test
+        run: just test-fuzzer ./fuzzers/binary_only/frida_libpng/
 
   windows-libfuzzer-stb-image:
     runs-on: windows-latest
@@ -530,7 +500,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/inprocess/libfuzzer_stb_image
-        run: cd fuzzers/inprocess/libfuzzer_stb_image && cargo build --release
+        run: just test-fuzzer ./fuzzers/inprocess/libfuzzer_stb_image
 
   # windows-libfuzzer-asan:
   #   runs-on: windows-latest
@@ -540,7 +510,7 @@ jobs:
   #     - uses: actions/checkout@v4
   #     - uses: ./.github/workflows/windows-tester-prepare
   #     - name: Build fuzzers/inprocess/libfuzzer_windows_asan
-  #       run: cd fuzzers/inprocess/libfuzzer_windows_asan && just test
+  #       run: just test-fuzzer ./fuzzers/inprocess/libfuzzer_windows_asan
 
   windows-frida-gdiplus:
     runs-on: windows-latest
@@ -550,7 +520,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/frida_windows_gdiplus
-        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && just test && just test_cmplog
+        run: just test-fuzzer ./fuzzers/binary_only/frida_windows_gdiplus/
+      - name: Build fuzzers/binary_only/frida_windows_gdiplus
+        run: just test-fuzzer ./fuzzers/binary_only/frida_windows_gdiplus/
+      - name: Cmplog test
+        run: just test-fuzzers-gdiplus-cmplog
 
   windows-tinyinst-simple:
     runs-on: windows-latest
@@ -562,7 +536,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/tinyinst_simple
-        run: cd fuzzers/binary_only/tinyinst_simple/ && just test
+        run: just test-fuzzer ./fuzzers/binary_only/tinyinst_simple/
 
   windows-clippy:
     runs-on: windows-latest
@@ -574,8 +548,7 @@ jobs:
       - uses: ./.github/workflows/windows-tester-prepare
       - uses: Swatinem/rust-cache@v2
       - name: Run real clippy, not the fake one
-        shell: pwsh
-        run: .\scripts\clippy.ps1
+        run: just clippy
 
   macos:
     runs-on: macOS-latest
@@ -590,11 +563,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: MacOS Build
-        run: cargo build --verbose
+        run: just build
       - name: Increase map sizes
-        run: ./scripts/shmem_limits_macos.sh
+        run: just increase-mem-limits
       - name: Clippy
-        run: cargo +nightly clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
+        run: just clippy
 
   ios:
     runs-on: macOS-latest
@@ -605,7 +578,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build iOS
-        run: PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
+        run: just build-ios
 
   android:
     runs-on: ubuntu-24.04
@@ -623,7 +596,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build Android
-        run: cd libafl && PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo ndk -t arm64-v8a build --release
+        run: just build-android
 
     #run: cargo build --target aarch64-linux-android
     # TODO: Figure out how to properly build stuff with clang
