@@ -328,6 +328,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/fuzzer-tester-prepare
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
