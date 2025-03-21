@@ -1,10 +1,13 @@
 //! Parse command line argument like AFL, then put it in a C-compatible way
 use alloc::{borrow::ToOwned, boxed::Box, vec::Vec};
+use core::{
+    ffi::{c_char, c_int},
+    pin::Pin,
+};
 use std::{
-    ffi::{CString, OsStr, OsString, c_char, c_int},
+    ffi::{CString, OsStr, OsString},
     os::unix::ffi::OsStrExt,
     path::Path,
-    pin::Pin,
 };
 
 use crate::{Error, fs::get_unique_std_input_file};
