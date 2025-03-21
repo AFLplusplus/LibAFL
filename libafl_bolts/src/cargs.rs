@@ -191,10 +191,7 @@ pub struct CMainArgs {
 
 // From https://gist.github.com/TrinityCoder/793c097b5a4ab25b8fabf5cd67e92f05
 impl CMainArgs {
-    /// later map this to any memory as you want
-    ///
-    /// You can simply map this to memory to pass input to the fuzzer,
-    /// also is is stdin, you could use `RedirectStdinModule`
+    /// If stdin is used for this or no
     #[must_use]
     pub fn use_stdin(&self) -> bool {
         self.use_stdin
