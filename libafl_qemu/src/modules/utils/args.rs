@@ -225,38 +225,3 @@ impl MainArgsShim {
         (self.argv_ptr.len() - 1).try_into().unwrap()
     }
 }
-
-/// With this function you will map the input to the memory (depending on the `InputType`, it changes the behavior a bit)
-/// For the rest, you just have to make sure that your input is copied into the returned address of this function
-pub fn map_input_to_memory(
-    qemu: &Qemu,
-    input: &InputType,
-    max_size: usize,
-) -> Result<u64, libafl::Error> {
-    let addr = match input {
-        InputType::UseStdin => {
-            log::info!("Mapping stdin to memory!");
-            let filename = get_unique_std_input_file();
-            let input = OpenOptions::new()
-                .create_new(true)
-                .read(true)
-                .write(true)
-                .open(filename.clone())?;
-            log::info!("{filename}");
-            let fd = input.as_raw_fd();
-            unsafe {
-                libc::dup2(fd, 0);
-            } // overwrite stdin
-            qemu.mmap(0, max_size, MmapPerms::ReadWrite, MAP_SHARED, fd)
-        }
-        InputType::UseFile(p) => {
-            log::info!("Mapping input file to memory!");
-            let input = OpenOptions::new().read(true).write(true).open(p)?;
-            let fd = input.as_raw_fd();
-            qemu.mmap(0, max_size, MmapPerms::ReadWrite, MAP_SHARED, fd)
-        }
-    };
-
-    log::info!("Input will be expected to put on {:?}", addr);
-    addr
-}
