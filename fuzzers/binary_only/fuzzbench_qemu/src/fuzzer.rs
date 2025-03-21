@@ -56,8 +56,8 @@ use libafl_qemu::{
         SnapshotModule,
     },
     Emulator, GuestReg, MmapPerms, PredicateObserver, PredicatesMap, Qemu, QemuExecutor,
-    QemuExitError, QemuExitReason, QemuMappingsCache, QemuMappingsViewer, QemuShutdownCause,
-    RCAStage, Regs, Tracer,
+    QemuExitError, QemuExitReason, QemuMappingsCache, QemuMappingsViewer, RCAStage, Regs,
+    TargetSignalHandling, Tracer,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 #[cfg(unix)]
@@ -206,6 +206,10 @@ fn fuzz(
         .qemu_parameters(args)
         .modules(modules)
         .build()?;
+
+    // return to harness instead of crashing the process.
+    // greatly speeds up crash recovery.
+    emulator.set_target_crash_handling(&TargetSignalHandling::RaiseSignal);
 
     let qemu = emulator.qemu();
 
@@ -387,13 +391,15 @@ fn fuzz(
                 qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
                 qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
-                match qemu.run() {
+                let qemu_ret = qemu.run();
+
+                match qemu_ret {
                     Ok(QemuExitReason::Breakpoint(_)) => {}
-                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(signal))) => {
-                        signal.handle();
-                    }
+                    Ok(QemuExitReason::Crash) => return ExitKind::Crash,
+                    Ok(QemuExitReason::Timeout) => return ExitKind::Timeout,
+
                     Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                    _ => panic!("Unexpected QEMU exit."),
+                    _ => panic!("Unexpected QEMU exit: {qemu_ret:?}"),
                 }
             }
 

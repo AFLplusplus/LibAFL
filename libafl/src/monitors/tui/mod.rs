@@ -26,7 +26,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use hashbrown::HashMap;
-use libafl_bolts::{ClientId, current_time, format_duration_hms};
+use libafl_bolts::{ClientId, current_time, format_big_number, format_duration_hms};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use typed_builder::TypedBuilder;
 
@@ -351,6 +351,7 @@ impl Monitor for TuiMonitor {
             let totalexec = global_stats.total_execs;
             let run_time = global_stats.run_time;
             let exec_per_sec_pretty = global_stats.execs_per_sec_pretty.clone();
+            let total_execs = global_stats.total_execs;
             let mut ctx = self.context.write().unwrap();
             ctx.total_corpus_count = global_stats.corpus_size;
             ctx.total_solutions = global_stats.objective_size;
@@ -358,7 +359,8 @@ impl Monitor for TuiMonitor {
                 .add(run_time, global_stats.corpus_size);
             ctx.objective_size_timed
                 .add(run_time, global_stats.objective_size);
-            let total_process_timing = client_stats_manager.process_timing(exec_per_sec_pretty);
+            let total_process_timing =
+                client_stats_manager.process_timing(exec_per_sec_pretty, total_execs);
 
             ctx.total_process_timing = total_process_timing;
             ctx.execs_per_sec_timed.add(run_time, execsec);
@@ -391,9 +393,9 @@ impl Monitor for TuiMonitor {
         let mut fmt = format!(
             "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
-            client.corpus_size(),
-            client.objective_size(),
-            client.executions(),
+            format_big_number(client.corpus_size()),
+            format_big_number(client.objective_size()),
+            format_big_number(client.executions()),
             exec_sec
         );
         for (key, val) in client.user_stats() {
