@@ -1,7 +1,6 @@
 //! Parse command line argument like AFL, then put it in a C-compatible way
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box, vec::Vec};
 use std::{
-    borrow::ToOwned,
     ffi::{CString, OsStr, OsString, c_char, c_int},
     os::unix::ffi::OsStrExt,
     path::Path,
@@ -167,7 +166,7 @@ impl CMainArgsBuilder {
         }
 
         let mut argv_ptr: Vec<*const c_char> = argv.iter().map(|arg| arg.as_ptr()).collect();
-        argv_ptr.push(std::ptr::null());
+        argv_ptr.push(core::ptr::null());
 
         Ok(CMainArgs {
             use_stdin: self.use_stdin,
