@@ -1,3 +1,4 @@
+//! Parse command line argument like AFL, then put it in a C-compatible way
 use alloc::{boxed::Box, vec::Vec};
 use std::{
     borrow::ToOwned,
