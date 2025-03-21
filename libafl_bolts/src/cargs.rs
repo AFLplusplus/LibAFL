@@ -1,11 +1,11 @@
 //! Parse command line argument like AFL, then put it in a C-compatible way
-use alloc::{borrow::ToOwned, boxed::Box, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box, ffi::CString, vec::Vec};
 use core::{
     ffi::{c_char, c_int},
     pin::Pin,
 };
 use std::{
-    ffi::{CString, OsStr, OsString},
+    ffi::{OsStr, OsString},
     os::unix::ffi::OsStrExt,
     path::Path,
 };
