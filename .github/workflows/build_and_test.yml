@@ -533,6 +533,8 @@ jobs:
     steps:
       - name: install cxx bridge
         run: cargo install cxxbridge-cmd
+      - name: Install just, ws
+        run: cargo install just cargo-workspaces
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/tinyinst_simple
@@ -545,6 +547,8 @@ jobs:
     steps:
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
+      - name: Install just, ws
+        run: cargo install just cargo-workspaces
       - uses: ./.github/workflows/windows-tester-prepare
       - uses: Swatinem/rust-cache@v2
       - name: Run real clippy, not the fake one
@@ -556,6 +560,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
+      - name: Install just, ws
+        run: cargo install just cargo-workspaces
       - name: Install deps
         run: brew install z3 gtk+3 python
       - name: Install cxxbridge
