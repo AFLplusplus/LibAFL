@@ -1,6 +1,6 @@
 [package]
 name = "desyscall"
-version = "0.15.1"
+version = "0.15.2"
 edition = "2024"
 description = "DeSyscall: Hooks syscalls for reduces overhead during in-process fuzzing"
 repository = "https://github.com/AFLplusplus/LibAFL/"

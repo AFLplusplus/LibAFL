@@ -1,6 +1,6 @@
 [package]
 name = "baby_fuzzer_listing_04"
-version = "0.15.1"
+version = "0.15.2"
 authors = ["Your Name <you@example.com>"]
 edition = "2018"
 
