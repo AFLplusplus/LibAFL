@@ -4,20 +4,8 @@ FUZZER_NAME := "fuzzbench_qemu"
 HARNESS_NAME := "harness"
 
 [unix]
-harness:
-    cc -c libfuzzer_main.c
-    cc \
-        ./fuzz.c \
-        ./libfuzzer_main.o \
-        -o {{ HARNESS_NAME }} \
-        -lm -lz
-
-[unix]
 tests:
-    cc -c -g {{PROJECT_DIR}}/libfuzzer_main.c
-    cc -O0 -g ./tests/test1.c ./libfuzzer_main.o -o test1 -lm -lz
-    cc -O0 -g ./tests/test2.c ./libfuzzer_main.o -o test2 -lm -lz
-    cc -O0 -g ./tests/test3.c ./libfuzzer_main.o -o test3 -lm -lz
+    cc -O0 -g ./tests/test1.c -o test1 -lm -lz
 
 
 [unix]
@@ -25,7 +13,7 @@ build:
     cargo build --profile {{ PROFILE }}
 
 [unix]
-run: build harness
+run: build
     {{ FUZZER }} \
       --libafl-in ../../inprocess/libfuzzer_libpng/corpus \
       --libafl-out ./out \
@@ -33,18 +21,13 @@ run: build harness
       -- \
       ./{{ HARNESS_NAME }}
 
-
-[unix]
-test2:
-    RUST_LOG=info cargo run --profile {{PROFILE}} ./test2 -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out ./out ./test2
-
 [unix]
 test1:
     RUST_LOG=info cargo run --profile {{PROFILE}} ./test1 -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out ./out ./test1
 
 
 [unix]
-test: build harness
+test: build
     #!/bin/bash
     timeout 15s {{ FUZZER }} ./harness -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out out ./harness | tee fuzz_stdout.log
     if grep -qa "objectives: 5" fuzz_stdout.log; then

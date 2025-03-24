@@ -81,8 +81,14 @@ where
             let value_is_stack = cache.is_stack_ptr(*ma);
             let value_is_executable = cache.is_executable_ptr(*ma);
             let value_is_heap = cache.is_heap_ptr(*ma);
+            let value_is_sharedlib = cache.is_so(*ma);
 
-            if !value_is_stack && addr_is_text && !value_is_executable && !value_is_heap {
+            if !value_is_stack
+                && addr_is_text
+                && !value_is_executable
+                && !value_is_heap
+                && !value_is_sharedlib
+            {
                 maxes.push((*addr, *ma));
             }
         }
@@ -91,8 +97,14 @@ where
             let value_is_stack = cache.is_stack_ptr(*mi);
             let value_is_executable = cache.is_executable_ptr(*mi);
             let value_is_heap = cache.is_heap_ptr(*mi);
+            let value_is_sharedlib = cache.is_so(*mi);
 
-            if !value_is_stack && addr_is_text && !value_is_executable && !value_is_heap {
+            if !value_is_stack
+                && addr_is_text
+                && !value_is_executable
+                && !value_is_heap
+                && !value_is_sharedlib
+            {
                 mins.push((*addr, *mi));
             }
         }

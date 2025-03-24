@@ -4,15 +4,6 @@ FUZZER_NAME := "fuzzbench_qemu"
 HARNESS_NAME := "harness"
 
 [unix]
-harness:
-    cc -c libfuzzer_main.c
-    cc \
-        ./fuzz.c \
-        ./libfuzzer_main.o \
-        -o {{ HARNESS_NAME }} \
-        -lm -lz
-
-[unix]
 tests:
     cc -c -g {{PROJECT_DIR}}/libfuzzer_main.c
     cc -O0 -g ./tests/test1.c ./libfuzzer_main.o -o test1 -lm -lz
@@ -24,7 +15,7 @@ build:
     cargo build --profile {{ PROFILE }}
 
 [unix]
-run: build harness
+run: build
     {{ FUZZER }} \
       --libafl-in ../../inprocess/libfuzzer_libpng/corpus \
       --libafl-out ./out \
@@ -43,7 +34,7 @@ test1:
 
 
 [unix]
-test: build harness
+test: build
     #!/bin/bash
     timeout 15s {{ FUZZER }} ./harness -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out out ./harness | tee fuzz_stdout.log
     if grep -qa "objectives: 5" fuzz_stdout.log; then

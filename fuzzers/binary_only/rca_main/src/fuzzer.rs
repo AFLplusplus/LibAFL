@@ -53,7 +53,7 @@ use libafl_qemu::{
         cmplog::{CmpLogModule, CmpLogObserver},
         edges::StdEdgeCoverageModule,
         tracer::TracerModule,
-        SnapshotModule,
+        RedirectStdinModule, SnapshotModule,
     },
     Emulator, GuestReg, MmapPerms, PredicateObserver, PredicatesMap, Qemu, QemuExecutor,
     QemuExitError, QemuExitReason, QemuMappingsCache, QemuMappingsViewer, RCAStage, Regs,
@@ -190,6 +190,7 @@ fn fuzz(
     let asan = AsanModuleBuilder::default().build();
     let tracer = TracerModule::default();
     let snapshot = SnapshotModule::new();
+    let redirect = RedirectStdinModule::new();
 
     let modules = tuple_list!(
         StdEdgeCoverageModule::builder()
@@ -200,9 +201,10 @@ fn fuzz(
         asan,
         snapshot,
         tracer,
+        redirect,
     );
 
-    let emulator = Emulator::empty()
+    let mut emulator = Emulator::empty()
         .qemu_parameters(args)
         .modules(modules)
         .build()?;
@@ -219,9 +221,9 @@ fn fuzz(
     let text_addr = vec![elf.get_section(".text", qemu.load_addr()).unwrap()]; // 100% there is
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
-        .expect("Symbol LLVMFuzzerTestOneInput not found");
-    println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+        .resolve_symbol("main", qemu.load_addr())
+        .expect("Symbol main not found");
+    println!("main @ {test_one_input_ptr:#x}");
 
     qemu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     unsafe {
@@ -251,6 +253,12 @@ fn fuzz(
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
         .unwrap();
     println!("Placing input at {input_addr:#x}");
+
+    let redirect = emulator
+        .modules_mut()
+        .get_mut::<RedirectStdinModule>()
+        .unwrap();
+    redirect.set_input_addr(input_addr as *const u8);
 
     let log = RefCell::new(
         OpenOptions::new()

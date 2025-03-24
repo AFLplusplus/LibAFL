@@ -195,6 +195,7 @@ where
 pub struct QemuMappingsCache {
     executable: Vec<Range<u64>>,
     mapped_initial: Vec<Range<u64>>,
+    sharedlib: Vec<Range<u64>>,
     tracking: Vec<Range<u64>>,
 }
 
@@ -205,6 +206,7 @@ impl QemuMappingsCache {
     pub fn new(viewer: &QemuMappingsViewer<'_>, tracking: Vec<Range<u64>>) -> Self {
         let mut executable = vec![];
         let mut mapped_initial: Vec<Range<u64>> = vec![];
+        let mut sharedlib = vec![];
         for rg in viewer.mappings() {
             if rg.flags().executable() && rg.path().is_some() {
                 executable.push(rg.start()..rg.end());
@@ -214,10 +216,19 @@ impl QemuMappingsCache {
             mapped_initial.push(rg.start()..rg.end());
         }
 
+        for rg in viewer.mappings() {
+            if let Some(p) = rg.path() {
+                if p.ends_with(".so") {
+                    sharedlib.push(rg.start()..rg.end());
+                }
+            }
+        }
+
         Self {
             executable,
             mapped_initial,
             tracking,
+            sharedlib,
         }
     }
 
@@ -232,6 +243,16 @@ impl QemuMappingsCache {
     #[must_use]
     pub fn is_rca(&self) -> bool {
         unsafe { IS_RCA }
+    }
+
+    #[must_use]
+    pub fn is_so(&self, ptr: u64) -> bool {
+        for mp in &self.mapped_initial {
+            if mp.contains(&ptr) {
+                return true;
+            }
+        }
+        return false;
     }
 
     #[must_use]

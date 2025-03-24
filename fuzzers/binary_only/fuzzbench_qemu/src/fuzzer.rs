@@ -185,6 +185,7 @@ fn fuzz(
             .build()
             .unwrap(),
         CmpLogModule::default(),
+        RedirectStdinModule::new(),
         // QemuAsanHelper::default(asan),
         //QemuSnapshotHelper::new()
     );
@@ -204,9 +205,9 @@ fn fuzz(
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
-        .expect("Symbol LLVMFuzzerTestOneInput not found");
-    println!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+        .resolve_symbol("main", qemu.load_addr())
+        .expect("Symbol main not found");
+    println!("main @ {test_one_input_ptr:#x}");
 
     qemu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     unsafe {
