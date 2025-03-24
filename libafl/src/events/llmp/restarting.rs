@@ -561,7 +561,7 @@ where
         // Send this mesasge off and we are leaving.
         match send_tcp_msg(&mut stream, &msg) {
             Ok(()) => (),
-            Err(e) => log::error!("Failed to send tcp message {:#?}", e),
+            Err(e) => log::error!("Failed to send tcp message {e:#?}"),
         }
         log::debug!("Asking he broker to be disconnected");
         Ok(())

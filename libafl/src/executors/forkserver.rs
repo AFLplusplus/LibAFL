@@ -1039,10 +1039,7 @@ where
             )));
         }
 
-        log::info!(
-            "All right - new fork server model version {} is up",
-            version
-        );
+        log::info!("All right - new fork server model version {version} is up");
 
         let status = forkserver.read_st().map_err(|err| {
             Error::illegal_state(format!("Reading from forkserver failed: {err:?}"))

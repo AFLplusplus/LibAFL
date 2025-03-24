@@ -443,7 +443,7 @@ mod tests {
             // Run the tests for each function
             for test in tests {
                 let (function_name, expected_error) = test;
-                log::info!("Testing with harness function {}", function_name);
+                log::info!("Testing with harness function {function_name}");
 
                 let mut corpus = InMemoryCorpus::<BytesInput>::new();
 

@@ -594,7 +594,7 @@ impl Allocator {
             .any(|r| r.start <= start && r.end >= start + size);
 
         if !valid {
-            log::error!("Not a valid shadow: {:#x}!", start);
+            log::error!("Not a valid shadow: {start:#x}!");
         }
         valid
     }
@@ -720,7 +720,7 @@ impl Allocator {
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-                log::trace!("New range: {:#x}-{:#x}", start, end);
+                log::trace!("New range: {start:#x}-{end:#x}");
 
                 #[cfg(target_vendor = "apple")]
                 if start >= 0x600000000000 {
@@ -762,7 +762,7 @@ impl Allocator {
             }
         }
 
-        log::trace!("max bit: {}", maxbit);
+        log::trace!("max bit: {maxbit}");
 
         {
             for try_shadow_bit in 44..=maxbit {
@@ -773,7 +773,7 @@ impl Allocator {
                 // check if the proposed shadow bit overlaps with occupied ranges.
                 for (start, end) in &occupied_ranges {
                     if (shadow_start <= *end) && (*start <= shadow_end) {
-                        log::trace!("{:x} {:x}, {:x} {:x}", shadow_start, shadow_end, start, end);
+                        log::trace!("{shadow_start:x} {shadow_end:x}, {start:x} {end:x}");
                         log::warn!("shadow_bit {try_shadow_bit:} is not suitable");
                         good_candidate = false;
                         break;
