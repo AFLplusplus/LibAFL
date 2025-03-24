@@ -1608,7 +1608,7 @@ impl AsanRuntime {
     ) -> *mut c_void {
         log::trace!("hook_mmap");
         let res = original(addr, length, prot, flags, fd, offset);
-        if res != (-1_isize as *mut c_void) {
+        if !ptr::eq(res, -1_isize as *mut c_void) {
             self.allocator_mut()
                 .map_shadow_for_region(res as usize, res as usize + length, true);
         }

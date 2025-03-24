@@ -24,7 +24,7 @@ fuzzer: cxx
 [macos]
 run: fuzzer
     #!/bin/bash
-    ./{{FUZZER}} &
+    ./{{FUZZER_NAME}} &
     sleep 0.2
 
 [windows]
@@ -35,17 +35,24 @@ run: fuzzer
 [macos]
 test: fuzzer
     #!/bin/bash
+    success=0
     rm -rf libafl_unix_shmem_server || true
-    (timeout 31s ./{{FUZZER_NAME}} | tee fuzz_stdout.log 2>/dev/null || true) &
-    sleep 0.2
-    timeout 30s ./{{FUZZER_NAME}} >/dev/null 2>/dev/null || true
-    if grep -qa "corpus: 30" fuzz_stdout.log; then
-        echo "Fuzzer is working"
+    timeout 5s ./{{FUZZER_NAME}} >fuzz_stdout.log
+    while read -r line; do
+        corpus_number=$(echo "$line" | cut -d' ' -f2)
+        if (( corpus_number > 50 )); then
+            success=1
+        fi
+    done < <(grep -o 'corpus: [0-9]\+' fuzz_stdout.log)
+
+    if [ "$success" -eq 1 ]; then
+        echo "Fuzzer is working!"
+        exit 0
     else
-        echo "Fuzzer does not generate any testcases or any crashes"
+        echo "Fuzzer not working!"
         exit 1
     fi
-
+    
 clean:
     #!/bin/bash
     rm -f {{FUZZER_NAME}}

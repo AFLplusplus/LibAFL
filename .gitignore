@@ -5,8 +5,8 @@ vendor
 
 # cargo lockfiles except from binaries
 **/Cargo.lock
-!fuzzers/**/Cargo.lock
-!utils/**/Cargo.lock
+# !fuzzers/**/Cargo.lock
+# !utils/**/Cargo.lock
 
 
 .DS_Store
