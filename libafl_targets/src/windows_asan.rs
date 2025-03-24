@@ -29,11 +29,8 @@ unsafe extern "C" {
 ///
 /// # Safety
 /// Calls the unsafe `__sanitizer_set_death_callback` symbol, but should be safe to call otherwise.
-pub unsafe fn setup_asan_callback<E, EM, I, OF, S, Z>(
-    _executor: &E,
-    _event_mgr: &EM,
-    _fuzzer: &Z,
-) where
+pub unsafe fn setup_asan_callback<E, EM, I, OF, S, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
+where
     E: Executor<EM, I, S, Z> + HasObservers,
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,

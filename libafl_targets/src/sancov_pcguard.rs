@@ -266,7 +266,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
             EDGES_MAP_PTR = &raw mut EDGES_MAP as *mut u8;
         }
 
-        if start == stop || *start != 0 {
+        if core::ptr::eq(start, stop) || *start != 0 {
             return;
         }
 

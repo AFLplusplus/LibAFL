@@ -170,7 +170,7 @@ where
     let prev = unsafe { pthread_introspection_hook_install(pthread_introspection_hook as _) };
 
     // Allow because we're sure this isn't from a different code generation unit.
-    if !(prev).is_null() && prev != pthread_introspection_hook as _ {
+    if !(prev).is_null() && !core::ptr::eq(prev, pthread_introspection_hook as _) {
         unsafe {
             (*previous_hook_ptr_mut()).set(prev as *const pthread_introspection_hook_t);
         }

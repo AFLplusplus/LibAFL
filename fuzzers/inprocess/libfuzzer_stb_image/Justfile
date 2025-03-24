@@ -24,7 +24,8 @@ fuzzer: cxx
 [macos]
 run: fuzzer
     #!/bin/bash
-    ./{{FUZZER}} &
+    ./{{FUZZER_NAME}} &
+    ./{{FUZZER_NAME}}
     sleep 0.2
 
 [windows]

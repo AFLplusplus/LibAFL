@@ -1587,7 +1587,7 @@ where
         unsafe {
             // log::info!("Sending msg {:?}", msg);
 
-            assert!(self.last_msg_sent != msg, "Message sent twice!");
+            assert!(!ptr::eq(self.last_msg_sent, msg), "Message sent twice!");
             assert!(
                 (*msg).tag != LLMP_TAG_UNSET,
                 "No tag set on message with id {:?}",
@@ -2276,7 +2276,7 @@ impl SignalHandler for LlmpShutdownSignalHandler {
 #[cfg(all(windows, feature = "std"))]
 impl CtrlHandler for LlmpShutdownSignalHandler {
     fn handle(&mut self, ctrl_type: u32) -> bool {
-        log::info!("LLMP: Received shutdown signal, ctrl_type {:?}", ctrl_type);
+        log::info!("LLMP: Received shutdown signal, ctrl_type {ctrl_type:?}");
         unsafe {
             ptr::write_volatile(&mut self.shutting_down, true);
         }
@@ -2421,7 +2421,7 @@ impl Brokers {
         } else {
             log::info!(
                 "{}: Broker successfully setup control handlers",
-                std::process::id().to_string()
+                std::process::id()
             );
         }
     }
@@ -2694,7 +2694,7 @@ where
             for idx in (0..self.inner.llmp_clients.len()).rev() {
                 let client_id = self.inner.llmp_clients[idx].id;
                 if self.inner.clients_to_remove.contains(&client_id) {
-                    log::info!("Client {:#?} wants to exit. Removing.", client_id);
+                    log::info!("Client {client_id:#?} wants to exit. Removing.");
                     self.inner.llmp_clients.remove(idx);
                 }
             }
@@ -2777,8 +2777,7 @@ where
                         let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
                         let client_id = ClientId((*exitinfo).client_id);
                         log::info!(
-                            "Client exit message received!, we are removing clients whose client_group_id is {:#?}",
-                            client_id
+                            "Client exit message received!, we are removing clients whose client_group_id is {client_id:#?}"
                         );
 
                         self.inner.clients_to_remove.push(client_id);
@@ -2890,7 +2889,7 @@ where
         } else {
             log::info!(
                 "{}: Broker successfully setup control handlers",
-                std::process::id().to_string()
+                std::process::id()
             );
         }
     }
