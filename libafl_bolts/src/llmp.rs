@@ -2276,7 +2276,7 @@ impl SignalHandler for LlmpShutdownSignalHandler {
 #[cfg(all(windows, feature = "std"))]
 impl CtrlHandler for LlmpShutdownSignalHandler {
     fn handle(&mut self, ctrl_type: u32) -> bool {
-        log::info!("LLMP: Received shutdown signal, ctrl_type {:?}", ctrl_type);
+        log::info!("LLMP: Received shutdown signal, ctrl_type {ctrl_type:?}");
         unsafe {
             ptr::write_volatile(&mut self.shutting_down, true);
         }
@@ -2421,7 +2421,7 @@ impl Brokers {
         } else {
             log::info!(
                 "{}: Broker successfully setup control handlers",
-                std::process::id().to_string()
+                std::process::id()
             );
         }
     }
@@ -2889,7 +2889,7 @@ where
         } else {
             log::info!(
                 "{}: Broker successfully setup control handlers",
-                std::process::id().to_string()
+                std::process::id()
             );
         }
     }
