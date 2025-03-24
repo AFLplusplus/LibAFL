@@ -1587,7 +1587,10 @@ where
         unsafe {
             // log::info!("Sending msg {:?}", msg);
 
-            assert!(!ptr::eq(self.last_msg_sent, msg), "Message sent twice!");
+            assert!(
+                !ptr::addr_eq(self.last_msg_sent, msg),
+                "Message sent twice!"
+            );
             assert!(
                 (*msg).tag != LLMP_TAG_UNSET,
                 "No tag set on message with id {:?}",
