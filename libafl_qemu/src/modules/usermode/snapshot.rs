@@ -383,7 +383,7 @@ impl SnapshotModule {
                         }
                     }
                 } else {
-                    log::warn!("\tpage not found @addr 0x{:x}", addr);
+                    log::warn!("\tpage not found @addr 0x{addr:x}");
                 }
 
                 addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
@@ -963,7 +963,7 @@ where
         }
         SYS_brk => {
             // We don't handle brk here. It is handled in the reset function only when it's needed.
-            log::debug!("New brk ({:#x?}) received.", result);
+            log::debug!("New brk ({result:#x?}) received.");
         }
         // mmap syscalls
         sys_const => {

@@ -101,7 +101,7 @@ where
             // so that Stalker knows to pick it despite the module being excluded
             let harness_fn_ref: &H = self.base.harness();
             let ptr: *const H = harness_fn_ref as *const H;
-            log::info!("Activating Stalker for {:p}", ptr);
+            log::info!("Activating Stalker for {ptr:p}");
             self.stalker.activate(NativePointer(ptr as *mut c_void));
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);

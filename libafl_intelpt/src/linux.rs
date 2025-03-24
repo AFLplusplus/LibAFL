@@ -471,8 +471,7 @@ impl IntelPT {
                     if e.code() != PtErrorCode::Eos {
                         let offset = decoder.offset().map_err(error_from_pt_error)?;
                         log::info!(
-                            "PT error in block next {e:?} trace offset {offset:x} last decoded block end {:x}",
-                            previous_block_end_ip
+                            "PT error in block next {e:?} trace offset {offset:x} last decoded block end {previous_block_end_ip:x}"
                         );
                     }
                     break 'block;

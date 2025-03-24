@@ -405,8 +405,7 @@ where
                     ..
                 } => {
                     log::debug!(
-                        "Received {} from {client_id:?} ({client_config:?}, forward {forward_id:?})",
-                        event_name
+                        "Received {event_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})"
                     );
 
                     log::debug!(
