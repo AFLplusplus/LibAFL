@@ -1106,7 +1106,7 @@ mod windows_logging {
         // Get the handle to standard output
         let h_stdout: HANDLE = get_stdout_handle();
 
-        if ptr::eq(h_stdout, INVALID_HANDLE_VALUE) {
+        if ptr::addr_eq(h_stdout, INVALID_HANDLE_VALUE) {
             eprintln!("Failed to get standard output handle");
             return;
         }
