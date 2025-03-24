@@ -16,8 +16,8 @@ use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor},
-    feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
+    feedback_and, feedback_or,
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -49,11 +49,15 @@ use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
     modules::{
+        asan::AsanModuleBuilder,
         cmplog::{CmpLogModule, CmpLogObserver},
         edges::StdEdgeCoverageModule,
+        tracer::TracerModule,
+        SnapshotModule,
     },
-    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
-    Regs, TargetSignalHandling,
+    Emulator, GuestReg, MmapPerms, PredicateObserver, PredicatesMap, Qemu, QemuExecutor,
+    QemuExitError, QemuExitReason, QemuMappingsCache, QemuMappingsViewer, RCAStage, Regs,
+    TargetSignalHandling, Tracer,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 #[cfg(unix)]
@@ -179,14 +183,23 @@ fn fuzz(
         .track_indices()
     };
 
+    let env = std::env::vars()
+        .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
+        .collect::<Vec<(String, String)>>();
+
+    let asan = AsanModuleBuilder::default().build();
+    let tracer = TracerModule::default();
+    let snapshot = SnapshotModule::new();
+
     let modules = tuple_list!(
         StdEdgeCoverageModule::builder()
             .map_observer(edges_observer.as_mut())
             .build()
             .unwrap(),
         CmpLogModule::default(),
-        // QemuAsanHelper::default(asan),
-        //QemuSnapshotHelper::new()
+        asan,
+        snapshot,
+        tracer,
     );
 
     let emulator = Emulator::empty()
@@ -202,6 +215,8 @@ fn fuzz(
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
+
+    let text_addr = vec![elf.get_section(".text", qemu.load_addr()).unwrap()]; // 100% there is
 
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
@@ -283,8 +298,10 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-    let map_feedback = MaxMapFeedback::new(&edges_observer);
+    let predicate = PredicateObserver::new();
 
+    let map_feedback = MaxMapFeedback::new(&edges_observer);
+    let crash_map = MaxMapFeedback::with_name("crash", &edges_observer);
     let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
@@ -292,12 +309,10 @@ fn fuzz(
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
-        // Time feedback, this one does not need a feedback state
-        TimeFeedback::new(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = CrashFeedback::new();
+    let mut objective = feedback_and!(CrashFeedback::new(), crash_map);
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -317,6 +332,19 @@ fn fuzz(
         )
         .unwrap()
     });
+
+    // data per one exec
+    state.add_metadata(Tracer::new());
+    // data per whole exec
+    state.metadata_or_insert_with(PredicatesMap::new);
+
+    // clear map or create map if it is not there
+    // to move this out of this stage.
+    let qemu = Qemu::get().expect("qemu not initialized??");
+    let viewer = QemuMappingsViewer::new(&qemu);
+    if !state.has_metadata::<QemuMappingsCache>() {
+        state.add_metadata(QemuMappingsCache::new(&viewer, text_addr));
+    }
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
@@ -382,7 +410,7 @@ fn fuzz(
     let executor = QemuExecutor::new(
         emulator,
         &mut harness,
-        tuple_list!(edges_observer, time_observer),
+        tuple_list!(edges_observer, predicate, time_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
@@ -409,18 +437,12 @@ fn fuzz(
         println!("We imported {} input(s) from disk.", state.corpus().count());
     }
 
+    let rca = RCAStage::new();
     let tracing = ShadowTracingStage::new();
 
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, i2s, power);
+    let mut stages = tuple_list!(calibration, tracing, i2s, power, rca);
 
-    // Remove target output (logs still survive)
-    #[cfg(unix)]
-    {
-        let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        dup2(null_fd, io::stderr().as_raw_fd())?;
-    }
     // reopen file to make sure we're at the end
     log.replace(
         OpenOptions::new()

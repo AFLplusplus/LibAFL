@@ -3,15 +3,13 @@
 #include <string.h>
 #include <stdio.h>
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
-  int array[16] = {};
-
-  array[1] = 114514;
-  if (Size % 2 == 0) {
-    array[0] = 1;
-  } else {
-    array[0] = 2;
+  if (Data[0] == 'a') {
+    if (Data[1] == 'b') {
+      if (Data[2] == 'c') {
+        if (Data[3] == 'd') { abort(); }
+      }
+    }
   }
-
   return 0;
 }
 
