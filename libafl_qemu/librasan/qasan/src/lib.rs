@@ -146,7 +146,7 @@ pub unsafe extern "C" fn asan_track(addr: *const c_void, len: usize) {
     FRONTEND
         .lock()
         .tracking_mut()
-        .alloc(addr as GuestAddr, len)
+        .track(addr as GuestAddr, len)
         .unwrap();
 }
 
@@ -157,7 +157,7 @@ pub unsafe extern "C" fn asan_untrack(addr: *const c_void) {
     FRONTEND
         .lock()
         .tracking_mut()
-        .dealloc(addr as GuestAddr)
+        .untrack(addr as GuestAddr)
         .unwrap();
 }
 
