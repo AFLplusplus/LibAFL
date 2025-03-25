@@ -52,6 +52,7 @@ pub mod strnlen;
 pub mod strrchr;
 pub mod strstr;
 pub mod valloc;
+pub mod wcschr;
 pub mod wcscmp;
 pub mod wcscpy;
 pub mod wcslen;
@@ -208,6 +209,10 @@ impl PatchedHook {
             PatchedHook::new::<
                 unsafe extern "C" fn(*mut *mut c_char, *const c_char, *const c_void) -> c_int,
             >(c"vasprintf", hooks::vasprintf),
+            PatchedHook::new::<unsafe extern "C" fn(*const wchar_t, c_int) -> *mut wchar_t>(
+                c"wcschr",
+                hooks::wcschr::wcschr,
+            ),
             PatchedHook::new::<unsafe extern "C" fn(*const wchar_t, *const wchar_t) -> c_int>(
                 c"wcscmp",
                 hooks::wcscmp::wcscmp,
