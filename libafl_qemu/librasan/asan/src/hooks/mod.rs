@@ -33,6 +33,7 @@ pub mod read;
 pub mod realloc;
 pub mod reallocarray;
 pub mod stpcpy;
+pub mod stpncpy;
 pub mod strcasecmp;
 pub mod strcasestr;
 pub mod strcat;
@@ -133,6 +134,9 @@ impl PatchedHook {
                 c"stpcpy",
                 hooks::stpcpy::stpcpy,
             ),
+            PatchedHook::new::<
+                unsafe extern "C" fn(*mut c_char, *const c_char, size_t) -> *mut c_char,
+            >(c"stpncpy", hooks::stpncpy::stpncpy),
             PatchedHook::new::<unsafe extern "C" fn(*const c_char, *const c_char) -> c_int>(
                 c"strcasecmp",
                 hooks::strcasecmp::strcasecmp,
