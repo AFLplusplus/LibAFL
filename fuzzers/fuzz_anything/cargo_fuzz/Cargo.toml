@@ -1,7 +1,7 @@
 [package]
 name = "cargo_fuzz_test"
 edition = "2021"
-version = "0.15.1"
+version = "0.15.2"
 description = "test"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",

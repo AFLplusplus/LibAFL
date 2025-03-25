@@ -1,6 +1,6 @@
 [package]
 name = "libafl-fuzz"
-version = "0.15.1"
+version = "0.15.2"
 description = "Reimplementation of afl-fuzz on top of LibAFL"
 documentation = "https://docs.rs/libafl"
 authors = ["Aarnav Bos <aarnavbos@gmail.com>"]
