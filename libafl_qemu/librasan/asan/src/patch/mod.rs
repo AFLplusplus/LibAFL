@@ -6,7 +6,7 @@ pub mod raw;
 use alloc::{collections::BTreeMap, fmt::Debug};
 
 use log::trace;
-use spin::{Mutex, MutexGuard, Once};
+use spin::{Mutex, Once};
 use thiserror::Error;
 
 use crate::{
@@ -20,24 +20,17 @@ pub trait Patch: Debug {
     fn patch(target: GuestAddr, destination: GuestAddr) -> Result<(), Self::Error>;
 }
 
-static PATCHED: Once<Mutex<Patches>> = Once::new();
+static PATCHES: Once<Mutex<Patches>> = Once::new();
+static PATCHED: Mutex<BTreeMap<GuestAddr, GuestAddr>> = Mutex::new(BTreeMap::new());
 
 pub struct Patches {
     maps: Maps,
-    patches: BTreeMap<GuestAddr, GuestAddr>,
 }
 
 impl Patches {
     pub fn init(maps: Maps) {
-        let patches = Mutex::new(Patches {
-            maps,
-            patches: BTreeMap::new(),
-        });
-        PATCHED.call_once(|| patches);
-    }
-
-    fn get() -> Option<MutexGuard<'static, Patches>> {
-        PATCHED.get().map(|m| m.lock())
+        let patches = Mutex::new(Patches { maps });
+        PATCHES.call_once(|| patches);
     }
 
     pub fn apply<P: Patch, M: Mmap>(
@@ -45,19 +38,19 @@ impl Patches {
         destination: GuestAddr,
     ) -> Result<(), PatchesError<P, M>> {
         trace!("patch: {:#x} -> {:#x}", target, destination);
-        let mut patches = Patches::get().ok_or(PatchesError::Uninitialized())?;
+        let patches = PATCHES.get().ok_or(PatchesError::Uninitialized())?.lock();
         let prot = patches
             .maps
             .writeable(target)
             .map_err(PatchesError::MapsError)?;
         P::patch(target, destination).map_err(|e| PatchesError::PatchError(e))?;
         drop(prot);
-        patches.patches.insert(target, destination);
+        PATCHED.lock().insert(target, destination);
         Ok(())
     }
 
     pub fn is_patched(addr: GuestAddr) -> bool {
-        Self::get().is_some_and(|patches| patches.patches.contains_key(&addr))
+        PATCHED.lock().contains_key(&addr)
     }
 }
 
