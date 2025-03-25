@@ -2,7 +2,7 @@
 #[cfg(feature = "hooks")]
 mod tests {
     use core::{
-        ffi::{c_char, c_int},
+        ffi::c_int,
         ptr::{null, null_mut},
     };
 

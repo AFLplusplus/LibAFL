@@ -48,8 +48,13 @@ mod tests {
         let mut vec = "abcde\0zzzzzzzzzzzzzzz".as_bytes().to_vec();
         let s = vec.as_mut_slice();
         let ct = c"fghij";
-        let len = ct.to_bytes().len();
-        let ret = unsafe { strncat(s.as_ptr() as *mut c_char, ct.as_ptr() as *const c_char, len) };
+        let ret = unsafe {
+            strncat(
+                s.as_ptr() as *mut c_char,
+                ct.as_ptr() as *const c_char,
+                ct.count_bytes(),
+            )
+        };
         assert_eq!(ret, s.as_ptr() as *mut c_char);
         let expected = c"abcdefghij";
         expected

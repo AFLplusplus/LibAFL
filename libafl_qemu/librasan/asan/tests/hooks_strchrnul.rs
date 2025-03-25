@@ -60,8 +60,8 @@ mod tests {
     fn test_strchrnul_not_found() {
         let data = c"abcdefghij";
         let c = 'k' as c_int;
-        let len = data.to_bytes().len();
         let ret = unsafe { strchrnul(data.as_ptr() as *const c_char, c) };
-        assert_eq!(ret, unsafe { data.as_ptr().add(len) } as *mut c_char);
+        assert_eq!(ret, unsafe { data.as_ptr().add(data.count_bytes()) }
+            as *mut c_char);
     }
 }
