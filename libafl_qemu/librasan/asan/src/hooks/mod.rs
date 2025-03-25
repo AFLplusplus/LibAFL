@@ -56,6 +56,7 @@ pub mod wcschr;
 pub mod wcscmp;
 pub mod wcscpy;
 pub mod wcslen;
+pub mod wcsncmp;
 pub mod write;
 
 #[cfg(feature = "libc")]
@@ -224,6 +225,10 @@ impl PatchedHook {
             PatchedHook::new::<unsafe extern "C" fn(*const wchar_t) -> size_t>(
                 c"wcslen",
                 hooks::wcslen::wcslen,
+            ),
+            PatchedHook::new::<unsafe extern "C" fn (*const wchar_t, *const wchar_t, size_t) -> c_int>(
+                c"wcsncmp",
+                hooks::wcsncmp::wcsncmp,
             ),
         ]
         .to_vec()
