@@ -1,7 +1,7 @@
 #[cfg(test)]
 #[cfg(feature = "hooks")]
 mod tests {
-    use core::{ffi::c_int, ptr::null_mut};
+    use core::ptr::null_mut;
 
     use asan::{expect_panic, hooks::wmemchr::wmemchr, wchar_t};
     use widestring::widecstr;
@@ -22,7 +22,7 @@ mod tests {
     #[test]
     fn test_wmemchr_find_first() {
         let data = widecstr!("abcdefghij");
-        let c = 'a' as c_int;
+        let c = 'a' as wchar_t;
         let ret = unsafe { wmemchr(data.as_ptr() as *const wchar_t, c, data.len()) };
         assert_eq!(ret, data.as_ptr() as *mut wchar_t);
     }
@@ -30,7 +30,7 @@ mod tests {
     #[test]
     fn test_wmemchr_find_last() {
         let data = widecstr!("abcdefghij");
-        let c = 'j' as c_int;
+        let c = 'j' as wchar_t;
         let ret = unsafe { wmemchr(data.as_ptr() as *const wchar_t, c, data.len()) };
         assert_eq!(ret, unsafe {
             data.as_ptr().add(data.len() - 1) as *mut wchar_t
@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn test_wmemchr_find_mid() {
         let data = widecstr!("abcdefghij");
-        let c = 'e' as c_int;
+        let c = 'e' as wchar_t;
         let ret = unsafe { wmemchr(data.as_ptr() as *const wchar_t, c, data.len()) };
         assert_eq!(ret, unsafe { data.as_ptr().add(4) as *mut wchar_t });
     }
@@ -48,7 +48,7 @@ mod tests {
     #[test]
     fn test_wmemchr_find_repeated() {
         let data = widecstr!("ababababab");
-        let c = 'b' as c_int;
+        let c = 'b' as wchar_t;
         let ret = unsafe { wmemchr(data.as_ptr() as *const wchar_t, c, data.len()) };
         assert_eq!(ret, unsafe { data.as_ptr().add(1) as *mut wchar_t });
     }
@@ -56,7 +56,7 @@ mod tests {
     #[test]
     fn test_wmemchr_not_found() {
         let data = widecstr!("abcdefghij");
-        let c = 'k' as c_int;
+        let c = 'k' as wchar_t;
         let ret = unsafe { wmemchr(data.as_ptr() as *const wchar_t, c, data.len()) };
         assert_eq!(ret, null_mut());
     }
