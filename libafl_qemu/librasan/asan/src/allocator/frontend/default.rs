@@ -94,7 +94,7 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
         );
 
         self.tracking
-            .alloc(data, len)
+            .track(data, len)
             .map_err(|e| DefaultFrontendError::TrackingError(e))?;
         self.shadow
             .poison(orig, data - orig, PoisonType::AsanHeapLeftRz)
@@ -130,7 +130,7 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
             )
             .map_err(|e| DefaultFrontendError::ShadowError(e))?;
         self.tracking
-            .dealloc(addr)
+            .untrack(addr)
             .map_err(|e| DefaultFrontendError::TrackingError(e))?;
         self.quaratine_used += alloc.backend_len;
         self.quarantine.push_back(alloc);

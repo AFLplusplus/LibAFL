@@ -54,7 +54,7 @@ pub struct GuestTracking {
 impl Tracking for GuestTracking {
     type Error = GuestTrackingError;
 
-    fn alloc(&mut self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
+    fn track(&mut self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
         debug!("alloc - start: 0x{:x}, len: 0x{:x}", start, len);
         if Self::is_out_of_bounds(start, len) {
             Err(GuestTrackingError::AddressRangeOverflow(start, len))?;
@@ -85,7 +85,7 @@ impl Tracking for GuestTracking {
         Ok(())
     }
 
-    fn dealloc(&mut self, start: GuestAddr) -> Result<(), Self::Error> {
+    fn untrack(&mut self, start: GuestAddr) -> Result<(), Self::Error> {
         debug!("dealloc - start: 0x{:x}", start);
         let pos = self.ranges.binary_search_by(|item| item.start.cmp(&start));
         match pos {

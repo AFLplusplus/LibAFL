@@ -28,14 +28,14 @@ mod tests {
     #[test]
     fn test_max() {
         let mut tracking = get_tracking();
-        assert_eq!(tracking.alloc(GuestAddr::MAX, 1), Ok(()));
+        assert_eq!(tracking.track(GuestAddr::MAX, 1), Ok(()));
     }
 
     #[test]
     fn test_out_of_bounds() {
         let mut tracking = get_tracking();
         assert_eq!(
-            tracking.alloc(GuestAddr::MAX, 2),
+            tracking.track(GuestAddr::MAX, 2),
             Err(GuestTrackingError::AddressRangeOverflow(GuestAddr::MAX, 2))
         );
     }
@@ -43,9 +43,9 @@ mod tests {
     #[test]
     fn test_track_identical() {
         let mut tracking = get_tracking();
-        assert_eq!(tracking.alloc(0x1000, 0x1000), Ok(()));
+        assert_eq!(tracking.track(0x1000, 0x1000), Ok(()));
         assert_eq!(
-            tracking.alloc(0x1000, 0x1000),
+            tracking.track(0x1000, 0x1000),
             Err(GuestTrackingError::TrackingConflict(
                 0x1000, 0x1000, 0x1000, 0x1000
             ))
@@ -55,23 +55,23 @@ mod tests {
     #[test]
     fn test_track_adjacent_after() {
         let mut tracking = get_tracking();
-        assert_eq!(tracking.alloc(0x1000, 0x1000), Ok(()));
-        assert_eq!(tracking.alloc(0x2000, 0x1000), Ok(()));
+        assert_eq!(tracking.track(0x1000, 0x1000), Ok(()));
+        assert_eq!(tracking.track(0x2000, 0x1000), Ok(()));
     }
 
     #[test]
     fn test_track_adjacent_before() {
         let mut tracking = get_tracking();
-        assert_eq!(tracking.alloc(0x1000, 0x1000), Ok(()));
-        assert_eq!(tracking.alloc(0x0000, 0x1000), Ok(()));
+        assert_eq!(tracking.track(0x1000, 0x1000), Ok(()));
+        assert_eq!(tracking.track(0x0000, 0x1000), Ok(()));
     }
 
     #[test]
     fn test_track_overlapping_start() {
         let mut tracking = get_tracking();
-        assert_eq!(tracking.alloc(0x1000, 0x1000), Ok(()));
+        assert_eq!(tracking.track(0x1000, 0x1000), Ok(()));
         assert_eq!(
-            tracking.alloc(0x0000, 0x1001),
+            tracking.track(0x0000, 0x1001),
             Err(GuestTrackingError::TrackingConflict(
                 0x1000, 0x1000, 0x0000, 0x1001
             ))
@@ -81,9 +81,9 @@ mod tests {
     #[test]
     fn test_track_overlapping_end() {
         let mut tracking = get_tracking();
-        assert_eq!(tracking.alloc(0x1000, 0x1000), Ok(()));
+        assert_eq!(tracking.track(0x1000, 0x1000), Ok(()));
         assert_eq!(
-            tracking.alloc(0x1fff, 0x1001),
+            tracking.track(0x1fff, 0x1001),
             Err(GuestTrackingError::TrackingConflict(
                 0x1000, 0x1000, 0x1fff, 0x1001
             ))
@@ -96,9 +96,9 @@ mod tests {
         let mut tracking = get_tracking();
         // alloc - start: 0xffffffffb5b5ff21, len: 0x3ff
         // alloc - start: 0xffffffffb5b60107, len: 0xdb
-        assert_eq!(tracking.alloc(0xffffffffb5b5ff21, 0x3ff), Ok(()));
+        assert_eq!(tracking.track(0xffffffffb5b5ff21, 0x3ff), Ok(()));
         assert_eq!(
-            tracking.alloc(0xffffffffb5b60107, 0xdb),
+            tracking.track(0xffffffffb5b60107, 0xdb),
             Err(GuestTrackingError::TrackingConflict(
                 0xffffffffb5b5ff21,
                 0x3ff,

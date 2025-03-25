@@ -4,7 +4,7 @@ use libc::{c_int, c_void};
 use log::trace;
 
 use crate::{
-    asan_swap, asan_sym, asan_untrack, size_t,
+    GuestAddr, asan_swap, asan_sym, asan_untrack, size_t,
     symbols::{AtomicGuestAddr, Function, FunctionPointer},
 };
 
@@ -24,8 +24,9 @@ static MUNMAP_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
     unsafe {
         trace!("munmap - addr: {:p}, len: {:#x}", addr, len);
-        let mmap_addr = MUNMAP_ADDR
-            .get_or_insert_with(|| asan_sym(FunctionMunmap::NAME.as_ptr() as *const c_char));
+        let mmap_addr = MUNMAP_ADDR.get_or_insert_with(|| {
+            asan_sym(FunctionMunmap::NAME.as_ptr() as *const c_char) as GuestAddr
+        });
         asan_swap(false);
         let fn_munmap = FunctionMunmap::as_ptr(mmap_addr).unwrap();
         asan_swap(true);

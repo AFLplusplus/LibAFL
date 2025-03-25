@@ -4,7 +4,7 @@ use libc::FILE;
 use log::trace;
 
 use crate::{
-    asan_load, asan_panic, asan_store, asan_swap, asan_sym,
+    GuestAddr, asan_load, asan_panic, asan_store, asan_swap, asan_sym,
     symbols::{AtomicGuestAddr, Function, FunctionPointer},
 };
 
@@ -36,8 +36,9 @@ pub unsafe extern "C" fn fgets(buf: *mut c_char, n: c_int, stream: *mut FILE) ->
 
         asan_store(buf as *const c_void, n as usize);
         asan_load(stream as *const c_void, size_of::<FILE>());
-        let addr = FGETS_ADDR
-            .get_or_insert_with(|| asan_sym(FunctionFgets::NAME.as_ptr() as *const c_char));
+        let addr = FGETS_ADDR.get_or_insert_with(|| {
+            asan_sym(FunctionFgets::NAME.as_ptr() as *const c_char) as GuestAddr
+        });
         let fn_fgets = FunctionFgets::as_ptr(addr).unwrap();
         asan_swap(false);
         let ret = fn_fgets(buf, n, stream);

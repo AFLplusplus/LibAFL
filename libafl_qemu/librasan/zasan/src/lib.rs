@@ -103,8 +103,8 @@ pub unsafe extern "C" fn asan_get_size(addr: *const c_void) -> usize {
 
 #[unsafe(no_mangle)]
 /// # Safety
-pub unsafe extern "C" fn asan_sym(name: *const c_char) -> GuestAddr {
-    ZasanSyms::lookup(name).unwrap()
+pub unsafe extern "C" fn asan_sym(name: *const c_char) -> *const c_void {
+    ZasanSyms::lookup(name).unwrap() as *const c_void
 }
 
 #[unsafe(no_mangle)]
@@ -131,7 +131,7 @@ pub unsafe extern "C" fn asan_track(addr: *const c_void, len: usize) {
     FRONTEND
         .lock()
         .tracking_mut()
-        .alloc(addr as GuestAddr, len)
+        .track(addr as GuestAddr, len)
         .unwrap();
 }
 
@@ -142,7 +142,7 @@ pub unsafe extern "C" fn asan_untrack(addr: *const c_void) {
     FRONTEND
         .lock()
         .tracking_mut()
-        .dealloc(addr as GuestAddr)
+        .untrack(addr as GuestAddr)
         .unwrap();
 }
 

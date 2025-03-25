@@ -9,11 +9,12 @@ use asan::{
         backend::{dlmalloc::DlmallocBackend, mimalloc::MimallocBackend},
         frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
+    hooks::PatchedHooks,
     host::{Host, libc::LibcHost},
     logger::libc::LibcLogger,
-    maps::libc::LibcMapReader,
+    maps::{MapReader, libc::LibcMapReader},
     mmap::libc::LibcMmap,
-    patch::{hooks::PatchedHooks, raw::RawPatch},
+    patch::{Patches, raw::RawPatch},
     shadow::{Shadow, host::HostShadow},
     symbols::{
         Symbols,
@@ -52,7 +53,12 @@ static FRONTEND: Lazy<Mutex<QasanFrontend>> = Lazy::new(|| {
         QasanFrontend::DEFAULT_QUARANTINE_SIZE,
     )
     .unwrap();
-    PatchedHooks::init::<QasanSyms, RawPatch, LibcMapReader<QasanSyms>, QasanMmap>().unwrap();
+    let mappings = LibcMapReader::<QasanSyms>::mappings().unwrap();
+    Patches::init(mappings);
+    for hook in PatchedHooks::default() {
+        let target = hook.lookup::<QasanSyms>().unwrap();
+        Patches::apply::<RawPatch, QasanMmap>(target, hook.destination).unwrap();
+    }
     Mutex::new(frontend)
 });
 
@@ -112,8 +118,8 @@ pub unsafe extern "C" fn asan_get_size(addr: *const c_void) -> usize {
 
 #[unsafe(no_mangle)]
 /// # Safety
-pub unsafe extern "C" fn asan_sym(name: *const c_char) -> GuestAddr {
-    QasanSyms::lookup(name).unwrap()
+pub unsafe extern "C" fn asan_sym(name: *const c_char) -> *const c_void {
+    QasanSyms::lookup(name).unwrap() as *const c_void
 }
 
 #[unsafe(no_mangle)]
@@ -140,7 +146,7 @@ pub unsafe extern "C" fn asan_track(addr: *const c_void, len: usize) {
     FRONTEND
         .lock()
         .tracking_mut()
-        .alloc(addr as GuestAddr, len)
+        .track(addr as GuestAddr, len)
         .unwrap();
 }
 
@@ -151,7 +157,7 @@ pub unsafe extern "C" fn asan_untrack(addr: *const c_void) {
     FRONTEND
         .lock()
         .tracking_mut()
-        .dealloc(addr as GuestAddr)
+        .untrack(addr as GuestAddr)
         .unwrap();
 }
 
