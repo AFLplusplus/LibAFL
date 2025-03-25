@@ -9,11 +9,12 @@ use asan::{
         backend::{dlmalloc::DlmallocBackend, mimalloc::MimallocBackend},
         frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
+    hooks::PatchedHooks,
     host::{Host, libc::LibcHost},
     logger::libc::LibcLogger,
-    maps::libc::LibcMapReader,
+    maps::{MapReader, libc::LibcMapReader},
     mmap::libc::LibcMmap,
-    patch::{hooks::PatchedHooks, raw::RawPatch},
+    patch::{Patches, raw::RawPatch},
     shadow::{Shadow, host::HostShadow},
     symbols::{
         Symbols,
@@ -52,7 +53,12 @@ static FRONTEND: Lazy<Mutex<QasanFrontend>> = Lazy::new(|| {
         QasanFrontend::DEFAULT_QUARANTINE_SIZE,
     )
     .unwrap();
-    PatchedHooks::init::<QasanSyms, RawPatch, LibcMapReader<QasanSyms>, QasanMmap>().unwrap();
+    let mappings = LibcMapReader::<QasanSyms>::mappings().unwrap();
+    Patches::init(mappings);
+    for hook in PatchedHooks::default() {
+        let target = hook.lookup::<QasanSyms>().unwrap();
+        Patches::apply::<RawPatch, QasanMmap>(target, hook.destination).unwrap();
+    }
     Mutex::new(frontend)
 });
 

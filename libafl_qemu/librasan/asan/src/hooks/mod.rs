@@ -65,17 +65,17 @@ pub mod write;
 #[cfg(feature = "libc")]
 pub mod fgets;
 
-use alloc::vec::Vec;
+use alloc::vec::{IntoIter, Vec};
 use core::ffi::{CStr, c_char, c_int, c_void};
 
-use crate::{GuestAddr, hooks, size_t, wchar_t};
+use crate::{GuestAddr, hooks, size_t, symbols::Symbols, wchar_t};
 
 unsafe extern "C" {
     pub fn asprintf(strp: *mut *mut c_char, fmt: *const c_char, ...) -> c_int;
     pub fn vasprintf(strp: *mut *mut c_char, fmt: *const c_char, va: *const c_void) -> c_int;
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PatchedHook {
     pub name: &'static CStr,
     pub destination: GuestAddr,
@@ -88,8 +88,27 @@ impl PatchedHook {
         Self { name, destination }
     }
 
-    pub fn all() -> Vec<Self> {
-        [
+    pub fn lookup<S: Symbols>(&self) -> Result<GuestAddr, S::Error> {
+        S::lookup(self.name.as_ptr() as *const c_char)
+    }
+}
+
+pub struct PatchedHooks {
+    hooks: Vec<PatchedHook>,
+}
+
+impl IntoIterator for PatchedHooks {
+    type Item = PatchedHook;
+    type IntoIter = IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.hooks.into_iter()
+    }
+}
+
+impl Default for PatchedHooks {
+    fn default() -> Self {
+        Self { hooks: [
             PatchedHook::new::<unsafe extern "C" fn(size_t, size_t) -> *mut c_void>(
                 c"aligned_alloc",
                 hooks::aligned_alloc::aligned_alloc,
@@ -247,6 +266,6 @@ impl PatchedHook {
             ),
 
         ]
-        .to_vec()
+        .to_vec() }
     }
 }

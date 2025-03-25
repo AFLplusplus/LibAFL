@@ -9,10 +9,11 @@ use asan::{
         backend::{dlmalloc::DlmallocBackend, mimalloc::MimallocBackend},
         frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
+    hooks::PatchedHooks,
     logger::libc::LibcLogger,
-    maps::libc::LibcMapReader,
+    maps::{MapReader, libc::LibcMapReader},
     mmap::libc::LibcMmap,
-    patch::{hooks::PatchedHooks, raw::RawPatch},
+    patch::{Patches, raw::RawPatch},
     shadow::{
         Shadow,
         guest::{DefaultShadowLayout, GuestShadow},
@@ -53,7 +54,12 @@ static FRONTEND: Lazy<Mutex<GasanFrontend>> = Lazy::new(|| {
         GasanFrontend::DEFAULT_QUARANTINE_SIZE,
     )
     .unwrap();
-    PatchedHooks::init::<GasanSyms, RawPatch, LibcMapReader<GasanSyms>, GasanMmap>().unwrap();
+    let mappings = LibcMapReader::<GasanSyms>::mappings().unwrap();
+    Patches::init(mappings);
+    for hook in PatchedHooks::default() {
+        let target = hook.lookup::<GasanSyms>().unwrap();
+        Patches::apply::<RawPatch, GasanMmap>(target, hook.destination).unwrap();
+    }
     Mutex::new(frontend)
 });
 

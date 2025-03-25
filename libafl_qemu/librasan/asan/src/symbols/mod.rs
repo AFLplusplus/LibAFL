@@ -12,9 +12,7 @@ use core::{
 
 use thiserror::Error;
 
-use crate::GuestAddr;
-#[cfg(feature = "hooks")]
-use crate::patch::hooks::{PatchedHooks, PatchesCheckError};
+use crate::{GuestAddr, patch::Patches};
 
 #[cfg(feature = "libc")]
 pub mod dlsym;
@@ -108,8 +106,9 @@ impl<T: Function> FunctionPointer for T {
             Err(FunctionPointerError::BadAddress(addr))?;
         }
 
-        #[cfg(feature = "hooks")]
-        PatchedHooks::check_patched(addr).map_err(FunctionPointerError::PatchedAddress)?;
+        if Patches::is_patched(addr) {
+            Err(FunctionPointerError::PatchedAddress(addr))?;
+        }
 
         let pp_sym = (&addr) as *const GuestAddr as *const *mut c_void;
         let p_f = pp_sym as *const Self::Func;
@@ -122,7 +121,6 @@ impl<T: Function> FunctionPointer for T {
 pub enum FunctionPointerError {
     #[error("Bad address: {0}")]
     BadAddress(GuestAddr),
-    #[cfg(feature = "hooks")]
     #[error("Patched address: {0}")]
-    PatchedAddress(PatchesCheckError),
+    PatchedAddress(GuestAddr),
 }
