@@ -28,6 +28,7 @@ pub mod mmap;
 pub mod munmap;
 pub mod posix_memalign;
 pub mod pvalloc;
+pub mod rawmemchr;
 pub mod read;
 pub mod realloc;
 pub mod reallocarray;
@@ -123,6 +124,10 @@ impl PatchedHook {
             PatchedHook::new::<unsafe extern "C" fn(*const c_void, c_int, size_t) -> *mut c_void>(
                 c"memrchr",
                 hooks::memrchr::memrchr,
+            ),
+            PatchedHook::new::<unsafe extern "C" fn(*const c_void, c_int) -> *mut c_void>(
+                c"rawmemchr",
+                hooks::rawmemchr::rawmemchr,
             ),
             PatchedHook::new::<unsafe extern "C" fn(*mut c_char, *const c_char) -> *mut c_char>(
                 c"stpcpy",
