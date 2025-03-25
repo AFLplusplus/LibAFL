@@ -23,7 +23,7 @@ pub unsafe extern "C" fn wcsrchr(cs: *const wchar_t, c: c_int) -> *mut wchar_t {
         while *cs.add(len) != 0 {
             len += 1;
         }
-        asan_load(cs as *const c_void, len + 1);
+        asan_load(cs as *const c_void, (len + 1) * size_of::<wchar_t>());
         let cs_slice = from_raw_parts(cs, len);
         let pos = cs_slice.iter().rev().position(|&x| x as c_int == c);
         match pos {

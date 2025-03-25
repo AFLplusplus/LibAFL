@@ -25,10 +25,10 @@ pub unsafe extern "C" fn wcsnlen(cs: *const wchar_t, maxlen: size_t) -> size_t {
         }
 
         if len < maxlen {
-            asan_load(cs as *const c_void, len + 1);
+            asan_load(cs as *const c_void, (len + 1) * size_of::<wchar_t>());
             len
         } else {
-            asan_load(cs as *const c_void, maxlen);
+            asan_load(cs as *const c_void, maxlen * size_of::<wchar_t>());
             maxlen
         }
     }

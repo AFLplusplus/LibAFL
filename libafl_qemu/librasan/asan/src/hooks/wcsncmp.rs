@@ -35,8 +35,8 @@ pub unsafe extern "C" fn wcsncmp(cs: *const wchar_t, ct: *const wchar_t, n: size
         while ct_len < n && *ct.add(ct_len) != 0 {
             ct_len += 1;
         }
-        asan_load(cs as *const c_void, cs_len + 1);
-        asan_load(ct as *const c_void, ct_len + 1);
+        asan_load(cs as *const c_void, (cs_len + 1) * size_of::<wchar_t>());
+        asan_load(ct as *const c_void, (ct_len + 1) * size_of::<wchar_t>());
 
         let slice1 = from_raw_parts(cs as *const u32, cs_len);
         let slice2 = from_raw_parts(ct as *const u32, ct_len);

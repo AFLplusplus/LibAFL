@@ -1,10 +1,7 @@
 #[cfg(test)]
 #[cfg(feature = "hooks")]
 mod tests {
-    use core::{
-        ffi::c_int,
-        ptr::null_mut,
-    };
+    use core::{ffi::c_int, ptr::null_mut};
 
     use asan::{expect_panic, hooks::wmemchr::wmemchr, wchar_t};
     use widestring::widecstr;
