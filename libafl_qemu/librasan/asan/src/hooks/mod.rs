@@ -38,6 +38,7 @@ pub mod strcasecmp;
 pub mod strcasestr;
 pub mod strcat;
 pub mod strchr;
+pub mod strchrnul;
 pub mod strcmp;
 pub mod strcpy;
 pub mod strdup;
@@ -152,6 +153,10 @@ impl PatchedHook {
             PatchedHook::new::<unsafe extern "C" fn(*const c_char, c_int) -> *mut c_char>(
                 c"strchr",
                 hooks::strchr::strchr,
+            ),
+            PatchedHook::new::<unsafe extern "C" fn(*const c_char, c_int) -> *mut c_char>(
+                c"strchrnul",
+                hooks::strchrnul::strchrnul,
             ),
             PatchedHook::new::<unsafe extern "C" fn(*const c_char, *const c_char) -> c_int>(
                 c"strcmp",
