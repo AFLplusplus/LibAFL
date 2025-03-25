@@ -118,8 +118,7 @@ unsafe extern "C" {
     pub fn asan_alloc(len: usize, align: usize) -> *mut c_void;
     pub fn asan_dealloc(addr: *const c_void);
     pub fn asan_get_size(addr: *const c_void) -> usize;
-    #[cfg(feature = "libc")]
-    pub fn asan_sym(name: *const c_char) -> GuestAddr;
+    pub fn asan_sym(name: *const c_char) -> *const c_void;
     pub fn asan_page_size() -> usize;
     pub fn asan_unpoison(addr: *mut c_void, len: usize);
     pub fn asan_track(addr: *mut c_void, len: usize);

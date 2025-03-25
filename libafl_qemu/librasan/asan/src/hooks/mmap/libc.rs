@@ -4,7 +4,7 @@ use libc::{c_int, c_void};
 use log::trace;
 
 use crate::{
-    asan_swap, asan_sym, asan_track, asan_unpoison, off_t, size_t,
+    GuestAddr, asan_swap, asan_sym, asan_track, asan_unpoison, off_t, size_t,
     symbols::{AtomicGuestAddr, Function, FunctionPointer},
 };
 
@@ -41,8 +41,9 @@ pub unsafe extern "C" fn mmap(
             "mmap - addr: {:p}, len: {:#x}, prot: {:#x}, flags: {:#x}, fd: {:#x}, offset: {:#x}",
             addr, len, prot, flags, fd, offset
         );
-        let mmap_addr =
-            MMAP_ADDR.get_or_insert_with(|| asan_sym(FunctionMmap::NAME.as_ptr() as *const c_char));
+        let mmap_addr = MMAP_ADDR.get_or_insert_with(|| {
+            asan_sym(FunctionMmap::NAME.as_ptr() as *const c_char) as GuestAddr
+        });
         asan_swap(false);
         let fn_mmap = FunctionMmap::as_ptr(mmap_addr).unwrap();
         asan_swap(true);
