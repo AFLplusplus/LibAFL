@@ -19,12 +19,10 @@ build:
 run: build harness
     cargo run \
       --profile {{ PROFILE }} \
-      ./{{ FUZZER_NAME }} \
+      {{ BUILD_DIR }}/harness \
       -- \
       --libafl-in ../../inprocess/libfuzzer_libpng/corpus \
-      --libafl-out ./out \
-      ./{{ FUZZER_NAME }}
-
+      --libafl-out ./out
 
 [unix]
 test: build harness
