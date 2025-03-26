@@ -578,9 +578,9 @@ impl AsanGiovese {
                 }
                 _ => (),
             }
-            SyscallHookResult::new(Some(r))
+            SyscallHookResult::Skip(r)
         } else {
-            SyscallHookResult::new(None)
+            SyscallHookResult::Run
         }
     }
 
@@ -1350,9 +1350,9 @@ where
             }
             _ => (),
         }
-        SyscallHookResult::new(Some(0))
+        SyscallHookResult::Skip(0)
     } else {
-        SyscallHookResult::new(None)
+        SyscallHookResult::Run
     }
 }
 

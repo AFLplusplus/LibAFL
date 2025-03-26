@@ -400,13 +400,13 @@ where
 
             let first_parameter = unsafe {
                 if (*c_array.offset(1)).is_null() {
-                    return SyscallHookResult::new(None);
+                    return SyscallHookResult::Run;
                 }
                 CStr::from_ptr(*c_array.offset(1)).to_string_lossy()
             };
             let second_parameter = unsafe {
                 if (*c_array.offset(2)).is_null() {
-                    return SyscallHookResult::new(None);
+                    return SyscallHookResult::Run;
                 }
                 CStr::from_ptr(*c_array.offset(2)).to_string_lossy()
             };
@@ -419,9 +419,9 @@ where
 
             //println!("PARAMETERS First {} Second {}", first_parameter, second_
         }
-        SyscallHookResult::new(Some(0))
+        SyscallHookResult::Skip(0)
     } else {
-        SyscallHookResult::new(None)
+        SyscallHookResult::Run
     }
 }
 
