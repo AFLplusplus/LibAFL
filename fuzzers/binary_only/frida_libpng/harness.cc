@@ -85,7 +85,13 @@ extern "C" int afl_libfuzzer_init() {
 
 static char *allocation = NULL;
 
-__attribute__((noinline)) void func3(char *alloc) {
+#ifdef _MSC_VER
+  #define NOINLINE __declspec(noinline)
+#else
+  #define NOINLINE __attribute__((noinline))
+#endif
+
+NOINLINE void func3(char *alloc) {
 // printf("func3\n");
 #ifdef _WIN32
   if ((rand() % 2) == 0) {
@@ -99,12 +105,12 @@ __attribute__((noinline)) void func3(char *alloc) {
   }
 #endif
 }
-__attribute__((noinline)) void func2() {
+NOINLINE void func2() {
   allocation = (char *)malloc(0xff);
   // printf("func2\n");
   func3(allocation);
 }
-__attribute__((noinline)) void func1() {
+NOINLINE void func1() {
   // printf("func1\n");
   func2();
 }
@@ -119,7 +125,7 @@ __attribute__((noinline)) void func1() {
 // Entry point for LibFuzzer.
 // Roughly follows the libpng book example:
 // http://www.libpng.org/pub/png/book/chapter13.html
-HARNESS_EXPORTS extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data,
+extern "C" HARNESS_EXPORTS int LLVMFuzzerTestOneInput(const uint8_t *data,
                                                       size_t         size) {
   if (size >= 8 && *(uint64_t *)data == 0xABCDEFAA8F1324AA) { abort(); }
   if (size < kPngHeaderSize) { return 0; }
