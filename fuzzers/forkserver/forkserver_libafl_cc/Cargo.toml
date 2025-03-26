@@ -1,6 +1,6 @@
 [package]
 name = "forkserver_libafl_cc"
-version = "0.15.1"
+version = "0.15.2"
 authors = ["ergrelet <ergrelet@users.noreply.github.com>"]
 edition = "2021"
 

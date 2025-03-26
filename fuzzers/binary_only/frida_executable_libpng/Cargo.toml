@@ -1,6 +1,6 @@
 [package]
 name = "frida_executable_fuzzer"
-version = "0.15.1"
+version = "0.15.2"
 edition = "2021"
 
 [lib]
