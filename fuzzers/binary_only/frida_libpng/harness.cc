@@ -85,12 +85,9 @@ extern "C" int afl_libfuzzer_init() {
 
 static char *allocation = NULL;
 
-// Export this symbol
-#ifdef _WIN32
-  #define HARNESS_EXPORTS __declspec(dllexport)
+#ifdef _MSC_VER
   #define NOINLINE __declspec(noinline)
 #else
-  #define HARNESS_EXPORTS
   #define NOINLINE __attribute__((noinline))
 #endif
 
@@ -117,6 +114,13 @@ NOINLINE void func1() {
   // printf("func1\n");
   func2();
 }
+
+// Export this symbol
+#ifdef _WIN32
+  #define HARNESS_EXPORTS __declspec(dllexport)
+#else
+  #define HARNESS_EXPORTS
+#endif
 
 // Entry point for LibFuzzer.
 // Roughly follows the libpng book example:
