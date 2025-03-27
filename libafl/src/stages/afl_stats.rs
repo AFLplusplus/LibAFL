@@ -113,6 +113,8 @@ pub struct AflStatsStage<C, E, EM, I, O, S, Z> {
     /// The core we are bound to
     core_id: CoreId,
     phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
+    report_current_corpus_idx: bool,
+    last_sent_corpus_idx: Option<usize>,
 }
 
 /// AFL++'s `fuzzer_stats`
@@ -266,7 +268,27 @@ where
                 "state is not currently processing a corpus index",
             ));
         };
+        // Clone or copy the required data from `state`
+        let corpus_idx_value = corpus_idx.0; // Extract `usize` value from `CorpusId`
+
+        // Fire the UpdateUserStats event with the corpus index
+        if self.report_current_corpus_idx && self.last_sent_corpus_idx != Some(corpus_idx_value) {
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: Cow::Borrowed("Current Testcase Index"),
+                    value: UserStats::new(
+                        UserStatsValue::Number(corpus_idx_value as u64),
+                        AggregatorOps::Sum,
+                    ),
+                    phantom: PhantomData,
+                },
+            )?;
+            // Update the last_sent_corpus_idx to the current value
+            self.last_sent_corpus_idx = Some(corpus_idx_value);
+        }
         let testcase = state.corpus().get(corpus_idx)?.borrow();
+
         // NOTE: scheduled_count represents the amount of fuzz runs a
         // testcase has had. Since this stage is kept at the very end of stage list,
         // the entry would have been fuzzed already (and should contain IsFavoredMetadata) but would have a scheduled count of zero
@@ -658,6 +680,7 @@ pub struct AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
     version: String,
     target_mode: String,
     phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
+    report_current_corpus_idx: bool,
 }
 
 impl<C, E, EM, I, O, S, Z> AflStatsStageBuilder<C, E, EM, I, O, S, Z>
@@ -682,6 +705,7 @@ where
             version: String::default(),
             target_mode: String::default(),
             phantom_data: PhantomData,
+            report_current_corpus_idx: false,
         }
     }
 
@@ -817,7 +841,9 @@ where
             dict_count: self.dict_count,
             core_id: self.core_id.unwrap_or(CoreId(0)),
             autotokens_enabled: self.uses_autotokens,
+            report_current_corpus_idx: self.report_current_corpus_idx, // Set field
             phantom_data: PhantomData,
+            last_sent_corpus_idx: None,
         })
     }
 }
