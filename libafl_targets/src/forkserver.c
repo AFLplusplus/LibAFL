@@ -1,87 +1,23 @@
-#include "common.h"
-
-#include "android-ashmem.h"
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <signal.h>
-#include <unistd.h>
-#ifndef USEMMAP
-  #include <sys/shm.h>
-#else
-  #include <sys/mman.h>
-  #include <sys/stat.h>
-  #include <fcntl.h>
-#endif
-#include <sys/wait.h>
-#include <sys/types.h>
-
-#define write_error(s) \
-  fprintf(stderr, "Error at %s:%d: %s\n", __FILE__, __LINE__, s)
-
-// AFL++ constants
-#define FORKSRV_FD 198
-#define MAX_FILE (1024 * 1024)
-#define SHMEM_FUZZ_HDR_SIZE 4
-#define SHM_ENV_VAR "__AFL_SHM_ID"
-#define SHM_FUZZ_ENV_VAR "__AFL_SHM_FUZZ_ID"
-#define DEFAULT_PERMISSION 0600
-
-/* Reporting errors */
-#define FS_OPT_ERROR 0xf800008f
-#define FS_OPT_GET_ERROR(x) ((x & 0x00ffff00) >> 8)
-#define FS_OPT_SET_ERROR(x) ((x & 0x0000ffff) << 8)
-#define FS_ERROR_MAP_SIZE 1
-#define FS_ERROR_MAP_ADDR 2
-#define FS_ERROR_SHM_OPEN 4
-#define FS_ERROR_SHMAT 8
-#define FS_ERROR_MMAP 16
-#define FS_ERROR_OLD_CMPLOG 32
-#define FS_ERROR_OLD_CMPLOG_QEMU 64
-
-#define FS_NEW_VERSION_MAX 1
-#define FS_NEW_OPT_MAPSIZE 0x1
-#define FS_NEW_OPT_SHDMEM_FUZZ 0x2
-#define FS_NEW_OPT_AUTODICT 0x800
-
-/* Reporting options */
-#define FS_OPT_ENABLED 0x80000001
-#define FS_OPT_MAPSIZE 0x40000000
-#define FS_OPT_SNAPSHOT 0x20000000
-#define FS_OPT_AUTODICT 0x10000000
-#define FS_OPT_SHDMEM_FUZZ 0x01000000
-#define FS_OPT_NEWCMPLOG 0x02000000
-#define FS_OPT_OLD_AFLPP_WORKAROUND 0x0f000000
-// FS_OPT_MAX_MAPSIZE is 8388608 = 0x800000 = 2^23 = 1 << 22
-#define FS_OPT_MAX_MAPSIZE ((0x00fffffeU >> 1) + 1)
-#define FS_OPT_GET_MAPSIZE(x) (((x & 0x00fffffe) >> 1) + 1)
-#define FS_OPT_SET_MAPSIZE(x) \
-  (x <= 1 || x > FS_OPT_MAX_MAPSIZE ? 0 : ((x - 1) << 1))
+#include "forkserver.h"
 
 // Set by this macro
 // https://github.com/AFLplusplus/AFLplusplus/blob/stable/src/afl-cc.c#L993
 
 int __afl_sharedmem_fuzzing __attribute__((weak));
 
-extern uint8_t *__afl_area_ptr;
-extern size_t   __afl_map_size;
-extern uint8_t *__token_start;
-extern uint8_t *__token_stop;
-
 uint8_t        *__afl_fuzz_ptr;
 static uint32_t __afl_fuzz_len_local;
 uint32_t       *__afl_fuzz_len = &__afl_fuzz_len_local;
 
-int already_initialized_shm;
-int already_initialized_forkserver;
+static int already_initialized_shm;
+static int already_initialized_forkserver;
 
 static int child_pid;
 static void (*old_sigterm_handler)(int) = 0;
 
 static uint8_t is_persistent;
 
-void __afl_set_persistent_mode(uint8_t mode) {
+void __libafl_set_persistent_mode(uint8_t mode) {
   is_persistent = mode;
 }
 
@@ -109,7 +45,7 @@ static void at_exit(int signal) {
 
 /* SHM fuzzing setup. */
 
-void __afl_map_shm(void) {
+void __libafl_map_shm(void) {
   if (already_initialized_shm) return;
   already_initialized_shm = 1;
 
@@ -160,7 +96,7 @@ void __afl_map_shm(void) {
     /* Write something into the bitmap so that even with low AFL_INST_RATIO,
        our parent doesn't give up on us. */
 
-    __afl_area_ptr[0] = 1;
+    // __afl_area_ptr[0] = 1;
   } else {
     fprintf(stderr,
             "Error: variable for edge coverage shared memory is not set\n");
@@ -214,9 +150,11 @@ static void map_input_shared_memory() {
   }
 }
 
-/* Fork server logic. */
+void __libafl_start_forkserver(void) {
+  __libafl_start_forkserver_with_hooks(NULL);
+}
 
-void __afl_start_forkserver(void) {
+void __libafl_start_forkserver_with_hooks(struct libafl_forkserver_hook* hook) {
   if (already_initialized_forkserver) return;
   already_initialized_forkserver = 1;
 
@@ -326,6 +264,10 @@ void __afl_start_forkserver(void) {
     if (!child_stopped) {
       /* Once woken up, create a clone of our process. */
 
+      if (hook) {
+        hook->pre_fork_hook(hook->data);
+      }
+
       child_pid = fork();
       if (child_pid < 0) {
         write_error("fork");
@@ -342,7 +284,16 @@ void __afl_start_forkserver(void) {
 
         close(FORKSRV_FD);
         close(FORKSRV_FD + 1);
+
+        if (hook) {
+          hook->post_child_fork_hook(hook->data);
+        }
+
         return;
+      } else {
+        if (hook) {
+          hook->post_parent_fork_hook(hook->data, child_pid);
+        }
       }
 
     } else {
@@ -360,6 +311,10 @@ void __afl_start_forkserver(void) {
       _exit(1);
     }
 
+    if (hook) {
+      hook->pre_parent_wait_hook(hook->data);
+    }
+
     if (waitpid(child_pid, &status, is_persistent ? WUNTRACED : 0) < 0) {
       write_error("waitpid");
       _exit(1);
@@ -371,7 +326,14 @@ void __afl_start_forkserver(void) {
 
     if (WIFSTOPPED(status)) child_stopped = 1;
 
+    if (hook) {
+      hook->post_parent_wait_hook(hook->data, child_pid, status);
+    }
+
     /* Relay wait status to pipe, then loop back. */
+
+    // printf("child status: %d\n", WEXITSTATUS(status));
+    printf("terminated by a signal? %d\n", WIFSIGNALED(status));
 
     if (write(FORKSRV_FD + 1, &status, 4) != 4) {
       write_error("writing to afl-fuzz");

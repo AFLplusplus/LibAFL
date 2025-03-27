@@ -7,7 +7,9 @@
 use core::{ffi::c_void, fmt::Debug, mem::transmute, ptr};
 
 use libafl::executors::hooks::inprocess::inprocess_get_state;
-use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize};
+use libafl_qemu_sys::{
+    CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TranslationBlock,
+};
 #[cfg(feature = "python")]
 use pyo3::{FromPyObject, pyclass, pymethods};
 
@@ -676,6 +678,9 @@ create_hook_types!(
         Option<&mut S>,
         pc: GuestAddr,
         block_length: GuestUsize,
+        tb: *const TranslationBlock,
+        last_tb: *const TranslationBlock,
+        tb_exit: i32,
     ),
     Box<
         dyn for<'a> FnMut(
@@ -684,9 +689,19 @@ create_hook_types!(
             Option<&mut S>,
             GuestAddr,
             GuestUsize,
+            *const TranslationBlock,
+            *const TranslationBlock,
+            i32,
         ),
     >,
-    unsafe extern "C" fn(libafl_qemu_opaque: *const (), pc: GuestAddr, block_length: GuestUsize)
+    unsafe extern "C" fn(
+        libafl_qemu_opaque: *const (),
+        pc: GuestAddr,
+        block_length: GuestUsize,
+        tb: *mut TranslationBlock,
+        last_tb: *mut TranslationBlock,
+        tb_exit: i32,
+    )
 );
 create_hook_types!(
     BlockExec,
@@ -697,7 +712,7 @@ create_hook_types!(
 
 create_hook_id!(Block, libafl_qemu_remove_block_hook, true);
 create_gen_wrapper!(block, (addr: GuestAddr), u64, 1, BlockHookId);
-create_post_gen_wrapper!(block, (addr: GuestAddr, len: GuestUsize), 1, BlockHookId);
+create_post_gen_wrapper!(block, (addr: GuestAddr, len: GuestUsize, tb: *const TranslationBlock, last_tb: *const TranslationBlock, tb_exit: i32), 1, BlockHookId);
 create_exec_wrapper!(block, (id: u64), 0, 1, BlockHookId);
 
 // Read hook wrappers
@@ -1062,15 +1077,32 @@ impl QemuHooks {
         &self,
         data: T,
         generator: Option<unsafe extern "C" fn(T, GuestAddr) -> u64>,
-        post_gen: Option<unsafe extern "C" fn(T, GuestAddr, GuestUsize)>,
+        post_gen: Option<
+            unsafe extern "C" fn(
+                T,
+                GuestAddr,
+                GuestUsize,
+                *const TranslationBlock,
+                *const TranslationBlock,
+                i32,
+            ),
+        >,
         exec: Option<unsafe extern "C" fn(T, u64)>,
     ) -> BlockHookId {
         unsafe {
             let data: u64 = data.into().0;
             let generator: Option<unsafe extern "C" fn(u64, GuestAddr) -> u64> =
                 transmute(generator);
-            let post_gen: Option<unsafe extern "C" fn(u64, GuestAddr, GuestUsize)> =
-                transmute(post_gen);
+            let post_gen: Option<
+                unsafe extern "C" fn(
+                    u64,
+                    GuestAddr,
+                    GuestUsize,
+                    *mut TranslationBlock,
+                    *mut TranslationBlock,
+                    i32,
+                ),
+            > = transmute(post_gen);
             let exec: Option<unsafe extern "C" fn(u64, u64)> = transmute(exec);
             let num = libafl_qemu_sys::libafl_add_block_hook(generator, post_gen, exec, data);
             BlockHookId(num)

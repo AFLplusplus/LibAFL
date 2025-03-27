@@ -5,16 +5,16 @@ use std::{
 
 use libafl_bolts::{Error, os::unix_signals::Signal};
 use libafl_qemu_sys::{
-    GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
-    exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
-    libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run,
-    libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps,
+    GuestAddr, GuestUsize, GuestVirtAddr, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms,
+    TranslationBlock, VerifyAccess, exec_path, free_self_maps, guest_base, libafl_force_dfl,
+    libafl_get_brk, libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next,
+    libafl_qemu_run, libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps,
 };
 use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
 use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 
-use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
+use crate::{CPU, Qemu, elf::EasyElf, qemu::QEMU_IS_RUNNING};
 
 /// Choose how QEMU target signals should be handled.
 /// It's main use is to describe how crashes and timeouts should be treated.
@@ -264,6 +264,10 @@ impl Qemu {
         unsafe { (addr as usize - guest_base) as GuestAddr }
     }
 
+    pub fn is_valid_addr(&self, addr: GuestAddr) -> bool {
+        unsafe { libafl_qemu_sys::libafl_is_valid_addr(addr) }
+    }
+
     #[must_use]
     pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
         self.current_cpu()
@@ -291,6 +295,24 @@ impl Qemu {
                 strlen(exec_path.cast_const()),
             ))
         }
+    }
+
+    /// Resolve a symbol dynamically.
+    pub fn resolve_symbol(&self, symbol: &str) -> Option<GuestAddr> {
+        let mut elf_buf = Vec::new();
+
+        for map in self.mappings() {
+            if let Some(path) = map.path() {
+                elf_buf.clear();
+                if let Ok(elf) = EasyElf::from_file(path, &mut elf_buf) {
+                    if let Some(symbol_addr) = elf.resolve_symbol(symbol, map.start()) {
+                        return Some(symbol_addr);
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     #[must_use]
@@ -459,6 +481,39 @@ impl Qemu {
             TargetSignalHandling::RaiseSignal => unsafe {
                 libafl_qemu_sys::libafl_set_return_on_crash(false);
             },
+        }
+    }
+
+    pub unsafe fn tb_lookup(
+        &self,
+        cpu: CPU,
+        pc: GuestVirtAddr,
+        cs_base: u64,
+        flags: u32,
+        cflags: u32,
+    ) -> *mut TranslationBlock {
+        unsafe { libafl_qemu_sys::libafl_tb_lookup(cpu.ptr, pc, cs_base, flags, cflags) }
+    }
+
+    pub unsafe fn tb_gen_code(
+        &self,
+        cpu: CPU,
+        pc: GuestVirtAddr,
+        cs_base: u64,
+        flags: u32,
+        cflags: i32,
+    ) -> *mut TranslationBlock {
+        unsafe { libafl_qemu_sys::libafl_tb_gen_code(cpu.ptr, pc, cs_base, flags, cflags) }
+    }
+
+    pub unsafe fn tb_add_jump(
+        &self,
+        tb: *mut TranslationBlock,
+        n: i32,
+        tb_next: *mut TranslationBlock,
+    ) {
+        unsafe {
+            libafl_qemu_sys::libafl_tb_add_jump(tb, n, tb_next);
         }
     }
 }
