@@ -27,6 +27,12 @@
 #define SHM_ENV_VAR "__AFL_SHM_ID"
 #define SHM_FUZZ_ENV_VAR "__AFL_SHM_FUZZ_ID"
 #define DEFAULT_PERMISSION 0600
+#define MAP_SIZE (1U << MAP_SIZE_POW2)
+#if MAP_SIZE <= 2097152
+  #define MAP_INITIAL_SIZE (2 << 20)  // = 2097152
+#else
+  #define MAP_INITIAL_SIZE MAP_SIZE
+#endif
 
 /* Reporting errors */
 #define FS_OPT_ERROR 0xf800008f
@@ -64,14 +70,19 @@
 
 int __afl_sharedmem_fuzzing __attribute__((weak));
 
+static uint8_t  __afl_area_initial[MAP_INITIAL_SIZE];
+static uint8_t *__afl_area_ptr_dummy = __afl_area_initial;
+static uint8_t *__afl_area_ptr_backup = __afl_area_initial;
+
 extern uint8_t *__afl_area_ptr;
 extern size_t   __afl_map_size;
 extern uint8_t *__token_start;
 extern uint8_t *__token_stop;
+extern uint8_t *__afl_fuzz_ptr;
+extern uint32_t *__afl_fuzz_len;
 
-uint8_t        *__afl_fuzz_ptr;
-static uint32_t __afl_fuzz_len_local;
-uint32_t       *__afl_fuzz_len = &__afl_fuzz_len_local;
+static uint8_t  __afl_fuzz_ptr_initial[MAP_INITIAL_SIZE];
+static uint32_t __afl_fuzz_len_local = 0;
 
 int already_initialized_shm;
 int already_initialized_forkserver;
@@ -109,9 +120,8 @@ static void at_exit(int signal) {
 
 /* SHM fuzzing setup. */
 
-void __afl_map_shm(void) {
-  if (already_initialized_shm) return;
-  already_initialized_shm = 1;
+uint8_t __afl_map_shm(void){
+  if (already_initialized_shm) return 1;
 
   char *id_str = getenv(SHM_ENV_VAR);
 
@@ -161,15 +171,15 @@ void __afl_map_shm(void) {
        our parent doesn't give up on us. */
 
     __afl_area_ptr[0] = 1;
+    already_initialized_shm = 1;
+    return 1;
   } else {
-    fprintf(stderr,
-            "Error: variable for edge coverage shared memory is not set\n");
-    send_forkserver_error(FS_ERROR_SHM_OPEN);
-    exit(1);
+    __afl_area_ptr = __afl_area_initial;
+    return 0;
   }
 }
 
-static void map_input_shared_memory() {
+uint8_t __afl_map_input_shm() {
   char *id_str = getenv(SHM_FUZZ_ENV_VAR);
 
   if (id_str) {
@@ -206,11 +216,11 @@ static void map_input_shared_memory() {
 
     __afl_fuzz_len = (uint32_t *)map;
     __afl_fuzz_ptr = map + sizeof(uint32_t);
-
+    return 1;
   } else {
-    fprintf(stderr, "Error: variable for fuzzing shared memory is not set\n");
-    send_forkserver_error(FS_ERROR_SHM_OPEN);
-    exit(1);
+    __afl_fuzz_ptr = __afl_fuzz_ptr_initial;
+    __afl_fuzz_len = &__afl_fuzz_len_local;
+    return 0;
   }
 }
 
@@ -294,7 +304,7 @@ void __afl_start_forkserver(void) {
   status = version;
   if (write(FORKSRV_FD + 1, msg, 4) != 4) { _exit(1); }
 
-  if (__afl_sharedmem_fuzzing) { map_input_shared_memory(); }
+  if (__afl_sharedmem_fuzzing && !__afl_fuzz_ptr) { __afl_map_input_shm(); }
 
   while (1) {
     int status;
