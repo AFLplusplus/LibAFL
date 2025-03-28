@@ -46,9 +46,7 @@ mod tests {
         assert_eq!(tracking.track(0x1000, 0x1000), Ok(()));
         assert_eq!(
             tracking.track(0x1000, 0x1000),
-            Err(GuestTrackingError::TrackingConflict(
-                0x1000, 0x1000, 0x1000, 0x1000
-            ))
+            Err(GuestTrackingError::TrackingConflict(0x1000, 0x1000))
         );
     }
 
@@ -72,9 +70,7 @@ mod tests {
         assert_eq!(tracking.track(0x1000, 0x1000), Ok(()));
         assert_eq!(
             tracking.track(0x0000, 0x1001),
-            Err(GuestTrackingError::TrackingConflict(
-                0x1000, 0x1000, 0x0000, 0x1001
-            ))
+            Err(GuestTrackingError::TrackingConflict(0x0000, 0x1001))
         );
     }
 
@@ -84,9 +80,7 @@ mod tests {
         assert_eq!(tracking.track(0x1000, 0x1000), Ok(()));
         assert_eq!(
             tracking.track(0x1fff, 0x1001),
-            Err(GuestTrackingError::TrackingConflict(
-                0x1000, 0x1000, 0x1fff, 0x1001
-            ))
+            Err(GuestTrackingError::TrackingConflict(0x1fff, 0x1001))
         );
     }
 
@@ -100,8 +94,6 @@ mod tests {
         assert_eq!(
             tracking.track(0xffffffffb5b60107, 0xdb),
             Err(GuestTrackingError::TrackingConflict(
-                0xffffffffb5b5ff21,
-                0x3ff,
                 0xffffffffb5b60107,
                 0xdb
             ))
