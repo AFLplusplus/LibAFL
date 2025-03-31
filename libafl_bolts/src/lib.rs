@@ -183,7 +183,7 @@ use core::{
     fmt::{self, Display},
     num::{ParseIntError, TryFromIntError},
     ops::{Deref, DerefMut},
-    time,
+    slice, time,
 };
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
@@ -831,7 +831,7 @@ where
 {
     type Item = S::Entry;
     type Ref = &'it Self::Item;
-    type IntoIter = core::slice::Iter<'it, Self::Item>;
+    type IntoIter = slice::Iter<'it, Self::Item>;
 
     fn as_iter(&'it self) -> Self::IntoIter {
         self.as_slice().iter()
@@ -855,7 +855,7 @@ where
     T: 'it,
 {
     type RefMut = &'it mut Self::Item;
-    type IntoIterMut = core::slice::IterMut<'it, Self::Item>;
+    type IntoIterMut = slice::IterMut<'it, Self::Item>;
 
     fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         self.as_slice_mut().iter_mut()
@@ -1569,6 +1569,34 @@ where
 
         Ok(new_vec)
     }
+}
+
+/// Cast any sized object into a byte array.
+pub fn any_as_bytes<T: Sized>(any: &T) -> &[u8] {
+    unsafe { slice::from_raw_parts(any as *const T as *const u8, size_of::<T>()) }
+}
+
+/// Cast any sized object into a mutable byte array.
+///
+/// # Safety
+///
+/// It is obviously dangerous, since it becomes possible to corrupt the
+/// input object. To use with care.
+pub unsafe fn any_as_bytes_mut<T: Sized>(any: &mut T) -> &mut [u8] {
+    unsafe { slice::from_raw_parts_mut(any as *mut T as *mut u8, size_of::<T>()) }
+}
+
+/// Cast back a byte array into a given struct type.
+/// There is no check performed regarding the validity of the operation.
+///
+/// # Safety
+///
+/// Of course, it is highly unsafe in general, since it can create arbitrary
+/// objects from unchecked memory.
+///
+/// The safest way to use this function is in combination with [`any_as_bytes`].
+pub unsafe fn any_from_bytes<T>(any_bytes: &[u8]) -> &T {
+    unsafe { &*(any_bytes.as_ptr() as *const T) }
 }
 
 #[cfg(test)]

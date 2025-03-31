@@ -86,12 +86,15 @@ pub trait HasAddressFilter {
     type AddressFilter: AddressFilter;
 
     fn address_filter(&self) -> &Self::AddressFilter;
+
     fn address_filter_mut(&mut self) -> &mut Self::AddressFilter;
+
     fn update_address_filter(&mut self, qemu: Qemu, filter: Self::AddressFilter) {
         *self.address_filter_mut() = filter;
         // Necessary because some hooks filter during TB generation.
         qemu.flush_jit();
     }
+
     fn allow_address_range(&mut self, address_range: &Range<GuestAddr>) {
         self.address_filter_mut().register(address_range);
     }

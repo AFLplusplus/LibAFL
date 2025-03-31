@@ -195,25 +195,24 @@ pub trait ObserverWithHashField {
 /// cleanup in `Observer::post_exec`. For individual executions, use
 /// `DifferentialObserver::{pre,post}_observe_{first,second}` as necessary for first and second,
 /// respectively.
-#[expect(unused_variables)]
 pub trait DifferentialObserver<OTA, OTB, I, S>: Observer<I, S> {
     /// Perform an operation with the first set of observers before they are `pre_exec`'d.
-    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+    fn pre_observe_first(&mut self, _observers: &mut OTA) -> Result<(), Error> {
         Ok(())
     }
 
     /// Perform an operation with the first set of observers after they are `post_exec`'d.
-    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+    fn post_observe_first(&mut self, _observers: &mut OTA) -> Result<(), Error> {
         Ok(())
     }
 
     /// Perform an operation with the second set of observers before they are `pre_exec`'d.
-    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+    fn pre_observe_second(&mut self, _observers: &mut OTB) -> Result<(), Error> {
         Ok(())
     }
 
     /// Perform an operation with the second set of observers after they are `post_exec`'d.
-    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+    fn post_observe_second(&mut self, _observers: &mut OTB) -> Result<(), Error> {
         Ok(())
     }
 }

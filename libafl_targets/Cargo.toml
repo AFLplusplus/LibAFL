@@ -78,6 +78,7 @@ hashbrown = { workspace = true, default-features = true }
 once_cell = "1.19.0"
 log = { workspace = true }
 rustversion = { workspace = true }
+nix = { workspace = true }
 
 rangemap = { workspace = true }
 serde = { workspace = true, default-features = false, features = [

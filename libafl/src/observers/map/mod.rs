@@ -7,7 +7,9 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use libafl_bolts::{AsSlice, AsSliceMut, HasLen, Named, Truncate, ownedref::OwnedMutSlice};
+use libafl_bolts::{
+    AsSlice, AsSliceMut, HasLen, Named, Truncate, hasher_std, ownedref::OwnedMutSlice,
+};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
@@ -404,6 +406,121 @@ pub trait VarLenMapObserver: MapObserver {
 }
 
 /// Implementors guarantee the size of the map is constant at any point in time and equals N.
+pub trait HasVarLenMap {
+    /// A map entry
+    type Entry: PartialEq + Copy;
+
+    /// A mutable slice reference to the map.
+    /// The length of the map gives the maximum allocatable size.
+    fn map_ptr(&self) -> *const Self::Entry;
+
+    /// A slice reference to the map.
+    /// The length of the map gives the maximum allocatable size.
+    fn map_ptr_mut(&mut self) -> *mut Self::Entry;
+
+    /// A reference to the size of the map.
+    fn size_ptr(&self) -> *const usize;
+
+    /// A mutable reference to the size of the map.
+    fn size_ptr_mut(&mut self) -> *mut usize;
+
+    /// The max size of the map
+    fn max_size(&self) -> usize;
+}
+
+/// Implementors guarantee the size of the map is constant at any point in time and equals N.
+pub trait HasConstLenMap<const N: usize> {
+    /// A map entry
+    type Entry: PartialEq + Copy;
+
+    /// The size of the map
+    const LENGTH: usize = N;
+
+    /// A const ptr to the map
+    fn map_ptr(&self) -> *const Self::Entry;
+
+    /// A mutable ptr to the map
+    fn map_ptr_mut(&mut self) -> *mut Self::Entry;
+}
+
+/// A wrapper around a const map
+#[derive(Debug)]
+pub struct ConstBytesMap<const N: usize> {
+    map_ptr: *mut u8,
+}
+
+/// A wrapper around a const map
+#[derive(Debug)]
+pub struct VarLenBytesMap {
+    map_ptr: *mut u8,
+    size_ptr: *mut usize,
+    max_size: usize,
+}
+
+impl<const N: usize> ConstBytesMap<N> {
+    /// Create a new const bytes map
+    ///
+    /// # Safety
+    ///
+    /// The map must be allocated at this point.
+    pub unsafe fn new(map_ptr: *mut u8) -> Self {
+        Self { map_ptr }
+    }
+}
+
+impl VarLenBytesMap {
+    /// Create a new variable length bytes map
+    ///
+    /// # Safety
+    ///
+    /// The map and the size must be allocated at this point.
+    /// invariant: the map should always have size elements
+    pub unsafe fn new(map_ptr: *mut u8, size_ptr: *mut usize, max_size: usize) -> Self {
+        Self {
+            map_ptr,
+            size_ptr,
+            max_size,
+        }
+    }
+}
+
+impl HasVarLenMap for VarLenBytesMap {
+    type Entry = u8;
+
+    fn map_ptr(&self) -> *const Self::Entry {
+        self.map_ptr as *const Self::Entry
+    }
+
+    fn map_ptr_mut(&mut self) -> *mut Self::Entry {
+        self.map_ptr
+    }
+
+    fn size_ptr(&self) -> *const usize {
+        self.size_ptr as *const usize
+    }
+
+    fn size_ptr_mut(&mut self) -> *mut usize {
+        self.size_ptr
+    }
+
+    fn max_size(&self) -> usize {
+        self.max_size
+    }
+}
+
+impl<const N: usize> HasConstLenMap<N> for ConstBytesMap<N> {
+    type Entry = u8;
+
+    fn map_ptr(&self) -> *const Self::Entry {
+        self.map_ptr as *const u8
+    }
+
+    fn map_ptr_mut(&mut self) -> *mut Self::Entry {
+        self.map_ptr
+    }
+}
+
+/// Implementors guarantee the size of the map is constant at any point in time and equals N.
 pub trait ConstLenMapObserver<const N: usize>: MapObserver {
     /// The size of the map
     const LENGTH: usize = N;
@@ -447,10 +564,25 @@ pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool> {
 impl<I, S, T> Observer<I, S> for StdMapObserver<'_, T, false>
 where
     Self: MapObserver,
+    T: Hash,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
+    }
+
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        let map = self.map.as_ref();
+
+        let mut hasher = hasher_std();
+        map.hash(&mut hasher);
+        // println!("map hash: {:#x}", hasher.finish());
+        Ok(())
     }
 }
 
