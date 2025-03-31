@@ -52,6 +52,7 @@ RUN apt-get update && \
     gdb-multiarch \
     git \
     gnupg \
+    less \
     libc6-dev:i386 \
     libclang-dev \
     libgcc-12-dev:i386 \
@@ -71,8 +72,6 @@ RUN set -ex &&\
 RUN apt-get update && \
   apt-get install -y \
   clang-format-${LLVM_VERSION}
-
-RUN git config --global core.pager cat
 
 # Install a modern version of QEMU
 WORKDIR /root

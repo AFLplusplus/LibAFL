@@ -188,6 +188,9 @@ where
                 }
                 _ => panic!("Unhandled QEMU shutdown cause: {shutdown_cause:?}."),
             },
+            EmulatorExitResult::Crash => {
+                return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)));
+            }
             EmulatorExitResult::Timeout => {
                 return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Timeout)));
             }

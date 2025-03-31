@@ -12,7 +12,7 @@ use std::{ptr, str};
 #[cfg(feature = "usermode")]
 use libafl::state::HasCorpus;
 use libafl::{
-    Error, ExecutionProcessor, HasScheduler,
+    Error, ExecutionProcessor,
     events::{EventFirer, EventRestarter},
     executors::{
         Executor, ExitKind, HasObservers,
@@ -21,7 +21,7 @@ use libafl::{
         inprocess_fork::stateful::StatefulInProcessForkExecutor,
     },
     feedbacks::Feedback,
-    fuzzer::{HasFeedback, HasObjective},
+    fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
@@ -45,6 +45,9 @@ use crate::{EmulatorModules, Qemu, QemuSignalContext, run_target_crash_hooks};
 type EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> =
     StatefulInProcessExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, Z>;
 
+#[cfg(feature = "systemmode")]
+pub(crate) static BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
+
 pub struct QemuExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
     inner: EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>,
     first_exec: bool,
@@ -60,7 +63,7 @@ pub struct QemuExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
 ///
 /// This should be used as a crash handler, and nothing else.
 #[cfg(feature = "usermode")]
-pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, F, I, OF, S, Z>(
+pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
     signal: Signal,
     info: &mut siginfo_t,
     mut context: Option<&mut ucontext_t>,
@@ -70,10 +73,9 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, F, I, OF, S, Z>(
     E: Executor<EM, I, S, Z> + HasObservers,
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
-    F: Feedback<EM, I, E::Observers, S>,
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I> + Unpin,
-    Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+    Z: HasObjective<Objective = OF>,
     I: Input + Clone + Unpin,
 {
     log::debug!("QEMU signal handler has been triggered (signal {signal})");
@@ -100,7 +102,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, F, I, OF, S, Z>(
                         qemu.run_signal_handler(signal.into(), info, puc);
                     }
 
-                    // if we are there, we can safely to execution
+                    // if we are there, we can safely resume from the signal handler.
                     return;
                 }
                 QemuSignalContext::InQemuSignalHandlerHost => {
@@ -121,13 +123,13 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, F, I, OF, S, Z>(
                     // run qemu hooks then report the crash.
 
                     log::debug!(
-                        "QEMU Target signal received that should be handled by host. Most likely a target crash."
+                        "QEMU Target signal received that should be handled by host. It is a target crash."
                     );
 
                     log::debug!("Running crash hooks.");
                     run_target_crash_hooks::<ET, I, S>(signal.into());
 
-                    assert!(unsafe { data.maybe_report_crash::<E, EM, F, I, OF, S, Z>(None) });
+                    assert!(unsafe { data.maybe_report_crash::<E, EM, I, OF, S, Z>(None) });
 
                     if let Some(cpu) = qemu.current_cpu() {
                         eprint!("QEMU Context:\n{}", cpu.display_context());
@@ -143,7 +145,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, F, I, OF, S, Z>(
 
             if let Ok(bsod) = bsod {
                 if let Ok(bsod_str) = str::from_utf8(&bsod) {
-                    log::error!("\n{}", bsod_str);
+                    log::error!("\n{bsod_str}");
                 } else {
                     log::error!("convert minibsod to string failed");
                 }
@@ -158,13 +160,10 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, F, I, OF, S, Z>(
     }
 }
 
-#[cfg(feature = "systemmode")]
-pub(crate) static BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
-
 /// # Safety
 /// Can call through the `unix_signal_handler::inproc_timeout_handler`.
 /// Calling this method multiple times concurrently can lead to race conditions.
-pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, F, I, OF, S, Z>(
+pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
     signal: Signal,
     info: &mut siginfo_t,
     context: Option<&mut ucontext_t>,
@@ -174,12 +173,11 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, F, I, OF, S, Z>(
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
-    F: Feedback<EM, I, E::Observers, S>,
     I: Unpin,
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasExecutions + HasSolutions<I> + Unpin + HasCurrentTestcase<I>,
     I: Input,
-    Z: HasObjective<Objective = OF> + HasFeedback<Feedback = F>,
+    Z: HasObjective<Objective = OF>,
 {
     #[cfg(feature = "systemmode")]
     unsafe {
@@ -189,7 +187,6 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, F, I, OF, S, Z>(
             libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
                 E,
                 EM,
-                F,
                 I,
                 OF,
                 S,
@@ -208,7 +205,6 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, F, I, OF, S, Z>(
         libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<
             E,
             EM,
-            F,
             I,
             OF,
             S,
@@ -238,7 +234,7 @@ where
     OT: ObserversTuple<I, S>,
     S: Unpin + HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
 {
-    pub fn new<F, OF>(
+    pub fn new<OF>(
         emulator: Emulator<C, CM, ED, ET, I, S, SM>,
         harness_fn: &'a mut H,
         observers: OT,
@@ -252,12 +248,8 @@ where
         CM: CommandManager<C, ED, ET, I, S, SM, Commands = C>,
         ED: EmulatorDriver<C, CM, ET, I, S, SM>,
         EM: EventFirer<I, S> + EventRestarter<S>,
-        F: Feedback<EM, I, OT, S>,
         OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF>
-            + HasScheduler<I, S>
-            + ExecutionProcessor<EM, I, OT, S>
-            + HasFeedback<Feedback = F>,
+        Z: HasObjective<Objective = OF> + ExecutionProcessor<EM, I, OT, S>,
     {
         let mut inner = StatefulInProcessExecutor::with_timeout(
             harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,
@@ -267,7 +259,7 @@ where
         #[cfg(feature = "usermode")]
         {
             inner.inprocess_hooks_mut().crash_handler =
-                inproc_qemu_crash_handler::<Self, EM, ET, F, I, OF, S, Z> as *const c_void;
+                inproc_qemu_crash_handler::<Self, EM, ET, I, OF, S, Z> as *const c_void;
         }
 
         // rewrite the timeout handler pointer
@@ -275,7 +267,6 @@ where
             StatefulInProcessExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, Z>,
             EM,
             ET,
-            F,
             I,
             OF,
             S,

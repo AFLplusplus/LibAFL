@@ -76,7 +76,7 @@ trait State:
 impl<C, I, R, SC> State for StdState<C, I, R, SC>
 where
     C: Serialize + DeserializeOwned,
-    R: Rand,
+    R: Rand + Serialize + for<'de> Deserialize<'de>,
     SC: Serialize + DeserializeOwned,
 {
 }
@@ -977,10 +977,7 @@ where
             self.reset_initial_files_state();
             self.canonicalize_input_dirs(in_dirs)?;
             if cores.ids.len() > corpus_size {
-                log::info!(
-                    "low intial corpus count ({}), no parallelism required.",
-                    corpus_size
-                );
+                log::info!("low intial corpus count ({corpus_size}), no parallelism required.");
             } else {
                 let core_index = cores
                     .ids

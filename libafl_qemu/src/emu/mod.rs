@@ -57,6 +57,7 @@ pub enum EmulatorExitResult<C> {
     QemuExit(QemuShutdownCause), // QEMU ended for some reason.
     Breakpoint(Breakpoint<C>),   // Breakpoint triggered. Contains the address of the trigger.
     CustomInsn(CustomInsn<C>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    Crash,                     // Crash
     Timeout,                   // Timeout
 }
 
@@ -74,6 +75,9 @@ where
             }
             EmulatorExitResult::CustomInsn(sync_exit) => {
                 write!(f, "{sync_exit:?}")
+            }
+            EmulatorExitResult::Crash => {
+                write!(f, "Crash")
             }
             EmulatorExitResult::Timeout => {
                 write!(f, "Timeout")
@@ -218,6 +222,9 @@ where
             EmulatorExitResult::Breakpoint(bp) => write!(f, "{bp}"),
             EmulatorExitResult::CustomInsn(sync_exit) => {
                 write!(f, "Sync exit: {sync_exit:?}")
+            }
+            EmulatorExitResult::Crash => {
+                write!(f, "Crash")
             }
             EmulatorExitResult::Timeout => {
                 write!(f, "Timeout")
@@ -455,6 +462,7 @@ where
                 QemuExitReason::End(qemu_shutdown_cause) => {
                     EmulatorExitResult::QemuExit(qemu_shutdown_cause)
                 }
+                QemuExitReason::Crash => EmulatorExitResult::Crash,
                 QemuExitReason::Timeout => EmulatorExitResult::Timeout,
                 QemuExitReason::Breakpoint(bp_addr) => {
                     let bp = self

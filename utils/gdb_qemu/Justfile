@@ -1,6 +1,5 @@
 import "../../just/libafl.just"
 
-
 DEMO_TARGET := "powerpc-unknown-linux-gnu"
 HOST_TARGET := "x86_64-unknown-linux-gnu"
 DEMO_DIR := TARGET_DIR/DEMO_TARGET/PROFILE_DIR

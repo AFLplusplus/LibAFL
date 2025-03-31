@@ -240,7 +240,7 @@ pub fn fuzz() {
         )));
 
         // Setup an havoc mutator with a mutational stage
-        let tracing = ShadowTracingStage::new(&mut executor);
+        let tracing = ShadowTracingStage::new();
         let mutator = StdScheduledMutator::new(havoc_mutations());
         let mut stages = tuple_list!(tracing, i2s, StdMutationalStage::new(mutator),);
 

@@ -60,7 +60,8 @@ alloc = ["serde/alloc", "hashbrown", "postcard", "erased-serde/alloc", "ahash"]
 ## Provide the `#[derive(SerdeAny)]` macro.
 derive = ["libafl_derive"]
 
-## If set, libafl_bolt's `rand` implementations will implement `rand::Rng`
+## If set, libafl_bolt's `rand` implementations will implement `rand_core::CoreRng`
+## and, inversely, all seedable `rand_core::RngCore` types can be used as Rng for LibAFL.
 rand_trait = ["rand_core"]
 
 ## Will build the `pyo3` bindings

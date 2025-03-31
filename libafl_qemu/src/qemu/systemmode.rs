@@ -96,11 +96,13 @@ impl CPU {
                 page as GuestVirtAddr,
                 attrs.as_mut_ptr(),
             );
+            let mask = Qemu::get_unchecked().target_page_mask();
+            let offset = vaddr & (mask as GuestVirtAddr);
             #[expect(clippy::cast_sign_loss)]
             if paddr == (-1i64 as GuestPhysAddr) {
                 None
             } else {
-                Some(paddr)
+                Some(paddr + offset)
             }
         }
     }
@@ -180,11 +182,6 @@ impl CPU {
 
 #[expect(clippy::unused_self)]
 impl Qemu {
-    #[must_use]
-    pub fn guest_page_size(&self) -> usize {
-        4096
-    }
-
     /// Write a value to a physical guest address, including ROM areas.
     ///
     /// # Safety
@@ -313,6 +310,11 @@ impl Qemu {
     pub fn target_page_size(&self) -> usize {
         unsafe { libafl_qemu_sys::qemu_target_page_size() }
     }
+
+    #[must_use]
+    pub fn target_page_mask(&self) -> usize {
+        unsafe { libafl_qemu_sys::qemu_target_page_mask() as usize }
+    }
 }
 
 impl QemuMemoryChunk {
@@ -426,7 +428,7 @@ impl Iterator for PhysMemoryIter {
                 }
             };
             let start_phys_addr: GuestPhysAddr = self.cpu.get_phys_addr(*vaddr)?;
-            let phys_page_size = self.qemu.guest_page_size();
+            let phys_page_size = self.qemu.target_page_size();
 
             // TODO: Turn this into a generic function
             let mut size_taken: usize = std::cmp::min(

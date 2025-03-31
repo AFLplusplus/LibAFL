@@ -1,0 +1,15 @@
+[target.i686-unknown-linux-gnu]
+linker = "i686-linux-gnu-gcc"
+
+[target.armv7-unknown-linux-gnueabi]
+linker = "arm-linux-gnueabi-gcc"
+runner = "qemu-arm -L /usr/arm-linux-gnueabi/"
+
+
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+runner = "qemu-aarch64 -L /usr/aarch64-linux-gnu/"
+
+[target.powerpc-unknown-linux-gnu]
+linker = "powerpc-linux-gnu-gcc"
+runner = "qemu-ppc -L /usr/powerpc-linux-gnu/"

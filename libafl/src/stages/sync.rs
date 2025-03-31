@@ -19,7 +19,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{Event, EventConfig, EventFirer, llmp::LlmpEventConverter},
     executors::{Executor, ExitKind, HasObservers},
-    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
+    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor, HasObjective},
     inputs::{Input, InputConverter},
     stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{
@@ -107,7 +107,7 @@ where
 
         let mut new_files = vec![];
         for dir in &self.sync_dirs {
-            log::debug!("Syncing from dir: {:?}", dir);
+            log::debug!("Syncing from dir: {dir:?}");
             let new_dir_files = find_new_files_rec(dir, &last)?;
             new_files.extend(new_dir_files);
         }
@@ -134,7 +134,7 @@ where
                 .unwrap()
                 .left_to_sync
                 .retain(|p| p != &path);
-            log::debug!("Syncing and evaluating {:?}", path);
+            log::debug!("Syncing and evaluating {path:?}");
             fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
 
@@ -248,7 +248,7 @@ where
         + MaybeHasClientPerfMonitor,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
-    Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
+    Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S> + HasObjective,
 {
     #[inline]
     fn perform(

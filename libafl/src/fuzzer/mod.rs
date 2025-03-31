@@ -15,10 +15,7 @@ use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    events::{
-        CanSerializeObserver, Event, EventConfig, EventFirer, EventReceiver, ProgressReporter,
-        RecordSerializationTime, SendExiting,
-    },
+    events::{Event, EventConfig, EventFirer, EventReceiver, ProgressReporter, SendExiting},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
@@ -70,6 +67,12 @@ pub trait HasObjective {
 
     /// The objective feedback (mutable)
     fn objective_mut(&mut self) -> &mut Self::Objective;
+
+    /// Whether to share objective testcases among fuzzing nodes
+    fn share_objectives(&self) -> bool;
+
+    /// Sets whether to share objectives among nodes
+    fn set_share_objectives(&mut self, share_objectives: bool);
 }
 
 /// Evaluates if an input is interesting using the feedback
@@ -91,6 +94,7 @@ pub trait ExecutionProcessor<EM, I, OT, S> {
         manager: &mut EM,
         input: &I,
         exec_res: &ExecuteInputResult,
+        exit_kind: &ExitKind,
         observers: &OT,
     ) -> Result<Option<CorpusId>, Error>;
 
@@ -292,6 +296,8 @@ pub struct StdFuzzer<CS, F, IF, OF> {
     feedback: F,
     objective: OF,
     input_filter: IF,
+    // Handles whether to share objective testcases among nodes
+    share_objectives: bool,
 }
 
 impl<CS, F, I, IF, OF, S> HasScheduler<I, S> for StdFuzzer<CS, F, IF, OF>
@@ -331,12 +337,20 @@ impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
     fn objective_mut(&mut self) -> &mut OF {
         &mut self.objective
     }
+
+    fn set_share_objectives(&mut self, share_objectives: bool) {
+        self.share_objectives = share_objectives;
+    }
+
+    fn share_objectives(&self) -> bool {
+        self.share_objectives
+    }
 }
 
 impl<CS, EM, F, I, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
-    EM: EventFirer<I, S> + CanSerializeObserver<OT>,
+    EM: EventFirer<I, S>,
     F: Feedback<EM, I, OT, S>,
     I: Input,
     OF: Feedback<EM, I, OT, S>,
@@ -389,12 +403,14 @@ where
 
     /// Post process a testcase depending the testcase execution results
     /// returns corpus id if it put something into corpus (not solution)
+    /// This code will not be reached by inprocess executor if crash happened.
     fn process_execution(
         &mut self,
         state: &mut S,
         manager: &mut EM,
         input: &I,
         exec_res: &ExecuteInputResult,
+        exit_kind: &ExitKind,
         observers: &OT,
     ) -> Result<Option<CorpusId>, Error> {
         let corpus = if exec_res.is_corpus() {
@@ -415,6 +431,7 @@ where
         if exec_res.is_solution() {
             // The input is a solution, add it to the respective corpus
             let mut testcase = Testcase::from(input.clone());
+            testcase.add_metadata(*exit_kind);
             testcase.set_parent_id_optional(*state.corpus().current());
             if let Ok(mut tc) = state.current_testcase_mut() {
                 tc.found_objective();
@@ -439,12 +456,12 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         // Now send off the event
-        let observers_buf = if exec_res.is_solution()
+        let observers_buf = if exec_res.is_corpus()
             && manager.should_send()
             && manager.configuration() != EventConfig::AlwaysUnique
         {
             // TODO set None for fast targets
-            manager.serialize_observers(observers)?
+            Some(postcard::to_allocvec(observers)?)
         } else {
             None
         };
@@ -480,14 +497,11 @@ where
                     },
                 )?;
             }
-
             if exec_res.is_solution() {
                 manager.fire(
                     state,
                     Event::Objective {
-                        #[cfg(feature = "share_objectives")]
-                        input: input.clone(),
-
+                        input: self.share_objectives.then_some(input.clone()),
                         objective_size: state.solutions().count(),
                         time: current_time(),
                     },
@@ -508,7 +522,8 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         let exec_res = self.check_results(state, manager, input, observers, exit_kind)?;
-        let corpus_id = self.process_execution(state, manager, input, &exec_res, observers)?;
+        let corpus_id =
+            self.process_execution(state, manager, input, &exec_res, exit_kind, observers)?;
         if send_events {
             self.serialize_and_dispatch(state, manager, input, &exec_res, observers, exit_kind)?;
         }
@@ -524,7 +539,7 @@ where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
     E::Observers: MatchName + ObserversTuple<I, S> + Serialize,
-    EM: EventFirer<I, S> + CanSerializeObserver<E::Observers>,
+    EM: EventFirer<I, S>,
     F: Feedback<EM, I, E::Observers, S>,
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasCorpus<I>
@@ -597,7 +612,7 @@ where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
     E::Observers: MatchName + ObserversTuple<I, S> + Serialize,
-    EM: EventFirer<I, S> + CanSerializeObserver<E::Observers>,
+    EM: EventFirer<I, S>,
     F: Feedback<EM, I, E::Observers, S>,
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasCorpus<I>
@@ -636,6 +651,8 @@ where
     }
 
     /// Adds an input, even if it's not considered `interesting` by any of the executors
+    /// If you are using inprocess executor, be careful.
+    /// Your crash-causing testcase will *NOT* be added into the corpus (only to solution)
     fn add_input(
         &mut self,
         state: &mut S,
@@ -677,9 +694,7 @@ where
             manager.fire(
                 state,
                 Event::Objective {
-                    #[cfg(feature = "share_objectives")]
-                    input: input.clone(),
-
+                    input: self.share_objectives.then_some(input.clone()),
                     objective_size: state.solutions().count(),
                     time: current_time(),
                 },
@@ -714,7 +729,7 @@ where
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
         } else {
-            manager.serialize_observers(&*observers)?
+            Some(postcard::to_allocvec(&*observers)?)
         };
         manager.fire(
             state,
@@ -747,10 +762,7 @@ where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
     E::Observers: DeserializeOwned + Serialize + ObserversTuple<I, S>,
-    EM: EventReceiver<I, S>
-        + RecordSerializationTime
-        + CanSerializeObserver<E::Observers>
-        + EventFirer<I, S>,
+    EM: EventReceiver<I, S> + EventFirer<I, S>,
     F: Feedback<EM, I, E::Observers, S>,
     I: Input,
     OF: Feedback<EM, I, E::Observers, S>,
@@ -780,13 +792,8 @@ where
                         exit_kind,
                         ..
                     } => {
-                        let start = current_time();
                         let observers: E::Observers =
                             postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                        {
-                            let dur = current_time() - start;
-                            manager.set_deserialization_time(dur);
-                        }
                         let res = self.evaluate_execution(
                             state, manager, input, &observers, &exit_kind, false,
                         )?;
@@ -802,10 +809,16 @@ where
                         )?;
                         res.1
                     }
-                    #[cfg(feature = "share_objectives")]
-                    Event::Objective { ref input, .. } => {
+                    Event::Objective {
+                        input: Some(ref unwrapped_input),
+                        ..
+                    } => {
                         let res = self.evaluate_input_with_observers(
-                            state, executor, manager, input, false,
+                            state,
+                            executor,
+                            manager,
+                            unwrapped_input,
+                            false,
                         )?;
                         res.1
                     }
@@ -831,7 +844,7 @@ where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
     E::Observers: DeserializeOwned + Serialize + ObserversTuple<I, S>,
-    EM: CanSerializeObserver<E::Observers> + EventFirer<I, S> + RecordSerializationTime,
+    EM: EventFirer<I, S>,
     I: Input,
     F: Feedback<EM, I, E::Observers, S>,
     OF: Feedback<EM, I, E::Observers, S>,
@@ -966,6 +979,7 @@ impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
             feedback,
             objective,
             input_filter,
+            share_objectives: false,
         }
     }
 }

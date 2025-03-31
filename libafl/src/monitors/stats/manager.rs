@@ -170,9 +170,10 @@ impl ClientStatsManager {
 
     /// Get process timing. `execs_per_sec_pretty` could be retrieved from `GlobalStats`.
     #[must_use]
-    pub fn process_timing(&self, execs_per_sec_pretty: String) -> ProcessTiming {
+    pub fn process_timing(&self, execs_per_sec_pretty: String, total_execs: u64) -> ProcessTiming {
         let mut total_process_timing = ProcessTiming::new();
         total_process_timing.exec_speed = execs_per_sec_pretty;
+        total_process_timing.total_execs = total_execs;
         if self.client_stats().len() > 1 {
             let mut new_path_time = Duration::default();
             let mut new_objectives_time = Duration::default();

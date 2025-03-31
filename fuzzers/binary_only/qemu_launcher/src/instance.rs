@@ -44,7 +44,8 @@ use libafl_qemu::{
         cmplog::CmpLogObserver,
         edges::EdgeCoverageFullVariant,
         utils::filters::{HasAddressFilter, NopPageFilter, StdAddressFilter},
-        EdgeCoverageModule, EmulatorModuleTuple, SnapshotModule, StdEdgeCoverageModule,
+        AsanGuestModule, EdgeCoverageModule, EmulatorModuleTuple, SnapshotModule,
+        StdEdgeCoverageModule,
     },
     Emulator, GuestAddr, Qemu, QemuExecutor,
 };
@@ -153,7 +154,7 @@ impl<M: Monitor> Instance<'_, M> {
             .map_observer(edges_observer.as_mut())
             .build()?;
 
-        let mut snapshot_module = SnapshotModule::new();
+        let mut snapshot_module = SnapshotModule::with_filters(AsanGuestModule::snapshot_filters());
 
         /*
          * Since the generics for the modules are already excessive when taking
@@ -315,7 +316,7 @@ impl<M: Monitor> Instance<'_, M> {
 
             let mut shadow_executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
-            let tracing = ShadowTracingStage::new(&mut shadow_executor);
+            let tracing = ShadowTracingStage::new();
 
             // Setup a randomic Input2State stage
             let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
