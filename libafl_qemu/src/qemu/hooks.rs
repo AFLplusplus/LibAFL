@@ -8,8 +8,6 @@ use core::{ffi::c_void, fmt::Debug, mem::transmute, ptr};
 
 use libafl::executors::hooks::inprocess::inprocess_get_state;
 use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize};
-#[cfg(feature = "python")]
-use pyo3::{FromPyObject, pyclass, pymethods};
 
 use crate::{
     HookData, HookId,
@@ -92,8 +90,6 @@ pub enum Hook<F, C, R: Clone> {
 /// This enum is shadowed by another enum in QEMU (`libafl_syshook_ret`). Any change made to this
 /// enum should be propagated to the C enum as well.
 #[repr(C)]
-#[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", derive(FromPyObject))]
 pub enum SyscallHookResult {
     /// Runs the syscall after the hook is executed. The return value will be the one of the
     /// syscall itself.
