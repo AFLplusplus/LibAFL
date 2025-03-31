@@ -39,6 +39,6 @@ pub trait Host: Debug + Send {
     fn unpoison(start: GuestAddr, len: usize) -> Result<(), Self::Error>;
     fn is_poison(start: GuestAddr, len: usize) -> Result<bool, Self::Error>;
     fn swap(enabled: bool) -> Result<(), Self::Error>;
-    fn alloc(start: GuestAddr, len: usize) -> Result<(), Self::Error>;
-    fn dealloc(start: GuestAddr) -> Result<(), Self::Error>;
+    fn track(start: GuestAddr, len: usize) -> Result<(), Self::Error>;
+    fn untrack(start: GuestAddr) -> Result<(), Self::Error>;
 }

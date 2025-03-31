@@ -111,7 +111,7 @@ impl<S: Symbols> Host for LibcHost<S> {
         Ok(())
     }
 
-    fn alloc(start: GuestAddr, len: usize) -> Result<(), LibcHostError<S>> {
+    fn track(start: GuestAddr, len: usize) -> Result<(), LibcHostError<S>> {
         unsafe {
             let syscall = Self::get_syscall()?;
             let ret = syscall(Self::SYSCALL_NO, HostAction::Alloc as usize, start, len);
@@ -122,7 +122,7 @@ impl<S: Symbols> Host for LibcHost<S> {
         Ok(())
     }
 
-    fn dealloc(start: GuestAddr) -> Result<(), LibcHostError<S>> {
+    fn untrack(start: GuestAddr) -> Result<(), LibcHostError<S>> {
         let syscall = Self::get_syscall()?;
         let ret = unsafe { syscall(Self::SYSCALL_NO, HostAction::Dealloc as usize, start) };
         if ret != 0 {

@@ -13,7 +13,8 @@ use alloc::{
     collections::{BTreeMap, VecDeque},
     fmt::Debug,
 };
-use core::slice::from_raw_parts_mut;
+#[cfg(feature = "initialize")]
+use core::ptr::write_bytes;
 
 use log::debug;
 use thiserror::Error;
@@ -94,7 +95,7 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
         );
 
         self.tracking
-            .alloc(data, len)
+            .track(data, len)
             .map_err(|e| DefaultFrontendError::TrackingError(e))?;
         self.shadow
             .poison(orig, data - orig, PoisonType::AsanHeapLeftRz)
@@ -107,8 +108,10 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
             .poison(data + len, poison_len, PoisonType::AsanStackRightRz)
             .map_err(|e| DefaultFrontendError::ShadowError(e))?;
 
-        let buffer = unsafe { from_raw_parts_mut(data as *mut u8, len) };
-        buffer.iter_mut().for_each(|b| *b = 0xff);
+        #[cfg(feature = "initialize")]
+        unsafe {
+            write_bytes(data as *mut u8, 0xff, len)
+        };
         Ok(data)
     }
 
@@ -130,7 +133,7 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
             )
             .map_err(|e| DefaultFrontendError::ShadowError(e))?;
         self.tracking
-            .dealloc(addr)
+            .untrack(addr)
             .map_err(|e| DefaultFrontendError::TrackingError(e))?;
         self.quaratine_used += alloc.backend_len;
         self.quarantine.push_back(alloc);
