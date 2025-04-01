@@ -238,15 +238,11 @@ where
             }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor {
-                time,
-                executions,
                 introspection_stats,
                 ..
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                client_stats_manager.client_stats_insert(ClientId(0));
                 client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
-                    client_stat.update_executions(*executions, *time);
                     client_stat.update_introspection_stats((**introspection_stats).clone());
                 });
                 monitor.display(client_stats_manager, event.name(), ClientId(0));
