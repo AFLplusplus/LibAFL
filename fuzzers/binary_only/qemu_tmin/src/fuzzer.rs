@@ -1,4 +1,4 @@
-//! A libfuzzer-like fuzzer using qemu for binary-only coverage
+//! A binary-only testcase minimizer using qemu, similar to AFL++ afl-tmin
 #[cfg(feature = "i386")]
 use core::mem::size_of;
 #[cfg(feature = "snapshot")]
@@ -7,7 +7,7 @@ use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    corpus::{Corpus, HasCurrentCorpusId, InMemoryOnDiskCorpus, InMemoryCorpus, NopCorpus},
+    corpus::{Corpus, HasCurrentCorpusId, InMemoryCorpus, InMemoryOnDiskCorpus, NopCorpus},
     events::{SendExiting, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
@@ -17,7 +17,7 @@ use libafl::{
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::{ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
-    stages::{ObserverEqualityFactory, StagesTuple, StdTMinMutationalStage},
+    stages::{ObserverEqualityFactory, StagesTuple, StdMutationalStage, StdTMinMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
@@ -112,28 +112,6 @@ pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
 pub fn fuzz() -> Result<(), Error> {
     env_logger::init();
-    let mut options = FuzzerOptions::parse();
-
-    let corpus_dir = PathBuf::from(options.input);
-
-    let files = corpus_dir
-        .read_dir()
-        .expect("Failed to read corpus dir")
-        .map(|x| Ok(x?.path()))
-        .collect::<Result<Vec<PathBuf>, io::Error>>()
-        .expect("Failed to read dir entry");
-
-    let num_files = files.len();
-    let num_cores = options.cores.ids.len();
-    let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
-    
-    let program = env::args().next().unwrap();
-    log::info!("Program: {program:}");
-
-    options.args.insert(0, program);
-    log::info!("ARGS: {:#?}", options.args);
-
-    env::remove_var("LD_LIBRARY_PATH");
 
     let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
@@ -150,8 +128,6 @@ pub fn fuzz() -> Result<(), Error> {
         ))
     };
 
-    let mut feedback = MaxMapFeedback::new(&edges_observer);
-
     #[cfg(feature = "fork")]
     let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
         .const_map_observer(edges_observer.as_mut())
@@ -165,6 +141,12 @@ pub fn fuzz() -> Result<(), Error> {
         SnapshotModule::new()
     );
 
+    let mut options = FuzzerOptions::parse();
+    let program = env::args().next().unwrap();
+    log::info!("Program: {program:}");
+    options.args.insert(0, program);
+    log::info!("ARGS: {:#?}", options.args);
+
     let emulator = Emulator::empty()
         .qemu_parameters(options.args)
         .modules(modules)
@@ -173,20 +155,12 @@ pub fn fuzz() -> Result<(), Error> {
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
-
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     log::info!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
     qemu.entry_break(test_one_input_ptr);
-
-    let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
-    log::info!("Break at {pc:#x}");
-
-    let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
-    log::info!("Return address = {ret_addr:#x}");
-    qemu.set_breakpoint(ret_addr);
 
     let input_addr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
@@ -195,37 +169,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
-    let monitor = SimpleMonitor::with_user_monitor(|s| {
-        println!("{s}");
-    });
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
-    {
-        Ok(res) => res,
-        Err(err) => match err {
-            Error::ShuttingDown => {
-                return Ok(());
-            }
-            _ => {
-                panic!("Failed to setup the restarter: {err}");
-            }
-        },
-    };
-
-    let mut objective = ();
-
-    let mut state = state.unwrap_or_else(|| {
-        StdState::new(
-            StdRand::new(),
-            InMemoryOnDiskCorpus::new(PathBuf::from(options.output)).unwrap(),
-            InMemoryCorpus::new(),
-            &mut feedback,
-            &mut objective,
-        )
-        .unwrap()
-    });
-
-    let scheduler = QueueScheduler::new();
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
 
     #[cfg(feature = "fork")]
     let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
@@ -294,34 +238,88 @@ pub fn fuzz() -> Result<(), Error> {
             ExitKind::Ok
         };
 
-        // let core_id = client_description.core_id();
-        // let core_idx = options
-        //     .cores
-        //     .position(core_id)
-        //     .expect("Failed to get core index");
+    let corpus_dir = PathBuf::from(options.input);
 
-        // let files = corpus_files
-        //     .iter()
-        //     .skip(files_per_core * core_idx)
-        //     .take(files_per_core)
-        //     .map(|x| x.path())
-        //     .collect::<Vec<PathBuf>>();
+    let files = corpus_dir
+        .read_dir()
+        .expect("Failed to read corpus dir")
+        .map(|x| Ok(x?.path()))
+        .collect::<Result<Vec<PathBuf>, io::Error>>()
+        .expect("Failed to read dir entry");
 
-        // if files.is_empty() {
-        //     mgr.send_exiting()?;
-        //     Err(Error::ShuttingDown)?
-        // }
+    let num_files = files.len();
+    let num_cores = options.cores.ids.len();
+    let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
 
-        let mut objective = ();
-        
+    env::remove_var("LD_LIBRARY_PATH");
 
-        let minimizer = StdScheduledMutator::new(havoc_mutations());
-        let factory = ObserverEqualityFactory::new(&edges_observer);
-        let mut stages = tuple_list!(StdTMinMutationalStage::new(
-            minimizer,
-            factory,
-            options.iterations
-        ));
+    let mut feedback = MaxMapFeedback::new(&edges_observer);
+
+    let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
+    log::info!("Break at {pc:#x}");
+
+    log::info!("Return address = {ret_addr:#x}");
+    qemu.set_breakpoint(ret_addr);
+
+    let monitor = SimpleMonitor::with_user_monitor(|s| {
+        println!("{s}");
+    });
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    {
+        Ok(res) => res,
+        Err(err) => match err {
+            Error::ShuttingDown => {
+                return Ok(());
+            }
+            _ => {
+                panic!("Failed to setup the restarter: {err}");
+            }
+        },
+    };
+
+    let mut objective = ();
+
+    let mut state = state.unwrap_or_else(|| {
+        StdState::new(
+            StdRand::new(),
+            InMemoryOnDiskCorpus::new(PathBuf::from(options.output)).unwrap(),
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap()
+    });
+
+    let scheduler = QueueScheduler::new();
+    let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+
+    // let core_id = client_description.core_id();
+    // let core_idx = options
+    //     .cores
+    //     .position(core_id)
+    //     .expect("Failed to get core index");
+
+    // let files = corpus_files
+    //     .iter()
+    //     .skip(files_per_core * core_idx)
+    //     .take(files_per_core)
+    //     .map(|x| x.path())
+    //     .collect::<Vec<PathBuf>>();
+
+    // if files.is_empty() {
+    //     mgr.send_exiting()?;
+    //     Err(Error::ShuttingDown)?
+    // }
+
+    let mut objective = ();
+
+    let minimizer = StdScheduledMutator::new(havoc_mutations());
+    let factory = ObserverEqualityFactory::new(&edges_observer);
+    let mut stages = tuple_list!(StdTMinMutationalStage::new(
+        minimizer,
+        factory,
+        options.iterations
+    ));
 
     #[cfg(feature = "fork")]
     let mut executor = QemuForkExecutor::new(
@@ -346,37 +344,19 @@ pub fn fuzz() -> Result<(), Error> {
         Duration::from_millis(5000),
     )?;
 
-    state.load_initial_inputs_by_filenames_forced(
-        &mut fuzzer,
-        &mut executor,
-        &mut mgr,
-        &files,
-    )?;
+    state.load_initial_inputs_by_filenames_forced(&mut fuzzer, &mut executor, &mut mgr, &files)?;
     log::info!("Processed {} inputs from disk.", files.len());
 
     let first_id = state.corpus().first().expect("Empty corpus");
     state.set_corpus_id(first_id)?;
-    
-    stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
-
-    // Old CMIN
-    // println!("Importing {} seeds...", files.len());
-    // if state.must_load_initial_inputs() {
-    //     state
-    //         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &files)
-    //         .unwrap_or_else(|_| {
-    //             println!("Failed to load initial corpus");
-    //             process::exit(0);
-    //         });
-    //     println!("Imported {} seeds from disk.", state.corpus().count());
-    // }
 
     let size = state.corpus().count();
-    println!(
-        "Removed {} duplicates from {} seeds",
-        files.len() - size,
-        files.len()
-    );
+    println!("Corpus size: {size}");
+
+    stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
+
+    let size = state.corpus().count();
+    println!("Corpus size: {size}");
 
     mgr.send_exiting()?;
     Ok(())

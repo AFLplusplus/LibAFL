@@ -1,4 +1,4 @@
-//! A libfuzzer-like fuzzer using qemu for binary-only coverage
+//! A binary-only testcase minimizer using qemu, similar to AFL++ afl-tmin
 #[cfg(target_os = "linux")]
 mod fuzzer;
 
