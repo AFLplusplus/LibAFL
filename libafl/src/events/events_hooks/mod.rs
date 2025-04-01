@@ -4,7 +4,7 @@
 //! other clients
 use libafl_bolts::ClientId;
 
-use crate::{Error, events::Event};
+use crate::{Error, events::EventWrapper};
 
 /// The `broker_hooks` that are run before and after the event manager calls `try_receive`
 pub trait EventManagerHook<I, S> {
@@ -14,7 +14,7 @@ pub trait EventManagerHook<I, S> {
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<I>,
+        event: &EventWrapper<I>,
     ) -> Result<bool, Error>;
 }
 
@@ -25,7 +25,7 @@ pub trait EventManagerHooksTuple<I, S> {
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<I>,
+        event: &EventWrapper<I>,
     ) -> Result<bool, Error>;
 }
 
@@ -35,7 +35,7 @@ impl<I, S> EventManagerHooksTuple<I, S> for () {
         &mut self,
         _state: &mut S,
         _client_id: ClientId,
-        _event: &Event<I>,
+        _event: &EventWrapper<I>,
     ) -> Result<bool, Error> {
         Ok(true)
     }
@@ -51,7 +51,7 @@ where
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<I>,
+        event: &EventWrapper<I>,
     ) -> Result<bool, Error> {
         let first = self.0.pre_receive(state, client_id, event)?;
         let second = self.1.pre_receive_all(state, client_id, event)?;

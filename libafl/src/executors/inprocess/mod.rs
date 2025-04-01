@@ -17,7 +17,7 @@ use libafl_bolts::tuples::{RefIndexable, tuple_list};
 use crate::{
     Error, HasMetadata,
     corpus::{Corpus, Testcase},
-    events::{Event, EventFirer, EventRestarter},
+    events::{Event, EventFirer, EventRestarter, EventWrapper},
     executors::{
         Executor, ExitKind, HasObservers,
         hooks::{ExecutorHooksTuple, inprocess::InProcessHooks},
@@ -360,14 +360,16 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
             .solutions_mut()
             .add(new_testcase)
             .expect("In run_observers_and_save_state solutions failure.");
+
+        let event = Event::Objective {
+            input: fuzzer.share_objectives().then_some(input.clone()),
+            objective_size: state.solutions().count(),
+        };
+
         event_mgr
             .fire(
                 state,
-                Event::Objective {
-                    input: fuzzer.share_objectives().then_some(input.clone()),
-                    objective_size: state.solutions().count(),
-                    time: libafl_bolts::current_time(),
-                },
+                EventWrapper::new_with_current_time(event, *state.executions()),
             )
             .expect("Could not send off events in run_observers_and_save_state");
     }

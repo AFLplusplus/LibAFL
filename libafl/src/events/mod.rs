@@ -238,6 +238,64 @@ where
 }
 */
 
+/// Basic statistics
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ExecStats {
+    /// The time of generation of the [`Event`]
+    time: Duration,
+    /// The executions of this client
+    executions: u64,
+}
+
+impl ExecStats {
+    /// Create an new [`ExecStats`].
+    #[must_use]
+    pub fn new(time: Duration, executions: u64) -> Self {
+        Self { time, executions }
+    }
+}
+
+/// Event with associated stats
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct EventWrapper<I> {
+    /// The event
+    event: Event<I>,
+    /// Statistics on new event
+    stats: ExecStats,
+}
+
+impl<I> EventWrapper<I> {
+    /// Create a new [`EventWrapper`].
+    pub fn new(event: Event<I>, stats: ExecStats) -> Self {
+        Self { event, stats }
+    }
+
+    /// Create a new [`EventWrapper`], with the current time.
+    pub fn new_with_current_time(event: Event<I>, executions: u64) -> Self {
+        let time = current_time();
+
+        Self {
+            event,
+            stats: ExecStats { time, executions },
+        }
+    }
+
+    /// Get the inner ref to the [`Event`] in [`EventWrapper`].
+    pub fn event(&self) -> &Event<I> {
+        &self.event
+    }
+
+    /// Get the inner mutable ref to the [`Event`] in [`EventWrapper`].
+    pub fn event_mut(&mut self) -> &mut Event<I> {
+        &mut self.event
+    }
+
+    /// Get the inner ref to the [`ExecStats`] in [`EventWrapper`].
+    pub fn stats(&self) -> &ExecStats {
+        &self.stats
+    }
+}
+
 // TODO remove forward_id as not anymore needed for centralized
 /// Events sent around in the library
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -256,23 +314,14 @@ pub enum Event<I> {
         corpus_size: usize,
         /// The client config for this observers/testcase combination
         client_config: EventConfig,
-        /// The time of generation of the event
-        time: Duration,
         /// The original sender if, if forwarded
         forward_id: Option<libafl_bolts::ClientId>,
         /// The (multi-machine) node from which the tc is from, if any
         #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
         node_id: Option<NodeId>,
     },
-    /// New stats event to monitor.
-    UpdateExecStats {
-        /// The time of generation of the [`Event`]
-        time: Duration,
-        /// The executions of this client
-        executions: u64,
-        /// [`PhantomData`]
-        phantom: PhantomData<I>,
-    },
+    /// A hearbeat, to notice a fuzzer is still alive.
+    Heartbeat,
     /// New user stats event to monitor.
     UpdateUserStats {
         /// Custom user monitor name
@@ -285,10 +334,6 @@ pub enum Event<I> {
     /// New monitor with performance monitor.
     #[cfg(feature = "introspection")]
     UpdatePerfMonitor {
-        /// The time of generation of the event
-        time: Duration,
-        /// The executions of this client
-        executions: u64,
         /// Current performance statistics
         introspection_stats: Box<ClientPerfStats>,
 
@@ -301,8 +346,6 @@ pub enum Event<I> {
         input: Option<I>,
         /// Objective corpus size
         objective_size: usize,
-        /// The time when this event was created
-        time: Duration,
     },
     /// Write a new log
     Log {
@@ -327,7 +370,7 @@ impl<I> Event<I> {
     pub fn name(&self) -> &str {
         match self {
             Event::NewTestcase { .. } => "Testcase",
-            Event::UpdateExecStats { .. } => "Client Heartbeat",
+            Event::Heartbeat => "Client Heartbeat",
             Event::UpdateUserStats { .. } => "UserStats",
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor { .. } => "PerfMonitor",
@@ -349,7 +392,7 @@ impl<I> Event<I> {
             Event::NewTestcase { input, .. } => {
                 Cow::Owned(format!("Testcase {}", input.generate_name(None)))
             }
-            Event::UpdateExecStats { .. } => Cow::Borrowed("Client Heartbeat"),
+            Event::Heartbeat => Cow::Borrowed("Client Heartbeat"),
             Event::UpdateUserStats { .. } => Cow::Borrowed("UserStats"),
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor { .. } => Cow::Borrowed("PerfMonitor"),
@@ -378,7 +421,7 @@ pub trait EventFirer<I, S> {
     /// (for example for each [`Input`], on multiple cores)
     /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
     /// This should not happen for a normal use-case.
-    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+    fn fire(&mut self, state: &mut S, event: EventWrapper<I>) -> Result<(), Error>;
 
     /// Send off an [`Event::Log`] event to the broker.
     /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
@@ -387,13 +430,27 @@ pub trait EventFirer<I, S> {
         state: &mut S,
         severity_level: LogSeverity,
         message: String,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        S: HasExecutions,
+    {
+        let executions = *state.executions();
+        let cur = current_time();
+
+        let stats = ExecStats {
+            executions,
+            time: cur,
+        };
+
         self.fire(
             state,
-            Event::Log {
-                severity_level,
-                message,
-                phantom: PhantomData,
+            EventWrapper {
+                event: Event::Log {
+                    severity_level,
+                    message,
+                    phantom: PhantomData,
+                },
+                stats,
             },
         )
     }
@@ -442,14 +499,18 @@ where
     let executions = *state.executions();
     let cur = current_time();
 
+    let stats = ExecStats {
+        executions,
+        time: cur,
+    };
+
     // Default no introspection implmentation
     #[cfg(not(feature = "introspection"))]
     reporter.fire(
         state,
-        Event::UpdateExecStats {
-            executions,
-            time: cur,
-            phantom: PhantomData,
+        EventWrapper {
+            event: Event::Heartbeat,
+            stats,
         },
     )?;
 
@@ -538,11 +599,11 @@ pub trait AwaitRestartSafe {
 pub trait EventReceiver<I, S> {
     /// Lookup for incoming events and process them.
     /// Return the event, if any, that needs to be evaluated
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error>;
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWrapper<I>, bool)>, Error>;
 
     /// Run the post processing routine after the fuzzer deemed this event as interesting
     /// For example, in centralized manager you wanna send this an event.
-    fn on_interesting(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+    fn on_interesting(&mut self, state: &mut S, event: EventWrapper<I>) -> Result<(), Error>;
 }
 /// The id of this `EventManager`.
 /// For multi processed `EventManagers`,
@@ -570,7 +631,7 @@ impl<I, S> EventFirer<I, S> for NopEventManager {
         true
     }
 
-    fn fire(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, _event: EventWrapper<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -602,11 +663,11 @@ impl AwaitRestartSafe for NopEventManager {
 }
 
 impl<I, S> EventReceiver<I, S> for NopEventManager {
-    fn try_receive(&mut self, _state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, _state: &mut S) -> Result<Option<(EventWrapper<I>, bool)>, Error> {
         Ok(None)
     }
 
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWrapper<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -659,7 +720,7 @@ where
     }
 
     #[inline]
-    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, event: EventWrapper<I>) -> Result<(), Error> {
         self.inner.fire(state, event)
     }
 
@@ -669,7 +730,10 @@ where
         state: &mut S,
         severity_level: LogSeverity,
         message: String,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        S: HasExecutions,
+    {
         self.inner.log(state, severity_level, message)
     }
 
@@ -718,10 +782,10 @@ where
     EM: EventReceiver<I, S>,
 {
     #[inline]
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWrapper<I>, bool)>, Error> {
         self.inner.try_receive(state)
     }
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWrapper<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -758,7 +822,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use libafl_bolts::{Named, current_time, tuples::tuple_list};
+    use libafl_bolts::{Named, tuples::tuple_list};
     use tuple_list::tuple_list_type;
 
     use crate::{
@@ -787,7 +851,6 @@ mod tests {
             exit_kind: ExitKind::Ok,
             corpus_size: 123,
             client_config: EventConfig::AlwaysUnique,
-            time: current_time(),
             forward_id: None,
             #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
             node_id: None,

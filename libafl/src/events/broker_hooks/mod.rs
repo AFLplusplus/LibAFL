@@ -30,6 +30,8 @@ pub mod centralized_multi_machine;
 #[cfg(all(unix, feature = "multi_machine"))]
 pub use centralized_multi_machine::*;
 
+use super::EventWrapper;
+
 /// An LLMP-backed event hook for scalable multi-processed fuzzing
 #[derive(Debug)]
 pub struct StdLlmpEventHook<I, MT> {
@@ -71,7 +73,7 @@ where
             } else {
                 &*msg
             };
-            let event: Event<I> = postcard::from_bytes(event_bytes)?;
+            let event: EventWrapper<I> = postcard::from_bytes(event_bytes)?;
             match Self::handle_in_broker(
                 monitor,
                 &mut self.client_stats_manager,
@@ -117,8 +119,16 @@ where
         monitor: &mut MT,
         client_stats_manager: &mut ClientStatsManager,
         client_id: ClientId,
-        event: &Event<I>,
+        event: &EventWrapper<I>,
     ) -> Result<BrokerEventResult, Error> {
+        let stats = event.stats();
+
+        client_stats_manager.client_stats_insert(ClientId(0));
+        client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
+            client_stat.update_executions(stats.executions, stats.time);
+        });
+
+        let event = event.event();
         match &event {
             Event::NewTestcase {
                 corpus_size,
@@ -138,19 +148,7 @@ where
                 monitor.display(client_stats_manager, event.name(), id);
                 Ok(BrokerEventResult::Forward)
             }
-            Event::UpdateExecStats {
-                time,
-                executions,
-                phantom: _,
-            } => {
-                // TODO: The monitor buffer should be added on client add.
-                client_stats_manager.client_stats_insert(client_id);
-                client_stats_manager.update_client_stats_for(client_id, |client_stat| {
-                    client_stat.update_executions(*executions, *time);
-                });
-                monitor.display(client_stats_manager, event.name(), client_id);
-                Ok(BrokerEventResult::Handled)
-            }
+            Event::Heartbeat => Ok(BrokerEventResult::Handled),
             Event::UpdateUserStats { name, value, .. } => {
                 client_stats_manager.client_stats_insert(client_id);
                 client_stats_manager.update_client_stats_for(client_id, |client_stat| {

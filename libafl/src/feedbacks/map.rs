@@ -23,11 +23,12 @@ use crate::feedbacks::premature_last_result_err;
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
     corpus::Testcase,
-    events::{Event, EventFirer},
+    events::{Event, EventFirer, EventWrapper},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver},
+    state::HasExecutions,
 };
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
@@ -390,7 +391,7 @@ where
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     OT: MatchName,
     R: Reducer<O::Entry>,
-    S: HasNamedMetadata,
+    S: HasNamedMetadata + HasExecutions,
 {
     #[rustversion::nightly]
     default fn is_interesting(
@@ -512,14 +513,17 @@ where
         // unnecessarily
         manager.fire(
             state,
-            Event::UpdateUserStats {
-                name: self.stats_name.clone(),
-                value: UserStats::new(
-                    UserStatsValue::Ratio(covered as u64, len as u64),
-                    AggregatorOps::Avg,
-                ),
-                phantom: PhantomData,
-            },
+            EventWrapper::new_with_current_time(
+                Event::UpdateUserStats {
+                    name: self.stats_name.clone(),
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(covered as u64, len as u64),
+                        AggregatorOps::Avg,
+                    ),
+                    phantom: PhantomData,
+                },
+                *state.executions(),
+            ),
         )?;
 
         Ok(())
@@ -534,7 +538,7 @@ where
     EM: EventFirer<I, S>,
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     OT: MatchName,
-    S: HasNamedMetadata,
+    S: HasNamedMetadata + HasExecutions,
 {
     fn is_interesting(
         &mut self,
