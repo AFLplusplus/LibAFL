@@ -6,7 +6,7 @@ use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
 use libafl_bolts::{
-    AsIter, Named, current_time,
+    AsIter, Named,
     tuples::{Handle, Handled},
 };
 use num_traits::ToPrimitive;
@@ -15,7 +15,7 @@ use z3::{Config, Context, Optimize, ast::Bool};
 use crate::{
     Error, HasMetadata, HasScheduler,
     corpus::Corpus,
-    events::{Event, EventFirer, LogSeverity},
+    events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, HasObservers},
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},

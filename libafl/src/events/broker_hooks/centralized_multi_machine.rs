@@ -22,7 +22,7 @@ use tokio::{
 
 use crate::{
     events::{
-        Event, EventWithStats,
+        EventWithStats,
         centralized::_LLMP_TAG_TO_MAIN,
         multi_machine::{MultiMachineMsg, TcpMultiMachineState},
     },

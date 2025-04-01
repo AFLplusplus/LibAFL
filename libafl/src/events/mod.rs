@@ -525,12 +525,13 @@ where
         // costly as `ClientPerfStats` impls `Copy` since it only contains `u64`s
         reporter.fire(
             state,
-            Event::UpdatePerfMonitor {
-                executions,
-                time: cur,
-                introspection_stats: Box::new(state.introspection_stats().clone()),
-                phantom: PhantomData,
-            },
+            EventWithStats::new(
+                Event::UpdatePerfMonitor {
+                    introspection_stats: Box::new(state.introspection_stats().clone()),
+                    phantom: PhantomData,
+                },
+                stats,
+            ),
         )?;
     }
 

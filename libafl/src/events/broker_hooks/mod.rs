@@ -160,8 +160,6 @@ where
             }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor {
-                time,
-                executions,
                 introspection_stats,
                 phantom: _,
             } => {
@@ -170,8 +168,6 @@ where
                 // Get the client for the staterestorer ID
                 client_stats_manager.client_stats_insert(client_id);
                 client_stats_manager.update_client_stats_for(client_id, |client_stat| {
-                    // Update the normal monitor for this client
-                    client_stat.update_executions(*executions, *time);
                     // Update the performance monitor for this client
                     client_stat.update_introspection_stats((**introspection_stats).clone());
                 });

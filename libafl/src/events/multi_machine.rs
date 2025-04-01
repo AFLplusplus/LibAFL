@@ -22,9 +22,7 @@ use tokio::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::{
-        Event, EventWithStats, TcpMultiMachineLlmpReceiverHook, TcpMultiMachineLlmpSenderHook,
-    },
+    events::{EventWithStats, TcpMultiMachineLlmpReceiverHook, TcpMultiMachineLlmpSenderHook},
     inputs::{Input, NopInput},
 };
 
