@@ -121,6 +121,21 @@ pub fn fuzz() -> Result<(), Error> {
     options.args.insert(0, program);
     log::info!("ARGS: {:#?}", options.args);
 
+    // Get all of the files supplied from the input corpus
+    let corpus_dir = PathBuf::from(options.input);
+    let files = corpus_dir
+        .read_dir()
+        .expect("Failed to read corpus dir")
+        .map(|x| Ok(x?.path()))
+        .collect::<Result<Vec<PathBuf>, io::Error>>()
+        .expect("Failed to read dir entry");
+    let num_files = files.len();
+    let num_cores = options.cores.ids.len();
+    let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
+
+    // Clear LD_LIBRARY_PATH
+    env::remove_var("LD_LIBRARY_PATH");
+
     // Create a shared memory region for sharing coverage map between fuzzer and target
     let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
@@ -249,20 +264,6 @@ pub fn fuzz() -> Result<(), Error> {
 
             ExitKind::Ok
         };
-
-    // Get all of the files supplied from the input corpus
-    let corpus_dir = PathBuf::from(options.input);
-    let files = corpus_dir
-        .read_dir()
-        .expect("Failed to read corpus dir")
-        .map(|x| Ok(x?.path()))
-        .collect::<Result<Vec<PathBuf>, io::Error>>()
-        .expect("Failed to read dir entry");
-    let num_files = files.len();
-    let num_cores = options.cores.ids.len();
-    let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
-
-    env::remove_var("LD_LIBRARY_PATH");
 
     // Set up the most basic monitor possible.
     let monitor = SimpleMonitor::with_user_monitor(|s| {
