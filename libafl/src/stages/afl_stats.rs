@@ -418,7 +418,7 @@ where
 
         manager.fire(
             state,
-            EventWithStats::new_with_current_time(
+            EventWithStats::with_current_time(
                 Event::UpdateUserStats {
                     name: Cow::Borrowed("AflStats"),
                     value: UserStats::new(

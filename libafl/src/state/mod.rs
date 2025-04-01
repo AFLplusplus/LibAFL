@@ -764,7 +764,7 @@ where
 
         manager.fire(
             self,
-            EventWithStats::new_with_current_time(
+            EventWithStats::with_current_time(
                 Event::Log {
                     severity_level: LogSeverity::Debug,
                     message: format!("Loaded {} initial testcases.", self.corpus().count()), // get corpus count
@@ -1065,7 +1065,7 @@ where
         }
         manager.fire(
             self,
-            EventWithStats::new_with_current_time(
+            EventWithStats::with_current_time(
                 Event::Log {
                     severity_level: LogSeverity::Debug,
                     message: format!("Loaded {added} over {num} initial testcases"),

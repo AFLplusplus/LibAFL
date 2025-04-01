@@ -513,7 +513,7 @@ where
         // unnecessarily
         manager.fire(
             state,
-            EventWithStats::new_with_current_time(
+            EventWithStats::with_current_time(
                 Event::UpdateUserStats {
                     name: self.stats_name.clone(),
                     value: UserStats::new(

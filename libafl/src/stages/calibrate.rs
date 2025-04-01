@@ -335,7 +335,7 @@ where
                     map_first_filled_count.saturating_sub(unstable_entries) as u64;
                 mgr.fire(
                     state,
-                    EventWithStats::new_with_current_time(
+                    EventWithStats::with_current_time(
                         Event::UpdateUserStats {
                             name: Cow::from("stability"),
                             value: UserStats::new(
@@ -351,7 +351,7 @@ where
         } else if send_default_stability {
             mgr.fire(
                 state,
-                EventWithStats::new_with_current_time(
+                EventWithStats::with_current_time(
                     Event::UpdateUserStats {
                         name: Cow::from("stability"),
                         value: UserStats::new(

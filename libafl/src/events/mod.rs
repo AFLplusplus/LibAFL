@@ -271,7 +271,7 @@ impl<I> EventWithStats<I> {
     }
 
     /// Create a new [`EventWithStats`], with the current time.
-    pub fn new_with_current_time(event: Event<I>, executions: u64) -> Self {
+    pub fn with_current_time(event: Event<I>, executions: u64) -> Self {
         let time = current_time();
 
         Self {

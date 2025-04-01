@@ -272,7 +272,7 @@ where
 
                 self.client.fire(
                     state,
-                    EventWithStats::new_with_current_time(
+                    EventWithStats::with_current_time(
                         Event::NewTestcase {
                             input,
                             observers_buf: None,

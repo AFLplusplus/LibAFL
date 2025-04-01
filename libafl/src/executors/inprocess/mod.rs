@@ -369,7 +369,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
         event_mgr
             .fire(
                 state,
-                EventWithStats::new_with_current_time(event, *state.executions()),
+                EventWithStats::with_current_time(event, *state.executions()),
             )
             .expect("Could not send off events in run_observers_and_save_state");
     }
