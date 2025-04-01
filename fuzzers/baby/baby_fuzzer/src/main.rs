@@ -35,6 +35,7 @@ fn signals_set(idx: usize) {
 
 #[expect(clippy::manual_assert)]
 pub fn main() {
+    env_logger::init();
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
