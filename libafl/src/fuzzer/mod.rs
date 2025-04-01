@@ -360,6 +360,7 @@ where
     OT: ObserversTuple<I, S> + Serialize,
     S: HasCorpus<I>
         + MaybeHasClientPerfMonitor
+        + HasExecutions
         + HasCurrentTestcase<I>
         + HasSolutions<I>
         + HasLastFoundTime
@@ -420,6 +421,7 @@ where
         let corpus = if exec_res.is_corpus() {
             // Add the input to the main corpus
             let mut testcase = Testcase::from(input.clone());
+            testcase.set_executions(*state.executions());
             #[cfg(feature = "track_hit_feedbacks")]
             self.feedback_mut()
                 .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
@@ -435,6 +437,7 @@ where
         if exec_res.is_solution() {
             // The input is a solution, add it to the respective corpus
             let mut testcase = Testcase::from(input.clone());
+            testcase.set_executions(*state.executions());
             testcase.add_metadata(*exit_kind);
             testcase.set_parent_id_optional(*state.corpus().current());
             if let Ok(mut tc) = state.current_testcase_mut() {
@@ -674,7 +677,9 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
+        let executions = *state.executions();
         let mut testcase = Testcase::from(input.clone());
+        testcase.set_executions(executions);
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
@@ -763,6 +768,7 @@ where
 
     fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {
         let mut testcase = Testcase::from(input.clone());
+        testcase.set_executions(*state.executions());
         testcase.set_disabled(true);
         // Add the disabled input to the main corpus
         let id = state.corpus_mut().add_disabled(testcase)?;
