@@ -16,7 +16,7 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
     Error,
-    events::{Event, EventFirer, EventWrapper},
+    events::{Event, EventFirer, EventWithStats},
     fuzzer::EvaluatorObservers,
     inputs::{Input, InputConverter, NopInput, NopInputConverter},
     state::{HasCurrentTestcase, HasSolutions, NopState},
@@ -385,13 +385,13 @@ where
     }
 
     #[cfg(feature = "llmp_compression")]
-    fn fire(&mut self, _state: &mut S, event: EventWrapper<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         if self.converter.is_none() {
             return Ok(());
         }
 
         // Filter out non interestign events and convert `NewTestcase`
-        let converted_event = EventWrapper::new(
+        let converted_event = EventWithStats::new(
             match event.event {
                 Event::NewTestcase {
                     input,
@@ -439,13 +439,13 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn fire(&mut self, _state: &mut S, event: EventWrapper<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         if self.converter.is_none() {
             return Ok(());
         }
 
         // Filter out non interestign events and convert `NewTestcase`
-        let converted_event = EventWrapper::new(
+        let converted_event = EventWithStats::new(
             match event.event {
                 Event::NewTestcase {
                     input,

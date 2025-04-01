@@ -22,7 +22,7 @@ use libafl_bolts::{
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 
-use super::{AwaitRestartSafe, EventWrapper};
+use super::{AwaitRestartSafe, EventWithStats};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
@@ -166,7 +166,7 @@ where
     }
 
     #[expect(clippy::match_same_arms)]
-    fn fire(&mut self, state: &mut S, mut event: EventWrapper<I>) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, mut event: EventWithStats<I>) -> Result<(), Error> {
         if !self.is_main {
             // secondary node
             let mut is_tc = false;
@@ -264,7 +264,7 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWrapper<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         if self.is_main {
             // main node
             self.receive_from_secondary(state)
@@ -275,7 +275,7 @@ where
         }
     }
 
-    fn on_interesting(&mut self, state: &mut S, event: EventWrapper<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         self.inner.fire(state, event)
     }
 }
@@ -346,7 +346,7 @@ where
     SP: ShMemProvider<ShMem = SHM>,
 {
     #[cfg(feature = "llmp_compression")]
-    fn forward_to_main(&mut self, event: &EventWrapper<I>) -> Result<(), Error> {
+    fn forward_to_main(&mut self, event: &EventWithStats<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
@@ -366,7 +366,7 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn forward_to_main(&mut self, event: &EventWrapper<I>) -> Result<(), Error> {
+    fn forward_to_main(&mut self, event: &EventWithStats<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(event)?;
         self.client.send_buf(_LLMP_TAG_TO_MAIN, &serialized)?;
         Ok(())
@@ -375,7 +375,7 @@ where
     fn receive_from_secondary(
         &mut self,
         state: &mut S,
-    ) -> Result<Option<(EventWrapper<I>, bool)>, Error> {
+    ) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client.sender().id();
         while let Some((client_id, tag, _flags, msg)) = self.client.recv_buf_with_flags()? {
@@ -398,7 +398,7 @@ where
             } else {
                 msg
             };
-            let event: EventWrapper<I> = postcard::from_bytes(event_bytes)?;
+            let event: EventWithStats<I> = postcard::from_bytes(event_bytes)?;
             log::debug!(
                 "Processor received message {}",
                 event.event().name_detailed()

@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
-    events::{Event, EventConfig, EventFirer, EventWrapper, llmp::LlmpEventConverter},
+    events::{Event, EventConfig, EventFirer, EventWithStats, llmp::LlmpEventConverter},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor, HasObjective},
     inputs::{Input, InputConverter},
@@ -272,7 +272,7 @@ where
 
                 self.client.fire(
                     state,
-                    EventWrapper::new_with_current_time(
+                    EventWithStats::new_with_current_time(
                         Event::NewTestcase {
                             input,
                             observers_buf: None,

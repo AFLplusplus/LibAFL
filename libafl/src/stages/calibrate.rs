@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
-    events::{Event, EventFirer, EventWrapper, LogSeverity},
+    events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{HasObserverHandle, map::MapFeedbackMetadata},
     fuzzer::Evaluator,
@@ -335,7 +335,7 @@ where
                     map_first_filled_count.saturating_sub(unstable_entries) as u64;
                 mgr.fire(
                     state,
-                    EventWrapper::new_with_current_time(
+                    EventWithStats::new_with_current_time(
                         Event::UpdateUserStats {
                             name: Cow::from("stability"),
                             value: UserStats::new(
@@ -351,7 +351,7 @@ where
         } else if send_default_stability {
             mgr.fire(
                 state,
-                EventWrapper::new_with_current_time(
+                EventWithStats::new_with_current_time(
                     Event::UpdateUserStats {
                         name: Cow::from("stability"),
                         value: UserStats::new(

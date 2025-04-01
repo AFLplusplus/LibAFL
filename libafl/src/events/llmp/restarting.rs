@@ -55,7 +55,7 @@ use crate::{
     common::HasMetadata,
     events::{
         _LLMP_TAG_EVENT_TO_BROKER, AwaitRestartSafe, Event, EventConfig, EventFirer,
-        EventManagerHooksTuple, EventManagerId, EventReceiver, EventRestarter, EventWrapper,
+        EventManagerHooksTuple, EventManagerId, EventReceiver, EventRestarter, EventWithStats,
         HasEventManagerId, LLMP_TAG_EVENT_TO_BOTH, LlmpShouldSaveState, ProgressReporter,
         SendExiting, StdLlmpEventHook, launcher::ClientDescription, std_maybe_report_progress,
         std_report_progress,
@@ -121,7 +121,7 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn fire(&mut self, _state: &mut S, event: EventWrapper<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         #[cfg(feature = "llmp_compression")]
         let flags = LLMP_FLAG_INITIALIZED;
@@ -255,7 +255,7 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWrapper<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
         while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
@@ -280,7 +280,7 @@ where
                 msg
             };
 
-            let event: EventWrapper<I> = postcard::from_bytes(event_bytes)?;
+            let event: EventWithStats<I> = postcard::from_bytes(event_bytes)?;
             log::debug!(
                 "Received event in normal llmp {}",
                 event.event().name_detailed()
@@ -341,7 +341,7 @@ where
         Ok(None)
     }
 
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWrapper<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWithStats<I>) -> Result<(), Error> {
         Ok(())
     }
 }

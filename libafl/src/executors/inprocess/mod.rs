@@ -17,7 +17,7 @@ use libafl_bolts::tuples::{RefIndexable, tuple_list};
 use crate::{
     Error, HasMetadata,
     corpus::{Corpus, Testcase},
-    events::{Event, EventFirer, EventRestarter, EventWrapper},
+    events::{Event, EventFirer, EventRestarter, EventWithStats},
     executors::{
         Executor, ExitKind, HasObservers,
         hooks::{ExecutorHooksTuple, inprocess::InProcessHooks},
@@ -369,7 +369,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
         event_mgr
             .fire(
                 state,
-                EventWrapper::new_with_current_time(event, *state.executions()),
+                EventWithStats::new_with_current_time(event, *state.executions()),
             )
             .expect("Could not send off events in run_observers_and_save_state");
     }

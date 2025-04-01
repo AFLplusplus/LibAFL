@@ -257,20 +257,20 @@ impl ExecStats {
 
 /// Event with associated stats
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct EventWrapper<I> {
+pub struct EventWithStats<I> {
     /// The event
     event: Event<I>,
     /// Statistics on new event
     stats: ExecStats,
 }
 
-impl<I> EventWrapper<I> {
-    /// Create a new [`EventWrapper`].
+impl<I> EventWithStats<I> {
+    /// Create a new [`EventWithStats`].
     pub fn new(event: Event<I>, stats: ExecStats) -> Self {
         Self { event, stats }
     }
 
-    /// Create a new [`EventWrapper`], with the current time.
+    /// Create a new [`EventWithStats`], with the current time.
     pub fn new_with_current_time(event: Event<I>, executions: u64) -> Self {
         let time = current_time();
 
@@ -280,17 +280,17 @@ impl<I> EventWrapper<I> {
         }
     }
 
-    /// Get the inner ref to the [`Event`] in [`EventWrapper`].
+    /// Get the inner ref to the [`Event`] in [`EventWithStats`].
     pub fn event(&self) -> &Event<I> {
         &self.event
     }
 
-    /// Get the inner mutable ref to the [`Event`] in [`EventWrapper`].
+    /// Get the inner mutable ref to the [`Event`] in [`EventWithStats`].
     pub fn event_mut(&mut self) -> &mut Event<I> {
         &mut self.event
     }
 
-    /// Get the inner ref to the [`ExecStats`] in [`EventWrapper`].
+    /// Get the inner ref to the [`ExecStats`] in [`EventWithStats`].
     pub fn stats(&self) -> &ExecStats {
         &self.stats
     }
@@ -421,7 +421,7 @@ pub trait EventFirer<I, S> {
     /// (for example for each [`Input`], on multiple cores)
     /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
     /// This should not happen for a normal use-case.
-    fn fire(&mut self, state: &mut S, event: EventWrapper<I>) -> Result<(), Error>;
+    fn fire(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error>;
 
     /// Send off an [`Event::Log`] event to the broker.
     /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
@@ -444,7 +444,7 @@ pub trait EventFirer<I, S> {
 
         self.fire(
             state,
-            EventWrapper {
+            EventWithStats {
                 event: Event::Log {
                     severity_level,
                     message,
@@ -508,7 +508,7 @@ where
     #[cfg(not(feature = "introspection"))]
     reporter.fire(
         state,
-        EventWrapper {
+        EventWithStats {
             event: Event::Heartbeat,
             stats,
         },
@@ -599,11 +599,11 @@ pub trait AwaitRestartSafe {
 pub trait EventReceiver<I, S> {
     /// Lookup for incoming events and process them.
     /// Return the event, if any, that needs to be evaluated
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWrapper<I>, bool)>, Error>;
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error>;
 
     /// Run the post processing routine after the fuzzer deemed this event as interesting
     /// For example, in centralized manager you wanna send this an event.
-    fn on_interesting(&mut self, state: &mut S, event: EventWrapper<I>) -> Result<(), Error>;
+    fn on_interesting(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error>;
 }
 /// The id of this `EventManager`.
 /// For multi processed `EventManagers`,
@@ -631,7 +631,7 @@ impl<I, S> EventFirer<I, S> for NopEventManager {
         true
     }
 
-    fn fire(&mut self, _state: &mut S, _event: EventWrapper<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, _event: EventWithStats<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -663,11 +663,11 @@ impl AwaitRestartSafe for NopEventManager {
 }
 
 impl<I, S> EventReceiver<I, S> for NopEventManager {
-    fn try_receive(&mut self, _state: &mut S) -> Result<Option<(EventWrapper<I>, bool)>, Error> {
+    fn try_receive(&mut self, _state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         Ok(None)
     }
 
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWrapper<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWithStats<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -720,7 +720,7 @@ where
     }
 
     #[inline]
-    fn fire(&mut self, state: &mut S, event: EventWrapper<I>) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         self.inner.fire(state, event)
     }
 
@@ -782,10 +782,10 @@ where
     EM: EventReceiver<I, S>,
 {
     #[inline]
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWrapper<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         self.inner.try_receive(state)
     }
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWrapper<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWithStats<I>) -> Result<(), Error> {
         Ok(())
     }
 }

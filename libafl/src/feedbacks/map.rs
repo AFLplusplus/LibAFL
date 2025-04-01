@@ -23,7 +23,7 @@ use crate::feedbacks::premature_last_result_err;
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
     corpus::Testcase,
-    events::{Event, EventFirer, EventWrapper},
+    events::{Event, EventFirer, EventWithStats},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
@@ -513,7 +513,7 @@ where
         // unnecessarily
         manager.fire(
             state,
-            EventWrapper::new_with_current_time(
+            EventWithStats::new_with_current_time(
                 Event::UpdateUserStats {
                     name: self.stats_name.clone(),
                     value: UserStats::new(

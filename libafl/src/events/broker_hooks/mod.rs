@@ -30,7 +30,7 @@ pub mod centralized_multi_machine;
 #[cfg(all(unix, feature = "multi_machine"))]
 pub use centralized_multi_machine::*;
 
-use super::EventWrapper;
+use super::EventWithStats;
 
 /// An LLMP-backed event hook for scalable multi-processed fuzzing
 #[derive(Debug)]
@@ -73,7 +73,7 @@ where
             } else {
                 &*msg
             };
-            let event: EventWrapper<I> = postcard::from_bytes(event_bytes)?;
+            let event: EventWithStats<I> = postcard::from_bytes(event_bytes)?;
             match Self::handle_in_broker(
                 monitor,
                 &mut self.client_stats_manager,
@@ -119,7 +119,7 @@ where
         monitor: &mut MT,
         client_stats_manager: &mut ClientStatsManager,
         client_id: ClientId,
-        event: &EventWrapper<I>,
+        event: &EventWithStats<I>,
     ) -> Result<BrokerEventResult, Error> {
         let stats = event.stats();
 

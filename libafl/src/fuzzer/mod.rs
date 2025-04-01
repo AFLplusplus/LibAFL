@@ -16,7 +16,7 @@ use crate::{
     Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{
-        Event, EventConfig, EventFirer, EventReceiver, EventWrapper, ProgressReporter, SendExiting,
+        Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter, SendExiting,
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -487,7 +487,7 @@ where
             if exec_res.is_corpus() {
                 manager.fire(
                     state,
-                    EventWrapper::new_with_current_time(
+                    EventWithStats::new_with_current_time(
                         Event::NewTestcase {
                             input: input.clone(),
                             observers_buf,
@@ -506,7 +506,7 @@ where
             if exec_res.is_solution() {
                 manager.fire(
                     state,
-                    EventWrapper::new_with_current_time(
+                    EventWithStats::new_with_current_time(
                         Event::Objective {
                             input: self.share_objectives.then_some(input.clone()),
                             objective_size: state.solutions().count(),
@@ -701,7 +701,7 @@ where
 
             manager.fire(
                 state,
-                EventWrapper::new_with_current_time(
+                EventWithStats::new_with_current_time(
                     Event::Objective {
                         input: self.share_objectives.then_some(input.clone()),
                         objective_size: state.solutions().count(),
@@ -743,7 +743,7 @@ where
         };
         manager.fire(
             state,
-            EventWrapper::new_with_current_time(
+            EventWithStats::new_with_current_time(
                 Event::NewTestcase {
                     input,
                     observers_buf,

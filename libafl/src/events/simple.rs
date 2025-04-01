@@ -23,7 +23,7 @@ use serde::Serialize;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 
-use super::{AwaitRestartSafe, EventWrapper, ProgressReporter, std_on_restart};
+use super::{AwaitRestartSafe, EventWithStats, ProgressReporter, std_on_restart};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
@@ -54,7 +54,7 @@ pub struct SimpleEventManager<I, MT, S> {
     /// The monitor
     monitor: MT,
     /// The events that happened since the last `handle_in_broker`
-    events: Vec<EventWrapper<I>>,
+    events: Vec<EventWithStats<I>>,
     phantom: PhantomData<S>,
     client_stats_manager: ClientStatsManager,
 }
@@ -83,7 +83,7 @@ where
         true
     }
 
-    fn fire(&mut self, _state: &mut S, event: EventWrapper<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         match Self::handle_in_broker(&mut self.monitor, &mut self.client_stats_manager, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
@@ -121,7 +121,7 @@ where
     MT: Monitor,
     S: Stoppable,
 {
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWrapper<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         while let Some(event) = self.events.pop() {
             match event.event() {
                 Event::Stop => {
@@ -136,7 +136,7 @@ where
         }
         Ok(None)
     }
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWrapper<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWithStats<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -200,7 +200,7 @@ where
     fn handle_in_broker(
         monitor: &mut MT,
         client_stats_manager: &mut ClientStatsManager,
-        event: &EventWrapper<I>,
+        event: &EventWithStats<I>,
     ) -> Result<BrokerEventResult, Error> {
         let stats = event.stats();
 
@@ -295,7 +295,7 @@ where
         true
     }
 
-    fn fire(&mut self, _state: &mut S, event: EventWrapper<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         self.inner.fire(_state, event)
     }
 }
@@ -354,11 +354,11 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWrapper<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         self.inner.try_receive(state)
     }
 
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWrapper<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWithStats<I>) -> Result<(), Error> {
         Ok(())
     }
 }
