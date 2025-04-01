@@ -123,20 +123,17 @@ where
 
             manager.fire(
                 state,
-                Event::UpdateUserStats {
-                    name: Cow::from("minimisation exec pass"),
-                    value: UserStats::new(UserStatsValue::Ratio(curr, total), AggregatorOps::None),
-                    phantom: PhantomData,
-                },
-            )?;
-
-            manager.fire(
-                state,
-                Event::UpdateExecStats {
-                    time: current_time(),
-                    phantom: PhantomData,
+                EventWithStats::with_current_time(
+                    Event::UpdateUserStats {
+                        name: Cow::from("minimisation exec pass"),
+                        value: UserStats::new(
+                            UserStatsValue::Ratio(curr, total),
+                            AggregatorOps::None,
+                        ),
+                        phantom: PhantomData,
+                    },
                     executions,
-                },
+                ),
             )?;
 
             let seed_expr = Bool::fresh_const(&ctx, "seed");
