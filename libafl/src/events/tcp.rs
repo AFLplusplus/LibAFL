@@ -45,7 +45,8 @@ use crate::{
     Error, HasMetadata,
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
-        EventReceiver, EventRestarter, HasEventManagerId, ProgressReporter, std_on_restart,
+        EventReceiver, EventRestarter, EventWithStats, HasEventManagerId, ProgressReporter,
+        std_on_restart,
     },
     inputs::Input,
     monitors::{Monitor, stats::ClientStatsManager},
@@ -292,7 +293,7 @@ where
             #[cfg(feature = "tcp_compression")]
             let event_bytes = &GzipCompressor::new().decompress(event_bytes)?;
 
-            let event: Event<I> = postcard::from_bytes(event_bytes)?;
+            let event: EventWithStats<I> = postcard::from_bytes(event_bytes)?;
             match Self::handle_in_broker(
                 &mut self.monitor,
                 &mut self.client_stats_manager,
@@ -321,9 +322,17 @@ where
         monitor: &mut MT,
         client_stats_manager: &mut ClientStatsManager,
         client_id: ClientId,
-        event: &Event<I>,
+        event: &EventWithStats<I>,
     ) -> Result<BrokerEventResult, Error> {
-        match &event {
+        let stats = event.stats();
+
+        client_stats_manager.client_stats_insert(ClientId(0));
+        client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
+            client_stat.update_executions(stats.executions, stats.time);
+        });
+
+        let event = event.event();
+        match event {
             Event::NewTestcase {
                 corpus_size,
                 forward_id,
@@ -341,16 +350,7 @@ where
                 monitor.display(client_stats_manager, event.name(), id);
                 Ok(BrokerEventResult::Forward)
             }
-            Event::UpdateExecStats {
-                time,
-                executions,
-                phantom: _,
-            } => {
-                // TODO: The monitor buffer should be added on client add.
-                client_stats_manager.client_stats_insert(client_id);
-                client_stats_manager.update_client_stats_for(client_id, |client| {
-                    client.update_executions(*executions, *time);
-                });
+            Event::Heartbeat => {
                 monitor.display(client_stats_manager, event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -608,7 +608,7 @@ where
         }
     }
 
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
 
         #[cfg(feature = "tcp_compression")]
@@ -648,7 +648,7 @@ where
         + Stoppable,
     I: DeserializeOwned,
 {
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client_id;
         let mut len_buf = [0_u8; 4];
@@ -678,15 +678,15 @@ where
                         let buf = &self.compressor.decompress(buf)?;
 
                         // make decompressed vec and slice compatible
-                        let event = postcard::from_bytes(buf)?;
+                        let event: EventWithStats<I> = postcard::from_bytes(buf)?;
 
                         if !self.hooks.pre_receive_all(state, other_client_id, &event)? {
                             continue;
                         }
-                        match event {
+                        match event.event() {
                             Event::NewTestcase {
                                 client_config,
-                                ref observers_buf,
+                                observers_buf,
                                 forward_id,
                                 ..
                             } => {
@@ -710,7 +710,7 @@ where
                             _ => {
                                 return Err(Error::unknown(format!(
                                     "Received illegal message that message should not have arrived: {:?}.",
-                                    event.name()
+                                    event.event().name()
                                 )));
                             }
                         }
@@ -729,7 +729,7 @@ where
         Ok(None)
     }
 
-    fn on_interesting(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event: EventWithStats<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -820,7 +820,7 @@ where
         self.tcp_mgr.should_send()
     }
 
-    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         self.tcp_mgr.fire(state, event)
     }
@@ -896,11 +896,11 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         self.tcp_mgr.try_receive(state)
     }
 
-    fn on_interesting(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         self.tcp_mgr.on_interesting(state, event)
     }
 }
