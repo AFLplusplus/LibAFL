@@ -677,9 +677,8 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
-        let executions = *state.executions();
         let mut testcase = Testcase::from(input.clone());
-        testcase.set_executions(executions);
+        testcase.set_executions(*state.executions());
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
