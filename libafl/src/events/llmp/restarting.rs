@@ -341,7 +341,11 @@ where
         Ok(None)
     }
 
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWithStats<I>) -> Result<(), Error> {
+    fn on_interesting(
+        &mut self,
+        _state: &mut S,
+        _event_vec: EventWithStats<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }

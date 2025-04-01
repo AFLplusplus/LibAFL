@@ -136,7 +136,11 @@ where
         }
         Ok(None)
     }
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWithStats<I>) -> Result<(), Error> {
+    fn on_interesting(
+        &mut self,
+        _state: &mut S,
+        _event_vec: EventWithStats<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -358,7 +362,11 @@ where
         self.inner.try_receive(state)
     }
 
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWithStats<I>) -> Result<(), Error> {
+    fn on_interesting(
+        &mut self,
+        _state: &mut S,
+        _event_vec: EventWithStats<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }

@@ -16,7 +16,8 @@ use crate::{
     Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{
-        Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter, SendExiting,
+        Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter,
+        SendExiting,
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,

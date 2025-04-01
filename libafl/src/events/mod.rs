@@ -667,7 +667,11 @@ impl<I, S> EventReceiver<I, S> for NopEventManager {
         Ok(None)
     }
 
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWithStats<I>) -> Result<(), Error> {
+    fn on_interesting(
+        &mut self,
+        _state: &mut S,
+        _event_vec: EventWithStats<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -785,7 +789,11 @@ where
     fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         self.inner.try_receive(state)
     }
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: EventWithStats<I>) -> Result<(), Error> {
+    fn on_interesting(
+        &mut self,
+        _state: &mut S,
+        _event_vec: EventWithStats<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
