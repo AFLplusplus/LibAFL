@@ -7,7 +7,7 @@ use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    corpus::{Corpus, HasCurrentCorpusId, InMemoryCorpus, InMemoryOnDiskCorpus, NopCorpus},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusId, InMemoryCorpus, InMemoryOnDiskCorpus},
     events::{SendExiting, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
@@ -129,9 +129,6 @@ pub fn fuzz() -> Result<(), Error> {
         .map(|x| Ok(x?.path()))
         .collect::<Result<Vec<PathBuf>, io::Error>>()
         .expect("Failed to read dir entry");
-    let num_files = files.len();
-    let num_cores = options.cores.ids.len();
-    let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
 
     // Clear LD_LIBRARY_PATH
     env::remove_var("LD_LIBRARY_PATH");
@@ -344,13 +341,15 @@ pub fn fuzz() -> Result<(), Error> {
     state.load_initial_inputs_by_filenames_forced(&mut fuzzer, &mut executor, &mut mgr, &files)?;
     log::info!("Processed {} inputs from disk.", files.len());
 
-    // Select first input, and run the minimization stages with it.
-    let first_id = state.corpus().first().expect("Failure: received empty corpus");
-    state.set_corpus_id(first_id)?;
-    stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
+    // Iterate over initial corpus_ids and minimize each.
+    let corpus_ids: Vec<CorpusId> = state.corpus().ids().collect();
+    for corpus_id in corpus_ids {
+        state.set_corpus_id(corpus_id)?;
+        stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
+    }
 
-    // We end up with one output, hopefully smaller than the input, but certainly
-    // no larger.
+    // We end up with equivalent output corpus, hopefully smaller than the
+    // input, but certainly no larger.
     let size = state.corpus().count();
     println!("Corpus size: {size}");
 
