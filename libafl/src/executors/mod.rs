@@ -231,13 +231,13 @@ pub fn common_signals() -> Vec<Signal> {
 pub mod test {
     use core::marker::PhantomData;
 
-    use libafl_bolts::{AsSlice, Error};
+    use libafl_bolts::{Error, HasLen};
 
     use crate::{
         events::NopEventManager,
         executors::{Executor, ExitKind},
         fuzzer::NopFuzzer,
-        inputs::{BytesInput, HasTargetBytes},
+        inputs::BytesInput,
         state::{HasExecutions, NopState},
     };
 
@@ -267,7 +267,7 @@ pub mod test {
     impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor<S>
     where
         S: HasExecutions,
-        I: HasTargetBytes,
+        I: HasLen,
     {
         fn run_target(
             &mut self,
@@ -278,7 +278,7 @@ pub mod test {
         ) -> Result<ExitKind, Error> {
             *state.executions_mut() += 1;
 
-            if input.target_bytes().as_slice().is_empty() {
+            if input.len() == 0 {
                 Err(Error::empty("Input Empty"))
             } else {
                 Ok(ExitKind::Ok)

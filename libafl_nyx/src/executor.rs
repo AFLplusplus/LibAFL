@@ -7,7 +7,7 @@ use std::{
 use libafl::{
     Error,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
-    inputs::HasTargetBytes,
+    inputs::{HasTargetBytes, TargetBytesConverter},
     observers::{ObserversTuple, StdOutObserver},
     state::HasExecutions,
 };
@@ -17,9 +17,11 @@ use libnyx::NyxReturnValue;
 use crate::{cmplog::CMPLOG_ENABLED, helper::NyxHelper};
 
 /// executor for nyx standalone mode
-pub struct NyxExecutor<S, OT> {
+pub struct NyxExecutor<S, OT, TC> {
     /// implement nyx function
     pub helper: NyxHelper,
+    /// Convert to u8
+    target_bytes_converter: TC,
     /// stdout
     stdout: Option<StdOutObserver>,
     /// stderr
@@ -30,7 +32,7 @@ pub struct NyxExecutor<S, OT> {
     phantom: PhantomData<S>,
 }
 
-impl NyxExecutor<(), ()> {
+impl NyxExecutor<(), (), ()> {
     /// Create a builder for [`NyxExeuctor`]
     #[must_use]
     pub fn builder() -> NyxExecutorBuilder {
@@ -38,11 +40,11 @@ impl NyxExecutor<(), ()> {
     }
 }
 
-impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for NyxExecutor<S, OT>
+impl<EM, I, OT, S, TC, Z> Executor<EM, I, S, Z> for NyxExecutor<S, OT, TC>
 where
     S: HasExecutions,
-    I: HasTargetBytes,
     OT: ObserversTuple<I, S>,
+    TC: TargetBytesConverter<I>,
 {
     fn run_target(
         &mut self,
@@ -53,7 +55,7 @@ where
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
-        let bytes = input.target_bytes();
+        let bytes = self.target_bytes_converter(input);
         let buffer = bytes.as_slice();
 
         if buffer.len() > self.helper.nyx_process.input_buffer_size() {
@@ -200,9 +202,15 @@ impl NyxExecutorBuilder {
     }
     */
 
-    pub fn build<S, OT>(&self, helper: NyxHelper, observers: OT) -> NyxExecutor<S, OT> {
+    pub fn build<S, OT>(
+        &self,
+        helper: NyxHelper,
+        observers: OT,
+        target_bytes_converter: TC,
+    ) -> NyxExecutor<S, OT> {
         NyxExecutor {
             helper,
+            target_bytes_converter,
             stdout: self.stdout.clone(),
             // stderr: self.stderr.clone(),
             observers,

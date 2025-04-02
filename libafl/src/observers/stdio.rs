@@ -28,7 +28,7 @@ use crate::{Error, observers::Observer};
 ///     events::{EventFirer, NopEventManager},
 ///     executors::{CommandExecutor, ExitKind},
 ///     feedbacks::{Feedback, StateInitializer},
-///     inputs::BytesInput,
+///     inputs::{BytesInput, NopTargetBytesConverter},
 ///     mutators::{MutationResult, NopMutator},
 ///     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
 ///     schedulers::QueueScheduler,
@@ -101,7 +101,7 @@ use crate::{Error, observers::Observer};
 ///        .arg("--decode")
 ///        .stdout_observer(stdout_observer.handle())
 ///        .stderr_observer(stderr_observer.handle())
-///        .build(tuple_list!(stdout_observer, stderr_observer))
+///        .build(tuple_list!(stdout_observer, stderr_observer), NopTargetBytesConverter::new())
 ///        .unwrap();
 ///
 ///    let mut state = StdState::new(

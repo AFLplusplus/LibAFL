@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     HasMetadata,
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::BytesInput,
     stages::{Restartable, Stage},
     state::{HasCorpus, HasCurrentTestcase},
 };
@@ -70,17 +70,17 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> UnicodeIdentificationMetadata {
 
 /// Stage which identifies potential strings in the provided input
 #[derive(Debug)]
-pub struct UnicodeIdentificationStage<I, S> {
-    phantom: PhantomData<(I, S)>,
+pub struct UnicodeIdentificationStage<S> {
+    phantom: PhantomData<S>,
 }
 
-impl<I, S> Default for UnicodeIdentificationStage<I, S> {
+impl<S> Default for UnicodeIdentificationStage<S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<I, S> UnicodeIdentificationStage<I, S> {
+impl<S> UnicodeIdentificationStage<S> {
     /// Create a new instance of the string identification stage
     #[must_use]
     pub fn new() -> Self {
@@ -90,8 +90,7 @@ impl<I, S> UnicodeIdentificationStage<I, S> {
     }
     fn identify_unicode_in_current_testcase(state: &mut S) -> Result<(), Error>
     where
-        S: HasCurrentTestcase<I>,
-        I: HasTargetBytes,
+        S: HasCurrentTestcase<BytesInput>,
     {
         let mut tc = state.current_testcase_mut()?;
         if tc.has_metadata::<UnicodeIdentificationMetadata>() {
@@ -108,7 +107,7 @@ impl<I, S> UnicodeIdentificationStage<I, S> {
     }
 }
 
-impl<E, EM, S, Z> Stage<E, EM, S, Z> for UnicodeIdentificationStage<BytesInput, S>
+impl<E, EM, S, Z> Stage<E, EM, S, Z> for UnicodeIdentificationStage<S>
 where
     S: HasCorpus<BytesInput> + HasCurrentTestcase<BytesInput>,
 {
@@ -123,7 +122,7 @@ where
     }
 }
 
-impl<S> Restartable<S> for UnicodeIdentificationStage<BytesInput, S> {
+impl<S> Restartable<S> for UnicodeIdentificationStage<S> {
     #[inline]
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // Stage does not run the target. No reset helper needed.

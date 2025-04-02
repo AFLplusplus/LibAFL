@@ -53,7 +53,7 @@ use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
     Error,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::HasTargetBytes,
+    inputs::TargetBytesConverter,
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::HasExecutions,
     std::borrow::ToOwned,
@@ -84,10 +84,11 @@ pub enum InputLocation {
 /// Writes the input either to stdio or to a file
 /// Use [`CommandExecutor::builder()`] to use this configurator.
 #[derive(Debug)]
-pub struct StdCommandConfigurator {
+pub struct StdCommandConfigurator<TC> {
     /// If set to true, the child output will remain visible
     /// By default, the child output is hidden to increase execution speed
     debug_child: bool,
+    target_bytes_converter: TC,
     stdout_observer: Option<Handle<StdOutObserver>>,
     stderr_observer: Option<Handle<StdErrObserver>>,
     timeout: Duration,
@@ -97,9 +98,9 @@ pub struct StdCommandConfigurator {
     command: Command,
 }
 
-impl<I> CommandConfigurator<I> for StdCommandConfigurator
+impl<I, TC> CommandConfigurator<I> for StdCommandConfigurator<TC>
 where
-    I: HasTargetBytes,
+    TC: TargetBytesConverter<I>,
 {
     fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
         self.stdout_observer.clone()
@@ -131,11 +132,17 @@ where
                     if i == *argnum {
                         debug_assert_eq!(arg, "PLACEHOLDER");
                         #[cfg(unix)]
-                        cmd.arg(OsStr::from_bytes(input.target_bytes().as_slice()));
+                        cmd.arg(OsStr::from_bytes(
+                            self.target_bytes_converter
+                                .to_target_bytes(input)
+                                .as_slice(),
+                        ));
                         // There is an issue here that the chars on Windows are 16 bit wide.
                         // I can't really test it. Please open a PR if this goes wrong.
                         #[cfg(not(unix))]
-                        cmd.arg(OsString::from_vec(input.target_bytes().as_vec()));
+                        cmd.arg(OsString::from_vec(
+                            self.target_bytes_converter.to_target_bytes(input).as_vec(),
+                        ));
                     } else {
                         cmd.arg(arg);
                     }
@@ -153,7 +160,11 @@ where
             InputLocation::StdIn => {
                 let mut handle = self.command.stdin(Stdio::piped()).spawn()?;
                 let mut stdin = handle.stdin.take().unwrap();
-                match stdin.write_all(input.target_bytes().as_slice()) {
+                match stdin.write_all(
+                    self.target_bytes_converter
+                        .to_target_bytes(input)
+                        .as_slice(),
+                ) {
                     Err(err) => {
                         if err.kind() != std::io::ErrorKind::BrokenPipe {
                             return Err(err.into());
@@ -171,7 +182,11 @@ where
                 Ok(handle)
             }
             InputLocation::File { out_file } => {
-                out_file.write_buf(input.target_bytes().as_slice())?;
+                out_file.write_buf(
+                    self.target_bytes_converter
+                        .to_target_bytes(input)
+                        .as_slice(),
+                )?;
                 Ok(self.command.spawn()?)
             }
         }
@@ -207,10 +222,7 @@ pub struct PTraceCommandConfigurator {
 }
 
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
-impl<I> CommandConfigurator<I, Pid> for PTraceCommandConfigurator
-where
-    I: HasTargetBytes,
-{
+impl<I> CommandConfigurator<I, Pid> for PTraceCommandConfigurator {
     fn spawn_child(&mut self, input: &I) -> Result<Pid, Error> {
         use nix::{
             sys::{
@@ -239,7 +251,11 @@ where
                             *argnum <= self.args.len(),
                             "If you want to fuzz arg {argnum}, you have to specify the other {argnum} (static) args."
                         );
-                        let terminated_input = [&input.target_bytes() as &[u8], &[0]].concat();
+                        let terminated_input = [
+                            &self.target_bytes_converter.to_target_bytes(input) as &[u8],
+                            &[0],
+                        ]
+                        .concat();
                         let cstring_input =
                             CString::from(CStr::from_bytes_until_nul(&terminated_input).unwrap());
                         if *argnum == self.args.len() {
@@ -250,11 +266,21 @@ where
                     }
                     InputLocation::StdIn => {
                         let (pipe_read, pipe_write) = pipe().unwrap();
-                        write(pipe_write, &input.target_bytes()).unwrap();
+                        write(
+                            pipe_write,
+                            &self.target_bytes_converter.to_target_bytes(input),
+                        )
+                        .unwrap();
                         dup2(pipe_read.as_raw_fd(), STDIN_FILENO).unwrap();
                     }
                     InputLocation::File { out_file } => {
-                        out_file.write_buf(input.target_bytes().as_slice()).unwrap();
+                        out_file
+                            .write_buf(
+                                self.target_bytes_converter
+                                    .to_target_bytes(input)
+                                    .as_slice(),
+                            )
+                            .unwrap();
                     }
                 }
 
@@ -681,13 +707,14 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `CommandExecutor`
-    pub fn build<I, OT, S>(
+    pub fn build<I, OT, S, TC>(
         &self,
         observers: OT,
-    ) -> Result<CommandExecutor<I, OT, S, StdCommandConfigurator>, Error>
+        target_bytes_converter: TC,
+    ) -> Result<CommandExecutor<I, OT, S, StdCommandConfigurator<TC>>, Error>
     where
-        I: HasTargetBytes,
         OT: MatchName + ObserversTuple<I, S>,
+        TC: TargetBytesConverter<I>,
     {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
@@ -728,6 +755,7 @@ impl CommandExecutorBuilder {
 
         let configurator = StdCommandConfigurator {
             debug_child: self.debug_child,
+            target_bytes_converter,
             stdout_observer: self.stdout.clone(),
             stderr_observer: self.stderr.clone(),
             input_location: self.input_location.clone(),
@@ -735,7 +763,7 @@ impl CommandExecutorBuilder {
             command,
         };
         Ok(
-            <StdCommandConfigurator as CommandConfigurator<I>>::into_executor::<OT, S>(
+            <StdCommandConfigurator<TC> as CommandConfigurator<I>>::into_executor::<OT, S>(
                 configurator,
                 observers,
             ),
@@ -872,7 +900,7 @@ mod tests {
             command::{CommandExecutor, InputLocation},
         },
         fuzzer::NopFuzzer,
-        inputs::{BytesInput, NopInput},
+        inputs::{BytesInput, NopInput, NopTargetBytesConverter},
         monitors::SimpleMonitor,
         state::NopState,
     };
@@ -889,7 +917,7 @@ mod tests {
         executor
             .program("ls")
             .input(InputLocation::Arg { argnum: 0 });
-        let executor = executor.build(());
+        let executor = executor.build((), NopTargetBytesConverter::new());
         let mut executor = executor.unwrap();
 
         executor

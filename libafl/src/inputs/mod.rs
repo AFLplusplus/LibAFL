@@ -137,11 +137,6 @@ impl NopInput {
 }
 
 impl Input for NopInput {}
-impl HasTargetBytes for NopInput {
-    fn target_bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::from(vec![0])
-    }
-}
 
 impl HasLen for NopInput {
     fn len(&self) -> usize {
@@ -365,6 +360,7 @@ where
 }
 
 /// A converter that converts from `input` to target bytes
+/// This is necessary because you cannot implemeent `HasTargetBytes` for any input defined inside libafl because of orphan's rule
 pub trait TargetBytesConverter<I> {
     /// Create target bytes
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
