@@ -8,8 +8,6 @@ use core::{ffi::c_void, fmt::Debug, mem::transmute, ptr};
 
 use libafl::executors::hooks::inprocess::inprocess_get_state;
 use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize};
-#[cfg(feature = "python")]
-use pyo3::{FromPyObject, pyclass, pymethods};
 
 use crate::{
     HookData, HookId,
@@ -85,12 +83,20 @@ pub enum Hook<F, C, R: Clone> {
     Empty,
 }
 
+/// Syshook result representation
+///
+/// # Safety
+///
+/// This enum is shadowed by another enum in QEMU (`libafl_syshook_ret`). Any change made to this
+/// enum should be propagated to the C enum as well.
 #[repr(C)]
-#[cfg_attr(feature = "python", pyclass)]
-#[cfg_attr(feature = "python", derive(FromPyObject))]
-pub struct SyscallHookResult {
-    pub retval: GuestAddr,
-    pub skip_syscall: bool,
+pub enum SyscallHookResult {
+    /// Runs the syscall after the hook is executed. The return value will be the one of the
+    /// syscall itself.
+    /// If you need to change the return value of the syscall, please use a post-syscall hook.
+    Run,
+    /// Skip the syscall, and make the syscall return the value provided in the field in the target.
+    Skip(GuestAddr),
 }
 
 impl<F, C, R: Clone> Hook<F, C, R> {
@@ -1281,7 +1287,7 @@ impl QemuHooks {
                 GuestAddr,
                 GuestAddr,
                 GuestAddr,
-            ) -> libafl_qemu_sys::syshook_ret = transmute(callback);
+            ) -> libafl_qemu_sys::libafl_syshook_ret = transmute(callback);
             let num = libafl_qemu_sys::libafl_add_pre_syscall_hook(Some(callback), data);
             PreSyscallHookId(num)
         }
@@ -1322,40 +1328,5 @@ impl QemuHooks {
             let num = libafl_qemu_sys::libafl_add_post_syscall_hook(Some(callback), data);
             PostSyscallHookId(num)
         }
-    }
-}
-
-#[cfg(feature = "python")]
-#[pymethods]
-impl SyscallHookResult {
-    #[new]
-    #[pyo3(signature = (
-        value=None
-    ))]
-    #[must_use]
-    pub fn new(value: Option<GuestAddr>) -> Self {
-        Self::new_internal(value)
-    }
-}
-
-impl SyscallHookResult {
-    #[cfg(not(feature = "python"))]
-    #[must_use]
-    pub fn new(value: Option<GuestAddr>) -> Self {
-        Self::new_internal(value)
-    }
-
-    #[must_use]
-    fn new_internal(value: Option<GuestAddr>) -> Self {
-        value.map_or(
-            Self {
-                retval: 0,
-                skip_syscall: false,
-            },
-            |v| Self {
-                retval: v,
-                skip_syscall: true,
-            },
-        )
     }
 }

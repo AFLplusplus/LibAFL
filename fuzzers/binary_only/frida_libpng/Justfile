@@ -25,8 +25,30 @@ harness: lib
     clang++ -O3 harness.o libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.so
 
 [windows]
-harness:
-    cl /c harness_win.cpp && link harness_win.obj /dll
+zlib:
+    powershell -Command Invoke-WebRequest -OutFile zlib-1.2.11.tar.gz https://zlib.net/fossils/zlib-1.2.11.tar.gz
+    tar -xvf zlib-1.2.11.tar.gz
+    del /q zlib-1.2.11.tar.gz
+    move zlib-1.2.11 zlib
+
+[windows]
+lib: zlib
+    cd zlib && cmake -A x64 -DCMAKE_CXX_COMPILER=cl . && cmake --build . --config Release
+
+[windows]
+libpng:
+    powershell -Command Invoke-WebRequest -OutFile libpng-1.6.37.tar.gz https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+    tar -xvf libpng-1.6.37.tar.gz
+    del /q libpng-1.6.37.tar.gz
+
+[windows]
+lib2: libpng
+    cd libpng-1.6.37 && cmake -A x64 -DCMAKE_CXX_COMPILER=cl -DZLIB_ROOT=..\zlib -DZLIB_LIBRARY=..\zlib\Release\zlib.lib . && cmake --build . --config Release
+
+[windows]
+harness: lib lib2
+    copy libpng-1.6.37\Release\libpng16.lib . && copy libpng-1.6.37\Release\libpng16.dll . && copy zlib\Release\zlib.lib . && copy zlib\Release\zlib.dll . && copy target\release\frida_fuzzer.exe .
+    cl /O2 /c /I .\libpng-1.6.37 harness.cc /Fo:harness.obj && link /DLL /OUT:libpng-harness.dll harness.obj libpng16.lib zlib.lib
 
 [unix]
 [windows]
@@ -39,7 +61,7 @@ run: build harness
 
 [windows]
 run: build harness
-    {{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME_WIN}} -F LLVMFuzzerTestOneInput -H .\harness_win.dll -l .\harness_win.dll --cores=0
+    {{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME_WIN}} -F LLVMFuzzerTestOneInput -H .\libpng-harness.dll -l .\libpng-harness.dll -l .\zlib.dll -l .\libpng16.dll --cores=0
 
 [unix]
 test: build harness
@@ -57,7 +79,7 @@ test: build harness
 [windows]
 [script("cmd.exe", "/c")]
 test: build harness
-    start "" "{{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME_WIN}}" -F LLVMFuzzerTestOneInput -H .\harness_win.dll -l .\harness_win.dll --cores=0
+    start "" "{{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME_WIN}}" -F LLVMFuzzerTestOneInput -H .\libpng-harness.dll -l .\libpng-harness.dll -l .\zlib.dll -l .\libpng16.dll --cores=0
     ping -n 10 127.0.0.1>NUL && taskkill /im frida_fuzzer.exe /F
     dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
 

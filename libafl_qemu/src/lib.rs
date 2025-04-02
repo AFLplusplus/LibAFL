@@ -98,7 +98,7 @@ pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     #[cfg(feature = "usermode")]
     m.add_class::<GuestMaps>()?;
 
-    m.add_class::<SyscallHookResult>()?;
+    m.add_class::<pybind::SyscallHookResult>()?;
     m.add_class::<pybind::Qemu>()?;
 
     Ok(())

@@ -63,3 +63,44 @@ clang++ -L.\zlib.dll .\harness.o .\libpng16.lib -lzlib -shared -o .\libpng-harne
 ./frida_fuzzer.exe ./libpng-harness.dll LLVMFuzzerTestOneInput ./libpng-harness.dll
 ```
 
+### To build it with visual studio for ci (no gui)
+
+Assumes that the fuzzer is already built with `cargo build --release`
+
+1. download and build zlib in this directory
+```
+powershell -Command Invoke-WebRequest -OutFile zlib-1.2.11.tar.gz https://zlib.net/fossils/zlib-1.2.11.tar.gz
+tar -xvf zlib-1.2.11.tar.gz
+del /q zlib-1.2.11.tar.gz
+move zlib-1.2.11 zlib
+cd zlib 
+cmake -A x64 -DCMAKE_CXX_COMPILER=cl .
+cmake --build . --config Release
+```
+2. download and build libpng in this directory
+```
+powershell -Command Invoke-WebRequest -OutFile libpng-1.6.37.tar.gz https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+tar -xvf libpng-1.6.37.tar.gz
+del /q libpng-1.6.37.tar.gz
+cd libpng-1.6.37 
+cmake -A x64 -DCMAKE_CXX_COMPILER=cl -DZLIB_ROOT=..\zlib -DZLIB_LIBRARY=..\zlib\Release\zlib.lib . 
+cmake --build . --config Release
+```
+3. copy libraries from zlib and libpng and use to build harness
+```
+copy libpng-1.6.37\Release\libpng16.lib . 
+copy libpng-1.6.37\Release\libpng16.dll . 
+copy zlib\Release\zlib.lib . 
+copy zlib\Release\zlib.dll . 
+copy target\release\frida_fuzzer.exe .
+cl /O2 /c /I .\libpng-1.6.37 harness.cc /Fo:harness.obj 
+link /DLL /OUT:libpng-harness.dll harness.obj libpng16.lib zlib.lib
+```
+4. start fuzzing
+```
+.\frida_fuzzer.exe -F LLVMFuzzerTestOneInput -H .\libpng-harness.dll -l .\libpng-harness.dll -l .\zlib.dll -l .\libpng16.dll --cores 0
+```
+OR
+
+1. Run `just test`
+

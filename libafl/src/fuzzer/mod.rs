@@ -15,7 +15,10 @@ use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    events::{Event, EventConfig, EventFirer, EventReceiver, ProgressReporter, SendExiting},
+    events::{
+        Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter,
+        SendExiting,
+    },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
@@ -359,7 +362,8 @@ where
         + MaybeHasClientPerfMonitor
         + HasCurrentTestcase<I>
         + HasSolutions<I>
-        + HasLastFoundTime,
+        + HasLastFoundTime
+        + HasExecutions,
 {
     fn check_results(
         &mut self,
@@ -484,27 +488,32 @@ where
             if exec_res.is_corpus() {
                 manager.fire(
                     state,
-                    Event::NewTestcase {
-                        input: input.clone(),
-                        observers_buf,
-                        exit_kind: *exit_kind,
-                        corpus_size: state.corpus().count(),
-                        client_config: manager.configuration(),
-                        time: current_time(),
-                        forward_id: None,
-                        #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                        node_id: None,
-                    },
+                    EventWithStats::with_current_time(
+                        Event::NewTestcase {
+                            input: input.clone(),
+                            observers_buf,
+                            exit_kind: *exit_kind,
+                            corpus_size: state.corpus().count(),
+                            client_config: manager.configuration(),
+                            forward_id: None,
+                            #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                            node_id: None,
+                        },
+                        *state.executions(),
+                    ),
                 )?;
             }
+
             if exec_res.is_solution() {
                 manager.fire(
                     state,
-                    Event::Objective {
-                        input: self.share_objectives.then_some(input.clone()),
-                        objective_size: state.solutions().count(),
-                        time: current_time(),
-                    },
+                    EventWithStats::with_current_time(
+                        Event::Objective {
+                            input: self.share_objectives.then_some(input.clone()),
+                            objective_size: state.solutions().count(),
+                        },
+                        *state.executions(),
+                    ),
                 )?;
             }
         }
@@ -693,11 +702,13 @@ where
 
             manager.fire(
                 state,
-                Event::Objective {
-                    input: self.share_objectives.then_some(input.clone()),
-                    objective_size: state.solutions().count(),
-                    time: current_time(),
-                },
+                EventWithStats::with_current_time(
+                    Event::Objective {
+                        input: self.share_objectives.then_some(input.clone()),
+                        objective_size: state.solutions().count(),
+                    },
+                    *state.executions(),
+                ),
             )?;
         }
 
@@ -733,17 +744,19 @@ where
         };
         manager.fire(
             state,
-            Event::NewTestcase {
-                input,
-                observers_buf,
-                exit_kind,
-                corpus_size: state.corpus().count(),
-                client_config: manager.configuration(),
-                time: current_time(),
-                forward_id: None,
-                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                node_id: None,
-            },
+            EventWithStats::with_current_time(
+                Event::NewTestcase {
+                    input,
+                    observers_buf,
+                    exit_kind,
+                    corpus_size: state.corpus().count(),
+                    client_config: manager.configuration(),
+                    forward_id: None,
+                    #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                    node_id: None,
+                },
+                *state.executions(),
+            ),
         )?;
         Ok((id, ExecuteInputResult::new(corpus_worthy, is_solution)))
     }
@@ -785,32 +798,32 @@ where
         while let Some((event, with_observers)) = manager.try_receive(state)? {
             // at this point event is either newtestcase or objectives
             let res = if with_observers {
-                match event {
+                match event.event() {
                     Event::NewTestcase {
-                        ref input,
-                        ref observers_buf,
+                        input,
+                        observers_buf,
                         exit_kind,
                         ..
                     } => {
                         let observers: E::Observers =
                             postcard::from_bytes(observers_buf.as_ref().unwrap())?;
                         let res = self.evaluate_execution(
-                            state, manager, input, &observers, &exit_kind, false,
+                            state, manager, input, &observers, exit_kind, false,
                         )?;
                         res.1
                     }
                     _ => None,
                 }
             } else {
-                match event {
-                    Event::NewTestcase { ref input, .. } => {
+                match event.event() {
+                    Event::NewTestcase { input, .. } => {
                         let res = self.evaluate_input_with_observers(
                             state, executor, manager, input, false,
                         )?;
                         res.1
                     }
                     Event::Objective {
-                        input: Some(ref unwrapped_input),
+                        input: Some(unwrapped_input),
                         ..
                     } => {
                         let res = self.evaluate_input_with_observers(

@@ -114,7 +114,7 @@ where
 {
     let h = emulator_modules.get_mut::<RedirectStdinModule>().unwrap();
     if h.input_addr.is_null() {
-        return SyscallHookResult::new(None);
+        return SyscallHookResult::Run;
     }
     if syscall == SYS_read as i32 && x0 == 0 {
         /*
@@ -143,7 +143,7 @@ where
         };
         // println!("copied {}", size);
         h.read += size as usize;
-        return SyscallHookResult::new(Some(size));
+        return SyscallHookResult::Skip(size);
     }
-    SyscallHookResult::new(None)
+    SyscallHookResult::Run
 }

@@ -65,10 +65,32 @@ pub unsafe extern "C" fn memcpy(dest: *mut u8, src: *const u8, count: usize) {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memset(dest: *mut u8, value: u8, count: usize) {
-    let dest_slice = unsafe { from_raw_parts_mut(dest, count) };
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..count {
-        dest_slice[i] = value;
+    unsafe {
+        let mut cursor = dest;
+        let word_value = match value {
+            u8::MIN => Some(usize::MIN),
+            u8::MAX => Some(usize::MAX),
+            _ => None,
+        };
+
+        if let Some(word_value) = word_value {
+            let num_words = count / size_of::<usize>();
+            for _ in 0..num_words {
+                *(cursor as *mut usize) = word_value;
+                cursor = cursor.wrapping_add(size_of::<usize>());
+            }
+
+            let num_bytes = count % size_of::<usize>();
+            for _ in 0..num_bytes {
+                *cursor = value;
+                cursor = cursor.wrapping_add(1);
+            }
+        } else {
+            for _ in 0..count {
+                *cursor = value;
+                cursor = cursor.wrapping_add(1);
+            }
+        }
     }
 }
 

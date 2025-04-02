@@ -1,5 +1,5 @@
 use libafl::{
-    events::{Event, EventManagerHook},
+    events::{Event, EventManagerHook, EventWithStats},
     state::Stoppable,
     Error,
 };
@@ -18,9 +18,9 @@ where
         &mut self,
         state: &mut S,
         _client_id: ClientId,
-        event: &Event<I>,
+        event: &EventWithStats<I>,
     ) -> Result<bool, Error> {
-        if self.exit_on_solution && matches!(event, Event::Objective { .. }) {
+        if self.exit_on_solution && matches!(event.event(), Event::Objective { .. }) {
             // TODO: dump state
             state.request_stop();
         }
