@@ -16,7 +16,7 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
     Error,
-    events::{Event, EventFirer},
+    events::{Event, EventFirer, EventWithStats},
     fuzzer::EvaluatorObservers,
     inputs::{Input, InputConverter, NopInput, NopInputConverter},
     state::{HasCurrentTestcase, HasSolutions, NopState},
@@ -385,38 +385,40 @@ where
     }
 
     #[cfg(feature = "llmp_compression")]
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         if self.converter.is_none() {
             return Ok(());
         }
 
         // Filter out non interestign events and convert `NewTestcase`
-        let converted_event = match event {
-            Event::NewTestcase {
-                input,
-                client_config,
-                exit_kind,
-                corpus_size,
-                observers_buf,
-                time,
-                forward_id,
-                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                node_id,
-            } => Event::NewTestcase {
-                input: self.converter.as_mut().unwrap().convert(input)?,
-                client_config,
-                exit_kind,
-                corpus_size,
-                observers_buf,
-                time,
-                forward_id,
-                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                node_id,
+        let converted_event = EventWithStats::new(
+            match event.event {
+                Event::NewTestcase {
+                    input,
+                    client_config,
+                    exit_kind,
+                    corpus_size,
+                    observers_buf,
+                    forward_id,
+                    #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                    node_id,
+                } => Event::NewTestcase {
+                    input: self.converter.as_mut().unwrap().convert(input)?,
+                    client_config,
+                    exit_kind,
+                    corpus_size,
+                    observers_buf,
+                    forward_id,
+                    #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                    node_id,
+                },
+                _ => {
+                    return Ok(());
+                }
             },
-            _ => {
-                return Ok(());
-            }
-        };
+            event.stats,
+        );
+
         let serialized = postcard::to_allocvec(&converted_event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
@@ -437,38 +439,40 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         if self.converter.is_none() {
             return Ok(());
         }
 
         // Filter out non interestign events and convert `NewTestcase`
-        let converted_event = match event {
-            Event::NewTestcase {
-                input,
-                client_config,
-                exit_kind,
-                corpus_size,
-                observers_buf,
-                time,
-                forward_id,
-                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                node_id,
-            } => Event::NewTestcase {
-                input: self.converter.as_mut().unwrap().convert(input)?,
-                client_config,
-                exit_kind,
-                corpus_size,
-                observers_buf,
-                time,
-                forward_id,
-                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                node_id,
+        let converted_event = EventWithStats::new(
+            match event.event {
+                Event::NewTestcase {
+                    input,
+                    client_config,
+                    exit_kind,
+                    corpus_size,
+                    observers_buf,
+                    forward_id,
+                    #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                    node_id,
+                } => Event::NewTestcase {
+                    input: self.converter.as_mut().unwrap().convert(input)?,
+                    client_config,
+                    exit_kind,
+                    corpus_size,
+                    observers_buf,
+                    forward_id,
+                    #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                    node_id,
+                },
+                _ => {
+                    return Ok(());
+                }
             },
-            _ => {
-                return Ok(());
-            }
-        };
+            event.stats,
+        );
+
         let serialized = postcard::to_allocvec(&converted_event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
