@@ -1,7 +1,14 @@
 # qemu_tmin
 
-This folder contains an example fuzzer which runs each entry in the input corpus and minimizes the input corpus. This fuzzer also distributes the test cases in
-the input corupus evenly across the selected cores.
+QEMU testcase minimizer.
+
+This folder contains an example fuzzer which runs each entry in the input corpus
+and minimizes the input, ensuring that coverage map remains the same. The output
+is a new corpus that may or may not be smaller than the original inputs, but
+will not be larger.
+
+If some input files are idential, only one of each duplicate set will be kept
+for minimization.
 
 The following architectures are supported:
 * arm

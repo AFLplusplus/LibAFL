@@ -5,6 +5,7 @@ authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
   "WorksButNotTested",
+  "forky2"
 ]
 edition = "2021"
 
