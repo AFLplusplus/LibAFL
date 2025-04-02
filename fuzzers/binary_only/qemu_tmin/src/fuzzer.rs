@@ -195,7 +195,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     // Rust harness: this closure copies an input buffer to our private region
     // for target function input and updates registers to a single iteration
-    // before telling QEMU to resume execution. 
+    // before telling QEMU to resume execution.
     #[cfg(feature = "fork")]
     let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
@@ -294,9 +294,11 @@ pub fn fuzz() -> Result<(), Error> {
     // coverage.
     let minimizer = StdScheduledMutator::new(havoc_mutations());
     let factory = ObserverEqualityFactory::new(&edges_observer);
-    let mut stages = tuple_list!(
-        StdTMinMutationalStage::new(minimizer, factory, options.iterations),
-    );
+    let mut stages = tuple_list!(StdTMinMutationalStage::new(
+        minimizer,
+        factory,
+        options.iterations
+    ),);
 
     // Create a state instance. Unlike a typical fuzzer, we start with an empty
     // input corpus, and we don't care about 'solutions' so store in an
