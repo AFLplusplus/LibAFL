@@ -11,7 +11,9 @@ runs:
     - name: Build docs
       shell: pwsh
       run: cargo doc
-    - uses: ilammy/msvc-dev-cmd@v1
+    - uses: TheMrMilchmann/setup-msvc-dev@v3
+      with:
+        arch: x64
     - name: Set LIBCLANG_PATH
       shell: pwsh
       run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
