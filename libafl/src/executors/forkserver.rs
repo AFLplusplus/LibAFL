@@ -277,6 +277,7 @@ pub trait HasAflStyleTargetArguments: Sized {
     }
 
     /// Set input
+    #[must_use]
     fn input(mut self, input: InputLocation) -> Self {
         *self.input_location_mut() = input;
         self
@@ -305,7 +306,7 @@ pub trait HasAflStyleTargetArguments: Sized {
             match moved.input_location_ref() {
                 InputLocation::File { out_file } => out_file.path.as_path() == path.as_ref(),
                 InputLocation::StdIn => true,
-                _ => false,
+                InputLocation::Arg { argnum: _ } => false,
             },
             "Already specified an input file under a different name. This is not supported"
         );
@@ -950,7 +951,7 @@ pub struct ForkserverExecutorBuilder<'a, TC, SP> {
     target_bytes_converter: TC,
 }
 
-impl<'a, TC, SP> HasAflStyleTargetArguments for ForkserverExecutorBuilder<'a, TC, SP> {
+impl<TC, SP> HasAflStyleTargetArguments for ForkserverExecutorBuilder<'_, TC, SP> {
     fn arguments_ref(&self) -> &Vec<OsString> {
         &self.arguments
     }
