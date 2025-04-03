@@ -270,6 +270,39 @@ pub trait HasAflStyleTargetArguments: Sized {
     /// Gets the mutable input file
     fn input_location_mut(&mut self) -> &mut InputLocation;
 
+    /// Get the environments
+    fn envs_ref(&self) -> &Vec<(OsString, OsString)>;
+    /// Get the mutable environments
+    fn envs_mut(&mut self) -> &mut Vec<(OsString, OsString)>;
+
+    /// Adds an environmental var to the harness's commandline
+    #[must_use]
+    fn env<K, V>(mut self, key: K, val: V) -> Self
+    where
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        self.envs_mut()
+            .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
+        self
+    }
+
+    /// Adds environmental vars to the harness's commandline
+    #[must_use]
+    fn envs<IT, K, V>(mut self, vars: IT) -> Self
+    where
+        IT: IntoIterator<Item = (K, V)>,
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        for (ref key, ref val) in vars {
+            res.push((key.as_ref().to_owned(), val.as_ref().to_owned()));
+        }
+        self.envs_mut().append(&mut res);
+        self
+    }
+
     /// If use stdin
     #[must_use]
     fn use_stdin(&self) -> bool {
@@ -959,6 +992,14 @@ impl<TC, SP> HasAflStyleTargetArguments for ForkserverExecutorBuilder<'_, TC, SP
         &mut self.arguments
     }
 
+    fn envs_ref(&self) -> &Vec<(OsString, OsString)> {
+        &self.envs
+    }
+
+    fn envs_mut(&mut self) -> &mut Vec<(OsString, OsString)> {
+        &mut self.envs
+    }
+
     fn program_ref(&self) -> &Option<OsString> {
         &self.program
     }
@@ -1422,34 +1463,6 @@ where
     #[must_use]
     pub fn min_input_size(mut self, size: usize) -> Self {
         self.min_input_size = size;
-        self
-    }
-
-    /// Adds an environmental var to the harness's commandline
-    #[must_use]
-    pub fn env<K, V>(mut self, key: K, val: V) -> Self
-    where
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        self.envs
-            .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
-        self
-    }
-
-    /// Adds environmental vars to the harness's commandline
-    #[must_use]
-    pub fn envs<IT, K, V>(mut self, vars: IT) -> Self
-    where
-        IT: IntoIterator<Item = (K, V)>,
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        let mut res = vec![];
-        for (ref key, ref val) in vars {
-            res.push((key.as_ref().to_owned(), val.as_ref().to_owned()));
-        }
-        self.envs.append(&mut res);
         self
     }
 

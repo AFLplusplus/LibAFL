@@ -539,6 +539,14 @@ impl HasAflStyleTargetArguments for CommandExecutorBuilder {
         &mut self.args
     }
 
+    fn envs_ref(&self) -> &Vec<(OsString, OsString)> {
+        &self.envs
+    }
+
+    fn envs_mut(&mut self) -> &mut Vec<(OsString, OsString)> {
+        &mut self.envs
+    }
+
     fn program_ref(&self) -> &Option<OsString> {
         &self.program
     }
@@ -588,30 +596,6 @@ impl CommandExecutorBuilder {
     /// Sets the stderr observer
     pub fn stderr_observer(&mut self, stderr: Handle<StdErrObserver>) -> &mut Self {
         self.stderr = Some(stderr);
-        self
-    }
-
-    /// Adds a range of environment variables to the executed command.
-    pub fn envs<IT, K, V>(&mut self, vars: IT) -> &mut CommandExecutorBuilder
-    where
-        IT: IntoIterator<Item = (K, V)>,
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        for (ref key, ref val) in vars {
-            self.env(key.as_ref(), val.as_ref());
-        }
-        self
-    }
-
-    /// Adds an environment variable to the executed command.
-    pub fn env<K, V>(&mut self, key: K, val: V) -> &mut CommandExecutorBuilder
-    where
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        self.envs
-            .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
         self
     }
 
