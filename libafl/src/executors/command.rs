@@ -24,7 +24,6 @@ use std::{
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
     AsSlice,
-    fs::InputFile,
     tuples::{Handle, MatchName, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
@@ -47,7 +46,10 @@ use nix::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use typed_builder::TypedBuilder;
 
-use super::{HasTimeout, afl_args::HasAflStyleTargetArguments};
+use super::{
+    HasTimeout,
+    afl_args::{HasAflStyleTargetArguments, InputLocation},
+};
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
@@ -58,27 +60,6 @@ use crate::{
     state::HasExecutions,
     std::borrow::ToOwned,
 };
-
-/// How to deliver input to an external program
-/// `StdIn`: The target reads from stdin
-/// `File`: The target reads from the specified [`InputFile`]
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum InputLocation {
-    /// Mutate a commandline argument to deliver an input
-    Arg {
-        /// The offset of the argument to mutate
-        argnum: usize,
-    },
-    /// Deliver input via `StdIn`
-    #[default]
-    StdIn,
-    /// Deliver the input via the specified [`InputFile`]
-    /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
-    File {
-        /// The file to write input to. The target should read input from this location.
-        out_file: InputFile,
-    },
-}
 
 /// A simple Configurator that takes the most common parameters
 /// Writes the input either to stdio or to a file

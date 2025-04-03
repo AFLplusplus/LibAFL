@@ -1,16 +1,33 @@
 //! Share implementation of afl style arguments
 
+use alloc::{borrow::ToOwned, vec::Vec};
 use std::{
     ffi::{OsStr, OsString},
-    path::Path
+    path::Path,
 };
-
-use alloc::borrow::ToOwned;
-use alloc::vec::Vec;
 
 use libafl_bolts::fs::{InputFile, get_unique_std_input_file};
 
-use crate::executors::command::InputLocation;
+/// How to deliver input to an external program
+/// `StdIn`: The target reads from stdin
+/// `File`: The target reads from the specified [`InputFile`]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum InputLocation {
+    /// Mutate a commandline argument to deliver an input
+    Arg {
+        /// The offset of the argument to mutate
+        argnum: usize,
+    },
+    /// Deliver input via `StdIn`
+    #[default]
+    StdIn,
+    /// Deliver the input via the specified [`InputFile`]
+    /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
+    File {
+        /// The file to write input to. The target should read input from this location.
+        out_file: InputFile,
+    },
+}
 
 /// The main implementation trait of afl style arguments handling
 pub trait HasAflStyleTargetArguments: Sized {

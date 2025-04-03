@@ -36,7 +36,10 @@ use nix::{
     unistd::Pid,
 };
 
-use super::{HasTimeout, afl_args::HasAflStyleTargetArguments, command::InputLocation};
+use super::{
+    HasTimeout,
+    afl_args::{HasAflStyleTargetArguments, InputLocation},
+};
 #[cfg(feature = "regex")]
 use crate::observers::{
     AsanBacktraceObserver, get_asan_runtime_flags, get_asan_runtime_flags_with_log_path,
