@@ -1,11 +1,12 @@
 //! Share implementation of afl style arguments
 
 use std::{
-    borrow::ToOwned,
     ffi::{OsStr, OsString},
-    path::Path,
-    vec::Vec,
+    path::Path
 };
+
+use alloc::borrow::ToOwned;
+use alloc::vec::Vec;
 
 use libafl_bolts::fs::{InputFile, get_unique_std_input_file};
 
