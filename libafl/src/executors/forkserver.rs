@@ -710,7 +710,7 @@ where
             self.map_input_to_shmem(&input_bytes_copy, input_size)?;
         } else {
             self.map_input_to_shmem(input, input_size)?;
-        };
+        }
 
         self.forkserver.set_last_run_timed_out(false);
         if let Err(err) = self.forkserver.write_ctl(last_run_timed_out) {
@@ -864,7 +864,7 @@ where
     }
 
     /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
-    #[expect(clippy::pedantic, clippy::type_complexity)]
+    #[expect(clippy::pedantic)]
     pub fn build_dynamic_map<A, MO, OT, I, S>(
         mut self,
         mut map_observer: A,
@@ -1422,12 +1422,14 @@ where
 
     /// Determine if the asan observer is present (always false if feature "regex" is disabled)
     #[cfg(feature = "regex")]
+    #[must_use]
     pub fn has_asan_obs(&self) -> bool {
         self.asan_obs.is_some()
     }
 
     /// Determine if the asan observer is present (always false if feature "regex" is disabled)
     #[cfg(not(feature = "regex"))]
+    #[must_use]
     pub fn has_asan_obs(&self) -> bool {
         false
     }

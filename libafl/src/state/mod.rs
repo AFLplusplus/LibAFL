@@ -1220,6 +1220,7 @@ impl
 {
     /// Create an empty [`StdState`] that has very minimal uses.
     /// Potentially good for testing.
+    #[expect(clippy::type_complexity)]
     pub fn nop() -> Result<
         StdState<
             InMemoryCorpus<NopInput>,
@@ -1241,7 +1242,7 @@ impl
 }
 
 #[cfg(feature = "introspection")]
-impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasClientPerfMonitor for StdState<C, I, R, SC, TC> {
     fn introspection_stats(&self) -> &ClientPerfStats {
         &self.introspection_stats
     }

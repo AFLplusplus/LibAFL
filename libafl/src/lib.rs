@@ -122,7 +122,7 @@ mod tests {
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
         fuzzer::Fuzzer,
-        inputs::BytesInput,
+        inputs::{BytesInput, NopTargetBytesConverter},
         monitors::SimpleMonitor,
         mutators::{StdScheduledMutator, mutations::BitFlipMutator},
         schedulers::RandScheduler,
@@ -196,12 +196,14 @@ mod tests {
             _,
             StdRand,
             InMemoryCorpus<BytesInput>,
+            _,
         > = postcard::from_bytes::<
             StdState<
                 InMemoryCorpus<BytesInput>,
                 BytesInput,
                 RomuDuoJrRand,
                 InMemoryCorpus<BytesInput>,
+                NopTargetBytesConverter<BytesInput>,
             >,
         >(state_serialized.as_slice())
         .unwrap();
