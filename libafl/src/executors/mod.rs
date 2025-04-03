@@ -24,6 +24,7 @@ use crate::Error;
 pub mod combined;
 #[cfg(all(feature = "std", unix))]
 pub mod command;
+pub mod r#const;
 pub mod differential;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub mod forkserver;
