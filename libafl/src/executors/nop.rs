@@ -20,22 +20,25 @@ pub struct ConstantExecutor<OT = ()> {
 
 impl<OT> ConstantExecutor<OT> {
     /// Construct a [`ConstantExecutor`]
+    #[must_use]
     pub fn new(exit: ExitKind, tm: Duration, ot: OT) -> Self {
         Self {
             exit,
-            tm: tm,
-            ot: ot,
+            tm,
+            ot,
         }
     }
 }
 
 impl ConstantExecutor<()> {
     /// Construct a [`ConstantExecutor`] that always returns Ok
+    #[must_use]
     pub fn ok() -> Self {
         Self::new(ExitKind::Ok, Duration::default(), ())
     }
 
     /// Construct a [`ConstantExecutor`] that always returns Crash
+    #[must_use]
     pub fn crash() -> Self {
         Self::new(ExitKind::Crash, Duration::default(), ())
     }
@@ -59,7 +62,7 @@ impl<OT> HasTimeout for ConstantExecutor<OT> {
     }
 
     fn set_timeout(&mut self, timeout: Duration) {
-        self.tm = timeout
+        self.tm = timeout;
     }
 }
 

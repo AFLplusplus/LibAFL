@@ -3,11 +3,12 @@
 use super::{Restartable, Stage};
 
 /// A stage that does nothing
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NopStage {}
 
 impl NopStage {
     /// Create a [`NopStage`]
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
