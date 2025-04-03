@@ -6,6 +6,13 @@ use super::{Restartable, Stage};
 #[derive(Debug)]
 pub struct NopStage {}
 
+impl NopStage {
+    /// Create a [`NopStage`]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl<E, EM, S, Z> Stage<E, EM, S, Z> for NopStage {
     fn perform(
         &mut self,
