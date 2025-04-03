@@ -22,7 +22,6 @@ use libafl_bolts::{
     AsSlice, AsSliceMut, Truncate,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
-    ownedref::OwnedSlice,
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
     tuples::{Handle, Handled, MatchNameRef, Prepend, RefIndexable},
 };
@@ -45,10 +44,10 @@ use crate::observers::{
 use crate::{
     Error,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{BytesInput, Input, NopTargetBytesConverter, TargetBytesConverter},
+    inputs::Input,
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
-    state::HasExecutions,
+    state::{CanToBytes, HasExecutions},
 };
 
 const FORKSRV_FD: i32 = 198;
@@ -577,11 +576,10 @@ impl Forkserver {
 ///
 /// Shared memory feature is also available, but you have to set things up in your code.
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
-pub struct ForkserverExecutor<I, OT, S, SHM, TC> {
+pub struct ForkserverExecutor<I, OT, S, SHM> {
     target: OsString,
     args: Vec<OsString>,
     input_file: InputFile,
-    target_bytes_converter: TC,
     uses_shmem_testcase: bool,
     forkserver: Forkserver,
     observers: OT,
@@ -596,9 +594,8 @@ pub struct ForkserverExecutor<I, OT, S, SHM, TC> {
     crash_exitcode: Option<i8>,
 }
 
-impl<I, OT, S, SHM, TC> Debug for ForkserverExecutor<I, OT, S, SHM, TC>
+impl<I, OT, S, SHM> Debug for ForkserverExecutor<I, OT, S, SHM>
 where
-    TC: Debug,
     OT: Debug,
     SHM: Debug,
 {
@@ -607,7 +604,6 @@ where
             .field("target", &self.target)
             .field("args", &self.args)
             .field("input_file", &self.input_file)
-            .field("target_bytes_converter", &self.target_bytes_converter)
             .field("uses_shmem_testcase", &self.uses_shmem_testcase)
             .field("forkserver", &self.forkserver)
             .field("observers", &self.observers)
@@ -616,20 +612,17 @@ where
     }
 }
 
-impl ForkserverExecutor<(), (), (), UnixShMem, ()> {
+impl ForkserverExecutor<(), (), UnixShMem, ()> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
-    pub fn builder()
-    -> ForkserverExecutorBuilder<'static, NopTargetBytesConverter<BytesInput>, UnixShMemProvider>
-    {
+    pub fn builder() -> ForkserverExecutorBuilder<'static, UnixShMemProvider> {
         ForkserverExecutorBuilder::new()
     }
 }
 
-impl<I, OT, S, SHM, TC> ForkserverExecutor<I, OT, S, SHM, TC>
+impl<I, OT, S, SHM> ForkserverExecutor<I, OT, S, SHM>
 where
     OT: ObserversTuple<I, S>,
-    TC: TargetBytesConverter<I>,
     SHM: ShMem,
 {
     /// The `target` binary that's going to run.
@@ -666,34 +659,15 @@ where
     #[inline]
     fn execute_input(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error>
     where
-        S: HasExecutions,
+        S: HasExecutions + CanToBytes<I>,
     {
         *state.executions_mut() += 1;
+        let bytes = state.to_bytes(input);
 
-        self.execute_input_uncounted(input)
+        self.execute_input_uncounted(bytes.as_slice())
     }
 
-    /// Execute input, but side-step the execution counter.
-    #[inline]
-    fn execute_input_uncounted(&mut self, input: &I) -> Result<ExitKind, Error> {
-        let mut exit_kind = ExitKind::Ok;
-
-        let last_run_timed_out = self.forkserver.last_run_timed_out_raw();
-
-        let mut input_bytes = self.target_bytes_converter.to_target_bytes(input);
-        let mut input_size = input_bytes.as_slice().len();
-        if input_size > self.max_input_size {
-            // Truncate like AFL++ does
-            input_size = self.max_input_size;
-        } else if input_size < self.min_input_size {
-            // Extend like AFL++ does
-            input_size = self.min_input_size;
-            let mut input_bytes_copy = Vec::with_capacity(input_size);
-            input_bytes_copy
-                .as_slice_mut()
-                .copy_from_slice(input_bytes.as_slice());
-            input_bytes = OwnedSlice::from(input_bytes_copy);
-        }
+    fn map_input_to_shmem(&mut self, input: &[u8], input_size: usize) -> Result<(), Error> {
         let input_size_in_bytes = input_size.to_ne_bytes();
         if self.uses_shmem_testcase {
             debug_assert!(
@@ -707,11 +681,36 @@ where
             map.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
                 .copy_from_slice(&input_size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
             map.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + input_size)]
-                .copy_from_slice(&input_bytes.as_slice()[..input_size]);
+                .copy_from_slice(&input[..input_size]);
         } else {
-            self.input_file
-                .write_buf(&input_bytes.as_slice()[..input_size])?;
+            self.input_file.write_buf(&input[..input_size])?;
         }
+        Ok(())
+    }
+
+    /// Execute input, but side-step the execution counter.
+    #[inline]
+    fn execute_input_uncounted(&mut self, input: &[u8]) -> Result<ExitKind, Error> {
+        let mut exit_kind = ExitKind::Ok;
+
+        let last_run_timed_out = self.forkserver.last_run_timed_out_raw();
+
+        let mut input_size = input.len();
+        if input_size > self.max_input_size {
+            // Truncate like AFL++ does
+            input_size = self.max_input_size;
+            self.map_input_to_shmem(input, input_size)?;
+        } else if input_size < self.min_input_size {
+            // Extend like AFL++ does
+            input_size = self.min_input_size;
+            let mut input_bytes_copy = Vec::with_capacity(input_size);
+            input_bytes_copy
+                .as_slice_mut()
+                .copy_from_slice(input.as_slice());
+            self.map_input_to_shmem(&input_bytes_copy, input_size)?;
+        } else {
+            self.map_input_to_shmem(input, input_size)?;
+        };
 
         self.forkserver.set_last_run_timed_out(false);
         if let Err(err) = self.forkserver.write_ctl(last_run_timed_out) {
@@ -772,7 +771,7 @@ where
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
 #[expect(clippy::struct_excessive_bools)]
-pub struct ForkserverExecutorBuilder<'a, TC, SP> {
+pub struct ForkserverExecutorBuilder<'a, SP> {
     program: Option<OsString>,
     arguments: Vec<OsString>,
     envs: Vec<(OsString, OsString)>,
@@ -792,10 +791,9 @@ pub struct ForkserverExecutorBuilder<'a, TC, SP> {
     #[cfg(feature = "regex")]
     asan_obs: Option<Handle<AsanBacktraceObserver>>,
     crash_exitcode: Option<i8>,
-    target_bytes_converter: TC,
 }
 
-impl<'a, TC, SHM, SP> ForkserverExecutorBuilder<'a, TC, SP>
+impl<'a, SHM, SP> ForkserverExecutorBuilder<'a, SP>
 where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
@@ -809,10 +807,9 @@ where
     pub fn build<I, OT, S>(
         mut self,
         observers: OT,
-    ) -> Result<ForkserverExecutor<I, OT, S, SHM, TC>, Error>
+    ) -> Result<ForkserverExecutor<I, OT, S, SHM>, Error>
     where
         OT: ObserversTuple<I, S>,
-        TC: TargetBytesConverter<I>,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
 
@@ -863,7 +860,6 @@ where
                 .clone()
                 .unwrap_or(AsanBacktraceObserver::default().handle()),
             crash_exitcode: self.crash_exitcode,
-            target_bytes_converter: self.target_bytes_converter,
         })
     }
 
@@ -873,7 +869,7 @@ where
         mut self,
         mut map_observer: A,
         other_observers: OT,
-    ) -> Result<ForkserverExecutor<I, (A, OT), S, SHM, TC>, Error>
+    ) -> Result<ForkserverExecutor<I, (A, OT), S, SHM>, Error>
     where
         A: Observer<I, S> + AsMut<MO>,
         I: Input,
@@ -927,7 +923,6 @@ where
                 .clone()
                 .unwrap_or(AsanBacktraceObserver::default().handle()),
             crash_exitcode: self.crash_exitcode,
-            target_bytes_converter: self.target_bytes_converter,
         })
     }
 
@@ -1438,7 +1433,7 @@ where
     }
 }
 
-impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
+impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
@@ -1446,8 +1441,7 @@ impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, Unix
     /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[must_use]
-    pub fn new()
-    -> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
+    pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
         ForkserverExecutorBuilder {
             program: None,
             arguments: vec![],
@@ -1468,17 +1462,16 @@ impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, Unix
             #[cfg(feature = "regex")]
             asan_obs: None,
             crash_exitcode: None,
-            target_bytes_converter: NopTargetBytesConverter::new(),
         }
     }
 }
 
-impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
+impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP>(
         self,
         shmem_provider: &'a mut SP,
-    ) -> ForkserverExecutorBuilder<'a, TC, SP> {
+    ) -> ForkserverExecutorBuilder<'a, SP> {
         ForkserverExecutorBuilder {
             // Set the new provider
             shmem_provider: Some(shmem_provider),
@@ -1501,57 +1494,20 @@ impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
             #[cfg(feature = "regex")]
             asan_obs: self.asan_obs,
             crash_exitcode: self.crash_exitcode,
-            target_bytes_converter: self.target_bytes_converter,
         }
     }
 }
 
-impl<'a, TC, SP> ForkserverExecutorBuilder<'a, TC, SP> {
-    /// Shmem provider for forkserver's shared memory testcase feature.
-    pub fn target_bytes_converter<I, TC2: TargetBytesConverter<I>>(
-        self,
-        target_bytes_converter: TC2,
-    ) -> ForkserverExecutorBuilder<'a, TC2, SP> {
-        ForkserverExecutorBuilder {
-            // Set the new provider
-            shmem_provider: self.shmem_provider,
-            // Copy all other values from the old Builder
-            program: self.program,
-            arguments: self.arguments,
-            envs: self.envs,
-            debug_child: self.debug_child,
-            use_stdin: self.use_stdin,
-            uses_shmem_testcase: self.uses_shmem_testcase,
-            is_persistent: self.is_persistent,
-            is_deferred_frksrv: self.is_deferred_frksrv,
-            autotokens: self.autotokens,
-            input_filename: self.input_filename,
-            map_size: self.map_size,
-            max_input_size: self.max_input_size,
-            min_input_size: self.min_input_size,
-            kill_signal: self.kill_signal,
-            timeout: self.timeout,
-            #[cfg(feature = "regex")]
-            asan_obs: self.asan_obs,
-            crash_exitcode: self.crash_exitcode,
-            target_bytes_converter,
-        }
-    }
-}
-
-impl Default
-    for ForkserverExecutorBuilder<'_, NopTargetBytesConverter<BytesInput>, UnixShMemProvider>
-{
+impl Default for ForkserverExecutorBuilder<'_, UnixShMemProvider> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<EM, I, OT, S, SHM, TC, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SHM, TC>
+impl<EM, I, OT, S, SHM, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SHM>
 where
     OT: ObserversTuple<I, S>,
-    S: HasExecutions,
-    TC: TargetBytesConverter<I>,
+    S: HasExecutions + CanToBytes<I>,
     SHM: ShMem,
 {
     #[inline]
@@ -1566,7 +1522,7 @@ where
     }
 }
 
-impl<I, OT, S, SHM, TC> HasTimeout for ForkserverExecutor<I, OT, S, SHM, TC> {
+impl<I, OT, S, SHM> HasTimeout for ForkserverExecutor<I, OT, S, SHM> {
     #[inline]
     fn timeout(&self) -> Duration {
         self.timeout.into()
@@ -1578,7 +1534,7 @@ impl<I, OT, S, SHM, TC> HasTimeout for ForkserverExecutor<I, OT, S, SHM, TC> {
     }
 }
 
-impl<I, OT, S, SHM, TC> HasObservers for ForkserverExecutor<I, OT, S, SHM, TC>
+impl<I, OT, S, SHM> HasObservers for ForkserverExecutor<I, OT, S, SHM>
 where
     OT: ObserversTuple<I, S>,
 {

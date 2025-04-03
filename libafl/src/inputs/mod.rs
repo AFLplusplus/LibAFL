@@ -371,7 +371,7 @@ pub trait TargetBytesConverter<I> {
 }
 
 /// Simply gets the target bytes out from a [`HasTargetBytes`] type.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct NopTargetBytesConverter<I> {
     phantom: PhantomData<I>,
 }

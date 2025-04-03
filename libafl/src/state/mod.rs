@@ -24,6 +24,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 mod stack;
+use libafl_bolts::ownedref::OwnedSlice;
 pub use stack::StageStack;
 
 #[cfg(feature = "std")]
@@ -37,10 +38,9 @@ use crate::{
     feedbacks::StateInitializer,
     fuzzer::Evaluator,
     generators::Generator,
-    inputs::{Input, NopInput},
+    inputs::{Input, NopInput, NopTargetBytesConverter, TargetBytesConverter},
     stages::StageId,
 };
-
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
@@ -73,11 +73,12 @@ trait State:
 {
 }
 
-impl<C, I, R, SC> State for StdState<C, I, R, SC>
+impl<C, I, R, SC, TC> State for StdState<C, I, R, SC, TC>
 where
     C: Serialize + DeserializeOwned,
     R: Rand + Serialize + for<'de> Deserialize<'de>,
     SC: Serialize + DeserializeOwned,
+    TC: Serialize + DeserializeOwned,
 {
 }
 
@@ -203,10 +204,11 @@ impl<I, S, Z> Debug for LoadConfig<'_, I, S, Z> {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "
         C: serde::Serialize + for<'a> serde::Deserialize<'a>,
+        R: serde::Serialize + for<'a> serde::Deserialize<'a>,
+        TC: serde::Serialize + for<'a> serde::Deserialize<'a>,
         SC: serde::Serialize + for<'a> serde::Deserialize<'a>,
-        R: serde::Serialize + for<'a> serde::Deserialize<'a>
     ")]
-pub struct StdState<C, I, R, SC> {
+pub struct StdState<C, I, R, SC, TC> {
     /// RNG instance
     rand: R,
     /// How many times the executor ran the harness/target
@@ -219,6 +221,8 @@ pub struct StdState<C, I, R, SC> {
     corpus: C,
     // Solutions corpus
     solutions: SC,
+    /// target bytes converter to convert arbitrary input to bytes
+    target_bytes_converter: TC,
     /// Metadata stored for this state by one of the components
     metadata: SerdeAnyMap,
     /// Metadata stored with names
@@ -252,7 +256,7 @@ pub struct StdState<C, I, R, SC> {
     phantom: PhantomData<I>,
 }
 
-impl<C, I, R, SC> HasRand for StdState<C, I, R, SC>
+impl<C, I, R, SC, TC> HasRand for StdState<C, I, R, SC, TC>
 where
     R: Rand,
 {
@@ -271,7 +275,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasCorpus<I> for StdState<C, I, R, SC>
+impl<C, I, R, SC, TC> HasCorpus<I> for StdState<C, I, R, SC, TC>
 where
     C: Corpus<I>,
 {
@@ -290,7 +294,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasTestcase<I> for StdState<C, I, R, SC>
+impl<C, I, R, SC, TC> HasTestcase<I> for StdState<C, I, R, SC, TC>
 where
     C: Corpus<I>,
 {
@@ -305,7 +309,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasSolutions<I> for StdState<C, I, R, SC>
+impl<C, I, R, SC, TC> HasSolutions<I> for StdState<C, I, R, SC, TC>
 where
     C: Corpus<I>,
     I: Input,
@@ -326,7 +330,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasMetadata for StdState<C, I, R, SC, TC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn metadata_map(&self) -> &SerdeAnyMap {
@@ -340,7 +344,7 @@ impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasNamedMetadata for StdState<C, I, R, SC, TC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
@@ -354,7 +358,7 @@ impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasExecutions for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasExecutions for StdState<C, I, R, SC, TC> {
     /// The executions counter
     #[inline]
     fn executions(&self) -> &u64 {
@@ -368,7 +372,7 @@ impl<C, I, R, SC> HasExecutions for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasImported for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasImported for StdState<C, I, R, SC, TC> {
     /// Return the number of new paths that imported from other fuzzers
     #[inline]
     fn imported(&self) -> &usize {
@@ -382,7 +386,7 @@ impl<C, I, R, SC> HasImported for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasLastFoundTime for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasLastFoundTime for StdState<C, I, R, SC, TC> {
     /// Return the number of new paths that imported from other fuzzers
     #[inline]
     fn last_found_time(&self) -> &Duration {
@@ -396,7 +400,7 @@ impl<C, I, R, SC> HasLastFoundTime for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasLastReportTime for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasLastReportTime for StdState<C, I, R, SC, TC> {
     /// The last time we reported progress,if available/used.
     /// This information is used by fuzzer `maybe_report_progress`.
     fn last_report_time(&self) -> &Option<Duration> {
@@ -410,7 +414,7 @@ impl<C, I, R, SC> HasLastReportTime for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasMaxSize for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasMaxSize for StdState<C, I, R, SC, TC> {
     fn max_size(&self) -> usize {
         self.max_size
     }
@@ -420,7 +424,7 @@ impl<C, I, R, SC> HasMaxSize for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasStartTime for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasStartTime for StdState<C, I, R, SC, TC> {
     /// The starting time
     #[inline]
     fn start_time(&self) -> &Duration {
@@ -434,7 +438,7 @@ impl<C, I, R, SC> HasStartTime for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasCurrentCorpusId for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasCurrentCorpusId for StdState<C, I, R, SC, TC> {
     fn set_corpus_id(&mut self, id: CorpusId) -> Result<(), Error> {
         self.corpus_id = Some(id);
         Ok(())
@@ -517,7 +521,7 @@ pub trait Stoppable {
     fn discard_stop_request(&mut self);
 }
 
-impl<C, I, R, SC> Stoppable for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> Stoppable for StdState<C, I, R, SC, TC> {
     fn request_stop(&mut self) {
         self.stop_requested = true;
     }
@@ -531,7 +535,7 @@ impl<C, I, R, SC> Stoppable for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasCurrentStageId for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasCurrentStageId for StdState<C, I, R, SC, TC> {
     fn set_current_stage_id(&mut self, idx: StageId) -> Result<(), Error> {
         self.stage_stack.set_current_stage_id(idx)
     }
@@ -577,7 +581,7 @@ pub trait HasNestedStage: HasCurrentStageId {
     fn exit_inner_stage(&mut self) -> Result<(), Error>;
 }
 
-impl<C, I, R, SC> HasNestedStage for StdState<C, I, R, SC> {
+impl<C, I, R, SC, TC> HasNestedStage for StdState<C, I, R, SC, TC> {
     fn enter_inner_stage(&mut self) -> Result<(), Error> {
         self.stage_stack.enter_inner_stage()
     }
@@ -587,8 +591,23 @@ impl<C, I, R, SC> HasNestedStage for StdState<C, I, R, SC> {
     }
 }
 
+/// Anything that implement this trait can transform input to bytes
+pub trait CanToBytes<I> {
+    /// do the transformation
+    fn to_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
+}
+
+impl<C, I, R, SC, TC> CanToBytes<I> for StdState<C, I, R, SC, TC>
+where
+    TC: TargetBytesConverter<I>,
+{
+    fn to_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8> {
+        self.target_bytes_converter.to_target_bytes(input)
+    }
+}
+
 #[cfg(feature = "std")]
-impl<C, I, R, SC> StdState<C, I, R, SC>
+impl<C, I, R, SC, TC> StdState<C, I, R, SC, TC>
 where
     C: Corpus<I>,
     I: Input,
@@ -1029,7 +1048,7 @@ where
     }
 }
 
-impl<C, I, R, SC> StdState<C, I, R, SC>
+impl<C, I, R, SC, TC> StdState<C, I, R, SC, TC>
 where
     C: Corpus<I>,
     I: Input,
@@ -1112,10 +1131,11 @@ where
     }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
-    pub fn new<F, O>(
+    pub fn with_target_bytes_converter<F, O>(
         rand: R,
         corpus: C,
         solutions: SC,
+        target_bytes_converter: TC,
         feedback: &mut F,
         objective: &mut O,
     ) -> Result<Self, Error>
@@ -1134,6 +1154,7 @@ where
             named_metadata: NamedSerdeAnyMap::default(),
             corpus,
             solutions,
+            target_bytes_converter,
             max_size: DEFAULT_MAX_SIZE,
             stop_requested: false,
             #[cfg(feature = "introspection")]
@@ -1156,11 +1177,57 @@ where
     }
 }
 
-impl StdState<InMemoryCorpus<NopInput>, NopInput, StdRand, InMemoryCorpus<NopInput>> {
+impl<C, I, R, SC> StdState<C, I, R, SC, NopTargetBytesConverter<I>>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    SC: Corpus<I>,
+{
+    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
+    pub fn new<F, O>(
+        rand: R,
+        corpus: C,
+        solutions: SC,
+        feedback: &mut F,
+        objective: &mut O,
+    ) -> Result<Self, Error>
+    where
+        F: StateInitializer<Self>,
+        O: StateInitializer<Self>,
+        C: Serialize + DeserializeOwned,
+        SC: Serialize + DeserializeOwned,
+    {
+        Self::with_target_bytes_converter(
+            rand,
+            corpus,
+            solutions,
+            NopTargetBytesConverter::new(),
+            feedback,
+            objective,
+        )
+    }
+}
+
+impl
+    StdState<
+        InMemoryCorpus<NopInput>,
+        NopInput,
+        StdRand,
+        InMemoryCorpus<NopInput>,
+        NopTargetBytesConverter<NopInput>,
+    >
+{
     /// Create an empty [`StdState`] that has very minimal uses.
     /// Potentially good for testing.
     pub fn nop() -> Result<
-        StdState<InMemoryCorpus<NopInput>, NopInput, StdRand, InMemoryCorpus<NopInput>>,
+        StdState<
+            InMemoryCorpus<NopInput>,
+            NopInput,
+            StdRand,
+            InMemoryCorpus<NopInput>,
+            NopTargetBytesConverter<NopInput>,
+        >,
         Error,
     > {
         StdState::new(
