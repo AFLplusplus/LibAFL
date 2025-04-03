@@ -47,7 +47,7 @@ use nix::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use typed_builder::TypedBuilder;
 
-use super::{HasTimeout, forkserver::HasAflStyleTargetArguments};
+use super::{HasTimeout, afl_args::HasAflStyleTargetArguments};
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
@@ -807,8 +807,8 @@ mod tests {
         events::SimpleEventManager,
         executors::{
             Executor,
+            afl_args::HasAflStyleTargetArguments,
             command::{CommandExecutor, InputLocation},
-            forkserver::HasAflStyleTargetArguments,
         },
         fuzzer::NopFuzzer,
         inputs::{BytesInput, NopInput},

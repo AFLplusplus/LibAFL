@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::forkserver::{ForkserverExecutor, HasAflStyleTargetArguments},
+    executors::{afl_args::HasAflStyleTargetArguments, forkserver::ForkserverExecutor},
     feedback_and,
     feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
