@@ -24,7 +24,7 @@ use std::{
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
     AsSlice,
-    fs::{InputFile, get_unique_std_input_file},
+    fs::InputFile,
     tuples::{Handle, MatchName, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
@@ -47,7 +47,7 @@ use nix::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use typed_builder::TypedBuilder;
 
-use super::HasTimeout;
+use super::{HasTimeout, forkserver::HasAflStyleTargetArguments};
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
@@ -530,6 +530,32 @@ pub struct CommandExecutorBuilder {
     timeout: Duration,
 }
 
+impl HasAflStyleTargetArguments for CommandExecutorBuilder {
+    fn arguments_ref(&self) -> &Vec<OsString> {
+        &self.args
+    }
+
+    fn arguments_mut(&mut self) -> &mut Vec<OsString> {
+        &mut self.args
+    }
+
+    fn program_ref(&self) -> &Option<OsString> {
+        &self.program
+    }
+
+    fn program_mut(&mut self) -> &mut Option<OsString> {
+        &mut self.program
+    }
+
+    fn input_location_ref(&self) -> &InputLocation {
+        &self.input_location
+    }
+
+    fn input_location_mut(&mut self) -> &mut InputLocation {
+        &mut self.input_location
+    }
+}
+
 impl Default for CommandExecutorBuilder {
     fn default() -> Self {
         Self::new()
@@ -553,40 +579,6 @@ impl CommandExecutorBuilder {
         }
     }
 
-    /// Set the binary to execute
-    /// This option is required.
-    pub fn program<O>(&mut self, program: O) -> &mut Self
-    where
-        O: AsRef<OsStr>,
-    {
-        self.program = Some(program.as_ref().to_owned());
-        self
-    }
-
-    /// Set the input mode and location.
-    /// This option is mandatory, if not set, the `build` method will error.
-    fn input(&mut self, input: InputLocation) -> &mut Self {
-        // This is a fatal error in the user code, no point in returning Err.
-        assert_eq!(
-            self.input_location,
-            InputLocation::StdIn,
-            "input location already set to non-stdin, cannot set it again"
-        );
-        self.input_location = input;
-        self
-    }
-
-    /// Sets the input mode to [`InputLocation::Arg`] and uses the current arg offset as `argnum`.
-    /// During execution, at input will be provided _as argument_ at this position.
-    /// Use [`Self::arg_input_file_std`] if you want to provide the input as a file instead.
-    pub fn arg_input_arg(&mut self) -> &mut Self {
-        let argnum = self.args.len();
-        self.input(InputLocation::Arg { argnum });
-        // Placeholder arg that gets replaced with the input name later.
-        self.arg("PLACEHOLDER");
-        self
-    }
-
     /// Sets the stdout observer
     pub fn stdout_observer(&mut self, stdout: Handle<StdOutObserver>) -> &mut Self {
         self.stdout = Some(stdout);
@@ -596,44 +588,6 @@ impl CommandExecutorBuilder {
     /// Sets the stderr observer
     pub fn stderr_observer(&mut self, stderr: Handle<StdErrObserver>) -> &mut Self {
         self.stderr = Some(stderr);
-        self
-    }
-
-    /// Sets the input mode to [`InputLocation::File`]
-    /// and adds the filename as arg to at the current position.
-    /// Uses a default filename.
-    /// Use [`Self::arg_input_file`] to specify a custom filename.
-    pub fn arg_input_file_std(&mut self) -> &mut Self {
-        self.arg_input_file(get_unique_std_input_file());
-        self
-    }
-
-    /// Sets the input mode to [`InputLocation::File`]
-    /// and adds the filename as arg to at the current position.
-    pub fn arg_input_file<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
-        self.arg(path.as_ref());
-        let out_file_std = InputFile::create(path.as_ref()).unwrap();
-        self.input(InputLocation::File {
-            out_file: out_file_std,
-        });
-        self
-    }
-
-    /// Adds an argument to the program's commandline.
-    pub fn arg<O: AsRef<OsStr>>(&mut self, arg: O) -> &mut CommandExecutorBuilder {
-        self.args.push(arg.as_ref().to_owned());
-        self
-    }
-
-    /// Adds a range of arguments to the program's commandline.
-    pub fn args<IT, O>(&mut self, args: IT) -> &mut CommandExecutorBuilder
-    where
-        IT: IntoIterator<Item = O>,
-        O: AsRef<OsStr>,
-    {
-        for arg in args {
-            self.arg(arg.as_ref());
-        }
         self
     }
 
@@ -870,6 +824,7 @@ mod tests {
         executors::{
             Executor,
             command::{CommandExecutor, InputLocation},
+            forkserver::HasAflStyleTargetArguments,
         },
         fuzzer::NopFuzzer,
         inputs::{BytesInput, NopInput},
@@ -885,8 +840,7 @@ mod tests {
                 log::info!("{status}");
             }));
 
-        let mut executor = CommandExecutor::builder();
-        executor
+        let executor = CommandExecutor::builder()
             .program("ls")
             .input(InputLocation::Arg { argnum: 0 });
         let executor = executor.build(());
