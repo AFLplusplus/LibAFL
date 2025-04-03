@@ -7,7 +7,7 @@ use libafl::{
     Error, HasMetadata,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
-    executors::forkserver::{ForkserverExecutor, HasAflStyleTargetArguments},
+    executors::{afl_args::HasAflStyleTargetArguments, forkserver::ForkserverExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
