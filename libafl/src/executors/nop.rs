@@ -22,11 +22,7 @@ impl<OT> ConstantExecutor<OT> {
     /// Construct a [`ConstantExecutor`]
     #[must_use]
     pub fn new(exit: ExitKind, tm: Duration, ot: OT) -> Self {
-        Self {
-            exit,
-            tm,
-            ot,
-        }
+        Self { exit, tm, ot }
     }
 }
 
