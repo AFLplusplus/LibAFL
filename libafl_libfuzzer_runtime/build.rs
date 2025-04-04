@@ -17,8 +17,9 @@ fn main() {
         .write_to_file(Path::new(&out_dir).join("harness_wrap.rs"))
         .expect("Couldn't write the harness wrapper!");
 
-    cc::Build::new()
-        .cpp(true)
-        .file("src/harness_wrap.cpp")
-        .compile("harness_wrap");
+    let mut harness_wrap = cc::Build::new();
+
+    harness_wrap.cpp(true).file("src/harness_wrap.cpp");
+
+    harness_wrap.compile("harness_wrap");
 }

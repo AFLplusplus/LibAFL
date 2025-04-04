@@ -49,6 +49,12 @@ function Cleanup {
 }
 
 try {
+    if ($profile -eq "dev") {
+        # Set the profile to debug for dev builds, because the path isn't the same
+        # as the profile name
+        $profile = "debug"
+    }
+
     $targetPath = Join-Path $SCRIPT_DIR "target\$profile\afl_libfuzzer_runtime.lib"
     $outputPath = Join-Path $SCRIPT_DIR "libFuzzer.lib"
     
