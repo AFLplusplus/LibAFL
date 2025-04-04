@@ -32,6 +32,6 @@ impl<S> Restartable<S> for NopStage {
     }
 
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, libafl_bolts::Error> {
-        Ok(true)
+        Ok(false)
     }
 }
