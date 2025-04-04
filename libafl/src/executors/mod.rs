@@ -21,6 +21,8 @@ pub use with_observers::WithObservers;
 
 use crate::Error;
 
+#[cfg(feature = "std")]
+pub mod afl_args;
 pub mod combined;
 #[cfg(all(feature = "std", unix))]
 pub mod command;

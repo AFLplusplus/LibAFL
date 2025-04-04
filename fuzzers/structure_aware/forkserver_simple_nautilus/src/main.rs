@@ -5,7 +5,9 @@ use clap::Parser;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{forkserver::ForkserverExecutor, HasObservers},
+    executors::{
+        afl_args::HasAflStyleTargetArguments, forkserver::ForkserverExecutor, HasObservers,
+    },
     feedback_and_fast, feedback_or,
     feedbacks::{
         CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback, TimeFeedback,

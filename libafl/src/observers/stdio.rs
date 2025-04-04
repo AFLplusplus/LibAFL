@@ -26,7 +26,7 @@ use crate::{Error, observers::Observer};
 ///     Error, Fuzzer, StdFuzzer,
 ///     corpus::{Corpus, InMemoryCorpus, Testcase},
 ///     events::{EventFirer, NopEventManager},
-///     executors::{CommandExecutor, ExitKind},
+///     executors::{afl_args::HasAflStyleTargetArguments, CommandExecutor, ExitKind},
 ///     feedbacks::{Feedback, StateInitializer},
 ///     inputs::BytesInput,
 ///     mutators::{MutationResult, NopMutator},
