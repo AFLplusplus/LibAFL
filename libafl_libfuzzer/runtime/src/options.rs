@@ -320,6 +320,10 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         "dict" => self.dict = Some(value),
                         "fork" | "jobs" => {
                             self.forks = Some(parse_or_bail!(name, value, usize));
+                            #[cfg(windows)]
+                            if self.forks.unwrap() > 1 {
+                                panic!("Error: Windows does not support forking!");
+                            }
                         }
                         "ignore_crashes" => {
                             self.ignore_crashes = Some(parse_or_bail!(name, value, u64) > 0);

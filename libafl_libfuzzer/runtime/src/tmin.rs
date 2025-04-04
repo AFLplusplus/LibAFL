@@ -3,11 +3,15 @@ use std::{
     fs::{read, write},
 };
 
+#[cfg(windows)]
+use libafl::executors::inprocess::InProcessExecutor;
+#[cfg(unix)]
+use libafl::executors::inprocess_fork::InProcessForkExecutor;
 use libafl::{
     Error, ExecutesInput, Fuzzer, StdFuzzer,
     corpus::{Corpus, HasTestcase, InMemoryCorpus, Testcase},
     events::SimpleEventManager,
-    executors::{ExitKind, inprocess_fork::InProcessForkExecutor},
+    executors::ExitKind,
     feedbacks::{CrashFeedback, TimeoutFeedback},
     inputs::{BytesInput, HasMutatorBytes, HasTargetBytes},
     mutators::{Mutator, StdScheduledMutator, havoc_mutations_no_crossover},
@@ -62,6 +66,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), (), ());
 
     let shmem_provider = StdShMemProvider::new()?;
+    #[cfg(unix)]
     let mut executor = InProcessForkExecutor::new(
         &mut harness,
         (),
@@ -70,6 +75,16 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
         &mut mgr,
         options.timeout(),
         shmem_provider,
+    )?;
+
+    #[cfg(windows)]
+    let mut executor = InProcessExecutor::with_timeout(
+        &mut harness,
+        (),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+        options.timeout(),
     )?;
 
     let exit_kind = fuzzer.execute_input(&mut state, &mut executor, &mut mgr, &input)?;

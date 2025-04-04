@@ -67,7 +67,10 @@
 #![allow(clippy::borrow_deref_ref)]
 
 use core::ffi::{CStr, c_char, c_int};
-use std::{fs::File, io::stderr, os::fd::RawFd};
+use std::{fs::File, io::stderr};
+
+#[cfg(unix)]
+use std::os::fd::RawFd;
 
 use env_logger::Target;
 use libafl::{
