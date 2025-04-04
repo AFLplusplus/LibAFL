@@ -16,40 +16,41 @@ use std::{
 
 use clap::{Arg, Command};
 use libafl::{
-    Error, HasMetadata,
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        StdMOptMutator, StdScheduledMutator, Tokens, havoc_mutations,
-        token_mutations::I2SRandReplace, tokens_mutations,
+        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
+        StdScheduledMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{
-        IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        ShadowTracingStage, StdMutationalStage, calibrate::CalibrationStage,
-        power::StdPowerMutationalStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
+        StdMutationalStage,
     },
     state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 use libafl_bolts::{
-    AsSlice, current_time,
+    current_time,
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{Merge, tuple_list},
+    tuples::{tuple_list, Merge},
+    AsSlice,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    CmpLogObserver, libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -270,7 +271,7 @@ fn fuzz(
     let mut state = state.unwrap_or_else(|| {
         StdState::new(
             // RNG
-            StdRand::new(),
+            StdRand::with_seed(0),
             // Corpus that will be evolved, we keep it in memory for performance
             InMemoryOnDiskCorpus::new(corpus_dir).unwrap(),
             // Corpus in which we store solutions (crashes in this example),
