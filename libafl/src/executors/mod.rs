@@ -230,77 +230,28 @@ pub fn common_signals() -> Vec<Signal> {
 #[cfg(test)]
 /// Tester for executor
 pub mod test {
-    use core::marker::PhantomData;
-
-    use libafl_bolts::{AsSlice, Error};
-
+    use super::nop::NopExecutor;
     use crate::{
         events::NopEventManager,
         executors::{Executor, ExitKind},
         fuzzer::NopFuzzer,
-        inputs::{BytesInput, HasTargetBytes},
-        state::{HasExecutions, NopState},
+        inputs::BytesInput,
+        state::NopState,
     };
-
-    /// A simple executor that does nothing.
-    /// If intput len is 0, `run_target` will return Err
-    #[derive(Debug)]
-    pub struct NopExecutor<S> {
-        phantom: PhantomData<S>,
-    }
-
-    impl<S> NopExecutor<S> {
-        /// Creates a new [`NopExecutor`]
-        #[must_use]
-        pub fn new() -> Self {
-            Self {
-                phantom: PhantomData,
-            }
-        }
-    }
-
-    impl<S> Default for NopExecutor<S> {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor<S>
-    where
-        S: HasExecutions,
-        I: HasTargetBytes,
-    {
-        fn run_target(
-            &mut self,
-            _fuzzer: &mut Z,
-            state: &mut S,
-            _mgr: &mut EM,
-            input: &I,
-        ) -> Result<ExitKind, Error> {
-            *state.executions_mut() += 1;
-
-            if input.target_bytes().as_slice().is_empty() {
-                Err(Error::empty("Input Empty"))
-            } else {
-                Ok(ExitKind::Ok)
-            }
-        }
-    }
 
     #[test]
     fn nop_executor() {
         let empty_input = BytesInput::new(vec![]);
-        let nonempty_input = BytesInput::new(vec![1u8]);
-        let mut executor = NopExecutor::new();
+        let mut executor = NopExecutor::ok();
         let mut fuzzer = NopFuzzer::new();
         let mut mgr: NopEventManager = NopEventManager::new();
         let mut state: NopState<BytesInput> = NopState::new();
 
-        executor
-            .run_target(&mut fuzzer, &mut state, &mut mgr, &empty_input)
-            .unwrap_err();
-        executor
-            .run_target(&mut fuzzer, &mut state, &mut mgr, &nonempty_input)
-            .unwrap();
+        assert_eq!(
+            executor
+                .run_target(&mut fuzzer, &mut state, &mut mgr, &empty_input)
+                .unwrap(),
+            ExitKind::Ok
+        );
     }
 }
