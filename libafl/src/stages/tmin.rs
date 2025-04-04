@@ -284,6 +284,9 @@ where
                 .feedback_mut()
                 .is_interesting(state, manager, &base, &*observers, &exit_kind)?;
             let mut testcase = Testcase::from(base);
+            testcase.set_executions(*state.executions());
+            testcase.set_parent_id(base_corpus_id);
+
             fuzzer
                 .feedback_mut()
                 .append_metadata(state, manager, &*observers, &mut testcase)?;
