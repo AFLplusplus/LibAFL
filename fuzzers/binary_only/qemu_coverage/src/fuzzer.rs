@@ -1,4 +1,4 @@
-//! A libfuzzer-like fuzzer using qemu for binary-only coverage
+//! A qemu test case runner to generate drcov coverage outputs
 #[cfg(feature = "i386")]
 use core::mem::size_of;
 use core::time::Duration;
