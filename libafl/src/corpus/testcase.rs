@@ -85,7 +85,9 @@ impl<I> Testcase<I> {
     /// Returns this [`Testcase`] with a loaded `Input`]
     pub fn load_input<C: Corpus<I>>(&mut self, corpus: &C) -> Result<&I, Error> {
         corpus.load_input_into(self)?;
-        Ok(self.input.as_ref().unwrap())
+        self.input
+            .as_ref()
+            .ok_or_else(|| Error::illegal_argument("Error converting reference"))
     }
 
     /// Get the input, if available any
@@ -521,7 +523,13 @@ impl<I> Drop for Testcase<I> {
     fn drop(&mut self) {
         if let Some(filename) = &self.filename {
             let mut path = PathBuf::from(filename);
-            let lockname = format!(".{}.lafl_lock", path.file_name().unwrap().to_str().unwrap());
+            let lockname = if let Some(name) = path.file_name().and_then(|os_str| os_str.to_str()) {
+                format!(".{name}.lafl_lock")
+            } else {
+                // Log an error or silently return if conversion fails.
+                eprintln!("Failed to convert filename to string for lock file.");
+                return;
+            };
             path.set_file_name(lockname);
             let _ = std::fs::remove_file(path);
         }
