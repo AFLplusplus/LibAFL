@@ -39,6 +39,9 @@ use libafl_qemu::{
 use libafl_qemu::{modules::SnapshotModule, QemuExecutor};
 use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
 
+#[cfg(feature = "fork")]
+compile_error!("'fork' feature is currently not working.");
+
 #[cfg(all(feature = "fork", feature = "snapshot"))]
 compile_error!("Cannot enable both 'fork' and 'snapshot' features at the same time.");
 
@@ -134,11 +137,14 @@ pub fn fuzz() -> Result<(), Error> {
     env::remove_var("LD_LIBRARY_PATH");
 
     // Create a shared memory region for sharing coverage map between fuzzer and target
+    // In snapshot mode, this is only required for the SimpleRestartingEventManager.
+    // However, fork mode requires it to share memory between parent and child,
+    // so we use it in both cases.
     let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
     let edges = edges_shmem.as_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
-
+    
     // We use a HitcountsMapObserver to observe the coverage map
     let mut edges_observer = unsafe {
         HitcountsMapObserver::new(ConstMapObserver::from_mut_ptr(
