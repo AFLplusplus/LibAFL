@@ -30,7 +30,7 @@ pub enum InputLocation {
 }
 
 /// The main implementation trait of afl style arguments handling
-pub trait HasAflStyleTargetArguments: Sized {
+pub trait AflTargetArgs: Sized {
     /// Gets the arguments
     fn arguments_ref(&self) -> &Vec<OsString>;
     /// Gets the mutable arguments

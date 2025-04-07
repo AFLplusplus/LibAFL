@@ -7,7 +7,7 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
-        HasObservers, afl_args::HasAflStyleTargetArguments, forkserver::ForkserverExecutor,
+        HasObservers, afl_args::AflTargetArgs, forkserver::ForkserverExecutor,
     },
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},

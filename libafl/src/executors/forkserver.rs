@@ -38,7 +38,7 @@ use nix::{
 
 use super::{
     HasTimeout,
-    afl_args::{HasAflStyleTargetArguments, InputLocation},
+    afl_args::{AflTargetArgs, InputLocation},
 };
 #[cfg(feature = "regex")]
 use crate::observers::{
@@ -796,7 +796,7 @@ pub struct ForkserverExecutorBuilder<'a, TC, SP> {
     target_bytes_converter: TC,
 }
 
-impl<TC, SP> HasAflStyleTargetArguments for ForkserverExecutorBuilder<'_, TC, SP> {
+impl<TC, SP> AflTargetArgs for ForkserverExecutorBuilder<'_, TC, SP> {
     fn arguments_ref(&self) -> &Vec<OsString> {
         &self.arguments
     }
@@ -1502,7 +1502,7 @@ mod tests {
         Error,
         corpus::NopCorpus,
         executors::{
-            afl_args::HasAflStyleTargetArguments,
+            afl_args::AflTargetArgs,
             forkserver::{FAILED_TO_START_FORKSERVER_MSG, ForkserverExecutor},
         },
         inputs::BytesInput,

@@ -48,7 +48,7 @@ use typed_builder::TypedBuilder;
 
 use super::{
     HasTimeout,
-    afl_args::{HasAflStyleTargetArguments, InputLocation},
+    afl_args::{AflTargetArgs, InputLocation},
 };
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
@@ -511,7 +511,7 @@ pub struct CommandExecutorBuilder {
     timeout: Duration,
 }
 
-impl HasAflStyleTargetArguments for CommandExecutorBuilder {
+impl AflTargetArgs for CommandExecutorBuilder {
     fn arguments_ref(&self) -> &Vec<OsString> {
         &self.args
     }
@@ -788,7 +788,7 @@ mod tests {
         events::SimpleEventManager,
         executors::{
             Executor,
-            afl_args::HasAflStyleTargetArguments,
+            afl_args::AflTargetArgs,
             command::{CommandExecutor, InputLocation},
         },
         fuzzer::NopFuzzer,

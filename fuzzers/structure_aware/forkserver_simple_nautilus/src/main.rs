@@ -6,7 +6,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
-        afl_args::HasAflStyleTargetArguments, forkserver::ForkserverExecutor, HasObservers,
+        afl_args::AflTargetArgs, forkserver::ForkserverExecutor, HasObservers,
     },
     feedback_and_fast, feedback_or,
     feedbacks::{
