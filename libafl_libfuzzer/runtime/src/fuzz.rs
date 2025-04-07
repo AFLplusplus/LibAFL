@@ -9,10 +9,6 @@ use std::{
     str::FromStr,
 };
 
-#[cfg(unix)]
-use libafl::events::{
-    EventConfig, SimpleRestartingEventManager, launcher::Launcher, monitors::Monitor,
-};
 #[cfg(feature = "tui_monitor")]
 use libafl::monitors::tui::TuiMonitor;
 use libafl::{
@@ -23,6 +19,11 @@ use libafl::{
     monitors::MultiMonitor,
     stages::StagesTuple,
     state::{HasCurrentStageId, HasExecutions, HasLastReportTime, HasSolutions, Stoppable},
+};
+#[cfg(unix)]
+use libafl::{
+    events::{EventConfig, SimpleRestartingEventManager, launcher::Launcher},
+    monitors::Monitor,
 };
 #[cfg(unix)]
 use libafl_bolts::{
