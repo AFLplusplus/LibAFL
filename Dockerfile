@@ -48,6 +48,7 @@ RUN apt-get update && \
     gcc-i686-linux-gnu \
     gcc-mipsel-linux-gnu \
     gcc-powerpc-linux-gnu \
+    gcc-riscv64-linux-gnu \
     gdb \
     gdb-multiarch \
     git \
