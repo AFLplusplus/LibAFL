@@ -1,4 +1,22 @@
-//! Expose an `Executor` based on a `Forkserver` in order to execute AFL/AFL++ binaries
+//! # LibAFL Forkserver Executor
+//! 
+//! This module implements an executor that communicates with LibAFL instrumented binaries
+//! through a forkserver mechanism. The forkserver allows for efficient process creation by
+//! forking from a pre-initialized parent process, avoiding the overhead of repeatedly executing
+//! the program from scratch.
+//! 
+//! Key features:
+//! - Support for LibAFL (libafl_cc/libafl_cxx) instrumented binaries
+//! - Compatible with AFL/AFL++ instrumentation
+//! - Shared memory testcase passing for improved performance
+//! - Support for persistent mode execution
+//! - Handling of deferred forkserver initialization
+//! - Automatic dictionary token extraction
+//! - Timeout and signal handling for target programs
+//! - Compatible with various observer types for feedback collection
+//! 
+//! This implementation follows the forkserver protocol and provides
+//! a flexible builder pattern for configuration.
 
 use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::{
@@ -93,6 +111,28 @@ const FS_ERROR_OLD_CMPLOG_QEMU: i32 = 64_u32 as i32;
 
 /// Forkserver message. We'll reuse it in a testcase.
 const FAILED_TO_START_FORKSERVER_MSG: &str = "Failed to start forkserver";
+
+/// Translates forkserver error codes into human-readable error messages
+/// 
+/// This function interprets error statuses received from the forkserver and returns
+/// appropriate error messages with troubleshooting advice. It handles various failure modes
+/// such as map size issues, shared memory problems, and compatibility errors.
+/// 
+/// # Arguments
+/// * `status` - The error status code received from the forkserver
+/// 
+/// # Returns
+/// * `Result<(), Error>` - Always returns `Err` with a descriptive error message
+///   that explains the failure and suggests possible solutions
+/// 
+/// # Error Codes
+/// * `FS_ERROR_MAP_SIZE` - Coverage map size configuration issues
+/// * `FS_ERROR_MAP_ADDR` - Hardcoded map address conflicts
+/// * `FS_ERROR_SHM_OPEN` - Shared memory opening failures
+/// * `FS_ERROR_SHMAT` - Shared memory attachment failures
+/// * `FS_ERROR_MMAP` - Memory mapping failures
+/// * `FS_ERROR_OLD_CMPLOG` - Outdated comparison logging instrumentation
+/// * `FS_ERROR_OLD_CMPLOG_QEMU` - Outdated QEMU/FRIDA loader versions
 
 fn report_error_and_exit(status: i32) -> Result<(), Error> {
     /* Report on the error received via the forkserver controller and exit */
@@ -253,8 +293,12 @@ impl ConfigTarget for Command {
     }
 }
 
-/// The [`Forkserver`] is communication channel with a child process that forks on request of the fuzzer.
-/// The communication happens via pipe.
+/// A communication channel with an instrumented target process that handles efficient forking
+///
+/// The Forkserver implements the LibAFL/AFL++ forkserver protocol, allowing the fuzzer to
+/// request new process instances without the overhead of loading the program from scratch.
+/// It communicates with the target via pipes for control messages and status information,
+/// and manages child process creation, monitoring, and termination.
 #[derive(Debug)]
 pub struct Forkserver {
     /// The "actual" forkserver we spawned in the target
@@ -500,7 +544,16 @@ impl Forkserver {
         }
     }
 
-    /// Read bytes of any length from the st pipe
+    /// Reads exactly `size` bytes from the status pipe
+    ///
+    /// Efficiently allocates and fills a buffer with the exact number of bytes
+    /// requested from the forkserver's status pipe.
+    ///
+    /// # Arguments
+    /// * `size` - Number of bytes to read
+    ///
+    /// # Returns
+    /// The read bytes or an error if the read fails
     pub fn read_st_of_len(&mut self, size: usize) -> Result<Vec<u8>, Error> {
         let mut buf = Vec::with_capacity(size);
         // SAFETY: `buf` will not be returned with `Ok` unless it is filled with `size` bytes.
@@ -550,6 +603,13 @@ impl Forkserver {
         let mut readfds = FdSet::new();
         readfds.insert(st_read);
         // We'll pass a copied timeout to keep the original timeout intact, because select updates timeout to indicate how much time was left. See select(2)
+
+        // Use pselect to wait for data with timeout protection
+        // If data is available (sret > 0), read a 4-byte integer from the pipe
+        // Returns:
+        // - Ok(Some(val)) if we successfully read a value
+        // - Err if communication fails
+        // - Ok(None) if timeout occurs with no data
         let sret = pselect(
             Some(readfds.highest().unwrap().as_raw_fd() + 1),
             &mut readfds,
@@ -573,10 +633,21 @@ impl Forkserver {
     }
 }
 
-/// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
+/// An executor that runs LibAFL-instrumented binaries via a forkserver protocol
 ///
-/// Shared memory feature is also available, but you have to set things up in your code.
-/// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
+/// This executor communicates with instrumented targets using the forkserver mechanism
+/// for efficient process creation. It supports shared memory-based test case passing,
+/// customizable timeouts, and can handle persistent mode execution.
+///
+/// For persistent mode details, see: 
+/// <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
+///
+/// # Type Parameters
+/// * `I` - Input type
+/// * `OT` - Observer tuple type
+/// * `S` - State type
+/// * `SHM` - Shared memory type
+/// * `TC` - Target bytes converter type
 pub struct ForkserverExecutor<I, OT, S, SHM, TC> {
     target: OsString,
     args: Vec<OsString>,
@@ -769,7 +840,17 @@ where
     }
 }
 
-/// The builder for `ForkserverExecutor`
+/// Builder for `ForkserverExecutor` with a fluent interface for configuration
+///
+/// Provides methods to customize all aspects of forkserver execution:
+/// - Target program path and arguments
+/// - Input handling (file, stdin, shared memory)
+/// - Execution parameters (timeouts, signals)
+/// - Performance options (persistent mode, map size)
+/// - Instrumentation features (deferred mode, ASan support)
+///
+/// Use methods like `program()`, `arg()`, and `timeout()` to configure
+/// the executor before calling `build()`.
 #[derive(Debug)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct ForkserverExecutorBuilder<'a, TC, SP> {
