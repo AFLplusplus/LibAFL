@@ -102,6 +102,7 @@ impl Default for ArtifactPrefix {
 #[derive(Debug, Clone)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct LibfuzzerOptions {
+    #[allow(unused)]
     fuzzer_name: String,
     mode: LibfuzzerMode,
     artifact_prefix: ArtifactPrefix,
@@ -122,6 +123,7 @@ pub struct LibfuzzerOptions {
     skip_tracing: bool,
     tui: bool,
     runs: usize,
+    #[allow(unused)]
     close_fd_mask: u8,
     unknown: Vec<String>,
 }
@@ -144,6 +146,7 @@ impl LibfuzzerOptions {
         .map(|builder| builder.build(name))
     }
 
+    #[cfg(unix)]
     pub fn fuzzer_name(&self) -> &str {
         &self.fuzzer_name
     }
@@ -224,6 +227,7 @@ impl LibfuzzerOptions {
         self.runs
     }
 
+    #[cfg(unix)]
     pub fn close_fd_mask(&self) -> u8 {
         self.close_fd_mask
     }

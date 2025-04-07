@@ -1,22 +1,31 @@
 use core::ffi::c_int;
 #[cfg(unix)]
-use std::io::{Write, os::fd::AsRawFd, stderr, stdout};
-use std::{fmt::Debug, fs::File, net::TcpListener, str::FromStr};
+use std::{
+    fmt::Debug,
+    fs::File,
+    io::{Write, stderr, stdout},
+    net::TcpListener,
+    os::fd::AsRawFd,
+    str::FromStr,
+};
 
+#[cfg(unix)]
+use libafl::events::{
+    EventConfig, SimpleRestartingEventManager, launcher::Launcher, monitors::Monitor,
+};
 #[cfg(feature = "tui_monitor")]
 use libafl::monitors::tui::TuiMonitor;
 use libafl::{
     Error, Fuzzer, HasMetadata,
     corpus::Corpus,
-    events::{
-        EventConfig, EventReceiver, ProgressReporter, SimpleEventManager,
-        SimpleRestartingEventManager, launcher::Launcher,
-    },
+    events::{EventReceiver, ProgressReporter, SimpleEventManager},
     executors::ExitKind,
-    monitors::{Monitor, MultiMonitor},
+    monitors::MultiMonitor,
     stages::StagesTuple,
     state::{HasCurrentStageId, HasExecutions, HasLastReportTime, HasSolutions, Stoppable},
 };
+
+#[cfg(unix)]
 use libafl_bolts::{
     core_affinity::Cores,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -24,29 +33,27 @@ use libafl_bolts::{
 
 use crate::{feedbacks::LibfuzzerCrashCauseMetadata, fuzz_with, options::LibfuzzerOptions};
 
+#[cfg(unix)]
 fn destroy_output_fds(options: &LibfuzzerOptions) {
-    #[cfg(unix)]
-    {
-        use libafl_bolts::os::{dup2, null_fd};
+    use libafl_bolts::os::{dup2, null_fd};
 
-        let null_fd = null_fd().unwrap();
-        let stdout_fd = stdout().as_raw_fd();
-        let stderr_fd = stderr().as_raw_fd();
+    let null_fd = null_fd().unwrap();
+    let stdout_fd = stdout().as_raw_fd();
+    let stderr_fd = stderr().as_raw_fd();
 
-        #[cfg(feature = "tui_monitor")]
-        if options.tui() {
+    #[cfg(feature = "tui_monitor")]
+    if options.tui() {
+        dup2(null_fd, stdout_fd).unwrap();
+        dup2(null_fd, stderr_fd).unwrap();
+        return;
+    }
+
+    if options.close_fd_mask() != 0 {
+        if options.close_fd_mask() & u8::try_from(stderr_fd).unwrap() != 0 {
             dup2(null_fd, stdout_fd).unwrap();
-            dup2(null_fd, stderr_fd).unwrap();
-            return;
         }
-
-        if options.close_fd_mask() != 0 {
-            if options.close_fd_mask() & u8::try_from(stderr_fd).unwrap() != 0 {
-                dup2(null_fd, stdout_fd).unwrap();
-            }
-            if options.close_fd_mask() & u8::try_from(stderr_fd).unwrap() != 0 {
-                dup2(null_fd, stderr_fd).unwrap();
-            }
+        if options.close_fd_mask() & u8::try_from(stderr_fd).unwrap() != 0 {
+            dup2(null_fd, stderr_fd).unwrap();
         }
     }
 }
@@ -128,22 +135,6 @@ where
     })
 }
 
-#[cfg(windows)]
-fn fuzz_single_forking<M>(
-    options: &LibfuzzerOptions,
-    harness: &extern "C" fn(*const u8, usize) -> c_int,
-    shmem_provider: StdShMemProvider,
-    monitor: M,
-) -> Result<(), Error>
-where
-    M: Monitor + Debug,
-{
-    panic!("Forking not supported on Windows");
-}
-
-/// Communicate the selected port to subprocesses
-const PORT_PROVIDER_VAR: &str = "_LIBAFL_LIBFUZZER_FORK_PORT";
-
 #[cfg(unix)]
 fn fuzz_many_forking<M>(
     options: &LibfuzzerOptions,
@@ -155,6 +146,9 @@ fn fuzz_many_forking<M>(
 where
     M: Monitor + Clone + Debug + 'static,
 {
+    // Communicate the selected port to subprocesses
+    const PORT_PROVIDER_VAR: &str = "_LIBAFL_LIBFUZZER_FORK_PORT";
+
     destroy_output_fds(options);
     let broker_port = std::env::var(PORT_PROVIDER_VAR)
         .map_err(Error::from)
@@ -191,20 +185,6 @@ where
     })
 }
 
-#[cfg(windows)]
-fn fuzz_many_forking<M>(
-    options: &LibfuzzerOptions,
-    harness: &extern "C" fn(*const u8, usize) -> c_int,
-    shmem_provider: StdShMemProvider,
-    forks: usize,
-    monitor: M,
-) -> Result<(), Error>
-where
-    M: Monitor + Clone + Debug + 'static,
-{
-    panic!("Forking not supported on Windows");
-}
-
 fn create_monitor_closure() -> impl Fn(&str) + Clone {
     #[cfg(unix)]
     let stderr_fd =
@@ -229,18 +209,17 @@ pub fn fuzz(
     options: &LibfuzzerOptions,
     harness: &extern "C" fn(*const u8, usize) -> c_int,
 ) -> Result<(), Error> {
+    #[cfg(unix)]
     if let Some(forks) = options.forks() {
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
         #[cfg(feature = "tui_monitor")]
-        {
-            if options.tui() {
-                let monitor = TuiMonitor::builder()
-                    .title(options.fuzzer_name())
-                    .enhanced_graphics(true)
-                    .build();
-                return fuzz_many_forking(options, harness, shmem_provider, forks, monitor);
-            }
+        if options.tui() {
+            let monitor = TuiMonitor::builder()
+                .title(options.fuzzer_name())
+                .enhanced_graphics(true)
+                .build();
+            return fuzz_many_forking(options, harness, shmem_provider, forks, monitor);
         }
 
         // Non-TUI path or when tui_monitor feature is disabled
@@ -250,26 +229,26 @@ pub fn fuzz(
         } else {
             fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
         }
-    } else {
-        #[cfg(feature = "tui_monitor")]
-        {
-            if options.tui() {
-                // if the user specifies TUI, we assume they want to fork; it would not be possible to use
-                // TUI safely otherwise
-                let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
-                let monitor = TuiMonitor::builder()
-                    .title(options.fuzzer_name())
-                    .enhanced_graphics(true)
-                    .build();
-                return fuzz_many_forking(options, harness, shmem_provider, 1, monitor);
-            }
-        }
-
-        // Default path when no forks or TUI are specified, or when tui_monitor feature is disabled
-        destroy_output_fds(options);
-        fuzz_with!(options, harness, do_fuzz, |fuzz_single| {
-            let mgr = SimpleEventManager::new(MultiMonitor::new(create_monitor_closure()));
-            crate::start_fuzzing_single(fuzz_single, None, mgr)
-        })
     }
+
+    #[cfg(feature = "tui_monitor")]
+    if options.tui() {
+        // if the user specifies TUI, we assume they want to fork; it would not be possible to use
+        // TUI safely otherwise
+        let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+        let monitor = TuiMonitor::builder()
+            .title(options.fuzzer_name())
+            .enhanced_graphics(true)
+            .build();
+        return fuzz_many_forking(options, harness, shmem_provider, 1, monitor);
+    }
+
+    // Default path when no forks or TUI are specified, or when tui_monitor feature is disabled
+    #[cfg(unix)]
+    destroy_output_fds(options);
+
+    fuzz_with!(options, harness, do_fuzz, |fuzz_single| {
+        let mgr = SimpleEventManager::new(MultiMonitor::new(create_monitor_closure()));
+        crate::start_fuzzing_single(fuzz_single, None, mgr)
+    })
 }

@@ -1,10 +1,9 @@
+use std::{env::temp_dir, ffi::c_int, fs::rename};
 #[cfg(unix)]
-use std::os::fd::{AsRawFd, FromRawFd};
 use std::{
-    env::temp_dir,
-    ffi::c_int,
-    fs::{File, rename},
+    fs::File,
     io::Write,
+    os::fd::{AsRawFd, FromRawFd},
 };
 
 use libafl::{

@@ -24,8 +24,6 @@ extern "C" int libafl_libfuzzer_test_one_input(
   #pragma comment(lib, "ole32.lib")
   // For debug facilities used in debug builds
   #pragma comment(lib, "dbghelp.lib")
-  // For terminal controls used by crossterm
-  #pragma comment(lib, "user32.lib")
 
   #pragma comment(linker, "/export:LLVMFuzzerRunDriver")
   #pragma comment(linker, "/export:__sanitizer_cov_8bit_counters_init")

@@ -19,10 +19,11 @@ use libafl::{
     stages::StdTMinMutationalStage,
     state::{HasCorpus, StdState},
 };
+#[cfg(unix)]
+use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{
     AsSlice, HasLen,
     rands::{RomuDuoJrRand, StdRand},
-    shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
 use libafl_targets::LLVMCustomMutator;
@@ -65,17 +66,19 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
 
     let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), (), ());
 
-    let shmem_provider = StdShMemProvider::new()?;
     #[cfg(unix)]
-    let mut executor = InProcessForkExecutor::new(
-        &mut harness,
-        (),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        options.timeout(),
-        shmem_provider,
-    )?;
+    {
+        let shmem_provider = StdShMemProvider::new()?;
+        let mut executor = InProcessForkExecutor::new(
+            &mut harness,
+            (),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+            options.timeout(),
+            shmem_provider,
+        )?;
+    }
 
     #[cfg(windows)]
     let mut executor = InProcessExecutor::with_timeout(
