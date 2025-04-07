@@ -11,9 +11,7 @@ use clap::{Arg, ArgAction, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{
-        afl_args::AflTargetArgs, forkserver::ForkserverExecutor, sand::SANDExecutor,
-    },
+    executors::{afl_args::AflTargetArgs, forkserver::ForkserverExecutor, sand::SANDExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},

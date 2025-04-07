@@ -6,9 +6,7 @@ use libafl::{
     HasMetadata,
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{
-        HasObservers, afl_args::AflTargetArgs, forkserver::ForkserverExecutor,
-    },
+    executors::{HasObservers, afl_args::AflTargetArgs, forkserver::ForkserverExecutor},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
