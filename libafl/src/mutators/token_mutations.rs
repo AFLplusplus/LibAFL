@@ -450,7 +450,7 @@ where
             let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
                 return Ok(MutationResult::Skipped);
             };
-            log::trace!("meta: {:x?}", meta);
+            log::trace!("meta: {meta:x?}");
             meta.list.len()
         };
 
@@ -648,7 +648,7 @@ where
         let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
             return Ok(MutationResult::Skipped);
         };
-        log::trace!("meta: {:x?}", meta);
+        log::trace!("meta: {meta:x?}");
 
         let Some(cmps_len) = NonZero::new(meta.list.len()) else {
             return Ok(MutationResult::Skipped);

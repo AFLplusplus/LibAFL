@@ -13,6 +13,6 @@ pub mod host;
 
 pub trait Tracking: Sized + Debug + Send {
     type Error: Debug;
-    fn alloc(&mut self, start: GuestAddr, len: usize) -> Result<(), Self::Error>;
-    fn dealloc(&mut self, start: GuestAddr) -> Result<(), Self::Error>;
+    fn track(&mut self, start: GuestAddr, len: usize) -> Result<(), Self::Error>;
+    fn untrack(&mut self, start: GuestAddr) -> Result<(), Self::Error>;
 }

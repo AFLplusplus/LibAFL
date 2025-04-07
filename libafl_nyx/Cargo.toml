@@ -20,7 +20,7 @@ categories = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [target.'cfg(target_os = "linux")'.dependencies]
-libnyx = { git = "https://github.com/nyx-fuzz/libnyx.git", rev = "ea6ceb994ab975b81aea0daaf64b92a3066c1e8d" }
+libnyx = { git = "https://github.com/nyx-fuzz/libnyx.git", rev = "f07a41fcf0a01be5f8b8397b26cb914a149b9198" }
 libafl = { workspace = true, default-features = true, features = [
   "std",
   "libafl_derive",

@@ -112,6 +112,11 @@ pub mod subrange;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 pub mod tuples;
 
+#[cfg(all(feature = "std", unix))]
+pub mod cargs;
+#[cfg(all(feature = "std", unix))]
+pub use cargs::*;
+
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod bolts_prelude {
@@ -1101,7 +1106,7 @@ mod windows_logging {
         // Get the handle to standard output
         let h_stdout: HANDLE = get_stdout_handle();
 
-        if h_stdout == INVALID_HANDLE_VALUE {
+        if ptr::addr_eq(h_stdout, INVALID_HANDLE_VALUE) {
             eprintln!("Failed to get standard output handle");
             return;
         }

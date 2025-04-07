@@ -383,7 +383,7 @@ impl SnapshotModule {
                         }
                     }
                 } else {
-                    log::warn!("\tpage not found @addr 0x{:x}", addr);
+                    log::warn!("\tpage not found @addr 0x{addr:x}");
                 }
 
                 addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
@@ -888,11 +888,11 @@ where
     if i64::from(sys_num) == SYS_munmap {
         let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
         if !h.is_unmap_allowed(a0 as GuestAddr, a1 as usize) {
-            return SyscallHookResult::new(Some(0));
+            return SyscallHookResult::Skip(0);
         }
     }
 
-    SyscallHookResult::new(None)
+    SyscallHookResult::Run
 }
 
 #[expect(non_upper_case_globals, clippy::too_many_arguments)]
@@ -963,7 +963,7 @@ where
         }
         SYS_brk => {
             // We don't handle brk here. It is handled in the reset function only when it's needed.
-            log::debug!("New brk ({:#x?}) received.", result);
+            log::debug!("New brk ({result:#x?}) received.");
         }
         // mmap syscalls
         sys_const => {

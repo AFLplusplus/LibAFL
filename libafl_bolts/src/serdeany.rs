@@ -892,7 +892,9 @@ macro_rules! create_manual_register {
 #[macro_export]
 macro_rules! create_manual_register {
     ($struct_type:ty) => {
-        $crate::serdeany::RegistryBuilder::register::<$struct_type>();
+        unsafe {
+            $crate::serdeany::RegistryBuilder::register::<$struct_type>();
+        }
     };
 }
 

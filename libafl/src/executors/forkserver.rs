@@ -45,7 +45,7 @@ use crate::observers::{
 use crate::{
     Error,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter},
+    inputs::{BytesInput, Input, NopTargetBytesConverter, TargetBytesConverter},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
     state::HasExecutions,
@@ -876,7 +876,7 @@ where
     ) -> Result<ForkserverExecutor<I, (A, OT), S, SHM, TC>, Error>
     where
         A: Observer<I, S> + AsMut<MO>,
-        I: Input + HasTargetBytes,
+        I: Input,
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
         OT: ObserversTuple<I, S> + Prepend<MO>,
     {
@@ -1039,10 +1039,7 @@ where
             )));
         }
 
-        log::info!(
-            "All right - new fork server model version {} is up",
-            version
-        );
+        log::info!("All right - new fork server model version {version} is up");
 
         let status = forkserver.read_st().map_err(|err| {
             Error::illegal_state(format!("Reading from forkserver failed: {err:?}"))

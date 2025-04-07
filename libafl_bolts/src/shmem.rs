@@ -771,7 +771,7 @@ pub mod unix_shmem {
                         shm_fd,
                         0,
                     );
-                    if map == libc::MAP_FAILED || map.is_null() {
+                    if ptr::addr_eq(map, libc::MAP_FAILED) {
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::last_os_error(format!(
@@ -845,7 +845,7 @@ pub mod unix_shmem {
                             shm_fd,
                             0,
                         );
-                        if map == libc::MAP_FAILED || map.is_null() {
+                        if ptr::addr_eq(map, libc::MAP_FAILED) {
                             close(shm_fd);
                             return Err(Error::last_os_error(format!(
                                 "mmap() failed for map with fd {shm_fd:?}"
@@ -1081,7 +1081,7 @@ pub mod unix_shmem {
                     let id_int: i32 = id.into();
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
-                    if map.is_null() || map == ptr::null_mut::<c_uchar>().wrapping_sub(1) {
+                    if ptr::addr_eq(map, ptr::null_mut::<c_uchar>().wrapping_sub(1)) {
                         return Err(Error::last_os_error(format!(
                             "Failed to map the shared mapping with id {id_int}"
                         )));
@@ -1250,7 +1250,7 @@ pub mod unix_shmem {
                         fd,
                         0,
                     );
-                    if map == usize::MAX as *mut c_void {
+                    if ptr::addr_eq(map, usize::MAX as *mut c_void) {
                         close(fd);
                         return Err(Error::unknown(
                             "Failed to map the ashmem mapping".to_string(),
@@ -1285,7 +1285,7 @@ pub mod unix_shmem {
                         fd,
                         0,
                     );
-                    if map == usize::MAX as *mut c_void {
+                    if ptr::addr_eq(map, usize::MAX as *mut c_void) {
                         close(fd);
                         return Err(Error::unknown(
                             "Failed to map the ashmem mapping".to_string(),
@@ -1392,9 +1392,7 @@ pub mod unix_shmem {
         };
         use std::os::fd::IntoRawFd;
 
-        use libc::{
-            MAP_SHARED, PROT_READ, PROT_WRITE, c_void, close, fstat, ftruncate, mmap, munmap,
-        };
+        use libc::{MAP_SHARED, PROT_READ, PROT_WRITE, close, fstat, ftruncate, mmap, munmap};
         use nix::sys::memfd::{MemFdCreateFlag, memfd_create};
 
         use crate::{
@@ -1436,7 +1434,7 @@ pub mod unix_shmem {
                         fd,
                         0,
                     );
-                    if map == usize::MAX as *mut c_void {
+                    if ptr::addr_eq(map, libc::MAP_FAILED) {
                         close(fd);
                         return Err(Error::unknown(
                             "Failed to map the memfd mapping".to_string(),
@@ -1473,7 +1471,7 @@ pub mod unix_shmem {
                         fd,
                         0,
                     );
-                    if map == usize::MAX as *mut c_void {
+                    if ptr::addr_eq(map, libc::MAP_FAILED) {
                         return Err(Error::last_os_error(format!(
                             "mmap() failed for map with fd {fd:?}"
                         )));

@@ -6,7 +6,7 @@ use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
 use libafl_bolts::{
-    AsIter, Named, current_time,
+    AsIter, Named,
     tuples::{Handle, Handled},
 };
 use num_traits::ToPrimitive;
@@ -15,7 +15,7 @@ use z3::{Config, Context, Optimize, ast::Bool};
 use crate::{
     Error, HasMetadata, HasScheduler,
     corpus::Corpus,
-    events::{Event, EventFirer, LogSeverity},
+    events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, HasObservers},
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
@@ -123,20 +123,17 @@ where
 
             manager.fire(
                 state,
-                Event::UpdateUserStats {
-                    name: Cow::from("minimisation exec pass"),
-                    value: UserStats::new(UserStatsValue::Ratio(curr, total), AggregatorOps::None),
-                    phantom: PhantomData,
-                },
-            )?;
-
-            manager.fire(
-                state,
-                Event::UpdateExecStats {
-                    time: current_time(),
-                    phantom: PhantomData,
+                EventWithStats::with_current_time(
+                    Event::UpdateUserStats {
+                        name: Cow::from("minimisation exec pass"),
+                        value: UserStats::new(
+                            UserStatsValue::Ratio(curr, total),
+                            AggregatorOps::None,
+                        ),
+                        phantom: PhantomData,
+                    },
                     executions,
-                },
+                ),
             )?;
 
             let seed_expr = Bool::fresh_const(&ctx, "seed");

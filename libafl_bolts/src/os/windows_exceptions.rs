@@ -508,7 +508,7 @@ pub unsafe extern "system" fn handle_exception(
             .ExceptionCode
     };
     let exception_code = From::from(code.0);
-    log::info!("Received exception; code: {}", exception_code);
+    log::info!("Received exception; code: {exception_code}");
     unsafe { internal_handle_exception(exception_code, exception_pointers) }
 }
 

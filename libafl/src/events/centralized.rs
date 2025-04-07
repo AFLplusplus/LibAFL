@@ -22,7 +22,7 @@ use libafl_bolts::{
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 
-use super::AwaitRestartSafe;
+use super::{AwaitRestartSafe, EventWithStats};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
@@ -166,18 +166,18 @@ where
     }
 
     #[expect(clippy::match_same_arms)]
-    fn fire(&mut self, state: &mut S, mut event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, mut event: EventWithStats<I>) -> Result<(), Error> {
         if !self.is_main {
             // secondary node
             let mut is_tc = false;
             // Forward to main only if new tc, heartbeat, or optionally, a new objective
-            let should_be_forwarded = match &mut event {
+            let should_be_forwarded = match event.event_mut() {
                 Event::NewTestcase { forward_id, .. } => {
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
                     is_tc = true;
                     true
                 }
-                Event::UpdateExecStats { .. } => true, // send UpdateExecStats but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+                Event::Heartbeat => true, // the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
                 Event::Objective { .. } => true,
                 Event::Stop => true,
                 _ => false,
@@ -201,7 +201,10 @@ where
         state: &mut S,
         severity_level: LogSeverity,
         message: String,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        S: HasExecutions,
+    {
         self.inner.log(state, severity_level, message)
     }
 
@@ -261,7 +264,7 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         if self.is_main {
             // main node
             self.receive_from_secondary(state)
@@ -272,7 +275,7 @@ where
         }
     }
 
-    fn on_interesting(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         self.inner.fire(state, event)
     }
 }
@@ -343,7 +346,7 @@ where
     SP: ShMemProvider<ShMem = SHM>,
 {
     #[cfg(feature = "llmp_compression")]
-    fn forward_to_main(&mut self, event: &Event<I>) -> Result<(), Error> {
+    fn forward_to_main(&mut self, event: &EventWithStats<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
@@ -363,13 +366,16 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn forward_to_main(&mut self, event: &Event<I>) -> Result<(), Error> {
+    fn forward_to_main(&mut self, event: &EventWithStats<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(event)?;
         self.client.send_buf(_LLMP_TAG_TO_MAIN, &serialized)?;
         Ok(())
     }
 
-    fn receive_from_secondary(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn receive_from_secondary(
+        &mut self,
+        state: &mut S,
+    ) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client.sender().id();
         while let Some((client_id, tag, _flags, msg)) = self.client.recv_buf_with_flags()? {
@@ -392,21 +398,23 @@ where
             } else {
                 msg
             };
-            let event: Event<I> = postcard::from_bytes(event_bytes)?;
-            log::debug!("Processor received message {}", event.name_detailed());
+            let event: EventWithStats<I> = postcard::from_bytes(event_bytes)?;
+            log::debug!(
+                "Processor received message {}",
+                event.event().name_detailed()
+            );
 
-            let event_name = event.name_detailed();
+            let event_name = event.event().name_detailed();
 
-            match event {
+            match event.event() {
                 Event::NewTestcase {
                     client_config,
-                    ref observers_buf,
+                    observers_buf,
                     forward_id,
                     ..
                 } => {
                     log::debug!(
-                        "Received {} from {client_id:?} ({client_config:?}, forward {forward_id:?})",
-                        event_name
+                        "Received {event_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})"
                     );
 
                     log::debug!(
@@ -426,7 +434,7 @@ where
                 _ => {
                     return Err(Error::illegal_state(format!(
                         "Received illegal message that message should not have arrived: {:?}.",
-                        event.name()
+                        event.event().name()
                     )));
                 }
             }

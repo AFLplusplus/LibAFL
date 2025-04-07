@@ -47,7 +47,7 @@ fuzz_target!(|data: Vec<GuestAddr>| {
         start.saturating_sub(test_offset)
     };
 
-    let result = tracking.alloc(start, len);
+    let result = tracking.track(start, len);
     if GuestTracking::is_out_of_bounds(start, len) {
         assert_eq!(
             result,
@@ -61,7 +61,7 @@ fuzz_target!(|data: Vec<GuestAddr>| {
         assert_eq!(result, Ok(()));
     }
 
-    let test_result = tracking.alloc(test_start, test_len);
+    let test_result = tracking.track(test_start, test_len);
     if GuestTracking::is_out_of_bounds(test_start, test_len) {
         assert_eq!(
             test_result,
@@ -86,14 +86,12 @@ fuzz_target!(|data: Vec<GuestAddr>| {
         if overlaps {
             assert_eq!(
                 test_result,
-                Err(GuestTrackingError::TrackingConflict(
-                    start, len, test_start, test_len
-                ))
+                Err(GuestTrackingError::TrackingConflict(test_start, test_len))
             );
         } else {
             assert_eq!(test_result, Ok(()));
-            assert_eq!(tracking.dealloc(test_start), Ok(()));
+            assert_eq!(tracking.untrack(test_start), Ok(()));
         }
     }
-    assert_eq!(tracking.dealloc(start), Ok(()));
+    assert_eq!(tracking.untrack(start), Ok(()));
 });

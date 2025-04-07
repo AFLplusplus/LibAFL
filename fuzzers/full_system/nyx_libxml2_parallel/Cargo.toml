@@ -1,6 +1,6 @@
 [package]
 name = "nyx_libxml2_parallel"
-version = "0.15.1"
+version = "0.15.2"
 edition = "2021"
 default-run = "nyx_libxml2_parallel"
 

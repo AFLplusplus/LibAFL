@@ -28,19 +28,23 @@ pub mod mmap;
 pub mod munmap;
 pub mod posix_memalign;
 pub mod pvalloc;
+pub mod rawmemchr;
 pub mod read;
 pub mod realloc;
 pub mod reallocarray;
 pub mod stpcpy;
+pub mod stpncpy;
 pub mod strcasecmp;
 pub mod strcasestr;
 pub mod strcat;
 pub mod strchr;
+pub mod strchrnul;
 pub mod strcmp;
 pub mod strcpy;
 pub mod strdup;
 pub mod strlen;
 pub mod strncasecmp;
+pub mod strncat;
 pub mod strncmp;
 pub mod strncpy;
 pub mod strndup;
@@ -48,25 +52,30 @@ pub mod strnlen;
 pub mod strrchr;
 pub mod strstr;
 pub mod valloc;
+pub mod wcschr;
 pub mod wcscmp;
 pub mod wcscpy;
 pub mod wcslen;
+pub mod wcsncmp;
+pub mod wcsnlen;
+pub mod wcsrchr;
+pub mod wmemchr;
 pub mod write;
 
 #[cfg(feature = "libc")]
 pub mod fgets;
 
-use alloc::vec::Vec;
+use alloc::vec::{IntoIter, Vec};
 use core::ffi::{CStr, c_char, c_int, c_void};
 
-use crate::{GuestAddr, hooks, size_t, wchar_t};
+use crate::{GuestAddr, hooks, size_t, symbols::Symbols, wchar_t};
 
 unsafe extern "C" {
     pub fn asprintf(strp: *mut *mut c_char, fmt: *const c_char, ...) -> c_int;
     pub fn vasprintf(strp: *mut *mut c_char, fmt: *const c_char, va: *const c_void) -> c_int;
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PatchedHook {
     pub name: &'static CStr,
     pub destination: GuestAddr,
@@ -79,8 +88,27 @@ impl PatchedHook {
         Self { name, destination }
     }
 
-    pub fn all() -> Vec<Self> {
-        [
+    pub fn lookup<S: Symbols>(&self) -> Result<GuestAddr, S::Error> {
+        S::lookup(self.name.as_ptr() as *const c_char)
+    }
+}
+
+pub struct PatchedHooks {
+    hooks: Vec<PatchedHook>,
+}
+
+impl IntoIterator for PatchedHooks {
+    type Item = PatchedHook;
+    type IntoIter = IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.hooks.into_iter()
+    }
+}
+
+impl Default for PatchedHooks {
+    fn default() -> Self {
+        Self { hooks: [
             PatchedHook::new::<unsafe extern "C" fn(size_t, size_t) -> *mut c_void>(
                 c"aligned_alloc",
                 hooks::aligned_alloc::aligned_alloc,
@@ -124,10 +152,17 @@ impl PatchedHook {
                 c"memrchr",
                 hooks::memrchr::memrchr,
             ),
+            PatchedHook::new::<unsafe extern "C" fn(*const c_void, c_int) -> *mut c_void>(
+                c"rawmemchr",
+                hooks::rawmemchr::rawmemchr,
+            ),
             PatchedHook::new::<unsafe extern "C" fn(*mut c_char, *const c_char) -> *mut c_char>(
                 c"stpcpy",
                 hooks::stpcpy::stpcpy,
             ),
+            PatchedHook::new::<
+                unsafe extern "C" fn(*mut c_char, *const c_char, size_t) -> *mut c_char,
+            >(c"stpncpy", hooks::stpncpy::stpncpy),
             PatchedHook::new::<unsafe extern "C" fn(*const c_char, *const c_char) -> c_int>(
                 c"strcasecmp",
                 hooks::strcasecmp::strcasecmp,
@@ -143,6 +178,10 @@ impl PatchedHook {
             PatchedHook::new::<unsafe extern "C" fn(*const c_char, c_int) -> *mut c_char>(
                 c"strchr",
                 hooks::strchr::strchr,
+            ),
+            PatchedHook::new::<unsafe extern "C" fn(*const c_char, c_int) -> *mut c_char>(
+                c"strchrnul",
+                hooks::strchrnul::strchrnul,
             ),
             PatchedHook::new::<unsafe extern "C" fn(*const c_char, *const c_char) -> c_int>(
                 c"strcmp",
@@ -164,6 +203,9 @@ impl PatchedHook {
                 c"strncasecmp",
                 hooks::strncasecmp::strncasecmp,
             ),
+            PatchedHook::new::<
+                unsafe extern "C" fn(*mut c_char, *const c_char, size_t) -> *mut c_char,
+            >(c"strncat", hooks::strncat::strncat),
             PatchedHook::new::<unsafe extern "C" fn(*const c_char, *const c_char, size_t) -> c_int>(
                 c"strncmp",
                 hooks::strncmp::strncmp,
@@ -190,6 +232,10 @@ impl PatchedHook {
             PatchedHook::new::<
                 unsafe extern "C" fn(*mut *mut c_char, *const c_char, *const c_void) -> c_int,
             >(c"vasprintf", hooks::vasprintf),
+            PatchedHook::new::<unsafe extern "C" fn(*const wchar_t, c_int) -> *mut wchar_t>(
+                c"wcschr",
+                hooks::wcschr::wcschr,
+            ),
             PatchedHook::new::<unsafe extern "C" fn(*const wchar_t, *const wchar_t) -> c_int>(
                 c"wcscmp",
                 hooks::wcscmp::wcscmp,
@@ -202,7 +248,24 @@ impl PatchedHook {
                 c"wcslen",
                 hooks::wcslen::wcslen,
             ),
+            PatchedHook::new::<unsafe extern "C" fn (*const wchar_t, *const wchar_t, size_t) -> c_int>(
+                c"wcsncmp",
+                hooks::wcsncmp::wcsncmp,
+            ),
+            PatchedHook::new::<unsafe extern "C" fn ( *const wchar_t,  size_t) -> size_t>(
+                c"wcsnlen",
+                hooks::wcsnlen::wcsnlen,
+            ),
+            PatchedHook::new::<unsafe extern "C" fn ( *const wchar_t,  c_int) -> *mut wchar_t >(
+                c"wcsrchr",
+                hooks::wcsrchr::wcsrchr,
+            ),
+            PatchedHook::new::<unsafe extern "C" fn ( *const wchar_t,  wchar_t,  size_t) -> *mut wchar_t>(
+                c"wmemchr",
+                hooks::wmemchr::wmemchr,
+            ),
+
         ]
-        .to_vec()
+        .to_vec() }
     }
 }

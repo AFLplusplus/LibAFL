@@ -168,6 +168,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut redefinitions_file = BufWriter::new(File::create(&redefined_symbols).unwrap());
 
+    let rn_prefix = if cfg!(target_os = "macos") {
+        // macOS symbols have an extra `_`
+        "__RN"
+    } else {
+        "_RN"
+    };
+
     let zn_prefix = if cfg!(target_os = "macos") {
         // macOS symbols have an extra `_`
         "__ZN"
@@ -188,11 +195,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         let (_, symbol) = line.rsplit_once(' ').unwrap();
 
-        if symbol.starts_with(zn_prefix) {
+        if symbol.starts_with(rn_prefix) {
+            let (_prefix, renamed) = symbol.split_once("__rustc").unwrap();
+            let (size, renamed) = renamed.split_once('_').unwrap();
+            writeln!(redefinitions_file, "{symbol} {replacement}{size}{renamed}E").unwrap();
+        } else if symbol.starts_with(zn_prefix) {
             writeln!(
                 redefinitions_file,
-                "{} {}",
-                symbol,
+                "{symbol} {}",
                 symbol.replacen(zn_prefix, &replacement, 1)
             )
             .unwrap();

@@ -145,7 +145,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
 
             if let Ok(bsod) = bsod {
                 if let Ok(bsod_str) = str::from_utf8(&bsod) {
-                    log::error!("\n{}", bsod_str);
+                    log::error!("\n{bsod_str}");
                 } else {
                     log::error!("convert minibsod to string failed");
                 }

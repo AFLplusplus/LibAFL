@@ -1,3 +1,4 @@
+use libafl_bolts::Error;
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
 use crate::{Emulator, GuestMaps, NopSnapshotManager, TargetSignalHandling};
@@ -68,7 +69,7 @@ impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
-    ) -> Result<GuestAddr, String> {
+    ) -> Result<GuestAddr, Error> {
         self.qemu.map_private(addr, size, perms)
     }
 
@@ -77,7 +78,7 @@ impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
-    ) -> Result<GuestAddr, String> {
+    ) -> Result<GuestAddr, Error> {
         self.qemu.map_fixed(addr, size, perms)
     }
 

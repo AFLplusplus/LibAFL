@@ -51,35 +51,35 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.15.1"
+version = "0.15.2"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 # Internal deps
-libafl = { path = "./libafl", version = "0.15.1", default-features = false }
-libafl_bolts = { path = "./libafl_bolts", version = "0.15.1", default-features = false }
-libafl_cc = { path = "./libafl_cc", version = "0.15.1", default-features = false }
-symcc_runtime = { path = "./libafl_concolic/symcc_runtime", version = "0.15.1", default-features = false }
-symcc_libafl = { path = "./libafl_concolic/symcc_libafl", version = "0.15.1", default-features = false }
-libafl_derive = { path = "./libafl_derive", version = "0.15.1", default-features = false }
-libafl_frida = { path = "./libafl_frida", version = "0.15.1", default-features = false }
-libafl_intelpt = { path = "./libafl_intelpt", version = "0.15.1", default-features = false }
-libafl_libfuzzer = { path = "./libafl_libfuzzer", version = "0.15.1", default-features = false }
-libafl_nyx = { path = "./libafl_nyx", version = "0.15.1", default-features = false }
-libafl_targets = { path = "./libafl_targets", version = "0.15.1", default-features = false }
-libafl_tinyinst = { path = "./libafl_tinyinst", version = "0.15.1", default-features = false }
-libafl_qemu = { path = "./libafl_qemu", version = "0.15.1", default-features = false }
-libafl_qemu_build = { path = "./libafl_qemu/libafl_qemu_build", version = "0.15.1", default-features = false }
-libafl_qemu_sys = { path = "./libafl_qemu/libafl_qemu_sys", version = "0.15.1", default-features = false }
-libafl_sugar = { path = "./libafl_sugar", version = "0.15.1", default-features = false }
-dump_constraints = { path = "./libafl_concolic/test/dump_constraints", version = "0.15.1", default-features = false }
-runtime_test = { path = "./libafl_concolic/test/runtime_test", version = "0.15.1", default-features = false }
-build_and_test_fuzzers = { path = "./utils/build_and_test_fuzzers", version = "0.15.1", default-features = false }
-deexit = { path = "./utils/deexit", version = "0.15.1", default-features = false }
-drcov_utils = { path = "./utils/drcov_utils", version = "0.15.1", default-features = false }
-construct_automata = { path = "./utils/gramatron/construct_automata", version = "0.15.1", default-features = false }
-libafl_benches = { path = "./utils/libafl_benches", version = "0.15.1", default-features = false }
-libafl_jumper = { path = "./utils/libafl_jumper", version = "0.15.1", default-features = false }
+libafl = { path = "./libafl", version = "0.15.2", default-features = false }
+libafl_bolts = { path = "./libafl_bolts", version = "0.15.2", default-features = false }
+libafl_cc = { path = "./libafl_cc", version = "0.15.2", default-features = false }
+symcc_runtime = { path = "./libafl_concolic/symcc_runtime", version = "0.15.2", default-features = false }
+symcc_libafl = { path = "./libafl_concolic/symcc_libafl", version = "0.15.2", default-features = false }
+libafl_derive = { path = "./libafl_derive", version = "0.15.2", default-features = false }
+libafl_frida = { path = "./libafl_frida", version = "0.15.2", default-features = false }
+libafl_intelpt = { path = "./libafl_intelpt", version = "0.15.2", default-features = false }
+libafl_libfuzzer = { path = "./libafl_libfuzzer", version = "0.15.2", default-features = false }
+libafl_nyx = { path = "./libafl_nyx", version = "0.15.2", default-features = false }
+libafl_targets = { path = "./libafl_targets", version = "0.15.2", default-features = false }
+libafl_tinyinst = { path = "./libafl_tinyinst", version = "0.15.2", default-features = false }
+libafl_qemu = { path = "./libafl_qemu", version = "0.15.2", default-features = false }
+libafl_qemu_build = { path = "./libafl_qemu/libafl_qemu_build", version = "0.15.2", default-features = false }
+libafl_qemu_sys = { path = "./libafl_qemu/libafl_qemu_sys", version = "0.15.2", default-features = false }
+libafl_sugar = { path = "./libafl_sugar", version = "0.15.2", default-features = false }
+dump_constraints = { path = "./libafl_concolic/test/dump_constraints", version = "0.15.2", default-features = false }
+runtime_test = { path = "./libafl_concolic/test/runtime_test", version = "0.15.2", default-features = false }
+build_and_test_fuzzers = { path = "./utils/build_and_test_fuzzers", version = "0.15.2", default-features = false }
+deexit = { path = "./utils/deexit", version = "0.15.2", default-features = false }
+drcov_utils = { path = "./utils/drcov_utils", version = "0.15.2", default-features = false }
+construct_automata = { path = "./utils/gramatron/construct_automata", version = "0.15.2", default-features = false }
+libafl_benches = { path = "./utils/libafl_benches", version = "0.15.2", default-features = false }
+libafl_jumper = { path = "./utils/libafl_jumper", version = "0.15.2", default-features = false }
 
 # External deps
 ahash = { version = "0.8.11", default-features = false }     # The hash function already used in hashbrown
@@ -110,7 +110,7 @@ paste = "1.0.15"
 postcard = { version = "1.0.10", features = [
   "alloc",
 ], default-features = false } # no_std compatible serde serialization format
-pyo3 = "0.23.2"
+pyo3 = "0.24.0"
 pyo3-build-config = "0.24.0"
 rangemap = "1.5.1"
 regex = "1.10.6"
@@ -123,7 +123,7 @@ static_assertions = "1.1.0"
 strum = "0.27.0"
 strum_macros = "0.27.0"
 toml = "0.8.19" # For parsing the injections toml file
-typed-builder = "0.20.0" # Implement the builder pattern at compiletime
+typed-builder = "0.21.0" # Implement the builder pattern at compiletime
 typeid = "1.0.0" # Safe type_eq that doesn't rely on std specialization
 unicorn-engine = "2.0.1" # Used in libafl_unicorn
 uuid = { version = "1.10.0", features = ["serde", "v4"] }
@@ -173,6 +173,7 @@ similar_names = "allow"
 too_many_lines = "allow"
 comparison_chain = "allow"             # This lint makes **ZERO** sense
 unnecessary_debug_formatting = "allow" # :thumbsdown: :thumbsdown: :thumbsdown: :thumbsdown: :thumbsdown: :thumbsdown: 
+struct_field_names = "allow"           # ????
 
 [workspace.lints.rustdoc]
 # Deny

@@ -1,6 +1,6 @@
 [package]
 name = "libafl_repo_tools"
-version = "0.15.1"
+version = "0.15.2"
 edition = "2024"
 description = "A set of useful tools to manage the LibAFL repository"
 authors = ["Romain Malmain <romain.malmain@pm.me>"]
