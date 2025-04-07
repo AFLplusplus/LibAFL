@@ -123,7 +123,7 @@ impl InputConverter for NautilusToBytesInputConverter<'_> {
 }
 
 /// A converter to convert a nautilus context to target bytes
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct NautilusTargetBytesConverter<'a> {
     /// The Nautilus Context
     ctx: &'a NautilusContext,

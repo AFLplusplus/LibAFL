@@ -135,7 +135,7 @@ pub fn main() {
     );
 
     // create a State from scratch
-    let mut state = StdState::new(
+    let mut state = StdState::with_target_bytes_converter(
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
@@ -143,6 +143,7 @@ pub fn main() {
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
+        NautilusTargetBytesConverter::new(&context),
         // States of the feedbacks.
         // The feedbacks can report the data that should persist in the State.
         &mut feedback,
@@ -186,7 +187,6 @@ pub fn main() {
         .coverage_map_size(MAP_SIZE)
         .timeout(Duration::from_millis(opt.timeout))
         .kill_signal(opt.signal)
-        .target_bytes_converter(NautilusTargetBytesConverter::new(&context))
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
