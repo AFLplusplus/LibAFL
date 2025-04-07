@@ -67,7 +67,6 @@
 #![allow(clippy::borrow_deref_ref)]
 
 use core::ffi::{CStr, c_char, c_int};
-
 #[cfg(unix)]
 use std::{
     os::fd::RawFd,

@@ -67,9 +67,9 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), (), ());
 
     #[cfg(unix)]
-    {
+    let mut executor = {
         let shmem_provider = StdShMemProvider::new()?;
-        let mut executor = InProcessForkExecutor::new(
+        InProcessForkExecutor::new(
             &mut harness,
             (),
             &mut fuzzer,
@@ -77,8 +77,8 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
             &mut mgr,
             options.timeout(),
             shmem_provider,
-        )?;
-    }
+        )?
+    };
 
     #[cfg(windows)]
     let mut executor = InProcessExecutor::with_timeout(

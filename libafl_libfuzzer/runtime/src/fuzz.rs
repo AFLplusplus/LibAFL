@@ -24,7 +24,6 @@ use libafl::{
     stages::StagesTuple,
     state::{HasCurrentStageId, HasExecutions, HasLastReportTime, HasSolutions, Stoppable},
 };
-
 #[cfg(unix)]
 use libafl_bolts::{
     core_affinity::Cores,
