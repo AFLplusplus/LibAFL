@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [features]
-default = []
+default = ["tui_monitor"]
 ## Enables forking mode for the LibAFL launcher (instead of starting new processes)
 fork = ["libafl/fork"]
 track_hit_feedbacks = [
@@ -16,7 +16,7 @@ tui_monitor = ["libafl/tui_monitor"]
 
 [target.'cfg(not(windows))'.features]
 ## Enable the `fork` feature on non-windows platforms
-default = ["fork", "tui_monitor"]
+default = ["fork"]
 
 [profile.release]
 lto = true
