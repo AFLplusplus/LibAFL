@@ -225,9 +225,9 @@ pub fn fuzz(
         // Non-TUI path or when tui_monitor feature is disabled
         let monitor = MultiMonitor::new(create_monitor_closure());
         if forks == 1 {
-            fuzz_single_forking(options, harness, shmem_provider, monitor)
+            return fuzz_single_forking(options, harness, shmem_provider, monitor);
         } else {
-            fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
+            return fuzz_many_forking(options, harness, shmem_provider, forks, monitor);
         }
     }
 
