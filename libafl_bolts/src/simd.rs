@@ -14,7 +14,7 @@ pub fn simplify_map_naive(map: &mut [u8]) {
 }
 
 /// `simplify_map` implementation by u8x16, worse performance compared to LLVM
-/// auto-vectorization buf faster if LLVM doesn't vectorize.
+/// auto-vectorization but faster if LLVM doesn't vectorize.
 #[cfg(feature = "wide")]
 pub fn simplify_map_u8x16(map: &mut [u8]) {
     type VectorType = wide::u8x16;
@@ -41,7 +41,7 @@ pub fn simplify_map_u8x16(map: &mut [u8]) {
 }
 
 /// `simplify_map` implementation by i8x32, achieving comparable performance with
-/// LLVM auto-vectorization. We shall switch to `u8x32` once wide releases it next time.
+/// LLVM auto-vectorization.
 #[cfg(feature = "wide")]
 pub fn simplify_map_u8x32(map: &mut [u8]) {
     use wide::CmpEq;
