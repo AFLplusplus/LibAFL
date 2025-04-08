@@ -2,7 +2,6 @@
 
 use alloc::{borrow::Cow, vec::Vec};
 #[rustversion::nightly]
-use core::simd::prelude::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,

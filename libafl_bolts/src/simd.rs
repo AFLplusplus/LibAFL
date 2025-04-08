@@ -2,16 +2,16 @@
 
 use alloc::vec::Vec;
 #[rustversion::nightly]
-use std::simd::cmp::SimdOrd;
+use core::simd::cmp::SimdOrd;
 
-/// simplify_map naive implementaion. In most cases, this can be auto-vectorized.
+/// `simplify_map` naive implementaion. In most cases, this can be auto-vectorized.
 pub fn simplify_map_naive(map: &mut [u8]) {
     for it in map.iter_mut() {
         *it = if *it == 0 { 0x1 } else { 0x80 };
     }
 }
 
-/// simplify_map implementation by u8x16, worse performance compared to LLVM
+/// `simplify_map` implementation by u8x16, worse performance compared to LLVM
 /// auto-vectorization buf faster if LLVM doesn't vectorize.
 pub fn simplify_map_u8x16(map: &mut [u8]) {
     type VectorType = wide::u8x16;
@@ -36,7 +36,7 @@ pub fn simplify_map_u8x16(map: &mut [u8]) {
     }
 }
 
-/// simplify_map implementation by u64x4, achieving comparable performance with
+/// `simplify_map` implementation by u64x4, achieving comparable performance with
 /// LLVM auto-vectorization.
 pub fn simplify_map_u64x4(map: &mut [u8]) {
     type VectorType = wide::u64x4;
@@ -50,7 +50,7 @@ pub fn simplify_map_u64x4(map: &mut [u8]) {
     for step in 0..steps {
         let i = step * N;
         let buf: [u8; 32] = map[i..i + N].try_into().unwrap();
-        let mp = VectorType::new(unsafe { std::mem::transmute::<[u8; 32], [u64; 4]>(buf) });
+        let mp = VectorType::new(unsafe { core::mem::transmute::<[u8; 32], [u64; 4]>(buf) });
 
         let mask = mp.cmp_eq(VectorType::ZERO);
         let out = mask.blend(lhs, rhs);
@@ -65,7 +65,7 @@ pub fn simplify_map_u64x4(map: &mut [u8]) {
     }
 }
 
-/// The std implementation of simplify_map. Use the fastest implementation by benchamrk by default.
+/// The std implementation of `simplify_map`. Use the fastest implementation by benchamrk by default.
 pub fn std_simplify_map(map: &mut [u8]) {
     #[cfg(feature = "simplify_map_naive")]
     simplify_map_naive(map);
@@ -78,6 +78,7 @@ pub fn std_simplify_map(map: &mut [u8]) {
 }
 
 #[rustversion::nightly]
+#[must_use]
 pub fn covmap_is_interesting_nightly(
     hist: &[u8],
     map: &[u8],
@@ -147,6 +148,7 @@ pub fn covmap_is_interesting_nightly(
 }
 
 /// Coverage map insteresting implementation by u8x16. Slightly faster than nightly simd.
+#[must_use]
 pub fn covmap_is_interesting_u8x16(
     hist: &[u8],
     map: &[u8],
@@ -219,6 +221,7 @@ pub fn covmap_is_interesting_u8x16(
 
 /// Coverage map insteresting implementation by u32x4. Slightly faster than nightly simd but slightly
 /// slower than u8x16 version.
+#[must_use]
 pub fn covmap_is_interesting_u32x4(
     hist: &[u8],
     map: &[u8],
@@ -236,9 +239,9 @@ pub fn covmap_is_interesting_u32x4(
         for step in 0..steps {
             let i = step * N;
             let buf: [u8; N] = hist[i..i + N].try_into().unwrap();
-            let history = VectorType::new(unsafe { std::mem::transmute(buf) });
+            let history = VectorType::new(unsafe { core::mem::transmute(buf) });
             let buf: [u8; N] = map[i..i + N].try_into().unwrap();
-            let items = VectorType::new(unsafe { std::mem::transmute(buf) });
+            let items = VectorType::new(unsafe { core::mem::transmute(buf) });
 
             if items.max(history) != history {
                 interesting = true;
@@ -276,9 +279,9 @@ pub fn covmap_is_interesting_u32x4(
         for step in 0..steps {
             let i = step * N;
             let buf: [u8; N] = hist[i..i + N].try_into().unwrap();
-            let history = VectorType::new(unsafe { std::mem::transmute(buf) });
+            let history = VectorType::new(unsafe { core::mem::transmute(buf) });
             let buf: [u8; N] = map[i..i + N].try_into().unwrap();
-            let items = VectorType::new(unsafe { std::mem::transmute(buf) });
+            let items = VectorType::new(unsafe { core::mem::transmute(buf) });
 
             if items.max(history) != history {
                 interesting = true;
@@ -303,6 +306,7 @@ pub fn covmap_is_interesting_u32x4(
 }
 
 /// Coverage map insteresting naive implementation. Do not use it unless you have strong reasons to do.
+#[must_use]
 pub fn covmap_is_interesting_naive(
     hist: &[u8],
     map: &[u8],
@@ -335,6 +339,7 @@ pub fn covmap_is_interesting_naive(
 }
 
 /// Standard coverage map instereting implementation. Use the fastest implementation by default.
+#[must_use]
 pub fn std_covmap_is_interesting(
     hist: &[u8],
     map: &[u8],
