@@ -6,6 +6,7 @@ use core::{
     marker::PhantomData,
     ops::{BitAnd, BitOr, Deref, DerefMut},
 };
+use std::string::ToString;
 
 use libafl_bolts::{
     AsIter, AsSlice, HasRefCnt, Named,
@@ -606,13 +607,24 @@ where
 #[derive(Debug, Clone)]
 pub struct SIMDMapFeedback<C, O> {
     map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
+    name: Cow<'static, str>,
 }
 
 impl<C, O> SIMDMapFeedback<C, O> {
     /// Wraps an existing map and enable SIMD acceleration
     #[must_use]
     pub fn new(map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>) -> Self {
-        Self { map }
+        let name = format!("simd-{}", map.name());
+        Self::with_name(map, &name)
+    }
+
+    /// Wraps an existing map and enable SIMD acceleration with alternative name
+    #[must_use]
+    pub fn with_name(map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>, name: &str) -> Self {
+        Self {
+            map,
+            name: Cow::Owned(name.to_string()),
+        }
     }
 }
 
@@ -652,7 +664,7 @@ impl<C, O> HasObserverHandle for SIMDMapFeedback<C, O> {
 impl<C, O> Named for SIMDMapFeedback<C, O> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        &self.map.name
+        &self.name
     }
 }
 
