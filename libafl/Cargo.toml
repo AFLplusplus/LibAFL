@@ -39,7 +39,6 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
-  "tcp_manager",
 ]
 document-features = ["dep:document-features"]
 
