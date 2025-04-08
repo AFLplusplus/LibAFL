@@ -4,7 +4,7 @@ mod fuzzer;
 
 #[cfg(target_os = "linux")]
 pub fn main() {
-    fuzzer::fuzz().unwrap();
+    fuzzer::fuzz();
 }
 
 #[cfg(not(target_os = "linux"))]

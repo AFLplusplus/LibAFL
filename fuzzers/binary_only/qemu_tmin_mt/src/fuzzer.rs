@@ -115,7 +115,7 @@ pub struct FuzzerOptions {
 
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
-pub fn fuzz() -> Result<(), Error> {
+pub fn fuzz() {
     // Initialise env_logger
     env_logger::init();
 
@@ -303,23 +303,6 @@ pub fn fuzz() -> Result<(), Error> {
                 ExitKind::Ok
             };
 
-        // Set up the most basic monitor possible.
-        // let monitor = SimpleMonitor::with_user_monitor(|s| {
-        //     println!("{s}");
-        // });
-        // let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
-        // {
-        //     Ok(res) => res,
-        //     Err(err) => match err {
-        //         Error::ShuttingDown => {
-        //             return Ok(());
-        //         }
-        //         _ => {
-        //             panic!("Failed to setup the restarter: {err}");
-        //         }
-        //     },
-        // };
-
         // Our fuzzer is a simple queue scheduler (FIFO), and has no corpus feedback
         // or objective feedback. This is important as we need the MaxMapFeedback
         // on the observer to be constrained by ObserverEqualityFactory which will
@@ -396,11 +379,6 @@ pub fn fuzz() -> Result<(), Error> {
             stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
         }
 
-        // We end up with equivalent output corpus, hopefully smaller than the
-        // input, but certainly no larger.
-        let size = state.corpus().count();
-        println!("Corpus size: {size}");
-
         mgr.send_exiting()?;
         Ok(())
     };
@@ -419,10 +397,10 @@ pub fn fuzz() -> Result<(), Error> {
         .build()
         .launch()
     {
-        Ok(()) => Ok(()),
+        Ok(()) => (),
         Err(Error::ShuttingDown) => {
-            println!("Run finished successfully. ????TODO");
-            Ok(())
+            println!("Run finished successfully.");
+            ()
         }
         Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
