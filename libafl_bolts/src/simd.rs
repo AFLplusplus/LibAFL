@@ -40,29 +40,29 @@ pub fn simplify_map_u8x16(map: &mut [u8]) {
     }
 }
 
-/// `simplify_map` implementation by u64x4, achieving comparable performance with
-/// LLVM auto-vectorization. We shall switch `u8x32` once wide releases it next time.
+/// `simplify_map` implementation by i8x32, achieving comparable performance with
+/// LLVM auto-vectorization. We shall switch to `u8x32` once wide releases it next time.
 #[cfg(feature = "wide")]
-pub fn simplify_map_i8x32(map: &mut [u8]) {
+pub fn simplify_map_u8x32(map: &mut [u8]) {
     use wide::CmpEq;
 
-    type VectorType = wide::i8x32;
+    type VectorType = wide::u8x32;
     const N: usize = VectorType::LANES as usize;
     let size = map.len();
     let steps = size / N;
     let left = size % N;
     let lhs = VectorType::new([0x01; 32]);
-    let rhs = VectorType::new([-128; 32]);
+    let rhs = VectorType::new([0x80; 32]);
 
     for step in 0..steps {
         let i = step * N;
-        let buf: [u8; 32] = map[i..i + N].try_into().unwrap();
-        let mp = VectorType::new(unsafe { core::mem::transmute::<[u8; 32], [i8; 32]>(buf) });
+        let mp = VectorType::new(map[i..i + N].try_into().unwrap());
 
         let mask = mp.cmp_eq(VectorType::ZERO);
         let out = mask.blend(lhs, rhs);
         unsafe {
-            (out.as_array_ref().as_ptr() as *const u8)
+            out.as_array_ref()
+                .as_ptr()
                 .copy_to_nonoverlapping(map.as_mut_ptr().add(i), N);
         }
     }
@@ -75,21 +75,11 @@ pub fn simplify_map_i8x32(map: &mut [u8]) {
 
 /// The std implementation of `simplify_map`. Use the fastest implementation by benchamrk by default.
 pub fn std_simplify_map(map: &mut [u8]) {
-    #[cfg(feature = "simplify_map_naive")]
+    #[cfg(not(feature = "wide"))]
     simplify_map_naive(map);
 
-    #[cfg(feature = "simplify_map_wide128")]
-    simplify_map_u8x16(map);
-
-    #[cfg(feature = "simplify_map_wide256")]
-    simplify_map_i8x32(map);
-
-    #[cfg(not(any(
-        feature = "simplify_map_naive",
-        feature = "simplify_map_wide128",
-        feature = "simplify_map_wide256"
-    )))]
-    simplify_map_naive(map);
+    #[cfg(feature = "wide")]
+    simplify_map_u8x32(map);
 }
 
 /// Coverage map insteresting implementation by nightly portable simd.
@@ -246,8 +236,8 @@ pub fn covmap_is_interesting_u32x4(
     map: &[u8],
     collect_novelties: bool,
 ) -> (bool, Vec<usize>) {
-    type VectorType = wide::u32x4;
-    const N: usize = 4 * VectorType::LANES as usize;
+    type VectorType = wide::u8x32;
+    const N: usize = VectorType::LANES as usize;
     let mut novelties = vec![];
     let mut interesting = false;
     let size = map.len();
@@ -257,11 +247,8 @@ pub fn covmap_is_interesting_u32x4(
     if collect_novelties {
         for step in 0..steps {
             let i = step * N;
-            let buf: [u8; N] = hist[i..i + N].try_into().unwrap();
-            let history =
-                VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
-            let buf: [u8; N] = map[i..i + N].try_into().unwrap();
-            let items = VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
+            let history = VectorType::new(hist[i..i + N].try_into().unwrap());
+            let items = VectorType::new(map[i..i + N].try_into().unwrap());
 
             if items.max(history) != history {
                 interesting = true;
@@ -298,11 +285,8 @@ pub fn covmap_is_interesting_u32x4(
     } else {
         for step in 0..steps {
             let i = step * N;
-            let buf: [u8; N] = hist[i..i + N].try_into().unwrap();
-            let history =
-                VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
-            let buf: [u8; N] = map[i..i + N].try_into().unwrap();
-            let items = VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
+            let history = VectorType::new(hist[i..i + N].try_into().unwrap());
+            let items = VectorType::new(map[i..i + N].try_into().unwrap());
 
             if items.max(history) != history {
                 interesting = true;
@@ -364,30 +348,36 @@ pub fn covmap_is_interesting_naive(
 #[cfg(feature = "alloc")]
 #[allow(unused_variables)] // or we fail cargo doc
 #[must_use]
+#[rustversion::not(nightly)]
 pub fn std_covmap_is_interesting(
     hist: &[u8],
     map: &[u8],
     collect_novelties: bool,
 ) -> (bool, Vec<usize>) {
-    #[cfg(feature = "covmap_naive")]
+    #[cfg(not(feature = "wide"))]
     let ret = covmap_is_interesting_naive(hist, map, collect_novelties);
 
-    #[cfg(feature = "covmap_wide128")]
+    #[cfg(feature = "wide")]
     let ret = covmap_is_interesting_u8x16(hist, map, collect_novelties);
 
-    #[cfg(feature = "covmap_wide256")]
-    let ret = covmap_is_interesting_u32x4(hist, map, collect_novelties);
+    ret
+}
 
-    #[cfg(feature = "covmap_stdsimd")]
+/// Standard coverage map instereting implementation on nightly. Use the fastest implementation by default.
+#[cfg(feature = "alloc")]
+#[allow(unused_variables)] // or we fail cargo doc
+#[must_use]
+#[rustversion::nightly]
+pub fn std_covmap_is_interesting(
+    hist: &[u8],
+    map: &[u8],
+    collect_novelties: bool,
+) -> (bool, Vec<usize>) {
+    #[cfg(not(feature = "wide"))]
     let ret = covmap_is_interesting_stdsimd(hist, map, collect_novelties);
 
-    #[cfg(not(any(
-        feature = "covmap_naive",
-        feature = "covmap_wide128",
-        feature = "covmap_wide256",
-        feature = "covmap_stdsimd"
-    )))]
-    let ret = covmap_is_interesting_naive(hist, map, collect_novelties);
+    #[cfg(feature = "wide")]
+    let ret = covmap_is_interesting_u8x16(hist, map, collect_novelties);
 
     ret
 }

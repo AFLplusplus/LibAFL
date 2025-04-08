@@ -7,9 +7,11 @@ use core::{
     ops::{BitAnd, BitOr, Deref, DerefMut},
 };
 
+#[rustversion::nightly]
+use libafl_bolts::simd::{covmap_is_interesting_stdsimd, std_covmap_is_interesting};
 use libafl_bolts::{
     AsIter, AsSlice, HasRefCnt, Named,
-    simd::std_covmap_is_interesting,
+    simd::{covmap_is_interesting_naive, covmap_is_interesting_u8x16, covmap_is_interesting_u32x4},
     tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 use num_traits::PrimInt;
@@ -547,7 +549,7 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        Ok(self.is_interesting_u8_simd_optimized(state, observers))
+        Ok(self.is_interesting_u8_simd_optimized(state, observers, std_covmap_is_interesting))
     }
 }
 
@@ -603,18 +605,72 @@ where
     }
 }
 
+/// The coverage map SIMD acceleration to use.
+/// Benchmark is available at <https://github.com/wtdcode/libafl_simd_bench>
+#[derive(Debug, Clone, Default)]
+pub enum SimdImplmentation {
+    /// The u8x16 implementation from wide, usually the fastest
+    #[default]
+    WideU8x16,
+    /// The u8x32 implementation from wide, slightly slower than u8x16 (~1%)
+    WideU8x32,
+    /// The `std::simd` u8x16 implementation, slightly slower (~10%)
+    StdSimdU8x16,
+    /// Naive implementation, reference only
+    Naive,
+}
+
+type CoverageMapFunPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
+
 /// Stable Rust wrapper for SIMD accelerated map feedback. Unfortunately, we have to
 /// keep this until specialization is stablized (not yet since 2016).
 #[derive(Debug, Clone)]
 pub struct SimdMapFeedback<C, O> {
     map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
+    simd: SimdImplmentation,
 }
 
 impl<C, O> SimdMapFeedback<C, O> {
     /// Wraps an existing map and enable SIMD acceleration
     #[must_use]
-    pub fn new(map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>) -> Self {
-        Self { map }
+    #[rustversion::not(nightly)]
+    pub fn new(
+        map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
+        simd: SimdImplmentation,
+    ) -> Self {
+        if matches!(simd, SimdImplmentation::StdSimdU8x16) {
+            panic!("std::simd is only available on nightly!")
+        }
+        Self { map, simd }
+    }
+
+    /// Wraps an existing map and enable SIMD acceleration (nightly version)
+    #[must_use]
+    #[rustversion::nightly]
+    pub fn new(
+        map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
+        simd: SimdImplmentation,
+    ) -> Self {
+        Self { map, simd }
+    }
+
+    #[rustversion::not(nightly)]
+    fn dispatch_nightly() -> CoverageMapFunPtr {
+        panic!("unreachable");
+    }
+
+    #[rustversion::nightly]
+    fn dispatch_nightly() -> CoverageMapFunPtr {
+        covmap_is_interesting_stdsimd
+    }
+
+    fn dispatch_simd(&self) -> CoverageMapFunPtr {
+        match self.simd {
+            SimdImplmentation::WideU8x16 => covmap_is_interesting_u8x16,
+            SimdImplmentation::WideU8x32 => covmap_is_interesting_u32x4,
+            SimdImplmentation::Naive => covmap_is_interesting_naive,
+            SimdImplmentation::StdSimdU8x16 => Self::dispatch_nightly(),
+        }
     }
 }
 
@@ -675,7 +731,9 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        let res = self.is_interesting_u8_simd_optimized(state, observers);
+        let res = self
+            .map
+            .is_interesting_u8_simd_optimized(state, observers, self.dispatch_simd());
         #[cfg(feature = "track_hit_feedbacks")]
         {
             self.last_result = Some(res);
@@ -732,10 +790,16 @@ where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     C: CanTrack + AsRef<O>,
 {
-    fn is_interesting_u8_simd_optimized<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
+    fn is_interesting_u8_simd_optimized<S, OT, F>(
+        &mut self,
+        state: &mut S,
+        observers: &OT,
+        simd: F,
+    ) -> bool
     where
         S: HasNamedMetadata,
         OT: MatchName,
+        F: FnOnce(&[u8], &[u8], bool) -> (bool, Vec<usize>),
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
@@ -768,8 +832,7 @@ where
             }
         }*/
 
-        let (interesting, novelties) =
-            std_covmap_is_interesting(history_map, &map, self.novelties.is_some());
+        let (interesting, novelties) = simd(history_map, &map, self.novelties.is_some());
         if let Some(nov) = self.novelties.as_mut() {
             *nov = novelties;
         }

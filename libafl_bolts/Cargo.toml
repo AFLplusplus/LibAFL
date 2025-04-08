@@ -36,7 +36,6 @@ default = [
   "serdeany_autoreg",
   "alloc",
   "xxh3",
-  "stable_simd",
 ]
 document-features = ["dep:document-features"]
 
@@ -53,6 +52,7 @@ std = [
   "uds",
   "serial_test",
   "alloc",
+  "stable_simd",
 ]
 
 ## Enables all features that allocate in `no_std`
@@ -121,23 +121,7 @@ llmp_small_maps = ["alloc"]
 #! ### Stable SIMD features
 
 ## Use the best SIMD implementation by our [benchmark](https://github.com/wtdcode/libafl_simd_bench)
-stable_simd = ["covmap_wide128", "simplify_map_wide256"]
-
-## Enable naive coverage map features, usually no auto-vectorization
-covmap_naive = ["alloc"]
-## Enable coverage map implemented by wide::u8x16, usualy the fastest
-covmap_wide128 = ["alloc", "wide"]
-## Enable coverage map implemented by wide::u32x4, almost as fast as covmap_wide128
-covmap_wide256 = ["alloc", "wide"]
-## Enable coverage map implemented std::simd, slightly slower
-covmap_stdsimd = ["alloc", "wide"]
-
-## Enable naive simplify_map implementation. Enable this if you trust LLVM will auto-vectorize it.
-simplify_map_naive = []
-## Enable simplify_map by wide::u8x16. Unfortunately, this could be slower on most platforms
-simplify_map_wide128 = ["wide"]
-## Enable simplify_map by wide::u32x4, usually as fast as LLVM auto-vectorization version.
-simplify_map_wide256 = ["wide"]
+stable_simd = ["alloc", "wide"]
 
 [build-dependencies]
 rustversion = { workspace = true }
@@ -187,8 +171,8 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
   "logging",
 ] }
 
-# optional stable simd
-wide = { version = "0.7.32", optional = true }
+# optional stable simd, pin to a commit due to `u8x32` not released yet. Switch as long as next release is out!
+wide = { git = "https://github.com/Lokathor/wide", rev = "71b5df0b2620da753836fafce5f99076181a49fe", optional = true }
 rustversion = { workspace = true }
 
 # Document all features of this crate (for `cargo doc`)
