@@ -1,5 +1,3 @@
-#![allow(clippy::all)] // We don't need beautiful code for benchmarks =)
-
 use chrono::Utc;
 use clap::Parser;
 use itertools::Itertools;
@@ -45,7 +43,7 @@ struct SimplifyMapInput {
 }
 
 impl SimplifyMapInput {
-    fn from_cli(name: &str, f: fn(&mut [u8]), cli: &CLI, rng: ThreadRng) -> Self {
+    fn from_cli(name: &str, f: fn(&mut [u8]), cli: &CLI, rng: &ThreadRng) -> Self {
         Self {
             name: name.to_string(),
             func: f,
@@ -72,9 +70,12 @@ impl SimplifyMapInput {
                 (self.func)(&mut self.map);
                 simplify_map_naive(&mut mp);
 
-                if mp != self.map {
-                    panic!("Incorrect covmap impl. {:?} vs\n{:?}", mp, self.map);
-                }
+                assert!(
+                    mp == self.map,
+                    "Incorrect covmap impl. {:?} vs\n{:?}",
+                    mp,
+                    self.map
+                );
             } else {
                 (self.func)(&mut self.map);
             }
@@ -101,7 +102,7 @@ impl CovInput {
         name: &str,
         f: fn(&[u8], &[u8], bool) -> (bool, Vec<usize>),
         cli: &CLI,
-        rng: ThreadRng,
+        rng: &ThreadRng,
     ) -> Self {
         CovInput {
             name: name.to_string(),
@@ -130,12 +131,10 @@ impl CovInput {
                 let (canonical_interesting, canonical_novelties) =
                     covmap_is_interesting_naive(&self.hist, &self.map, true);
 
-                if canonical_interesting != interesting || novelties != canonical_novelties {
-                    panic!(
-                        "Incorrect covmap impl. {} vs {}, {:?} vs\n{:?}",
-                        canonical_interesting, interesting, canonical_novelties, novelties
-                    );
-                }
+                assert!(
+                    canonical_interesting == interesting && novelties == canonical_novelties,
+                    "Incorrect covmap impl. {canonical_interesting} vs {interesting}, {canonical_novelties:?} vs\n{novelties:?}"
+                );
             }
             let after = Utc::now();
             outs.push(after - before);
@@ -145,7 +144,8 @@ impl CovInput {
     }
 }
 
-fn printout(ty: &str, tms: Vec<chrono::TimeDelta>) {
+#[allow(clippy::cast_precision_loss)]
+fn printout(ty: &str, tms: &[chrono::TimeDelta]) {
     let tms = tms
         .iter()
         .map(|t| t.to_std().unwrap().as_secs_f64())
@@ -178,26 +178,26 @@ fn main() {
     let rng = rand::rng();
 
     let simpls = [
-        SimplifyMapInput::from_cli("naive simplify_map", simplify_map_naive, &cli, rng.clone()),
-        SimplifyMapInput::from_cli("u8x16 simplify_map", simplify_map_u8x16, &cli, rng.clone()),
-        SimplifyMapInput::from_cli("u8x32 simplify_map", simplify_map_u8x32, &cli, rng.clone()),
+        SimplifyMapInput::from_cli("naive simplify_map", simplify_map_naive, &cli, &rng),
+        SimplifyMapInput::from_cli("u8x16 simplify_map", simplify_map_u8x16, &cli, &rng),
+        SimplifyMapInput::from_cli("u8x32 simplify_map", simplify_map_u8x32, &cli, &rng),
     ];
 
-    for bench in simpls.into_iter() {
+    for bench in simpls {
         let name = bench.name.clone();
         let outs = bench.measure_simplify_input();
-        printout(&name, outs);
+        printout(&name, &outs);
     }
 
     let benches = [
-        CovInput::from_cli("naive cov", covmap_is_interesting_naive, &cli, rng.clone()),
-        CovInput::from_cli("u8x16 cov", covmap_is_interesting_u8x16, &cli, rng.clone()),
-        CovInput::from_cli("u8x32 cov", covmap_is_interesting_u8x32, &cli, rng.clone()),
+        CovInput::from_cli("naive cov", covmap_is_interesting_naive, &cli, &rng),
+        CovInput::from_cli("u8x16 cov", covmap_is_interesting_u8x16, &cli, &rng),
+        CovInput::from_cli("u8x32 cov", covmap_is_interesting_u8x32, &cli, &rng),
     ];
 
-    for bench in benches.into_iter() {
+    for bench in benches {
         let name = bench.name.clone();
         let outs = bench.measure_cov();
-        printout(&name, outs);
+        printout(&name, &outs);
     }
 }
