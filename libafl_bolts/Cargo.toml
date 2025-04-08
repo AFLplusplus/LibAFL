@@ -133,7 +133,7 @@ covmap_wide256 = ["wide"]
 covmap_stdsimd = ["wide"]
 
 ## Enable naive simplify_map implementation. Enable this if you trust LLVM will auto-vectorize it.
-simplify_map_naive = ["wide"]
+simplify_map_naive = []
 ## Enable simplify_map by wide::u8x16. Unfortunately, this could be slower on most platforms
 simplify_map_wide128 = ["wide"]
 ## Enable simplify_map by wide::u32x4, usually as fast as LLVM auto-vectorization version.
