@@ -1,7 +1,7 @@
 //! Map feedback, maximizing or minimizing maps, for example the afl-style map observer.
 
 use alloc::{
-    borrow::{Cow, ToOwned},
+    borrow::Cow,
     vec::Vec,
 };
 use core::{
@@ -609,24 +609,13 @@ where
 #[derive(Debug, Clone)]
 pub struct SIMDMapFeedback<C, O> {
     map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
-    name: Cow<'static, str>,
 }
 
 impl<C, O> SIMDMapFeedback<C, O> {
     /// Wraps an existing map and enable SIMD acceleration
     #[must_use]
     pub fn new(map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>) -> Self {
-        let name = format!("simd-{}", map.name());
-        Self::with_name(map, &name)
-    }
-
-    /// Wraps an existing map and enable SIMD acceleration with alternative name
-    #[must_use]
-    pub fn with_name(map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>, name: &str) -> Self {
-        Self {
-            map,
-            name: Cow::Owned(name.to_owned()),
-        }
+        Self { map }
     }
 }
 
@@ -666,7 +655,7 @@ impl<C, O> HasObserverHandle for SIMDMapFeedback<C, O> {
 impl<C, O> Named for SIMDMapFeedback<C, O> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
-        &self.name
+        &self.map.name
     }
 }
 
