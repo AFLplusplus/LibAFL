@@ -1,6 +1,6 @@
 //! SIMD accelerated map feedback with stable Rust.
 
-use alloc::borrow::Cow;
+use alloc::{vec::Vec, borrow::Cow};
 use core::{
     fmt::Debug,
     ops::{Deref, DerefMut},
@@ -14,8 +14,7 @@ use libafl_bolts::{
 use serde::{Serialize, de::DeserializeOwned};
 
 use super::{
-    CoverageMapFunPtr, DifferentIsNovel, Feedback, HasObserverHandle, MapFeedback, MaxReducer,
-    StateInitializer,
+    DifferentIsNovel, Feedback, HasObserverHandle, MapFeedback, MaxReducer, StateInitializer,
 };
 use crate::{
     HasNamedMetadata,
@@ -46,6 +45,8 @@ pub struct SimdMapFeedback<C, O> {
     map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
     simd: SimdImplmentation,
 }
+
+type CoverageMapFunPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
 
 impl<C, O> SimdMapFeedback<C, O> {
     /// Wraps an existing map and enable SIMD acceleration

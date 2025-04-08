@@ -604,9 +604,6 @@ where
     }
 }
 
-/// Coverage map computing function type
-pub(crate) type CoverageMapFunPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
-
 impl<C, N, O, R> HasObserverHandle for MapFeedback<C, N, O, R> {
     type Observer = C;
 
