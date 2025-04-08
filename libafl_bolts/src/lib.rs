@@ -118,9 +118,9 @@ pub mod argparse;
 pub use argparse::*;
 
 #[cfg(all(feature = "std", unix))]
-pub mod afl_args;
+pub mod target_args;
 #[cfg(all(feature = "std", unix))]
-pub use afl_args::*;
+pub use target_args::*;
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
