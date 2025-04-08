@@ -1439,7 +1439,7 @@ dependencies = [
 [[package]]
 name = "tinyinst"
 version = "0.1.0"
-source = "git+https://github.com/AFLplusplus/tinyinst-rs#d30a8ca29803930aa302c66708f40b4634dafe31"
+source = "git+https://github.com/AFLplusplus/tinyinst-rs?branch=main#984bcb0d60ec82963ab47c47b7280d2eaa4df47d"
 dependencies = [
  "cmake",
  "cxx",

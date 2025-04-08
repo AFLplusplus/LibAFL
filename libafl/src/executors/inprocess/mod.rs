@@ -345,6 +345,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
 
     if is_solution {
         let mut new_testcase = Testcase::from(input.clone());
+        new_testcase.set_executions(*state.executions());
         new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
 
