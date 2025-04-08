@@ -38,12 +38,22 @@ pub enum SimdImplmentation {
     Naive,
 }
 
+impl SimdImplmentation {
+    fn dispatch_simd(&self) -> CoverageMapFunPtr {
+        match self {
+            SimdImplmentation::WideU8x16 => covmap_is_interesting_u8x16,
+            SimdImplmentation::WideU8x32 => covmap_is_interesting_u8x32,
+            SimdImplmentation::Naive => covmap_is_interesting_naive,
+        }
+    }
+}
+
 /// Stable Rust wrapper for SIMD accelerated map feedback. Unfortunately, we have to
 /// keep this until specialization is stablized (not yet since 2016).
 #[derive(Debug, Clone)]
 pub struct SimdMapFeedback<C, O> {
     map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
-    simd: SimdImplmentation,
+    simd: CoverageMapFunPtr,
 }
 
 type CoverageMapFunPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
@@ -55,14 +65,9 @@ impl<C, O> SimdMapFeedback<C, O> {
         map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
         simd: SimdImplmentation,
     ) -> Self {
-        Self { map, simd }
-    }
-
-    fn dispatch_simd(&self) -> CoverageMapFunPtr {
-        match self.simd {
-            SimdImplmentation::WideU8x16 => covmap_is_interesting_u8x16,
-            SimdImplmentation::WideU8x32 => covmap_is_interesting_u8x32,
-            SimdImplmentation::Naive => covmap_is_interesting_naive,
+        Self {
+            map,
+            simd: simd.dispatch_simd(),
         }
     }
 }
@@ -126,7 +131,7 @@ where
     ) -> Result<bool, Error> {
         let res = self
             .map
-            .is_interesting_u8_simd_optimized(state, observers, self.dispatch_simd());
+            .is_interesting_u8_simd_optimized(state, observers, self.simd);
         #[cfg(feature = "track_hit_feedbacks")]
         {
             self.last_result = Some(res);
