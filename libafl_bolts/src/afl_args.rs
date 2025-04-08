@@ -1,4 +1,4 @@
-//! Share implementation of afl style arguments
+//! Shared implementation of afl style arguments
 
 use alloc::{borrow::ToOwned, vec::Vec};
 use std::{
@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use libafl_bolts::fs::{InputFile, get_unique_std_input_file};
+use crate::fs::{InputFile, get_unique_std_input_file};
 
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin

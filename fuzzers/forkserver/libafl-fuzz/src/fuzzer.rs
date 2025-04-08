@@ -16,10 +16,7 @@ use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::ProgressReporter,
-    executors::{
-        afl_args::AflTargetArgs,
-        forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
-    },
+    executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
     feedback_and, feedback_or, feedback_or_fast,
     feedbacks::{
         CaptureTimeoutFeedback, ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback,

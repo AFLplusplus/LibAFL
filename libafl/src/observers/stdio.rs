@@ -26,7 +26,7 @@ use crate::{Error, observers::Observer};
 ///     Error, Fuzzer, StdFuzzer,
 ///     corpus::{Corpus, InMemoryCorpus, Testcase},
 ///     events::{EventFirer, NopEventManager},
-///     executors::{afl_args::AflTargetArgs, CommandExecutor, ExitKind},
+///     executors::{CommandExecutor, ExitKind},
 ///     feedbacks::{Feedback, StateInitializer},
 ///     inputs::BytesInput,
 ///     mutators::{MutationResult, NopMutator},
@@ -36,6 +36,7 @@ use crate::{Error, observers::Observer};
 /// };
 /// use libafl_bolts::{
 ///     Named, current_nanos,
+///     AflTargetArgs,
 ///     rands::StdRand,
 ///     tuples::{Handle, Handled, MatchNameRef, tuple_list},
 /// };

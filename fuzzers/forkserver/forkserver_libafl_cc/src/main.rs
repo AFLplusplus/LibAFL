@@ -5,7 +5,7 @@ use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{afl_args::AflTargetArgs, forkserver::ForkserverExecutor, HasObservers},
+    executors::{forkserver::ForkserverExecutor, HasObservers},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -22,7 +22,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, Truncate,
+    AflTargetArgs, AsSliceMut, Truncate,
 };
 use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 use nix::sys::signal::Signal;

@@ -6,7 +6,7 @@ use libafl::{
     HasMetadata,
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{HasObservers, afl_args::AflTargetArgs, forkserver::ForkserverExecutor},
+    executors::{HasObservers, forkserver::ForkserverExecutor},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -19,7 +19,7 @@ use libafl::{
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSliceMut, Truncate, current_nanos,
+    AflTargetArgs, AsSliceMut, Truncate, current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{Handled, Merge, tuple_list},

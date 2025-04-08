@@ -18,7 +18,7 @@ use std::{
 };
 
 use libafl_bolts::{
-    AsSlice, AsSliceMut, Truncate,
+    AflTargetArgs, AsSlice, AsSliceMut, InputLocation, Truncate,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     ownedref::OwnedSlice,
@@ -36,10 +36,7 @@ use nix::{
     unistd::Pid,
 };
 
-use super::{
-    HasTimeout,
-    afl_args::{AflTargetArgs, InputLocation},
-};
+use super::HasTimeout;
 #[cfg(feature = "regex")]
 use crate::observers::{
     AsanBacktraceObserver, get_asan_runtime_flags, get_asan_runtime_flags_with_log_path,
@@ -1492,7 +1489,7 @@ mod tests {
     use std::ffi::OsString;
 
     use libafl_bolts::{
-        AsSliceMut,
+        AflTargetArgs, AsSliceMut,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::tuple_list,
     };
@@ -1501,10 +1498,7 @@ mod tests {
     use crate::{
         Error,
         corpus::NopCorpus,
-        executors::{
-            afl_args::AflTargetArgs,
-            forkserver::{FAILED_TO_START_FORKSERVER_MSG, ForkserverExecutor},
-        },
+        executors::forkserver::{FAILED_TO_START_FORKSERVER_MSG, ForkserverExecutor},
         inputs::BytesInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
     };

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{afl_args::AflTargetArgs, forkserver::ForkserverExecutor},
+    executors::forkserver::ForkserverExecutor,
     feedback_and,
     feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -25,7 +25,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider},
     tuples::tuple_list,
-    AsSliceMut,
+    AflTargetArgs, AsSliceMut,
 };
 
 pub fn main() {

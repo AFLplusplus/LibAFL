@@ -23,7 +23,7 @@ use std::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
-    AsSlice,
+    AflTargetArgs, AsSlice, InputLocation,
     tuples::{Handle, MatchName, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
@@ -46,10 +46,7 @@ use nix::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use typed_builder::TypedBuilder;
 
-use super::{
-    HasTimeout,
-    afl_args::{AflTargetArgs, InputLocation},
-};
+use super::HasTimeout;
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
@@ -784,11 +781,12 @@ fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus
 
 #[cfg(test)]
 mod tests {
+    use libafl_bolts::AflTargetArgs;
+
     use crate::{
         events::SimpleEventManager,
         executors::{
             Executor,
-            afl_args::AflTargetArgs,
             command::{CommandExecutor, InputLocation},
         },
         fuzzer::NopFuzzer,
