@@ -170,7 +170,7 @@ fn printout(ty: &str, tms: Vec<chrono::TimeDelta>) {
 
 fn main() {
     // Bench with `taskset -c 3 cargo bench --example simd`
-    // Valite with `cargo bench --example simd -- --validate --rounds 8192`
+    // Validate with `cargo bench --example simd -- --validate --rounds 8192`
     let cli = CLI::parse();
 
     let rng = rand::rng();
