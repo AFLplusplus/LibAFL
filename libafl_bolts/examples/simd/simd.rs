@@ -8,7 +8,7 @@ use libafl_bolts::simd::{
 use rand::{RngCore, rngs::ThreadRng};
 
 #[derive(Parser)]
-struct CLI {
+struct Cli {
     #[arg(short, long, default_value_t = 2097152, env = "LIBAFL_BENCH_MAP_SIZE")]
     pub map: usize,
     #[arg(short, long, default_value_t = 32768, env = "LIBAFL_BENCH_ROUNDS")]
@@ -43,7 +43,7 @@ struct SimplifyMapInput {
 }
 
 impl SimplifyMapInput {
-    fn from_cli(name: &str, f: fn(&mut [u8]), cli: &CLI, rng: &ThreadRng) -> Self {
+    fn from_cli(name: &str, f: fn(&mut [u8]), cli: &Cli, rng: &ThreadRng) -> Self {
         Self {
             name: name.to_string(),
             func: f,
@@ -87,9 +87,11 @@ impl SimplifyMapInput {
     }
 }
 
+type CovFuncPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
+
 struct CovInput {
     name: String,
-    func: fn(&[u8], &[u8], bool) -> (bool, Vec<usize>),
+    func: CovFuncPtr,
     hist: Vec<u8>,
     map: Vec<u8>,
     rounds: usize,
@@ -98,12 +100,7 @@ struct CovInput {
 }
 
 impl CovInput {
-    fn from_cli(
-        name: &str,
-        f: fn(&[u8], &[u8], bool) -> (bool, Vec<usize>),
-        cli: &CLI,
-        rng: &ThreadRng,
-    ) -> Self {
+    fn from_cli(name: &str, f: CovFuncPtr, cli: &Cli, rng: &ThreadRng) -> Self {
         CovInput {
             name: name.to_string(),
             func: f,
@@ -173,7 +170,7 @@ fn printout(ty: &str, tms: &[chrono::TimeDelta]) {
 fn main() {
     // Bench with `taskset -c 3 cargo bench --example simd`
     // Validate with `cargo bench --example simd -- --validate --rounds 8192`
-    let cli = CLI::parse();
+    let cli = Cli::parse();
 
     let rng = rand::rng();
 
