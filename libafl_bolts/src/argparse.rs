@@ -6,7 +6,7 @@ use core::{
 };
 use std::{ffi::OsString, os::unix::ffi::OsStrExt};
 
-use crate::{TargetArgs, Error, InputLocation};
+use crate::{Error, InputLocation, TargetArgs};
 
 /// For creating an C-compatible argument
 #[derive(Debug)]

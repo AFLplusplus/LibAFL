@@ -18,7 +18,7 @@ use std::{
 };
 
 use libafl_bolts::{
-    TargetArgs, AsSlice, AsSliceMut, InputLocation, Truncate,
+    AsSlice, AsSliceMut, InputLocation, TargetArgs, Truncate,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     ownedref::OwnedSlice,
@@ -1489,7 +1489,7 @@ mod tests {
     use std::ffi::OsString;
 
     use libafl_bolts::{
-        TargetArgs, AsSliceMut,
+        AsSliceMut, TargetArgs,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::tuple_list,
     };

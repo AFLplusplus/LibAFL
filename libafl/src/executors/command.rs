@@ -23,7 +23,7 @@ use std::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
-    TargetArgs, AsSlice, InputLocation,
+    AsSlice, InputLocation, TargetArgs,
     tuples::{Handle, MatchName, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
