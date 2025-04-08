@@ -2,9 +2,6 @@
 
 #[cfg(feature = "alloc")]
 use alloc::{vec, vec::Vec};
-#[rustversion::nightly]
-#[cfg(feature = "alloc")]
-use core::simd::cmp::SimdOrd;
 
 /// `simplify_map` naive implementaion. In most cases, this can be auto-vectorized.
 pub fn simplify_map_naive(map: &mut [u8]) {
