@@ -608,6 +608,14 @@ pub struct SIMDMapFeedback<C, O> {
     map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
 }
 
+impl<C, O> SIMDMapFeedback<C, O> {
+    /// Wraps an existing map and enable SIMD acceleration
+    #[must_use]
+    pub fn new(map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>) -> Self {
+        Self { map }
+    }
+}
+
 impl<C, O> Deref for SIMDMapFeedback<C, O> {
     type Target = MapFeedback<C, DifferentIsNovel, O, MaxReducer>;
     fn deref(&self) -> &Self::Target {
