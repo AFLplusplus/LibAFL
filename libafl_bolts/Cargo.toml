@@ -121,16 +121,16 @@ llmp_small_maps = ["alloc"]
 #! ### Stable SIMD features
 
 ## Use the best SIMD implementation by our [benchmark](https://github.com/wtdcode/libafl_simd_bench)
-stable_simd = ["std", "covmap_wide128", "simplify_map_wide256"]
+stable_simd = ["covmap_wide128", "simplify_map_wide256"]
 
 ## Enable naive coverage map features, usually no auto-vectorization
-covmap_naive = []
+covmap_naive = ["alloc"]
 ## Enable coverage map implemented by wide::u8x16, usualy the fastest
-covmap_wide128 = ["wide"]
+covmap_wide128 = ["alloc", "wide"]
 ## Enable coverage map implemented by wide::u32x4, almost as fast as covmap_wide128
-covmap_wide256 = ["wide"]
+covmap_wide256 = ["alloc", "wide"]
 ## Enable coverage map implemented std::simd, slightly slower
-covmap_stdsimd = ["wide"]
+covmap_stdsimd = ["alloc", "wide"]
 
 ## Enable naive simplify_map implementation. Enable this if you trust LLVM will auto-vectorize it.
 simplify_map_naive = []
