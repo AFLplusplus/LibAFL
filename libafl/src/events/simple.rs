@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 use core::sync::atomic::{Ordering, compiler_fence};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
+#[cfg(feature = "std")]
 use hashbrown::HashMap;
 use libafl_bolts::ClientId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -201,7 +202,6 @@ where
     }
 
     /// Handle arriving events in the broker
-    #[expect(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         monitor: &mut MT,
         client_stats_manager: &mut ClientStatsManager,

@@ -321,6 +321,6 @@ mod test {
             NopMonitor::default(),
             NopMonitor::default(),
         );
-        mgr_list.display(&mut client_stats, "test", ClientId(0));
+        let _ = mgr_list.display(&mut client_stats, "test", ClientId(0));
     }
 }

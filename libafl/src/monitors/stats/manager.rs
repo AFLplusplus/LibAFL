@@ -51,11 +51,10 @@ impl ClientStatsManager {
     }
 
     /// Get client with `client_id`
-    #[must_use]
     pub fn get(&self, client_id: ClientId) -> Result<&ClientStats, Error> {
         self.client_stats
             .get(&client_id)
-            .ok_or_else(|| Error::key_not_found(format!("Client id {:#?} not found", client_id)))
+            .ok_or_else(|| Error::key_not_found(format!("Client id {client_id:#?} not found")))
     }
 
     /// The client monitor for a specific id, creating new if it doesn't exist
@@ -101,7 +100,7 @@ impl ClientStatsManager {
             }
             Ok(res)
         } else {
-            return Err(Error::key_not_found(format!(
+            Err(Error::key_not_found(format!(
                 "Client id {:#?} not found!",
                 client_id
             )));
@@ -117,11 +116,10 @@ impl ClientStatsManager {
     }
 
     /// Get immutable reference to client stats
-    #[must_use]
     pub fn client_stats_for(&self, client_id: ClientId) -> Result<&ClientStats, Error> {
         self.client_stats
             .get(&client_id)
-            .ok_or_else(|| Error::key_not_found(format!("Client id {:#?} not found", client_id)))
+            .ok_or_else(|| Error::key_not_found(format!("Client id {client_id:#?} not found")))
     }
 
     /// Aggregate user-defined stats
