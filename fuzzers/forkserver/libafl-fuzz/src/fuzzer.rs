@@ -51,7 +51,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut,
+    AflTargetArgs, AsSliceMut,
 };
 #[cfg(feature = "nyx")]
 use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
