@@ -187,7 +187,7 @@ impl ClientStatsManager {
         let mut total_process_timing = ProcessTiming::new();
         total_process_timing.exec_speed = execs_per_sec_pretty;
         total_process_timing.total_execs = total_execs;
-        if self.client_stats().len() > 1 {
+        if !self.client_stats().is_empty() {
             let mut new_path_time = Duration::default();
             let mut new_objectives_time = Duration::default();
             for (_, stat) in self
@@ -199,10 +199,10 @@ impl ClientStatsManager {
                 new_objectives_time = stat.last_objective_time().max(new_objectives_time);
             }
             if new_path_time > self.start_time() {
-                total_process_timing.last_new_entry = new_path_time - self.start_time();
+                total_process_timing.last_new_entry = current_time() - new_path_time;
             }
             if new_objectives_time > self.start_time() {
-                total_process_timing.last_saved_solution = new_objectives_time - self.start_time();
+                total_process_timing.last_saved_solution = current_time() - new_objectives_time;
             }
         }
         total_process_timing
