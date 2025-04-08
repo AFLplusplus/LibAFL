@@ -2,11 +2,11 @@
 
 #[cfg(feature = "std")]
 use alloc::string::ToString;
-use alloc::{borrow::Cow, string::String, vec::Vec};
+use alloc::{borrow::Cow, string::String};
 use core::time::Duration;
 
 use hashbrown::HashMap;
-use libafl_bolts::{ClientId, current_time, format_duration_hms};
+use libafl_bolts::{ClientId, Error, current_time, format_duration_hms};
 #[cfg(feature = "std")]
 use serde_json::Value;
 
@@ -20,7 +20,7 @@ use super::{
 /// Manager of all client's statistics
 #[derive(Debug)]
 pub struct ClientStatsManager {
-    client_stats: Vec<ClientStats>,
+    client_stats: HashMap<ClientId, ClientStats>,
     /// Aggregated user stats value.
     ///
     /// This map is updated by event manager, and is read by monitors to display user-defined stats.
@@ -37,7 +37,7 @@ impl ClientStatsManager {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            client_stats: vec![],
+            client_stats: HashMap::new(),
             cached_aggregated_user_stats: HashMap::new(),
             cached_global_stats: None,
             start_time: current_time(),
@@ -46,25 +46,31 @@ impl ClientStatsManager {
 
     /// Get all client stats
     #[must_use]
-    pub fn client_stats(&self) -> &[ClientStats] {
+    pub fn client_stats(&self) -> &HashMap<ClientId, ClientStats> {
         &self.client_stats
     }
 
+    /// Get client with `client_id`
+    pub fn get(&self, client_id: ClientId) -> Result<&ClientStats, Error> {
+        self.client_stats
+            .get(&client_id)
+            .ok_or_else(|| Error::key_not_found(format!("Client id {client_id:#?} not found")))
+    }
+
     /// The client monitor for a specific id, creating new if it doesn't exist
-    pub fn client_stats_insert(&mut self, client_id: ClientId) {
-        let total_client_stat_count = self.client_stats().len();
-        for _ in total_client_stat_count..=(client_id.0) as usize {
-            self.client_stats.push(ClientStats {
+    pub fn client_stats_insert(&mut self, client_id: ClientId) -> Result<(), Error> {
+        // if it doesn't contain this new client then insert it
+        if !self.client_stats.contains_key(&client_id) {
+            let stats = ClientStats {
                 enabled: false,
                 last_window_time: Duration::from_secs(0),
                 start_time: Duration::from_secs(0),
                 ..ClientStats::default()
-            });
-        }
-        if total_client_stat_count <= client_id.0 as usize {
-            // The client count changed!
+            };
+            self.client_stats.insert(client_id, stats);
             self.cached_global_stats = None;
         }
+
         self.update_client_stats_for(client_id, |new_stat| {
             if !new_stat.enabled {
                 let timestamp = current_time();
@@ -74,7 +80,8 @@ impl ClientStatsManager {
                 new_stat.enabled = true;
                 new_stat.stats_status.basic_stats_updated = true;
             }
-        });
+        })?;
+        Ok(())
     }
 
     /// Update sepecific client stats.
@@ -84,28 +91,34 @@ impl ClientStatsManager {
         &mut self,
         client_id: ClientId,
         update: F,
-    ) -> T {
-        let client_stat = &mut self.client_stats[client_id.0 as usize];
-        client_stat.clear_stats_status();
-        let res = update(client_stat);
-        if client_stat.stats_status.basic_stats_updated {
-            self.cached_global_stats = None;
+    ) -> Result<T, Error> {
+        if let Some(stat) = self.client_stats.get_mut(&client_id) {
+            stat.clear_stats_status();
+            let res = update(stat);
+            if stat.stats_status.basic_stats_updated {
+                self.cached_global_stats = None;
+            }
+            Ok(res)
+        } else {
+            Err(Error::key_not_found(format!(
+                "Client id {client_id:#?} not found!"
+            )))
         }
-        res
     }
 
     /// Update all client stats. This will clear all previous client stats, and fill in the new client stats.
     ///
     /// This will clear global stats cache.
-    pub fn update_all_client_stats(&mut self, new_client_stats: Vec<ClientStats>) {
+    pub fn update_all_client_stats(&mut self, new_client_stats: HashMap<ClientId, ClientStats>) {
         self.client_stats = new_client_stats;
         self.cached_global_stats = None;
     }
 
     /// Get immutable reference to client stats
-    #[must_use]
-    pub fn client_stats_for(&self, client_id: ClientId) -> &ClientStats {
-        &self.client_stats()[client_id.0 as usize]
+    pub fn client_stats_for(&self, client_id: ClientId) -> Result<&ClientStats, Error> {
+        self.client_stats
+            .get(&client_id)
+            .ok_or_else(|| Error::key_not_found(format!("Client id {client_id:#?} not found")))
     }
 
     /// Aggregate user-defined stats
@@ -138,20 +151,20 @@ impl ClientStatsManager {
             client_stats_count: self
                 .client_stats
                 .iter()
-                .filter(|client| client.enabled)
+                .filter(|(_, client)| client.enabled)
                 .count(),
             corpus_size: self
                 .client_stats
                 .iter()
-                .fold(0_u64, |acc, x| acc + x.corpus_size),
+                .fold(0_u64, |acc, (_, client)| acc + client.corpus_size),
             objective_size: self
                 .client_stats
                 .iter()
-                .fold(0_u64, |acc, x| acc + x.objective_size),
+                .fold(0_u64, |acc, (_, client)| acc + client.objective_size),
             total_execs: self
                 .client_stats
                 .iter()
-                .fold(0_u64, |acc, x| acc + x.executions),
+                .fold(0_u64, |acc, (_, client)| acc + client.executions),
             ..GlobalStats::default()
         });
 
@@ -162,7 +175,7 @@ impl ClientStatsManager {
         global_stats.execs_per_sec = self
             .client_stats
             .iter_mut()
-            .fold(0.0, |acc, x| acc + x.execs_per_sec(cur_time));
+            .fold(0.0, |acc, (_, client)| acc + client.execs_per_sec(cur_time));
         global_stats.execs_per_sec_pretty = super::prettify_float(global_stats.execs_per_sec);
 
         global_stats
@@ -177,9 +190,13 @@ impl ClientStatsManager {
         if self.client_stats().len() > 1 {
             let mut new_path_time = Duration::default();
             let mut new_objectives_time = Duration::default();
-            for client in self.client_stats().iter().filter(|client| client.enabled()) {
-                new_path_time = client.last_corpus_time().max(new_path_time);
-                new_objectives_time = client.last_objective_time().max(new_objectives_time);
+            for (_, stat) in self
+                .client_stats()
+                .iter()
+                .filter(|(_, client)| client.enabled())
+            {
+                new_path_time = stat.last_corpus_time().max(new_path_time);
+                new_objectives_time = stat.last_objective_time().max(new_objectives_time);
             }
             if new_path_time > self.start_time() {
                 total_process_timing.last_new_entry = new_path_time - self.start_time();
@@ -196,7 +213,8 @@ impl ClientStatsManager {
     pub fn edges_coverage(&self) -> Option<EdgeCoverage> {
         self.client_stats()
             .iter()
-            .filter(|client| client.enabled())
+            .filter(|(_, client)| client.enabled())
+            .map(|(_, client)| client)
             .filter_map(ClientStats::edges_coverage)
             .max_by_key(
                 |EdgeCoverage {
@@ -217,7 +235,11 @@ impl ClientStatsManager {
         }
         let mut ratio_a: u64 = 0;
         let mut ratio_b: u64 = 0;
-        for client in self.client_stats().iter().filter(|client| client.enabled()) {
+        for (_, client) in self
+            .client_stats()
+            .iter()
+            .filter(|(_, client)| client.enabled())
+        {
             let afl_stats = client
                 .get_user_stats("AflStats")
                 .map_or("None".to_string(), ToString::to_string);

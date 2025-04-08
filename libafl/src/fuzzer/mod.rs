@@ -15,7 +15,10 @@ use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    events::{Event, EventConfig, EventFirer, EventReceiver, ProgressReporter, SendExiting},
+    events::{
+        Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter,
+        SendExiting,
+    },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
@@ -357,9 +360,11 @@ where
     OT: ObserversTuple<I, S> + Serialize,
     S: HasCorpus<I>
         + MaybeHasClientPerfMonitor
+        + HasExecutions
         + HasCurrentTestcase<I>
         + HasSolutions<I>
-        + HasLastFoundTime,
+        + HasLastFoundTime
+        + HasExecutions,
 {
     fn check_results(
         &mut self,
@@ -416,6 +421,7 @@ where
         let corpus = if exec_res.is_corpus() {
             // Add the input to the main corpus
             let mut testcase = Testcase::from(input.clone());
+            testcase.set_executions(*state.executions());
             #[cfg(feature = "track_hit_feedbacks")]
             self.feedback_mut()
                 .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
@@ -431,6 +437,7 @@ where
         if exec_res.is_solution() {
             // The input is a solution, add it to the respective corpus
             let mut testcase = Testcase::from(input.clone());
+            testcase.set_executions(*state.executions());
             testcase.add_metadata(*exit_kind);
             testcase.set_parent_id_optional(*state.corpus().current());
             if let Ok(mut tc) = state.current_testcase_mut() {
@@ -484,27 +491,32 @@ where
             if exec_res.is_corpus() {
                 manager.fire(
                     state,
-                    Event::NewTestcase {
-                        input: input.clone(),
-                        observers_buf,
-                        exit_kind: *exit_kind,
-                        corpus_size: state.corpus().count(),
-                        client_config: manager.configuration(),
-                        time: current_time(),
-                        forward_id: None,
-                        #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                        node_id: None,
-                    },
+                    EventWithStats::with_current_time(
+                        Event::NewTestcase {
+                            input: input.clone(),
+                            observers_buf,
+                            exit_kind: *exit_kind,
+                            corpus_size: state.corpus().count(),
+                            client_config: manager.configuration(),
+                            forward_id: None,
+                            #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                            node_id: None,
+                        },
+                        *state.executions(),
+                    ),
                 )?;
             }
+
             if exec_res.is_solution() {
                 manager.fire(
                     state,
-                    Event::Objective {
-                        input: self.share_objectives.then_some(input.clone()),
-                        objective_size: state.solutions().count(),
-                        time: current_time(),
-                    },
+                    EventWithStats::with_current_time(
+                        Event::Objective {
+                            input: self.share_objectives.then_some(input.clone()),
+                            objective_size: state.solutions().count(),
+                        },
+                        *state.executions(),
+                    ),
                 )?;
             }
         }
@@ -666,6 +678,7 @@ where
         let observers = executor.observers();
         // Always consider this to be "interesting"
         let mut testcase = Testcase::from(input.clone());
+        testcase.set_executions(*state.executions());
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
@@ -693,11 +706,13 @@ where
 
             manager.fire(
                 state,
-                Event::Objective {
-                    input: self.share_objectives.then_some(input.clone()),
-                    objective_size: state.solutions().count(),
-                    time: current_time(),
-                },
+                EventWithStats::with_current_time(
+                    Event::Objective {
+                        input: self.share_objectives.then_some(input.clone()),
+                        objective_size: state.solutions().count(),
+                    },
+                    *state.executions(),
+                ),
             )?;
         }
 
@@ -733,23 +748,26 @@ where
         };
         manager.fire(
             state,
-            Event::NewTestcase {
-                input,
-                observers_buf,
-                exit_kind,
-                corpus_size: state.corpus().count(),
-                client_config: manager.configuration(),
-                time: current_time(),
-                forward_id: None,
-                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                node_id: None,
-            },
+            EventWithStats::with_current_time(
+                Event::NewTestcase {
+                    input,
+                    observers_buf,
+                    exit_kind,
+                    corpus_size: state.corpus().count(),
+                    client_config: manager.configuration(),
+                    forward_id: None,
+                    #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                    node_id: None,
+                },
+                *state.executions(),
+            ),
         )?;
         Ok((id, ExecuteInputResult::new(corpus_worthy, is_solution)))
     }
 
     fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {
         let mut testcase = Testcase::from(input.clone());
+        testcase.set_executions(*state.executions());
         testcase.set_disabled(true);
         // Add the disabled input to the main corpus
         let id = state.corpus_mut().add_disabled(testcase)?;
@@ -785,32 +803,32 @@ where
         while let Some((event, with_observers)) = manager.try_receive(state)? {
             // at this point event is either newtestcase or objectives
             let res = if with_observers {
-                match event {
+                match event.event() {
                     Event::NewTestcase {
-                        ref input,
-                        ref observers_buf,
+                        input,
+                        observers_buf,
                         exit_kind,
                         ..
                     } => {
                         let observers: E::Observers =
                             postcard::from_bytes(observers_buf.as_ref().unwrap())?;
                         let res = self.evaluate_execution(
-                            state, manager, input, &observers, &exit_kind, false,
+                            state, manager, input, &observers, exit_kind, false,
                         )?;
                         res.1
                     }
                     _ => None,
                 }
             } else {
-                match event {
-                    Event::NewTestcase { ref input, .. } => {
+                match event.event() {
+                    Event::NewTestcase { input, .. } => {
                         let res = self.evaluate_input_with_observers(
                             state, executor, manager, input, false,
                         )?;
                         res.1
                     }
                     Event::Objective {
-                        input: Some(ref unwrapped_input),
+                        input: Some(unwrapped_input),
                         ..
                     } => {
                         let res = self.evaluate_input_with_observers(

@@ -39,7 +39,7 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
-  "tui_monitor",
+  "stable_simd",
 ]
 document-features = ["dep:document-features"]
 
@@ -196,6 +196,9 @@ nautilus = [
   "regex",
 ]
 
+## Use the best SIMD implementation by our [benchmark](https://github.com/wtdcode/libafl_simd_bench)
+stable_simd = ["libafl_bolts/stable_simd"]
+
 [[example]]
 name = "tui_mock"
 path = "./examples/tui_mock/main.rs"
@@ -249,7 +252,7 @@ libm = "0.2.8"
 ratatui = { version = "0.29.0", default-features = false, features = [
   'crossterm',
 ], optional = true } # Commandline rendering, for TUI Monitor
-crossterm = { version = "0.28.1", optional = true }
+crossterm = { version = "0.29.0", optional = true }
 
 cadence = { version = "1.5.0", optional = true } # For the statsd monitor
 prometheus-client = { version = "0.23.0", optional = true } # For the prometheus monitor

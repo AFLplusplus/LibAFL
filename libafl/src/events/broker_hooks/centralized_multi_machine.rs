@@ -22,7 +22,7 @@ use tokio::{
 
 use crate::{
     events::{
-        Event,
+        EventWithStats,
         centralized::_LLMP_TAG_TO_MAIN,
         multi_machine::{MultiMachineMsg, TcpMultiMachineState},
     },
@@ -128,7 +128,7 @@ where
     #[cfg(feature = "llmp_compression")]
     fn try_compress(
         state_lock: &mut RwLockWriteGuard<TcpMultiMachineState<A>>,
-        event: &Event<I>,
+        event: &EventWithStats<I>,
     ) -> Result<(Flags, Vec<u8>), Error> {
         let serialized = postcard::to_allocvec(&event)?;
 
@@ -141,7 +141,7 @@ where
     #[cfg(not(feature = "llmp_compression"))]
     fn try_compress(
         _state_lock: &mut RwLockWriteGuard<TcpMultiMachineState<A>>,
-        event: &Event<I>,
+        event: &EventWithStats<I>,
     ) -> Result<(Flags, Vec<u8>), Error> {
         Ok((Flags(0), postcard::to_allocvec(&event)?))
     }
