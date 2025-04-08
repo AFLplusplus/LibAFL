@@ -134,10 +134,6 @@ where
         let res = self
             .map
             .is_interesting_u8_simd_optimized(state, observers, self.simd);
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(res);
-        }
         Ok(res)
     }
 
