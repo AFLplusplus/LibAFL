@@ -344,7 +344,7 @@ pub fn covmap_is_interesting_naive(
     (interesting, novelties)
 }
 
-/// Standard coverage map instereting implementation. Use the fastest implementation by default.
+/// Standard coverage map instereting implementation. Use the available fastest implementation by default.
 #[cfg(feature = "alloc")]
 #[allow(unused_variables)] // or we fail cargo doc
 #[must_use]
@@ -363,7 +363,8 @@ pub fn std_covmap_is_interesting(
     ret
 }
 
-/// Standard coverage map instereting implementation on nightly. Use the fastest implementation by default.
+/// Standard coverage map instereting implementation on nightly. Use the available fastest implementation
+/// by default.
 #[cfg(feature = "alloc")]
 #[allow(unused_variables)] // or we fail cargo doc
 #[must_use]
