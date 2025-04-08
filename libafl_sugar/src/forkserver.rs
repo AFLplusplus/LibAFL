@@ -24,7 +24,7 @@ use libafl::{
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSliceMut,
+    AflTargetArgs, AsSliceMut,
     core_affinity::Cores,
     nonzero,
     rands::StdRand,
