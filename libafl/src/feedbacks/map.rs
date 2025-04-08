@@ -1,8 +1,6 @@
 //! Map feedback, maximizing or minimizing maps, for example the afl-style map observer.
 
 use alloc::{borrow::Cow, vec::Vec};
-#[rustversion::nightly]
-use core::simd::prelude::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,
@@ -10,9 +8,9 @@ use core::{
 };
 
 #[rustversion::nightly]
-use libafl_bolts::AsSlice;
+use libafl_bolts::simd::std_covmap_is_interesting;
 use libafl_bolts::{
-    AsIter, HasRefCnt, Named,
+    AsIter, AsSlice, HasRefCnt, Named,
     tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 use num_traits::PrimInt;
@@ -548,7 +546,7 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        Ok(self.is_interesting_u8_simd_optimized(state, observers))
+        Ok(self.is_interesting_u8_simd_optimized(state, observers, std_covmap_is_interesting))
     }
 }
 
@@ -601,117 +599,6 @@ where
             last_result: None,
             phantom: PhantomData,
         }
-    }
-}
-
-/// Specialize for the common coverage map size, maximization of u8s
-#[rustversion::nightly]
-impl<C, O> MapFeedback<C, DifferentIsNovel, O, MaxReducer>
-where
-    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
-    C: CanTrack + AsRef<O>,
-{
-    fn is_interesting_u8_simd_optimized<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
-    where
-        S: HasNamedMetadata,
-        OT: MatchName,
-    {
-        // 128 bits vectors
-        type VectorType = core::simd::u8x16;
-
-        let mut interesting = false;
-        // TODO Replace with match_name_type when stable
-        let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
-
-        let map_state = state
-            .named_metadata_map_mut()
-            .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
-            .unwrap();
-        let size = observer.usable_count();
-        let len = observer.len();
-        if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, u8::default());
-        }
-
-        let map = observer.as_slice();
-        debug_assert!(map.len() >= size);
-
-        let history_map = map_state.history_map.as_slice();
-
-        // Non vector implementation for reference
-        /*for (i, history) in history_map.iter_mut().enumerate() {
-            let item = map[i];
-            let reduced = MaxReducer::reduce(*history, item);
-            if DifferentIsNovel::is_novel(*history, reduced) {
-                *history = reduced;
-                interesting = true;
-                if self.novelties.is_some() {
-                    self.novelties.as_mut().unwrap().push(i);
-                }
-            }
-        }*/
-
-        let steps = size / VectorType::LEN;
-        let left = size % VectorType::LEN;
-
-        if let Some(novelties) = self.novelties.as_mut() {
-            novelties.clear();
-            for step in 0..steps {
-                let i = step * VectorType::LEN;
-                let history = VectorType::from_slice(&history_map[i..]);
-                let items = VectorType::from_slice(&map[i..]);
-
-                if items.simd_max(history) != history {
-                    interesting = true;
-                    unsafe {
-                        for j in i..(i + VectorType::LEN) {
-                            let item = *map.get_unchecked(j);
-                            if item > *history_map.get_unchecked(j) {
-                                novelties.push(j);
-                            }
-                        }
-                    }
-                }
-            }
-
-            for j in (size - left)..size {
-                unsafe {
-                    let item = *map.get_unchecked(j);
-                    if item > *history_map.get_unchecked(j) {
-                        interesting = true;
-                        novelties.push(j);
-                    }
-                }
-            }
-        } else {
-            for step in 0..steps {
-                let i = step * VectorType::LEN;
-                let history = VectorType::from_slice(&history_map[i..]);
-                let items = VectorType::from_slice(&map[i..]);
-
-                if items.simd_max(history) != history {
-                    interesting = true;
-                    break;
-                }
-            }
-
-            if !interesting {
-                for j in (size - left)..size {
-                    unsafe {
-                        let item = *map.get_unchecked(j);
-                        if item > *history_map.get_unchecked(j) {
-                            interesting = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(interesting);
-        }
-        interesting
     }
 }
 
@@ -785,6 +672,67 @@ where
             }
         }
 
+        interesting
+    }
+}
+
+/// Specialize for the common coverage map size, maximization of u8s
+impl<C, O> MapFeedback<C, DifferentIsNovel, O, MaxReducer>
+where
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
+    C: CanTrack + AsRef<O>,
+{
+    #[allow(dead_code)] // this is true on stable wihout "stable_simd"
+    pub(crate) fn is_interesting_u8_simd_optimized<S, OT, F>(
+        &mut self,
+        state: &mut S,
+        observers: &OT,
+        simd: F,
+    ) -> bool
+    where
+        S: HasNamedMetadata,
+        OT: MatchName,
+        F: FnOnce(&[u8], &[u8], bool) -> (bool, Vec<usize>),
+    {
+        // TODO Replace with match_name_type when stable
+        let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
+
+        let map_state = state
+            .named_metadata_map_mut()
+            .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
+            .unwrap();
+        let size = observer.usable_count();
+        let len = observer.len();
+        if map_state.history_map.len() < len {
+            map_state.history_map.resize(len, u8::default());
+        }
+
+        let map = observer.as_slice();
+        debug_assert!(map.len() >= size);
+
+        let history_map = map_state.history_map.as_slice();
+
+        // Non vector implementation for reference
+        /*for (i, history) in history_map.iter_mut().enumerate() {
+            let item = map[i];
+            let reduced = MaxReducer::reduce(*history, item);
+            if DifferentIsNovel::is_novel(*history, reduced) {
+                *history = reduced;
+                interesting = true;
+                if self.novelties.is_some() {
+                    self.novelties.as_mut().unwrap().push(i);
+                }
+            }
+        }*/
+
+        let (interesting, novelties) = simd(history_map, &map, self.novelties.is_some());
+        if let Some(nov) = self.novelties.as_mut() {
+            *nov = novelties;
+        }
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(interesting);
+        }
         interesting
     }
 }

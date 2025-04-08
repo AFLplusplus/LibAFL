@@ -122,6 +122,8 @@ pub mod target_args;
 #[cfg(all(feature = "std", unix))]
 pub use target_args::*;
 
+pub mod simd;
+
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod bolts_prelude {

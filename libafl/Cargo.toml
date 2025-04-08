@@ -39,6 +39,7 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
+  "stable_simd",
 ]
 document-features = ["dep:document-features"]
 
@@ -194,6 +195,9 @@ nautilus = [
   "regex-syntax",
   "regex",
 ]
+
+## Use the best SIMD implementation by our [benchmark](https://github.com/wtdcode/libafl_simd_bench)
+stable_simd = ["libafl_bolts/stable_simd"]
 
 [[example]]
 name = "tui_mock"
