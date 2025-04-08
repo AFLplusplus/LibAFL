@@ -133,7 +133,7 @@ covmap_wide128 = ["wide"]
 ## Enable coverage map implemented by wide::u32x4, almost as fast as covmap_wide128
 covmap_wide256 = ["wide"]
 ## Enable coverage map implemented std::simd, slightly slower
-covmap_nightly = ["wide"]
+covmap_stdsimd = ["wide"]
 
 ## Enable naive simplify_map implementation. Enable this if you trust LLVM will auto-vectorize it.
 simplify_map_naive = ["wide"]

@@ -2,8 +2,8 @@
 
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
-    marker::PhantomData,
     fmt::Debug,
+    marker::PhantomData,
     ops::{BitAnd, BitOr, Deref, DerefMut},
 };
 

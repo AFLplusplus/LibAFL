@@ -23,7 +23,7 @@ fn main() {
         "covmap_naive",
         "covmap_wide128",
         "covmap_wide256",
-        "covmap_nightly"
+        "covmap_stdsimd"
     );
     assert_unique_feature!(
         "simplify_map_naive",

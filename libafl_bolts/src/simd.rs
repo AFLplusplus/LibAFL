@@ -69,20 +69,21 @@ pub fn simplify_map_u64x4(map: &mut [u8]) {
 
 /// The std implementation of `simplify_map`. Use the fastest implementation by benchamrk by default.
 pub fn std_simplify_map(map: &mut [u8]) {
-    #[cfg(feature = "simplify_map_naive")]
-    simplify_map_naive(map);
-
-    #[cfg(feature = "simplify_map_wide128")]
-    simplify_map_u8x16(map);
-
-    #[cfg(feature = "simplify_map_wide256")]
-    simplify_map_u64x4(map);
+    if cfg!(feature = "simplify_map_naive") {
+        simplify_map_naive(map);
+    } else if cfg!(feature = "simplify_map_wide128") {
+        simplify_map_u8x16(map);
+    } else if cfg!(feature = "simplify_map_wide256") {
+        simplify_map_u64x4(map);
+    } else {
+        simplify_map_naive(map);
+    }
 }
 
 /// Coverage map insteresting implementation by nightly portable simd.
 #[rustversion::nightly]
 #[must_use]
-pub fn covmap_is_interesting_nightly(
+pub fn covmap_is_interesting_stdsimd(
     hist: &[u8],
     map: &[u8],
     collect_novelties: bool,
@@ -350,17 +351,20 @@ pub fn std_covmap_is_interesting(
     map: &[u8],
     collect_novelties: bool,
 ) -> (bool, Vec<usize>) {
-    #[cfg(feature = "covmap_naive")]
-    let ret = covmap_is_interesting_naive(hist, map, collect_novelties);
+    if cfg!(feature = "covmap_naive") {
+        covmap_is_interesting_naive(hist, map, collect_novelties)
+    } else if cfg!(feature = "covmap_wide128") {
+        covmap_is_interesting_u8x16(hist, map, collect_novelties)
+    } else if cfg!(feature = "covmap_wide256") {
+        covmap_is_interesting_u32x4(hist, map, collect_novelties)
+    } else {
+        // Can't use cfg! or stable won't compile
+        #[cfg(feature = "covmap_stdsimd")]
+        let ret = covmap_is_interesting_stdsimd(hist, map, collect_novelties);
 
-    #[cfg(feature = "covmap_wide128")]
-    let ret = covmap_is_interesting_u8x16(hist, map, collect_novelties);
+        #[cfg(not(feature = "covmap_stdsimd"))]
+        let ret = covmap_is_interesting_naive(hist, map, collect_novelties);
 
-    #[cfg(feature = "covmap_wide256")]
-    let ret = covmap_is_interesting_u32x4(hist, map, collect_novelties);
-
-    #[cfg(feature = "covmap_nightly")]
-    let ret = covmap_is_interesting_nightly(hist, map, collect_novelties);
-
-    ret
+        ret
+    }
 }
