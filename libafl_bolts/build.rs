@@ -19,7 +19,7 @@ fn nightly() {
 fn nightly() {}
 
 fn main() {
-    if !std::env::var("DOCS_RS").is_ok() {
+    if std::env::var("DOCS_RS").is_err() {
         assert_unique_feature!(
             "covmap_naive",
             "covmap_wide128",
