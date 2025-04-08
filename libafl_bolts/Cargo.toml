@@ -36,7 +36,7 @@ default = [
   "serdeany_autoreg",
   "alloc",
   "xxh3",
-  "stable_simd"
+  "stable_simd",
 ]
 document-features = ["dep:document-features"]
 
@@ -121,11 +121,7 @@ llmp_small_maps = ["alloc"]
 #! ### Stable SIMD features
 
 ## Use the best SIMD implementation by our [benchmark](https://github.com/wtdcode/libafl_simd_bench)
-stable_simd = [
-  "std",
-  "covmap_wide128",
-  "simplify_map_wide256"
-]
+stable_simd = ["std", "covmap_wide128", "simplify_map_wide256"]
 
 ## Enable naive coverage map features, usually no auto-vectorization
 covmap_naive = []
@@ -192,7 +188,7 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
 ] }
 
 # optional stable simd
-wide = {version = "0.7.32", optional = true}
+wide = { version = "0.7.32", optional = true }
 rustversion = { workspace = true }
 
 # Document all features of this crate (for `cargo doc`)
