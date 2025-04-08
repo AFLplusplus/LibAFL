@@ -1,12 +1,14 @@
 //! Map feedback, maximizing or minimizing maps, for example the afl-style map observer.
 
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{
+    borrow::{Cow, ToOwned},
+    vec::Vec,
+};
 use core::{
     fmt::Debug,
     marker::PhantomData,
     ops::{BitAnd, BitOr, Deref, DerefMut},
 };
-use std::string::ToString;
 
 use libafl_bolts::{
     AsIter, AsSlice, HasRefCnt, Named,
@@ -623,7 +625,7 @@ impl<C, O> SIMDMapFeedback<C, O> {
     pub fn with_name(map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>, name: &str) -> Self {
         Self {
             map,
-            name: Cow::Owned(name.to_string()),
+            name: Cow::Owned(name.to_owned()),
         }
     }
 }
