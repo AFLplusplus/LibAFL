@@ -1,10 +1,9 @@
 //! Map feedback, maximizing or minimizing maps, for example the afl-style map observer.
 
 use alloc::{borrow::Cow, vec::Vec};
-#[rustversion::nightly]
 use core::{
-    fmt::Debug,
     marker::PhantomData,
+    fmt::Debug,
     ops::{BitAnd, BitOr, Deref, DerefMut},
 };
 
