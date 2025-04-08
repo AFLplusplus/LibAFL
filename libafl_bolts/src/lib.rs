@@ -117,6 +117,8 @@ pub mod cargs;
 #[cfg(all(feature = "std", unix))]
 pub use cargs::*;
 
+pub mod simd;
+
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod bolts_prelude {

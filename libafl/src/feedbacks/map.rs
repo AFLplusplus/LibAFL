@@ -9,10 +9,9 @@ use core::{
     ops::{BitAnd, BitOr, Deref, DerefMut},
 };
 
-#[rustversion::nightly]
-use libafl_bolts::AsSlice;
 use libafl_bolts::{
-    AsIter, HasRefCnt, Named,
+    AsIter, AsSlice, HasRefCnt, Named,
+    simd::std_covmap_is_interesting,
     tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 use num_traits::PrimInt;
@@ -604,8 +603,80 @@ where
     }
 }
 
+/// Stable Rust wrapper for SIMD map feedback. Unfortunately, we have to keep this
+/// until specialization is stablized (not yet since 2016).
+#[derive(Debug, Clone)]
+pub struct SIMDMapFeedback<C, O> {
+    map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
+}
+
+impl<C, O> Deref for SIMDMapFeedback<C, O> {
+    type Target = MapFeedback<C, DifferentIsNovel, O, MaxReducer>;
+    fn deref(&self) -> &Self::Target {
+        &self.map
+    }
+}
+
+impl<C, O> DerefMut for SIMDMapFeedback<C, O> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.map
+    }
+}
+
+impl<C, O, S> StateInitializer<S> for SIMDMapFeedback<C, O>
+where
+    O: MapObserver,
+    O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
+    S: HasNamedMetadata,
+{
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        self.map.init_state(state)
+    }
+}
+
+impl<C, O> HasObserverHandle for SIMDMapFeedback<C, O> {
+    type Observer = C;
+
+    #[inline]
+    fn observer_handle(&self) -> &Handle<C> {
+        &self.map.map_ref
+    }
+}
+
+impl<C, O> Named for SIMDMapFeedback<C, O> {
+    #[inline]
+    fn name(&self) -> &Cow<'static, str> {
+        &self.map.name
+    }
+}
+
+impl<C, O, EM, I, OT, S> Feedback<EM, I, OT, S> for SIMDMapFeedback<C, O>
+where
+    C: CanTrack + AsRef<O>,
+    EM: EventFirer<I, S>,
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
+    OT: MatchName,
+    S: HasNamedMetadata + HasExecutions,
+{
+    fn is_interesting(
+        &mut self,
+        state: &mut S,
+        _manager: &mut EM,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error> {
+        let res = self.is_interesting_u8_simd_optimized(state, observers);
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
+    }
+}
+
 /// Specialize for the common coverage map size, maximization of u8s
-#[rustversion::nightly]
+
 impl<C, O> MapFeedback<C, DifferentIsNovel, O, MaxReducer>
 where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
@@ -616,10 +687,6 @@ where
         S: HasNamedMetadata,
         OT: MatchName,
     {
-        // 128 bits vectors
-        type VectorType = core::simd::u8x16;
-
-        let mut interesting = false;
         // TODO Replace with match_name_type when stable
         let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
 
@@ -651,61 +718,10 @@ where
             }
         }*/
 
-        let steps = size / VectorType::LEN;
-        let left = size % VectorType::LEN;
-
-        if let Some(novelties) = self.novelties.as_mut() {
-            novelties.clear();
-            for step in 0..steps {
-                let i = step * VectorType::LEN;
-                let history = VectorType::from_slice(&history_map[i..]);
-                let items = VectorType::from_slice(&map[i..]);
-
-                if items.simd_max(history) != history {
-                    interesting = true;
-                    unsafe {
-                        for j in i..(i + VectorType::LEN) {
-                            let item = *map.get_unchecked(j);
-                            if item > *history_map.get_unchecked(j) {
-                                novelties.push(j);
-                            }
-                        }
-                    }
-                }
-            }
-
-            for j in (size - left)..size {
-                unsafe {
-                    let item = *map.get_unchecked(j);
-                    if item > *history_map.get_unchecked(j) {
-                        interesting = true;
-                        novelties.push(j);
-                    }
-                }
-            }
-        } else {
-            for step in 0..steps {
-                let i = step * VectorType::LEN;
-                let history = VectorType::from_slice(&history_map[i..]);
-                let items = VectorType::from_slice(&map[i..]);
-
-                if items.simd_max(history) != history {
-                    interesting = true;
-                    break;
-                }
-            }
-
-            if !interesting {
-                for j in (size - left)..size {
-                    unsafe {
-                        let item = *map.get_unchecked(j);
-                        if item > *history_map.get_unchecked(j) {
-                            interesting = true;
-                            break;
-                        }
-                    }
-                }
-            }
+        let (interesting, novelties) =
+            std_covmap_is_interesting(history_map, &map, self.novelties.is_some());
+        if let Some(nov) = self.novelties.as_mut() {
+            *nov = novelties;
         }
         #[cfg(feature = "track_hit_feedbacks")]
         {

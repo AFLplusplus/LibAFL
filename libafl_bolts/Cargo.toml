@@ -36,6 +36,7 @@ default = [
   "serdeany_autoreg",
   "alloc",
   "xxh3",
+  "stable_simd"
 ]
 document-features = ["dep:document-features"]
 
@@ -117,6 +118,30 @@ llmp_debug = ["alloc", "std"]
 ## Reduces the initial map size for llmp
 llmp_small_maps = ["alloc"]
 
+#! ### Stable SIMD features
+
+## Use the best SIMD implementation by our [benchmark](https://github.com/wtdcode/libafl_simd_bench)
+stable_simd = [
+  "covmap_wide128",
+  "simplify_map_wide256"
+]
+
+## Enable naive coverage map features, usually no auto-vectorization
+covmap_naive = []
+## Enable coverage map implemented by wide::u8x16, usualy the fastest
+covmap_wide128 = ["wide"]
+## Enable coverage map implemented by wide::u32x4, almost as fast as covmap_wide128
+covmap_wide256 = ["wide"]
+## Enable coverage map implemented std::simd, slightly slower
+covmap_nightly = ["wide"]
+
+## Enable naive simplify_map implementation. Enable this if you trust LLVM will auto-vectorize it.
+simplify_map_naive = ["wide"]
+## Enable simplify_map by wide::u8x16. Unfortunately, this could be slower on most platforms
+simplify_map_wide128 = ["wide"]
+## Enable simplify_map by wide::u32x4, usually as fast as LLVM auto-vectorization version.
+simplify_map_wide256 = ["wide"]
+
 [build-dependencies]
 rustversion = { workspace = true }
 
@@ -164,6 +189,10 @@ pyo3 = { workspace = true, optional = true, features = ["serde", "macros"] }
 serial_test = { workspace = true, optional = true, default-features = false, features = [
   "logging",
 ] }
+
+# optional stable simd
+wide = {version = "0.7.32", optional = true}
+rustversion = { workspace = true }
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
