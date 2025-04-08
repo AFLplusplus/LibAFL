@@ -41,21 +41,23 @@ pub fn simplify_map_u8x16(map: &mut [u8]) {
 }
 
 /// `simplify_map` implementation by u64x4, achieving comparable performance with
-/// LLVM auto-vectorization.
+/// LLVM auto-vectorization. We shall switch `u8x32` once wide releases it next time.
 #[cfg(feature = "wide")]
-pub fn simplify_map_u64x4(map: &mut [u8]) {
-    type VectorType = wide::u64x4;
-    const N: usize = 8 * VectorType::LANES as usize;
+pub fn simplify_map_i8x32(map: &mut [u8]) {
+    use wide::CmpEq;
+
+    type VectorType = wide::i8x32;
+    const N: usize = VectorType::LANES as usize;
     let size = map.len();
     let steps = size / N;
     let left = size % N;
-    let lhs = VectorType::new([0x01010101010101; 4]);
-    let rhs = VectorType::new([0x80808080808080; 4]);
+    let lhs = VectorType::new([0x01; 32]);
+    let rhs = VectorType::new([-128; 32]);
 
     for step in 0..steps {
         let i = step * N;
         let buf: [u8; 32] = map[i..i + N].try_into().unwrap();
-        let mp = VectorType::new(unsafe { core::mem::transmute::<[u8; 32], [u64; 4]>(buf) });
+        let mp = VectorType::new(unsafe { core::mem::transmute::<[u8; 32], [i8; 32]>(buf) });
 
         let mask = mp.cmp_eq(VectorType::ZERO);
         let out = mask.blend(lhs, rhs);
@@ -80,7 +82,7 @@ pub fn std_simplify_map(map: &mut [u8]) {
     simplify_map_u8x16(map);
 
     #[cfg(feature = "simplify_map_wide256")]
-    simplify_map_u64x4(map);
+    simplify_map_i8x32(map);
 
     #[cfg(not(any(
         feature = "simplify_map_naive",
