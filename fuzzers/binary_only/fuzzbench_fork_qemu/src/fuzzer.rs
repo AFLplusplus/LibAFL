@@ -66,6 +66,8 @@ pub fn main() {
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
 
+    env_logger::init();
+
     let res = match Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author("AFLplusplus team")
