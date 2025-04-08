@@ -122,6 +122,7 @@ llmp_small_maps = ["alloc"]
 
 ## Use the best SIMD implementation by our [benchmark](https://github.com/wtdcode/libafl_simd_bench)
 stable_simd = [
+  "std",
   "covmap_wide128",
   "simplify_map_wide256"
 ]
