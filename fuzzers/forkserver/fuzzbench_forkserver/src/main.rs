@@ -38,7 +38,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSliceMut,
+    AsSliceMut, TargetArgs,
 };
 use libafl_targets::cmps::AFLppCmpLogMap;
 use nix::sys::signal::Signal;

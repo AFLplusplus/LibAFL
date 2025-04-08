@@ -19,7 +19,7 @@ use libafl::{
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSliceMut, Truncate, current_nanos,
+    AsSliceMut, TargetArgs, Truncate, current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{Handled, Merge, tuple_list},

@@ -22,7 +22,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, Truncate,
+    AsSliceMut, TargetArgs, Truncate,
 };
 use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 use nix::sys::signal::Signal;

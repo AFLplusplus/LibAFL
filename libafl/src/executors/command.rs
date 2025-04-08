@@ -23,8 +23,7 @@ use std::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
-    AsSlice,
-    fs::{InputFile, get_unique_std_input_file},
+    AsSlice, InputLocation, TargetArgs,
     tuples::{Handle, MatchName, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
@@ -58,27 +57,6 @@ use crate::{
     state::HasExecutions,
     std::borrow::ToOwned,
 };
-
-/// How to deliver input to an external program
-/// `StdIn`: The target reads from stdin
-/// `File`: The target reads from the specified [`InputFile`]
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum InputLocation {
-    /// Mutate a commandline argument to deliver an input
-    Arg {
-        /// The offset of the argument to mutate
-        argnum: usize,
-    },
-    /// Deliver input via `StdIn`
-    #[default]
-    StdIn,
-    /// Deliver the input via the specified [`InputFile`]
-    /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
-    File {
-        /// The file to write input to. The target should read input from this location.
-        out_file: InputFile,
-    },
-}
 
 /// A simple Configurator that takes the most common parameters
 /// Writes the input either to stdio or to a file
@@ -530,6 +508,40 @@ pub struct CommandExecutorBuilder {
     timeout: Duration,
 }
 
+impl TargetArgs for CommandExecutorBuilder {
+    fn arguments_ref(&self) -> &Vec<OsString> {
+        &self.args
+    }
+
+    fn arguments_mut(&mut self) -> &mut Vec<OsString> {
+        &mut self.args
+    }
+
+    fn envs_ref(&self) -> &Vec<(OsString, OsString)> {
+        &self.envs
+    }
+
+    fn envs_mut(&mut self) -> &mut Vec<(OsString, OsString)> {
+        &mut self.envs
+    }
+
+    fn program_ref(&self) -> &Option<OsString> {
+        &self.program
+    }
+
+    fn program_mut(&mut self) -> &mut Option<OsString> {
+        &mut self.program
+    }
+
+    fn input_location_ref(&self) -> &InputLocation {
+        &self.input_location
+    }
+
+    fn input_location_mut(&mut self) -> &mut InputLocation {
+        &mut self.input_location
+    }
+}
+
 impl Default for CommandExecutorBuilder {
     fn default() -> Self {
         Self::new()
@@ -553,40 +565,6 @@ impl CommandExecutorBuilder {
         }
     }
 
-    /// Set the binary to execute
-    /// This option is required.
-    pub fn program<O>(&mut self, program: O) -> &mut Self
-    where
-        O: AsRef<OsStr>,
-    {
-        self.program = Some(program.as_ref().to_owned());
-        self
-    }
-
-    /// Set the input mode and location.
-    /// This option is mandatory, if not set, the `build` method will error.
-    fn input(&mut self, input: InputLocation) -> &mut Self {
-        // This is a fatal error in the user code, no point in returning Err.
-        assert_eq!(
-            self.input_location,
-            InputLocation::StdIn,
-            "input location already set to non-stdin, cannot set it again"
-        );
-        self.input_location = input;
-        self
-    }
-
-    /// Sets the input mode to [`InputLocation::Arg`] and uses the current arg offset as `argnum`.
-    /// During execution, at input will be provided _as argument_ at this position.
-    /// Use [`Self::arg_input_file_std`] if you want to provide the input as a file instead.
-    pub fn arg_input_arg(&mut self) -> &mut Self {
-        let argnum = self.args.len();
-        self.input(InputLocation::Arg { argnum });
-        // Placeholder arg that gets replaced with the input name later.
-        self.arg("PLACEHOLDER");
-        self
-    }
-
     /// Sets the stdout observer
     pub fn stdout_observer(&mut self, stdout: Handle<StdOutObserver>) -> &mut Self {
         self.stdout = Some(stdout);
@@ -596,68 +574,6 @@ impl CommandExecutorBuilder {
     /// Sets the stderr observer
     pub fn stderr_observer(&mut self, stderr: Handle<StdErrObserver>) -> &mut Self {
         self.stderr = Some(stderr);
-        self
-    }
-
-    /// Sets the input mode to [`InputLocation::File`]
-    /// and adds the filename as arg to at the current position.
-    /// Uses a default filename.
-    /// Use [`Self::arg_input_file`] to specify a custom filename.
-    pub fn arg_input_file_std(&mut self) -> &mut Self {
-        self.arg_input_file(get_unique_std_input_file());
-        self
-    }
-
-    /// Sets the input mode to [`InputLocation::File`]
-    /// and adds the filename as arg to at the current position.
-    pub fn arg_input_file<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
-        self.arg(path.as_ref());
-        let out_file_std = InputFile::create(path.as_ref()).unwrap();
-        self.input(InputLocation::File {
-            out_file: out_file_std,
-        });
-        self
-    }
-
-    /// Adds an argument to the program's commandline.
-    pub fn arg<O: AsRef<OsStr>>(&mut self, arg: O) -> &mut CommandExecutorBuilder {
-        self.args.push(arg.as_ref().to_owned());
-        self
-    }
-
-    /// Adds a range of arguments to the program's commandline.
-    pub fn args<IT, O>(&mut self, args: IT) -> &mut CommandExecutorBuilder
-    where
-        IT: IntoIterator<Item = O>,
-        O: AsRef<OsStr>,
-    {
-        for arg in args {
-            self.arg(arg.as_ref());
-        }
-        self
-    }
-
-    /// Adds a range of environment variables to the executed command.
-    pub fn envs<IT, K, V>(&mut self, vars: IT) -> &mut CommandExecutorBuilder
-    where
-        IT: IntoIterator<Item = (K, V)>,
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        for (ref key, ref val) in vars {
-            self.env(key.as_ref(), val.as_ref());
-        }
-        self
-    }
-
-    /// Adds an environment variable to the executed command.
-    pub fn env<K, V>(&mut self, key: K, val: V) -> &mut CommandExecutorBuilder
-    where
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        self.envs
-            .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
         self
     }
 
@@ -865,6 +781,8 @@ fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus
 
 #[cfg(test)]
 mod tests {
+    use libafl_bolts::TargetArgs;
+
     use crate::{
         events::SimpleEventManager,
         executors::{
@@ -885,8 +803,7 @@ mod tests {
                 log::info!("{status}");
             }));
 
-        let mut executor = CommandExecutor::builder();
-        executor
+        let executor = CommandExecutor::builder()
             .program("ls")
             .input(InputLocation::Arg { argnum: 0 });
         let executor = executor.build(());
