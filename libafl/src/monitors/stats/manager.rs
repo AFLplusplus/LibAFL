@@ -103,7 +103,7 @@ impl ClientStatsManager {
             Err(Error::key_not_found(format!(
                 "Client id {:#?} not found!",
                 client_id
-            )));
+            )))
         }
     }
 
