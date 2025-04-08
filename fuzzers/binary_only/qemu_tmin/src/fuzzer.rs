@@ -144,7 +144,7 @@ pub fn fuzz() -> Result<(), Error> {
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
     let edges = edges_shmem.as_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
-    
+
     // We use a HitcountsMapObserver to observe the coverage map
     let mut edges_observer = unsafe {
         HitcountsMapObserver::new(ConstMapObserver::from_mut_ptr(

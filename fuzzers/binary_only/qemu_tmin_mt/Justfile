@@ -32,7 +32,7 @@ run: harness build
     {{ FUZZER }} \
         --output ./output \
         --input ./corpus \
-        --cores 5 \
+        --cores 5,6 \
         --verbose \
         -- {{ HARNESS }}
 

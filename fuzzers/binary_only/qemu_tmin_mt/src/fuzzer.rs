@@ -9,12 +9,13 @@ use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, InMemoryCorpus, InMemoryOnDiskCorpus},
     events::{
-        EventConfig, ClientDescription, launcher::Launcher, SendExiting, LlmpRestartingEventManager, SimpleRestartingEventManager},
+        launcher::Launcher, ClientDescription, EventConfig, LlmpRestartingEventManager, SendExiting,
+    },
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
-    monitors::{SimpleMonitor, MultiMonitor},
+    monitors::MultiMonitor,
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::{ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
@@ -134,11 +135,16 @@ pub fn fuzz() -> Result<(), Error> {
         .collect::<Result<Vec<PathBuf>, io::Error>>()
         .expect("Failed to read dir entry");
 
+    // To run parallelised, we work out number of files to process per core.
+    let num_files = files.len();
+    let num_cores = options.cores.ids.len();
+    let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
+
     // Create a shared memory region for sharing coverage map between fuzzer and target
     // In snapshot mode, this is only required for the SimpleRestartingEventManager.
     // However, fork mode requires it to share memory between parent and child,
     // so we use it in both cases.
-    let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+    let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     // Clear LD_LIBRARY_PATH
     env::remove_var("LD_LIBRARY_PATH");
@@ -149,8 +155,28 @@ pub fn fuzz() -> Result<(), Error> {
     let mut run_client = |state: Option<_>,
                           mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                           client_description: ClientDescription| {
-        
-        let mut edges_shmem = shmem_provider.clone().new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
+        let core_id = client_description.core_id();
+        let core_idx = options
+            .cores
+            .position(core_id)
+            .expect("Failed to get core index");
+
+        let files: Vec<PathBuf> = files
+            .iter()
+            .skip(files_per_core * core_idx)
+            .take(files_per_core)
+            .map(|x| x.clone())
+            .collect();
+
+        if files.is_empty() {
+            mgr.send_exiting()?;
+            Err(Error::ShuttingDown)?
+        }
+
+        let mut edges_shmem = shmem_provider
+            .clone()
+            .new_shmem(EDGES_MAP_DEFAULT_SIZE)
+            .unwrap();
         let edges = edges_shmem.as_slice_mut();
         unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
@@ -233,38 +259,6 @@ pub fn fuzz() -> Result<(), Error> {
 
                 match qemu.run() {
                     Ok(QemuExitReason::Breakpoint(_)) => {}
-                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                        process::exit(0)
-                    }
-                    Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                    _ => panic!("Unexpected QEMU exit."),
-                }
-            }
-
-            ExitKind::Ok
-        };
-        #[cfg(feature = "snapshot")]
-        let mut harness =|_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
-            let target = input.target_bytes();
-            let mut buf = target.as_slice();
-            let mut len = buf.len();
-            if len > MAX_INPUT_SIZE {
-                buf = &buf[0..MAX_INPUT_SIZE];
-                len = MAX_INPUT_SIZE;
-            }
-            let len = len as GuestReg;
-
-            unsafe {
-                qemu.write_mem(input_addr, buf).expect("qemu write failed.");
-
-                qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
-                qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
-                qemu.write_return_address(ret_addr).unwrap();
-                qemu.write_function_argument(0, input_addr).unwrap();
-                qemu.write_function_argument(1, len).unwrap();
-
-                match qemu.run() {
-                    Ok(QemuExitReason::Breakpoint(_)) => {}
                     Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
                         Signal::SigInterrupt,
                     ))) => process::exit(0),
@@ -275,6 +269,39 @@ pub fn fuzz() -> Result<(), Error> {
 
             ExitKind::Ok
         };
+        #[cfg(feature = "snapshot")]
+        let mut harness =
+            |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+                let target = input.target_bytes();
+                let mut buf = target.as_slice();
+                let mut len = buf.len();
+                if len > MAX_INPUT_SIZE {
+                    buf = &buf[0..MAX_INPUT_SIZE];
+                    len = MAX_INPUT_SIZE;
+                }
+                let len = len as GuestReg;
+
+                unsafe {
+                    qemu.write_mem(input_addr, buf).expect("qemu write failed.");
+
+                    qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
+                    qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
+                    qemu.write_return_address(ret_addr).unwrap();
+                    qemu.write_function_argument(0, input_addr).unwrap();
+                    qemu.write_function_argument(1, len).unwrap();
+
+                    match qemu.run() {
+                        Ok(QemuExitReason::Breakpoint(_)) => {}
+                        Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
+                            Signal::SigInterrupt,
+                        ))) => process::exit(0),
+                        Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
+                        _ => panic!("Unexpected QEMU exit."),
+                    }
+                }
+
+                ExitKind::Ok
+            };
 
         // Set up the most basic monitor possible.
         // let monitor = SimpleMonitor::with_user_monitor(|s| {
@@ -354,7 +381,12 @@ pub fn fuzz() -> Result<(), Error> {
         )?;
 
         // Load the input corpus
-        state.load_initial_inputs_by_filenames_forced(&mut fuzzer, &mut executor, &mut mgr, &files)?;
+        state.load_initial_inputs_by_filenames_forced(
+            &mut fuzzer,
+            &mut executor,
+            &mut mgr,
+            &files,
+        )?;
         log::info!("Processed {} inputs from disk.", files.len());
 
         // Iterate over initial corpus_ids and minimize each.
