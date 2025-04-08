@@ -34,6 +34,8 @@ guest = []
 hooks = []
 ## Enable support for shadow memory and tracking in the host
 host = ["dep:syscalls"]
+## Intialize all allocations with 0xff
+initialize = []
 ## Enable use of the `libc` library to support creation of mappings, read/write, logging etc (more OS agnostic)
 libc = ["dep:libc"]
 ## Enable the use of direct syscalls (supported by `rustix`) to interact with the operating system (Linux specific).

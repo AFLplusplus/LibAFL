@@ -1238,6 +1238,8 @@ impl QemuMemoryChunk {
 pub mod pybind {
     use pyo3::{exceptions::PyValueError, prelude::*};
 
+    #[cfg(feature = "usermode")]
+    pub use super::usermode::pybind::*;
     use super::{GuestAddr, GuestUsize};
 
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];

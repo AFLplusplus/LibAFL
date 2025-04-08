@@ -20,7 +20,7 @@ build_bin:
 
 [linux]
 [macos]
-test: fuzzer build_bin (test_single "arm") (test_single "arm64") (test_single "x86")
+test: fuzzer build_bin (test_single "arm") (test_single "arm64") (test_single "riscv64") (test_single "x86")
     echo "Done"
 
 test_single arch="arm":

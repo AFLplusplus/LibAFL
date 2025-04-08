@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
-    events::{Event, EventConfig, EventFirer, llmp::LlmpEventConverter},
+    events::{Event, EventConfig, EventFirer, EventWithStats, llmp::LlmpEventConverter},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor, HasObjective},
     inputs::{Input, InputConverter},
@@ -272,17 +272,19 @@ where
 
                 self.client.fire(
                     state,
-                    Event::NewTestcase {
-                        input,
-                        observers_buf: None,
-                        exit_kind: ExitKind::Ok,
-                        corpus_size: 0, // TODO choose if sending 0 or the actual real value
-                        client_config: EventConfig::AlwaysUnique,
-                        time: current_time(),
-                        forward_id: None,
-                        #[cfg(all(unix, feature = "multi_machine"))]
-                        node_id: None,
-                    },
+                    EventWithStats::with_current_time(
+                        Event::NewTestcase {
+                            input,
+                            observers_buf: None,
+                            exit_kind: ExitKind::Ok,
+                            corpus_size: 0, // TODO choose if sending 0 or the actual real value
+                            client_config: EventConfig::AlwaysUnique,
+                            forward_id: None,
+                            #[cfg(all(unix, feature = "multi_machine"))]
+                            node_id: None,
+                        },
+                        *state.executions(),
+                    ),
                 )?;
 
                 cur_id = state.corpus().next(id);

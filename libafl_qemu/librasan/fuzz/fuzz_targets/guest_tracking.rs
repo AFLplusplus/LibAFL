@@ -86,9 +86,7 @@ fuzz_target!(|data: Vec<GuestAddr>| {
         if overlaps {
             assert_eq!(
                 test_result,
-                Err(GuestTrackingError::TrackingConflict(
-                    start, len, test_start, test_len
-                ))
+                Err(GuestTrackingError::TrackingConflict(test_start, test_len))
             );
         } else {
             assert_eq!(test_result, Ok(()));

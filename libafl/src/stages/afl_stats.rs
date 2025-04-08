@@ -23,7 +23,7 @@ use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 use crate::{
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
-    events::{Event, EventFirer},
+    events::{Event, EventFirer, EventWithStats},
     executors::HasObservers,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
@@ -418,14 +418,17 @@ where
 
         manager.fire(
             state,
-            Event::UpdateUserStats {
-                name: Cow::Borrowed("AflStats"),
-                value: UserStats::new(
-                    UserStatsValue::String(Cow::Owned(json)),
-                    AggregatorOps::None,
-                ),
-                phantom: PhantomData,
-            },
+            EventWithStats::with_current_time(
+                Event::UpdateUserStats {
+                    name: Cow::Borrowed("AflStats"),
+                    value: UserStats::new(
+                        UserStatsValue::String(Cow::Owned(json)),
+                        AggregatorOps::None,
+                    ),
+                    phantom: PhantomData,
+                },
+                *state.executions(),
+            ),
         )?;
 
         Ok(())

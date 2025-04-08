@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::COMPRESS_THRESHOLD;
-use crate::events::{_LLMP_TAG_TO_MAIN, BrokerEventResult, Event};
+use crate::events::{_LLMP_TAG_TO_MAIN, BrokerEventResult, Event, EventWithStats};
 
 /// An LLMP-backed event manager for scalable multi-processed fuzzing
 pub struct CentralizedLlmpHook<I> {
@@ -47,7 +47,7 @@ where
             } else {
                 &*msg
             };
-            let event: Event<I> = postcard::from_bytes(event_bytes)?;
+            let event: EventWithStats<I> = postcard::from_bytes(event_bytes)?;
             match Self::handle_in_broker(client_id, &event)? {
                 BrokerEventResult::Forward => Ok(LlmpMsgHookResult::ForwardToClients),
                 BrokerEventResult::Handled => Ok(LlmpMsgHookResult::Handled),
@@ -85,9 +85,9 @@ impl<I> CentralizedLlmpHook<I> {
     #[expect(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         _client_id: ClientId,
-        event: &Event<I>,
+        event: &EventWithStats<I>,
     ) -> Result<BrokerEventResult, Error> {
-        match &event {
+        match event.event() {
             Event::NewTestcase { .. } | Event::Stop => Ok(BrokerEventResult::Forward),
             _ => Ok(BrokerEventResult::Handled),
         }

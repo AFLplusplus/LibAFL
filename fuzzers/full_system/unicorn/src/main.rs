@@ -36,7 +36,7 @@ use libafl_unicorn::{
 use unicorn_engine::{unicorn_const::MemType, HookType};
 use unicorn_engine::{
     unicorn_const::{Arch, SECOND_SCALE},
-    Mode, Permission, RegisterARM, RegisterARM64, RegisterX86, Unicorn,
+    Mode, Permission, RegisterARM, RegisterARM64, RegisterRISCV, RegisterX86, Unicorn,
 };
 
 pub const CODE_ADDRESS: u64 = 0x9000;
@@ -64,6 +64,7 @@ fn main() {
     let arch = match args[1].as_str() {
         "arm" => Arch::ARM,
         "arm64" => Arch::ARM64,
+        "riscv64" => Arch::RISCV,
         "x86" => Arch::X86,
         _ => {
             panic!("This arcghitecture is not supported")
@@ -86,6 +87,10 @@ pub fn init_registers(emu: &mut Unicorn<()>, sp: u64) {
             emu.reg_write(RegisterARM64::SP, sp)
                 .expect("Could not setup register");
         }
+        Arch::RISCV => {
+            emu.reg_write(RegisterRISCV::SP, sp)
+                .expect("Could not setup register");
+        }
         Arch::X86 => {
             emu.reg_write(RegisterX86::ESP, sp)
                 .expect("Could not setup register");
@@ -99,6 +104,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     let mode = match arch {
         Arch::ARM => Mode::ARM,
         Arch::ARM64 => Mode::ARM926,
+        Arch::RISCV => Mode::RISCV64,
         Arch::X86 => Mode::MODE_64,
         _ => Mode::MODE_64,
     };
@@ -112,6 +118,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
         match arch {
             Arch::ARM => "bin/foo_arm.bin",
             Arch::ARM64 => "bin/foo_arm64.bin",
+            Arch::RISCV => "bin/foo_riscv64.bin",
             Arch::X86 => "bin/foo_x86.bin",
             _ => "",
         },
@@ -191,6 +198,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
         match arch {
             Arch::ARM => emu.reg_write(RegisterARM::LR, RETURN_ADDRESS).unwrap(),
             Arch::ARM64 => emu.reg_write(RegisterARM64::LR, RETURN_ADDRESS).unwrap(),
+            Arch::RISCV => emu.reg_write(RegisterRISCV::RA, RETURN_ADDRESS).unwrap(),
             Arch::X86 => {
                 let bytes = u64::to_le_bytes(RETURN_ADDRESS);
 
@@ -213,6 +221,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
                 let result_value = match arch {
                     Arch::ARM => emu.reg_read(RegisterARM::R0).unwrap(),
                     Arch::ARM64 => emu.reg_read(RegisterARM64::W0).unwrap(),
+                    Arch::RISCV => emu.reg_read(RegisterRISCV::A0).unwrap(),
                     Arch::X86 => emu.reg_read(RegisterX86::EAX).unwrap(),
                     _ => 0,
                 };
