@@ -11,7 +11,7 @@ use core::{
 use libafl_bolts::simd::{covmap_is_interesting_stdsimd, std_covmap_is_interesting};
 use libafl_bolts::{
     AsIter, AsSlice, HasRefCnt, Named,
-    simd::{covmap_is_interesting_naive, covmap_is_interesting_u8x16, covmap_is_interesting_u32x4},
+    simd::{covmap_is_interesting_naive, covmap_is_interesting_u8x16, covmap_is_interesting_u8x32},
     tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 use num_traits::PrimInt;
@@ -667,7 +667,7 @@ impl<C, O> SimdMapFeedback<C, O> {
     fn dispatch_simd(&self) -> CoverageMapFunPtr {
         match self.simd {
             SimdImplmentation::WideU8x16 => covmap_is_interesting_u8x16,
-            SimdImplmentation::WideU8x32 => covmap_is_interesting_u32x4,
+            SimdImplmentation::WideU8x32 => covmap_is_interesting_u8x32,
             SimdImplmentation::Naive => covmap_is_interesting_naive,
             SimdImplmentation::StdSimdU8x16 => Self::dispatch_nightly(),
         }

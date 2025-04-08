@@ -227,11 +227,11 @@ pub fn covmap_is_interesting_u8x16(
     (interesting, novelties)
 }
 
-/// Coverage map insteresting implementation by u32x4. Slightly faster than nightly simd but slightly
+/// Coverage map insteresting implementation by u8x32. Slightly faster than nightly simd but slightly
 /// slower than u8x16 version.
 #[cfg(all(feature = "alloc", feature = "wide"))]
 #[must_use]
-pub fn covmap_is_interesting_u32x4(
+pub fn covmap_is_interesting_u8x32(
     hist: &[u8],
     map: &[u8],
     collect_novelties: bool,
