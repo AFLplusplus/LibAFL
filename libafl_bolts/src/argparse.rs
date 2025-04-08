@@ -11,7 +11,6 @@ use crate::{AflTargetArgs, Error, InputLocation};
 /// For creating an C-compatible argument
 #[derive(Debug)]
 pub struct CMainArgsBuilder {
-    use_stdin: bool,
     program: Option<OsString>,
     input_location: InputLocation,
     envs: Vec<(OsString, OsString)>,
@@ -64,7 +63,6 @@ impl CMainArgsBuilder {
     pub fn new() -> Self {
         Self {
             program: None,
-            use_stdin: false,
             input_location: InputLocation::StdIn,
             envs: Vec::new(),
             args: Vec::new(),
@@ -89,7 +87,7 @@ impl CMainArgsBuilder {
         argv_ptr.push(core::ptr::null());
 
         Ok(CMainArgs {
-            use_stdin: self.use_stdin,
+            use_stdin: self.use_stdin(),
             argv,
             argv_ptr,
         })
