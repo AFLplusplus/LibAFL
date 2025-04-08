@@ -120,8 +120,9 @@ where
                     (self.harness_fn)(&mut self.exposed_executor_state, input);
                     self.inner.post_run_target_child(fuzzer, state, mgr, input);
 
-                    // post_run_target_child should make the process quit.
-                    unreachable!();
+                    unreachable!(
+                        "post_run_target_child should make the process quit. This is a bug."
+                    );
                 }
                 Ok(ForkResult::Parent { child }) => {
                     // Parent
