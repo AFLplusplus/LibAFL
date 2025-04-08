@@ -4,7 +4,7 @@ use capstone::{
 };
 pub use libafl_targets::{EDGES_MAP, EDGES_MAP_PTR};
 use unicorn_engine::{
-    RegisterARM, RegisterARM64, RegisterX86, Unicorn,
+    RegisterARM, RegisterARM64, RegisterRISCV, RegisterX86, Unicorn,
     unicorn_const::{Arch, Permission},
 };
 
@@ -57,6 +57,14 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
             log::debug!("X2: {:X}", emu.reg_read(RegisterARM64::X2).unwrap());
             log::debug!("X3: {:X}", emu.reg_read(RegisterARM64::X3).unwrap());
         }
+        Arch::RISCV => {
+            log::debug!("SP: {:X}", emu.reg_read(RegisterRISCV::SP).unwrap());
+            log::debug!("RA: {:X}", emu.reg_read(RegisterRISCV::RA).unwrap());
+            log::debug!("GP: {:X}", emu.reg_read(RegisterRISCV::GP).unwrap());
+            log::debug!("TP: {:X}", emu.reg_read(RegisterRISCV::TP).unwrap());
+            log::debug!("A0: {:X}", emu.reg_read(RegisterRISCV::A0).unwrap());
+            log::debug!("A1: {:X}", emu.reg_read(RegisterRISCV::A1).unwrap());
+        }
         Arch::X86 => {
             log::debug!("ESP: {:X}", emu.reg_read(RegisterX86::ESP).unwrap());
             log::debug!("RAX: {:X}", emu.reg_read(RegisterX86::RAX).unwrap());
@@ -97,6 +105,12 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
                 Arch::ARM64 => Capstone::new()
                     .arm64()
                     .mode(arch::arm64::ArchMode::Arm)
+                    .detail(true)
+                    .build()
+                    .expect("Failed to create Capstone object"),
+                Arch::RISCV => Capstone::new()
+                    .riscv()
+                    .mode(arch::riscv::ArchMode::RiscV64)
                     .detail(true)
                     .build()
                     .expect("Failed to create Capstone object"),
