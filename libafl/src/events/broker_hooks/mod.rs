@@ -114,7 +114,6 @@ where
     }
 
     /// Handle arriving events in the broker
-    #[expect(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         monitor: &mut MT,
         client_stats_manager: &mut ClientStatsManager,
