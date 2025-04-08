@@ -1,6 +1,6 @@
 //! SIMD accelerated map feedback with stable Rust.
 
-use alloc::{vec::Vec, borrow::Cow};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
     ops::{Deref, DerefMut},
