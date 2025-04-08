@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
+#[cfg(feature = "introspection")]
+use crate::state::HasClientPerfMonitor;
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
     corpus::Testcase,
