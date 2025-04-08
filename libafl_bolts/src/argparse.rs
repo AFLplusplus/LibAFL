@@ -6,7 +6,7 @@ use core::{
 };
 use std::{ffi::OsString, os::unix::ffi::OsStrExt};
 
-use crate::{AflTargetArgs, Error, InputLocation};
+use crate::{TargetArgs, Error, InputLocation};
 
 /// For creating an C-compatible argument
 #[derive(Debug)]
@@ -17,7 +17,7 @@ pub struct CMainArgsBuilder {
     args: Vec<OsString>,
 }
 
-impl AflTargetArgs for CMainArgsBuilder {
+impl TargetArgs for CMainArgsBuilder {
     fn arguments_ref(&self) -> &Vec<OsString> {
         &self.args
     }

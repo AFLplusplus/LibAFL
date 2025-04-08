@@ -23,7 +23,7 @@ use std::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
-    AflTargetArgs, AsSlice, InputLocation,
+    TargetArgs, AsSlice, InputLocation,
     tuples::{Handle, MatchName, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
@@ -508,7 +508,7 @@ pub struct CommandExecutorBuilder {
     timeout: Duration,
 }
 
-impl AflTargetArgs for CommandExecutorBuilder {
+impl TargetArgs for CommandExecutorBuilder {
     fn arguments_ref(&self) -> &Vec<OsString> {
         &self.args
     }
@@ -781,7 +781,7 @@ fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::AflTargetArgs;
+    use libafl_bolts::TargetArgs;
 
     use crate::{
         events::SimpleEventManager,

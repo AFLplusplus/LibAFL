@@ -18,7 +18,7 @@ use std::{
 };
 
 use libafl_bolts::{
-    AflTargetArgs, AsSlice, AsSliceMut, InputLocation, Truncate,
+    TargetArgs, AsSlice, AsSliceMut, InputLocation, Truncate,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     ownedref::OwnedSlice,
@@ -793,7 +793,7 @@ pub struct ForkserverExecutorBuilder<'a, TC, SP> {
     target_bytes_converter: TC,
 }
 
-impl<TC, SP> AflTargetArgs for ForkserverExecutorBuilder<'_, TC, SP> {
+impl<TC, SP> TargetArgs for ForkserverExecutorBuilder<'_, TC, SP> {
     fn arguments_ref(&self) -> &Vec<OsString> {
         &self.arguments
     }
@@ -1489,7 +1489,7 @@ mod tests {
     use std::ffi::OsString;
 
     use libafl_bolts::{
-        AflTargetArgs, AsSliceMut,
+        TargetArgs, AsSliceMut,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::tuple_list,
     };

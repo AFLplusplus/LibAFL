@@ -25,7 +25,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider},
     tuples::tuple_list,
-    AflTargetArgs, AsSliceMut,
+    TargetArgs, AsSliceMut,
 };
 
 pub fn main() {

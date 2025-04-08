@@ -29,7 +29,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled},
-    AflTargetArgs, AsSliceMut, Truncate,
+    TargetArgs, AsSliceMut, Truncate,
 };
 use nix::sys::signal::Signal;
 
