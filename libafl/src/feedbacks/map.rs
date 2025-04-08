@@ -675,7 +675,6 @@ where
 }
 
 /// Specialize for the common coverage map size, maximization of u8s
-
 impl<C, O> MapFeedback<C, DifferentIsNovel, O, MaxReducer>
 where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
