@@ -1,6 +1,6 @@
 //! Monitors that log to disk using different formats like `JSON` and `TOML`.
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::time::Duration;
 use std::{
     fs::{File, OpenOptions},
@@ -57,14 +57,19 @@ exec_sec = {}
             )
             .expect("Failed to write to the Toml file");
 
-            for i in 0..(client_stats_manager.client_stats().len()) {
-                let client_id = ClientId(i as u32);
+            let all_clients: Vec<ClientId> = client_stats_manager
+                .client_stats()
+                .keys()
+                .copied()
+                .collect();
+
+            for client_id in &all_clients {
                 let exec_sec = client_stats_manager
-                    .update_client_stats_for(client_id, |client_stat| {
+                    .update_client_stats_for(*client_id, |client_stat| {
                         client_stat.execs_per_sec(cur_time)
                     })?;
 
-                let client = client_stats_manager.client_stats_for(client_id)?;
+                let client = client_stats_manager.client_stats_for(*client_id)?;
 
                 write!(
                     &mut file,
@@ -75,7 +80,7 @@ objectives = {}
 executions = {}
 exec_sec = {}
 ",
-                    i,
+                    client_id.0,
                     client.corpus_size(),
                     client.objective_size(),
                     client.executions(),
