@@ -39,7 +39,6 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
-  "tui_monitor",
 ]
 document-features = ["dep:document-features"]
 
