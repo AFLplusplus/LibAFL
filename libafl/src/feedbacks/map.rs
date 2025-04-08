@@ -670,6 +670,7 @@ impl<C, O> Named for SIMDMapFeedback<C, O> {
     }
 }
 
+// Delegate implementations to inner mapping except is_interesting
 impl<C, O, EM, I, OT, S> Feedback<EM, I, OT, S> for SIMDMapFeedback<C, O>
 where
     C: CanTrack + AsRef<O>,
@@ -692,6 +693,44 @@ where
             self.last_result = Some(res);
         }
         Ok(res)
+    }
+
+    #[cfg(feature = "introspection")]
+    fn is_interesting_introspection(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        S: HasClientPerfMonitor,
+    {
+        self.map
+            .is_interesting_introspection(state, manager, input, observers, exit_kind)
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        self.map.last_result()
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) -> Result<(), Error> {
+        self.map.append_hit_feedbacks(list)
+    }
+
+    #[inline]
+    fn append_metadata(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        observers: &OT,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
+        self.map
+            .append_metadata(state, manager, observers, testcase)
     }
 }
 
