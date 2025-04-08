@@ -1,5 +1,6 @@
 //! Module for SIMD assisted methods.
 
+#[cfg(feature = "std")]
 use alloc::{vec, vec::Vec};
 #[rustversion::nightly]
 use core::simd::cmp::SimdOrd;
@@ -13,7 +14,7 @@ pub fn simplify_map_naive(map: &mut [u8]) {
 
 /// `simplify_map` implementation by u8x16, worse performance compared to LLVM
 /// auto-vectorization buf faster if LLVM doesn't vectorize.
-#[cfg(feature = "wide")]
+#[cfg(all(feature = "std", feature = "wide"))]
 pub fn simplify_map_u8x16(map: &mut [u8]) {
     type VectorType = wide::u8x16;
     const N: usize = VectorType::LANES as usize;
@@ -40,7 +41,7 @@ pub fn simplify_map_u8x16(map: &mut [u8]) {
 
 /// `simplify_map` implementation by u64x4, achieving comparable performance with
 /// LLVM auto-vectorization.
-#[cfg(feature = "wide")]
+#[cfg(all(feature = "std", feature = "wide"))]
 pub fn simplify_map_u64x4(map: &mut [u8]) {
     type VectorType = wide::u64x4;
     const N: usize = 8 * VectorType::LANES as usize;
@@ -89,6 +90,7 @@ pub fn std_simplify_map(map: &mut [u8]) {
 }
 
 /// Coverage map insteresting implementation by nightly portable simd.
+#[cfg(feature = "std")]
 #[rustversion::nightly]
 #[must_use]
 pub fn covmap_is_interesting_stdsimd(
@@ -160,7 +162,7 @@ pub fn covmap_is_interesting_stdsimd(
 }
 
 /// Coverage map insteresting implementation by u8x16. Slightly faster than nightly simd.
-#[cfg(feature = "wide")]
+#[cfg(all(feature = "std", feature = "wide"))]
 #[must_use]
 pub fn covmap_is_interesting_u8x16(
     hist: &[u8],
@@ -234,7 +236,7 @@ pub fn covmap_is_interesting_u8x16(
 
 /// Coverage map insteresting implementation by u32x4. Slightly faster than nightly simd but slightly
 /// slower than u8x16 version.
-#[cfg(feature = "wide")]
+#[cfg(all(feature = "std", feature = "wide"))]
 #[must_use]
 pub fn covmap_is_interesting_u32x4(
     hist: &[u8],
