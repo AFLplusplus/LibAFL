@@ -242,7 +242,8 @@ pub fn covmap_is_interesting_u32x4(
         for step in 0..steps {
             let i = step * N;
             let buf: [u8; N] = hist[i..i + N].try_into().unwrap();
-            let history = VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
+            let history =
+                VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
             let buf: [u8; N] = map[i..i + N].try_into().unwrap();
             let items = VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
 
@@ -282,7 +283,8 @@ pub fn covmap_is_interesting_u32x4(
         for step in 0..steps {
             let i = step * N;
             let buf: [u8; N] = hist[i..i + N].try_into().unwrap();
-            let history = VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
+            let history =
+                VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
             let buf: [u8; N] = map[i..i + N].try_into().unwrap();
             let items = VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
 
