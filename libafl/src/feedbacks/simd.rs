@@ -16,6 +16,8 @@ use serde::{Serialize, de::DeserializeOwned};
 use super::{
     DifferentIsNovel, Feedback, HasObserverHandle, MapFeedback, MaxReducer, StateInitializer,
 };
+#[cfg(feature = "introspection")]
+use crate::state::HasClientPerfMonitor;
 use crate::{
     HasNamedMetadata,
     corpus::Testcase,
@@ -39,7 +41,7 @@ pub enum SimdImplmentation {
 }
 
 impl SimdImplmentation {
-    fn dispatch_simd(&self) -> CoverageMapFunPtr {
+    fn dispatch_simd(self) -> CoverageMapFunPtr {
         match self {
             SimdImplmentation::WideU8x16 => covmap_is_interesting_u8x16,
             SimdImplmentation::WideU8x32 => covmap_is_interesting_u8x32,
