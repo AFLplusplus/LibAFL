@@ -19,17 +19,19 @@ fn nightly() {
 fn nightly() {}
 
 fn main() {
-    assert_unique_feature!(
-        "covmap_naive",
-        "covmap_wide128",
-        "covmap_wide256",
-        "covmap_stdsimd"
-    );
-    assert_unique_feature!(
-        "simplify_map_naive",
-        "simplify_map_wide128",
-        "simplify_map_wide256"
-    );
+    if !std::env::var("DOCS_RS").is_ok() {
+        assert_unique_feature!(
+            "covmap_naive",
+            "covmap_wide128",
+            "covmap_wide256",
+            "covmap_stdsimd"
+        );
+        assert_unique_feature!(
+            "simplify_map_naive",
+            "simplify_map_wide128",
+            "simplify_map_wide256"
+        );
+    }
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rustc-check-cfg=cfg(nightly)");
