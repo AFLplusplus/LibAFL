@@ -8,10 +8,9 @@ use core::{
 };
 
 #[rustversion::nightly]
-use libafl_bolts::simd::{covmap_is_interesting_stdsimd, std_covmap_is_interesting};
+use libafl_bolts::simd::std_covmap_is_interesting;
 use libafl_bolts::{
     AsIter, AsSlice, HasRefCnt, Named,
-    simd::{covmap_is_interesting_naive, covmap_is_interesting_u8x16, covmap_is_interesting_u8x32},
     tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 use num_traits::PrimInt;
@@ -605,244 +604,8 @@ where
     }
 }
 
-/// The coverage map SIMD acceleration to use.
-/// Benchmark is available at <https://github.com/wtdcode/libafl_simd_bench>
-#[derive(Debug, Clone, Default)]
-pub enum SimdImplmentation {
-    /// The u8x16 implementation from wide, usually the fastest
-    #[default]
-    WideU8x16,
-    /// The u8x32 implementation from wide, slightly slower than u8x16 (~1%)
-    WideU8x32,
-    /// The `std::simd` u8x16 implementation, slightly slower (~10%)
-    StdSimdU8x16,
-    /// Naive implementation, reference only
-    Naive,
-}
-
-type CoverageMapFunPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
-
-/// Stable Rust wrapper for SIMD accelerated map feedback. Unfortunately, we have to
-/// keep this until specialization is stablized (not yet since 2016).
-#[derive(Debug, Clone)]
-pub struct SimdMapFeedback<C, O> {
-    map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
-    simd: SimdImplmentation,
-}
-
-impl<C, O> SimdMapFeedback<C, O> {
-    /// Wraps an existing map and enable SIMD acceleration
-    #[must_use]
-    #[rustversion::not(nightly)]
-    pub fn new(
-        map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
-        simd: SimdImplmentation,
-    ) -> Self {
-        if matches!(simd, SimdImplmentation::StdSimdU8x16) {
-            panic!("std::simd is only available on nightly!")
-        }
-        Self { map, simd }
-    }
-
-    /// Wraps an existing map and enable SIMD acceleration (nightly version)
-    #[must_use]
-    #[rustversion::nightly]
-    pub fn new(
-        map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
-        simd: SimdImplmentation,
-    ) -> Self {
-        Self { map, simd }
-    }
-
-    #[rustversion::not(nightly)]
-    fn dispatch_nightly() -> CoverageMapFunPtr {
-        panic!("unreachable");
-    }
-
-    #[rustversion::nightly]
-    fn dispatch_nightly() -> CoverageMapFunPtr {
-        covmap_is_interesting_stdsimd
-    }
-
-    fn dispatch_simd(&self) -> CoverageMapFunPtr {
-        match self.simd {
-            SimdImplmentation::WideU8x16 => covmap_is_interesting_u8x16,
-            SimdImplmentation::WideU8x32 => covmap_is_interesting_u8x32,
-            SimdImplmentation::Naive => covmap_is_interesting_naive,
-            SimdImplmentation::StdSimdU8x16 => Self::dispatch_nightly(),
-        }
-    }
-}
-
-impl<C, O> Deref for SimdMapFeedback<C, O> {
-    type Target = MapFeedback<C, DifferentIsNovel, O, MaxReducer>;
-    fn deref(&self) -> &Self::Target {
-        &self.map
-    }
-}
-
-impl<C, O> DerefMut for SimdMapFeedback<C, O> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.map
-    }
-}
-
-impl<C, O, S> StateInitializer<S> for SimdMapFeedback<C, O>
-where
-    O: MapObserver,
-    O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
-    S: HasNamedMetadata,
-{
-    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        self.map.init_state(state)
-    }
-}
-
-impl<C, O> HasObserverHandle for SimdMapFeedback<C, O> {
-    type Observer = C;
-
-    #[inline]
-    fn observer_handle(&self) -> &Handle<C> {
-        &self.map.map_ref
-    }
-}
-
-impl<C, O> Named for SimdMapFeedback<C, O> {
-    #[inline]
-    fn name(&self) -> &Cow<'static, str> {
-        &self.map.name
-    }
-}
-
-// Delegate implementations to inner mapping except is_interesting
-impl<C, O, EM, I, OT, S> Feedback<EM, I, OT, S> for SimdMapFeedback<C, O>
-where
-    C: CanTrack + AsRef<O>,
-    EM: EventFirer<I, S>,
-    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
-    OT: MatchName,
-    S: HasNamedMetadata + HasExecutions,
-{
-    fn is_interesting(
-        &mut self,
-        state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error> {
-        let res = self
-            .map
-            .is_interesting_u8_simd_optimized(state, observers, self.dispatch_simd());
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(res);
-        }
-        Ok(res)
-    }
-
-    #[cfg(feature = "introspection")]
-    fn is_interesting_introspection(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: &I,
-        observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        S: HasClientPerfMonitor,
-    {
-        self.map
-            .is_interesting_introspection(state, manager, input, observers, exit_kind)
-    }
-
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Result<bool, Error> {
-        // cargo +nightly doc asks so
-        <MapFeedback<C, DifferentIsNovel, O, MaxReducer> as Feedback<EM, I, OT, S>>::last_result(
-            &self.map,
-        )
-    }
-
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) -> Result<(), Error> {
-        // cargo +nightly doc asks so
-        <MapFeedback<C, DifferentIsNovel, O, MaxReducer> as Feedback<EM, I, OT, S>>::append_hit_feedbacks(&self.map, list)
-    }
-
-    #[inline]
-    fn append_metadata(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        observers: &OT,
-        testcase: &mut Testcase<I>,
-    ) -> Result<(), Error> {
-        self.map
-            .append_metadata(state, manager, observers, testcase)
-    }
-}
-
-/// Specialize for the common coverage map size, maximization of u8s
-impl<C, O> MapFeedback<C, DifferentIsNovel, O, MaxReducer>
-where
-    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
-    C: CanTrack + AsRef<O>,
-{
-    fn is_interesting_u8_simd_optimized<S, OT, F>(
-        &mut self,
-        state: &mut S,
-        observers: &OT,
-        simd: F,
-    ) -> bool
-    where
-        S: HasNamedMetadata,
-        OT: MatchName,
-        F: FnOnce(&[u8], &[u8], bool) -> (bool, Vec<usize>),
-    {
-        // TODO Replace with match_name_type when stable
-        let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
-
-        let map_state = state
-            .named_metadata_map_mut()
-            .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
-            .unwrap();
-        let size = observer.usable_count();
-        let len = observer.len();
-        if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, u8::default());
-        }
-
-        let map = observer.as_slice();
-        debug_assert!(map.len() >= size);
-
-        let history_map = map_state.history_map.as_slice();
-
-        // Non vector implementation for reference
-        /*for (i, history) in history_map.iter_mut().enumerate() {
-            let item = map[i];
-            let reduced = MaxReducer::reduce(*history, item);
-            if DifferentIsNovel::is_novel(*history, reduced) {
-                *history = reduced;
-                interesting = true;
-                if self.novelties.is_some() {
-                    self.novelties.as_mut().unwrap().push(i);
-                }
-            }
-        }*/
-
-        let (interesting, novelties) = simd(history_map, &map, self.novelties.is_some());
-        if let Some(nov) = self.novelties.as_mut() {
-            *nov = novelties;
-        }
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(interesting);
-        }
-        interesting
-    }
-}
+/// Coverage map computing function type
+pub(crate) type CoverageMapFunPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
 
 impl<C, N, O, R> HasObserverHandle for MapFeedback<C, N, O, R> {
     type Observer = C;
@@ -914,6 +677,66 @@ where
             }
         }
 
+        interesting
+    }
+}
+
+/// Specialize for the common coverage map size, maximization of u8s
+impl<C, O> MapFeedback<C, DifferentIsNovel, O, MaxReducer>
+where
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
+    C: CanTrack + AsRef<O>,
+{
+    pub(crate) fn is_interesting_u8_simd_optimized<S, OT, F>(
+        &mut self,
+        state: &mut S,
+        observers: &OT,
+        simd: F,
+    ) -> bool
+    where
+        S: HasNamedMetadata,
+        OT: MatchName,
+        F: FnOnce(&[u8], &[u8], bool) -> (bool, Vec<usize>),
+    {
+        // TODO Replace with match_name_type when stable
+        let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
+
+        let map_state = state
+            .named_metadata_map_mut()
+            .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
+            .unwrap();
+        let size = observer.usable_count();
+        let len = observer.len();
+        if map_state.history_map.len() < len {
+            map_state.history_map.resize(len, u8::default());
+        }
+
+        let map = observer.as_slice();
+        debug_assert!(map.len() >= size);
+
+        let history_map = map_state.history_map.as_slice();
+
+        // Non vector implementation for reference
+        /*for (i, history) in history_map.iter_mut().enumerate() {
+            let item = map[i];
+            let reduced = MaxReducer::reduce(*history, item);
+            if DifferentIsNovel::is_novel(*history, reduced) {
+                *history = reduced;
+                interesting = true;
+                if self.novelties.is_some() {
+                    self.novelties.as_mut().unwrap().push(i);
+                }
+            }
+        }*/
+
+        let (interesting, novelties) = simd(history_map, &map, self.novelties.is_some());
+        if let Some(nov) = self.novelties.as_mut() {
+            *nov = novelties;
+        }
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(interesting);
+        }
         interesting
     }
 }
