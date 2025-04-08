@@ -82,78 +82,6 @@ pub fn std_simplify_map(map: &mut [u8]) {
     simplify_map_u8x32(map);
 }
 
-/// Coverage map insteresting implementation by nightly portable simd.
-#[cfg(feature = "alloc")]
-#[rustversion::nightly]
-#[must_use]
-pub fn covmap_is_interesting_stdsimd(
-    hist: &[u8],
-    map: &[u8],
-    collect_novelties: bool,
-) -> (bool, Vec<usize>) {
-    type VectorType = core::simd::u8x16;
-    let mut novelties = vec![];
-    let mut interesting = false;
-    let size = map.len();
-    let steps = size / VectorType::LEN;
-    let left = size % VectorType::LEN;
-
-    if collect_novelties {
-        for step in 0..steps {
-            let i = step * VectorType::LEN;
-            let history = VectorType::from_slice(&hist[i..]);
-            let items = VectorType::from_slice(&map[i..]);
-
-            if items.simd_max(history) != history {
-                interesting = true;
-                unsafe {
-                    for j in i..(i + VectorType::LEN) {
-                        let item = *map.get_unchecked(j);
-                        if item > *hist.get_unchecked(j) {
-                            novelties.push(j);
-                        }
-                    }
-                }
-            }
-        }
-
-        for j in (size - left)..size {
-            unsafe {
-                let item = *map.get_unchecked(j);
-                if item > *hist.get_unchecked(j) {
-                    interesting = true;
-                    novelties.push(j);
-                }
-            }
-        }
-    } else {
-        for step in 0..steps {
-            let i = step * VectorType::LEN;
-            let history = VectorType::from_slice(&hist[i..]);
-            let items = VectorType::from_slice(&map[i..]);
-
-            if items.simd_max(history) != history {
-                interesting = true;
-                break;
-            }
-        }
-
-        if !interesting {
-            for j in (size - left)..size {
-                unsafe {
-                    let item = *map.get_unchecked(j);
-                    if item > *hist.get_unchecked(j) {
-                        interesting = true;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    (interesting, novelties)
-}
-
 /// Coverage map insteresting implementation by u8x16. Slightly faster than nightly simd.
 #[cfg(all(feature = "alloc", feature = "wide"))]
 #[must_use]
@@ -348,7 +276,6 @@ pub fn covmap_is_interesting_naive(
 #[cfg(feature = "alloc")]
 #[allow(unused_variables)] // or we fail cargo doc
 #[must_use]
-#[rustversion::not(nightly)]
 pub fn std_covmap_is_interesting(
     hist: &[u8],
     map: &[u8],
@@ -358,27 +285,14 @@ pub fn std_covmap_is_interesting(
     let ret = covmap_is_interesting_naive(hist, map, collect_novelties);
 
     #[cfg(feature = "wide")]
-    let ret = covmap_is_interesting_u8x16(hist, map, collect_novelties);
+    {
+        // Supported by benchmark:
+        // - on aarch64, u8x32 is 15% faster than u8x16
+        // - on amd64, u8x16 is 10% faster compared to the u8x32
+        #[cfg(target_arch = "aarch64")]
+        return covmap_is_interesting_u8x32(hist, map, collect_novelties);
 
-    ret
-}
-
-/// Standard coverage map instereting implementation on nightly. Use the available fastest implementation
-/// by default.
-#[cfg(feature = "alloc")]
-#[allow(unused_variables)] // or we fail cargo doc
-#[must_use]
-#[rustversion::nightly]
-pub fn std_covmap_is_interesting(
-    hist: &[u8],
-    map: &[u8],
-    collect_novelties: bool,
-) -> (bool, Vec<usize>) {
-    #[cfg(not(feature = "wide"))]
-    let ret = covmap_is_interesting_stdsimd(hist, map, collect_novelties);
-
-    #[cfg(feature = "wide")]
-    let ret = covmap_is_interesting_u8x16(hist, map, collect_novelties);
-
-    ret
+        #[cfg(not(target_arch = "aarch64"))]
+        return covmap_is_interesting_u8x16(hist, map, collect_novelties);
+    }
 }

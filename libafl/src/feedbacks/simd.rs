@@ -8,7 +8,10 @@ use core::{
 
 use libafl_bolts::{
     AsIter, AsSlice, Error, Named,
-    simd::{covmap_is_interesting_naive, covmap_is_interesting_u8x16, covmap_is_interesting_u8x32},
+    simd::{
+        covmap_is_interesting_naive, covmap_is_interesting_u8x16, covmap_is_interesting_u8x32,
+        std_covmap_is_interesting,
+    },
     tuples::{Handle, MatchName},
 };
 use serde::{Serialize, de::DeserializeOwned};
@@ -50,6 +53,8 @@ impl SimdImplmentation {
     }
 }
 
+type CoverageMapFunPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
+
 /// Stable Rust wrapper for SIMD accelerated map feedback. Unfortunately, we have to
 /// keep this until specialization is stablized (not yet since 2016).
 #[derive(Debug, Clone)]
@@ -58,12 +63,21 @@ pub struct SimdMapFeedback<C, O> {
     simd: CoverageMapFunPtr,
 }
 
-type CoverageMapFunPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
-
 impl<C, O> SimdMapFeedback<C, O> {
-    /// Wraps an existing map and enable SIMD acceleration
+    /// Wraps an existing map and enable SIMD acceleration. This will use standard SIMD
+    /// implementation, which might vary based on target architecture according to our
+    /// benchmark.
     #[must_use]
-    pub fn new(
+    pub fn new(map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>) -> Self {
+        Self {
+            map,
+            simd: std_covmap_is_interesting,
+        }
+    }
+
+    /// Wraps an existing map and enable SIMD acceleration according to arguments.
+    #[must_use]
+    pub fn with_simd(
         map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
         simd: SimdImplmentation,
     ) -> Self {
