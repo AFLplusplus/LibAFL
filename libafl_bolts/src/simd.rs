@@ -1,7 +1,9 @@
 //! Module for SIMD assisted methods.
 
+#[cfg(feature = "alloc")]
 use alloc::{vec, vec::Vec};
 #[rustversion::nightly]
+#[cfg(feature = "alloc")]
 use core::simd::cmp::SimdOrd;
 
 /// `simplify_map` naive implementaion. In most cases, this can be auto-vectorized.
@@ -89,6 +91,7 @@ pub fn std_simplify_map(map: &mut [u8]) {
 }
 
 /// Coverage map insteresting implementation by nightly portable simd.
+#[cfg(feature = "alloc")]
 #[rustversion::nightly]
 #[must_use]
 pub fn covmap_is_interesting_stdsimd(
@@ -160,7 +163,7 @@ pub fn covmap_is_interesting_stdsimd(
 }
 
 /// Coverage map insteresting implementation by u8x16. Slightly faster than nightly simd.
-#[cfg(feature = "wide")]
+#[cfg(all(feature = "alloc", feature = "wide"))]
 #[must_use]
 pub fn covmap_is_interesting_u8x16(
     hist: &[u8],
@@ -234,7 +237,7 @@ pub fn covmap_is_interesting_u8x16(
 
 /// Coverage map insteresting implementation by u32x4. Slightly faster than nightly simd but slightly
 /// slower than u8x16 version.
-#[cfg(feature = "wide")]
+#[cfg(all(feature = "alloc", feature = "wide"))]
 #[must_use]
 pub fn covmap_is_interesting_u32x4(
     hist: &[u8],
@@ -322,6 +325,7 @@ pub fn covmap_is_interesting_u32x4(
 }
 
 /// Coverage map insteresting naive implementation. Do not use it unless you have strong reasons to do.
+#[cfg(feature = "alloc")]
 #[must_use]
 pub fn covmap_is_interesting_naive(
     hist: &[u8],
@@ -355,6 +359,7 @@ pub fn covmap_is_interesting_naive(
 }
 
 /// Standard coverage map instereting implementation. Use the fastest implementation by default.
+#[cfg(feature = "alloc")]
 #[must_use]
 pub fn std_covmap_is_interesting(
     hist: &[u8],
