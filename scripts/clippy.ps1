@@ -17,7 +17,7 @@ function Run-Clippy {
     
     try {
         $env:RUST_BACKTRACE = "full"
-        DOCS_RS=1 cargo +nightly clippy --all-features --no-deps --tests --examples --benches -- -Z macro-backtrace
+        cargo +nightly clippy --all-features --no-deps --tests --examples --benches -- -Z macro-backtrace
 
         # Exit unsuccessfully on clippy error
         if (!$?) {

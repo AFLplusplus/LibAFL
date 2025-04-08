@@ -82,7 +82,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Build Docs
-        run: DOCS_RS=1 RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
+        run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
 
   ubuntu-doc-test:
     runs-on: ubuntu-24.04
@@ -92,7 +92,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Test Docs
-        run: DOCS_RS=1 RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
+        run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
