@@ -126,6 +126,12 @@ stable_simd = ["alloc", "wide"]
 [build-dependencies]
 rustversion = { workspace = true }
 
+[dev-dependencies]
+clap = { version = "4.5", features = ["derive", "env"] }
+rand = "0.9.0"
+chrono = "0.4.40"
+itertools = "0.14.0"
+
 [dependencies]
 libafl_derive = { workspace = true, default-features = true, optional = true }
 static_assertions = { workspace = true }
@@ -222,3 +228,11 @@ mach = "0.3.2"
 name = "llmp_test"
 path = "./examples/llmp_test/main.rs"
 required-features = ["std"]
+
+
+[[example]]
+name = "simd"
+path = "./examples/simd/simd.rs"
+bench = true
+harness = false
+required-features = ["std", "stable_simd"]
