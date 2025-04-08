@@ -67,12 +67,8 @@ impl TuiUi {
         }
     }
 
-    //pub fn on_up(&mut self) {}
-
-    //pub fn on_down(&mut self) {}
-
     pub fn on_right(&mut self) {
-        if self.client_idx < self.client_idx - 1 {
+        if self.clients > 0 && self.client_idx < self.clients - 1 {
             self.client_idx += 1;
         }
     }
@@ -238,7 +234,7 @@ impl TuiUi {
     fn draw_client_ui(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect) {
         let client_block = Block::default()
             .title(Span::styled(
-                format!("client #{} (l/r arrows to switch)", self.client_idx),
+                format!("client #{} (←/→ arrows to switch)", self.client_idx),
                 Style::default()
                     .fg(Color::LightCyan)
                     .add_modifier(Modifier::BOLD),
