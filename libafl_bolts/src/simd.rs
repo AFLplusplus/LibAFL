@@ -77,6 +77,7 @@ pub fn std_simplify_map(map: &mut [u8]) {
     simplify_map_u64x4(map);
 }
 
+/// Coverage map insteresting implementation by nightly portable simd.
 #[rustversion::nightly]
 #[must_use]
 pub fn covmap_is_interesting_nightly(
