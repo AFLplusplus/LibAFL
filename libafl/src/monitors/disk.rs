@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
 };
 
-use libafl_bolts::{ClientId, current_time};
+use libafl_bolts::{ClientId, Error, current_time};
 use serde_json::json;
 
 use crate::monitors::{Monitor, stats::ClientStatsManager};
@@ -27,7 +27,7 @@ impl Monitor for OnDiskTomlMonitor {
         client_stats_manager: &mut ClientStatsManager,
         _event_msg: &str,
         _sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         let cur_time = current_time();
 
         if cur_time - self.last_update >= self.update_interval {
@@ -62,9 +62,9 @@ exec_sec = {}
                 let exec_sec = client_stats_manager
                     .update_client_stats_for(client_id, |client_stat| {
                         client_stat.execs_per_sec(cur_time)
-                    });
+                    })?;
 
-                let client = client_stats_manager.client_stats_for(client_id);
+                let client = client_stats_manager.client_stats_for(client_id)?;
 
                 write!(
                     &mut file,
@@ -96,6 +96,7 @@ exec_sec = {}
 
             drop(file);
         }
+        Ok(())
     }
 }
 
@@ -170,7 +171,7 @@ where
         client_stats_manager: &mut ClientStatsManager,
         _event_msg: &str,
         _sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         if (self.log_record)(client_stats_manager) {
             let file = OpenOptions::new()
                 .append(true)
@@ -190,5 +191,6 @@ where
             });
             writeln!(&file, "{line}").expect("Unable to write Json to file");
         }
+        Ok(())
     }
 }

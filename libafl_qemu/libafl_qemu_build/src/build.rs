@@ -1,8 +1,8 @@
+use core::str::FromStr;
 use std::{
     env, fs,
     path::{Path, PathBuf},
     process::Command,
-    str::FromStr,
 };
 
 use which::which;

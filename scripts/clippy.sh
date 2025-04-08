@@ -23,6 +23,7 @@ run_clippy() {
 # Define projects based on the operating system
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
    ALL_PROJECTS=(
+      "libafl"
       "libafl_bolts"
       "libafl_cc"
       "libafl_concolic/symcc_runtime"
@@ -52,9 +53,6 @@ else
    IFS=',' read -ra PROJECTS <<<"$1"
 fi
 
-# First run it on all
-eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"
-
 # Loop through each project and run Clippy
 for project in "${PROJECTS[@]}"; do
    # Trim leading and trailing whitespace
@@ -71,3 +69,6 @@ for project in "${PROJECTS[@]}"; do
 done
 
 echo "Clippy run completed for all specified projects."
+
+# Last run it on all
+eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"
