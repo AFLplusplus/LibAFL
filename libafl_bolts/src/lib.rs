@@ -113,9 +113,14 @@ pub mod subrange;
 pub mod tuples;
 
 #[cfg(all(feature = "std", unix))]
-pub mod cargs;
+pub mod argparse;
 #[cfg(all(feature = "std", unix))]
-pub use cargs::*;
+pub use argparse::*;
+
+#[cfg(all(feature = "std", unix))]
+pub mod target_args;
+#[cfg(all(feature = "std", unix))]
+pub use target_args::*;
 
 pub mod simd;
 

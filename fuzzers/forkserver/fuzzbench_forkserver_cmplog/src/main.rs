@@ -37,7 +37,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut,
+    AsSliceMut, TargetArgs,
 };
 use libafl_targets::{
     cmps::{observers::AFLppCmpLogObserver, stages::AFLppCmplogTracingStage},
