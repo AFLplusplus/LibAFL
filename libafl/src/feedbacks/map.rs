@@ -603,8 +603,8 @@ where
     }
 }
 
-/// Stable Rust wrapper for SIMD map feedback. Unfortunately, we have to keep this
-/// until specialization is stablized (not yet since 2016).
+/// Stable Rust wrapper for SIMD accelerated map feedback. Unfortunately, we have to
+/// keep this until specialization is stablized (not yet since 2016).
 #[derive(Debug, Clone)]
 pub struct SIMDMapFeedback<C, O> {
     map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
