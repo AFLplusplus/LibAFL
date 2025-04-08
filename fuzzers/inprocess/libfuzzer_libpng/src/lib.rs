@@ -95,10 +95,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let map_feedback = SimdMapFeedback::new(
-        MaxMapFeedback::new(&edges_observer),
-        SimdImplmentation::default(),
-    );
+    let map_feedback = SimdMapFeedback::new(MaxMapFeedback::new(&edges_observer));
     let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
