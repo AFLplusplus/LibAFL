@@ -279,7 +279,7 @@ pub fn std_covmap_is_interesting(
     collect_novelties: bool,
 ) -> (bool, Vec<usize>) {
     #[cfg(not(feature = "wide"))]
-    let ret = covmap_is_interesting_naive(hist, map, collect_novelties);
+    return covmap_is_interesting_naive(hist, map, collect_novelties);
 
     #[cfg(feature = "wide")]
     {
