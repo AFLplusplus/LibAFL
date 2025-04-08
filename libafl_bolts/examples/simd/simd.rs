@@ -1,3 +1,5 @@
+#![allow(clippy::all)] // We don't need beautiful code for benchmarks =)
+
 use chrono::Utc;
 use clap::Parser;
 use itertools::Itertools;
