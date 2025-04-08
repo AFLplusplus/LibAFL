@@ -15,8 +15,8 @@ pub fn simplify_map_naive(map: &mut [u8]) {
 /// auto-vectorization buf faster if LLVM doesn't vectorize.
 pub fn simplify_map_u8x16(map: &mut [u8]) {
     type VectorType = wide::u8x16;
-    let size = map.len();
     const N: usize = VectorType::LANES as usize;
+    let size = map.len();
     let steps = size / N;
     let left = size % N;
     let lhs = VectorType::new([0x1; N]);
@@ -31,6 +31,7 @@ pub fn simplify_map_u8x16(map: &mut [u8]) {
         map[i..i + N].copy_from_slice(out.as_array_ref());
     }
 
+    #[allow(clippy::needless_range_loop)]
     for j in (size - left)..size {
         map[j] = if map[j] == 0 { 0x1 } else { 0x80 }
     }
@@ -40,8 +41,8 @@ pub fn simplify_map_u8x16(map: &mut [u8]) {
 /// LLVM auto-vectorization.
 pub fn simplify_map_u64x4(map: &mut [u8]) {
     type VectorType = wide::u64x4;
-    let size = map.len();
     const N: usize = 8 * VectorType::LANES as usize;
+    let size = map.len();
     let steps = size / N;
     let left = size % N;
     let lhs = VectorType::new([0x01010101010101; 4]);
@@ -60,6 +61,7 @@ pub fn simplify_map_u64x4(map: &mut [u8]) {
         }
     }
 
+    #[allow(clippy::needless_range_loop)]
     for j in (size - left)..size {
         map[j] = if map[j] == 0 { 0x1 } else { 0x80 }
     }
@@ -229,9 +231,9 @@ pub fn covmap_is_interesting_u32x4(
     collect_novelties: bool,
 ) -> (bool, Vec<usize>) {
     type VectorType = wide::u32x4;
+    const N: usize = 4 * VectorType::LANES as usize;
     let mut novelties = vec![];
     let mut interesting = false;
-    const N: usize = 4 * VectorType::LANES as usize;
     let size = map.len();
     let steps = size / N;
     let left = size % N;
@@ -240,9 +242,9 @@ pub fn covmap_is_interesting_u32x4(
         for step in 0..steps {
             let i = step * N;
             let buf: [u8; N] = hist[i..i + N].try_into().unwrap();
-            let history = VectorType::new(unsafe { core::mem::transmute(buf) });
+            let history = VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
             let buf: [u8; N] = map[i..i + N].try_into().unwrap();
-            let items = VectorType::new(unsafe { core::mem::transmute(buf) });
+            let items = VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
 
             if items.max(history) != history {
                 interesting = true;
@@ -280,9 +282,9 @@ pub fn covmap_is_interesting_u32x4(
         for step in 0..steps {
             let i = step * N;
             let buf: [u8; N] = hist[i..i + N].try_into().unwrap();
-            let history = VectorType::new(unsafe { core::mem::transmute(buf) });
+            let history = VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
             let buf: [u8; N] = map[i..i + N].try_into().unwrap();
-            let items = VectorType::new(unsafe { core::mem::transmute(buf) });
+            let items = VectorType::new(unsafe { core::mem::transmute::<[u8; 16], [u32; 4]>(buf) });
 
             if items.max(history) != history {
                 interesting = true;
