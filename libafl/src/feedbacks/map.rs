@@ -1,9 +1,6 @@
 //! Map feedback, maximizing or minimizing maps, for example the afl-style map observer.
 
-use alloc::{
-    borrow::Cow,
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
     marker::PhantomData,
