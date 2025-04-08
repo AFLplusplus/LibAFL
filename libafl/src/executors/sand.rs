@@ -8,7 +8,9 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use libafl_bolts::{
-    hash_std, simd::std_simplify_map, tuples::{Handle, MatchName, MatchNameRef}, AsIter, Error, Named
+    AsIter, Error, Named, hash_std,
+    simd::std_simplify_map,
+    tuples::{Handle, MatchName, MatchNameRef},
 };
 
 use super::{Executor, ExecutorsTuple, ExitKind, HasObservers, HasTimeout};
