@@ -71,15 +71,21 @@ pub fn simplify_map_u64x4(map: &mut [u8]) {
 
 /// The std implementation of `simplify_map`. Use the fastest implementation by benchamrk by default.
 pub fn std_simplify_map(map: &mut [u8]) {
-    if cfg!(feature = "simplify_map_naive") {
-        simplify_map_naive(map);
-    } else if cfg!(feature = "simplify_map_wide128") {
-        simplify_map_u8x16(map);
-    } else if cfg!(feature = "simplify_map_wide256") {
-        simplify_map_u64x4(map);
-    } else {
-        simplify_map_naive(map);
-    }
+    #[cfg(feature = "simplify_map_naive")]
+    simplify_map_naive(map);
+
+    #[cfg(feature = "simplify_map_wide128")]
+    simplify_map_u8x16(map);
+
+    #[cfg(feature = "simplify_map_wide256")]
+    simplify_map_u64x4(map);
+
+    #[cfg(not(any(
+        feature = "simplify_map_naive",
+        feature = "simplify_map_wide128",
+        feature = "simplify_map_wide256"
+    )))]
+    simplify_map_naive(map);
 }
 
 /// Coverage map insteresting implementation by nightly portable simd.
@@ -355,20 +361,25 @@ pub fn std_covmap_is_interesting(
     map: &[u8],
     collect_novelties: bool,
 ) -> (bool, Vec<usize>) {
-    if cfg!(feature = "covmap_naive") {
-        covmap_is_interesting_naive(hist, map, collect_novelties)
-    } else if cfg!(feature = "covmap_wide128") {
-        covmap_is_interesting_u8x16(hist, map, collect_novelties)
-    } else if cfg!(feature = "covmap_wide256") {
-        covmap_is_interesting_u32x4(hist, map, collect_novelties)
-    } else {
-        // Can't use cfg! or stable won't compile
-        #[cfg(feature = "covmap_stdsimd")]
-        let ret = covmap_is_interesting_stdsimd(hist, map, collect_novelties);
+    #[cfg(feature = "covmap_naive")]
+    let ret = covmap_is_interesting_naive(hist, map, collect_novelties);
 
-        #[cfg(not(feature = "covmap_stdsimd"))]
-        let ret = covmap_is_interesting_naive(hist, map, collect_novelties);
+    #[cfg(feature = "covmap_wide128")]
+    let ret = covmap_is_interesting_u8x16(hist, map, collect_novelties);
 
-        ret
-    }
+    #[cfg(feature = "covmap_wide256")]
+    let ret = covmap_is_interesting_u32x4(hist, map, collect_novelties);
+
+    #[cfg(feature = "covmap_stdsimd")]
+    let ret = covmap_is_interesting_stdsimd(hist, map, collect_novelties);
+
+    #[cfg(not(any(
+        feature = "covmap_naive",
+        feature = "covmap_wide128",
+        feature = "covmap_wide256",
+        feature = "covmap_stdsimd"
+    )))]
+    let ret = covmap_is_interesting_naive(hist, map, collect_novelties);
+
+    ret
 }
