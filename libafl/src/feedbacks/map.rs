@@ -606,11 +606,11 @@ where
 /// Stable Rust wrapper for SIMD accelerated map feedback. Unfortunately, we have to
 /// keep this until specialization is stablized (not yet since 2016).
 #[derive(Debug, Clone)]
-pub struct SIMDMapFeedback<C, O> {
+pub struct SimdMapFeedback<C, O> {
     map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>,
 }
 
-impl<C, O> SIMDMapFeedback<C, O> {
+impl<C, O> SimdMapFeedback<C, O> {
     /// Wraps an existing map and enable SIMD acceleration
     #[must_use]
     pub fn new(map: MapFeedback<C, DifferentIsNovel, O, MaxReducer>) -> Self {
@@ -618,20 +618,20 @@ impl<C, O> SIMDMapFeedback<C, O> {
     }
 }
 
-impl<C, O> Deref for SIMDMapFeedback<C, O> {
+impl<C, O> Deref for SimdMapFeedback<C, O> {
     type Target = MapFeedback<C, DifferentIsNovel, O, MaxReducer>;
     fn deref(&self) -> &Self::Target {
         &self.map
     }
 }
 
-impl<C, O> DerefMut for SIMDMapFeedback<C, O> {
+impl<C, O> DerefMut for SimdMapFeedback<C, O> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.map
     }
 }
 
-impl<C, O, S> StateInitializer<S> for SIMDMapFeedback<C, O>
+impl<C, O, S> StateInitializer<S> for SimdMapFeedback<C, O>
 where
     O: MapObserver,
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
@@ -642,7 +642,7 @@ where
     }
 }
 
-impl<C, O> HasObserverHandle for SIMDMapFeedback<C, O> {
+impl<C, O> HasObserverHandle for SimdMapFeedback<C, O> {
     type Observer = C;
 
     #[inline]
@@ -651,7 +651,7 @@ impl<C, O> HasObserverHandle for SIMDMapFeedback<C, O> {
     }
 }
 
-impl<C, O> Named for SIMDMapFeedback<C, O> {
+impl<C, O> Named for SimdMapFeedback<C, O> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         &self.map.name
@@ -659,7 +659,7 @@ impl<C, O> Named for SIMDMapFeedback<C, O> {
 }
 
 // Delegate implementations to inner mapping except is_interesting
-impl<C, O, EM, I, OT, S> Feedback<EM, I, OT, S> for SIMDMapFeedback<C, O>
+impl<C, O, EM, I, OT, S> Feedback<EM, I, OT, S> for SimdMapFeedback<C, O>
 where
     C: CanTrack + AsRef<O>,
     EM: EventFirer<I, S>,
