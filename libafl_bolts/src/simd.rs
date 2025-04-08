@@ -360,6 +360,7 @@ pub fn covmap_is_interesting_naive(
 
 /// Standard coverage map instereting implementation. Use the fastest implementation by default.
 #[cfg(feature = "alloc")]
+#[allow(unused_variables)] // or we fail cargo doc
 #[must_use]
 pub fn std_covmap_is_interesting(
     hist: &[u8],
