@@ -1,7 +1,6 @@
 //! Module for SIMD assisted methods.
 
 use alloc::{vec, vec::Vec};
-
 #[rustversion::nightly]
 use core::simd::cmp::SimdOrd;
 
