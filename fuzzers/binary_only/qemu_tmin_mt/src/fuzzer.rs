@@ -8,12 +8,13 @@ use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, InMemoryCorpus, InMemoryOnDiskCorpus},
-    events::{SendExiting, SimpleRestartingEventManager},
+    events::{
+        EventConfig, ClientDescription, launcher::Launcher, SendExiting, LlmpRestartingEventManager, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
-    monitors::SimpleMonitor,
+    monitors::{SimpleMonitor, MultiMonitor},
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::{ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
@@ -38,6 +39,9 @@ use libafl_qemu::{
 #[cfg(feature = "snapshot")]
 use libafl_qemu::{modules::SnapshotModule, QemuExecutor};
 use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
+
+#[cfg(feature = "fork")]
+compile_error!("'fork' feature is currently not working.");
 
 #[cfg(all(feature = "fork", feature = "snapshot"))]
 compile_error!("Cannot enable both 'fork' and 'snapshot' features at the same time.");
@@ -130,107 +134,117 @@ pub fn fuzz() -> Result<(), Error> {
         .collect::<Result<Vec<PathBuf>, io::Error>>()
         .expect("Failed to read dir entry");
 
+    // Create a shared memory region for sharing coverage map between fuzzer and target
+    // In snapshot mode, this is only required for the SimpleRestartingEventManager.
+    // However, fork mode requires it to share memory between parent and child,
+    // so we use it in both cases.
+    let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+
     // Clear LD_LIBRARY_PATH
     env::remove_var("LD_LIBRARY_PATH");
 
-    // Create a shared memory region for sharing coverage map between fuzzer and target
-    let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
-    let edges = edges_shmem.as_slice_mut();
-    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
+    // The client closure is a 'fuzzing' process for a single core.
+    // Because it is used inside the Launcher (below) it is a fork()ed separate
+    // process from our main process here.
+    let mut run_client = |state: Option<_>,
+                          mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
+                          client_description: ClientDescription| {
+        
+        let mut edges_shmem = shmem_provider.clone().new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
+        let edges = edges_shmem.as_slice_mut();
+        unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
-    // We use a HitcountsMapObserver to observe the coverage map
-    let mut edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::from_mut_ptr(
-            "edges",
-            NonNull::new(edges.as_mut_ptr())
-                .expect("The edge map pointer is null.")
-                .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
-        ))
-    };
+        // We use a HitcountsMapObserver to observe the coverage map
+        let mut edges_observer = unsafe {
+            HitcountsMapObserver::new(ConstMapObserver::from_mut_ptr(
+                "edges",
+                NonNull::new(edges.as_mut_ptr())
+                    .expect("The edge map pointer is null.")
+                    .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
+            ))
+        };
 
-    // In either fork/snapshot mode, we link the observer to QEMU
-    #[cfg(feature = "fork")]
-    let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
-        .const_map_observer(edges_observer.as_mut())
-        .build()?);
-    #[cfg(feature = "snapshot")]
-    let modules = tuple_list!(
-        StdEdgeCoverageChildModule::builder()
+        // In either fork/snapshot mode, we link the observer to QEMU
+        #[cfg(feature = "fork")]
+        let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
             .const_map_observer(edges_observer.as_mut())
-            .build()?,
-        SnapshotModule::new()
-    );
+            .build()?);
+        #[cfg(feature = "snapshot")]
+        let modules = tuple_list!(
+            StdEdgeCoverageChildModule::builder()
+                .const_map_observer(edges_observer.as_mut())
+                .build()?,
+            SnapshotModule::new()
+        );
 
-    // Create our QEMU emulator
-    let emulator = Emulator::empty()
-        .qemu_parameters(options.args)
-        .modules(modules)
-        .build()?;
-    let qemu = emulator.qemu();
+        // Create our QEMU emulator
+        let emulator = Emulator::empty()
+            .qemu_parameters(options.args.clone())
+            .modules(modules)
+            .build()?;
+        let qemu = emulator.qemu();
 
-    // Use ELF tools to get the target function
-    let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
-    let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
-        .expect("Symbol LLVMFuzzerTestOneInput not found");
-    log::info!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+        // Use ELF tools to get the target function
+        let mut elf_buffer = Vec::new();
+        let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
+        let test_one_input_ptr = elf
+            .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
+            .expect("Symbol LLVMFuzzerTestOneInput not found");
+        log::info!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
-    // Run target until the target function, and store important registers.
-    // Set a breakpoint on target function return.
-    qemu.entry_break(test_one_input_ptr);
-    let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
-    let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
-    let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
-    log::info!("Break at {pc:#x}");
-    log::info!("Return address = {ret_addr:#x}");
-    qemu.set_breakpoint(ret_addr);
+        // Run target until the target function, and store important registers.
+        // Set a breakpoint on target function return.
+        qemu.entry_break(test_one_input_ptr);
+        let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
+        let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
+        let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
+        log::info!("Break at {pc:#x}");
+        log::info!("Return address = {ret_addr:#x}");
+        qemu.set_breakpoint(ret_addr);
 
-    // Map a private region for input buffer
-    let input_addr = qemu
-        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
-        .unwrap();
-    log::info!("Placing input at {input_addr:#x}");
+        // Map a private region for input buffer
+        let input_addr = qemu
+            .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
+            .unwrap();
+        log::info!("Placing input at {input_addr:#x}");
 
-    // Rust harness: this closure copies an input buffer to our private region
-    // for target function input and updates registers to a single iteration
-    // before telling QEMU to resume execution.
-    #[cfg(feature = "fork")]
-    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
-        let target = input.target_bytes();
-        let mut buf = target.as_slice();
-        let mut len = buf.len();
-        if len > MAX_INPUT_SIZE {
-            buf = &buf[0..MAX_INPUT_SIZE];
-            len = MAX_INPUT_SIZE;
-        }
-        let len = len as GuestReg;
-
-        unsafe {
-            qemu.write_mem(input_addr, buf).expect("qemu write failed.");
-
-            qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
-            qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
-            qemu.write_return_address(ret_addr).unwrap();
-            qemu.write_function_argument(0, input_addr).unwrap();
-            qemu.write_function_argument(1, len).unwrap();
-
-            match qemu.run() {
-                Ok(QemuExitReason::Breakpoint(_)) => {}
-                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                    process::exit(0)
-                }
-                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                _ => panic!("Unexpected QEMU exit."),
+        // Rust harness: this closure copies an input buffer to our private region
+        // for target function input and updates registers to a single iteration
+        // before telling QEMU to resume execution.
+        #[cfg(feature = "fork")]
+        let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
+            let target = input.target_bytes();
+            let mut buf = target.as_slice();
+            let mut len = buf.len();
+            if len > MAX_INPUT_SIZE {
+                buf = &buf[0..MAX_INPUT_SIZE];
+                len = MAX_INPUT_SIZE;
             }
-        }
+            let len = len as GuestReg;
 
-        ExitKind::Ok
-    };
-    #[cfg(feature = "snapshot")]
-    let mut harness =
-        |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+            unsafe {
+                qemu.write_mem(input_addr, buf).expect("qemu write failed.");
+
+                qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
+                qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
+                qemu.write_return_address(ret_addr).unwrap();
+                qemu.write_function_argument(0, input_addr).unwrap();
+                qemu.write_function_argument(1, len).unwrap();
+
+                match qemu.run() {
+                    Ok(QemuExitReason::Breakpoint(_)) => {}
+                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
+                        process::exit(0)
+                    }
+                    Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
+                    _ => panic!("Unexpected QEMU exit."),
+                }
+            }
+
+            ExitKind::Ok
+        };
+        #[cfg(feature = "snapshot")]
+        let mut harness =|_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
             let target = input.target_bytes();
             let mut buf = target.as_slice();
             let mut len = buf.len();
@@ -262,99 +276,122 @@ pub fn fuzz() -> Result<(), Error> {
             ExitKind::Ok
         };
 
-    // Set up the most basic monitor possible.
-    let monitor = SimpleMonitor::with_user_monitor(|s| {
-        println!("{s}");
-    });
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
-    {
-        Ok(res) => res,
-        Err(err) => match err {
-            Error::ShuttingDown => {
-                return Ok(());
-            }
-            _ => {
-                panic!("Failed to setup the restarter: {err}");
-            }
-        },
+        // Set up the most basic monitor possible.
+        // let monitor = SimpleMonitor::with_user_monitor(|s| {
+        //     println!("{s}");
+        // });
+        // let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+        // {
+        //     Ok(res) => res,
+        //     Err(err) => match err {
+        //         Error::ShuttingDown => {
+        //             return Ok(());
+        //         }
+        //         _ => {
+        //             panic!("Failed to setup the restarter: {err}");
+        //         }
+        //     },
+        // };
+
+        // Our fuzzer is a simple queue scheduler (FIFO), and has no corpus feedback
+        // or objective feedback. This is important as we need the MaxMapFeedback
+        // on the observer to be constrained by ObserverEqualityFactory which will
+        // ensure interestingness is only true for identical coverage.
+        let scheduler = QueueScheduler::new();
+        let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+
+        // We define the stages that will be performed by the fuzzer. We have one
+        // stage of the StdTMinMutationalStage which will run for n iterations.
+        // The havoc mutator will generate mutations; only those shorter than the
+        // current input will be tested; and the ObservreEqualityFactory will
+        // provide an observer that ensures additions to the corpus have the same
+        // coverage.
+        let minimizer = StdScheduledMutator::new(havoc_mutations());
+        let factory = ObserverEqualityFactory::new(&edges_observer);
+        let mut stages = tuple_list!(StdTMinMutationalStage::new(
+            minimizer,
+            factory,
+            options.iterations
+        ),);
+
+        // Create a state instance. Unlike a typical fuzzer, we start with an empty
+        // input corpus, and we don't care about 'solutions' so store in an
+        // InMemoryCorpus.
+        let mut feedback = MaxMapFeedback::new(&edges_observer);
+        let mut objective = ();
+        let mut state = state.unwrap_or_else(|| {
+            StdState::new(
+                StdRand::new(),
+                InMemoryOnDiskCorpus::new(PathBuf::from(options.output.clone())).unwrap(),
+                InMemoryCorpus::new(),
+                &mut feedback,
+                &mut objective,
+            )
+            .unwrap()
+        });
+
+        // The executor. Nothing exciting here.
+        #[cfg(feature = "fork")]
+        let mut executor = QemuForkExecutor::new(
+            emulator,
+            &mut harness,
+            tuple_list!(edges_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+            shmem_provider,
+            core::time::Duration::from_millis(5000),
+        )?;
+        #[cfg(feature = "snapshot")]
+        let mut executor = QemuExecutor::new(
+            emulator,
+            &mut harness,
+            tuple_list!(edges_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+            Duration::from_millis(5000),
+        )?;
+
+        // Load the input corpus
+        state.load_initial_inputs_by_filenames_forced(&mut fuzzer, &mut executor, &mut mgr, &files)?;
+        log::info!("Processed {} inputs from disk.", files.len());
+
+        // Iterate over initial corpus_ids and minimize each.
+        let corpus_ids: Vec<CorpusId> = state.corpus().ids().collect();
+        for corpus_id in corpus_ids {
+            state.set_corpus_id(corpus_id)?;
+            stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
+        }
+
+        // We end up with equivalent output corpus, hopefully smaller than the
+        // input, but certainly no larger.
+        let size = state.corpus().count();
+        println!("Corpus size: {size}");
+
+        mgr.send_exiting()?;
+        Ok(())
     };
 
-    // Our fuzzer is a simple queue scheduler (FIFO), and has no corpus feedback
-    // or objective feedback. This is important as we need the MaxMapFeedback
-    // on the observer to be constrained by ObserverEqualityFactory which will
-    // ensure interestingness is only true for identical coverage.
-    let scheduler = QueueScheduler::new();
-    let mut fuzzer = StdFuzzer::new(scheduler, (), ());
-
-    // We define the stages that will be performed by the fuzzer. We have one
-    // stage of the StdTMinMutationalStage which will run for n iterations.
-    // The havoc mutator will generate mutations; only those shorter than the
-    // current input will be tested; and the ObservreEqualityFactory will
-    // provide an observer that ensures additions to the corpus have the same
-    // coverage.
-    let minimizer = StdScheduledMutator::new(havoc_mutations());
-    let factory = ObserverEqualityFactory::new(&edges_observer);
-    let mut stages = tuple_list!(StdTMinMutationalStage::new(
-        minimizer,
-        factory,
-        options.iterations
-    ),);
-
-    // Create a state instance. Unlike a typical fuzzer, we start with an empty
-    // input corpus, and we don't care about 'solutions' so store in an
-    // InMemoryCorpus.
-    let mut feedback = MaxMapFeedback::new(&edges_observer);
-    let mut objective = ();
-    let mut state = state.unwrap_or_else(|| {
-        StdState::new(
-            StdRand::new(),
-            InMemoryOnDiskCorpus::new(PathBuf::from(options.output)).unwrap(),
-            InMemoryCorpus::new(),
-            &mut feedback,
-            &mut objective,
-        )
-        .unwrap()
-    });
-
-    // The executor. Nothing exciting here.
-    #[cfg(feature = "fork")]
-    let mut executor = QemuForkExecutor::new(
-        emulator,
-        &mut harness,
-        tuple_list!(edges_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        shmem_provider,
-        core::time::Duration::from_millis(5000),
-    )?;
-    #[cfg(feature = "snapshot")]
-    let mut executor = QemuExecutor::new(
-        emulator,
-        &mut harness,
-        tuple_list!(edges_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        Duration::from_millis(5000),
-    )?;
-
-    // Load the input corpus
-    state.load_initial_inputs_by_filenames_forced(&mut fuzzer, &mut executor, &mut mgr, &files)?;
-    log::info!("Processed {} inputs from disk.", files.len());
-
-    // Iterate over initial corpus_ids and minimize each.
-    let corpus_ids: Vec<CorpusId> = state.corpus().ids().collect();
-    for corpus_id in corpus_ids {
-        state.set_corpus_id(corpus_id)?;
-        stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
+    // The Launcher creates forks on the specified list of cores, and for each
+    // one runs the run_client closure which performs the work.
+    // It links the forks to a MultiMonitor which just prints out the events
+    // it receives.
+    match Launcher::builder()
+        .shmem_provider(shmem_provider.clone())
+        .broker_port(options.port)
+        .configuration(EventConfig::from_build_id())
+        .monitor(MultiMonitor::new(|s| println!("{s}")))
+        .run_client(&mut run_client)
+        .cores(&options.cores)
+        .build()
+        .launch()
+    {
+        Ok(()) => Ok(()),
+        Err(Error::ShuttingDown) => {
+            println!("Run finished successfully. ????TODO");
+            Ok(())
+        }
+        Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
-
-    // We end up with equivalent output corpus, hopefully smaller than the
-    // input, but certainly no larger.
-    let size = state.corpus().count();
-    println!("Corpus size: {size}");
-
-    mgr.send_exiting()?;
-    Ok(())
 }
