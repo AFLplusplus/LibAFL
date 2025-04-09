@@ -56,7 +56,7 @@ use libafl_qemu::{
     Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
     QemuShutdownCause, Regs,
 };
-use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
+use libafl_targets::{CMPLOG_MAP_PTR, EDGES_MAP_DEFAULT_SIZE};
 #[cfg(unix)]
 use nix::unistd::dup;
 
@@ -267,6 +267,9 @@ fn fuzz(
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
+    unsafe {
+        CMPLOG_MAP_PTR = cmplog_map_ptr;
+    }
     let cmplog_observer = unsafe { CmpLogObserver::with_map_ptr("cmplog", cmplog_map_ptr, true) };
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
