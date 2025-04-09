@@ -22,8 +22,11 @@ impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
         self.qemu.h2g(addr)
     }
 
+    /// Checks whether the access at address @addr of size @size is valid.
+    /// The acess is done relatively to the CPU as described by [`Qemu::access_ok`].
+    /// If no CPU is found, returns None.
     #[must_use]
-    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
+    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> Option<bool> {
         self.qemu.access_ok(kind, addr, size)
     }
 
