@@ -144,7 +144,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below_or_zero(self.max_stack_pow))
+        1 << (state.rand_mut().below_or_zero(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
@@ -176,9 +176,6 @@ where
     }
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
-    ///
-    /// # Errors
-    /// Will return [`Error::IllegalArgument`] for `max_stack_pow` of 0.
     #[inline]
     pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
         Self {
