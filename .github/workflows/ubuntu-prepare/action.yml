@@ -21,16 +21,6 @@ runs:
     - name: Add nightly clippy
       shell: bash
       run: rustup toolchain install nightly --component clippy --allow-downgrade
-    - name: Remove existing clang and LLVM
-      shell: bash
-      run: |
-        for version in {15..30}; do
-          if [ "${{ env.MAIN_LLVM_VERSION }}" != "$version" ]; then
-            if dpkg-query -W -f='${Status}\n' "*llvm-${version}*" 2>/dev/null | grep "install ok installed"; then
-              sudo apt-get purge -y *llvm-${version}* *clang-${version}* lld-${version}* lldb-${version}*
-            fi
-          fi
-        done
     - name: Install cargo-hack
       shell: bash
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
