@@ -3,7 +3,7 @@ use std::{
     str::from_utf8_unchecked_mut,
 };
 
-use libafl_bolts::os::unix_signals::Signal;
+use libafl_bolts::{Error, os::unix_signals::Signal};
 use libafl_qemu_sys::{
     GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
@@ -16,9 +16,36 @@ use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 
 use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
 
+/// Choose how QEMU target signals should be handled.
+/// It's main use is to describe how crashes and timeouts should be treated.
+pub enum TargetSignalHandling {
+    /// Return to harness with the associated exit request on target crashing or timeout signal.
+    /// The snapshot mechanism should make sure to recover correctly from the crash.
+    /// For instance, snapshots do not take into account side effects related to file descriptors.
+    /// If it could have an impact in case of a crash, prefer the other policy.
+    ///
+    /// *Warning*: this policy should be used with [`SnapshotModule`]. It can be used without
+    /// snapshotting, but it is up to the user to make sure the recovery is possible without
+    /// corrupting the target.
+    ReturnToHarness,
+    /// Propagate target signal to host (following QEMU target to host signal translation) by
+    /// raising the proper signal.
+    /// This the safe policy, since the target is completely reset.
+    /// However, it could make the fuzzer much slower if many crashes are triggered during the
+    /// fuzzing campaign.
+    RaiseSignal,
+}
+
 pub struct QemuMappingsViewer<'a> {
     qemu: &'a Qemu,
     mappings: Vec<MapInfo>,
+}
+
+impl Default for TargetSignalHandling {
+    /// Historically, `LibAFL` QEMU raises the target signal to the host.
+    fn default() -> Self {
+        TargetSignalHandling::RaiseSignal
+    }
 }
 
 impl<'a> QemuMappingsViewer<'a> {
@@ -81,7 +108,6 @@ pub struct ImageInfo {
     pub vdso: GuestAddr,
     pub entry: GuestAddr,
     pub brk: GuestAddr,
-    pub alignment: GuestAddr,
     pub exec_stack: bool,
 }
 
@@ -224,7 +250,6 @@ impl Qemu {
             vdso: image_info.vdso,
             entry: image_info.entry,
             brk: image_info.brk,
-            alignment: image_info.alignment,
             exec_stack: image_info.exec_stack,
         }
     }
@@ -303,18 +328,22 @@ impl Qemu {
     }
 
     #[expect(clippy::cast_sign_loss)]
-    fn mmap(
+    pub fn mmap(
         self,
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
         flags: c_int,
-    ) -> Result<GuestAddr, ()> {
+        fd: i32,
+    ) -> Result<GuestAddr, Error> {
         let res = unsafe {
-            libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, -1, 0)
+            libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, fd, 0)
         };
         if res <= 0 {
-            Err(())
+            let errno = std::io::Error::last_os_error().raw_os_error();
+            Err(Error::illegal_argument(format!(
+                "failed to mmap addr: {addr:x} (size: {size:?} prot: {perms:?} flags: {flags:?} fd: {fd:?}). The errno is {errno:?}",
+            )))
         } else {
             Ok(res as GuestAddr)
         }
@@ -325,10 +354,14 @@ impl Qemu {
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
-    ) -> Result<GuestAddr, String> {
-        self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
-            .map_err(|()| format!("Failed to map {addr}"))
-            .map(|addr| addr as GuestAddr)
+    ) -> Result<GuestAddr, Error> {
+        self.mmap(
+            addr,
+            size,
+            perms,
+            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+            -1,
+        )
     }
 
     pub fn map_fixed(
@@ -336,15 +369,14 @@ impl Qemu {
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
-    ) -> Result<GuestAddr, String> {
+    ) -> Result<GuestAddr, Error> {
         self.mmap(
             addr,
             size,
             perms,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+            -1,
         )
-        .map_err(|()| format!("Failed to map {addr}"))
-        .map(|addr| addr as GuestAddr)
     }
 
     pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
@@ -417,22 +449,47 @@ impl Qemu {
             libc::raise(signal.into());
         }
     }
+
+    /// Set the target crash handling policy according to [`TargetSignalHandling`]'s documentation.
+    ///
+    /// # Safety
+    ///
+    /// It has an important impact on how crashes are handled by QEMU on target crashing signals.
+    /// Please make sure to read the documentation of [`TargetSignalHandling`] before touching
+    /// this.
+    pub unsafe fn set_target_crash_handling(&self, handling: &TargetSignalHandling) {
+        match handling {
+            TargetSignalHandling::ReturnToHarness => unsafe {
+                libafl_qemu_sys::libafl_set_return_on_crash(true);
+            },
+            TargetSignalHandling::RaiseSignal => unsafe {
+                libafl_qemu_sys::libafl_set_return_on_crash(false);
+            },
+        }
+    }
 }
 
 #[cfg(feature = "python")]
 pub mod pybind {
     use libafl_qemu_sys::{GuestAddr, MmapPerms};
     use pyo3::{
-        Bound, PyObject, PyResult, Python,
-        conversion::FromPyObject,
+        Bound, FromPyObject, PyObject, PyResult, Python,
         exceptions::PyValueError,
-        pymethods,
+        pyclass, pymethods,
         types::{PyAnyMethods, PyInt},
     };
 
-    use crate::{pybind::Qemu, qemu::hooks::SyscallHookResult};
+    use crate::{pybind::Qemu, qemu::hooks};
 
     static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
+
+    #[pyclass]
+    #[derive(FromPyObject)]
+    pub struct SyscallHookResult {
+        /// if None: run.
+        /// else: skip with given value.
+        skip: Option<GuestAddr>,
+    }
 
     extern "C" fn py_syscall_hook_wrapper(
         _data: u64,
@@ -445,25 +502,31 @@ pub mod pybind {
         a5: u64,
         a6: u64,
         a7: u64,
-    ) -> SyscallHookResult {
+    ) -> hooks::SyscallHookResult {
         unsafe { (&raw const PY_SYSCALL_HOOK).read() }.map_or_else(
-            || SyscallHookResult::new(None),
+            || hooks::SyscallHookResult::Run,
             |obj| {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
                 Python::with_gil(|py| {
                     let ret = obj.call1(py, args).expect("Error in the syscall hook");
                     let any = ret.bind(py);
                     if any.is_none() {
-                        SyscallHookResult::new(None)
+                        hooks::SyscallHookResult::Run
                     } else {
                         let a: Result<&Bound<'_, PyInt>, _> = any.downcast_exact();
                         if let Ok(i) = a {
-                            SyscallHookResult::new(Some(
+                            hooks::SyscallHookResult::Skip(
                                 i.extract().expect("Invalid syscall hook return value"),
-                            ))
+                            )
                         } else {
-                            SyscallHookResult::extract_bound(ret.bind(py))
-                                .expect("The syscall hook must return a SyscallHookResult")
+                            let syscall = SyscallHookResult::extract_bound(ret.bind(py))
+                                .expect("The syscall hook must return a SyscallHookResult");
+
+                            if let Some(ret) = syscall.skip {
+                                hooks::SyscallHookResult::Skip(ret)
+                            } else {
+                                hooks::SyscallHookResult::Run
+                            }
                         }
                     }
                 })
@@ -493,7 +556,7 @@ pub mod pybind {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.qemu
                     .map_private(addr, size, p)
-                    .map_err(PyValueError::new_err)
+                    .map_err(|_| PyValueError::new_err("Failed to mmap"))
             } else {
                 Err(PyValueError::new_err("Invalid perms"))
             }
@@ -502,8 +565,8 @@ pub mod pybind {
         fn map_fixed(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<GuestAddr> {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.qemu
-                    .map_fixed(addr, size, p)
-                    .map_err(PyValueError::new_err)
+                    .map_private(addr, size, p)
+                    .map_err(|_| PyValueError::new_err("Failed to mmap"))
             } else {
                 Err(PyValueError::new_err("Invalid perms"))
             }

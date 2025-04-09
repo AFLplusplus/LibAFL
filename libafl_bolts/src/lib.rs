@@ -112,6 +112,18 @@ pub mod subrange;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 pub mod tuples;
 
+#[cfg(all(feature = "std", unix))]
+pub mod argparse;
+#[cfg(all(feature = "std", unix))]
+pub use argparse::*;
+
+#[cfg(all(feature = "std", unix))]
+pub mod target_args;
+#[cfg(all(feature = "std", unix))]
+pub use target_args::*;
+
+pub mod simd;
+
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod bolts_prelude {
@@ -140,7 +152,7 @@ pub mod bolts_prelude {
 #[cfg(all(unix, feature = "std"))]
 use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
@@ -945,6 +957,45 @@ pub fn format_duration_hms(duration: &time::Duration) -> String {
     format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
 }
 
+/// Format a number with thousands separators
+#[cfg(feature = "alloc")]
+#[must_use]
+pub fn format_big_number(val: u64) -> String {
+    let short = {
+        let (num, unit) = match val {
+            0..=999 => return format!("{val}"),
+            1_000..=999_999 => (1000, "K"),
+            1_000_000..=999_999_999 => (1_000_000, "M"),
+            1_000_000_000..=999_999_999_999 => (1_000_000_000, "G"),
+            _ => (1_000_000_000_000, "T"),
+        };
+        let main = val / num;
+        let frac = (val % num) / (num / 100);
+        format!(
+            "{}.{}{}",
+            main,
+            format!("{frac:02}").trim_end_matches('0'),
+            unit
+        )
+    };
+    let long = val
+        .to_string()
+        .chars()
+        .rev()
+        .enumerate()
+        .fold(String::new(), |mut acc, (i, c)| {
+            if i > 0 && i % 3 == 0 {
+                acc.push(',');
+            }
+            acc.push(c);
+            acc
+        })
+        .chars()
+        .rev()
+        .collect::<String>();
+    format!("{short} ({long})")
+}
+
 /// Stderr logger
 #[cfg(feature = "std")]
 pub static LIBAFL_STDERR_LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
@@ -1062,7 +1113,7 @@ mod windows_logging {
         // Get the handle to standard output
         let h_stdout: HANDLE = get_stdout_handle();
 
-        if h_stdout == INVALID_HANDLE_VALUE {
+        if ptr::addr_eq(h_stdout, INVALID_HANDLE_VALUE) {
             eprintln!("Failed to get standard output handle");
             return;
         }

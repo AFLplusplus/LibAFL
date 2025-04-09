@@ -247,7 +247,7 @@ pub mod unix_signal_handler {
                         let _ = writer.flush();
                     }
                     if let Ok(r) = core::str::from_utf8(&bsod) {
-                        log::error!("{}", r);
+                        log::error!("{r}");
                     }
                 }
 
@@ -287,7 +287,7 @@ pub mod unix_signal_handler {
                             let _ = writer.flush();
                         }
                         if let Ok(r) = core::str::from_utf8(&bsod) {
-                            log::error!("{}", r);
+                            log::error!("{r}");
                         }
                     }
                 }

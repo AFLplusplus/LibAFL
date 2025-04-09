@@ -117,6 +117,7 @@ where
         }
     }
 }
+
 impl<C, CM, ED, ET, QP, I, S, SM> EmulatorBuilder<C, CM, ED, ET, QP, I, S, SM>
 where
     I: Unpin,

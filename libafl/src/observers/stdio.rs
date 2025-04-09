@@ -36,6 +36,7 @@ use crate::{Error, observers::Observer};
 /// };
 /// use libafl_bolts::{
 ///     Named, current_nanos,
+///     TargetArgs,
 ///     rands::StdRand,
 ///     tuples::{Handle, Handled, MatchNameRef, tuple_list},
 /// };

@@ -3,10 +3,10 @@ use core::{
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 
-#[cfg(feature = "dlmalloc")]
+#[cfg(all(feature = "global_allocator", feature = "dlmalloc"))]
 use crate::allocator::backend::dlmalloc::DlmallocBackend;
 
-#[cfg(all(feature = "linux", not(feature = "libc")))]
+#[cfg(all(feature = "global_allocator", feature = "linux", not(feature = "libc")))]
 type Mmap = crate::mmap::linux::LinuxMmap;
 
 #[cfg(feature = "libc")]
@@ -14,14 +14,23 @@ type Mmap = crate::mmap::libc::LibcMmap<
     crate::symbols::dlsym::DlSymSymbols<crate::symbols::dlsym::LookupTypeNext>,
 >;
 
+#[cfg(all(feature = "global_allocator"))]
 const PAGE_SIZE: usize = 4096;
 
 #[global_allocator]
-#[cfg(all(feature = "dlmalloc", not(feature = "mimalloc")))]
+#[cfg(all(
+    feature = "global_allocator",
+    feature = "dlmalloc",
+    not(feature = "mimalloc")
+))]
 static GLOBAL_ALLOCATOR: DlmallocBackend<Mmap> = DlmallocBackend::new(PAGE_SIZE);
 
 #[global_allocator]
-#[cfg(all(feature = "dlmalloc", feature = "mimalloc"))]
+#[cfg(all(
+    feature = "global_allocator",
+    feature = "dlmalloc",
+    feature = "mimalloc"
+))]
 static GLOBAL_ALLOCATOR: baby_mimalloc::MimallocMutexWrapper<DlmallocBackend<Mmap>> =
     baby_mimalloc::MimallocMutexWrapper::with_os_allocator(DlmallocBackend::new(PAGE_SIZE));
 
@@ -56,10 +65,32 @@ pub unsafe extern "C" fn memcpy(dest: *mut u8, src: *const u8, count: usize) {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn memset(dest: *mut u8, value: u8, count: usize) {
-    let dest_slice = unsafe { from_raw_parts_mut(dest, count) };
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..count {
-        dest_slice[i] = value;
+    unsafe {
+        let mut cursor = dest;
+        let word_value = match value {
+            u8::MIN => Some(usize::MIN),
+            u8::MAX => Some(usize::MAX),
+            _ => None,
+        };
+
+        if let Some(word_value) = word_value {
+            let num_words = count / size_of::<usize>();
+            for _ in 0..num_words {
+                *(cursor as *mut usize) = word_value;
+                cursor = cursor.wrapping_add(size_of::<usize>());
+            }
+
+            let num_bytes = count % size_of::<usize>();
+            for _ in 0..num_bytes {
+                *cursor = value;
+                cursor = cursor.wrapping_add(1);
+            }
+        } else {
+            for _ in 0..count {
+                *cursor = value;
+                cursor = cursor.wrapping_add(1);
+            }
+        }
     }
 }
 

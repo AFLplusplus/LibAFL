@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "PyLibAFL"
-version = "0.15.1"
+version = "0.15.2"
 description = "Advanced Fuzzing Library for Python"
 readme = "README.md"
 requires-python = ">=3.8"

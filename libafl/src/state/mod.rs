@@ -33,7 +33,7 @@ use crate::monitors::stats::ClientPerfStats;
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
-    events::{Event, EventFirer, LogSeverity},
+    events::{Event, EventFirer, EventWithStats, LogSeverity},
     feedbacks::StateInitializer,
     fuzzer::Evaluator,
     generators::Generator,
@@ -764,11 +764,14 @@ where
 
         manager.fire(
             self,
-            Event::Log {
-                severity_level: LogSeverity::Debug,
-                message: format!("Loaded {} initial testcases.", self.corpus().count()), // get corpus count
-                phantom: PhantomData::<I>,
-            },
+            EventWithStats::with_current_time(
+                Event::Log {
+                    severity_level: LogSeverity::Debug,
+                    message: format!("Loaded {} initial testcases.", self.corpus().count()), // get corpus count
+                    phantom: PhantomData::<I>,
+                },
+                *self.executions(),
+            ),
         )?;
         Ok(())
     }
@@ -977,10 +980,7 @@ where
             self.reset_initial_files_state();
             self.canonicalize_input_dirs(in_dirs)?;
             if cores.ids.len() > corpus_size {
-                log::info!(
-                    "low intial corpus count ({}), no parallelism required.",
-                    corpus_size
-                );
+                log::info!("low intial corpus count ({corpus_size}), no parallelism required.");
             } else {
                 let core_index = cores
                     .ids
@@ -1065,11 +1065,14 @@ where
         }
         manager.fire(
             self,
-            Event::Log {
-                severity_level: LogSeverity::Debug,
-                message: format!("Loaded {added} over {num} initial testcases"),
-                phantom: PhantomData,
-            },
+            EventWithStats::with_current_time(
+                Event::Log {
+                    severity_level: LogSeverity::Debug,
+                    message: format!("Loaded {added} over {num} initial testcases"),
+                    phantom: PhantomData,
+                },
+                *self.executions(),
+            ),
         )?;
         Ok(())
     }

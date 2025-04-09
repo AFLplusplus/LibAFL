@@ -45,6 +45,9 @@ use crate::{EmulatorModules, Qemu, QemuSignalContext, run_target_crash_hooks};
 type EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> =
     StatefulInProcessExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, Z>;
 
+#[cfg(feature = "systemmode")]
+pub(crate) static BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
+
 pub struct QemuExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
     inner: EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>,
     first_exec: bool,
@@ -99,7 +102,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
                         qemu.run_signal_handler(signal.into(), info, puc);
                     }
 
-                    // if we are there, we can safely to execution
+                    // if we are there, we can safely resume from the signal handler.
                     return;
                 }
                 QemuSignalContext::InQemuSignalHandlerHost => {
@@ -120,7 +123,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
                     // run qemu hooks then report the crash.
 
                     log::debug!(
-                        "QEMU Target signal received that should be handled by host. Most likely a target crash."
+                        "QEMU Target signal received that should be handled by host. It is a target crash."
                     );
 
                     log::debug!("Running crash hooks.");
@@ -142,7 +145,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
 
             if let Ok(bsod) = bsod {
                 if let Ok(bsod_str) = str::from_utf8(&bsod) {
-                    log::error!("\n{}", bsod_str);
+                    log::error!("\n{bsod_str}");
                 } else {
                     log::error!("convert minibsod to string failed");
                 }
@@ -156,9 +159,6 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
         libc::_exit(128 + (signal as i32));
     }
 }
-
-#[cfg(feature = "systemmode")]
-pub(crate) static BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
 
 /// # Safety
 /// Can call through the `unix_signal_handler::inproc_timeout_handler`.
@@ -361,6 +361,7 @@ pub type QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z
 #[cfg(feature = "fork")]
 pub struct QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
     inner: QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>,
+    first_exec: bool,
 }
 
 #[cfg(feature = "fork")]
@@ -425,6 +426,7 @@ where
                 timeout,
                 shmem_provider,
             )?,
+            first_exec: true,
         })
     }
 
@@ -475,7 +477,10 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.inner.exposed_executor_state.first_exec(state);
+        if self.first_exec {
+            self.inner.exposed_executor_state.first_exec(state);
+            self.first_exec = false;
+        }
 
         self.inner.exposed_executor_state.pre_exec(state, input);
 

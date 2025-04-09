@@ -3,6 +3,7 @@ use alloc::{string::ToString, sync::Arc, vec::Vec};
 use core::cmp::{max, min};
 use std::sync::RwLock;
 
+use libafl_bolts::format_big_number;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -25,7 +26,7 @@ pub struct TuiUi {
     version: String,
     enhanced_graphics: bool,
     show_logs: bool,
-    clients_idx: usize,
+    client_idx: usize,
     clients: usize,
     charts_tab_idx: usize,
     graph_data: Vec<(f64, f64)>,
@@ -47,7 +48,7 @@ impl TuiUi {
             version,
             enhanced_graphics,
             show_logs: true,
-            clients_idx: 1,
+            client_idx: 0,
             ..TuiUi::default()
         }
     }
@@ -66,29 +67,15 @@ impl TuiUi {
         }
     }
 
-    //pub fn on_up(&mut self) {}
-
-    //pub fn on_down(&mut self) {}
-
     pub fn on_right(&mut self) {
-        if self.clients != 0 {
-            // clients_idx never 0
-            if self.clients - 1 != 0 {
-                // except for when it is ;)
-                self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
-            }
+        if self.clients > 0 && self.client_idx < self.clients - 1 {
+            self.client_idx += 1;
         }
     }
 
     pub fn on_left(&mut self) {
-        if self.clients != 0 {
-            // clients_idx never 0
-            if self.clients_idx == 1 {
-                self.clients_idx = self.clients - 1;
-            } else if self.clients - 1 != 0 {
-                // don't wanna be dividing by 0
-                self.clients_idx = 1 + (self.clients_idx - 2) % (self.clients - 1);
-            }
+        if self.client_idx > 0 {
+            self.client_idx -= 1;
         }
     }
 
@@ -247,7 +234,7 @@ impl TuiUi {
     fn draw_client_ui(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect) {
         let client_block = Block::default()
             .title(Span::styled(
-                format!("client #{} (l/r arrows to switch)", self.clients_idx),
+                format!("client #{} (←/→ arrows to switch)", self.client_idx),
                 Style::default()
                     .fg(Color::LightCyan)
                     .add_modifier(Modifier::BOLD),
@@ -430,16 +417,16 @@ impl TuiUi {
         let empty_geometry: ItemGeometry = ItemGeometry::new();
         let item_geometry: &ItemGeometry = if is_overall {
             &tui_context.total_item_geometry
-        } else if self.clients < 2 {
+        } else if self.clients == 0 {
             &empty_geometry
         } else {
             let clients = &tui_context.clients;
-            let client = clients.get(&self.clients_idx);
+            let client = clients.get(&self.client_idx);
             let client = client.as_ref();
             if let Some(client) = client {
                 &client.item_geometry
             } else {
-                log::warn!("Client {} was `None`. Race condition?", &self.clients_idx);
+                log::warn!("Client {} was `None`. Race condition?", &self.client_idx);
                 &empty_geometry
             }
         };
@@ -507,11 +494,11 @@ impl TuiUi {
         let empty_timing: ProcessTiming = ProcessTiming::new();
         let tup: (Duration, &ProcessTiming) = if is_overall {
             (tui_context.start_time, &tui_context.total_process_timing)
-        } else if self.clients < 2 {
+        } else if self.clients == 0 {
             (current_time(), &empty_timing)
         } else {
             let clients = &tui_context.clients;
-            let client = clients.get(&self.clients_idx);
+            let client = clients.get(&self.client_idx);
             let client = client.as_ref();
             if let Some(client) = client {
                 (
@@ -519,7 +506,7 @@ impl TuiUi {
                     &client.process_timing,
                 )
             } else {
-                log::warn!("Client {} was `None`. Race condition?", &self.clients_idx);
+                log::warn!("Client {} was `None`. Race condition?", &self.client_idx);
                 (current_time(), &empty_timing)
             }
         };
@@ -531,6 +518,10 @@ impl TuiUi {
             Row::new(vec![
                 Cell::from(Span::raw("exec speed")),
                 Cell::from(Span::raw(&tup.1.exec_speed)),
+            ]),
+            Row::new(vec![
+                Cell::from(Span::raw("total execs")),
+                Cell::from(Span::raw(format_big_number(tup.1.total_execs))),
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("last new entry")),
@@ -581,17 +572,17 @@ impl TuiUi {
                     Cell::from(Span::raw("clients")),
                     Cell::from(Span::raw(format!("{}", self.clients))),
                     Cell::from(Span::raw("total execs")),
-                    Cell::from(Span::raw(format!("{}", app.total_execs))),
+                    Cell::from(Span::raw(format_big_number(app.total_execs))),
                     Cell::from(Span::raw("map density")),
                     Cell::from(Span::raw(app.total_map_density.to_string())),
                 ]),
                 Row::new(vec![
                     Cell::from(Span::raw("solutions")),
-                    Cell::from(Span::raw(format!("{}", app.total_solutions))),
+                    Cell::from(Span::raw(format_big_number(app.total_solutions))),
                     Cell::from(Span::raw("cycle done")),
-                    Cell::from(Span::raw(format!("{}", app.total_cycles_done))),
+                    Cell::from(Span::raw(format_big_number(app.total_cycles_done))),
                     Cell::from(Span::raw("corpus count")),
-                    Cell::from(Span::raw(format!("{}", app.total_corpus_count))),
+                    Cell::from(Span::raw(format_big_number(app.total_corpus_count))),
                 ]),
             ]
         };
@@ -637,7 +628,7 @@ impl TuiUi {
                     Cell::from(Span::raw(format!(
                         "{}",
                         app.clients
-                            .get(&self.clients_idx)
+                            .get(&self.client_idx)
                             .map_or(0, |x| x.cycles_done)
                     ))),
                 ]),
@@ -646,7 +637,7 @@ impl TuiUi {
                     Cell::from(Span::raw(format!(
                         "{}",
                         app.clients
-                            .get(&self.clients_idx)
+                            .get(&self.client_idx)
                             .map_or(0, |x| x.objectives)
                     ))),
                 ]),
@@ -680,25 +671,23 @@ impl TuiUi {
             vec![
                 Row::new(vec![
                     Cell::from(Span::raw("corpus count")),
-                    Cell::from(Span::raw(format!(
-                        "{}",
-                        app.clients.get(&self.clients_idx).map_or(0, |x| x.corpus)
+                    Cell::from(Span::raw(format_big_number(
+                        app.clients.get(&self.client_idx).map_or(0, |x| x.corpus),
                     ))),
                 ]),
                 Row::new(vec![
                     Cell::from(Span::raw("total execs")),
-                    Cell::from(Span::raw(format!(
-                        "{}",
+                    Cell::from(Span::raw(format_big_number(
                         app.clients
-                            .get(&self.clients_idx)
-                            .map_or(0, |x| x.executions)
+                            .get(&self.client_idx)
+                            .map_or(0, |x| x.executions),
                     ))),
                 ]),
                 Row::new(vec![
                     Cell::from(Span::raw("map density")),
                     Cell::from(Span::raw(
                         app.clients
-                            .get(&self.clients_idx)
+                            .get(&self.client_idx)
                             .map_or("0%".to_string(), |x| x.map_density.to_string()),
                     )),
                 ]),
@@ -731,7 +720,7 @@ impl TuiUi {
         let mut items = vec![];
         {
             let ctx = app.read().unwrap();
-            if let Some(client) = ctx.introspection.get(&self.clients_idx) {
+            if let Some(client) = ctx.introspection.get(&self.client_idx) {
                 items.push(Row::new(vec![
                     Cell::from(Span::raw("scheduler")),
                     Cell::from(Span::raw(format!("{:.2}%", client.scheduler * 100.0))),

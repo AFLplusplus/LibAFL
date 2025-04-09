@@ -4,7 +4,7 @@ use libc::{SYS_write, c_int, c_void};
 use log::trace;
 
 use crate::{
-    asan_load, asan_panic, asan_swap, asan_sym, size_t, ssize_t,
+    GuestAddr, asan_load, asan_panic, asan_swap, asan_sym, size_t, ssize_t,
     symbols::{AtomicGuestAddr, Function, FunctionPointer},
 };
 
@@ -30,8 +30,9 @@ pub unsafe extern "C" fn write(fd: c_int, buf: *const c_void, count: size_t) -> 
         }
 
         asan_load(buf, count);
-        let addr = SYSCALL_ADDR
-            .get_or_insert_with(|| asan_sym(FunctionSyscall::NAME.as_ptr() as *const c_char));
+        let addr = SYSCALL_ADDR.get_or_insert_with(|| {
+            asan_sym(FunctionSyscall::NAME.as_ptr() as *const c_char) as GuestAddr
+        });
         let fn_syscall = FunctionSyscall::as_ptr(addr).unwrap();
         asan_swap(false);
         let ret = fn_syscall(SYS_write, fd, buf, count);

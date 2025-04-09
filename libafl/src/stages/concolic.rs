@@ -345,7 +345,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                         res.push(replacements);
                         solver.pop(1);
                     }
-                };
+                }
                 // assert the path constraint
                 solver.assert(&op);
             }
