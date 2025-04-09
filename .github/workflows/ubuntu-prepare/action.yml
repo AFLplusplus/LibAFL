@@ -30,14 +30,12 @@ runs:
     - name: Default to nightly
       shell: bash
       run: rustup default nightly
-    - name: Add LLVM in sources list
+    - name: Install LLVM
       shell: bash
       run: |
-        llvm-config-${{env.MAIN_LLVM_VERSION}} --version || (
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh ${{env.MAIN_LLVM_VERSION}} all
-        )
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh ${{env.MAIN_LLVM_VERSION}} all
     - name: Symlink Headers
       shell: bash
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
