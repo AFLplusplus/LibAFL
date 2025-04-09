@@ -36,6 +36,7 @@ runs:
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
         sudo ./llvm.sh ${{env.MAIN_LLVM_VERSION}} all
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{env.MAIN_LLVM_VERSION}} 200
     - name: Symlink Headers
       shell: bash
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
