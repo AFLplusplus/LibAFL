@@ -30,7 +30,7 @@ test: build harness
 
     rm -rf out/
     timeout 15s {{ FUZZER }} {{ BUILD_DIR }}/harness -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out out ./harness | tee fuzz_stdout.log
-    if grep -qa "corpus: 2" fuzz_stdout.log; then
+    if grep -qa "objectives: 1" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
         echo "Fuzzer does not generate any testcases or any crashes"
