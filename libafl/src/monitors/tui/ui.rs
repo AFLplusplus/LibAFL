@@ -512,23 +512,23 @@ impl TuiUi {
         };
         let items = vec![
             Row::new(vec![
-                Cell::from(Span::raw("global run time")),
+                Cell::from(Span::raw("run time")),
                 Cell::from(Span::raw(format_duration_hms(&(current_time() - tup.0)))),
             ]),
             Row::new(vec![
-                Cell::from(Span::raw("global exec speed")),
+                Cell::from(Span::raw("exec speed")),
                 Cell::from(Span::raw(&tup.1.exec_speed)),
             ]),
             Row::new(vec![
-                Cell::from(Span::raw("global total execs")),
+                Cell::from(Span::raw("total execs")),
                 Cell::from(Span::raw(format_big_number(tup.1.total_execs))),
             ]),
             Row::new(vec![
-                Cell::from(Span::raw("global last new entry")),
+                Cell::from(Span::raw("last new entry")),
                 Cell::from(Span::raw(format_duration_hms(&(tup.1.last_new_entry)))),
             ]),
             Row::new(vec![
-                Cell::from(Span::raw("global last solution")),
+                Cell::from(Span::raw("last solution")),
                 Cell::from(Span::raw(format_duration_hms(&(tup.1.last_saved_solution)))),
             ]),
         ];
