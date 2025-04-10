@@ -6,6 +6,7 @@ use goblin::elf::{Elf, header::ET_DYN};
 use libafl::Error;
 use libafl_qemu_sys::GuestAddr;
 
+#[derive(Debug)]
 pub struct EasyElf<'a> {
     elf: Elf<'a>,
 }
@@ -71,6 +72,27 @@ impl<'a> EasyElf<'a> {
                 }
             }
         }
+
+        if self.elf.is_lib {
+            for sym in &self.elf.dynsyms {
+                if let Some(sym_name) = self.elf.dynstrtab.get_at(sym.st_name) {
+                    if sym_name == name {
+                        return if sym.st_value == 0 {
+                            None
+                        } else {
+                            #[cfg(cpu_target = "arm")]
+                            // Required because of arm interworking addresses aka bit(0) for thumb mode
+                            let addr =
+                                (sym.st_value as GuestAddr + load_addr) & !(0x1 as GuestAddr);
+                            #[cfg(not(cpu_target = "arm"))]
+                            let addr = sym.st_value as GuestAddr + load_addr;
+                            Some(addr)
+                        };
+                    }
+                }
+            }
+        }
+
         None
     }
 

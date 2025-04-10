@@ -256,6 +256,7 @@ fn main() {
     {
         if target_family == "unix" {
             println!("cargo:rerun-if-changed=src/forkserver.c");
+            println!("cargo:rerun-if-changed=src/forkserver.h");
 
             let mut forkserver = cc::Build::new();
 
@@ -267,6 +268,16 @@ fn main() {
             forkserver
                 .file(src_dir.join("forkserver.c"))
                 .compile("forkserver");
+
+            let forkserver_bindgen = bindgen::builder()
+                .header("src/forkserver.h")
+                .generate_comments(true)
+                .generate()
+                .expect("Couldn't generate the forkserver bindings!");
+
+            forkserver_bindgen
+                .write_to_file(Path::new(&out_dir).join("forkserver_bindings.rs"))
+                .expect("Couldn't write the forkserver bindings!");
         }
     }
 

@@ -2,7 +2,7 @@ use libafl::HasMetadata;
 
 use super::{
     EdgeCoverageVariant,
-    helpers::{gen_unique_edge_ids, trace_edge_hitcount, trace_edge_single},
+    helpers::{gen_unique_edge_ids, trace_edge_hitcount_ptr, trace_edge_single},
 };
 use crate::{
     EmulatorModules, Hook,
@@ -80,7 +80,7 @@ impl<AF, PF, const IS_CONST_MAP: bool, const MAP_SIZE: usize>
     {
         emulator_modules.edges(
             Hook::Function(gen_unique_edge_ids::<AF, ET, PF, I, S, Self, IS_CONST_MAP, MAP_SIZE>),
-            Hook::Raw(trace_edge_hitcount),
+            Hook::Raw(trace_edge_hitcount_ptr),
         );
     }
 

@@ -3,7 +3,7 @@
 use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
 
 use libafl::{executors::ExitKind, observers::ObserversTuple};
-use libafl_qemu_sys::{CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
+use libafl_qemu_sys::{CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp, TranslationBlock};
 
 #[cfg(feature = "usermode")]
 use crate::qemu::{
@@ -337,6 +337,9 @@ where
                     &mut TcgHookState<1, BlockHookId>,
                     pc: GuestAddr,
                     block_length: GuestUsize,
+                    tb: *const TranslationBlock,
+                    last_tb: *const TranslationBlock,
+                    tb_exit: i32,
                 )
             );
 

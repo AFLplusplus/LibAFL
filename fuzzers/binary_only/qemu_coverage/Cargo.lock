@@ -1592,6 +1592,7 @@ dependencies = [
  "libafl_bolts",
  "libc",
  "log",
+ "nix",
  "once_cell",
  "rangemap",
  "rustversion",

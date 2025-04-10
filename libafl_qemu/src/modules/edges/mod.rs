@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use libafl::{HasMetadata, observers::VarLenMapObserver};
+use libafl::HasMetadata;
 use libafl_bolts::Error;
 use libafl_qemu_sys::GuestAddr;
 #[cfg(feature = "systemmode")]
@@ -32,7 +32,7 @@ pub mod child;
 pub use child::{
     EdgeCoverageChildVariant, StdEdgeCoverageChildModule, StdEdgeCoverageChildModuleBuilder,
 };
-use libafl::observers::ConstLenMapObserver;
+use libafl::observers::{HasConstLenMap, HasVarLenMap};
 
 use super::utils::filters::HasAddressFilter;
 #[cfg(feature = "systemmode")]
@@ -166,16 +166,13 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
     }
 
     #[must_use]
-    pub fn map_observer<O>(
-        self,
-        map_observer: &mut O,
-    ) -> EdgeCoverageModuleBuilder<AF, PF, V, true, false, 0>
+    pub fn map<M>(self, map: &mut M) -> EdgeCoverageModuleBuilder<AF, PF, V, true, false, 0>
     where
-        O: VarLenMapObserver,
+        M: HasVarLenMap<Entry = u8>,
     {
-        let map_ptr = map_observer.map_slice_mut().as_mut_ptr() as *mut u8;
-        let map_max_size = map_observer.map_slice_mut().len();
-        let size_ptr = map_observer.as_mut().size_mut() as *mut usize;
+        let map_ptr = map.map_ptr_mut();
+        let map_max_size = map.max_size();
+        let size_ptr = map.size_ptr_mut();
 
         unsafe {
             LIBAFL_QEMU_EDGES_MAP_PTR = map_ptr;
@@ -194,14 +191,14 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
     }
 
     #[must_use]
-    pub fn const_map_observer<O, const NEW_MAP_SIZE: usize>(
+    pub fn const_map<M, const NEW_MAP_SIZE: usize>(
         self,
-        map_observer: &mut O,
+        map: &mut M,
     ) -> EdgeCoverageModuleBuilder<AF, PF, V, true, true, NEW_MAP_SIZE>
     where
-        O: ConstLenMapObserver<NEW_MAP_SIZE>,
+        M: HasConstLenMap<NEW_MAP_SIZE, Entry = u8>,
     {
-        let map_ptr = map_observer.map_slice_mut().as_mut_ptr() as *mut u8;
+        let map_ptr = map.map_ptr_mut();
 
         unsafe {
             LIBAFL_QEMU_EDGES_MAP_PTR = map_ptr;
@@ -429,7 +426,7 @@ mod tests {
         };
 
         StdEdgeCoverageModule::builder()
-            .map_observer(edges_observer.as_mut())
+            .map(edges_observer.as_mut())
             .build()
             .unwrap();
     }

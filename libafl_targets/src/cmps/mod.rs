@@ -30,11 +30,11 @@ pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
 /// The size of a logged routine argument in bytes
 pub const CMPLOG_RTN_LEN: usize = 32;
 
-/// The hight of a cmplog routine map
+/// The height of a cmplog routine map
 pub const CMPLOG_MAP_RTN_H: usize =
     (CMPLOG_MAP_H * size_of::<CmpLogInstruction>()) / size_of::<CmpLogRoutine>();
 
-/// The height of extended rountine map
+/// The height of extended routine map
 pub const CMPLOG_MAP_RTN_EXTENDED_H: usize =
     CMPLOG_MAP_H * size_of::<AFLppCmpLogOperands>() / size_of::<AFLppCmpLogFnOperands>();
 
