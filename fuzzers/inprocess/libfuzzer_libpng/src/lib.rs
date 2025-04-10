@@ -62,6 +62,8 @@ pub extern "C" fn libafl_main() {
 #[cfg(not(test))]
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
+
+    use libafl::feedbacks::simd::{SimdImplmentation, SimdMapFeedback};
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
@@ -93,8 +95,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let map_feedback = MaxMapFeedback::new(&edges_observer);
-
+    let map_feedback = SimdMapFeedback::new(MaxMapFeedback::new(&edges_observer));
     let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input

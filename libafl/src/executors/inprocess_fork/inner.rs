@@ -194,7 +194,7 @@ where
                     Ok(ExitKind::Ok)
                 }
             }
-            _ => Ok(ExitKind::Ok),
+            _ => panic!("Unexpected waitpid exit: {res:?}"),
         }
     }
 }

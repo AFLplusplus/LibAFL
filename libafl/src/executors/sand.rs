@@ -9,6 +9,7 @@ use core::marker::PhantomData;
 
 use libafl_bolts::{
     AsIter, Error, Named, hash_std,
+    simd::std_simplify_map,
     tuples::{Handle, MatchName, MatchNameRef},
 };
 
@@ -148,14 +149,10 @@ where
         let kind = self.executor.run_target(fuzzer, state, mgr, input)?;
         let ot = self.executor.observers();
         let ob = ot.get(&self.ob_ref).unwrap().as_ref();
-        let initial = ob.initial();
         let mut covs = ob.to_vec();
         match self.pattern {
             SANDExecutionPattern::SimplifiedTrace => {
-                // TODO: SIMD Optimizations
-                for it in &mut covs {
-                    *it = if *it == initial { 0x1 } else { 0x80 };
-                }
+                std_simplify_map(&mut covs);
             }
             SANDExecutionPattern::UniqueTrace => {
                 classify_counts(covs.as_mut_slice());

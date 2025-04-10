@@ -52,6 +52,7 @@ std = [
   "uds",
   "serial_test",
   "alloc",
+  "stable_simd",
 ]
 
 ## Enables all features that allocate in `no_std`
@@ -117,8 +118,19 @@ llmp_debug = ["alloc", "std"]
 ## Reduces the initial map size for llmp
 llmp_small_maps = ["alloc"]
 
+#! ### Stable SIMD features
+
+## Use the best SIMD implementation by our [benchmark](https://github.com/wtdcode/libafl_simd_bench)
+stable_simd = ["alloc", "wide"]
+
 [build-dependencies]
 rustversion = { workspace = true }
+
+[dev-dependencies]
+clap = { version = "4.5", features = ["derive", "env"] }
+rand = "0.9.0"
+chrono = "0.4.40"
+itertools = "0.14.0"
 
 [dependencies]
 libafl_derive = { workspace = true, default-features = true, optional = true }
@@ -164,6 +176,10 @@ pyo3 = { workspace = true, optional = true, features = ["serde", "macros"] }
 serial_test = { workspace = true, optional = true, default-features = false, features = [
   "logging",
 ] }
+
+# optional stable simd, pin to a commit due to `u8x32` not released yet. Switch as long as next release is out!
+wide = { git = "https://github.com/Lokathor/wide", rev = "71b5df0b2620da753836fafce5f99076181a49fe", optional = true }
+rustversion = { workspace = true }
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
@@ -212,3 +228,11 @@ mach = "0.3.2"
 name = "llmp_test"
 path = "./examples/llmp_test/main.rs"
 required-features = ["std"]
+
+
+[[example]]
+name = "simd"
+path = "./examples/simd/simd.rs"
+bench = true
+harness = false
+required-features = ["std", "stable_simd"]

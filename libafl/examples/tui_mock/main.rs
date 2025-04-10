@@ -17,6 +17,6 @@ pub fn main() {
     let _client_stats = ClientStats::default();
     let mut client_stats_manager = ClientStatsManager::default();
 
-    monitor.display(&mut client_stats_manager, "Test", ClientId(0));
+    let _ = monitor.display(&mut client_stats_manager, "Test", ClientId(0));
     sleep(Duration::from_secs(10));
 }

@@ -69,7 +69,7 @@ pub(super) fn aggregate_user_stats(
     let mut gather = client_stats_manager
         .client_stats()
         .iter()
-        .filter_map(|client| client.user_stats.get(name.as_ref()));
+        .filter_map(|(_, client)| client.user_stats.get(name.as_ref()));
 
     let gather_count = gather.clone().count();
 
