@@ -46,7 +46,7 @@ pub mod map;
 pub mod nautilus;
 #[cfg(feature = "std")]
 pub mod new_hash_feedback;
-#[cfg(feature = "stable_simd")]
+#[cfg(feature = "simd")]
 pub mod simd;
 #[cfg(feature = "std")]
 pub mod stdio;

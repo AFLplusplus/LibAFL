@@ -682,7 +682,7 @@ where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     C: CanTrack + AsRef<O>,
 {
-    #[allow(dead_code)] // this is true on stable wihout "stable_simd"
+    #[allow(dead_code)] // this is true on stable wihout "simd"
     pub(crate) fn is_interesting_u8_simd_optimized<S, OT, F>(
         &mut self,
         state: &mut S,

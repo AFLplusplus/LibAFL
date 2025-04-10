@@ -39,7 +39,7 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
-  "stable_simd",
+  "simd",
 ]
 document-features = ["dep:document-features"]
 

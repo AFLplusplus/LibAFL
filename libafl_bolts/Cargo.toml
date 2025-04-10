@@ -52,7 +52,7 @@ std = [
   "uds",
   "serial_test",
   "alloc",
-  "stable_simd",
+  "simd",
 ]
 
 ## Enables all features that allocate in `no_std`
@@ -235,4 +235,4 @@ name = "simd"
 path = "./examples/simd/simd.rs"
 bench = true
 harness = false
-required-features = ["std", "stable_simd"]
+required-features = ["std", "simd"]
