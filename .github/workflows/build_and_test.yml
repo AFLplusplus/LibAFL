@@ -270,6 +270,7 @@ jobs:
           - ./fuzzers/binary_only/fuzzbench_qemu
           - ./fuzzers/binary_only/intel_pt_baby_fuzzer
           - ./fuzzers/binary_only/intel_pt_command_executor
+          # - ./fuzzers/binary_only/libafl_qemu_trace
           - ./fuzzers/binary_only/tinyinst_simple
 
           # Forkserver
