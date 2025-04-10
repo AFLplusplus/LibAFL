@@ -31,7 +31,7 @@ use crate::{
 };
 
 /// The coverage map SIMD acceleration to use.
-/// Benchmark is available at <https://github.com/wtdcode/libafl_simd_bench>
+/// Benchmark is available at [`libafl_bolts`]
 #[derive(Debug, Clone, Default, Copy)]
 pub enum SimdImplmentation {
     /// The u8x16 implementation from wide, usually the fastest
