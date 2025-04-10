@@ -1,5 +1,5 @@
 //! The UI-specific parts of [`super::TuiMonitor`]
-use alloc::{string::ToString, sync::Arc, vec::Vec};
+use alloc::{sync::Arc, vec::Vec};
 use core::cmp::{max, min};
 use std::sync::RwLock;
 
@@ -27,11 +27,25 @@ pub struct TuiUi {
     enhanced_graphics: bool,
     show_logs: bool,
     client_idx: usize,
-    clients: usize,
+    clients: Vec<usize>,
     charts_tab_idx: usize,
     graph_data: Vec<(f64, f64)>,
 
     pub should_quit: bool,
+}
+
+fn next_larger(sorted: &[usize], value: usize) -> Option<usize> {
+    if let Some(index) = sorted.iter().position(|x| *x > value) {
+        return Some(index);
+    }
+    None
+}
+
+fn next_smaller(sorted: &[usize], value: usize) -> Option<usize> {
+    if let Some(index) = sorted.iter().rposition(|x| *x < value) {
+        return Some(index);
+    }
+    None
 }
 
 impl TuiUi {
@@ -68,20 +82,31 @@ impl TuiUi {
     }
 
     pub fn on_right(&mut self) {
-        if self.clients > 0 && self.client_idx < self.clients - 1 {
-            self.client_idx += 1;
+        if let Some(idx) = next_larger(&self.clients, self.client_idx) {
+            self.client_idx = self.clients[idx];
         }
     }
 
     pub fn on_left(&mut self) {
-        if self.client_idx > 0 {
-            self.client_idx -= 1;
+        if let Some(idx) = next_smaller(&self.clients, self.client_idx) {
+            self.client_idx = self.clients[idx];
         }
     }
 
     /// Draw the current TUI context
     pub fn draw(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>) {
-        self.clients = app.read().unwrap().clients_num;
+        let new = app.read().unwrap().clients_num;
+        if new != self.clients.len() {
+            // get the list of all clients
+            let mut all: Vec<usize> = app.read().unwrap().clients.keys().copied().collect();
+            all.sort_unstable();
+
+            // move the current client to the first one
+            self.client_idx = all[0];
+
+            // move the vector holding all clients ids
+            self.clients = all;
+        }
 
         let body = Layout::default()
             .constraints(if self.show_logs {
@@ -417,7 +442,7 @@ impl TuiUi {
         let empty_geometry: ItemGeometry = ItemGeometry::new();
         let item_geometry: &ItemGeometry = if is_overall {
             &tui_context.total_item_geometry
-        } else if self.clients == 0 {
+        } else if self.clients.is_empty() {
             &empty_geometry
         } else {
             let clients = &tui_context.clients;
@@ -494,7 +519,7 @@ impl TuiUi {
         let empty_timing: ProcessTiming = ProcessTiming::new();
         let tup: (Duration, &ProcessTiming) = if is_overall {
             (tui_context.start_time, &tui_context.total_process_timing)
-        } else if self.clients == 0 {
+        } else if self.clients.is_empty() {
             (current_time(), &empty_timing)
         } else {
             let clients = &tui_context.clients;
@@ -570,11 +595,9 @@ impl TuiUi {
             vec![
                 Row::new(vec![
                     Cell::from(Span::raw("clients")),
-                    Cell::from(Span::raw(format!("{}", self.clients))),
+                    Cell::from(Span::raw(format!("{}", self.clients.len()))),
                     Cell::from(Span::raw("total execs")),
                     Cell::from(Span::raw(format_big_number(app.total_execs))),
-                    Cell::from(Span::raw("map density")),
-                    Cell::from(Span::raw(app.total_map_density.to_string())),
                 ]),
                 Row::new(vec![
                     Cell::from(Span::raw("solutions")),
@@ -682,14 +705,6 @@ impl TuiUi {
                             .get(&self.client_idx)
                             .map_or(0, |x| x.executions),
                     ))),
-                ]),
-                Row::new(vec![
-                    Cell::from(Span::raw("map density")),
-                    Cell::from(Span::raw(
-                        app.clients
-                            .get(&self.client_idx)
-                            .map_or("0%".to_string(), |x| x.map_density.to_string()),
-                    )),
                 ]),
             ]
         };

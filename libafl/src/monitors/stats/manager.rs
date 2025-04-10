@@ -230,7 +230,7 @@ impl ClientStatsManager {
     #[must_use]
     pub fn item_geometry(&self) -> ItemGeometry {
         let mut total_item_geometry = ItemGeometry::new();
-        if self.client_stats().len() < 2 {
+        if self.client_stats.is_empty() {
             return total_item_geometry;
         }
         let mut ratio_a: u64 = 0;
@@ -240,23 +240,15 @@ impl ClientStatsManager {
             .iter()
             .filter(|(_, client)| client.enabled())
         {
-            let afl_stats = client
-                .get_user_stats("AflStats")
-                .map_or("None".to_string(), ToString::to_string);
+            let afl_stats = client.get_user_stats("AflStats");
             let stability = client.get_user_stats("stability").map_or(
                 UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
                 Clone::clone,
             );
 
-            if afl_stats != "None" {
-                let default_json = serde_json::json!({
-                    "pending": 0,
-                    "pend_fav": 0,
-                    "imported": 0,
-                    "own_finds": 0,
-                });
-                let afl_stats_json: Value =
-                    serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
+            if let Some(stat) = afl_stats {
+                let stats = stat.to_string();
+                let afl_stats_json: Value = serde_json::from_str(stats.as_str()).unwrap();
                 total_item_geometry.pending +=
                     afl_stats_json["pending"].as_u64().unwrap_or_default();
                 total_item_geometry.pend_fav +=
@@ -277,6 +269,7 @@ impl ClientStatsManager {
         } else {
             Some((ratio_a as f64) / (ratio_b as f64))
         };
+
         total_item_geometry
     }
 }
