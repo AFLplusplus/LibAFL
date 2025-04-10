@@ -102,6 +102,7 @@ impl Default for ArtifactPrefix {
 #[derive(Debug, Clone)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct LibfuzzerOptions {
+    #[allow(unused)]
     fuzzer_name: String,
     mode: LibfuzzerMode,
     artifact_prefix: ArtifactPrefix,
@@ -122,6 +123,7 @@ pub struct LibfuzzerOptions {
     skip_tracing: bool,
     tui: bool,
     runs: usize,
+    #[allow(unused)]
     close_fd_mask: u8,
     unknown: Vec<String>,
 }
@@ -144,6 +146,7 @@ impl LibfuzzerOptions {
         .map(|builder| builder.build(name))
     }
 
+    #[cfg(unix)]
     pub fn fuzzer_name(&self) -> &str {
         &self.fuzzer_name
     }
@@ -224,6 +227,7 @@ impl LibfuzzerOptions {
         self.runs
     }
 
+    #[cfg(unix)]
     pub fn close_fd_mask(&self) -> u8 {
         self.close_fd_mask
     }
@@ -318,6 +322,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                                 })?);
                         }
                         "dict" => self.dict = Some(value),
+                        #[cfg(not(windows))]
                         "fork" | "jobs" => {
                             self.forks = Some(parse_or_bail!(name, value, usize));
                         }
@@ -358,6 +363,97 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         }
                         "runs" => self.runs = parse_or_bail!(name, value, usize),
                         "close_fd_mask" => self.close_fd_mask = parse_or_bail!(name, value, u8),
+                        "help" => {
+                            println!("Usage:");
+                            println!();
+                            println!("To run fuzzing pass 0 or more directories.");
+                            println!("{name} [-flag1=val1 [-flag2=val2 ...] ] [dir1 [dir2 ...] ]");
+                            println!();
+                            println!(
+                                "To run individual tests without fuzzing pass 1 or more files:"
+                            );
+                            println!("{name} [-flag1=val1 [-flag2=val2 ...] ] file1 [file2 ...]");
+                            println!();
+                            println!("Flags: (strictly in form -flag=value)");
+                            println!(
+                                " artifact_prefix                        0       Write fuzzing artifacts (crash, timeout, or slow inputs) as $(artifact_prefix)file"
+                            );
+                            println!(
+                                " timeout                                1200    Timeout in seconds. If one unit runs more than this number of seconds the process will abort."
+                            );
+                            println!(
+                                " grimoire                               0       If 1, enable the Grimoire mutator that is structure-aware."
+                            );
+                            println!(
+                                " use_value_profile                      0       Use value profile to guide fuzzing."
+                            );
+                            println!(
+                                " unicode                                1       If 1, generate Unicode inputs."
+                            );
+                            println!(
+                                " dict                                   0       Use the dictionary file."
+                            );
+                            #[cfg(not(windows))]
+                            println!(
+                                " fork                                   0       Number of forks to use (>1 requires Unix-like OS)."
+                            );
+                            println!(
+                                " jobs                                   0       Same as fork. Number of jobs to run with stdout/stderr redirected."
+                            );
+                            println!(
+                                " ignore_crashes                         0       If 1, ignore crashes in fork mode."
+                            );
+                            println!(
+                                " ignore_timeouts                        0       If 1, ignore timeouts in fork mode."
+                            );
+                            println!(
+                                " ignore_ooms                            0       If 1, ignore out-of-memory errors in fork mode."
+                            );
+                            println!(
+                                " rss_limit_mb                           2048    If non-zero, the fuzzer will exit upon reaching this limit of RSS memory usage (in Mb)."
+                            );
+                            println!(
+                                " malloc_limit_mb                        2048    If non-zero, the fuzzer will exit if the target tries to allocate this number of Mb with one malloc call."
+                            );
+                            println!(
+                                " ignore_remaining_args                  0       If 1, ignore all arguments passed after this one."
+                            );
+                            println!(
+                                " dedup                                  0       If 1, deduplicate corpus elements."
+                            );
+                            println!(
+                                " shrink                                 0       If 1, try to shrink corpus elements."
+                            );
+                            println!(
+                                " skip_tracing                           0       If 1, skip coverage tracing for faster execution."
+                            );
+                            println!(
+                                " tui                                    0       If 1, use the terminal UI interface."
+                            );
+                            println!(
+                                " runs                                   0       Number of individual test runs (0 for infinite runs)."
+                            );
+                            println!(
+                                " close_fd_mask                          0       If 1, close stdout; if 2, close stderr; if 3, close both."
+                            );
+                            println!(
+                                " merge                                  0       If 1, merge multiple corpora into a single one."
+                            );
+                            println!(
+                                " minimize_crash                         0       If 1, minimize crashes to their smallest reproducing input."
+                            );
+                            println!(
+                                " report                                 0       If 1, report statistics without actually fuzzing."
+                            );
+                            println!(
+                                " help                                   0       Print this help message."
+                            );
+                            println!();
+                            println!(
+                                "Flags starting with '--' will be ignored and will be passed verbatim to subprocesses."
+                            );
+                            std::process::exit(0);
+                        }
                         _ => {
                             self.unknown.push(arg);
                         }

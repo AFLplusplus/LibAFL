@@ -67,8 +67,13 @@
 #![allow(clippy::borrow_deref_ref)]
 
 use core::ffi::{CStr, c_char, c_int};
-use std::{fs::File, io::stderr, os::fd::RawFd};
+#[cfg(unix)]
+use std::{
+    os::fd::RawFd,
+    {fs::File, io::stderr},
+};
 
+#[cfg(unix)]
 use env_logger::Target;
 use libafl::{
     Error,
@@ -328,11 +333,20 @@ macro_rules! fuzz_with {
 
             // Attempt to use tokens from libfuzzer dicts
             if !state.has_metadata::<Tokens>() {
+                #[cfg(any(target_os = "linux", target_vendor = "apple"))]
                 let mut toks = if let Some(tokens) = $options.dict() {
                     tokens.clone()
                 } else {
                     Tokens::default()
                 };
+
+                #[cfg(not(any(target_os = "linux", target_vendor = "apple")))]
+                let toks = if let Some(tokens) = $options.dict() {
+                    tokens.clone()
+                } else {
+                    Tokens::default()
+                };
+
                 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
                 {
                     toks += libafl_targets::autotokens()?;
