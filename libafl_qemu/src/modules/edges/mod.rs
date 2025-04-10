@@ -426,7 +426,7 @@ mod tests {
         };
 
         StdEdgeCoverageModule::builder()
-            .map_observer(edges_observer.as_mut())
+            .map(edges_observer.as_mut())
             .build()
             .unwrap();
     }

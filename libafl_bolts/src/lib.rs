@@ -190,7 +190,7 @@ use core::{
     fmt::{self, Display},
     num::{ParseIntError, TryFromIntError},
     ops::{Deref, DerefMut},
-    slice, time,
+    ptr, slice, time,
 };
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
@@ -1580,7 +1580,7 @@ where
 
 /// Cast any sized object into a byte array.
 pub fn any_as_bytes<T: Sized>(any: &T) -> &[u8] {
-    unsafe { slice::from_raw_parts(any as *const T as *const u8, size_of::<T>()) }
+    unsafe { slice::from_raw_parts(ptr::from_ref(any) as *const u8, size_of::<T>()) }
 }
 
 /// Cast any sized object into a mutable byte array.
@@ -1590,7 +1590,7 @@ pub fn any_as_bytes<T: Sized>(any: &T) -> &[u8] {
 /// It is obviously dangerous, since it becomes possible to corrupt the
 /// input object. To use with care.
 pub unsafe fn any_as_bytes_mut<T: Sized>(any: &mut T) -> &mut [u8] {
-    unsafe { slice::from_raw_parts_mut(any as *mut T as *mut u8, size_of::<T>()) }
+    unsafe { slice::from_raw_parts_mut(ptr::from_mut(any) as *mut u8, size_of::<T>()) }
 }
 
 /// Cast back a byte array into a given struct type.
@@ -1602,6 +1602,7 @@ pub unsafe fn any_as_bytes_mut<T: Sized>(any: &mut T) -> &mut [u8] {
 /// objects from unchecked memory.
 ///
 /// The safest way to use this function is in combination with [`any_as_bytes`].
+#[must_use]
 pub unsafe fn any_from_bytes<T>(any_bytes: &[u8]) -> &T {
     unsafe { &*(any_bytes.as_ptr() as *const T) }
 }

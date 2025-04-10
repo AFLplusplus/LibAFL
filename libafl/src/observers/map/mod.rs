@@ -5,6 +5,7 @@ use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
+    slice::{from_raw_parts, from_raw_parts_mut},
 };
 
 use libafl_bolts::{
@@ -405,23 +406,35 @@ pub trait VarLenMapObserver: MapObserver {
     fn size_mut(&mut self) -> &mut usize;
 }
 
-/// Implementors guarantee the size of the map is constant at any point in time and equals N.
+/// A variable length map, with a given size.
 pub trait HasVarLenMap {
     /// A map entry
     type Entry: PartialEq + Copy;
 
-    /// A mutable slice reference to the map.
-    /// The length of the map gives the maximum allocatable size.
+    /// A const ptr to the map.
     fn map_ptr(&self) -> *const Self::Entry;
 
-    /// A slice reference to the map.
-    /// The length of the map gives the maximum allocatable size.
+    /// A mutable slice reference to the map.
+    /// The length of the map gives the current size.
+    fn map_slice(&self) -> &[Self::Entry] {
+        unsafe { from_raw_parts(self.map_ptr(), *self.size_ptr()) }
+    }
+
+    /// A mutable ptr to the map.
     fn map_ptr_mut(&mut self) -> *mut Self::Entry;
 
+    /// A slice reference to the map.
+    /// The length of the map gives the current size.
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry] {
+        unsafe { from_raw_parts_mut(self.map_ptr_mut(), *self.size_ptr()) }
+    }
+
     /// A reference to the size of the map.
+    /// The pointee should always be between 0 and `self.max_size()`
     fn size_ptr(&self) -> *const usize;
 
     /// A mutable reference to the size of the map.
+    /// The pointee should always be between 0 and `self.max_size()`
     fn size_ptr_mut(&mut self) -> *mut usize;
 
     /// The max size of the map
@@ -488,7 +501,7 @@ impl HasVarLenMap for VarLenBytesMap {
     type Entry = u8;
 
     fn map_ptr(&self) -> *const Self::Entry {
-        self.map_ptr as *const Self::Entry
+        self.map_ptr.cast_const()
     }
 
     fn map_ptr_mut(&mut self) -> *mut Self::Entry {
@@ -496,7 +509,7 @@ impl HasVarLenMap for VarLenBytesMap {
     }
 
     fn size_ptr(&self) -> *const usize {
-        self.size_ptr as *const usize
+        self.size_ptr.cast_const()
     }
 
     fn size_ptr_mut(&mut self) -> *mut usize {
@@ -512,7 +525,7 @@ impl<const N: usize> HasConstLenMap<N> for ConstBytesMap<N> {
     type Entry = u8;
 
     fn map_ptr(&self) -> *const Self::Entry {
-        self.map_ptr as *const u8
+        self.map_ptr.cast_const()
     }
 
     fn map_ptr_mut(&mut self) -> *mut Self::Entry {
