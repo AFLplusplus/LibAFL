@@ -1,4 +1,4 @@
-//! A libfuzzer-like fuzzer using qemu for binary-only coverage
+//! A binary-only corpus minimizer using qemu, similar to AFL++ afl-cmin
 #[cfg(target_os = "linux")]
 mod fuzzer;
 

@@ -1,4 +1,4 @@
-//! A qemu test case runner to generate drcov coverage outputs
+//! A binary-only testcase minimizer using qemu, similar to AFL++ afl-tmin
 #[cfg(target_os = "linux")]
 mod fuzzer;
 

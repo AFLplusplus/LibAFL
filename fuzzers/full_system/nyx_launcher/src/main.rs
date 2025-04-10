@@ -1,4 +1,4 @@
-//! A libfuzzer-like fuzzer using qemu for binary-only coverage
+//! A libfuzzer-like fuzzer using Nyx for binary-only coverage
 #[cfg(target_os = "linux")]
 mod client;
 #[cfg(target_os = "linux")]
