@@ -9,7 +9,7 @@ use crate::{
     Emulator, NopEmulatorDriver, NopSnapshotManager, QemuInitError, QemuParams, StdEmulatorDriver,
     StdSnapshotManager,
     command::{NopCommandManager, StdCommandManager},
-    config::QemuConfigBuilder,
+    parameters::config::QemuConfigBuilder,
     modules::{EmulatorModule, EmulatorModuleTuple},
 };
 #[cfg(doc)]
