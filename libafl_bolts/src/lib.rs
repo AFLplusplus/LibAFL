@@ -6,7 +6,7 @@
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]
 // For `type_eq`
-#![cfg_attr(nightly, feature(specialization))]
+// #![cfg_attr(nightly, feature(specialization))]
 // For `std::simd`
 #![cfg_attr(nightly, feature(portable_simd))]
 #![cfg_attr(not(test), warn(
