@@ -99,19 +99,19 @@ where
 
 /// A [`Mutator`] that schedules one of the embedded mutations on each call.
 #[derive(Debug)]
-pub struct StdScheduledMutator<MT> {
+pub struct HavocScheduledMutator<MT> {
     name: Cow<'static, str>,
     mutations: MT,
     max_stack_pow: usize,
 }
 
-impl<MT> Named for StdScheduledMutator<MT> {
+impl<MT> Named for HavocScheduledMutator<MT> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<I, MT, S> Mutator<I, S> for StdScheduledMutator<MT>
+impl<I, MT, S> Mutator<I, S> for HavocScheduledMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
@@ -122,7 +122,7 @@ where
     }
 }
 
-impl<MT> ComposedByMutations for StdScheduledMutator<MT> {
+impl<MT> ComposedByMutations for HavocScheduledMutator<MT> {
     type Mutations = MT;
     /// Get the mutations
     #[inline]
@@ -137,14 +137,14 @@ impl<MT> ComposedByMutations for StdScheduledMutator<MT> {
     }
 }
 
-impl<I, MT, S> ScheduledMutator<I, S> for StdScheduledMutator<MT>
+impl<I, MT, S> ScheduledMutator<I, S> for HavocScheduledMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (state.rand_mut().below_or_zero(self.max_stack_pow))
+        1 << (1 + state.rand_mut().below_or_zero(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
@@ -159,15 +159,15 @@ where
     }
 }
 
-impl<MT> StdScheduledMutator<MT>
+impl<MT> HavocScheduledMutator<MT>
 where
     MT: NamedTuple,
 {
-    /// Create a new [`StdScheduledMutator`] instance specifying mutations
+    /// Create a new [`HavocScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
-        StdScheduledMutator {
+        HavocScheduledMutator {
             name: Cow::from(format!(
-                "StdScheduledMutator[{}]",
+                "HavocScheduledMutator[{}]",
                 mutations.names().join(", ")
             )),
             mutations,
@@ -175,12 +175,12 @@ where
         }
     }
 
-    /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
+    /// Create a new [`HavocScheduledMutator`] instance specifying mutations and the maximun number of iterations
     #[inline]
     pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
         Self {
             name: Cow::from(format!(
-                "StdScheduledMutator[{}]",
+                "HavocScheduledMutator[{}]",
                 mutations.names().join(", ")
             )),
             mutations,
@@ -195,7 +195,7 @@ pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
     tuple_list!(TokenInsert::new(), TokenReplace::new())
 }
 
-/// A logging [`Mutator`] that wraps around a [`StdScheduledMutator`].
+/// A logging [`Mutator`] that wraps around a [`HavocScheduledMutator`].
 #[derive(Debug)]
 pub struct LoggerScheduledMutator<SM> {
     name: Cow<'static, str>,
@@ -315,7 +315,7 @@ mod tests {
         inputs::{BytesInput, HasMutatorBytes},
         mutators::{
             Mutator, havoc_mutations::havoc_mutations, mutations::SpliceMutator,
-            scheduled::StdScheduledMutator,
+            scheduled::HavocScheduledMutator,
         },
         state::StdState,
     };
@@ -376,7 +376,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut havoc = StdScheduledMutator::new(havoc_mutations());
+        let mut havoc = HavocScheduledMutator::new(havoc_mutations());
 
         assert_eq!(input, input_prior);
 

@@ -13,7 +13,7 @@ use libafl::{
     inputs::NautilusInput,
     monitors::SimpleMonitor,
     mutators::{
-        NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator, StdScheduledMutator,
+        NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator, HavocScheduledMutator,
     },
     observers::StdMapObserver,
     schedulers::QueueScheduler,
@@ -145,7 +145,7 @@ pub fn main() {
     }
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_stack_pow(
+    let mutator = HavocScheduledMutator::with_max_stack_pow(
         tuple_list!(
             NautilusRandomMutator::new(&context),
             NautilusRandomMutator::new(&context),

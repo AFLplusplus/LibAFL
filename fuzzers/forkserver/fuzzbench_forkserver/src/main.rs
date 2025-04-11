@@ -19,7 +19,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
-        StdScheduledMutator, Tokens,
+        HavocScheduledMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdCmpObserver, StdMapObserver, TimeObserver},
     schedulers::{
@@ -372,7 +372,7 @@ fn fuzz(
 
         // Setup a randomic Input2State stage
         let i2s =
-            StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+            StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
         // The order of the stages matter!
         let mut stages = tuple_list!(calibration, tracing, i2s, power);
