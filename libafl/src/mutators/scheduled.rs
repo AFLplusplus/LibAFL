@@ -174,7 +174,7 @@ impl<MT> SingleChoiceScheduledMutator<MT>
     }
 }
 
-/// A [`Mutator`] that schedules one of the embedded mutations on each call.
+/// A [`Mutator`] that stacks embedded mutations in a havoc manner on each call.
 #[derive(Debug)]
 pub struct HavocScheduledMutator<MT> {
     name: Cow<'static, str>,
