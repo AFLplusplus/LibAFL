@@ -15,8 +15,8 @@ use libafl::{
     inputs::{NautilusInput, NautilusTargetBytesConverter},
     monitors::SimpleMonitor,
     mutators::{
-        NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator,
-        HavocScheduledMutator, Tokens,
+        HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
+        NautilusSpliceMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},

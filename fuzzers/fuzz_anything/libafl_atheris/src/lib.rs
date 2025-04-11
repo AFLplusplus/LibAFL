@@ -221,8 +221,9 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         let tracing = ShadowTracingStage::new();
 
         // Setup a randomic Input2State stage
-        let i2s =
-            StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+        let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+            I2SRandReplace::new()
+        )));
 
         // Setup a basic mutator
         let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));

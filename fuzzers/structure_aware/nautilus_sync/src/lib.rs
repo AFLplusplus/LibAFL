@@ -18,7 +18,8 @@ use libafl::{
     inputs::{NautilusInput, NautilusToBytesInputConverter},
     monitors::SimpleMonitor,
     mutators::{
-        NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator, HavocScheduledMutator,
+        HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
+        NautilusSpliceMutator,
     },
     none_input_converter,
     schedulers::QueueScheduler,

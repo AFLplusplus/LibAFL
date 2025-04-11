@@ -10,7 +10,7 @@ use libafl::{
     executors::{ExitKind, inprocess_fork::InProcessForkExecutor},
     feedbacks::{CrashFeedback, TimeoutFeedback},
     inputs::{BytesInput, HasMutatorBytes, HasTargetBytes},
-    mutators::{Mutator, HavocScheduledMutator, havoc_mutations_no_crossover},
+    mutators::{HavocScheduledMutator, Mutator, havoc_mutations_no_crossover},
     schedulers::QueueScheduler,
     stages::StdTMinMutationalStage,
     state::{HasCorpus, StdState},

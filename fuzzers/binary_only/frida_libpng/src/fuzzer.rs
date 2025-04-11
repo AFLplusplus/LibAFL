@@ -221,8 +221,9 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         let tracing = ShadowTracingStage::new();
 
         // Setup a randomic Input2State stage
-        let i2s =
-            StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+        let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+            I2SRandReplace::new()
+        )));
 
         // In case the corpus is empty (on first run), reset
         if state.must_load_initial_inputs() {

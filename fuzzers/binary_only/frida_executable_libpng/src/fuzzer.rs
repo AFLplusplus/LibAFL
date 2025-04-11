@@ -194,7 +194,8 @@ unsafe fn fuzz(
                 }
 
                 // Setup a basic mutator with a mutational stage
-                let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                let mutator =
+                    HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
                 let scheduler =
@@ -323,7 +324,8 @@ unsafe fn fuzz(
                 }
 
                 // Setup a basic mutator with a mutational stage
-                let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                let mutator =
+                    HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
                 let scheduler =
@@ -467,7 +469,8 @@ unsafe fn fuzz(
                 }
 
                 // Setup a basic mutator with a mutational stage
-                let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                let mutator =
+                    HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
                 let scheduler =

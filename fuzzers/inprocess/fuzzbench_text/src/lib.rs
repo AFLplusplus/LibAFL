@@ -32,7 +32,7 @@ use libafl::{
         },
         havoc_mutations,
         token_mutations::I2SRandReplace,
-        tokens_mutations, StdMOptMutator, HavocScheduledMutator, Tokens,
+        tokens_mutations, HavocScheduledMutator, StdMOptMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{
@@ -364,7 +364,9 @@ fn fuzz_binary(
     }
 
     // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+        I2SRandReplace::new()
+    )));
 
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(
@@ -572,7 +574,9 @@ fn fuzz_text(
     }
 
     // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+        I2SRandReplace::new()
+    )));
 
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(

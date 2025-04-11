@@ -13,7 +13,8 @@ use libafl::{
     inputs::NautilusInput,
     monitors::SimpleMonitor,
     mutators::{
-        NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator, HavocScheduledMutator,
+        HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
+        NautilusSpliceMutator,
     },
     observers::StdMapObserver,
     schedulers::QueueScheduler,
