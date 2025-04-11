@@ -111,9 +111,9 @@ impl<MT> Named for SingleChoiceScheduledMutator<MT> {
 }
 
 impl<I, MT, S> Mutator<I, S> for SingleChoiceScheduledMutator<MT>
-    where
-        MT: MutatorsTuple<I, S>,
-        S: HasRand,
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand,
 {
     #[inline]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -137,9 +137,9 @@ impl<MT> ComposedByMutations for SingleChoiceScheduledMutator<MT> {
 }
 
 impl<I, MT, S> ScheduledMutator<I, S> for SingleChoiceScheduledMutator<MT>
-    where
-        MT: MutatorsTuple<I, S>,
-        S: HasRand,
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, _state: &mut S, _: &I) -> u64 {
@@ -159,8 +159,8 @@ impl<I, MT, S> ScheduledMutator<I, S> for SingleChoiceScheduledMutator<MT>
 }
 
 impl<MT> SingleChoiceScheduledMutator<MT>
-    where
-        MT: NamedTuple,
+where
+    MT: NamedTuple,
 {
     /// Create a new [`SingleChoiceScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
@@ -392,7 +392,7 @@ mod tests {
         inputs::{BytesInput, HasMutatorBytes},
         mutators::{
             Mutator, havoc_mutations::havoc_mutations, mutations::SpliceMutator,
-            scheduled::HavocScheduledMutator, scheduled::SingleChoiceScheduledMutator
+            scheduled::HavocScheduledMutator, scheduled::SingleChoiceScheduledMutator,
         },
         state::StdState,
     };
@@ -492,7 +492,7 @@ mod tests {
             &mut feedback,
             &mut objective,
         )
-            .unwrap();
+        .unwrap();
 
         let mut mutator = SingleChoiceScheduledMutator::new(havoc_mutations());
 
