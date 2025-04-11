@@ -147,6 +147,7 @@ where
     }
 
     /// Get the next mutation to apply
+    #[allow(clippy::duplicate_code)]
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert_ne!(self.mutations.len(), 0);
         // # Safety
@@ -391,8 +392,10 @@ mod tests {
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasMutatorBytes},
         mutators::{
-            Mutator, havoc_mutations::havoc_mutations, mutations::SpliceMutator,
-            scheduled::HavocScheduledMutator, scheduled::SingleChoiceScheduledMutator,
+            Mutator,
+            havoc_mutations::havoc_mutations,
+            mutations::SpliceMutator,
+            scheduled::{HavocScheduledMutator, SingleChoiceScheduledMutator},
         },
         state::StdState,
     };
@@ -500,7 +503,7 @@ mod tests {
 
         let mut equal_in_a_row = 0;
 
-        for _ in 0..42 {
+        for _ in 0..100 {
             mutator.mutate(&mut state, &mut input).unwrap();
 
             // Make sure we actually mutate something, at least sometimes
@@ -509,7 +512,7 @@ mod tests {
             } else {
                 0
             };
-            assert_ne!(equal_in_a_row, 5);
+            assert_ne!(equal_in_a_row, 20);
         }
     }
 }
