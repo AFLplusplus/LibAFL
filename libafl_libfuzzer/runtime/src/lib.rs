@@ -156,7 +156,7 @@ macro_rules! fuzz_with {
             mutators::{
                 GrimoireExtensionMutator, GrimoireRecursiveReplacementMutator, GrimoireRandomDeleteMutator,
                 GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
-                I2SRandReplace, StdScheduledMutator, UnicodeCategoryRandMutator, UnicodeSubcategoryRandMutator,
+                I2SRandReplace, HavocScheduledMutator, UnicodeCategoryRandMutator, UnicodeSubcategoryRandMutator,
                 UnicodeCategoryTokenReplaceMutator, UnicodeSubcategoryTokenReplaceMutator, Tokens, tokens_mutations,
                 UnicodeInput,
             },
@@ -302,7 +302,7 @@ macro_rules! fuzz_with {
 
             // Set up a string category analysis stage for unicode mutations
             let unicode_used = $options.unicode();
-            let unicode_mutator = StdScheduledMutator::new(
+            let unicode_mutator = HavocScheduledMutator::new(
                 tuple_list!(
                     UnicodeCategoryRandMutator,
                     UnicodeSubcategoryRandMutator,
@@ -311,7 +311,7 @@ macro_rules! fuzz_with {
                     UnicodeSubcategoryRandMutator,
                 )
             );
-            let unicode_replace_mutator = StdScheduledMutator::new(
+            let unicode_replace_mutator = HavocScheduledMutator::new(
                 tuple_list!(
                     UnicodeCategoryTokenReplaceMutator,
                     UnicodeSubcategoryTokenReplaceMutator,
@@ -345,17 +345,17 @@ macro_rules! fuzz_with {
 
             // Setup a randomic Input2State stage, conditionally within a custom mutator
             let i2s =
-                StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+                StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
             let i2s = IfStage::new(|_, _, _, _| Ok((!mutator_status.custom_mutation).into()), (i2s, ()));
             let cm_i2s = StdMutationalStage::new(unsafe {
-                LLVMCustomMutator::mutate_unchecked(StdScheduledMutator::new(tuple_list!(
+                LLVMCustomMutator::mutate_unchecked(HavocScheduledMutator::new(tuple_list!(
                     I2SRandReplace::new()
                 )))
             });
             let cm_i2s = IfStage::new(|_, _, _, _| Ok(mutator_status.custom_mutation.into()), (cm_i2s, ()));
 
             // TODO configure with mutation stacking options from libfuzzer
-            let std_mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+            let std_mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
             let std_power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> = StdPowerMutationalStage::new(std_mutator);
             let std_power = IfStage::new(|_, _, _, _| Ok(mutator_status.std_mutational.into()), (std_power, ()));
@@ -374,10 +374,10 @@ macro_rules! fuzz_with {
             // we opt not to use crossover in the LLVMFuzzerMutate and instead have a second crossover pass,
             // though it is likely an error for fuzzers to provide custom mutators but not custom crossovers
             let custom_mutator = unsafe {
-                LLVMCustomMutator::mutate_unchecked(StdScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations())))
+                LLVMCustomMutator::mutate_unchecked(HavocScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations())))
             };
             // Safe to unwrap: stack pow is not 0.
-            let std_mutator_no_mutate = StdScheduledMutator::with_max_stack_pow(havoc_crossover(),3);
+            let std_mutator_no_mutate = HavocScheduledMutator::with_max_stack_pow(havoc_crossover(),3);
 
             let cm_power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> = StdPowerMutationalStage::new(custom_mutator);
             let cm_power = IfStage::new(|_, _, _, _| Ok(mutator_status.custom_mutation.into()), (cm_power, ()));
@@ -390,12 +390,12 @@ macro_rules! fuzz_with {
             // we handle it here explicitly anyways
             // Safe to unwrap: stack pow is not 0.
             let custom_crossover = unsafe {
-                LLVMCustomMutator::crossover_unchecked(StdScheduledMutator::with_max_stack_pow(
+                LLVMCustomMutator::crossover_unchecked(HavocScheduledMutator::with_max_stack_pow(
                     havoc_mutations_no_crossover().merge(tokens_mutations()),
                     3,
                 ))
             };
-            let std_mutator_no_crossover = StdScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations()));
+            let std_mutator_no_crossover = HavocScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations()));
 
             let cc_power = StdMutationalStage::new(custom_crossover);
             let cc_power = IfStage::new(|_, _, _, _| Ok(mutator_status.custom_crossover.into()), (cc_power, ()));
@@ -404,7 +404,7 @@ macro_rules! fuzz_with {
                 IfStage::new(|_, _, _, _| Ok(mutator_status.std_no_crossover.into()), (cc_std_power, ()));
 
             // Safe to unwrap: stack pow is not 0.
-            let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
+            let grimoire_mutator = HavocScheduledMutator::with_max_stack_pow(
                 tuple_list!(
                     GrimoireExtensionMutator::new(),
                     GrimoireRecursiveReplacementMutator::new(),

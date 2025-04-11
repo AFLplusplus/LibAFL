@@ -6,7 +6,7 @@ use libafl::{
     feedbacks::{CrashFeedback, ListFeedback},
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations, HavocScheduledMutator},
     observers::ListObserver,
     schedulers::RandScheduler,
     stages::StdMutationalStage,
@@ -73,7 +73,7 @@ fn main() {
         .build(tuple_list!(observer))
         .unwrap();
 
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)

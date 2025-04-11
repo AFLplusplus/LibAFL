@@ -15,7 +15,7 @@ use libafl::{
     monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
-        scheduled::{StdScheduledMutator, tokens_mutations},
+        scheduled::{HavocScheduledMutator, tokens_mutations},
         token_mutations::Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -247,7 +247,8 @@ impl ForkserverBytesCoverageSugar<'_> {
 
             if self.tokens_file.is_some() {
                 // Setup a basic mutator
-                let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                let mutator =
+                    HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!
@@ -268,7 +269,7 @@ impl ForkserverBytesCoverageSugar<'_> {
                 }
             } else {
                 // Setup a basic mutator
-                let mutator = StdScheduledMutator::new(havoc_mutations());
+                let mutator = HavocScheduledMutator::new(havoc_mutations());
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!

@@ -17,7 +17,7 @@ use libafl::{
     monitors::{MultiMonitor, OnDiskTomlMonitor},
     mutators::{
         havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, StdScheduledMutator},
+        scheduled::{tokens_mutations, HavocScheduledMutator},
         token_mutations::Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
@@ -198,7 +198,7 @@ pub extern "C" fn libafl_main() {
         }
 
         // Setup a basic mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+        let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus

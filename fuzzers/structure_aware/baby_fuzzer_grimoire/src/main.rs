@@ -11,7 +11,7 @@ use libafl::{
     inputs::{BytesInput, GeneralizedInputMetadata, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        havoc_mutations, scheduled::StdScheduledMutator, GrimoireExtensionMutator,
+        havoc_mutations, scheduled::HavocScheduledMutator, GrimoireExtensionMutator,
         GrimoireRandomDeleteMutator, GrimoireRecursiveReplacementMutator,
         GrimoireStringReplacementMutator, Tokens,
     },
@@ -142,8 +142,8 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_stack_pow(havoc_mutations(), 2);
-    let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
+    let mutator = HavocScheduledMutator::with_max_stack_pow(havoc_mutations(), 2);
+    let grimoire_mutator = HavocScheduledMutator::with_max_stack_pow(
         tuple_list!(
             GrimoireExtensionMutator::new(),
             GrimoireRecursiveReplacementMutator::new(),

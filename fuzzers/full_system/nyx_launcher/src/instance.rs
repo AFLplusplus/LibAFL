@@ -13,7 +13,7 @@ use libafl::{
     inputs::BytesInput,
     monitors::Monitor,
     mutators::{
-        havoc_mutations, tokens_mutations, I2SRandReplace, StdMOptMutator, StdScheduledMutator,
+        havoc_mutations, tokens_mutations, HavocScheduledMutator, I2SRandReplace, StdMOptMutator,
         Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -188,7 +188,7 @@ impl<M: Monitor> Instance<'_, M> {
             let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
             // Setup a randomic Input2State stage
-            let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+            let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
                 I2SRandReplace::new()
             )));
 
@@ -214,7 +214,7 @@ impl<M: Monitor> Instance<'_, M> {
         let mut executor = NyxExecutor::builder().build(helper, observers);
 
         // Setup an havoc mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+        let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 

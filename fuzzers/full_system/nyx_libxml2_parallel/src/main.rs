@@ -6,7 +6,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::BytesInput,
     monitors::MultiMonitor,
-    mutators::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations, HavocScheduledMutator},
     observers::StdMapObserver,
     schedulers::RandScheduler,
     stages::StdMutationalStage,
@@ -64,7 +64,7 @@ fn main() {
         });
 
         println!("We're a client, let's fuzz :)");
-        let mutator = StdScheduledMutator::new(havoc_mutations());
+        let mutator = HavocScheduledMutator::new(havoc_mutations());
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A fuzzer with feedbacks and a corpus scheduler

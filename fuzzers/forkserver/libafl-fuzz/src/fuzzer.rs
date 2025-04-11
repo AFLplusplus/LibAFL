@@ -23,7 +23,7 @@ use libafl::{
     },
     fuzzer::StdFuzzer,
     inputs::{BytesInput, NopTargetBytesConverter},
-    mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens},
+    mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, HavocScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::{BaseSchedule, PowerSchedule},
@@ -263,7 +263,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     // Create our Mutational Stage.
     // We can either have a simple MutationalStage (for Queue scheduling)
     // Or one that utilizes scheduling metadadata (Weighted Random scheduling)
-    let mutation = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+    let mutation = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
     let inner_mutational_stage = if opt.sequential_queue {
         SupportedMutationalStages::StdMutational(StdMutationalStage::new(mutation), PhantomData)
     } else {

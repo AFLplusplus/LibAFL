@@ -14,7 +14,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     mutators::{
-        StdScheduledMutator, UnicodeCategoryRandMutator, UnicodeInput,
+        HavocScheduledMutator, UnicodeCategoryRandMutator, UnicodeInput,
         UnicodeSubcategoryRandMutator,
     },
     observers::StdMapObserver,
@@ -128,7 +128,7 @@ pub fn main() {
         .unwrap();
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(tuple_list!(
+    let mutator = HavocScheduledMutator::new(tuple_list!(
         UnicodeCategoryRandMutator,
         UnicodeSubcategoryRandMutator,
         UnicodeSubcategoryRandMutator,

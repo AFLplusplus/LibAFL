@@ -15,8 +15,8 @@ use libafl::{
     inputs::{BytesInput, Input},
     monitors::Monitor,
     mutators::{
-        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
-        StdScheduledMutator, Tokens,
+        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, HavocScheduledMutator,
+        StdMOptMutator, Tokens,
     },
     observers::{
         CanTrack, HitcountsMapObserver, ObserversTuple, TimeObserver, VariableMapObserver,
@@ -319,7 +319,7 @@ impl<M: Monitor> Instance<'_, M> {
             let tracing = ShadowTracingStage::new();
 
             // Setup a randomic Input2State stage
-            let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+            let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
                 I2SRandReplace::new()
             )));
 
@@ -359,7 +359,7 @@ impl<M: Monitor> Instance<'_, M> {
             )?;
 
             // Setup an havoc mutator with a mutational stage
-            let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+            let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
             let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
                 StdPowerMutationalStage::new(mutator);
             let mut stages = tuple_list!(calibration, power, stats_stage);

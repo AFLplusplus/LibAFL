@@ -19,7 +19,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     monitors::SimpleMonitor,
-    mutators::scheduled::StdScheduledMutator,
+    mutators::scheduled::HavocScheduledMutator,
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
@@ -197,7 +197,7 @@ pub fn main() {
         .prepend(ToggleBooleanMutator);
 
     // Scheduling layer for the mutations
-    let mutator_scheduler = StdScheduledMutator::new(mutators);
+    let mutator_scheduler = HavocScheduledMutator::new(mutators);
     // Defining the mutator stage
     let mut stages = tuple_list!(StdMutationalStage::new(mutator_scheduler));
 

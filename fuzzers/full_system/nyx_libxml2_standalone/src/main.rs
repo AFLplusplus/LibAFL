@@ -6,7 +6,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::BytesInput,
     monitors::tui::TuiMonitor,
-    mutators::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations, HavocScheduledMutator},
     observers::StdMapObserver,
     schedulers::RandScheduler,
     stages::StdMutationalStage,
@@ -44,7 +44,7 @@ fn main() {
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = NyxExecutor::builder().build(helper, tuple_list!(observer));
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     // start fuzz

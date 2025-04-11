@@ -16,7 +16,7 @@ use libafl::{
     monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, StdScheduledMutator},
+        scheduled::{tokens_mutations, HavocScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -184,7 +184,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         }
 
         // Setup a basic mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+        let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler =
@@ -221,8 +221,9 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         let tracing = ShadowTracingStage::new();
 
         // Setup a randomic Input2State stage
-        let i2s =
-            StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+        let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+            I2SRandReplace::new()
+        )));
 
         // In case the corpus is empty (on first run), reset
         if state.must_load_initial_inputs() {

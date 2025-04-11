@@ -16,7 +16,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
-        havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator,
+        havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator,
         token_mutations::I2SRandReplace,
     },
     observers::{CanTrack, TimeObserver},
@@ -155,10 +155,12 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let tracing = ShadowTracingStage::new();
 
     // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+        I2SRandReplace::new()
+    )));
 
     // Setup a basic mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mutational = StdMutationalStage::new(mutator);
 
     // The order of the stages matter!
