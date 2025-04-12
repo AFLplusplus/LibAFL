@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use lain::traits::Mutatable;
 use libafl::{
+    corpus::CorpusId,
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
