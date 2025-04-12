@@ -145,6 +145,11 @@ impl<S> Mutator<CustomInput, S> for ToggleBooleanMutator {
         input.boolean = !input.boolean;
         Ok(MutationResult::Mutated)
     }
+
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for ToggleBooleanMutator {
