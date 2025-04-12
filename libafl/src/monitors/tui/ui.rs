@@ -602,8 +602,6 @@ impl TuiUi {
                 Row::new(vec![
                     Cell::from(Span::raw("solutions")),
                     Cell::from(Span::raw(format_big_number(app.total_solutions))),
-                    Cell::from(Span::raw("cycle done")),
-                    Cell::from(Span::raw(format_big_number(app.total_cycles_done))),
                     Cell::from(Span::raw("corpus count")),
                     Cell::from(Span::raw(format_big_number(app.total_corpus_count))),
                 ]),

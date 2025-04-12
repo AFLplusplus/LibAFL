@@ -5,7 +5,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{cell::RefCell, marker::PhantomData, ops::Deref};
-
+use libafl::corpus::CorpusId;
 use libafl::{
     Error,
     corpus::Corpus,
@@ -302,6 +302,10 @@ where
     fn mutate(&mut self, state: &mut S, input: &mut BytesInput) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input)
     }
+    #[inline]
+    fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        self.mutator.deref().borrow_mut().post_exec(state, new_corpus_id)
+    }
 }
 
 impl<S, SM> ScheduledMutator<BytesInput, S> for LLVMCustomMutator<S, SM, false>
@@ -380,6 +384,10 @@ where
     #[inline]
     fn mutate(&mut self, state: &mut S, input: &mut BytesInput) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input)
+    }
+    #[inline]
+    fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        self.mutator.deref().borrow_mut().post_exec(state, new_corpus_id)
     }
 }
 
