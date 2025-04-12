@@ -73,6 +73,14 @@ where
     fn mutate(&mut self, state: &mut S, input: &mut IO) -> Result<MutationResult, Error> {
         self.inner.mutate(state, (self.mapper)(input))
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        self.inner.post_exec(state, new_corpus_id)
+    }
 }
 
 impl<M, F> Named for MappingMutator<M, F> {
@@ -201,6 +209,14 @@ where
             None => Ok(MutationResult::Skipped),
             Some(i) => self.inner.mutate(state, i),
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        self.inner.post_exec(state, new_corpus_id)
     }
 }
 

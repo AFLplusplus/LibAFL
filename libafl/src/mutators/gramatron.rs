@@ -56,6 +56,14 @@ where
             Ok(MutationResult::Skipped)
         }
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<S> Named for GramatronRandomMutator<'_, S>
@@ -157,6 +165,14 @@ where
                 Ok(MutationResult::Mutated)
             },
         )
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -266,6 +282,14 @@ where
         input.terminals_mut().extend_from_slice(&self.suffix);
 
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
