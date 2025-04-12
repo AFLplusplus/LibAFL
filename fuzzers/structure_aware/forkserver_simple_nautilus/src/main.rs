@@ -15,8 +15,8 @@ use libafl::{
     inputs::{NautilusInput, NautilusTargetBytesConverter},
     monitors::SimpleMonitor,
     mutators::{
-        NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator,
-        StdScheduledMutator, Tokens,
+        HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
+        NautilusSpliceMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
@@ -207,7 +207,7 @@ pub fn main() {
     state.add_metadata(tokens);
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_stack_pow(
+    let mutator = HavocScheduledMutator::with_max_stack_pow(
         tuple_list!(
             NautilusRandomMutator::new(&context),
             NautilusRandomMutator::new(&context),

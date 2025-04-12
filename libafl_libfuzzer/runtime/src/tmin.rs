@@ -10,7 +10,7 @@ use libafl::{
     executors::{ExitKind, inprocess_fork::InProcessForkExecutor},
     feedbacks::{CrashFeedback, TimeoutFeedback},
     inputs::{BytesInput, HasMutatorBytes, HasTargetBytes},
-    mutators::{Mutator, StdScheduledMutator, havoc_mutations_no_crossover},
+    mutators::{HavocScheduledMutator, Mutator, havoc_mutations_no_crossover},
     schedulers::QueueScheduler,
     stages::StdTMinMutationalStage,
     state::{HasCorpus, StdState},
@@ -165,13 +165,13 @@ pub fn minimize_crash(
     // TODO configure with mutation stacking options from libfuzzer
     if mutator_status.custom_mutation {
         let custom_mutator = unsafe {
-            LLVMCustomMutator::mutate_unchecked(StdScheduledMutator::new(
+            LLVMCustomMutator::mutate_unchecked(HavocScheduledMutator::new(
                 havoc_mutations_no_crossover(),
             ))
         };
         minimize_crash_with_mutator(options, harness, custom_mutator, state)
     } else {
-        let std_mutator = StdScheduledMutator::new(havoc_mutations_no_crossover());
+        let std_mutator = HavocScheduledMutator::new(havoc_mutations_no_crossover());
         minimize_crash_with_mutator(options, harness, std_mutator, state)
     }
 }
