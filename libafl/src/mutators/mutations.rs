@@ -141,6 +141,14 @@ where
             Ok(MutationResult::Mutated)
         }
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for BitFlipMutator {
@@ -174,6 +182,14 @@ where
             *state.rand_mut().choose(input.mutator_bytes_mut()).unwrap() ^= 0xff;
             Ok(MutationResult::Mutated)
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -210,6 +226,14 @@ where
             Ok(MutationResult::Mutated)
         }
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for ByteIncMutator {
@@ -244,6 +268,14 @@ where
             *byte = byte.wrapping_sub(1);
             Ok(MutationResult::Mutated)
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -280,6 +312,14 @@ where
             Ok(MutationResult::Mutated)
         }
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for ByteNegMutator {
@@ -314,6 +354,14 @@ where
             *byte ^= 1 + state.rand_mut().below(nonzero!(254)) as u8;
             Ok(MutationResult::Mutated)
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -376,6 +424,10 @@ macro_rules! add_mutator_impl {
                     Ok(MutationResult::Mutated)
                 }
             }
+            #[inline]
+            fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<crate::corpus::CorpusId>) -> Result<(), Error> {
+                Ok(())
+            }
         }
 
         impl Named for $name {
@@ -434,6 +486,14 @@ macro_rules! interesting_mutator_impl {
                     Ok(MutationResult::Mutated)
                 }
             }
+            #[inline]
+            fn post_exec(
+                &mut self,
+                _state: &mut S,
+                _new_corpus_id: Option<crate::corpus::CorpusId>,
+            ) -> Result<(), Error> {
+                Ok(())
+            }
         }
 
         impl Named for $name {
@@ -481,6 +541,14 @@ where
         input.drain(range);
 
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -532,6 +600,14 @@ where
         }
 
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -601,6 +677,14 @@ where
 
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for BytesInsertMutator {
@@ -664,6 +748,14 @@ where
 
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for BytesRandInsertMutator {
@@ -707,6 +799,14 @@ where
 
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for BytesSetMutator {
@@ -749,6 +849,14 @@ where
         buffer_set(input.mutator_bytes_mut(), range.start, quantity, val);
 
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -798,6 +906,14 @@ where
         }
 
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -874,6 +990,14 @@ where
             );
         }
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -1090,6 +1214,14 @@ where
             Ok(MutationResult::Skipped)
         }
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for BytesSwapMutator {
@@ -1201,6 +1333,14 @@ where
             other.mutator_bytes(),
         ))
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for CrossoverInsertMutator {
@@ -1295,6 +1435,14 @@ where
             range,
             other.mutator_bytes(),
         ))
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -1409,6 +1557,14 @@ where
             mapped_other_input,
         ))
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<F, I, O> Named for MappedCrossoverInsertMutator<F, I, O> {
@@ -1495,6 +1651,14 @@ where
             mapped_other_input,
         ))
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<F, I, O> Named for MappedCrossoverReplaceMutator<F, I, O> {
@@ -1564,6 +1728,14 @@ where
         );
 
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 

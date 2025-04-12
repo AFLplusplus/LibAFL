@@ -281,7 +281,6 @@ pub struct TuiContext {
 
     pub total_map_density: String,
     pub total_solutions: u64,
-    pub total_cycles_done: u64,
     pub total_corpus_count: u64,
 
     pub total_process_timing: ProcessTiming,
@@ -310,7 +309,6 @@ impl TuiContext {
 
             total_map_density: "0%".to_string(),
             total_solutions: 0,
-            total_cycles_done: 0,
             total_corpus_count: 0,
             total_item_geometry: ItemGeometry::new(),
             total_process_timing: ProcessTiming::new(),
@@ -374,7 +372,6 @@ impl Monitor for TuiMonitor {
                      edges_total,
                  }| format!("{}%", edges_hit * 100 / edges_total),
             );
-            ctx.total_cycles_done = 0;
             ctx.total_item_geometry = client_stats_manager.item_geometry();
         }
 
