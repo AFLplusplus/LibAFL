@@ -2,6 +2,7 @@ use core::num::NonZeroUsize;
 use std::{borrow::Cow, hash::Hash};
 
 use libafl::{
+    corpus::CorpusId,
     generators::{Generator, RandBytesGenerator},
     inputs::{BytesInput, HasTargetBytes, Input},
     mutators::{MutationResult, Mutator},
