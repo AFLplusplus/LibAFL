@@ -147,7 +147,6 @@ where
     }
 
     /// Get the next mutation to apply
-    #[allow(clippy::duplicate_code)]
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert_ne!(self.mutations.len(), 0);
         // # Safety
