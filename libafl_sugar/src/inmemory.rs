@@ -21,7 +21,7 @@ use libafl::{
     monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
-        scheduled::{StdScheduledMutator, tokens_mutations},
+        scheduled::{HavocScheduledMutator, tokens_mutations},
         token_mutations::{I2SRandReplace, Tokens},
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -264,13 +264,14 @@ where
             let tracing = ShadowTracingStage::new();
 
             // Setup a randomic Input2State stage
-            let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+            let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
                 I2SRandReplace::new()
             )));
 
             if self.tokens_file.is_some() {
                 // Setup a basic mutator
-                let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                let mutator =
+                    HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!
@@ -307,7 +308,7 @@ where
                 }
             } else {
                 // Setup a basic mutator
-                let mutator = StdScheduledMutator::new(havoc_mutations());
+                let mutator = HavocScheduledMutator::new(havoc_mutations());
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!

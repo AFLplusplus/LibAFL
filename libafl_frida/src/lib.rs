@@ -341,7 +341,7 @@ mod tests {
         feedback_and_fast, feedback_or_fast,
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasTargetBytes},
-        mutators::{StdScheduledMutator, mutations::BitFlipMutator},
+        mutators::{HavocScheduledMutator, mutations::BitFlipMutator},
         schedulers::StdScheduler,
         stages::StdMutationalStage,
         state::{HasSolutions, StdState},
@@ -517,7 +517,7 @@ mod tests {
                         Rc::clone(&frida_helper),
                     );
 
-                    let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
+                    let mutator = HavocScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
                     let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
                         mutator,
                         NonZero::new(1).unwrap()

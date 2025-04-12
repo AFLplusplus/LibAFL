@@ -10,7 +10,7 @@ use libafl::{
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::{havoc_mutations, scheduled::StdScheduledMutator},
+    mutators::{havoc_mutations, scheduled::HavocScheduledMutator},
     nonzero,
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     schedulers::QueueScheduler,
@@ -310,7 +310,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
