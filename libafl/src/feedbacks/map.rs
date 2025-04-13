@@ -39,24 +39,30 @@ use crate::{
     state::HasExecutions,
 };
 
-/// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
 #[cfg(feature = "simd")]
+/// A [`SimdMapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
 pub type AflMapFeedback<C, O> = SimdMapFeedback<C, O, SimdOrReducer, u8x32>;
 #[cfg(not(feature = "simd"))]
+/// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
 pub type AflMapFeedback<C, O> = MapFeedback<C, DifferentIsNovel, O, OrReducer>;
 
-/// A [`MapFeedback`] that strives to maximize the map contents.
+
 #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+/// A [`SimdMapFeedback`] that strives to maximize the map contents.
 pub type MaxMapFeedback<C, O> = SimdMapFeedback<C, O, SimdMaxReducer, u8x16>;
 #[cfg(all(feature = "simd", not(target_arch = "x86_64")))]
+/// A [`SimdMapFeedback`] that strives to maximize the map contents.
 pub type MaxMapFeedback<C, O> = SimdMapFeedback<C, O, SimdMaxReducer, u8x32>;
 #[cfg(not(feature = "simd"))]
+/// A [`MapFeedback`] that strives to maximize the map contents.
 pub type MaxMapFeedback<C, O> = MapFeedback<C, DifferentIsNovel, O, MaxReducer>;
 
-/// A [`MapFeedback`] that strives to minimize the map contents.
+
 #[cfg(feature = "simd")]
+/// A [`SimdMapFeedback`] that strives to minimize the map contents.
 pub type MinMapFeedback<C, O> = SimdMapFeedback<C, O, SimdMinReducer, u8x32>;
 #[cfg(not(feature = "simd"))]
+/// A [`MapFeedback`] that strives to minimize the map contents.
 pub type MinMapFeedback<C, O> = MapFeedback<C, DifferentIsNovel, O, MinReducer>;
 
 /// A [`MapFeedback`] that always returns `true` for `is_interesting`. Useful for tracing all executions.

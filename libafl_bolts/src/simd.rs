@@ -75,7 +75,7 @@ where
     }
 }
 
-/// Unforunately we have to keep this type due to [`wide::*`] might not `PartialOrd``
+/// Unforunately we have to keep this type due to [`wide::*`] might not `PartialOrd`
 #[cfg(feature = "wide")]
 #[derive(Debug)]
 pub struct SimdMaxReducer;

@@ -55,7 +55,7 @@ where
 
         let map_state = state
             .named_metadata_map_mut()
-            .get_mut::<MapFeedbackMetadata<u8>>(&self.map.name())
+            .get_mut::<MapFeedbackMetadata<u8>>(self.map.name())
             .unwrap();
         let size = observer.usable_count();
         let len = observer.len();
@@ -107,7 +107,7 @@ where
     pub fn new(map_observer: &C) -> Self {
         let map = MapFeedback::new(map_observer);
         Self {
-            map: map,
+            map,
             _ph: PhantomData,
         }
     }
@@ -117,7 +117,7 @@ where
     pub fn with_name(name: &'static str, map_observer: &C) -> Self {
         let map = MapFeedback::with_name(name, map_observer);
         Self {
-            map: map,
+            map,
             _ph: PhantomData,
         }
     }
