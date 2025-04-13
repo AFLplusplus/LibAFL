@@ -17,7 +17,7 @@ use libafl_bolts::{
     tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 #[cfg(not(feature = "simd"))]
-use libafl_bolts::{MinReducer, OrReducer, Reducer};
+use libafl_bolts::simd::{MinReducer, OrReducer};
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
