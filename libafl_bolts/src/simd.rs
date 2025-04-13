@@ -78,7 +78,7 @@ where
     }
 }
 
-/// Unforunately we have to keep this type due to [`wide::*`] might not `PartialOrd`
+/// Unforunately we have to keep this type due to [`wide`] might not `PartialOrd`
 #[cfg(feature = "wide")]
 #[derive(Debug)]
 pub struct SimdMaxReducer;
@@ -131,7 +131,7 @@ where
     }
 }
 
-/// Unforunately we have to keep this type due to [`wide::*`] might not `PartialOrd`
+/// Unforunately we have to keep this type due to [`wide`] might not `PartialOrd`
 #[cfg(feature = "wide")]
 #[derive(Debug)]
 pub struct SimdMinReducer;
@@ -228,7 +228,7 @@ pub trait VectorType {
     #[must_use]
     fn blend(self, lhs: Self, rhs: Self) -> Self;
 
-    /// Can't reuse [`crate::AsSlice`] due to [`wide::*`] might implement `Deref`
+    /// Can't reuse [`crate::AsSlice`] due to [`wide`] might implement `Deref`
     fn as_slice(&self) -> &[u8];
 }
 

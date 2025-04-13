@@ -219,15 +219,13 @@ where
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         // cargo +nightly doc asks so
-        <MapFeedback<C, DifferentIsNovel, O, MaxReducer> as Feedback<EM, I, OT, S>>::last_result(
-            &self.map,
-        )
+        self.map.last_result()
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
     fn append_hit_feedbacks(&self, list: &mut Vec<Cow<'static, str>>) -> Result<(), Error> {
         // cargo +nightly doc asks so
-        <MapFeedback<C, DifferentIsNovel, O, MaxReducer> as Feedback<EM, I, OT, S>>::append_hit_feedbacks(&self.map, list)
+        self.map.append_hit_feedbacks(list)
     }
 
     #[inline]

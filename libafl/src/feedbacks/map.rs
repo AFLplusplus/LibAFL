@@ -37,7 +37,7 @@ use crate::{
 };
 
 #[cfg(feature = "simd")]
-/// A [`SimdMapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
+/// A [`SimdMapFeedback`] that implements the AFL algorithm using an [`SimdOrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
 pub type AflMapFeedback<C, O> = SimdMapFeedback<C, O, SimdOrReducer, u8x32>;
 #[cfg(not(feature = "simd"))]
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
