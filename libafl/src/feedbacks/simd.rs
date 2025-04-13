@@ -107,7 +107,7 @@ impl<C, O, R, V> SimdMapFeedback<C, O, R, V>
 where
     R: SimdReducer<V>,
     C: CanTrack + AsRef<O> + Named,
-    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
 {
     /// Mock [`MapFeedback::new`]. If you are getting bound errors, your entry is probably not
     /// `u8` and you should use [`MapFeedback`] instead.

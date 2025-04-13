@@ -21,7 +21,9 @@ use libafl::{
     state::StdState,
     Evaluator,
 };
-use libafl_bolts::{nonnull_raw_mut, rands::StdRand, simd::MinReducer, tuples::tuple_list, AsSlice};
+use libafl_bolts::{
+    nonnull_raw_mut, rands::StdRand, simd::MinReducer, tuples::tuple_list, AsSlice,
+};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 128] = [0; 128];
