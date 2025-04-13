@@ -310,7 +310,7 @@ pub struct MapFeedback<C, N, O, R> {
     stats_name: Cow<'static, str>,
     // The previous run's result of [`Self::is_interesting`]
     #[cfg(feature = "track_hit_feedbacks")]
-    last_result: Option<bool>,
+    pub(crate) last_result: Option<bool>,
     /// Phantom Data of Reducer
     #[expect(clippy::type_complexity)]
     phantom: PhantomData<fn() -> (N, O, R)>,
