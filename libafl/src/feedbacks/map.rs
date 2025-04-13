@@ -10,8 +10,11 @@ use core::{
 #[cfg(feature = "simd")]
 use libafl_bolts::simd::{
     SimdMaxReducer, SimdMinReducer, SimdOrReducer,
-    vector::{u8x16, u8x32},
+    vector::u8x32,
 };
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
+use libafl_bolts::simd::vector::u8x16;
+
 use libafl_bolts::{
     AsIter, HasRefCnt, Named,
     simd::{MaxReducer, NopReducer, Reducer},
