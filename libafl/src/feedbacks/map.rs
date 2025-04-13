@@ -7,14 +7,10 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-#[cfg(feature = "simd")]
-use libafl_bolts::simd::{
-    SimdMaxReducer, SimdMinReducer, SimdOrReducer,
-    vector::u8x32,
-};
 #[cfg(all(feature = "simd", target_arch = "x86_64"))]
 use libafl_bolts::simd::vector::u8x16;
-
+#[cfg(feature = "simd")]
+use libafl_bolts::simd::{SimdMaxReducer, SimdMinReducer, SimdOrReducer, vector::u8x32};
 use libafl_bolts::{
     AsIter, HasRefCnt, Named,
     simd::{MaxReducer, NopReducer, Reducer},
@@ -46,7 +42,6 @@ pub type AflMapFeedback<C, O> = SimdMapFeedback<C, O, SimdOrReducer, u8x32>;
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
 pub type AflMapFeedback<C, O> = MapFeedback<C, DifferentIsNovel, O, OrReducer>;
 
-
 #[cfg(all(feature = "simd", target_arch = "x86_64"))]
 /// A [`SimdMapFeedback`] that strives to maximize the map contents.
 pub type MaxMapFeedback<C, O> = SimdMapFeedback<C, O, SimdMaxReducer, u8x16>;
@@ -56,7 +51,6 @@ pub type MaxMapFeedback<C, O> = SimdMapFeedback<C, O, SimdMaxReducer, u8x32>;
 #[cfg(not(feature = "simd"))]
 /// A [`MapFeedback`] that strives to maximize the map contents.
 pub type MaxMapFeedback<C, O> = MapFeedback<C, DifferentIsNovel, O, MaxReducer>;
-
 
 #[cfg(feature = "simd")]
 /// A [`SimdMapFeedback`] that strives to minimize the map contents.
