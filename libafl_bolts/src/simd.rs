@@ -225,9 +225,10 @@ pub trait VectorType {
     fn novelties(hist: &[u8], map: &[u8], base: usize, novelties: &mut Vec<usize>);
 
     /// Do blending
+    #[must_use]
     fn blend(self, lhs: Self, rhs: Self) -> Self;
 
-    /// Can't reuse AsSlice due to [`wide::*`] might implement `Deref`
+    /// Can't reuse [`crate::AsSlice`] due to [`wide::*`] might implement `Deref`
     fn as_slice(&self) -> &[u8];
 }
 
@@ -332,6 +333,7 @@ where
         map[i..i + V::N].copy_from_slice(out.as_slice());
     }
 
+    #[allow(clippy::needless_range_loop)]
     for j in (size - left)..size {
         map[j] = if map[j] == 0 { 0x1 } else { 0x80 }
     }
