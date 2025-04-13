@@ -2,7 +2,9 @@ use chrono::Utc;
 use clap::Parser;
 use itertools::Itertools;
 use libafl_bolts::simd::{
-    covmap_is_interesting_naive, covmap_is_interesting_simd, simplify_map_naive, simplify_map_u8x16, simplify_map_u8x32, AndReducer, MaxReducer, MinReducer, OrReducer, Reducer, SimdAndReducer, SimdMaxReducer, SimdMinReducer, SimdOrReducer, SimdReducer, VectorType
+    AndReducer, MaxReducer, MinReducer, OrReducer, Reducer, SimdAndReducer, SimdMaxReducer,
+    SimdMinReducer, SimdOrReducer, SimdReducer, VectorType, covmap_is_interesting_naive,
+    covmap_is_interesting_simd, simplify_map_naive, simplify_map_u8x16, simplify_map_u8x32,
 };
 use rand::{RngCore, rngs::ThreadRng};
 
@@ -100,7 +102,11 @@ struct CovInput {
 }
 
 impl CovInput {
-    fn from_cli_simd<T: VectorType + Eq + Copy, R: SimdReducer<T>>(name: &str, cli: &Cli, rng: &ThreadRng) -> Self {
+    fn from_cli_simd<T: VectorType + Eq + Copy, R: SimdReducer<T>>(
+        name: &str,
+        cli: &Cli,
+        rng: &ThreadRng,
+    ) -> Self {
         CovInput {
             name: name.to_string(),
             func: covmap_is_interesting_simd::<R, T>,
@@ -145,7 +151,8 @@ impl CovInput {
 
                 assert!(
                     canonical_interesting == interesting && novelties == canonical_novelties,
-                    "Incorrect {} impl. {canonical_interesting} vs {interesting}, {canonical_novelties:?} vs\n{novelties:?}", self.name
+                    "Incorrect {} impl. {canonical_interesting} vs {interesting}, {canonical_novelties:?} vs\n{novelties:?}",
+                    self.name
                 );
             }
             let after = Utc::now();
@@ -213,7 +220,7 @@ fn main() {
         CovInput::from_cli_simd::<wide::u8x32, SimdAndReducer>("u8x32 and cov", &cli, &rng),
         CovInput::from_cli_naive::<OrReducer>("naive or cov", &cli, &rng),
         CovInput::from_cli_simd::<wide::u8x16, SimdOrReducer>("u8x16 or cov", &cli, &rng),
-        CovInput::from_cli_simd::<wide::u8x32, SimdOrReducer>("u8x32 or cov", &cli, &rng)
+        CovInput::from_cli_simd::<wide::u8x32, SimdOrReducer>("u8x32 or cov", &cli, &rng),
     ];
 
     for bench in benches {

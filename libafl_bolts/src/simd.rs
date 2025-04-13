@@ -1,9 +1,14 @@
 //! Module for SIMD assisted methods.
 
-use core::ops::{BitAnd, BitOr};
-
 #[cfg(feature = "alloc")]
 use alloc::{vec, vec::Vec};
+use core::ops::{BitAnd, BitOr};
+
+/// Re-export our vector types
+#[cfg(feature = "wide")]
+pub mod vector {
+    pub use wide::{u8x16, u8x32};
+}
 
 /// The SIMD based reducer implementation
 #[cfg(feature = "wide")]
@@ -56,7 +61,6 @@ impl HasMin for wide::u8x32 {
     }
 }
 
-
 /// A [`MaxReducer`] reduces int values and returns their maximum.
 #[derive(Clone, Debug)]
 pub struct MaxReducer {}
@@ -77,9 +81,9 @@ where
 pub struct SimdMaxReducer;
 
 #[cfg(feature = "wide")]
-impl<T> Reducer<T> for SimdMaxReducer 
-where 
-    T: HasMax
+impl<T> Reducer<T> for SimdMaxReducer
+where
+    T: HasMax,
 {
     fn reduce(first: T, second: T) -> T {
         first.max_(second)
@@ -87,9 +91,9 @@ where
 }
 
 #[cfg(feature = "wide")]
-impl<T> SimdReducer<T> for SimdMaxReducer 
+impl<T> SimdReducer<T> for SimdMaxReducer
 where
-    T: HasMax
+    T: HasMax,
 {
     type PrimitiveReducer = MaxReducer;
 }
@@ -109,7 +113,6 @@ impl<T> Reducer<T> for NopReducer {
 impl<T> SimdReducer<T> for NopReducer {
     type PrimitiveReducer = NopReducer;
 }
-
 
 /// A [`MinReducer`] reduces int values and returns their minimum.
 #[derive(Clone, Debug)]
@@ -131,9 +134,9 @@ where
 pub struct SimdMinReducer;
 
 #[cfg(feature = "wide")]
-impl<T> Reducer<T> for SimdMinReducer 
-where 
-    T: HasMin
+impl<T> Reducer<T> for SimdMinReducer
+where
+    T: HasMin,
 {
     fn reduce(first: T, second: T) -> T {
         first.min_(second)
@@ -142,12 +145,11 @@ where
 
 #[cfg(feature = "wide")]
 impl<T> SimdReducer<T> for SimdMinReducer
-where 
-    T: HasMin
+where
+    T: HasMin,
 {
     type PrimitiveReducer = MinReducer;
 }
-
 
 /// A [`OrReducer`] reduces the values returning the bitwise OR with the old value
 #[derive(Clone, Debug)]
@@ -164,9 +166,9 @@ where
 }
 
 #[cfg(feature = "wide")]
-impl<T> SimdReducer<T> for OrReducer 
-where 
-    T: BitOr<Output = T>
+impl<T> SimdReducer<T> for OrReducer
+where
+    T: BitOr<Output = T>,
 {
     type PrimitiveReducer = OrReducer;
 }
@@ -190,9 +192,9 @@ where
 }
 
 #[cfg(feature = "wide")]
-impl<T> SimdReducer<T> for AndReducer 
-where 
-    T: BitAnd<Output = T>
+impl<T> SimdReducer<T> for AndReducer
+where
+    T: BitAnd<Output = T>,
 {
     type PrimitiveReducer = AndReducer;
 }
@@ -200,7 +202,6 @@ where
 /// SIMD based AndReducer, alias for consistency
 #[cfg(feature = "wide")]
 pub type SimdAndReducer = AndReducer;
-
 
 /// `simplify_map` naive implementaion. In most cases, this can be auto-vectorized.
 pub fn simplify_map_naive(map: &mut [u8]) {
@@ -278,7 +279,6 @@ pub fn std_simplify_map(map: &mut [u8]) {
     simplify_map_u8x32(map);
 }
 
-
 /// The vector type that can be used with coverage map
 pub trait VectorType {
     /// Number of bytes
@@ -286,7 +286,7 @@ pub trait VectorType {
 
     /// Construct vector from slice
     fn from_array(arr: &[u8]) -> Self;
-    
+
     /// Collect novelties. We pass in base to avoid redo calculate for novelties indice.
     fn novelties(hist: &[u8], map: &[u8], base: usize, novelties: &mut Vec<usize>);
 }
@@ -347,9 +347,9 @@ pub fn covmap_is_interesting_simd<R, V>(
     map: &[u8],
     collect_novelties: bool,
 ) -> (bool, Vec<usize>)
-where 
+where
     V: VectorType + Eq + Copy,
-    R: SimdReducer<V>
+    R: SimdReducer<V>,
 {
     let mut novelties = vec![];
     let mut interesting = false;
@@ -360,11 +360,10 @@ where
     if collect_novelties {
         for step in 0..steps {
             let i = step * V::N;
-            let history =
-                V::from_array(&hist[i..]);
+            let history = V::from_array(&hist[i..]);
             let items = V::from_array(&map[i..]);
 
-            let out= R::reduce(history, items);
+            let out = R::reduce(history, items);
             if out != history {
                 interesting = true;
                 V::novelties(hist, map, i, &mut novelties);
@@ -385,11 +384,10 @@ where
     } else {
         for step in 0..steps {
             let i = step * V::N;
-            let history =
-                V::from_array(&hist[i..]);
+            let history = V::from_array(&hist[i..]);
             let items = V::from_array(&map[i..]);
 
-            let out= R::reduce(history, items);
+            let out = R::reduce(history, items);
             if out != history {
                 interesting = true;
                 break;
@@ -414,7 +412,6 @@ where
     (interesting, novelties)
 }
 
-
 /// Coverage map insteresting naive implementation. Do not use it unless you have strong reasons to do.
 #[cfg(feature = "alloc")]
 #[must_use]
@@ -422,9 +419,9 @@ pub fn covmap_is_interesting_naive<R>(
     hist: &[u8],
     map: &[u8],
     collect_novelties: bool,
-) -> (bool, Vec<usize>) 
-where 
-    R: Reducer<u8>
+) -> (bool, Vec<usize>)
+where
+    R: Reducer<u8>,
 {
     let mut novelties = vec![];
     let mut interesting = false;
@@ -450,30 +447,4 @@ where
     }
 
     (interesting, novelties)
-}
-
-
-/// Standard max coverage map instereting implementation. Use the available fastest implementation by default.
-#[cfg(feature = "alloc")]
-#[allow(unused_variables)] // or we fail cargo doc
-#[must_use]
-pub fn std_max_covmap_is_interesting(
-    hist: &[u8],
-    map: &[u8],
-    collect_novelties: bool,
-) -> (bool, Vec<usize>) {
-    #[cfg(not(feature = "wide"))]
-    return covmap_is_interesting_naive::<MaxReducer>(hist, map, collect_novelties);
-
-    #[cfg(feature = "wide")]
-    {
-        // Supported by benchmark:
-        // - on aarch64, u8x32 is 15% faster than u8x16
-        // - on amd64, u8x16 is 10% faster compared to the u8x32
-        #[cfg(target_arch = "aarch64")]
-        return covmap_is_interesting_simd::<SimdMaxReducer, wide::u8x32>(hist, map, collect_novelties);
-
-        #[cfg(not(target_arch = "aarch64"))]
-        return covmap_is_interesting_simd::<SimdMaxReducer, wide::u8x16>(hist, map, collect_novelties);
-    }
 }
