@@ -4,7 +4,7 @@ use itertools::Itertools;
 use libafl_bolts::simd::{
     AndReducer, MaxReducer, MinReducer, OrReducer, Reducer, SimdAndReducer, SimdMaxReducer,
     SimdMinReducer, SimdOrReducer, SimdReducer, VectorType, covmap_is_interesting_naive,
-    covmap_is_interesting_simd, simplify_map_naive, simplify_map_u8x16, simplify_map_u8x32,
+    covmap_is_interesting_simd, simplify_map_naive, simplify_map_simd,
 };
 use rand::{RngCore, rngs::ThreadRng};
 
@@ -198,8 +198,18 @@ fn main() {
 
     let simpls = [
         SimplifyMapInput::from_cli("naive simplify_map", simplify_map_naive, &cli, &rng),
-        SimplifyMapInput::from_cli("u8x16 simplify_map", simplify_map_u8x16, &cli, &rng),
-        SimplifyMapInput::from_cli("u8x32 simplify_map", simplify_map_u8x32, &cli, &rng),
+        SimplifyMapInput::from_cli(
+            "u8x16 simplify_map",
+            simplify_map_simd::<wide::u8x16>,
+            &cli,
+            &rng,
+        ),
+        SimplifyMapInput::from_cli(
+            "u8x32 simplify_map",
+            simplify_map_simd::<wide::u8x32>,
+            &cli,
+            &rng,
+        ),
     ];
 
     for bench in simpls {

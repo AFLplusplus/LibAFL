@@ -4,6 +4,9 @@
 use alloc::{vec, vec::Vec};
 use core::ops::{BitAnd, BitOr};
 
+#[cfg(feature = "wide")]
+use wide::CmpEq;
+
 /// Re-export our vector types
 #[cfg(feature = "wide")]
 pub mod vector {
@@ -203,98 +206,39 @@ where
 #[cfg(feature = "wide")]
 pub type SimdAndReducer = AndReducer;
 
-/// `simplify_map` naive implementaion. In most cases, this can be auto-vectorized.
-pub fn simplify_map_naive(map: &mut [u8]) {
-    for it in map.iter_mut() {
-        *it = if *it == 0 { 0x1 } else { 0x80 };
-    }
-}
-
-/// `simplify_map` implementation by u8x16, worse performance compared to LLVM
-/// auto-vectorization but faster if LLVM doesn't vectorize.
 #[cfg(feature = "wide")]
-pub fn simplify_map_u8x16(map: &mut [u8]) {
-    type VectorType = wide::u8x16;
-    const N: usize = VectorType::LANES as usize;
-    let size = map.len();
-    let steps = size / N;
-    let left = size % N;
-    let lhs = VectorType::new([0x1; N]);
-    let rhs = VectorType::new([0x80; N]);
-
-    for step in 0..steps {
-        let i = step * N;
-        let mp = VectorType::new(map[i..(i + N)].try_into().unwrap());
-
-        let mask = mp.cmp_eq(VectorType::ZERO);
-        let out = mask.blend(lhs, rhs);
-        map[i..i + N].copy_from_slice(out.as_array_ref());
-    }
-
-    #[allow(clippy::needless_range_loop)]
-    for j in (size - left)..size {
-        map[j] = if map[j] == 0 { 0x1 } else { 0x80 }
-    }
-}
-
-/// `simplify_map` implementation by i8x32, achieving comparable performance with
-/// LLVM auto-vectorization.
-#[cfg(feature = "wide")]
-pub fn simplify_map_u8x32(map: &mut [u8]) {
-    use wide::CmpEq;
-
-    type VectorType = wide::u8x32;
-    const N: usize = VectorType::LANES as usize;
-    let size = map.len();
-    let steps = size / N;
-    let left = size % N;
-    let lhs = VectorType::new([0x01; 32]);
-    let rhs = VectorType::new([0x80; 32]);
-
-    for step in 0..steps {
-        let i = step * N;
-        let mp = VectorType::new(map[i..i + N].try_into().unwrap());
-
-        let mask = mp.cmp_eq(VectorType::ZERO);
-        let out = mask.blend(lhs, rhs);
-        unsafe {
-            out.as_array_ref()
-                .as_ptr()
-                .copy_to_nonoverlapping(map.as_mut_ptr().add(i), N);
-        }
-    }
-
-    #[allow(clippy::needless_range_loop)]
-    for j in (size - left)..size {
-        map[j] = if map[j] == 0 { 0x1 } else { 0x80 }
-    }
-}
-
-/// The std implementation of `simplify_map`. Use the fastest implementation by benchamrk by default.
-pub fn std_simplify_map(map: &mut [u8]) {
-    #[cfg(not(feature = "wide"))]
-    simplify_map_naive(map);
-
-    #[cfg(feature = "wide")]
-    simplify_map_u8x32(map);
-}
-
 /// The vector type that can be used with coverage map
 pub trait VectorType {
     /// Number of bytes
     const N: usize;
+    /// Zero vector
+    const ZERO: Self;
+    /// One vector
+    const ONE: Self;
+    /// 0x80 vector
+    const EIGHTY: Self;
 
-    /// Construct vector from slice
-    fn from_array(arr: &[u8]) -> Self;
+    /// Construct vector from slice. Can't use N unless const generics is stablized.
+    fn from_slice(arr: &[u8]) -> Self;
 
     /// Collect novelties. We pass in base to avoid redo calculate for novelties indice.
     fn novelties(hist: &[u8], map: &[u8], base: usize, novelties: &mut Vec<usize>);
+
+    /// Do blending
+    fn blend(self, lhs: Self, rhs: Self) -> Self;
+
+    /// Can't reuse AsSlice due to [`wide::*`] might implement `Deref`
+    fn as_slice(&self) -> &[u8];
 }
 
+#[cfg(feature = "wide")]
 impl VectorType for wide::u8x16 {
     const N: usize = Self::LANES as usize;
+    const ZERO: Self = Self::ZERO;
+    const ONE: Self = Self::new([0x1u8; Self::N]);
+    const EIGHTY: Self = Self::new([0x80u8; Self::N]);
 
-    fn from_array(arr: &[u8]) -> Self {
+    fn from_slice(arr: &[u8]) -> Self {
         Self::new(arr[0..Self::N].try_into().unwrap())
     }
 
@@ -308,12 +252,24 @@ impl VectorType for wide::u8x16 {
             }
         }
     }
+
+    fn blend(self, lhs: Self, rhs: Self) -> Self {
+        self.blend(lhs, rhs)
+    }
+
+    fn as_slice(&self) -> &[u8] {
+        self.as_array_ref()
+    }
 }
 
+#[cfg(feature = "wide")]
 impl VectorType for wide::u8x32 {
     const N: usize = Self::LANES as usize;
+    const ZERO: Self = Self::ZERO;
+    const ONE: Self = Self::new([0x1u8; Self::N]);
+    const EIGHTY: Self = Self::new([0x80u8; Self::N]);
 
-    fn from_array(arr: &[u8]) -> Self {
+    fn from_slice(arr: &[u8]) -> Self {
         Self::new(arr[0..Self::N].try_into().unwrap())
     }
 
@@ -337,6 +293,57 @@ impl VectorType for wide::u8x32 {
             }
         }
     }
+
+    fn blend(self, lhs: Self, rhs: Self) -> Self {
+        self.blend(lhs, rhs)
+    }
+
+    fn as_slice(&self) -> &[u8] {
+        self.as_array_ref()
+    }
+}
+
+/// `simplify_map` naive implementaion. In most cases, this can be auto-vectorized.
+pub fn simplify_map_naive(map: &mut [u8]) {
+    for it in map.iter_mut() {
+        *it = if *it == 0 { 0x1 } else { 0x80 };
+    }
+}
+
+/// `simplify_map` implementation by u8x16, worse performance compared to LLVM
+/// auto-vectorization but faster if LLVM doesn't vectorize.
+#[cfg(feature = "wide")]
+pub fn simplify_map_simd<V>(map: &mut [u8])
+where
+    V: VectorType + Copy + Eq + CmpEq<Output = V>,
+{
+    let size = map.len();
+    let steps = size / V::N;
+    let left = size % V::N;
+    let lhs = V::ONE;
+    let rhs = V::EIGHTY;
+
+    for step in 0..steps {
+        let i = step * V::N;
+        let mp = V::from_slice(&map[i..]);
+
+        let mask = mp.cmp_eq(V::ZERO);
+        let out = mask.blend(lhs, rhs);
+        map[i..i + V::N].copy_from_slice(out.as_slice());
+    }
+
+    for j in (size - left)..size {
+        map[j] = if map[j] == 0 { 0x1 } else { 0x80 }
+    }
+}
+
+/// The std implementation of `simplify_map`. Use the fastest implementation by benchamrk by default.
+pub fn std_simplify_map(map: &mut [u8]) {
+    #[cfg(not(feature = "wide"))]
+    simplify_map_naive(map);
+
+    #[cfg(feature = "wide")]
+    simplify_map_simd::<wide::u8x32>(map);
 }
 
 /// Coverage map insteresting implementation by u8x16. Slightly faster than nightly simd.
@@ -360,8 +367,8 @@ where
     if collect_novelties {
         for step in 0..steps {
             let i = step * V::N;
-            let history = V::from_array(&hist[i..]);
-            let items = V::from_array(&map[i..]);
+            let history = V::from_slice(&hist[i..]);
+            let items = V::from_slice(&map[i..]);
 
             let out = R::reduce(history, items);
             if out != history {
@@ -384,8 +391,8 @@ where
     } else {
         for step in 0..steps {
             let i = step * V::N;
-            let history = V::from_array(&hist[i..]);
-            let items = V::from_array(&map[i..]);
+            let history = V::from_slice(&hist[i..]);
+            let items = V::from_slice(&map[i..]);
 
             let out = R::reduce(history, items);
             if out != history {
