@@ -9,6 +9,8 @@ use core::{
 
 #[cfg(all(feature = "simd", target_arch = "x86_64"))]
 use libafl_bolts::simd::vector::u8x16;
+#[cfg(not(feature = "simd"))]
+use libafl_bolts::simd::{MinReducer, OrReducer};
 #[cfg(feature = "simd")]
 use libafl_bolts::simd::{SimdMaxReducer, SimdMinReducer, SimdOrReducer, vector::u8x32};
 use libafl_bolts::{
@@ -16,8 +18,6 @@ use libafl_bolts::{
     simd::{MaxReducer, NopReducer, Reducer},
     tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
-#[cfg(not(feature = "simd"))]
-use libafl_bolts::simd::{MinReducer, OrReducer};
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
