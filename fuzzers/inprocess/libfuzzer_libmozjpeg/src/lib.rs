@@ -11,7 +11,7 @@ use libafl::{
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    feedbacks::{CrashFeedback, DifferentIsNovel, MapFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -28,6 +28,7 @@ use libafl::{
 };
 use libafl_bolts::{
     rands::StdRand,
+    simd::MaxReducer,
     tuples::{tuple_list, Merge},
     AsSlice,
 };
@@ -101,7 +102,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut feedback = feedback_or!(
         MaxMapFeedback::new(&edges_observer),
         MaxMapFeedback::new(&cmps_observer),
-        MaxMapFeedback::new(&allocs_observer)
+        MapFeedback::<_, DifferentIsNovel, _, MaxReducer>::new(&allocs_observer)
     );
 
     // A feedback to choose if an input is a solution or not
