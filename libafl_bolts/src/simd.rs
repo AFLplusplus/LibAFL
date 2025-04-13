@@ -75,7 +75,7 @@ where
     }
 }
 
-/// Unforunately we have to keep this type due to [`wide::*`] might not PartialOrd
+/// Unforunately we have to keep this type due to [`wide::*`] might not `PartialOrd``
 #[cfg(feature = "wide")]
 #[derive(Debug)]
 pub struct SimdMaxReducer;
@@ -128,7 +128,7 @@ where
     }
 }
 
-/// Unforunately we have to keep this type due to [`wide::*`] might not PartialOrd
+/// Unforunately we have to keep this type due to [`wide::*`] might not `PartialOrd`
 #[cfg(feature = "wide")]
 #[derive(Debug)]
 pub struct SimdMinReducer;
@@ -173,7 +173,7 @@ where
     type PrimitiveReducer = OrReducer;
 }
 
-/// SIMD based OrReducer, alias for consistency
+/// SIMD based [`OrReducer`], alias for consistency
 #[cfg(feature = "wide")]
 pub type SimdOrReducer = OrReducer;
 
@@ -199,7 +199,7 @@ where
     type PrimitiveReducer = AndReducer;
 }
 
-/// SIMD based AndReducer, alias for consistency
+/// SIMD based [`AndReducer`], alias for consistency
 #[cfg(feature = "wide")]
 pub type SimdAndReducer = AndReducer;
 
