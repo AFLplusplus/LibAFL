@@ -99,12 +99,18 @@ where
     }
 }
 
+/// Implementation that mocks [`MapFeedback`], note the bound of O is intentionally stricter
+/// than we we need to hint users when their entry is not `u8`. Without this bound, there
+/// would be bound related errors in [`crate::fuzzer::StdFuzzer`], which is super confusing
+/// and misleading.
 impl<C, O, R, V> SimdMapFeedback<C, O, R, V>
 where
     R: SimdReducer<V>,
     C: CanTrack + AsRef<O> + Named,
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>
 {
-    /// Mock [`MapFeedback::new`]
+    /// Mock [`MapFeedback::new`]. If you are getting bound errors, your entry is probably not
+    /// `u8` and you should use [`MapFeedback`] instead.
     #[must_use]
     pub fn new(map_observer: &C) -> Self {
         let map = MapFeedback::new(map_observer);
@@ -114,7 +120,8 @@ where
         }
     }
 
-    /// Mock [`MapFeedback::with_name`]
+    /// Mock [`MapFeedback::with_name`] If you are getting bound errors, your entry is probably not
+    /// `u8` and you should use [`MapFeedback`] instead.
     #[must_use]
     pub fn with_name(name: &'static str, map_observer: &C) -> Self {
         let map = MapFeedback::with_name(name, map_observer);

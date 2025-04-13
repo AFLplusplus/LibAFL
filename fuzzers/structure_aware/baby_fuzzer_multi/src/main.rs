@@ -11,7 +11,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or_fast,
-    feedbacks::{CrashFeedback, MaxMapFeedback, MinMapFeedback},
+    feedbacks::{CrashFeedback, DifferentIsNovel, MapFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, MultipartInput},
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
@@ -21,14 +21,14 @@ use libafl::{
     state::StdState,
     Evaluator,
 };
-use libafl_bolts::{nonnull_raw_mut, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{nonnull_raw_mut, rands::StdRand, simd::MinReducer, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 128] = [0; 128];
 static mut SIGNALS_PTR: *mut [u8; 128] = &raw mut SIGNALS;
 
 /// "Coverage" map for count, just to help things along
-static mut LAST_COUNT: [u8; 8] = [0xffu8; 8];
+static mut LAST_COUNT: [usize; 1] = [usize::MAX];
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
@@ -37,10 +37,7 @@ fn signals_set(idx: usize) {
 
 /// Assign a count to the count "map"
 fn count_set(count: usize) {
-    unsafe {
-        #[allow(static_mut_refs)]
-        LAST_COUNT.copy_from_slice(&count.to_le_bytes());
-    };
+    unsafe { LAST_COUNT[0] = count };
 }
 
 #[expect(clippy::manual_assert)]
@@ -86,12 +83,13 @@ pub fn main() {
     // Create an observation channel using the signals map
     let signals_observer =
         unsafe { ConstMapObserver::from_mut_ptr("signals", nonnull_raw_mut!(SIGNALS)) };
-    let count_observer =
+    let mut count_observer =
         unsafe { ConstMapObserver::from_mut_ptr("count", nonnull_raw_mut!(LAST_COUNT)) };
+    *count_observer.initial_mut() = usize::MAX; // we are minimising!
 
     // Feedback to rate the interestingness of an input
     let signals_feedback = MaxMapFeedback::new(&signals_observer);
-    let count_feedback = MinMapFeedback::new(&count_observer);
+    let count_feedback = MapFeedback::<_, DifferentIsNovel, _, MinReducer>::new(&count_observer);
 
     let mut feedback = feedback_or_fast!(count_feedback, signals_feedback);
 
