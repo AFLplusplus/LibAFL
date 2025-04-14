@@ -341,6 +341,14 @@ pub enum Error {
     InvalidCorpus(String, ErrorBacktrace),
     /// Error specific to a runtime like QEMU or Frida
     Runtime(String, ErrorBacktrace),
+    /// Configuration errors, such as incorrect map sizes
+    Configuration(String, ErrorBacktrace),
+    /// Compilation-related errors
+    Compilation(String, ErrorBacktrace),
+    /// System call or resource allocation failures
+    System(String, ErrorBacktrace),
+    /// Version compatibility issues
+    Version(String, ErrorBacktrace),
 }
 
 impl Error {
@@ -496,6 +504,42 @@ impl Error {
         S: Into<String>,
     {
         Error::Runtime(arg.into(), ErrorBacktrace::new())
+    }
+
+    /// Create a new configuration error
+    #[must_use]
+    pub fn configuration<S>(msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::Configuration(msg.into(), ErrorBacktrace::new())
+    }
+
+    /// Create a new compilation error
+    #[must_use]
+    pub fn compilation<S>(msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::Compilation(msg.into(), ErrorBacktrace::new())
+    }
+
+    /// Create a new system error
+    #[must_use]
+    pub fn system<S>(msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::System(msg.into(), ErrorBacktrace::new())
+    }
+
+    /// Create a new version error
+    #[must_use]
+    pub fn version<S>(msg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::Version(msg.into(), ErrorBacktrace::new())
     }
 }
 
