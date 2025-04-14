@@ -4,18 +4,25 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
     marker::PhantomData,
-    ops::{BitAnd, BitOr, Deref, DerefMut},
+    ops::{Deref, DerefMut},
 };
 
-#[rustversion::nightly]
-use libafl_bolts::simd::std_covmap_is_interesting;
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
+use libafl_bolts::simd::vector::u8x16;
+#[cfg(not(feature = "simd"))]
+use libafl_bolts::simd::{MinReducer, OrReducer};
+#[cfg(feature = "simd")]
+use libafl_bolts::simd::{SimdMaxReducer, SimdMinReducer, SimdOrReducer, vector::u8x32};
 use libafl_bolts::{
-    AsIter, AsSlice, HasRefCnt, Named,
+    AsIter, HasRefCnt, Named,
+    simd::{MaxReducer, NopReducer, Reducer},
     tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
+#[cfg(feature = "simd")]
+use super::simd::SimdMapFeedback;
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
@@ -29,11 +36,27 @@ use crate::{
     state::HasExecutions,
 };
 
+#[cfg(feature = "simd")]
+/// A [`SimdMapFeedback`] that implements the AFL algorithm using an [`SimdOrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
+pub type AflMapFeedback<C, O> = SimdMapFeedback<C, O, SimdOrReducer, u8x32>;
+#[cfg(not(feature = "simd"))]
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from (`HitcountsMapObserver`)[`crate::observers::HitcountsMapObserver`].
 pub type AflMapFeedback<C, O> = MapFeedback<C, DifferentIsNovel, O, OrReducer>;
 
+#[cfg(all(feature = "simd", target_arch = "x86_64"))]
+/// A [`SimdMapFeedback`] that strives to maximize the map contents.
+pub type MaxMapFeedback<C, O> = SimdMapFeedback<C, O, SimdMaxReducer, u8x16>;
+#[cfg(all(feature = "simd", not(target_arch = "x86_64")))]
+/// A [`SimdMapFeedback`] that strives to maximize the map contents.
+pub type MaxMapFeedback<C, O> = SimdMapFeedback<C, O, SimdMaxReducer, u8x32>;
+#[cfg(not(feature = "simd"))]
 /// A [`MapFeedback`] that strives to maximize the map contents.
 pub type MaxMapFeedback<C, O> = MapFeedback<C, DifferentIsNovel, O, MaxReducer>;
+
+#[cfg(feature = "simd")]
+/// A [`SimdMapFeedback`] that strives to minimize the map contents.
+pub type MinMapFeedback<C, O> = SimdMapFeedback<C, O, SimdMinReducer, u8x32>;
+#[cfg(not(feature = "simd"))]
 /// A [`MapFeedback`] that strives to minimize the map contents.
 pub type MinMapFeedback<C, O> = MapFeedback<C, DifferentIsNovel, O, MinReducer>;
 
@@ -46,79 +69,6 @@ pub type MaxMapPow2Feedback<C, O> = MapFeedback<C, NextPow2IsNovel, O, MaxReduce
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is either `T::one()` or `T::max_value()`.
 pub type MaxMapOneOrFilledFeedback<C, O> = MapFeedback<C, OneOrFilledIsNovel, O, MaxReducer>;
-
-/// A `Reducer` function is used to aggregate values for the novelty search
-pub trait Reducer<T> {
-    /// Reduce two values to one value, with the current [`Reducer`].
-    fn reduce(first: T, second: T) -> T;
-}
-
-/// A [`OrReducer`] reduces the values returning the bitwise OR with the old value
-#[derive(Clone, Debug)]
-pub struct OrReducer {}
-
-impl<T> Reducer<T> for OrReducer
-where
-    T: BitOr<Output = T>,
-{
-    #[inline]
-    fn reduce(history: T, new: T) -> T {
-        history | new
-    }
-}
-
-/// A [`AndReducer`] reduces the values returning the bitwise AND with the old value
-#[derive(Clone, Debug)]
-pub struct AndReducer {}
-
-impl<T> Reducer<T> for AndReducer
-where
-    T: BitAnd<Output = T>,
-{
-    #[inline]
-    fn reduce(history: T, new: T) -> T {
-        history & new
-    }
-}
-
-/// A [`NopReducer`] does nothing, and just "reduces" to the second/`new` value.
-#[derive(Clone, Debug)]
-pub struct NopReducer {}
-
-impl<T> Reducer<T> for NopReducer {
-    #[inline]
-    fn reduce(_history: T, new: T) -> T {
-        new
-    }
-}
-
-/// A [`MaxReducer`] reduces int values and returns their maximum.
-#[derive(Clone, Debug)]
-pub struct MaxReducer {}
-
-impl<T> Reducer<T> for MaxReducer
-where
-    T: PartialOrd,
-{
-    #[inline]
-    fn reduce(first: T, second: T) -> T {
-        if first > second { first } else { second }
-    }
-}
-
-/// A [`MinReducer`] reduces int values and returns their minimum.
-#[derive(Clone, Debug)]
-pub struct MinReducer {}
-
-impl<T> Reducer<T> for MinReducer
-where
-    T: PartialOrd,
-{
-    #[inline]
-    fn reduce(first: T, second: T) -> T {
-        if first < second { first } else { second }
-    }
-}
 
 /// A `IsNovel` function is used to discriminate if a reduced value is considered novel.
 pub trait IsNovel<T> {
@@ -351,7 +301,7 @@ where
 #[derive(Clone, Debug)]
 pub struct MapFeedback<C, N, O, R> {
     /// New indexes observed in the last observation
-    novelties: Option<Vec<usize>>,
+    pub(crate) novelties: Option<Vec<usize>>,
     /// Name identifier of this instance
     name: Cow<'static, str>,
     /// Name identifier of the observer
@@ -360,7 +310,7 @@ pub struct MapFeedback<C, N, O, R> {
     stats_name: Cow<'static, str>,
     // The previous run's result of [`Self::is_interesting`]
     #[cfg(feature = "track_hit_feedbacks")]
-    last_result: Option<bool>,
+    pub(crate) last_result: Option<bool>,
     /// Phantom Data of Reducer
     #[expect(clippy::type_complexity)]
     phantom: PhantomData<fn() -> (N, O, R)>,
@@ -391,24 +341,6 @@ where
     R: Reducer<O::Entry>,
     S: HasNamedMetadata + HasExecutions,
 {
-    #[rustversion::nightly]
-    default fn is_interesting(
-        &mut self,
-        state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error> {
-        let res = self.is_interesting_default(state, observers);
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(res);
-        }
-        Ok(res)
-    }
-
-    #[rustversion::not(nightly)]
     fn is_interesting(
         &mut self,
         state: &mut S,
@@ -525,28 +457,6 @@ where
         )?;
 
         Ok(())
-    }
-}
-
-/// Specialize for the common coverage map size, maximization of u8s
-#[rustversion::nightly]
-impl<C, O, EM, I, OT, S> Feedback<EM, I, OT, S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer>
-where
-    C: CanTrack + AsRef<O>,
-    EM: EventFirer<I, S>,
-    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
-    OT: MatchName,
-    S: HasNamedMetadata + HasExecutions,
-{
-    fn is_interesting(
-        &mut self,
-        state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error> {
-        Ok(self.is_interesting_u8_simd_optimized(state, observers, std_covmap_is_interesting))
     }
 }
 
@@ -672,67 +582,6 @@ where
             }
         }
 
-        interesting
-    }
-}
-
-/// Specialize for the common coverage map size, maximization of u8s
-impl<C, O> MapFeedback<C, DifferentIsNovel, O, MaxReducer>
-where
-    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
-    C: CanTrack + AsRef<O>,
-{
-    #[allow(dead_code)] // this is true on stable wihout "stable_simd"
-    pub(crate) fn is_interesting_u8_simd_optimized<S, OT, F>(
-        &mut self,
-        state: &mut S,
-        observers: &OT,
-        simd: F,
-    ) -> bool
-    where
-        S: HasNamedMetadata,
-        OT: MatchName,
-        F: FnOnce(&[u8], &[u8], bool) -> (bool, Vec<usize>),
-    {
-        // TODO Replace with match_name_type when stable
-        let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
-
-        let map_state = state
-            .named_metadata_map_mut()
-            .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
-            .unwrap();
-        let size = observer.usable_count();
-        let len = observer.len();
-        if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, u8::default());
-        }
-
-        let map = observer.as_slice();
-        debug_assert!(map.len() >= size);
-
-        let history_map = map_state.history_map.as_slice();
-
-        // Non vector implementation for reference
-        /*for (i, history) in history_map.iter_mut().enumerate() {
-            let item = map[i];
-            let reduced = MaxReducer::reduce(*history, item);
-            if DifferentIsNovel::is_novel(*history, reduced) {
-                *history = reduced;
-                interesting = true;
-                if self.novelties.is_some() {
-                    self.novelties.as_mut().unwrap().push(i);
-                }
-            }
-        }*/
-
-        let (interesting, novelties) = simd(history_map, &map, self.novelties.is_some());
-        if let Some(nov) = self.novelties.as_mut() {
-            *nov = novelties;
-        }
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(interesting);
-        }
         interesting
     }
 }

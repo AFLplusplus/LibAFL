@@ -52,7 +52,7 @@ std = [
   "uds",
   "serial_test",
   "alloc",
-  "stable_simd",
+  "simd",
 ]
 
 ## Enables all features that allocate in `no_std`
@@ -120,8 +120,8 @@ llmp_small_maps = ["alloc"]
 
 #! ### Stable SIMD features
 
-## Use the best SIMD implementation by our [benchmark](https://github.com/wtdcode/libafl_simd_bench)
-stable_simd = ["alloc", "wide"]
+## Use the best SIMD implementation by our benchmark.
+simd = ["alloc", "wide"]
 
 [build-dependencies]
 rustversion = { workspace = true }
@@ -235,4 +235,4 @@ name = "simd"
 path = "./examples/simd/simd.rs"
 bench = true
 harness = false
-required-features = ["std", "stable_simd"]
+required-features = ["std", "simd"]

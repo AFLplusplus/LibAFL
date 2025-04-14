@@ -2,8 +2,9 @@ use chrono::Utc;
 use clap::Parser;
 use itertools::Itertools;
 use libafl_bolts::simd::{
-    covmap_is_interesting_naive, covmap_is_interesting_u8x16, covmap_is_interesting_u8x32,
-    simplify_map_naive, simplify_map_u8x16, simplify_map_u8x32,
+    AndReducer, MaxReducer, MinReducer, OrReducer, Reducer, SimdAndReducer, SimdMaxReducer,
+    SimdMinReducer, SimdOrReducer, SimdReducer, VectorType, covmap_is_interesting_naive,
+    covmap_is_interesting_simd, simplify_map_naive, simplify_map_simd,
 };
 use rand::{RngCore, rngs::ThreadRng};
 
@@ -92,6 +93,7 @@ type CovFuncPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
 struct CovInput {
     name: String,
     func: CovFuncPtr,
+    naive: CovFuncPtr,
     hist: Vec<u8>,
     map: Vec<u8>,
     rounds: usize,
@@ -100,10 +102,15 @@ struct CovInput {
 }
 
 impl CovInput {
-    fn from_cli(name: &str, f: CovFuncPtr, cli: &Cli, rng: &ThreadRng) -> Self {
+    fn from_cli_simd<T: VectorType + Eq + Copy, R: SimdReducer<T>>(
+        name: &str,
+        cli: &Cli,
+        rng: &ThreadRng,
+    ) -> Self {
         CovInput {
             name: name.to_string(),
-            func: f,
+            func: covmap_is_interesting_simd::<R, T>,
+            naive: covmap_is_interesting_naive::<R::PrimitiveReducer>,
             hist: vec![0; cli.map],
             map: vec![0; cli.map],
             rng: rng.clone(),
@@ -111,6 +118,20 @@ impl CovInput {
             validate: cli.validate,
         }
     }
+
+    fn from_cli_naive<R: Reducer<u8>>(name: &str, cli: &Cli, rng: &ThreadRng) -> Self {
+        CovInput {
+            name: name.to_string(),
+            func: covmap_is_interesting_naive::<R>,
+            naive: covmap_is_interesting_naive::<R>,
+            hist: vec![0; cli.map],
+            map: vec![0; cli.map],
+            rng: rng.clone(),
+            rounds: cli.rounds,
+            validate: cli.validate,
+        }
+    }
+
     fn measure_cov(mut self) -> Vec<chrono::TimeDelta> {
         println!("Running {}", &self.name);
         let mut outs = vec![];
@@ -126,11 +147,12 @@ impl CovInput {
             let (interesting, novelties) = (self.func)(&self.hist, &self.map, true);
             if self.validate {
                 let (canonical_interesting, canonical_novelties) =
-                    covmap_is_interesting_naive(&self.hist, &self.map, true);
+                    (self.naive)(&self.hist, &self.map, true);
 
                 assert!(
                     canonical_interesting == interesting && novelties == canonical_novelties,
-                    "Incorrect covmap impl. {canonical_interesting} vs {interesting}, {canonical_novelties:?} vs\n{novelties:?}"
+                    "Incorrect {} impl. {canonical_interesting} vs {interesting}, {canonical_novelties:?} vs\n{novelties:?}",
+                    self.name
                 );
             }
             let after = Utc::now();
@@ -176,8 +198,18 @@ fn main() {
 
     let simpls = [
         SimplifyMapInput::from_cli("naive simplify_map", simplify_map_naive, &cli, &rng),
-        SimplifyMapInput::from_cli("u8x16 simplify_map", simplify_map_u8x16, &cli, &rng),
-        SimplifyMapInput::from_cli("u8x32 simplify_map", simplify_map_u8x32, &cli, &rng),
+        SimplifyMapInput::from_cli(
+            "u8x16 simplify_map",
+            simplify_map_simd::<wide::u8x16>,
+            &cli,
+            &rng,
+        ),
+        SimplifyMapInput::from_cli(
+            "u8x32 simplify_map",
+            simplify_map_simd::<wide::u8x32>,
+            &cli,
+            &rng,
+        ),
     ];
 
     for bench in simpls {
@@ -187,9 +219,18 @@ fn main() {
     }
 
     let benches = [
-        CovInput::from_cli("naive cov", covmap_is_interesting_naive, &cli, &rng),
-        CovInput::from_cli("u8x16 cov", covmap_is_interesting_u8x16, &cli, &rng),
-        CovInput::from_cli("u8x32 cov", covmap_is_interesting_u8x32, &cli, &rng),
+        CovInput::from_cli_naive::<MaxReducer>("naive max cov", &cli, &rng),
+        CovInput::from_cli_simd::<wide::u8x16, SimdMaxReducer>("u8x16 max cov", &cli, &rng),
+        CovInput::from_cli_simd::<wide::u8x32, SimdMaxReducer>("u8x32 max cov", &cli, &rng),
+        CovInput::from_cli_naive::<MinReducer>("naive min cov", &cli, &rng),
+        CovInput::from_cli_simd::<wide::u8x16, SimdMinReducer>("u8x16 min cov", &cli, &rng),
+        CovInput::from_cli_simd::<wide::u8x32, SimdMinReducer>("u8x32 min cov", &cli, &rng),
+        CovInput::from_cli_naive::<AndReducer>("naive and cov", &cli, &rng),
+        CovInput::from_cli_simd::<wide::u8x16, SimdAndReducer>("u8x16 and cov", &cli, &rng),
+        CovInput::from_cli_simd::<wide::u8x32, SimdAndReducer>("u8x32 and cov", &cli, &rng),
+        CovInput::from_cli_naive::<OrReducer>("naive or cov", &cli, &rng),
+        CovInput::from_cli_simd::<wide::u8x16, SimdOrReducer>("u8x16 or cov", &cli, &rng),
+        CovInput::from_cli_simd::<wide::u8x32, SimdOrReducer>("u8x32 or cov", &cli, &rng),
     ];
 
     for bench in benches {

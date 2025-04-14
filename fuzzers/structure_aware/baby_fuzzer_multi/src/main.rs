@@ -11,7 +11,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or_fast,
-    feedbacks::{CrashFeedback, MaxMapFeedback, MinMapFeedback},
+    feedbacks::{CrashFeedback, DifferentIsNovel, MapFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, MultipartInput},
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
@@ -21,7 +21,9 @@ use libafl::{
     state::StdState,
     Evaluator,
 };
-use libafl_bolts::{nonnull_raw_mut, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{
+    nonnull_raw_mut, rands::StdRand, simd::MinReducer, tuples::tuple_list, AsSlice,
+};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 128] = [0; 128];
@@ -89,7 +91,7 @@ pub fn main() {
 
     // Feedback to rate the interestingness of an input
     let signals_feedback = MaxMapFeedback::new(&signals_observer);
-    let count_feedback = MinMapFeedback::new(&count_observer);
+    let count_feedback = MapFeedback::<_, DifferentIsNovel, _, MinReducer>::new(&count_observer);
 
     let mut feedback = feedback_or_fast!(count_feedback, signals_feedback);
 
