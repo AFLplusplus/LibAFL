@@ -1,10 +1,10 @@
 //! # LibAFL Forkserver Executor
-//!
+//! 
 //! This module implements an executor that communicates with LibAFL instrumented binaries
 //! through a forkserver mechanism. The forkserver allows for efficient process creation by
 //! forking from a pre-initialized parent process, avoiding the overhead of repeatedly executing
 //! the program from scratch.
-//!
+//! 
 //! Key features:
 //! - Support for LibAFL (libafl_cc/libafl_cxx) instrumented binaries
 //! - Compatible with AFL/AFL++ instrumentation
@@ -14,7 +14,7 @@
 //! - Automatic dictionary token extraction
 //! - Timeout and signal handling for target programs
 //! - Compatible with various observer types for feedback collection
-//!
+//! 
 //! This implementation follows the forkserver protocol and provides
 //! a flexible builder pattern for configuration.
 
@@ -122,40 +122,39 @@ const FAILED_TO_START_FORKSERVER_MSG: &str = "Failed to start forkserver";
 /// * `status` - The error status code received from the forkserver
 ///
 /// # Returns
-/// * `Result<(), Error>` - Always returns `Err` with a descriptive error message
-///   that explains the failure and suggests possible solutions
+/// * `Result<(), Error>` - Always returns `Err` with a specific error type that includes
+///   a descriptive message explaining the failure and suggesting possible solutions
 ///
-/// # Error Codes
-/// * `FS_ERROR_MAP_SIZE` - Coverage map size configuration issues
-/// * `FS_ERROR_MAP_ADDR` - Hardcoded map address conflicts
-/// * `FS_ERROR_SHM_OPEN` - Shared memory opening failures
-/// * `FS_ERROR_SHMAT` - Shared memory attachment failures
-/// * `FS_ERROR_MMAP` - Memory mapping failures
-/// * `FS_ERROR_OLD_CMPLOG` - Outdated comparison logging instrumentation
-/// * `FS_ERROR_OLD_CMPLOG_QEMU` - Outdated QEMU/FRIDA loader versions
-
+/// # Error Codes and Corresponding Error Types
+/// * `FS_ERROR_MAP_SIZE` - Returns `Error::Configuration` for coverage map size issues
+/// * `FS_ERROR_MAP_ADDR` - Returns `Error::Compilation` for hardcoded map address conflicts
+/// * `FS_ERROR_SHM_OPEN` - Returns `Error::System` for shared memory opening failures
+/// * `FS_ERROR_SHMAT` - Returns `Error::System` for shared memory attachment failures
+/// * `FS_ERROR_MMAP` - Returns `Error::System` for memory mapping failures
+/// * `FS_ERROR_OLD_CMPLOG` - Returns `Error::Version` for outdated instrumentation
+/// * `FS_ERROR_OLD_CMPLOG_QEMU` - Returns `Error::Version` for outdated loader versions
 fn report_error_and_exit(status: i32) -> Result<(), Error> {
     /* Report on the error received via the forkserver controller and exit */
     match status {
     FS_ERROR_MAP_SIZE =>
-        Err(Error::unknown(
-            "AFL_MAP_SIZE is not set and fuzzing target reports that the required size is very large. Solution: Run the fuzzing target stand-alone with the environment variable AFL_DEBUG=1 set and set the value for __afl_final_loc in the AFL_MAP_SIZE environment variable for afl-fuzz.".to_string())),
+        Err(Error::configuration(
+            "AFL_MAP_SIZE is not set and fuzzing target reports that the required size is very large. Solution: Run the fuzzing target stand-alone with the environment variable AFL_DEBUG=1 set and set the value for __afl_final_loc in the AFL_MAP_SIZE environment variable for afl-fuzz.")),
     FS_ERROR_MAP_ADDR =>
-        Err(Error::unknown(
-            "the fuzzing target reports that hardcoded map address might be the reason the mmap of the shared memory failed. Solution: recompile the target with either afl-clang-lto and do not set AFL_LLVM_MAP_ADDR or recompile with afl-clang-fast.".to_string())),
+        Err(Error::compilation(
+            "The fuzzing target reports that hardcoded map address might be the reason the mmap of the shared memory failed. Solution: recompile the target with either afl-clang-lto and do not set AFL_LLVM_MAP_ADDR or recompile with afl-clang-fast.")),
     FS_ERROR_SHM_OPEN =>
-        Err(Error::unknown("the fuzzing target reports that the shm_open() call failed.".to_string())),
+        Err(Error::system("The fuzzing target reports that the shm_open() call failed.")),
     FS_ERROR_SHMAT =>
-        Err(Error::unknown("the fuzzing target reports that the shmat() call failed.".to_string())),
+        Err(Error::system("The fuzzing target reports that the shmat() call failed.")),
     FS_ERROR_MMAP =>
-        Err(Error::unknown("the fuzzing target reports that the mmap() call to the shared memory failed.".to_string())),
+        Err(Error::system("The fuzzing target reports that the mmap() call to the shared memory failed.")),
     FS_ERROR_OLD_CMPLOG =>
-        Err(Error::unknown(
-            "the -c cmplog target was instrumented with an too old AFL++ version, you need to recompile it.".to_string())),
+        Err(Error::version(
+            "The -c cmplog target was instrumented with an too old AFL++ version, you need to recompile it.")),
     FS_ERROR_OLD_CMPLOG_QEMU =>
-        Err(Error::unknown("The AFL++ QEMU/FRIDA loaders are from an older version, for -c you need to recompile it.".to_string())),
+        Err(Error::version("The AFL++ QEMU/FRIDA loaders are from an older version, for -c you need to recompile it.")),
     _ =>
-        Err(Error::unknown(format!("unknown error code {status} from fuzzing target!"))),
+        Err(Error::unknown(format!("Unknown error code {status} from fuzzing target!"))),
     }
 }
 
@@ -639,7 +638,7 @@ impl Forkserver {
 /// for efficient process creation. It supports shared memory-based test case passing,
 /// customizable timeouts, and can handle persistent mode execution.
 ///
-/// For persistent mode details, see:
+/// For persistent mode details, see: 
 /// <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
 
 pub struct ForkserverExecutor<I, OT, S, SHM, TC> {
@@ -836,7 +835,7 @@ where
 
 /// Builder for [`ForkserverExecutor`] with a fluent interface for configuration
 ///
-/// Provides methods to customize all aspects of forkserver instantiation:
+/// Provides methods to customize all aspects of forkserver execution:
 /// - Target program path and arguments
 /// - Input handling (file, stdin, shared memory)
 /// - Execution parameters (timeouts, signals)
