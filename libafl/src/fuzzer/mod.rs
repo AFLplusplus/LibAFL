@@ -14,7 +14,9 @@ use serde::{Serialize, de::DeserializeOwned};
 use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
+    corpus::{
+        Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase, testcase::TestcaseMetadata,
+    },
     events::{
         Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter,
         SendExiting,
@@ -420,13 +422,18 @@ where
     ) -> Result<Option<CorpusId>, Error> {
         let corpus = if exec_res.is_corpus() {
             // Add the input to the main corpus
-            let mut testcase = Testcase::from(input.clone());
-            testcase.set_executions(*state.executions());
+            let tc_md = TestcaseMetadata::builder()
+                .executions(*state.executions())
+                .build();
+
+            let testcase = Testcase::new(input.clone(), tc_md);
+
             #[cfg(feature = "track_hit_feedbacks")]
             self.feedback_mut()
                 .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
             self.feedback_mut()
                 .append_metadata(state, manager, observers, &mut testcase)?;
+
             let id = state.corpus_mut().add(testcase)?;
             self.scheduler_mut().on_add(state, id)?;
             Ok(Some(id))
@@ -436,10 +443,14 @@ where
 
         if exec_res.is_solution() {
             // The input is a solution, add it to the respective corpus
-            let mut testcase = Testcase::from(input.clone());
-            testcase.set_executions(*state.executions());
+            let tc_md = TestcaseMetadata::builder()
+                .executions(*state.executions())
+                .parent_id(*state.corpus().current())
+                .build();
+
+            let mut testcase = Testcase::new(input.clone(), tc_md);
             testcase.add_metadata(*exit_kind);
-            testcase.set_parent_id_optional(*state.corpus().current());
+
             if let Ok(mut tc) = state.current_testcase_mut() {
                 tc.found_objective();
             }
@@ -677,8 +688,10 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
-        let mut testcase = Testcase::from(input.clone());
-        testcase.set_executions(*state.executions());
+        let tc_md = TestcaseMetadata::builder()
+            .executions(*state.executions())
+            .build();
+        let mut testcase = Testcase::new(input.clone(), tc_md);
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
@@ -766,9 +779,13 @@ where
     }
 
     fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {
-        let mut testcase = Testcase::from(input.clone());
-        testcase.set_executions(*state.executions());
-        testcase.set_disabled(true);
+        let tc_md = TestcaseMetadata::builder()
+            .executions(*state.executions())
+            .disabled(true)
+            .build();
+
+        let mut testcase = Testcase::new(input.clone(), tc_md);
+
         // Add the disabled input to the main corpus
         let id = state.corpus_mut().add_disabled(testcase)?;
         Ok(id)

@@ -18,6 +18,7 @@ use std::{
 #[cfg(feature = "std")]
 use libafl_bolts::core_affinity::{CoreId, Cores};
 use libafl_bolts::{
+    current_time,
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };
@@ -159,6 +160,13 @@ pub trait HasStartTime {
 
     /// The starting time (mutable)
     fn start_time_mut(&mut self) -> &mut Duration;
+
+    fn time_since_start(&self) -> Duration {
+        let start_time = self.start_time();
+        let current_time = current_time();
+
+        current_time - *start_time
+    }
 }
 
 /// Trait for the last report time, the last time this node reported progress
@@ -296,12 +304,14 @@ where
 {
     /// To get the testcase
     fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<I>>, Error> {
-        Ok(self.corpus().get(id)?.borrow())
+        let tc = self.corpus().get(id)?;
+        Ok(tc.borrow())
     }
 
     /// To get mutable testcase
     fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<I>>, Error> {
-        Ok(self.corpus().get(id)?.borrow_mut())
+        let tc = self.corpus().get(id)?;
+        Ok(tc.borrow_mut())
     }
 }
 
@@ -1129,7 +1139,7 @@ where
             rand,
             executions: 0,
             imported: 0,
-            start_time: libafl_bolts::current_time(),
+            start_time: current_time(),
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
             corpus,
@@ -1143,7 +1153,7 @@ where
             #[cfg(feature = "std")]
             dont_reenter: None,
             last_report_time: None,
-            last_found_time: libafl_bolts::current_time(),
+            last_found_time: current_time(),
             corpus_id: None,
             stage_stack: StageStack::default(),
             phantom: PhantomData,

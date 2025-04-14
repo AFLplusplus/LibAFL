@@ -379,7 +379,7 @@ where
         }
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-        *input = *other_testcase.input().as_ref().unwrap();
+        *input = *other_testcase.input();
         Ok(MutationResult::Mutated)
     }
 }
@@ -420,7 +420,7 @@ where
         }
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-        let other_input = other_testcase.input().as_ref().unwrap();
+        let other_input = other_testcase.input();
         let mapped_input = (self.input_mapper)(other_input).clone();
         *input = mapped_input;
         Ok(MutationResult::Mutated)

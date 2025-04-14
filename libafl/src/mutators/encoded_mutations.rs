@@ -332,7 +332,7 @@ where
         let other_size = {
             // new scope to make the borrow checker happy
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-            other_testcase.load_input(state.corpus())?.codes().len()
+            other_testcase.input().codes().len()
         };
 
         if other_size < 2 {
@@ -362,7 +362,7 @@ where
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // no need to `load_input` again -  we did that above already.
-        let other = other_testcase.input().as_ref().unwrap();
+        let other = other_testcase.input();
 
         input.codes_mut().resize(size + len, 0);
         unsafe {
@@ -411,7 +411,7 @@ where
         let other_size = {
             // new scope to make the borrow checker happy
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-            other_testcase.load_input(state.corpus())?.codes().len()
+            other_testcase.input().codes().len()
         };
 
         if other_size < 2 {
@@ -437,7 +437,7 @@ where
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // no need to load the input again, it'll already be present at this point.
-        let other = other_testcase.input().as_ref().unwrap();
+        let other = other_testcase.input();
 
         unsafe {
             buffer_copy(input.codes_mut(), other.codes(), from, to, len);

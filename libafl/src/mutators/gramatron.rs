@@ -128,17 +128,18 @@ where
 
         let rand_num = state.rand_mut().next();
 
-        let mut other_testcase = state.corpus().get(id)?.borrow_mut();
+        let other_testcase_ref = state.corpus().get(id)?;
+        let mut other_testcase = other_testcase_ref.borrow_mut();
 
         if !other_testcase.has_metadata::<GramatronIdxMapMetadata>() {
-            let meta = GramatronIdxMapMetadata::new(other_testcase.load_input(state.corpus())?);
+            let meta = GramatronIdxMapMetadata::new(other_testcase.input());
             other_testcase.add_metadata(meta);
         }
         let meta = other_testcase
             .metadata_map()
             .get::<GramatronIdxMapMetadata>()
             .unwrap();
-        let other = other_testcase.input().as_ref().unwrap();
+        let other = other_testcase.input();
 
         meta.map.get(&input.terminals()[insert_at].state).map_or(
             Ok(MutationResult::Skipped),

@@ -16,7 +16,7 @@ use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, Testcase, testcase::TestcaseMetadata},
     events::{Event, EventFirer, EventRestarter, EventWithStats},
     executors::{
         Executor, ExitKind, HasObservers,
@@ -344,10 +344,13 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
         .expect("In run_observers_and_save_state objective failure.");
 
     if is_solution {
-        let mut new_testcase = Testcase::from(input.clone());
-        new_testcase.set_executions(*state.executions());
+        let testcase_md = TestcaseMetadata::builder()
+            .executions(*state.executions())
+            .parent_id(*state.corpus().current())
+            .build();
+
+        let mut new_testcase = Testcase::new(input.clone(), testcase_md);
         new_testcase.add_metadata(exitkind);
-        new_testcase.set_parent_id_optional(*state.corpus().current());
 
         if let Ok(mut tc) = state.current_testcase_mut() {
             tc.found_objective();
