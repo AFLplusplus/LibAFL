@@ -1,10 +1,10 @@
 //! # LibAFL Forkserver Executor
-//! 
+//!
 //! This module implements an executor that communicates with LibAFL instrumented binaries
 //! through a forkserver mechanism. The forkserver allows for efficient process creation by
 //! forking from a pre-initialized parent process, avoiding the overhead of repeatedly executing
 //! the program from scratch.
-//! 
+//!
 //! Key features:
 //! - Support for LibAFL (libafl_cc/libafl_cxx) instrumented binaries
 //! - Compatible with AFL/AFL++ instrumentation
@@ -14,7 +14,7 @@
 //! - Automatic dictionary token extraction
 //! - Timeout and signal handling for target programs
 //! - Compatible with various observer types for feedback collection
-//! 
+//!
 //! This implementation follows the forkserver protocol and provides
 //! a flexible builder pattern for configuration.
 
@@ -113,18 +113,18 @@ const FS_ERROR_OLD_CMPLOG_QEMU: i32 = 64_u32 as i32;
 const FAILED_TO_START_FORKSERVER_MSG: &str = "Failed to start forkserver";
 
 /// Translates forkserver error codes into human-readable error messages
-/// 
+///
 /// This function interprets error statuses received from the forkserver and returns
 /// appropriate error messages with troubleshooting advice. It handles various failure modes
 /// such as map size issues, shared memory problems, and compatibility errors.
-/// 
+///
 /// # Arguments
 /// * `status` - The error status code received from the forkserver
-/// 
+///
 /// # Returns
 /// * `Result<(), Error>` - Always returns `Err` with a descriptive error message
 ///   that explains the failure and suggests possible solutions
-/// 
+///
 /// # Error Codes
 /// * `FS_ERROR_MAP_SIZE` - Coverage map size configuration issues
 /// * `FS_ERROR_MAP_ADDR` - Hardcoded map address conflicts
@@ -639,15 +639,9 @@ impl Forkserver {
 /// for efficient process creation. It supports shared memory-based test case passing,
 /// customizable timeouts, and can handle persistent mode execution.
 ///
-/// For persistent mode details, see: 
+/// For persistent mode details, see:
 /// <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
-///
-/// # Type Parameters
-/// * `I` - Input type
-/// * `OT` - Observer tuple type
-/// * `S` - State type
-/// * `SHM` - Shared memory type
-/// * `TC` - Target bytes converter type
+
 pub struct ForkserverExecutor<I, OT, S, SHM, TC> {
     target: OsString,
     args: Vec<OsString>,
@@ -840,9 +834,9 @@ where
     }
 }
 
-/// Builder for `ForkserverExecutor` with a fluent interface for configuration
+/// Builder for [`ForkserverExecutor`] with a fluent interface for configuration
 ///
-/// Provides methods to customize all aspects of forkserver execution:
+/// Provides methods to customize all aspects of forkserver instantiation:
 /// - Target program path and arguments
 /// - Input handling (file, stdin, shared memory)
 /// - Execution parameters (timeouts, signals)
