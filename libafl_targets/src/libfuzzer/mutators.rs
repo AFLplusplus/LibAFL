@@ -5,10 +5,10 @@ use alloc::{
     vec::Vec,
 };
 use core::{cell::RefCell, marker::PhantomData, ops::Deref};
-use libafl::corpus::CorpusId;
+
 use libafl::{
     Error,
-    corpus::Corpus,
+    corpus::{Corpus, CorpusId},
     inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
@@ -304,7 +304,10 @@ where
     }
     #[inline]
     fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
-        self.mutator.deref().borrow_mut().post_exec(state, new_corpus_id)
+        self.mutator
+            .deref()
+            .borrow_mut()
+            .post_exec(state, new_corpus_id)
     }
 }
 
@@ -387,7 +390,10 @@ where
     }
     #[inline]
     fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
-        self.mutator.deref().borrow_mut().post_exec(state, new_corpus_id)
+        self.mutator
+            .deref()
+            .borrow_mut()
+            .post_exec(state, new_corpus_id)
     }
 }
 
