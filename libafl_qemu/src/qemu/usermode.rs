@@ -494,14 +494,14 @@ pub mod pybind {
     extern "C" fn py_syscall_hook_wrapper(
         _data: u64,
         sys_num: i32,
-        a0: u64,
-        a1: u64,
-        a2: u64,
-        a3: u64,
-        a4: u64,
-        a5: u64,
-        a6: u64,
-        a7: u64,
+        a0: GuestAddr,
+        a1: GuestAddr,
+        a2: GuestAddr,
+        a3: GuestAddr,
+        a4: GuestAddr,
+        a5: GuestAddr,
+        a6: GuestAddr,
+        a7: GuestAddr,
     ) -> hooks::SyscallHookResult {
         unsafe { (&raw const PY_SYSCALL_HOOK).read() }.map_or_else(
             || hooks::SyscallHookResult::Run,
