@@ -581,7 +581,8 @@ where
     }
 }
 
-trait InputFilter<I> {
+/// A trait to determine if a input should be run or not
+pub trait InputFilter<I> {
     fn should_execute(&mut self, input: &I) -> bool;
 }
 
