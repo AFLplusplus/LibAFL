@@ -72,6 +72,7 @@ const WRAPPER_HEADER: &str = r#"
 #include "exec/cpu-all.h"
 #include "exec/exec-all.h"
 #include "exec/translate-all.h"
+#include "exec/translation-block.h"
 #include "exec/log.h"
 #include "trace/trace-root.h"
 #include "qemu/accel.h"
@@ -88,6 +89,7 @@ const WRAPPER_HEADER: &str = r#"
 #include "libafl/exit.h"
 #include "libafl/jit.h"
 #include "libafl/utils.h"
+#include "libafl/tcg.h"
 
 #include "libafl/hook.h"
 
@@ -138,6 +140,7 @@ pub fn generate(
         .allowlist_var("mmap_next_start")
         .allowlist_var("guest_base")
         .allowlist_var("exec_path")
+        .allowlist_var("TB_JMP_OFFSET_INVALID")
         .allowlist_type("target_ulong")
         .allowlist_type("target_long")
         .allowlist_type("CPUState")

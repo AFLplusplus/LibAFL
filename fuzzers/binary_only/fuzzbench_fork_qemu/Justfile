@@ -17,11 +17,10 @@ build:
 
 [unix]
 run: build harness
-    cargo run \
-      --profile {{ PROFILE }} \
+    {{ FUZZER }} \
       {{ BUILD_DIR }}/harness \
       -- \
-      --libafl-in ../../inprocess/libfuzzer_libpng/corpus \
+      --libafl-in ./corpus \
       --libafl-out ./out
 
 [unix]

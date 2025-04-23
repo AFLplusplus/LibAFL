@@ -7,7 +7,7 @@ use std::{path::PathBuf, sync::Mutex};
 
 use hashbrown::{HashMap, hash_map::Entry};
 use libafl::{HasMetadata, executors::ExitKind, observers::ObserversTuple};
-use libafl_qemu_sys::{GuestAddr, GuestUsize};
+use libafl_qemu_sys::{GuestAddr, GuestUsize, TranslationBlock};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
@@ -173,6 +173,9 @@ pub fn gen_block_lengths<ET, F, I, S>(
     _state: Option<&mut S>,
     pc: GuestAddr,
     block_length: GuestUsize,
+    _tb: *const TranslationBlock,
+    _last_tb: *const TranslationBlock,
+    _tb_exit: i32,
 ) where
     ET: EmulatorModuleTuple<I, S>,
     F: AddressFilter,

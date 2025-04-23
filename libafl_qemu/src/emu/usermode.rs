@@ -1,7 +1,9 @@
 use libafl_bolts::Error;
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
-use crate::{Emulator, GuestMaps, NopSnapshotManager, TargetSignalHandling};
+use crate::{
+    Emulator, GuestMaps, NopSnapshotManager, TargetSignalHandling, modules::EmulatorModuleTuple,
+};
 
 pub type StdSnapshotManager = NopSnapshotManager;
 
@@ -98,6 +100,20 @@ impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
     pub fn set_target_crash_handling(&self, handling: &TargetSignalHandling) {
         unsafe {
             self.qemu.set_target_crash_handling(handling);
+        }
+    }
+}
+
+impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM>
+where
+    ET: EmulatorModuleTuple<I, S>,
+    S: Unpin,
+{
+    pub unsafe fn run_target_crash_hooks_on_dying_signal(&self) {
+        unsafe {
+            libafl_qemu_sys::libafl_set_on_signal_handler(Some(
+                super::hooks::run_target_crash_hooks::<ET, I, S>,
+            ));
         }
     }
 }
