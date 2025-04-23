@@ -583,6 +583,7 @@ where
 
 /// A trait to determine if a input should be run or not
 pub trait InputFilter<I> {
+    /// should run execution for this input or no
     fn should_execute(&mut self, input: &I) -> bool;
 }
 
