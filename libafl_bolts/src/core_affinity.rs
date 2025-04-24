@@ -452,7 +452,8 @@ mod windows {
 
             let mut outga = GROUP_AFFINITY::default();
 
-            let result = SetThreadGroupAffinity(GetCurrentThread(), &ga, Some(&mut outga));
+            let result =
+                SetThreadGroupAffinity(GetCurrentThread(), &raw const ga, Some(&mut outga));
             if result.0 == 0 {
                 Err(Error::unknown("Failed to set_for_current"))
             } else {
