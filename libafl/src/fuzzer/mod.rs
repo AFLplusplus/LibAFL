@@ -617,6 +617,7 @@ pub struct BloomInputFilter {
     bloom: BloomFilter,
 }
 
+#[cfg(feature = "std")]
 impl Default for BloomInputFilter {
     fn default() -> Self {
         let bloom = BloomFilter::with_false_pos(1e-4).expected_items(100);
