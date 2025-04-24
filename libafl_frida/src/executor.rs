@@ -15,7 +15,7 @@ use frida_gum::{
 #[cfg(windows)]
 use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks};
 use libafl::{
-    Error, HasInputConverter,
+    Error, HasBytesConverter,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{Input, InputToBytes},
     observers::ObserversTuple,
@@ -63,7 +63,7 @@ where
     S: HasExecutions + HasCurrentTestcase<I> + HasSolutions<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
-    Z: HasInputConverter,
+    Z: HasBytesConverter,
     Z::Converter: InputToBytes<I>,
 {
     /// Instruct the target about the input and run

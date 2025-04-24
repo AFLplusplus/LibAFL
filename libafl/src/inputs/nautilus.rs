@@ -8,6 +8,7 @@ use core::{
 use libafl_bolts::{HasLen, ownedref::OwnedSlice};
 use serde::{Deserialize, Serialize};
 
+use super::BytesInput;
 use crate::{
     common::nautilus::grammartec::{
         newtypes::NodeId,
@@ -15,7 +16,7 @@ use crate::{
         tree::{Tree, TreeLike},
     },
     generators::nautilus::NautilusContext,
-    inputs::{Input, InputToBytes},
+    inputs::{Input, InputConverter, InputToBytes},
 };
 
 /// An [`Input`] implementation for `Nautilus` grammar.
@@ -95,7 +96,7 @@ impl Hash for NautilusInput {
     }
 }
 
-/// `InputConverter` to convert from `NautilusInput` to `BytesInput`
+/// Convert from `NautilusInput` to `BytesInput`
 #[derive(Debug)]
 pub struct NautilusBytesConverter<'a> {
     ctx: &'a NautilusContext,
@@ -103,9 +104,20 @@ pub struct NautilusBytesConverter<'a> {
 
 impl<'a> NautilusBytesConverter<'a> {
     #[must_use]
-    /// Create a new `NautilusToBytesInputConverter` from a context
+    /// Create a new `NautilusBytesConverter` from a context
     pub fn new(ctx: &'a NautilusContext) -> Self {
         Self { ctx }
+    }
+}
+
+impl InputConverter for NautilusBytesConverter<'_> {
+    type From = NautilusInput;
+    type To = BytesInput;
+
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, libafl_bolts::Error> {
+        let mut bytes = vec![];
+        input.unparse(self.ctx, &mut bytes);
+        Ok(BytesInput::new(bytes))
     }
 }
 

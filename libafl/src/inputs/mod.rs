@@ -299,7 +299,7 @@ impl ResizableMutator<u8> for &mut Vec<u8> {
 }
 
 #[derive(Debug, Default)]
-/// Basic `InputConverter` with just one type that is not converting
+/// Basic `NopBytesConverter` with just one type that is not converting
 pub struct NopBytesConverter {}
 
 impl<I> InputToBytes<I> for NopBytesConverter

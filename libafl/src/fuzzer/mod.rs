@@ -79,7 +79,7 @@ pub trait HasObjective {
 }
 
 /// Can convert input to another type
-pub trait HasInputConverter {
+pub trait HasBytesConverter {
     /// The converter itself
     type Converter;
     /// the input converter
@@ -1077,7 +1077,7 @@ impl<IC, IF> StdFuzzerBuilder<IC, IF> {
     }
 }
 
-impl<CS, F, IC, IF, OF> HasInputConverter for StdFuzzer<CS, F, IC, IF, OF> {
+impl<CS, F, IC, IF, OF> HasBytesConverter for StdFuzzer<CS, F, IC, IF, OF> {
     type Converter = IC;
 
     fn converter(&self) -> &Self::Converter {

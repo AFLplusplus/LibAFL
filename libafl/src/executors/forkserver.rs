@@ -41,7 +41,7 @@ use crate::observers::{
     AsanBacktraceObserver, get_asan_runtime_flags, get_asan_runtime_flags_with_log_path,
 };
 use crate::{
-    Error, HasInputConverter,
+    Error, HasBytesConverter,
     executors::{Executor, ExitKind, HasObservers},
     inputs::{Input, InputToBytes},
     mutators::Tokens,
@@ -1400,7 +1400,7 @@ where
     OT: ObserversTuple<I, S>,
     S: HasExecutions,
     SHM: ShMem,
-    Z: HasInputConverter,
+    Z: HasBytesConverter,
     Z::Converter: InputToBytes<I>,
 {
     #[inline]
