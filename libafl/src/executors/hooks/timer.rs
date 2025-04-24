@@ -190,7 +190,7 @@ impl TimerStruct {
 
         let mut critical = CRITICAL_SECTION::default();
         unsafe {
-            InitializeCriticalSection(&mut critical);
+            InitializeCriticalSection(&raw mut critical);
         }
         Self {
             milli_sec,
@@ -289,7 +289,7 @@ impl TimerStruct {
             LeaveCriticalSection(self.critical_mut());
             compiler_fence(Ordering::SeqCst);
 
-            SetThreadpoolTimer(*self.ptp_timer(), Some(&ft), 0, None);
+            SetThreadpoolTimer(*self.ptp_timer(), Some(&raw const ft), 0, None);
         }
     }
 
