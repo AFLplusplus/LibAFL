@@ -12,8 +12,6 @@ runs:
         submodules: true
         fetch-depth: 0
     - uses: ./.github/workflows/ubuntu-prepare
-    - uses: Swatinem/rust-cache@v2
-      with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
     - name: Install fuzzers deps
       shell: bash
       run: sudo apt-get update && sudo apt-get install -y nlohmann-json3-dev libc6-dev-i386-cross libc6-dev libc6-dev-i386
