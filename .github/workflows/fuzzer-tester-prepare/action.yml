@@ -26,16 +26,16 @@ runs:
       with:
         just-version: '1.40.0'
     - name: Add wasm target
-      if: ${{ inputs.fuzzer-name }} == './fuzzers/fuzz_anything/baby_fuzzer_wasm'
+      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
       shell: bash
       run: rustup target add wasm32-unknown-unknown
     - name: install wasm-pack
-      if: ${{ inputs.fuzzer-name }} == './fuzzers/fuzz_anything/baby_fuzzer_wasm'
+      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
       uses: baptiste0928/cargo-install@v3
       with:
         crate: wasm-pack
     - name: install chrome
-      if: ${{ inputs.fuzzer-name }} == './fuzzers/fuzz_anything/baby_fuzzer_wasm'
+      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
       uses: browser-actions/setup-chrome@v1
       with:
         chrome-version: stable
