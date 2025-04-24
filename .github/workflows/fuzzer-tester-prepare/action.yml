@@ -22,10 +22,6 @@ runs:
       if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/unicorn' }}
       shell: bash
       run: sudo apt-get install -y riscv64-linux-gnu
-    - name: Install glib for qemu
-      if: ${{ inputs.fuzzer-name == './fuzzers/binary_only/fuzzbench_fork_qemu' || inputs.fuzzer-name == './fuzzers/binary_only/fuzzbench_qemu' }}
-      shell: bash
-      run: sudo apt-get install -y libglib2.0-dev
     - name: Add no_std toolchain
       if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_no_std' }}
       shell: bash
