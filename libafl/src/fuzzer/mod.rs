@@ -21,7 +21,7 @@ use crate::{
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
-    inputs::Input,
+    inputs::{Input, NopBytesConverter},
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
@@ -76,6 +76,16 @@ pub trait HasObjective {
 
     /// Sets whether to share objectives among nodes
     fn set_share_objectives(&mut self, share_objectives: bool);
+}
+
+/// Can convert input to another type
+pub trait HasBytesConverter {
+    /// The converter itself
+    type Converter;
+    /// the input converter
+    fn converter(&self) -> &Self::Converter;
+    /// the input converter(mut)
+    fn converter_mut(&mut self) -> &mut Self::Converter;
 }
 
 /// Evaluates if an input is interesting using the feedback
@@ -294,16 +304,17 @@ impl ExecuteInputResult {
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
-pub struct StdFuzzer<CS, F, IF, OF> {
+pub struct StdFuzzer<CS, F, IC, IF, OF> {
     scheduler: CS,
     feedback: F,
     objective: OF,
+    bytes_converter: IC,
     input_filter: IF,
     // Handles whether to share objective testcases among nodes
     share_objectives: bool,
 }
 
-impl<CS, F, I, IF, OF, S> HasScheduler<I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, F, I, IC, IF, OF, S> HasScheduler<I, S> for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
 {
@@ -318,7 +329,7 @@ where
     }
 }
 
-impl<CS, F, IF, OF> HasFeedback for StdFuzzer<CS, F, IF, OF> {
+impl<CS, F, IC, IF, OF> HasFeedback for StdFuzzer<CS, F, IC, IF, OF> {
     type Feedback = F;
 
     fn feedback(&self) -> &Self::Feedback {
@@ -330,7 +341,7 @@ impl<CS, F, IF, OF> HasFeedback for StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
+impl<CS, F, IC, IF, OF> HasObjective for StdFuzzer<CS, F, IC, IF, OF> {
     type Objective = OF;
 
     fn objective(&self) -> &OF {
@@ -350,7 +361,8 @@ impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, EM, F, I, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, EM, F, I, IC, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S>
+    for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     EM: EventFirer<I, S>,
@@ -546,7 +558,8 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> EvaluatorObservers<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IC, IF, OF, S> EvaluatorObservers<E, EM, I, S>
+    for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -581,7 +594,9 @@ where
     }
 }
 
-trait InputFilter<I> {
+/// A trait to determine if a input should be run or not
+pub trait InputFilter<I> {
+    /// should run execution for this input or no
     fn should_execute(&mut self, input: &I) -> bool;
 }
 
@@ -603,9 +618,18 @@ pub struct BloomInputFilter {
 }
 
 #[cfg(feature = "std")]
+impl Default for BloomInputFilter {
+    fn default() -> Self {
+        let bloom = BloomFilter::with_false_pos(1e-4).expected_items(10_000_000);
+        Self { bloom }
+    }
+}
+
+#[cfg(feature = "std")]
 impl BloomInputFilter {
     #[must_use]
-    fn new(items_count: usize, fp_p: f64) -> Self {
+    /// Constructor
+    pub fn new(items_count: usize, fp_p: f64) -> Self {
         let bloom = BloomFilter::with_false_pos(fp_p).expected_items(items_count);
         Self { bloom }
     }
@@ -619,7 +643,7 @@ impl<I: Hash> InputFilter<I> for BloomInputFilter {
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IC, IF, OF, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -775,7 +799,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> EventProcessor<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IC, IF, OF, S> EventProcessor<E, EM, I, S> for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -857,7 +881,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IC, IF, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -989,42 +1013,93 @@ where
     }
 }
 
-impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
-    /// Create a new [`StdFuzzer`] with standard behavior and the provided duplicate input execution filter.
-    pub fn with_input_filter(scheduler: CS, feedback: F, objective: OF, input_filter: IF) -> Self {
+/// The builder for std fuzzer
+#[derive(Debug, Default)]
+pub struct StdFuzzerBuilder<IC, IF> {
+    bytes_converter: Option<IC>,
+    input_filter: Option<IF>,
+}
+
+impl StdFuzzerBuilder<(), ()> {
+    /// Contstuctor
+    #[must_use]
+    pub fn new() -> Self {
         Self {
-            scheduler,
-            feedback,
-            objective,
-            input_filter,
-            share_objectives: false,
+            input_filter: None,
+            bytes_converter: None,
         }
     }
 }
 
-impl<CS, F, OF> StdFuzzer<CS, F, NopInputFilter, OF> {
-    /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
-    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
-        Self::with_input_filter(scheduler, feedback, objective, NopInputFilter)
+impl<IF> StdFuzzerBuilder<(), IF> {
+    /// set input converter
+    pub fn bytes_converter<IC>(self, bytes_converter: IC) -> StdFuzzerBuilder<IC, IF> {
+        StdFuzzerBuilder {
+            bytes_converter: Some(bytes_converter),
+            input_filter: self.input_filter,
+        }
     }
 }
 
-#[cfg(feature = "std")] // hashing requires std
-impl<CS, F, OF> StdFuzzer<CS, F, BloomInputFilter, OF> {
-    /// Create a new [`StdFuzzer`], which, with a certain certainty, executes each input only once.
-    ///
-    /// This is achieved by hashing each input and using a bloom filter to differentiate inputs.
-    ///
-    /// Use this implementation if hashing each input is very fast compared to executing potential duplicate inputs.
-    pub fn with_bloom_input_filter(
+impl<IC> StdFuzzerBuilder<IC, ()> {
+    /// set input filter
+    pub fn input_filter<IF>(self, input_filter: IF) -> StdFuzzerBuilder<IC, IF> {
+        StdFuzzerBuilder {
+            bytes_converter: self.bytes_converter,
+            input_filter: Some(input_filter),
+        }
+    }
+}
+
+impl<IC, IF> StdFuzzerBuilder<IC, IF> {
+    /// build it
+    pub fn build<CS, F, OF>(
+        self,
         scheduler: CS,
         feedback: F,
         objective: OF,
-        items_count: usize,
-        fp_p: f64,
-    ) -> Self {
-        let input_filter = BloomInputFilter::new(items_count, fp_p);
-        Self::with_input_filter(scheduler, feedback, objective, input_filter)
+    ) -> Result<StdFuzzer<CS, F, IC, IF, OF>, Error> {
+        let Some(bytes_converter) = self.bytes_converter else {
+            return Err(Error::illegal_argument("input converter not set"));
+        };
+        let Some(input_filter) = self.input_filter else {
+            return Err(Error::illegal_argument("input filter not set"));
+        };
+
+        Ok(StdFuzzer {
+            bytes_converter,
+            input_filter,
+            scheduler,
+            feedback,
+            objective,
+            share_objectives: false,
+        })
+    }
+}
+
+impl<CS, F, IC, IF, OF> HasBytesConverter for StdFuzzer<CS, F, IC, IF, OF> {
+    type Converter = IC;
+
+    fn converter(&self) -> &Self::Converter {
+        &self.bytes_converter
+    }
+
+    fn converter_mut(&mut self) -> &mut Self::Converter {
+        &mut self.bytes_converter
+    }
+}
+
+impl<CS, F, OF> StdFuzzer<CS, F, NopBytesConverter, NopInputFilter, OF> {
+    /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
+    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
+        Self {
+            scheduler,
+            feedback,
+            objective,
+            bytes_converter: NopBytesConverter::default(),
+            input_filter: NopInputFilter,
+            share_objectives: false,
+        }
     }
 }
 
@@ -1040,7 +1115,7 @@ pub trait ExecutesInput<E, EM, I, S> {
     ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> ExecutesInput<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IC, IF, OF, S> ExecutesInput<E, EM, I, S> for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers,
@@ -1135,12 +1210,12 @@ mod tests {
 
     use libafl_bolts::rands::StdRand;
 
-    use super::{Evaluator, StdFuzzer};
     use crate::{
         corpus::InMemoryCorpus,
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
-        inputs::BytesInput,
+        fuzzer::{BloomInputFilter, Evaluator, StdFuzzerBuilder},
+        inputs::{BytesInput, NopBytesConverter},
         schedulers::StdScheduler,
         state::StdState,
     };
@@ -1149,7 +1224,12 @@ mod tests {
     fn filtered_execution() {
         let execution_count = RefCell::new(0);
         let scheduler = StdScheduler::new();
-        let mut fuzzer = StdFuzzer::with_bloom_input_filter(scheduler, (), (), 100, 1e-4);
+        let bloom_filter = BloomInputFilter::default();
+        let mut fuzzer = StdFuzzerBuilder::new()
+            .input_filter(bloom_filter)
+            .bytes_converter(NopBytesConverter::default())
+            .build(scheduler, (), ())
+            .unwrap();
         let mut state = StdState::new(
             StdRand::new(),
             InMemoryCorpus::new(),

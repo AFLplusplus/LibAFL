@@ -1,4 +1,4 @@
-# Fuzzing libpng with frida as executale
+# Fuzzing libpng with frida as executable
 
 This folder contains an example fuzzer for libpng, using LLMP for fast multi-process fuzzing and crash detection.
 To show off crash detection, we added a ud2 instruction to the harness, edit harness.cc if you want a non-crashing example.

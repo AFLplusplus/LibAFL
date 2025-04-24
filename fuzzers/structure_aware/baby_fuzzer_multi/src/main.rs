@@ -11,17 +11,19 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or_fast,
-    feedbacks::{CrashFeedback, MaxMapFeedback, MinMapFeedback},
+    feedbacks::{CrashFeedback, DifferentIsNovel, MapFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, MultipartInput},
-    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::ConstMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
     Evaluator,
 };
-use libafl_bolts::{nonnull_raw_mut, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{
+    nonnull_raw_mut, rands::StdRand, simd::MinReducer, tuples::tuple_list, AsSlice,
+};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 128] = [0; 128];
@@ -89,7 +91,7 @@ pub fn main() {
 
     // Feedback to rate the interestingness of an input
     let signals_feedback = MaxMapFeedback::new(&signals_observer);
-    let count_feedback = MinMapFeedback::new(&count_observer);
+    let count_feedback = MapFeedback::<_, DifferentIsNovel, _, MinReducer>::new(&count_observer);
 
     let mut feedback = feedback_or_fast!(count_feedback, signals_feedback);
 
@@ -152,7 +154,7 @@ pub fn main() {
         .unwrap();
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer

@@ -10,7 +10,7 @@ use libafl::{
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     inputs::{EncodedInput, InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
     monitors::SimpleMonitor,
-    mutators::{encoded_mutations::encoded_mutations, scheduled::StdScheduledMutator},
+    mutators::{encoded_mutations::encoded_mutations, scheduled::HavocScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
@@ -119,7 +119,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_stack_pow(encoded_mutations(), 2);
+    let mutator = HavocScheduledMutator::with_max_stack_pow(encoded_mutations(), 2);
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     println!("Decoder {:?} ...", &encoder_decoder);

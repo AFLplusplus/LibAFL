@@ -15,9 +15,9 @@ use frida_gum::{
 #[cfg(windows)]
 use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks};
 use libafl::{
-    Error,
+    Error, HasBytesConverter,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{Input, NopTargetBytesConverter, TargetBytesConverter},
+    inputs::{Input, InputToBytes},
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
 };
@@ -30,7 +30,7 @@ use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 use crate::windows_hooks::initialize;
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
-pub struct FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, TC, Z> {
+pub struct FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, Z> {
     base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
     /// `thread_id` for the Stalker
     thread_id: Option<u32>,
@@ -38,13 +38,11 @@ pub struct FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, TC, Z> {
     stalker: Stalker,
     /// User provided callback for instrumentation
     helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
-    target_bytes_converter: TC,
     followed: bool,
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<EM, H, I, OT, RT, S, TC, Z> Debug
-    for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, TC, Z>
+impl<EM, H, I, OT, RT, S, Z> Debug for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, Z>
 where
     OT: Debug,
 {
@@ -57,17 +55,16 @@ where
     }
 }
 
-impl<EM, H, I, OT, RT, S, TC, Z> Executor<EM, I, S, Z>
-    for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, TC, Z>
+impl<EM, H, I, OT, RT, S, Z> Executor<EM, I, S, Z>
+    for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, Z>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    S: HasExecutions,
-    S: HasCurrentTestcase<I>,
-    S: HasSolutions<I>,
-    TC: TargetBytesConverter<I>,
+    S: HasExecutions + HasCurrentTestcase<I> + HasSolutions<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
+    Z: HasBytesConverter,
+    Z::Converter: InputToBytes<I>,
 {
     /// Instruct the target about the input and run
     #[inline]
@@ -78,7 +75,8 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        let target_bytes = self.target_bytes_converter.to_target_bytes(input);
+        let converter = fuzzer.converter_mut();
+        let target_bytes = converter.to_bytes(input);
         self.helper.borrow_mut().pre_exec(target_bytes.as_slice())?;
         if self.helper.borrow_mut().stalker_enabled() {
             if !(self.followed) {
@@ -125,8 +123,8 @@ where
     }
 }
 
-impl<EM, H, I, OT, RT, S, TC, Z> HasObservers
-    for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, TC, Z>
+impl<EM, H, I, OT, RT, S, Z> HasObservers
+    for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, Z>
 {
     type Observers = OT;
     #[inline]
@@ -140,8 +138,7 @@ impl<EM, H, I, OT, RT, S, TC, Z> HasObservers
     }
 }
 
-impl<'a, 'b, EM, H, I, OT, RT, S, Z>
-    FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, NopTargetBytesConverter<I>, Z>
+impl<'a, 'b, EM, H, I, OT, RT, S, Z> FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, Z>
 where
     RT: FridaRuntimeTuple,
 {
@@ -151,13 +148,7 @@ where
         base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
         helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
     ) -> Self {
-        FridaInProcessExecutor::with_target_bytes_converter(
-            gum,
-            base,
-            helper,
-            None,
-            NopTargetBytesConverter::new(),
-        )
+        FridaInProcessExecutor::with_target_bytes_converter(gum, base, helper, None)
     }
 
     /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`.
@@ -167,17 +158,11 @@ where
         helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
         thread_id: u32,
     ) -> Self {
-        FridaInProcessExecutor::with_target_bytes_converter(
-            gum,
-            base,
-            helper,
-            Some(thread_id),
-            NopTargetBytesConverter::new(),
-        )
+        FridaInProcessExecutor::with_target_bytes_converter(gum, base, helper, Some(thread_id))
     }
 }
 
-impl<'a, 'b, EM, H, I, OT, RT, S, TC, Z> FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, TC, Z>
+impl<'a, 'b, EM, H, I, OT, RT, S, Z> FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, Z>
 where
     RT: FridaRuntimeTuple,
 {
@@ -187,7 +172,6 @@ where
         base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
         helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
         thread_id: Option<u32>,
-        target_bytes_converter: TC,
     ) -> Self {
         let mut stalker = Stalker::new(gum);
         let ranges = helper.borrow_mut().ranges().clone();
@@ -237,7 +221,6 @@ where
             thread_id,
             stalker,
             helper,
-            target_bytes_converter,
             followed: false,
             _phantom: PhantomData,
         }
@@ -245,13 +228,12 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, EM, H, I, OT, RT, S, TC, Z> HasInProcessHooks<I, S>
-    for FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, TC, Z>
+impl<'a, 'b, EM, H, I, OT, RT, S, Z> HasInProcessHooks<I, S>
+    for FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, Z>
 where
     H: FnMut(&I) -> ExitKind,
     S: HasSolutions<I> + HasCurrentTestcase<I> + HasExecutions,
     I: Input,
-    TC: TargetBytesConverter<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
 {

@@ -1022,11 +1022,11 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
         r = unsafe {
             mach_vm_region_recurse(
                 task,
-                &mut addr,
-                &mut sz,
-                &mut reg,
+                &raw mut addr,
+                &raw mut sz,
+                &raw mut reg,
                 pvminfo.as_mut_ptr() as vm_region_recurse_info_t,
-                &mut _cnt,
+                &raw mut _cnt,
             )
         };
         if r != libc::KERN_SUCCESS {

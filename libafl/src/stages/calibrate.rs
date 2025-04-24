@@ -254,7 +254,7 @@ where
                 metadata.unstable_entries.insert(item); // Insert newly found items
             }
             metadata.filled_entries_count = map_first_filled_count;
-        } else if !state.has_metadata::<UnstableEntriesMetadata>() {
+        } else if !state.has_metadata::<UnstableEntriesMetadata>() && map_first_filled_count > 0 {
             send_default_stability = true;
             state.add_metadata(UnstableEntriesMetadata::new());
         }

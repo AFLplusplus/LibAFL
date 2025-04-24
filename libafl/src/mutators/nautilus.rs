@@ -62,6 +62,14 @@ impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
             Ok(MutationResult::Mutated)
         }
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for NautilusRandomMutator<'_> {
@@ -126,6 +134,14 @@ impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
             }
         }
         Ok(MutationResult::Skipped)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -197,6 +213,14 @@ where
             input.tree = Tree::from_rule_vec(tmp, self.ctx);
             Ok(MutationResult::Mutated)
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 

@@ -252,6 +252,14 @@ where
         input.flip_bit_at(offset);
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for BitFlipMutator {
@@ -271,6 +279,14 @@ where
     fn mutate(&mut self, _state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         input.flip_all_bits();
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -292,6 +308,14 @@ where
         input.wrapping_inc();
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for IncMutator {
@@ -312,6 +336,14 @@ where
         input.wrapping_dec();
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for DecMutator {
@@ -331,6 +363,14 @@ where
     fn mutate(&mut self, _state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         input.twos_complement();
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -353,6 +393,14 @@ where
         // set to random data byte-wise since the RNGs don't work for all numeric types
         input.randomize(state.rand_mut());
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -381,6 +429,14 @@ where
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         *input = *other_testcase.input().as_ref().unwrap();
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -424,6 +480,14 @@ where
         let mapped_input = (self.input_mapper)(other_input).clone();
         *input = mapped_input;
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 

@@ -11,7 +11,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
+    mutators::{havoc_mutations, tokens_mutations, HavocScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
@@ -22,7 +22,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, Truncate,
+    AsSliceMut, TargetArgs, Truncate,
 };
 use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 use nix::sys::signal::Signal;
@@ -207,7 +207,7 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator =
-        StdScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 6);
+        HavocScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 6);
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer

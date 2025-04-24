@@ -36,6 +36,14 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
             Ok(MutationResult::Mutated)
         }
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for EncodedRandMutator {
@@ -67,6 +75,14 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
             Ok(MutationResult::Mutated)
         }
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for EncodedIncMutator {
@@ -97,6 +113,14 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
             *val = val.wrapping_sub(1);
             Ok(MutationResult::Mutated)
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -132,6 +156,14 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
             };
             Ok(MutationResult::Mutated)
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -173,6 +205,14 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
         input.codes_mut().drain(off..off + len);
 
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -241,6 +281,14 @@ where
 
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for EncodedInsertCopyMutator {
@@ -288,6 +336,14 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
         }
 
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -372,6 +428,14 @@ where
 
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for EncodedCrossoverInsertMutator {
@@ -444,6 +508,14 @@ where
         }
 
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 

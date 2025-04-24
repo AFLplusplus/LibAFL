@@ -903,7 +903,7 @@ fn linux_version() -> Result<(usize, usize, usize), ()> {
         domainname: [0; 65],
     };
 
-    if unsafe { libc::uname(&mut uname_data) } != 0 {
+    if unsafe { libc::uname(&raw mut uname_data) } != 0 {
         return Err(());
     }
 

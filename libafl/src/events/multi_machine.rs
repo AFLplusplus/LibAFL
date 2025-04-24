@@ -268,10 +268,10 @@ where
                 let timeout = current_time() + parent_lock.node_descriptor.timeout;
 
                 parent_lock.parent = loop {
-                    log::debug!("Trying to connect to parent @ {}..", parent_addr);
+                    log::debug!("Trying to connect to parent @ {parent_addr}..");
                     match TcpStream::connect(parent_addr).await {
                         Ok(stream) => {
-                            log::debug!("Connected to parent @ {}", parent_addr);
+                            log::debug!("Connected to parent @ {parent_addr}");
 
                             break Some(stream);
                         }
@@ -302,10 +302,10 @@ where
 
                 // The main listening loop. Should never fail.
                 'listening: loop {
-                    log::debug!("listening for children on {:?}...", listener);
+                    log::debug!("listening for children on {listener:?}...");
                     match listener.accept().await {
                         Ok((mut stream, addr)) => {
-                            log::debug!("{} joined the children.", addr);
+                            log::debug!("{addr} joined the children.");
                             let mut state_guard = state.write().await;
 
                             if let Err(e) = state_guard
@@ -487,7 +487,7 @@ where
 
             // Garbage collect disconnected children
             for id_to_remove in &ids_to_remove {
-                log::debug!("Child {:?} has been garbage collected.", id_to_remove);
+                log::debug!("Child {id_to_remove:?} has been garbage collected.");
                 self.children.remove(id_to_remove);
             }
         }
@@ -596,7 +596,7 @@ where
 
         // Garbage collect disconnected children
         for id_to_remove in &ids_to_remove {
-            log::debug!("Child {:?} has been garbage collected.", id_to_remove);
+            log::debug!("Child {id_to_remove:?} has been garbage collected.");
             self.children.remove(id_to_remove);
         }
 

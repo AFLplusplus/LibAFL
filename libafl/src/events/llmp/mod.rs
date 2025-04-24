@@ -18,7 +18,7 @@ use crate::{
     Error,
     events::{Event, EventFirer, EventWithStats},
     fuzzer::EvaluatorObservers,
-    inputs::{Input, InputConverter, NopInput, NopInputConverter},
+    inputs::{Input, InputConverter, NopInput},
     state::{HasCurrentTestcase, HasSolutions, NopState},
 };
 
@@ -88,16 +88,7 @@ pub struct LlmpEventConverter<I, IC, ICB, S, SHM, SP> {
     phantom: PhantomData<(I, S)>,
 }
 
-impl
-    LlmpEventConverter<
-        NopInput,
-        NopInputConverter<NopInput>,
-        NopInputConverter<NopInput>,
-        NopState<NopInput>,
-        NopShMem,
-        NopShMemProvider,
-    >
-{
+impl LlmpEventConverter<NopInput, (), (), NopState<NopInput>, NopShMem, NopShMemProvider> {
     /// Create a builder for [`LlmpEventConverter`]
     #[must_use]
     pub fn builder() -> LlmpEventConverterBuilder {
