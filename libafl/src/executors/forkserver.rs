@@ -222,7 +222,7 @@ impl ConfigTarget for Command {
             #[cfg(target_os = "openbsd")]
             let ret = unsafe { libc::setrlimit(libc::RLIMIT_RSS, &r) };
             #[cfg(not(target_os = "openbsd"))]
-            let ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &r) };
+            let ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &raw const r) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
             }
@@ -239,7 +239,7 @@ impl ConfigTarget for Command {
                 rlim_cur: if enable { RLIM_INFINITY } else { 0 },
                 rlim_max: if enable { RLIM_INFINITY } else { 0 },
             };
-            let ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &r0) };
+            let ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &raw const r0) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
             }
