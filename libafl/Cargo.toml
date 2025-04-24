@@ -40,7 +40,6 @@ default = [
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
   "simd",
-  "nautilus",
 ]
 document-features = ["dep:document-features"]
 

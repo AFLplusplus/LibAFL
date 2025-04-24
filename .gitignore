@@ -5,7 +5,7 @@ vendor
 
 # cargo lockfiles except from binaries
 **/Cargo.lock
-# !fuzzers/**/Cargo.lock
+fuzzers/**/Cargo.lock
 # !utils/**/Cargo.lock
 
 

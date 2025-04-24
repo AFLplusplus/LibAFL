@@ -10,9 +10,9 @@ use libafl::{
     feedbacks::{
         CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback, TimeFeedback,
     },
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::Fuzzer,
     generators::{NautilusContext, NautilusGenerator},
-    inputs::NautilusInput,
+    inputs::{NautilusBytesConverter, NautilusInput},
     monitors::SimpleMonitor,
     mutators::{
         HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
@@ -22,7 +22,7 @@ use libafl::{
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::StdState,
-    HasMetadata,
+    BloomInputFilter, HasMetadata, StdFuzzerBuilder,
 };
 use libafl_bolts::{
     current_nanos,
@@ -135,7 +135,7 @@ pub fn main() {
     );
 
     // create a State from scratch
-    let mut state = StdState::with_target_bytes_converter(
+    let mut state = StdState::new(
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
@@ -166,7 +166,12 @@ pub fn main() {
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let converter = NautilusBytesConverter::new(&context);
+    let mut fuzzer = StdFuzzerBuilder::new()
+        .input_filter(BloomInputFilter::default())
+        .bytes_converter(converter)
+        .build(scheduler, feedback, objective)
+        .unwrap();
 
     // If we should debug the child
     let debug_child = opt.debug_child;
