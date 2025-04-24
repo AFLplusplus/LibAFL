@@ -18,7 +18,7 @@ use crate::{
     Error,
     events::{Event, EventFirer, EventWithStats},
     fuzzer::EvaluatorObservers,
-    inputs::{Input, InputConverter, NopInput, NopInputConverter},
+    inputs::{Input, InputConverter, NopBytesConverter, NopInput},
     state::{HasCurrentTestcase, HasSolutions, NopState},
 };
 
@@ -91,8 +91,8 @@ pub struct LlmpEventConverter<I, IC, ICB, S, SHM, SP> {
 impl
     LlmpEventConverter<
         NopInput,
-        NopInputConverter<NopInput>,
-        NopInputConverter<NopInput>,
+        NopBytesConverter,
+        NopBytesConverter,
         NopState<NopInput>,
         NopShMem,
         NopShMemProvider,

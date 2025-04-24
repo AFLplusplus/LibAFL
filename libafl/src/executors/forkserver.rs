@@ -41,12 +41,12 @@ use crate::observers::{
     AsanBacktraceObserver, get_asan_runtime_flags, get_asan_runtime_flags_with_log_path,
 };
 use crate::{
-    Error,
+    Error, HasInputConverter,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
+    inputs::{Input, InputToBytes},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
-    state::{CanToBytes, HasExecutions},
+    state::HasExecutions,
 };
 
 const FORKSRV_FD: i32 = 198;
@@ -656,14 +656,13 @@ where
 
     /// Execute input and increase the execution counter.
     #[inline]
-    fn execute_input(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error>
+    fn execute_input(&mut self, state: &mut S, input: &[u8]) -> Result<ExitKind, Error>
     where
-        S: HasExecutions + CanToBytes<I>,
+        S: HasExecutions,
     {
         *state.executions_mut() += 1;
-        let bytes = state.to_bytes(input);
 
-        self.execute_input_uncounted(bytes.as_slice())
+        self.execute_input_uncounted(input)
     }
 
     fn map_input_to_shmem(&mut self, input: &[u8], input_size: usize) -> Result<(), Error> {
@@ -1399,18 +1398,22 @@ impl Default for ForkserverExecutorBuilder<'_, UnixShMemProvider> {
 impl<EM, I, OT, S, SHM, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SHM>
 where
     OT: ObserversTuple<I, S>,
-    S: HasExecutions + CanToBytes<I>,
+    S: HasExecutions,
     SHM: ShMem,
+    Z: HasInputConverter,
+    Z::Converter: InputToBytes<I>,
 {
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.execute_input(state, input)
+        let converter = fuzzer.converter_mut();
+        let bytes = converter.to_bytes(input);
+        self.execute_input(state, bytes.as_slice())
     }
 }
 

@@ -12,7 +12,7 @@ use libafl::{
     },
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
-    inputs::{NautilusInput, NautilusTargetBytesConverter},
+    inputs::NautilusInput,
     monitors::SimpleMonitor,
     mutators::{
         HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
@@ -143,7 +143,6 @@ pub fn main() {
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-        NautilusTargetBytesConverter::new(&context),
         // States of the feedbacks.
         // The feedbacks can report the data that should persist in the State.
         &mut feedback,

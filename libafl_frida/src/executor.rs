@@ -15,11 +15,11 @@ use frida_gum::{
 #[cfg(windows)]
 use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks};
 use libafl::{
-    Error,
+    Error, HasInputConverter,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::Input,
+    inputs::{Input, InputToBytes},
     observers::ObserversTuple,
-    state::{CanToBytes, HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
 };
 use libafl_bolts::{AsSlice, tuples::RefIndexable};
 
@@ -60,11 +60,11 @@ impl<EM, H, I, OT, RT, S, Z> Executor<EM, I, S, Z>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    S: HasExecutions,
-    S: HasCurrentTestcase<I>,
-    S: HasSolutions<I> + CanToBytes<I>,
+    S: HasExecutions + HasCurrentTestcase<I> + HasSolutions<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
+    Z: HasInputConverter,
+    Z::Converter: InputToBytes<I>,
 {
     /// Instruct the target about the input and run
     #[inline]
@@ -75,7 +75,8 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        let target_bytes = state.to_bytes(input);
+        let converter = fuzzer.converter_mut();
+        let target_bytes = converter.to_bytes(input);
         self.helper.borrow_mut().pre_exec(target_bytes.as_slice())?;
         if self.helper.borrow_mut().stalker_enabled() {
             if !(self.followed) {

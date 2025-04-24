@@ -9,7 +9,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{ExitKind, inprocess_fork::InProcessForkExecutor},
     feedbacks::{CrashFeedback, TimeoutFeedback},
-    inputs::{BytesInput, HasMutatorBytes, HasTargetBytes, NopTargetBytesConverter},
+    inputs::{BytesInput, HasMutatorBytes, HasTargetBytes},
     mutators::{HavocScheduledMutator, Mutator, havoc_mutations_no_crossover},
     schedulers::QueueScheduler,
     stages::StdTMinMutationalStage,
@@ -24,13 +24,8 @@ use libafl_bolts::{
 use libafl_targets::LLVMCustomMutator;
 
 use crate::{CustomMutationStatus, options::LibfuzzerOptions};
-type TMinState = StdState<
-    InMemoryCorpus<BytesInput>,
-    BytesInput,
-    RomuDuoJrRand,
-    InMemoryCorpus<BytesInput>,
-    NopTargetBytesConverter<BytesInput>,
->;
+type TMinState =
+    StdState<InMemoryCorpus<BytesInput>, BytesInput, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;
 
 fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     options: &LibfuzzerOptions,

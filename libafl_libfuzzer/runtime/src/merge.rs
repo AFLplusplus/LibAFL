@@ -66,8 +66,8 @@ pub fn merge(
     });
 
     let (state, mut mgr): (
-        Option<StdState<_, _, _, _, _>>,
-        SimpleRestartingEventManager<_, _, StdState<_, _, _, _, _>, _, _>,
+        Option<StdState<_, _, _, _>>,
+        SimpleRestartingEventManager<_, _, StdState<_, _, _, _>, _, _>,
     ) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider) {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
         Ok(res) => res,
