@@ -18,10 +18,14 @@ runs:
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
-    - name: Install more fuzzers deps
+    - name: Install riscv for unicorn
       if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/unicorn' }}
       shell: bash
       run: sudo apt-get install -y riscv64-linux-gnu
+    - name: Install glib for qemu
+      if: ${{ inputs.fuzzer-name == './fuzzers/binary_only/fuzzbench_fork_qemu' || inputs.fuzzer-name == './fuzzers/binary_only/fuzzbench_qemu' }}
+      shell: bash
+      run: sudo apt-get install -y libglib2.0-dev
     - name: Add no_std toolchain
       if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_no_std' }}
       shell: bash
@@ -30,6 +34,7 @@ runs:
       uses: extractions/setup-just@v2
       with:
         just-version: '1.40.0'
+    
     - name: Add wasm target
       if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
       shell: bash
