@@ -139,7 +139,7 @@ where
             }
             #[cfg(not(target_os = "linux"))]
             {
-                setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+                setitimer(ITIMER_REAL, &raw mut self.itimerval, null_mut());
             }
             // log::trace!("{v:#?} {}", nix::errno::errno());
 
