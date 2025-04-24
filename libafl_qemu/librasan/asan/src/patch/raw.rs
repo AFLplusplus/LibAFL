@@ -71,11 +71,11 @@ impl RawPatch {
     #[cfg(target_arch = "arm")]
     fn get_patch(destination: GuestAddr) -> Result<Vec<u8>, RawPatchError> {
         // ldr ip, [pc]
-        // mov pc, ip
+        // bx ip
         // .long 0xdeadface
         let insns = [
             [0x00, 0xc0, 0x9f, 0xe5].to_vec(),
-            [0x0c, 0xf0, 0xa0, 0xe1].to_vec(),
+            [0x1c, 0xff, 0x2f, 0xe1].to_vec(),
             [0xce, 0xfa, 0xad, 0xde].to_vec(),
         ];
         let addr = destination.to_ne_bytes().to_vec();
