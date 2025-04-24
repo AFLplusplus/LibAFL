@@ -17,4 +17,5 @@ runs:
       run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
     - name: install just
       uses: extractions/setup-just@v2
+      with:
         just-version: '*'

@@ -46,6 +46,7 @@ runs:
     - uses: dtolnay/rust-toolchain@nightly
     - name: install just
       uses: extractions/setup-just@v2
+      with:
         just-version: '*'
     - name: Install cargo-binstall
       shell: bash

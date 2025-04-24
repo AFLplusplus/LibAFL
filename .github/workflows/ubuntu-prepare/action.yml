@@ -12,6 +12,7 @@ runs:
     - uses: dtolnay/rust-toolchain@stable
     - name: install just
       uses: extractions/setup-just@v2
+      with:
         just-version: '*'
     - name: Add stable clippy
       shell: bash
