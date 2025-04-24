@@ -278,7 +278,7 @@ mod linux {
             sched_setaffinity(
                 0, // Defaults to current thread
                 size_of::<cpu_set_t>(),
-                &set,
+                &raw const set,
             )
         };
 
@@ -297,7 +297,7 @@ mod linux {
             sched_getaffinity(
                 0, // Defaults to current thread
                 size_of::<cpu_set_t>(),
-                &mut set,
+                &raw mut set,
             )
         };
 
