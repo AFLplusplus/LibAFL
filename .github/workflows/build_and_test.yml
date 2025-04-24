@@ -171,8 +171,6 @@ jobs:
     runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
-      - name: Install curl
-        run: sudo apt-get update && sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -186,7 +184,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build python3-dev python3-pip python3-venv libz3-dev
+        run: sudo apt-get update && sudo apt-get install -y lsb-release wget software-properties-common gnupg libz3-dev
       - name: Install maturin
         run: cargo install --locked maturin
       - uses: actions/checkout@v4
@@ -610,8 +608,6 @@ jobs:
   android:
     runs-on: ubuntu-24.04
     steps:
-      - name: Install curl
-        run: sudo apt-get update && sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: nttld/setup-ndk@v1
         with:

@@ -34,3 +34,4 @@ libafl_targets = { path = "../../../libafl_targets" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 clap = { version = "4.5.18", features = ["default"] }
 nix = { version = "0.29.0", features = ["fs"] }
+env_logger = "0.11.7"

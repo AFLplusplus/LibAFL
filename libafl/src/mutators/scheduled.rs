@@ -99,19 +99,18 @@ where
 
 /// A [`Mutator`] that schedules one of the embedded mutations on each call.
 #[derive(Debug)]
-pub struct StdScheduledMutator<MT> {
+pub struct SingleChoiceScheduledMutator<MT> {
     name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: usize,
 }
 
-impl<MT> Named for StdScheduledMutator<MT> {
+impl<MT> Named for SingleChoiceScheduledMutator<MT> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<I, MT, S> Mutator<I, S> for StdScheduledMutator<MT>
+impl<I, MT, S> Mutator<I, S> for SingleChoiceScheduledMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
@@ -120,9 +119,13 @@ where
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input)
     }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
-impl<MT> ComposedByMutations for StdScheduledMutator<MT> {
+impl<MT> ComposedByMutations for SingleChoiceScheduledMutator<MT> {
     type Mutations = MT;
     /// Get the mutations
     #[inline]
@@ -137,7 +140,89 @@ impl<MT> ComposedByMutations for StdScheduledMutator<MT> {
     }
 }
 
-impl<I, MT, S> ScheduledMutator<I, S> for StdScheduledMutator<MT>
+impl<I, MT, S> ScheduledMutator<I, S> for SingleChoiceScheduledMutator<MT>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand,
+{
+    /// Compute the number of iterations used to apply stacked mutations
+    fn iterations(&self, _state: &mut S, _: &I) -> u64 {
+        1
+    }
+
+    /// Get the next mutation to apply
+    fn schedule(&self, state: &mut S, _: &I) -> MutationId {
+        debug_assert_ne!(self.mutations.len(), 0);
+        // # Safety
+        // We check for empty mutations
+        state
+            .rand_mut()
+            .below(unsafe { NonZero::new(self.mutations.len()).unwrap_unchecked() })
+            .into()
+    }
+}
+
+impl<MT> SingleChoiceScheduledMutator<MT>
+where
+    MT: NamedTuple,
+{
+    /// Create a new [`SingleChoiceScheduledMutator`] instance specifying mutations
+    pub fn new(mutations: MT) -> Self {
+        SingleChoiceScheduledMutator {
+            name: Cow::from(format!(
+                "SingleChoiceScheduledMutator[{}]",
+                mutations.names().join(", ")
+            )),
+            mutations,
+        }
+    }
+}
+
+/// A [`Mutator`] that stacks embedded mutations in a havoc manner on each call.
+#[derive(Debug)]
+pub struct HavocScheduledMutator<MT> {
+    name: Cow<'static, str>,
+    mutations: MT,
+    max_stack_pow: usize,
+}
+
+impl<MT> Named for HavocScheduledMutator<MT> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
+impl<I, MT, S> Mutator<I, S> for HavocScheduledMutator<MT>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand,
+{
+    #[inline]
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        self.scheduled_mutate(state, input)
+    }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<MT> ComposedByMutations for HavocScheduledMutator<MT> {
+    type Mutations = MT;
+    /// Get the mutations
+    #[inline]
+    fn mutations(&self) -> &MT {
+        &self.mutations
+    }
+
+    // Get the mutations (mutable)
+    #[inline]
+    fn mutations_mut(&mut self) -> &mut MT {
+        &mut self.mutations
+    }
+}
+
+impl<I, MT, S> ScheduledMutator<I, S> for HavocScheduledMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
@@ -159,15 +244,15 @@ where
     }
 }
 
-impl<MT> StdScheduledMutator<MT>
+impl<MT> HavocScheduledMutator<MT>
 where
     MT: NamedTuple,
 {
-    /// Create a new [`StdScheduledMutator`] instance specifying mutations
+    /// Create a new [`HavocScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
-        StdScheduledMutator {
+        HavocScheduledMutator {
             name: Cow::from(format!(
-                "StdScheduledMutator[{}]",
+                "HavocScheduledMutator[{}]",
                 mutations.names().join(", ")
             )),
             mutations,
@@ -175,15 +260,12 @@ where
         }
     }
 
-    /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
-    ///
-    /// # Errors
-    /// Will return [`Error::IllegalArgument`] for `max_stack_pow` of 0.
+    /// Create a new [`HavocScheduledMutator`] instance specifying mutations and the maximun number of iterations
     #[inline]
     pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
         Self {
             name: Cow::from(format!(
-                "StdScheduledMutator[{}]",
+                "HavocScheduledMutator[{}]",
                 mutations.names().join(", ")
             )),
             mutations,
@@ -198,7 +280,7 @@ pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
     tuple_list!(TokenInsert::new(), TokenReplace::new())
 }
 
-/// A logging [`Mutator`] that wraps around a [`StdScheduledMutator`].
+/// A logging [`Mutator`] that wraps around a [`HavocScheduledMutator`].
 #[derive(Debug)]
 pub struct LoggerScheduledMutator<SM> {
     name: Cow<'static, str>,
@@ -317,8 +399,10 @@ mod tests {
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasMutatorBytes},
         mutators::{
-            Mutator, havoc_mutations::havoc_mutations, mutations::SpliceMutator,
-            scheduled::StdScheduledMutator,
+            Mutator,
+            havoc_mutations::havoc_mutations,
+            mutations::SpliceMutator,
+            scheduled::{HavocScheduledMutator, SingleChoiceScheduledMutator},
         },
         state::StdState,
     };
@@ -379,7 +463,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut havoc = StdScheduledMutator::new(havoc_mutations());
+        let mut havoc = HavocScheduledMutator::new(havoc_mutations());
 
         assert_eq!(input, input_prior);
 
@@ -395,6 +479,47 @@ mod tests {
                 0
             };
             assert_ne!(equal_in_a_row, 5);
+        }
+    }
+
+    #[test]
+    fn test_single_choice() {
+        let rand = StdRand::with_seed(0x1337);
+        let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
+        corpus.add(Testcase::new(b"abc".to_vec().into())).unwrap();
+        corpus.add(Testcase::new(b"def".to_vec().into())).unwrap();
+
+        let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
+        let input_prior = input.clone();
+
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
+
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
+
+        let mut mutator = SingleChoiceScheduledMutator::new(havoc_mutations());
+
+        assert_eq!(input, input_prior);
+
+        let mut equal_in_a_row = 0;
+
+        for _ in 0..100 {
+            mutator.mutate(&mut state, &mut input).unwrap();
+
+            // Make sure we actually mutate something, at least sometimes
+            equal_in_a_row = if input == input_prior {
+                equal_in_a_row + 1
+            } else {
+                0
+            };
+            assert_ne!(equal_in_a_row, 20);
         }
     }
 }

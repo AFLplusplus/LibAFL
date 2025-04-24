@@ -23,6 +23,7 @@ run_clippy() {
 # Define projects based on the operating system
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
    ALL_PROJECTS=(
+      "libafl"
       "libafl_bolts"
       "libafl_cc"
       "libafl_concolic/symcc_runtime"
@@ -57,9 +58,11 @@ for project in "${PROJECTS[@]}"; do
    # Trim leading and trailing whitespace
    project=$(echo "$project" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
    features="--all-features"
-   if [[ " ${NO_ALL_FEATURES[*]} " =~ ${project} ]]; then
-      features="--features=clippy"
-   fi
+   for item in "${NO_ALL_FEATURES[@]}"; do
+     if [[ "$item" == "$project" ]]; then
+       features="--features=clippy"
+     fi
+   done
    if [ -d "$project" ]; then
       run_clippy "$project" "$features"
    else
@@ -70,3 +73,6 @@ done
 eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"
 
 echo "Clippy run completed for all specified projects."
+
+# Last run it on all
+eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"

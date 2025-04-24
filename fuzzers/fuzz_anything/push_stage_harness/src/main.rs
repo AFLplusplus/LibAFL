@@ -15,7 +15,7 @@ use libafl::{
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::StdMapObserver,
     schedulers::{QueueScheduler, Scheduler},
     stages::push::{PushStageSharedState, StdMutationalPushStage},
@@ -89,7 +89,7 @@ pub fn main() {
     //    .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
 
     let exit_kind = Rc::new(Cell::new(None));
 

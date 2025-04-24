@@ -410,7 +410,7 @@ where
             "{{\
                 \"pending\":{},\
                 \"pending_fav\":{},\
-                \"own_finds:\"{},\
+                \"own_finds\":{},\
                 \"imported\":{}\
             }}",
             stats.pending_total, stats.pending_favs, stats.corpus_found, stats.corpus_imported

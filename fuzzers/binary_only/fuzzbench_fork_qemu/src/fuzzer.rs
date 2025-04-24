@@ -24,8 +24,8 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
-        StdScheduledMutator, Tokens,
+        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, HavocScheduledMutator,
+        StdMOptMutator, Tokens,
     },
     observers::{CanTrack, ConstMapObserver, HitcountsMapObserver, TimeObserver},
     schedulers::{
@@ -56,7 +56,7 @@ use libafl_qemu::{
     Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
     QemuShutdownCause, Regs,
 };
-use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
+use libafl_targets::{CMPLOG_MAP_PTR, EDGES_MAP_DEFAULT_SIZE};
 #[cfg(unix)]
 use nix::unistd::dup;
 
@@ -65,6 +65,8 @@ pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
+
+    env_logger::init();
 
     let res = match Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
@@ -265,6 +267,9 @@ fn fuzz(
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
+    unsafe {
+        CMPLOG_MAP_PTR = cmplog_map_ptr;
+    }
     let cmplog_observer = unsafe { CmpLogObserver::with_map_ptr("cmplog", cmplog_map_ptr, true) };
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
@@ -303,7 +308,9 @@ fn fuzz(
     });
 
     // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+        I2SRandReplace::new()
+    )));
 
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(

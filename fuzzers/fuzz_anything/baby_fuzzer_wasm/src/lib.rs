@@ -9,7 +9,7 @@ use libafl::{
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations, HavocScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::{RetryCountRestartHelper, StdMutationalStage},
@@ -143,7 +143,7 @@ pub fn fuzz() {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     while state.solutions().is_empty() {
