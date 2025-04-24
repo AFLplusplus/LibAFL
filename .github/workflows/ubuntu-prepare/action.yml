@@ -12,6 +12,7 @@ runs:
     - uses: dtolnay/rust-toolchain@stable
     - name: install just
       uses: extractions/setup-just@v2
+        just-version: '*'
     - name: Add stable clippy
       shell: bash
       run: rustup toolchain install stable --component clippy --allow-downgrade
