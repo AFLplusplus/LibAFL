@@ -14,6 +14,8 @@ pub struct RawPatch;
 
 impl Patch for RawPatch {
     type Error = RawPatchError;
+
+    #[cfg(not(target_arch = "arm"))]
     fn patch(target: GuestAddr, destination: GuestAddr) -> Result<(), Self::Error> {
         debug!("patch - addr: {:#x}, target: {:#x}", target, destination);
         if target == destination {
@@ -21,6 +23,26 @@ impl Patch for RawPatch {
         }
         let patch = Self::get_patch(destination)?;
         trace!("patch: {:02x?}", patch);
+        let dest = unsafe { from_raw_parts_mut(target as *mut u8, patch.len()) };
+        dest.copy_from_slice(&patch);
+        Ok(())
+    }
+
+    #[cfg(target_arch = "arm")]
+    fn patch(target: GuestAddr, destination: GuestAddr) -> Result<(), Self::Error> {
+        debug!("patch - addr: {:#x}, target: {:#x}", target, destination);
+        if target == destination {
+            Err(RawPatchError::IdentityPatch(target))?;
+        }
+
+        let patch = if target & 1 == 1 {
+            Self::get_patch_thumb(destination)?
+        } else {
+            Self::get_patch_arm(destination)?
+        };
+
+        trace!("patch: {:02x?}", patch);
+        let target = target & !1;
         let dest = unsafe { from_raw_parts_mut(target as *mut u8, patch.len()) };
         dest.copy_from_slice(&patch);
         Ok(())
@@ -69,13 +91,28 @@ impl RawPatch {
     }
 
     #[cfg(target_arch = "arm")]
-    fn get_patch(destination: GuestAddr) -> Result<Vec<u8>, RawPatchError> {
+    fn get_patch_arm(destination: GuestAddr) -> Result<Vec<u8>, RawPatchError> {
         // ldr ip, [pc]
         // bx ip
         // .long 0xdeadface
         let insns = [
             [0x00, 0xc0, 0x9f, 0xe5].to_vec(),
             [0x1c, 0xff, 0x2f, 0xe1].to_vec(),
+            [0xce, 0xfa, 0xad, 0xde].to_vec(),
+        ];
+        let addr = destination.to_ne_bytes().to_vec();
+        let insns_mod = [&insns[0], &insns[1], &addr];
+        Ok(insns_mod.into_iter().flatten().cloned().collect())
+    }
+
+    #[cfg(target_arch = "arm")]
+    fn get_patch_thumb(destination: GuestAddr) -> Result<Vec<u8>, RawPatchError> {
+        // ldr ip, [pc, #2]
+        // bx ip
+        // .long 0xdeadface
+        let insns = [
+            [0xdf, 0xf8, 0x02, 0xc0].to_vec(),
+            [0x60, 0x47].to_vec(),
             [0xce, 0xfa, 0xad, 0xde].to_vec(),
         ];
         let addr = destination.to_ne_bytes().to_vec();
