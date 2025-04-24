@@ -7,7 +7,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y curl lsb-release wget software-properties-common gnupg shellcheck pax-utils libsqlite3-dev libc6-dev gcc g++ build-essential libglib2.0-dev
+        sudo apt-get install -y curl lsb-release wget software-properties-common gnupg shellcheck pax-utils libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev
     - uses: dtolnay/rust-toolchain@stable
     - name: install just
       uses: extractions/setup-just@v2
