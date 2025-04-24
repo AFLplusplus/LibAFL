@@ -544,7 +544,7 @@ impl AsanRuntime {
         // Write something to (hopefully) make sure the val isn't optimized out
 
         unsafe {
-            write_volatile(&mut stack_var, 0xfadbeef);
+            write_volatile(&raw mut stack_var, 0xfadbeef);
         }
 
         let range = Self::range_for_address(stack_address);
