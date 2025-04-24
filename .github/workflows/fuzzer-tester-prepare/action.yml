@@ -16,7 +16,7 @@ runs:
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - name: Install riscv for unicorn
-      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/unicorn' }}
+      if: ${{ inputs.fuzzer-name == './fuzzers/full_system/unicorn' }}
       shell: bash
       run: sudo apt-get install -y riscv64-linux-gnu-gcc
     - name: Add no_std toolchain
