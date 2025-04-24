@@ -51,7 +51,7 @@ impl StateShMemContent {
 
     /// Get a length that's safe to deref from this map, or error.
     pub fn buf_len_checked(&self, shmem_size: usize) -> Result<usize, Error> {
-        let buf_len = unsafe { read_volatile(&self.buf_len) };
+        let buf_len = unsafe { read_volatile(&raw const self.buf_len) };
         if size_of::<StateShMemContent>() + buf_len > shmem_size {
             Err(Error::illegal_state(format!(
                 "Stored buf_len is larger than the shared map! Shared data corrupted? Expected {shmem_size} bytes max, but got {} (buf_len {buf_len})",

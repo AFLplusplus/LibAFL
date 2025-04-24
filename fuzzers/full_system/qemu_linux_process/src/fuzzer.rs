@@ -14,7 +14,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::{havoc_mutations, I2SRandReplaceBinonly, StdScheduledMutator},
+    mutators::{havoc_mutations, HavocScheduledMutator, I2SRandReplaceBinonly},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
@@ -235,13 +235,13 @@ pub fn fuzz() {
         }
 
         // a CmpLog-based mutational stage
-        let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+        let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
             I2SRandReplaceBinonly::new()
         )));
 
         // Setup an havoc mutator with a mutational stage
         let tracing = ShadowTracingStage::new();
-        let mutator = StdScheduledMutator::new(havoc_mutations());
+        let mutator = HavocScheduledMutator::new(havoc_mutations());
         let mut stages = tuple_list!(tracing, i2s, StdMutationalStage::new(mutator),);
 
         match fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr) {

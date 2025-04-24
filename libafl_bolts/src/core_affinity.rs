@@ -278,7 +278,7 @@ mod linux {
             sched_setaffinity(
                 0, // Defaults to current thread
                 size_of::<cpu_set_t>(),
-                &set,
+                &raw const set,
             )
         };
 
@@ -297,7 +297,7 @@ mod linux {
             sched_getaffinity(
                 0, // Defaults to current thread
                 size_of::<cpu_set_t>(),
-                &mut set,
+                &raw mut set,
             )
         };
 
@@ -452,7 +452,8 @@ mod windows {
 
             let mut outga = GROUP_AFFINITY::default();
 
-            let result = SetThreadGroupAffinity(GetCurrentThread(), &ga, Some(&mut outga));
+            let result =
+                SetThreadGroupAffinity(GetCurrentThread(), &raw const ga, Some(&raw mut outga));
             if result.0 == 0 {
                 Err(Error::unknown("Failed to set_for_current"))
             } else {

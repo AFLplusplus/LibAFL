@@ -11,13 +11,13 @@ use libafl::{
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    feedbacks::{CrashFeedback, DifferentIsNovel, MapFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, StdScheduledMutator},
+        scheduled::{tokens_mutations, HavocScheduledMutator},
         token_mutations::Tokens,
     },
     observers::StdMapObserver,
@@ -28,6 +28,7 @@ use libafl::{
 };
 use libafl_bolts::{
     rands::StdRand,
+    simd::MaxReducer,
     tuples::{tuple_list, Merge},
     AsSlice,
 };
@@ -101,7 +102,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut feedback = feedback_or!(
         MaxMapFeedback::new(&edges_observer),
         MaxMapFeedback::new(&cmps_observer),
-        MaxMapFeedback::new(&allocs_observer)
+        MapFeedback::<_, DifferentIsNovel, _, MaxReducer>::new(&allocs_observer)
     );
 
     // A feedback to choose if an input is a solution or not
@@ -134,7 +135,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // Setup a basic mutator with a mutational stage
-    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+    let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     // A random policy to get testcasess from the corpus

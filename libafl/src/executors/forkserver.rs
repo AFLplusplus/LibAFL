@@ -1,6 +1,6 @@
 //! Expose an `Executor` based on a `Forkserver` in order to execute AFL/AFL++ binaries
 
-use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
+use alloc::{string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -8,21 +8,19 @@ use core::{
 };
 use std::{
     env,
-    ffi::{OsStr, OsString},
+    ffi::OsString,
     io::{self, ErrorKind, Read, Write},
     os::{
         fd::{AsRawFd, BorrowedFd},
         unix::{io::RawFd, process::CommandExt},
     },
-    path::Path,
     process::{Child, Command, Stdio},
 };
 
 use libafl_bolts::{
-    AsSlice, AsSliceMut, Truncate,
+    AsSlice, AsSliceMut, InputLocation, TargetArgs, Truncate,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
-    ownedref::OwnedSlice,
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
     tuples::{Handle, Handled, MatchNameRef, Prepend, RefIndexable},
 };
@@ -43,9 +41,9 @@ use crate::observers::{
     AsanBacktraceObserver, get_asan_runtime_flags, get_asan_runtime_flags_with_log_path,
 };
 use crate::{
-    Error,
+    Error, HasBytesConverter,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{BytesInput, Input, NopTargetBytesConverter, TargetBytesConverter},
+    inputs::{Input, InputToBytes},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
     state::HasExecutions,
@@ -224,7 +222,7 @@ impl ConfigTarget for Command {
             #[cfg(target_os = "openbsd")]
             let ret = unsafe { libc::setrlimit(libc::RLIMIT_RSS, &r) };
             #[cfg(not(target_os = "openbsd"))]
-            let ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &r) };
+            let ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &raw const r) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
             }
@@ -241,7 +239,7 @@ impl ConfigTarget for Command {
                 rlim_cur: if enable { RLIM_INFINITY } else { 0 },
                 rlim_max: if enable { RLIM_INFINITY } else { 0 },
             };
-            let ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &r0) };
+            let ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &raw const r0) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
             }
@@ -577,11 +575,10 @@ impl Forkserver {
 ///
 /// Shared memory feature is also available, but you have to set things up in your code.
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
-pub struct ForkserverExecutor<I, OT, S, SHM, TC> {
+pub struct ForkserverExecutor<I, OT, S, SHM> {
     target: OsString,
     args: Vec<OsString>,
     input_file: InputFile,
-    target_bytes_converter: TC,
     uses_shmem_testcase: bool,
     forkserver: Forkserver,
     observers: OT,
@@ -596,9 +593,8 @@ pub struct ForkserverExecutor<I, OT, S, SHM, TC> {
     crash_exitcode: Option<i8>,
 }
 
-impl<I, OT, S, SHM, TC> Debug for ForkserverExecutor<I, OT, S, SHM, TC>
+impl<I, OT, S, SHM> Debug for ForkserverExecutor<I, OT, S, SHM>
 where
-    TC: Debug,
     OT: Debug,
     SHM: Debug,
 {
@@ -607,7 +603,6 @@ where
             .field("target", &self.target)
             .field("args", &self.args)
             .field("input_file", &self.input_file)
-            .field("target_bytes_converter", &self.target_bytes_converter)
             .field("uses_shmem_testcase", &self.uses_shmem_testcase)
             .field("forkserver", &self.forkserver)
             .field("observers", &self.observers)
@@ -616,20 +611,17 @@ where
     }
 }
 
-impl ForkserverExecutor<(), (), (), UnixShMem, ()> {
+impl ForkserverExecutor<(), (), UnixShMem, ()> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
-    pub fn builder()
-    -> ForkserverExecutorBuilder<'static, NopTargetBytesConverter<BytesInput>, UnixShMemProvider>
-    {
+    pub fn builder() -> ForkserverExecutorBuilder<'static, UnixShMemProvider> {
         ForkserverExecutorBuilder::new()
     }
 }
 
-impl<I, OT, S, SHM, TC> ForkserverExecutor<I, OT, S, SHM, TC>
+impl<I, OT, S, SHM> ForkserverExecutor<I, OT, S, SHM>
 where
     OT: ObserversTuple<I, S>,
-    TC: TargetBytesConverter<I>,
     SHM: ShMem,
 {
     /// The `target` binary that's going to run.
@@ -664,7 +656,7 @@ where
 
     /// Execute input and increase the execution counter.
     #[inline]
-    fn execute_input(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error>
+    fn execute_input(&mut self, state: &mut S, input: &[u8]) -> Result<ExitKind, Error>
     where
         S: HasExecutions,
     {
@@ -673,27 +665,7 @@ where
         self.execute_input_uncounted(input)
     }
 
-    /// Execute input, but side-step the execution counter.
-    #[inline]
-    fn execute_input_uncounted(&mut self, input: &I) -> Result<ExitKind, Error> {
-        let mut exit_kind = ExitKind::Ok;
-
-        let last_run_timed_out = self.forkserver.last_run_timed_out_raw();
-
-        let mut input_bytes = self.target_bytes_converter.to_target_bytes(input);
-        let mut input_size = input_bytes.as_slice().len();
-        if input_size > self.max_input_size {
-            // Truncate like AFL++ does
-            input_size = self.max_input_size;
-        } else if input_size < self.min_input_size {
-            // Extend like AFL++ does
-            input_size = self.min_input_size;
-            let mut input_bytes_copy = Vec::with_capacity(input_size);
-            input_bytes_copy
-                .as_slice_mut()
-                .copy_from_slice(input_bytes.as_slice());
-            input_bytes = OwnedSlice::from(input_bytes_copy);
-        }
+    fn map_input_to_shmem(&mut self, input: &[u8], input_size: usize) -> Result<(), Error> {
         let input_size_in_bytes = input_size.to_ne_bytes();
         if self.uses_shmem_testcase {
             debug_assert!(
@@ -707,10 +679,35 @@ where
             map.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
                 .copy_from_slice(&input_size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
             map.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + input_size)]
-                .copy_from_slice(&input_bytes.as_slice()[..input_size]);
+                .copy_from_slice(&input[..input_size]);
         } else {
-            self.input_file
-                .write_buf(&input_bytes.as_slice()[..input_size])?;
+            self.input_file.write_buf(&input[..input_size])?;
+        }
+        Ok(())
+    }
+
+    /// Execute input, but side-step the execution counter.
+    #[inline]
+    fn execute_input_uncounted(&mut self, input: &[u8]) -> Result<ExitKind, Error> {
+        let mut exit_kind = ExitKind::Ok;
+
+        let last_run_timed_out = self.forkserver.last_run_timed_out_raw();
+
+        let mut input_size = input.len();
+        if input_size > self.max_input_size {
+            // Truncate like AFL++ does
+            input_size = self.max_input_size;
+            self.map_input_to_shmem(input, input_size)?;
+        } else if input_size < self.min_input_size {
+            // Extend like AFL++ does
+            input_size = self.min_input_size;
+            let mut input_bytes_copy = Vec::with_capacity(input_size);
+            input_bytes_copy
+                .as_slice_mut()
+                .copy_from_slice(input.as_slice());
+            self.map_input_to_shmem(&input_bytes_copy, input_size)?;
+        } else {
+            self.map_input_to_shmem(input, input_size)?;
         }
 
         self.forkserver.set_last_run_timed_out(false);
@@ -772,17 +769,16 @@ where
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
 #[expect(clippy::struct_excessive_bools)]
-pub struct ForkserverExecutorBuilder<'a, TC, SP> {
+pub struct ForkserverExecutorBuilder<'a, SP> {
     program: Option<OsString>,
     arguments: Vec<OsString>,
     envs: Vec<(OsString, OsString)>,
     debug_child: bool,
-    use_stdin: bool,
     uses_shmem_testcase: bool,
     is_persistent: bool,
     is_deferred_frksrv: bool,
     autotokens: Option<&'a mut Tokens>,
-    input_filename: Option<OsString>,
+    input_location: InputLocation,
     shmem_provider: Option<&'a mut SP>,
     max_input_size: usize,
     min_input_size: usize,
@@ -792,10 +788,46 @@ pub struct ForkserverExecutorBuilder<'a, TC, SP> {
     #[cfg(feature = "regex")]
     asan_obs: Option<Handle<AsanBacktraceObserver>>,
     crash_exitcode: Option<i8>,
-    target_bytes_converter: TC,
 }
 
-impl<'a, TC, SHM, SP> ForkserverExecutorBuilder<'a, TC, SP>
+impl<SP> TargetArgs for ForkserverExecutorBuilder<'_, SP> {
+    fn arguments_ref(&self) -> &Vec<OsString> {
+        &self.arguments
+    }
+    fn arguments_mut(&mut self) -> &mut Vec<OsString> {
+        &mut self.arguments
+    }
+
+    fn envs_ref(&self) -> &Vec<(OsString, OsString)> {
+        &self.envs
+    }
+
+    fn envs_mut(&mut self) -> &mut Vec<(OsString, OsString)> {
+        &mut self.envs
+    }
+
+    fn program_ref(&self) -> &Option<OsString> {
+        &self.program
+    }
+
+    fn program_mut(&mut self) -> &mut Option<OsString> {
+        &mut self.program
+    }
+
+    fn input_location_ref(&self) -> &InputLocation {
+        &self.input_location
+    }
+
+    fn input_location_mut(&mut self) -> &mut InputLocation {
+        &mut self.input_location
+    }
+
+    fn arg_input_arg(self) -> Self {
+        panic!("ForkserverExecutor doesn't support mutating arguments")
+    }
+}
+
+impl<'a, SHM, SP> ForkserverExecutorBuilder<'a, SP>
 where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
@@ -809,10 +841,9 @@ where
     pub fn build<I, OT, S>(
         mut self,
         observers: OT,
-    ) -> Result<ForkserverExecutor<I, OT, S, SHM, TC>, Error>
+    ) -> Result<ForkserverExecutor<I, OT, S, SHM>, Error>
     where
         OT: ObserversTuple<I, S>,
-        TC: TargetBytesConverter<I>,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
 
@@ -821,7 +852,7 @@ where
             "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
             target,
             self.arguments.clone(),
-            self.use_stdin
+            self.use_stdin()
         );
 
         if self.uses_shmem_testcase && map.is_none() {
@@ -863,17 +894,16 @@ where
                 .clone()
                 .unwrap_or(AsanBacktraceObserver::default().handle()),
             crash_exitcode: self.crash_exitcode,
-            target_bytes_converter: self.target_bytes_converter,
         })
     }
 
     /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
-    #[expect(clippy::pedantic, clippy::type_complexity)]
+    #[expect(clippy::pedantic)]
     pub fn build_dynamic_map<A, MO, OT, I, S>(
         mut self,
         mut map_observer: A,
         other_observers: OT,
-    ) -> Result<ForkserverExecutor<I, (A, OT), S, SHM, TC>, Error>
+    ) -> Result<ForkserverExecutor<I, (A, OT), S, SHM>, Error>
     where
         A: Observer<I, S> + AsMut<MO>,
         I: Input,
@@ -887,7 +917,7 @@ where
             "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}, map_size: {:?}",
             target,
             self.arguments.clone(),
-            self.use_stdin,
+            self.use_stdin(),
             self.map_size
         );
 
@@ -927,21 +957,20 @@ where
                 .clone()
                 .unwrap_or(AsanBacktraceObserver::default().handle()),
             crash_exitcode: self.crash_exitcode,
-            target_bytes_converter: self.target_bytes_converter,
         })
     }
 
     #[expect(clippy::pedantic)]
     fn build_helper(&mut self) -> Result<(Forkserver, InputFile, Option<SHM>), Error> {
-        let input_filename = match &self.input_filename {
-            Some(name) => name.clone(),
-            None => {
-                self.use_stdin = true;
-                OsString::from(get_unique_std_input_file())
+        let input_file = match &self.input_location {
+            InputLocation::StdIn => InputFile::create(OsString::from(get_unique_std_input_file()))?,
+            InputLocation::Arg { argnum: _ } => {
+                return Err(Error::illegal_argument(
+                    "forkserver doesn't support argument mutation",
+                ));
             }
+            InputLocation::File { out_file } => out_file.clone(),
         };
-
-        let input_file = InputFile::create(input_filename)?;
 
         let map = match &mut self.shmem_provider {
             None => None,
@@ -966,7 +995,7 @@ where
                 self.arguments.clone(),
                 self.envs.clone(),
                 input_file.as_raw_fd(),
-                self.use_stdin,
+                self.use_stdin(),
                 0,
                 self.is_persistent,
                 self.is_deferred_frksrv,
@@ -1226,94 +1255,6 @@ where
         self
     }
 
-    #[must_use]
-    /// Parse afl style command line
-    ///
-    /// Replaces `@@` with the path to the input file generated by the fuzzer. If `@@` is omitted,
-    /// `stdin` is used to pass the test case instead.
-    ///
-    /// Interprets the first argument as the path to the program as long as it is not set yet.
-    /// You have to omit the program path in case you have set it already. Otherwise
-    /// it will be interpreted as a regular argument, leading to probably unintended results.
-    pub fn parse_afl_cmdline<IT, O>(self, args: IT) -> Self
-    where
-        IT: IntoIterator<Item = O>,
-        O: AsRef<OsStr>,
-    {
-        let mut moved = self;
-
-        let mut use_arg_0_as_program = false;
-        if moved.program.is_none() {
-            use_arg_0_as_program = true;
-        }
-
-        for item in args {
-            if use_arg_0_as_program {
-                moved = moved.program(item);
-                // After the program has been set, unset `use_arg_0_as_program` to treat all
-                // subsequent arguments as regular arguments
-                use_arg_0_as_program = false;
-            } else if item.as_ref() == "@@" {
-                match &moved.input_filename.clone() {
-                    Some(name) => {
-                        // If the input file name has been modified, use this one
-                        moved = moved.arg_input_file(name);
-                    }
-                    _ => {
-                        moved = moved.arg_input_file_std();
-                    }
-                }
-            } else {
-                moved = moved.arg(item);
-            }
-        }
-
-        // If we have not set an input file, use stdin as it is AFLs default
-        moved.use_stdin = moved.input_filename.is_none();
-        moved
-    }
-
-    /// The harness
-    #[must_use]
-    pub fn program<O>(mut self, program: O) -> Self
-    where
-        O: AsRef<OsStr>,
-    {
-        self.program = Some(program.as_ref().to_owned());
-        self
-    }
-
-    /// Adds an argument to the harness's commandline
-    ///
-    /// You may want to use `parse_afl_cmdline` if you're going to pass `@@`
-    /// represents the input file generated by the fuzzer (similar to the `afl-fuzz` command line).
-    #[must_use]
-    pub fn arg<O>(mut self, arg: O) -> Self
-    where
-        O: AsRef<OsStr>,
-    {
-        self.arguments.push(arg.as_ref().to_owned());
-        self
-    }
-
-    /// Adds arguments to the harness's commandline
-    ///
-    /// You may want to use `parse_afl_cmdline` if you're going to pass `@@`
-    /// represents the input file generated by the fuzzer (similar to the `afl-fuzz` command line).
-    #[must_use]
-    pub fn args<IT, O>(mut self, args: IT) -> Self
-    where
-        IT: IntoIterator<Item = O>,
-        O: AsRef<OsStr>,
-    {
-        let mut res = vec![];
-        for arg in args {
-            res.push(arg.as_ref().to_owned());
-        }
-        self.arguments.append(&mut res);
-        self
-    }
-
     /// Set the max input size
     #[must_use]
     pub fn max_input_size(mut self, size: usize) -> Self {
@@ -1326,61 +1267,6 @@ where
     pub fn min_input_size(mut self, size: usize) -> Self {
         self.min_input_size = size;
         self
-    }
-
-    /// Adds an environmental var to the harness's commandline
-    #[must_use]
-    pub fn env<K, V>(mut self, key: K, val: V) -> Self
-    where
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        self.envs
-            .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
-        self
-    }
-
-    /// Adds environmental vars to the harness's commandline
-    #[must_use]
-    pub fn envs<IT, K, V>(mut self, vars: IT) -> Self
-    where
-        IT: IntoIterator<Item = (K, V)>,
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        let mut res = vec![];
-        for (ref key, ref val) in vars {
-            res.push((key.as_ref().to_owned(), val.as_ref().to_owned()));
-        }
-        self.envs.append(&mut res);
-        self
-    }
-
-    /// Place the input at this position and set the filename for the input.
-    ///
-    /// Note: If you use this, you should ensure that there is only one instance using this
-    /// file at any given time.
-    #[must_use]
-    pub fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
-        let mut moved = self.arg(path.as_ref());
-
-        let path_as_string = path.as_ref().as_os_str().to_os_string();
-
-        assert!(
-            // It's only save to set the input_filename, if it does not overwrite an existing one.
-            (moved.input_filename.is_none() || moved.input_filename.unwrap() == path_as_string),
-            "Already specified an input file under a different name. This is not supported"
-        );
-
-        moved.input_filename = Some(path_as_string);
-        moved
-    }
-
-    /// Place the input at this position and set the default filename for the input.
-    #[must_use]
-    /// The filename includes the PID of the fuzzer to ensure that no two fuzzers write to the same file
-    pub fn arg_input_file_std(self) -> Self {
-        self.arg_input_file(get_unique_std_input_file())
     }
 
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
@@ -1427,18 +1313,20 @@ where
 
     /// Determine if the asan observer is present (always false if feature "regex" is disabled)
     #[cfg(feature = "regex")]
+    #[must_use]
     pub fn has_asan_obs(&self) -> bool {
         self.asan_obs.is_some()
     }
 
     /// Determine if the asan observer is present (always false if feature "regex" is disabled)
     #[cfg(not(feature = "regex"))]
+    #[must_use]
     pub fn has_asan_obs(&self) -> bool {
         false
     }
 }
 
-impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
+impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
@@ -1446,19 +1334,17 @@ impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, Unix
     /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[must_use]
-    pub fn new()
-    -> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
+    pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
         ForkserverExecutorBuilder {
             program: None,
             arguments: vec![],
             envs: vec![],
             debug_child: false,
-            use_stdin: false,
             uses_shmem_testcase: false,
             is_persistent: false,
             is_deferred_frksrv: false,
             autotokens: None,
-            input_filename: None,
+            input_location: InputLocation::StdIn,
             shmem_provider: None,
             map_size: None,
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
@@ -1468,17 +1354,16 @@ impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, Unix
             #[cfg(feature = "regex")]
             asan_obs: None,
             crash_exitcode: None,
-            target_bytes_converter: NopTargetBytesConverter::new(),
         }
     }
 }
 
-impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
+impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP>(
         self,
         shmem_provider: &'a mut SP,
-    ) -> ForkserverExecutorBuilder<'a, TC, SP> {
+    ) -> ForkserverExecutorBuilder<'a, SP> {
         ForkserverExecutorBuilder {
             // Set the new provider
             shmem_provider: Some(shmem_provider),
@@ -1487,12 +1372,11 @@ impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
             arguments: self.arguments,
             envs: self.envs,
             debug_child: self.debug_child,
-            use_stdin: self.use_stdin,
             uses_shmem_testcase: self.uses_shmem_testcase,
             is_persistent: self.is_persistent,
             is_deferred_frksrv: self.is_deferred_frksrv,
             autotokens: self.autotokens,
-            input_filename: self.input_filename,
+            input_location: InputLocation::StdIn,
             map_size: self.map_size,
             max_input_size: self.max_input_size,
             min_input_size: self.min_input_size,
@@ -1501,72 +1385,39 @@ impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
             #[cfg(feature = "regex")]
             asan_obs: self.asan_obs,
             crash_exitcode: self.crash_exitcode,
-            target_bytes_converter: self.target_bytes_converter,
         }
     }
 }
 
-impl<'a, TC, SP> ForkserverExecutorBuilder<'a, TC, SP> {
-    /// Shmem provider for forkserver's shared memory testcase feature.
-    pub fn target_bytes_converter<I, TC2: TargetBytesConverter<I>>(
-        self,
-        target_bytes_converter: TC2,
-    ) -> ForkserverExecutorBuilder<'a, TC2, SP> {
-        ForkserverExecutorBuilder {
-            // Set the new provider
-            shmem_provider: self.shmem_provider,
-            // Copy all other values from the old Builder
-            program: self.program,
-            arguments: self.arguments,
-            envs: self.envs,
-            debug_child: self.debug_child,
-            use_stdin: self.use_stdin,
-            uses_shmem_testcase: self.uses_shmem_testcase,
-            is_persistent: self.is_persistent,
-            is_deferred_frksrv: self.is_deferred_frksrv,
-            autotokens: self.autotokens,
-            input_filename: self.input_filename,
-            map_size: self.map_size,
-            max_input_size: self.max_input_size,
-            min_input_size: self.min_input_size,
-            kill_signal: self.kill_signal,
-            timeout: self.timeout,
-            #[cfg(feature = "regex")]
-            asan_obs: self.asan_obs,
-            crash_exitcode: self.crash_exitcode,
-            target_bytes_converter,
-        }
-    }
-}
-
-impl Default
-    for ForkserverExecutorBuilder<'_, NopTargetBytesConverter<BytesInput>, UnixShMemProvider>
-{
+impl Default for ForkserverExecutorBuilder<'_, UnixShMemProvider> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<EM, I, OT, S, SHM, TC, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SHM, TC>
+impl<EM, I, OT, S, SHM, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SHM>
 where
     OT: ObserversTuple<I, S>,
     S: HasExecutions,
-    TC: TargetBytesConverter<I>,
     SHM: ShMem,
+    Z: HasBytesConverter,
+    Z::Converter: InputToBytes<I>,
 {
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.execute_input(state, input)
+        let converter = fuzzer.converter_mut();
+        let bytes = converter.to_bytes(input);
+        self.execute_input(state, bytes.as_slice())
     }
 }
 
-impl<I, OT, S, SHM, TC> HasTimeout for ForkserverExecutor<I, OT, S, SHM, TC> {
+impl<I, OT, S, SHM> HasTimeout for ForkserverExecutor<I, OT, S, SHM> {
     #[inline]
     fn timeout(&self) -> Duration {
         self.timeout.into()
@@ -1578,7 +1429,7 @@ impl<I, OT, S, SHM, TC> HasTimeout for ForkserverExecutor<I, OT, S, SHM, TC> {
     }
 }
 
-impl<I, OT, S, SHM, TC> HasObservers for ForkserverExecutor<I, OT, S, SHM, TC>
+impl<I, OT, S, SHM> HasObservers for ForkserverExecutor<I, OT, S, SHM>
 where
     OT: ObserversTuple<I, S>,
 {
@@ -1600,7 +1451,7 @@ mod tests {
     use std::ffi::OsString;
 
     use libafl_bolts::{
-        AsSliceMut,
+        AsSliceMut, TargetArgs,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::tuple_list,
     };

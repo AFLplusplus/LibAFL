@@ -18,8 +18,8 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{
-        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
-        StdScheduledMutator, Tokens,
+        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, HavocScheduledMutator,
+        StdMOptMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdCmpObserver, StdMapObserver, TimeObserver},
     schedulers::{
@@ -38,7 +38,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSliceMut,
+    AsSliceMut, TargetArgs,
 };
 use libafl_targets::cmps::AFLppCmpLogMap;
 use nix::sys::signal::Signal;
@@ -371,8 +371,9 @@ fn fuzz(
         let tracing = TracingStage::new(cmplog_executor);
 
         // Setup a randomic Input2State stage
-        let i2s =
-            StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+        let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+            I2SRandReplace::new()
+        )));
 
         // The order of the stages matter!
         let mut stages = tuple_list!(calibration, tracing, i2s, power);

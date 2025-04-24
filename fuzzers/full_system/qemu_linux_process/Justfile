@@ -1,5 +1,5 @@
 import "../../../just/libafl-qemu.just"
-FUZZER_NAME := "qemu_linux_kernel"
+FUZZER_NAME := "qemu_linux_process"
 
 LINUX_BUILDER_URL := "git@github.com:AFLplusplus/linux-qemu-image-builder.git"
 LINUX_BUILDER_DIR := TARGET_DIR / "linux_builder"

@@ -190,7 +190,7 @@ impl TimerStruct {
 
         let mut critical = CRITICAL_SECTION::default();
         unsafe {
-            InitializeCriticalSection(&mut critical);
+            InitializeCriticalSection(&raw mut critical);
         }
         Self {
             milli_sec,
@@ -258,7 +258,7 @@ impl TimerStruct {
         // # Safety
         // Safe because the variables are all alive at this time and don't contain pointers.
         unsafe {
-            setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
+            setitimer(ITIMER_REAL, &raw mut self.itimerval, core::ptr::null_mut());
         }
     }
 
@@ -289,7 +289,7 @@ impl TimerStruct {
             LeaveCriticalSection(self.critical_mut());
             compiler_fence(Ordering::SeqCst);
 
-            SetThreadpoolTimer(*self.ptp_timer(), Some(&ft), 0, None);
+            SetThreadpoolTimer(*self.ptp_timer(), Some(&raw const ft), 0, None);
         }
     }
 
@@ -317,7 +317,7 @@ impl TimerStruct {
         // No user-provided values.
         unsafe {
             let mut itimerval_zero: Itimerval = core::mem::zeroed();
-            setitimer(ITIMER_REAL, &mut itimerval_zero, core::ptr::null_mut());
+            setitimer(ITIMER_REAL, &raw mut itimerval_zero, core::ptr::null_mut());
         }
     }
 

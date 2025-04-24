@@ -361,6 +361,7 @@ pub type QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z
 #[cfg(feature = "fork")]
 pub struct QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
     inner: QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>,
+    first_exec: bool,
 }
 
 #[cfg(feature = "fork")]
@@ -425,6 +426,7 @@ where
                 timeout,
                 shmem_provider,
             )?,
+            first_exec: true,
         })
     }
 
@@ -475,7 +477,10 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.inner.exposed_executor_state.first_exec(state);
+        if self.first_exec {
+            self.inner.exposed_executor_state.first_exec(state);
+            self.first_exec = false;
+        }
 
         self.inner.exposed_executor_state.pre_exec(state, input);
 

@@ -23,6 +23,7 @@ run_clippy() {
 # Define projects based on the operating system
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
    ALL_PROJECTS=(
+      "libafl"
       "libafl_bolts"
       "libafl_cc"
       "libafl_concolic/symcc_runtime"
@@ -30,12 +31,12 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       "libafl_frida"
       "libafl_libfuzzer"
       "libafl_libfuzzer_runtime"
-      "libafl_intelpt"
-      "libafl_nyx"
       "libafl_qemu"
       "libafl_tinyinst"
       "libafl_qemu/libafl_qemu_build"
       "libafl_qemu/libafl_qemu_sys"
+      "libafl_nyx"
+      "libafl_intelpt"
    )
 fi
 
@@ -52,17 +53,16 @@ else
    IFS=',' read -ra PROJECTS <<<"$1"
 fi
 
-# First run it on all
-eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"
-
 # Loop through each project and run Clippy
 for project in "${PROJECTS[@]}"; do
    # Trim leading and trailing whitespace
    project=$(echo "$project" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
    features="--all-features"
-   if [[ " ${NO_ALL_FEATURES[*]} " =~ ${project} ]]; then
-      features="--features=clippy"
-   fi
+   for item in "${NO_ALL_FEATURES[@]}"; do
+     if [[ "$item" == "$project" ]]; then
+       features="--features=clippy"
+     fi
+   done
    if [ -d "$project" ]; then
       run_clippy "$project" "$features"
    else
@@ -70,4 +70,9 @@ for project in "${PROJECTS[@]}"; do
    fi
 done
 
+eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"
+
 echo "Clippy run completed for all specified projects."
+
+# Last run it on all
+eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"

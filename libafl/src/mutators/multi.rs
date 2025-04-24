@@ -255,6 +255,10 @@ where
             Ok(MutationResult::Mutated)
         }
     }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<I, K, S> Mutator<MultipartInput<I, K>, S> for BytesInputCrossoverReplaceMutator
@@ -388,5 +392,9 @@ where
 
             Ok(MutationResult::Mutated)
         }
+    }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
     }
 }
