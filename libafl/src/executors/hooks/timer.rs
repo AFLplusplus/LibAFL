@@ -258,7 +258,7 @@ impl TimerStruct {
         // # Safety
         // Safe because the variables are all alive at this time and don't contain pointers.
         unsafe {
-            setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
+            setitimer(ITIMER_REAL, &raw mut self.itimerval, core::ptr::null_mut());
         }
     }
 
@@ -317,7 +317,7 @@ impl TimerStruct {
         // No user-provided values.
         unsafe {
             let mut itimerval_zero: Itimerval = core::mem::zeroed();
-            setitimer(ITIMER_REAL, &mut itimerval_zero, core::ptr::null_mut());
+            setitimer(ITIMER_REAL, &raw mut itimerval_zero, core::ptr::null_mut());
         }
     }
 
