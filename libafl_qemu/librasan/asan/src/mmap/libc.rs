@@ -55,7 +55,7 @@ struct FunctionErrnoLocation;
 
 impl Function for FunctionErrnoLocation {
     type Func = unsafe extern "C" fn() -> *mut c_int;
-    const NAME: &'static CStr = c"errno_location";
+    const NAME: &'static CStr = c"__errno_location";
 }
 
 #[derive(Debug)]
