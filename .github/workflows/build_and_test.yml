@@ -368,7 +368,7 @@ jobs:
       - name: "Install dependencies"
         if: runner.os == 'Linux'
         shell: bash
-        run: sudo apt-get update && sudo apt-get install gcc gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+        run: sudo apt-get update && sudo apt-get install gcc gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu riscv64-linux-gnu-gcc
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
