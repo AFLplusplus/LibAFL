@@ -13,7 +13,7 @@ runs:
     - name: install just
       uses: extractions/setup-just@v2
       with:
-        just-version: '*'
+        just-version: '1.40.0'
     - name: Add stable clippy
       shell: bash
       run: rustup toolchain install stable --component clippy --allow-downgrade
