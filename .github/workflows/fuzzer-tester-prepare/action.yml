@@ -14,11 +14,15 @@ runs:
     - uses: ./.github/workflows/ubuntu-prepare
     - name: Install fuzzers deps
       shell: bash
-      run: sudo apt-get update && sudo apt-get install -y nlohmann-json3-dev libc6-dev-i386-cross libc6-dev libc6-dev-i386
+      run: sudo apt-get update && sudo apt-get install -y nlohmann-json3-dev libc6-dev
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
+    - name: Install more fuzzers deps
+      shell: bash
+      run: sudo apt-get install -y riscv64-linux-gnu
     - name: Add no_std toolchain
+      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_no_std' }}
       shell: bash
       run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
     - name: install just
