@@ -1,5 +1,9 @@
 name: Setup Rust Environment
 description: Sets up the Rust environment for the CI workflow
+inputs:
+  fuzzer-name:
+    description: 'The fuzzer name to run'
+    required: true
 runs:
   using: composite
   steps:
@@ -27,14 +31,12 @@ runs:
       with:
         just-version: '1.40.0'
     - name: install wasm-pack
+      if: ${{ inputs.fuzzer-name }} == './fuzzers/fuzz_anything/baby_fuzzer_wasm'
       uses: baptiste0928/cargo-install@v3
       with:
         crate: wasm-pack
-    - name: install cxxbridge-cmd
-      uses: baptiste0928/cargo-install@v3
-      with:
-        crate: cxxbridge-cmd
     - name: install chrome
+      if: ${{ inputs.fuzzer-name }} == './fuzzers/fuzz_anything/baby_fuzzer_wasm'
       uses: browser-actions/setup-chrome@v1
       with:
         chrome-version: stable
