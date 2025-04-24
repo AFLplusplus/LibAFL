@@ -1452,7 +1452,7 @@ pub mod unix_shmem {
                 let fd = i32::from(id);
                 unsafe {
                     let mut stat = core::mem::zeroed();
-                    if fstat(fd, &mut stat) == -1 {
+                    if fstat(fd, &raw mut stat) == -1 {
                         return Err(Error::unknown(
                             "Failed to map the memfd mapping".to_string(),
                         ));

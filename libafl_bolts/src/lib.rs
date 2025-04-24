@@ -1127,7 +1127,7 @@ mod windows_logging {
                 h_stdout,
                 bytes.as_ptr() as *const _,
                 bytes.len() as u32,
-                &mut bytes_written,
+                &raw mut bytes_written,
                 ptr::null_mut(),
             )
         };

@@ -7,13 +7,12 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y curl lsb-release wget software-properties-common gnupg shellcheck pax-utils \
-          nasm libsqlite3-dev libc6-dev libgtk-3-dev gcc g++ libslirp-dev libz3-dev build-essential \
+        sudo apt-get install -y curl lsb-release wget software-properties-common gnupg shellcheck pax-utils libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev
     - uses: dtolnay/rust-toolchain@stable
     - name: install just
       uses: extractions/setup-just@v2
       with:
-        just-version: 1.39.0
+        just-version: '1.40.0'
     - name: Add stable clippy
       shell: bash
       run: rustup toolchain install stable --component clippy --allow-downgrade

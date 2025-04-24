@@ -93,7 +93,7 @@ impl From<i32> for MutationId {
 ///
 /// [`MutationResult::Skipped`] does not necessarily mean that the input changed,
 /// just that the mutator did something. For slow targets, consider using
-/// a filtered fuzzer (see [`crate::fuzzer::StdFuzzer::with_input_filter`])
+/// a fuzzer with a input filter
 /// or wrapping your mutator in a [`hash::MutationChecker`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MutationResult {

@@ -10,9 +10,9 @@ use libafl::{
     feedbacks::{
         CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback, TimeFeedback,
     },
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::Fuzzer,
     generators::{NautilusContext, NautilusGenerator},
-    inputs::{NautilusInput, NautilusTargetBytesConverter},
+    inputs::{NautilusBytesConverter, NautilusInput},
     monitors::SimpleMonitor,
     mutators::{
         HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
@@ -22,7 +22,7 @@ use libafl::{
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::StdState,
-    HasMetadata,
+    BloomInputFilter, HasMetadata, StdFuzzerBuilder,
 };
 use libafl_bolts::{
     current_nanos,
@@ -166,7 +166,12 @@ pub fn main() {
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let converter = NautilusBytesConverter::new(&context);
+    let mut fuzzer = StdFuzzerBuilder::new()
+        .input_filter(BloomInputFilter::default())
+        .bytes_converter(converter)
+        .build(scheduler, feedback, objective)
+        .unwrap();
 
     // If we should debug the child
     let debug_child = opt.debug_child;
@@ -186,7 +191,6 @@ pub fn main() {
         .coverage_map_size(MAP_SIZE)
         .timeout(Duration::from_millis(opt.timeout))
         .kill_signal(opt.signal)
-        .target_bytes_converter(NautilusTargetBytesConverter::new(&context))
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 

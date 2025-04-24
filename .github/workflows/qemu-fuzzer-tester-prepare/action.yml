@@ -16,7 +16,7 @@ runs:
     - name: install just
       uses: extractions/setup-just@v2
       with:
-        just-version: 1.39.0
+        just-version: '1.40.0'
     - uses: actions/checkout@v4
       with:
         submodules: true

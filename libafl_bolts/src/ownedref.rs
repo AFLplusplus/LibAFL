@@ -1159,7 +1159,7 @@ impl<T: Sized> OwnedMutPtr<T> {
     pub fn as_ptr(&self) -> *const T {
         match self {
             OwnedMutPtr::Ptr(ptr) => *ptr,
-            OwnedMutPtr::Owned(owned) => &**owned,
+            OwnedMutPtr::Owned(owned) => &raw const **owned,
         }
     }
 
@@ -1168,7 +1168,7 @@ impl<T: Sized> OwnedMutPtr<T> {
     pub fn as_mut_ptr(&mut self) -> *mut T {
         match self {
             OwnedMutPtr::Ptr(ptr) => *ptr,
-            OwnedMutPtr::Owned(owned) => &mut **owned,
+            OwnedMutPtr::Owned(owned) => &raw mut **owned,
         }
     }
 }

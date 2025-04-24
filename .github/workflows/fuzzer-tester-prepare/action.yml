@@ -1,5 +1,9 @@
 name: Setup Rust Environment
 description: Sets up the Rust environment for the CI workflow
+inputs:
+  fuzzer-name:
+    description: 'The fuzzer name to run'
+    required: true
 runs:
   using: composite
   steps:
@@ -8,33 +12,33 @@ runs:
         submodules: true
         fetch-depth: 0
     - uses: ./.github/workflows/ubuntu-prepare
-    - uses: Swatinem/rust-cache@v2
-      with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
-    - name: Install fuzzers deps
-      shell: bash
-      run: sudo apt-get update && sudo apt-get install -y nasm nlohmann-json3-dev gcc-aarch64-linux-gnu g++-aarch64-linux-gnu gcc-mipsel-linux-gnu g++-mipsel-linux-gnu gcc-riscv64-linux-gnu gcc-powerpc-linux-gnu g++-powerpc-linux-gnu libc6-dev-i386-cross libc6-dev libc6-dev-i386 lib32gcc-11-dev lib32stdc++-11-dev libgtk-3-dev pax-utils python3-msgpack python3-jinja2 
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - name: Add no_std toolchain
+      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_no_std' }}
       shell: bash
       run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-    - name: Add wasm target
+    - name: Add nyx deps
+      if: ${{ inputs.fuzzer-name == './fuzzers/full_system/nyx_launcher' || inputs.fuzzer-name == './fuzzers/full_system/nyx_libxml2_standalone' || inputs.fuzzer-name == './fuzzers/full_system/nyx_libxml2_parallel' }}
       shell: bash
-      run: rustup target add wasm32-unknown-unknown
+      run: sudo apt update && sudo apt install -y libgtk-3-dev pax-utils python3-msgpack python3-jinja2 libcapstone-dev
     - name: install just
       uses: extractions/setup-just@v2
       with:
-        just-version: 1.39.0
+        just-version: '1.40.0'
+    
+    - name: Add wasm target
+      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
+      shell: bash
+      run: rustup target add wasm32-unknown-unknown
     - name: install wasm-pack
+      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
       uses: baptiste0928/cargo-install@v3
       with:
         crate: wasm-pack
-    - name: install cxxbridge-cmd
-      uses: baptiste0928/cargo-install@v3
-      with:
-        crate: cxxbridge-cmd
     - name: install chrome
+      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
       uses: browser-actions/setup-chrome@v1
       with:
         chrome-version: stable

@@ -31,12 +31,12 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       "libafl_frida"
       "libafl_libfuzzer"
       "libafl_libfuzzer_runtime"
-      "libafl_intelpt"
-      "libafl_nyx"
       "libafl_qemu"
       "libafl_tinyinst"
       "libafl_qemu/libafl_qemu_build"
       "libafl_qemu/libafl_qemu_sys"
+      "libafl_nyx"
+      "libafl_intelpt"
    )
 fi
 
@@ -69,6 +69,8 @@ for project in "${PROJECTS[@]}"; do
       echo "Warning: Directory $project does not exist. Skipping."
    fi
 done
+
+eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"
 
 echo "Clippy run completed for all specified projects."
 

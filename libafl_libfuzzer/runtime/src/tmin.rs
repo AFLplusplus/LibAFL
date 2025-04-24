@@ -24,7 +24,6 @@ use libafl_bolts::{
 use libafl_targets::LLVMCustomMutator;
 
 use crate::{CustomMutationStatus, options::LibfuzzerOptions};
-
 type TMinState =
     StdState<InMemoryCorpus<BytesInput>, BytesInput, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;
 

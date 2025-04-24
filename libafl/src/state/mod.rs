@@ -40,7 +40,6 @@ use crate::{
     inputs::{Input, NopInput},
     stages::StageId,
 };
-
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
@@ -203,8 +202,8 @@ impl<I, S, Z> Debug for LoadConfig<'_, I, S, Z> {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "
         C: serde::Serialize + for<'a> serde::Deserialize<'a>,
+        R: serde::Serialize + for<'a> serde::Deserialize<'a>,
         SC: serde::Serialize + for<'a> serde::Deserialize<'a>,
-        R: serde::Serialize + for<'a> serde::Deserialize<'a>
     ")]
 pub struct StdState<C, I, R, SC> {
     /// RNG instance
@@ -1110,7 +1109,15 @@ where
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
+}
 
+impl<C, I, R, SC> StdState<C, I, R, SC>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    SC: Corpus<I>,
+{
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
     pub fn new<F, O>(
         rand: R,
