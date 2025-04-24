@@ -67,20 +67,26 @@ pub unsafe extern "C" fn memcpy(dest: *mut u8, src: *const u8, count: usize) {
 pub unsafe extern "C" fn memset(dest: *mut u8, value: u8, count: usize) {
     unsafe {
         let mut cursor = dest;
-        let word_value = match value {
-            u8::MIN => Some(usize::MIN),
-            u8::MAX => Some(usize::MAX),
+        let align_offset = dest.align_offset(align_of::<usize>());
+        let word_value = match (value, align_offset > count) {
+            (u8::MIN, true) => Some(usize::MIN),
+            (u8::MAX, true) => Some(usize::MAX),
             _ => None,
         };
 
         if let Some(word_value) = word_value {
-            let num_words = count / size_of::<usize>();
+            for _ in 0..align_offset {
+                *cursor = value;
+                cursor = cursor.wrapping_add(1);
+            }
+
+            let num_words = (count - align_offset) / size_of::<usize>();
             for _ in 0..num_words {
                 *(cursor as *mut usize) = word_value;
                 cursor = cursor.wrapping_add(size_of::<usize>());
             }
 
-            let num_bytes = count % size_of::<usize>();
+            let num_bytes = (count - align_offset) % size_of::<usize>();
             for _ in 0..num_bytes {
                 *cursor = value;
                 cursor = cursor.wrapping_add(1);
