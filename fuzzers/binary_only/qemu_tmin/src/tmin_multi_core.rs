@@ -360,7 +360,6 @@ pub fn fuzz() {
     // to provide an exit summary (as is done for the "snapshot" version), but
     // to do so would require more communication between child and parent. So
     // it is left undone.
-
 }
 
 #[cfg(target_os = "linux")]
