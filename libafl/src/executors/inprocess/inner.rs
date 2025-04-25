@@ -199,7 +199,7 @@ where
                 This number 0x20000 could vary depending on the compilers optimization for future compression library changes.
             */
             let mut stack_reserved = 0x20000;
-            SetThreadStackGuarantee(&mut stack_reserved)?;
+            SetThreadStackGuarantee(&raw mut stack_reserved)?;
         }
 
         #[cfg(all(feature = "std", windows))]

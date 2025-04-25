@@ -334,6 +334,10 @@ where
 
         Ok(MutationResult::Skipped)
     }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 /// Mutator which randomly replaces a randomly selected range of bytes with bytes that preserve the
@@ -384,6 +388,10 @@ where
         }
 
         Ok(MutationResult::Skipped)
+    }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -444,6 +452,10 @@ where
 
         Ok(MutationResult::Skipped)
     }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 /// Mutator which randomly replaces a full subcategory-contiguous region of chars with a random token
@@ -502,6 +514,10 @@ where
         }
 
         Ok(MutationResult::Skipped)
+    }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
     }
 }
 

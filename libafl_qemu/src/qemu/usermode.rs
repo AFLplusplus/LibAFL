@@ -264,11 +264,17 @@ impl Qemu {
         unsafe { (addr as usize - guest_base) as GuestAddr }
     }
 
+    /// Tells whether access to target address @addr of size @size is valid or not.
+    /// The access is checked relatively to `current_cpu` if available, or the CPU at index 0
+    /// otherwise.
+    /// The function returns None if no CPU could be found.
     #[must_use]
-    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
-        self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index(0))
-            .access_ok(kind, addr, size)
+    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> Option<bool> {
+        Some(
+            self.current_cpu()
+                .or_else(|| self.cpu_from_index(0))?
+                .access_ok(kind, addr, size),
+        )
     }
 
     pub fn force_dfl(&self) {
@@ -488,14 +494,14 @@ pub mod pybind {
     extern "C" fn py_syscall_hook_wrapper(
         _data: u64,
         sys_num: i32,
-        a0: u64,
-        a1: u64,
-        a2: u64,
-        a3: u64,
-        a4: u64,
-        a5: u64,
-        a6: u64,
-        a7: u64,
+        a0: GuestAddr,
+        a1: GuestAddr,
+        a2: GuestAddr,
+        a3: GuestAddr,
+        a4: GuestAddr,
+        a5: GuestAddr,
+        a6: GuestAddr,
+        a7: GuestAddr,
     ) -> hooks::SyscallHookResult {
         unsafe { (&raw const PY_SYSCALL_HOOK).read() }.map_or_else(
             || hooks::SyscallHookResult::Run,

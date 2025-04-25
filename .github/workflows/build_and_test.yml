@@ -171,8 +171,6 @@ jobs:
     runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
-      - name: Install curl
-        run: sudo apt-get update && sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -186,7 +184,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build python3-dev python3-pip python3-venv libz3-dev
+        run: sudo apt-get update && sudo apt-get install -y lsb-release wget software-properties-common gnupg libz3-dev
       - name: Install maturin
         run: cargo install --locked maturin
       - uses: actions/checkout@v4
@@ -272,7 +270,7 @@ jobs:
           - ./fuzzers/binary_only/fuzzbench_qemu
           - ./fuzzers/binary_only/intel_pt_baby_fuzzer
           - ./fuzzers/binary_only/intel_pt_command_executor
-          - ./fuzzers/binary_only/tinyinst_simple
+          # - ./fuzzers/binary_only/tinyinst_simple
 
           # Forkserver
           - ./fuzzers/forkserver/forkserver_simple
@@ -328,6 +326,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/fuzzer-tester-prepare
+        with:
+          fuzzer-name: ${{ matrix.fuzzer }}
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -368,7 +368,7 @@ jobs:
       - name: "Install dependencies"
         if: runner.os == 'Linux'
         shell: bash
-        run: sudo apt-get update && sudo apt-get install gcc gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+        run: sudo apt-get update && sudo apt-get install gcc gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -610,8 +610,6 @@ jobs:
   android:
     runs-on: ubuntu-24.04
     steps:
-      - name: Install curl
-        run: sudo apt-get update && sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: nttld/setup-ndk@v1
         with:

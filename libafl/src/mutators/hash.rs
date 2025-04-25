@@ -40,6 +40,14 @@ where
             Ok(MutationResult::Mutated)
         }
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        self.inner.post_exec(state, new_corpus_id)
+    }
 }
 
 impl<M> Named for MutationChecker<M> {

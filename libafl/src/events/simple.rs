@@ -5,6 +5,8 @@ use alloc::vec::Vec;
 use core::sync::atomic::{Ordering, compiler_fence};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
+#[cfg(feature = "std")]
+use hashbrown::HashMap;
 use libafl_bolts::ClientId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
@@ -200,7 +202,6 @@ where
     }
 
     /// Handle arriving events in the broker
-    #[expect(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         monitor: &mut MT,
         client_stats_manager: &mut ClientStatsManager,
@@ -208,32 +209,32 @@ where
     ) -> Result<BrokerEventResult, Error> {
         let stats = event.stats();
 
-        client_stats_manager.client_stats_insert(ClientId(0));
+        client_stats_manager.client_stats_insert(ClientId(0))?;
         client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
             client_stat.update_executions(stats.executions, stats.time);
-        });
+        })?;
 
         let event = event.event();
         match event {
             Event::NewTestcase { corpus_size, .. } => {
-                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.client_stats_insert(ClientId(0))?;
                 client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_corpus_size(*corpus_size as u64);
-                });
-                monitor.display(client_stats_manager, event.name(), ClientId(0));
+                })?;
+                monitor.display(client_stats_manager, event.name(), ClientId(0))?;
                 Ok(BrokerEventResult::Handled)
             }
             Event::Heartbeat => {
-                monitor.display(client_stats_manager, event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0))?;
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats { name, value, .. } => {
-                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.client_stats_insert(ClientId(0))?;
                 client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_user_stats(name.clone(), value.clone());
-                });
+                })?;
                 client_stats_manager.aggregate(name);
-                monitor.display(client_stats_manager, event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0))?;
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
@@ -244,16 +245,16 @@ where
                 // TODO: The monitor buffer should be added on client add.
                 client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_introspection_stats((**introspection_stats).clone());
-                });
-                monitor.display(client_stats_manager, event.name(), ClientId(0));
+                })?;
+                monitor.display(client_stats_manager, event.name(), ClientId(0))?;
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size, .. } => {
-                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.client_stats_insert(ClientId(0))?;
                 client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_objective_size(*objective_size as u64);
-                });
-                monitor.display(client_stats_manager, event.name(), ClientId(0));
+                })?;
+                monitor.display(client_stats_manager, event.name(), ClientId(0))?;
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -525,31 +526,32 @@ where
         }
 
         // If we're restarting, deserialize the old state.
-        let (state, mgr) = match staterestorer.restore::<(S, Duration, Vec<ClientStats>)>()? {
-            None => {
-                log::info!("First run. Let's set it all up");
-                // Mgr to send and receive msgs from/to all other fuzzer instances
-                (
-                    None,
-                    SimpleRestartingEventManager::launched(monitor, staterestorer),
-                )
-            }
-            // Restoring from a previous run, deserialize state and corpus.
-            Some((state, start_time, clients_stats)) => {
-                log::info!("Subsequent run. Loaded previous state.");
-                // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
-                staterestorer.reset();
+        let (state, mgr) =
+            match staterestorer.restore::<(S, Duration, HashMap<ClientId, ClientStats>)>()? {
+                None => {
+                    log::info!("First run. Let's set it all up");
+                    // Mgr to send and receive msgs from/to all other fuzzer instances
+                    (
+                        None,
+                        SimpleRestartingEventManager::launched(monitor, staterestorer),
+                    )
+                }
+                // Restoring from a previous run, deserialize state and corpus.
+                Some((state, start_time, clients_stats)) => {
+                    log::info!("Subsequent run. Loaded previous state.");
+                    // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
+                    staterestorer.reset();
 
-                // reload the state of the monitor to display the correct stats after restarts
-                let mut this = SimpleRestartingEventManager::launched(monitor, staterestorer);
-                this.inner.client_stats_manager.set_start_time(start_time);
-                this.inner
-                    .client_stats_manager
-                    .update_all_client_stats(clients_stats);
+                    // reload the state of the monitor to display the correct stats after restarts
+                    let mut this = SimpleRestartingEventManager::launched(monitor, staterestorer);
+                    this.inner.client_stats_manager.set_start_time(start_time);
+                    this.inner
+                        .client_stats_manager
+                        .update_all_client_stats(clients_stats);
 
-                (Some(state), this)
-            }
-        };
+                    (Some(state), this)
+                }
+            };
 
         /* TODO: Not sure if this is needed
         // We commit an empty NO_RESTART message to this buf, against infinite loops,

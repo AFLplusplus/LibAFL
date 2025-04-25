@@ -58,7 +58,7 @@ impl ChildHandle {
     pub fn status(&self) -> i32 {
         let mut status = -1;
         unsafe {
-            libc::waitpid(self.pid, &mut status, 0);
+            libc::waitpid(self.pid, &raw mut status, 0);
         }
         libc::WEXITSTATUS(status)
     }

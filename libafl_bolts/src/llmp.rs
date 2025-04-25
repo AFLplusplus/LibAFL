@@ -2281,7 +2281,7 @@ impl CtrlHandler for LlmpShutdownSignalHandler {
     fn handle(&mut self, ctrl_type: u32) -> bool {
         log::info!("LLMP: Received shutdown signal, ctrl_type {ctrl_type:?}");
         unsafe {
-            ptr::write_volatile(&mut self.shutting_down, true);
+            ptr::write_volatile(&raw mut self.shutting_down, true);
         }
         true
     }

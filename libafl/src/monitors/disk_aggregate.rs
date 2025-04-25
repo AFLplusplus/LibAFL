@@ -6,7 +6,7 @@ use core::{
 };
 use std::{fs::OpenOptions, io::Write, path::PathBuf};
 
-use libafl_bolts::{ClientId, current_time};
+use libafl_bolts::{ClientId, Error, current_time};
 use serde_json::json;
 
 use crate::monitors::{Monitor, stats::ClientStatsManager};
@@ -35,7 +35,7 @@ impl Monitor for OnDiskJsonAggregateMonitor {
         client_stats_manager: &mut ClientStatsManager,
         _event_msg: &str,
         _sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         // Write JSON stats if update interval has elapsed
         let cur_time = current_time();
         if cur_time - self.last_update >= self.update_interval {
@@ -69,6 +69,7 @@ impl Monitor for OnDiskJsonAggregateMonitor {
 
             writeln!(&file, "{json_value}").expect("Unable to write JSON to file");
         }
+        Ok(())
     }
 }
 

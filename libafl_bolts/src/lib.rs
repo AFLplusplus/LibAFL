@@ -113,9 +113,16 @@ pub mod subrange;
 pub mod tuples;
 
 #[cfg(all(feature = "std", unix))]
-pub mod cargs;
+pub mod argparse;
 #[cfg(all(feature = "std", unix))]
-pub use cargs::*;
+pub use argparse::*;
+
+#[cfg(all(feature = "std", unix))]
+pub mod target_args;
+#[cfg(all(feature = "std", unix))]
+pub use target_args::*;
+
+pub mod simd;
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
@@ -1120,7 +1127,7 @@ mod windows_logging {
                 h_stdout,
                 bytes.as_ptr() as *const _,
                 bytes.len() as u32,
-                &mut bytes_written,
+                &raw mut bytes_written,
                 ptr::null_mut(),
             )
         };

@@ -39,7 +39,6 @@ use core::{
     clone::Clone,
     fmt::Debug,
     hash::Hash,
-    marker::PhantomData,
     ops::{DerefMut, RangeBounds},
 };
 #[cfg(feature = "std")]
@@ -114,6 +113,12 @@ pub trait InputConverter: Debug {
 
     /// Convert the src type to the dest
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error>;
+}
+
+/// This trait can transfor any input to bytes
+pub trait InputToBytes<I>: Debug {
+    /// Transform to bytes
+    fn to_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
 }
 
 /// `None` type to satisfy the type infearence in an `Option`
@@ -293,29 +298,16 @@ impl ResizableMutator<u8> for &mut Vec<u8> {
     }
 }
 
-#[derive(Debug)]
-/// Basic `InputConverter` with just one type that is not converting
-pub struct NopInputConverter<I> {
-    phantom: PhantomData<I>,
-}
+#[derive(Debug, Default)]
+/// Basic `NopBytesConverter` with just one type that is not converting
+pub struct NopBytesConverter {}
 
-impl<I> Default for NopInputConverter<I> {
-    fn default() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> InputConverter for NopInputConverter<I>
+impl<I> InputToBytes<I> for NopBytesConverter
 where
-    I: Input,
+    I: HasTargetBytes + Debug,
 {
-    type From = I;
-    type To = I;
-
-    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
-        Ok(input)
+    fn to_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8> {
+        input.target_bytes()
     }
 }
 
@@ -361,42 +353,5 @@ where
 
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
         (self.convert_cb)(input)
-    }
-}
-
-/// A converter that converts from `input` to target bytes
-pub trait TargetBytesConverter<I> {
-    /// Create target bytes
-    fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
-}
-
-/// Simply gets the target bytes out from a [`HasTargetBytes`] type.
-#[derive(Debug)]
-pub struct NopTargetBytesConverter<I> {
-    phantom: PhantomData<I>,
-}
-
-impl<I> NopTargetBytesConverter<I> {
-    /// Create a new [`NopTargetBytesConverter`]
-    #[must_use]
-    pub fn new() -> NopTargetBytesConverter<I> {
-        Self {
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> Default for NopTargetBytesConverter<I> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<I> TargetBytesConverter<I> for NopTargetBytesConverter<I>
-where
-    I: HasTargetBytes,
-{
-    fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8> {
-        input.target_bytes()
     }
 }

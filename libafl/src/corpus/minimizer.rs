@@ -190,7 +190,7 @@ where
         // Perform the optimization!
         opt.check(&[]);
 
-        let res = if let Some(model) = opt.get_model() {
+        if let Some(model) = opt.get_model() {
             let mut removed = Vec::with_capacity(state.corpus().count());
             for (seed, (id, _)) in seed_exprs {
                 // if the model says the seed isn't there, mark it for deletion
@@ -214,11 +214,8 @@ where
             }
 
             *state.corpus_mut().current_mut() = None; //we may have removed the current ID from the corpus
-            Ok(())
-        } else {
-            Err(Error::unknown("Corpus minimization failed; unsat."))
-        };
-
-        res
+            return Ok(());
+        }
+        Err(Error::unknown("Corpus minimization failed; unsat."))
     }
 }

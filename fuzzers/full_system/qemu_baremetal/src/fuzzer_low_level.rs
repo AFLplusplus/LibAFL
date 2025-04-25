@@ -11,7 +11,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
@@ -171,7 +171,7 @@ pub fn fuzz() {
 
                     // If the execution stops at any point other than the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                     let mut pcs = (0..qemu.num_cpus())
-                        .map(|i| qemu.cpu_from_index(i))
+                        .map(|i| qemu.cpu_from_index(i).unwrap())
                         .map(|cpu| -> Result<u32, QemuRWError> { cpu.read_reg(Regs::Pc) });
                     let ret = match pcs
                         .find(|pc| (breakpoint..breakpoint + 5).contains(pc.as_ref().unwrap_or(&0)))
@@ -262,7 +262,7 @@ pub fn fuzz() {
         }
 
         // Setup an havoc mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations());
+        let mutator = HavocScheduledMutator::new(havoc_mutations());
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         fuzzer

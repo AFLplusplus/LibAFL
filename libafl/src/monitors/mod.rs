@@ -1,8 +1,8 @@
 //! Keep stats, and display them to the user. Usually used in a broker, or main node, of some sort.
 
 pub mod multi;
+use libafl_bolts::Error;
 pub use multi::MultiMonitor;
-
 pub mod stats;
 
 pub mod logics;
@@ -53,7 +53,7 @@ pub trait Monitor {
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    );
+    ) -> Result<(), Error>;
 }
 
 /// Monitor that print exactly nothing.
@@ -68,7 +68,8 @@ impl Monitor for NopMonitor {
         _client_stats_manager: &mut ClientStatsManager,
         _event_msg: &str,
         _sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -107,8 +108,9 @@ impl Monitor for SimplePrintingMonitor {
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
-        let mut userstats = client_stats_manager.client_stats()[sender_id.0 as usize]
+    ) -> Result<(), Error> {
+        let mut userstats = client_stats_manager
+            .get(sender_id)?
             .user_stats()
             .iter()
             .map(|(key, value)| format!("{key}: {value}"))
@@ -135,11 +137,12 @@ impl Monitor for SimplePrintingMonitor {
             println!(
                 "Client {:03}:\n{}",
                 sender_id.0,
-                client_stats_manager.client_stats()[sender_id.0 as usize].introspection_stats
+                client_stats_manager.get(sender_id)?.introspection_stats
             );
             // Separate the spacing just a bit
             println!();
         }
+        Ok(())
     }
 }
 
@@ -171,7 +174,7 @@ where
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         let global_stats = client_stats_manager.global_stats();
         let mut fmt = format!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
@@ -186,8 +189,8 @@ where
         );
 
         if self.print_user_monitor {
-            client_stats_manager.client_stats_insert(sender_id);
-            let client = client_stats_manager.client_stats_for(sender_id);
+            client_stats_manager.client_stats_insert(sender_id)?;
+            let client = client_stats_manager.client_stats_for(sender_id)?;
             for (key, val) in client.user_stats() {
                 write!(fmt, ", {key}: {val}").unwrap();
             }
@@ -202,13 +205,14 @@ where
             let fmt = format!(
                 "Client {:03}:\n{}",
                 sender_id.0,
-                client_stats_manager.client_stats()[sender_id.0 as usize].introspection_stats
+                client_stats_manager.get(sender_id)?.introspection_stats
             );
             (self.print_fn)(&fmt);
 
             // Separate the spacing just a bit
             (self.print_fn)("");
         }
+        Ok(())
     }
 }
 
@@ -278,9 +282,9 @@ impl<A: Monitor, B: Monitor> Monitor for (A, B) {
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
-        self.0.display(client_stats_manager, event_msg, sender_id);
-        self.1.display(client_stats_manager, event_msg, sender_id);
+    ) -> Result<(), Error> {
+        self.0.display(client_stats_manager, event_msg, sender_id)?;
+        self.1.display(client_stats_manager, event_msg, sender_id)
     }
 }
 
@@ -290,8 +294,8 @@ impl<A: Monitor> Monitor for (A, ()) {
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
-        self.0.display(client_stats_manager, event_msg, sender_id);
+    ) -> Result<(), Error> {
+        self.0.display(client_stats_manager, event_msg, sender_id)
     }
 }
 
@@ -317,6 +321,6 @@ mod test {
             NopMonitor::default(),
             NopMonitor::default(),
         );
-        mgr_list.display(&mut client_stats, "test", ClientId(0));
+        let _ = mgr_list.display(&mut client_stats, "test", ClientId(0));
     }
 }
