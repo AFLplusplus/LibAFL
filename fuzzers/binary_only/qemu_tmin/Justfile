@@ -42,7 +42,7 @@ run_multi: harness build
     {{ FUZZER_MULTI }} \
         --output ./output \
         --input ./corpus \
-        --cores 5,6 \
+        --cores 0 \
         --verbose \
         -- {{ HARNESS }}
 
