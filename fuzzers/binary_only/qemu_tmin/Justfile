@@ -28,6 +28,7 @@ harness: libpng
         -L"{{TARGET_DIR}}/build-zlib/zlib/lib" \
         -o"{{ HARNESS }}" \
         -lm -static
+    [ ! -d ./corpus ] && cp -r {{PROJECT_DIR}}/../../../seeds/pngs ./corpus
 
 [unix]
 run_single: harness build
