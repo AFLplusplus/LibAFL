@@ -1,4 +1,4 @@
-//! A libfuzzer-like fuzzer using qemu for binary-only coverage
+//! A binary-only systemmode fuzzer using qemu for binary-only coverage
 #[cfg(all(target_os = "linux", feature = "low_level"))]
 mod fuzzer_low_level;
 

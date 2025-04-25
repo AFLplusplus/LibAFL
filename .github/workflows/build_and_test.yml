@@ -384,6 +384,7 @@ jobs:
         fuzzer:
           # Binary only
           - ./fuzzers/binary_only/qemu_cmin
+          - ./fuzzers/binary_only/qemu_tmin
           - ./fuzzers/binary_only/qemu_coverage
           - ./fuzzers/binary_only/qemu_launcher
         arch:

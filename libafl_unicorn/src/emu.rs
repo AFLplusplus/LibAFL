@@ -40,7 +40,7 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
 
     let pc = emu.pc_read().unwrap();
 
-    log::debug!("PC: {:X}", pc);
+    log::debug!("PC: {pc:X}");
     let arch = emu.get_arch();
     match arch {
         Arch::ARM => {
@@ -132,7 +132,7 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
             }
 
             for i in insns.as_ref() {
-                log::debug!("{}", i);
+                log::debug!("{i}");
             }
         }
     }
