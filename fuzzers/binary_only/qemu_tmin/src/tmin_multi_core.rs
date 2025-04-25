@@ -31,8 +31,6 @@ use libafl_bolts::{
     tuples::tuple_list,
     AsSlice, AsSliceMut,
 };
-#[cfg(feature = "fork")]
-use libafl_qemu::QemuForkExecutor;
 use libafl_qemu::{
     elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, Emulator, GuestAddr,
     GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuShutdownCause, Regs,
@@ -42,7 +40,7 @@ use libafl_qemu::{modules::SnapshotModule, QemuExecutor};
 use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
 
 #[cfg(feature = "fork")]
-compile_error!("'fork' feature is currently not working.");
+compile_error!("'fork' feature is currently not implemented; pending forkserver PR.");
 
 #[cfg(all(feature = "fork", feature = "snapshot"))]
 compile_error!("Cannot enable both 'fork' and 'snapshot' features at the same time.");
@@ -191,10 +189,6 @@ pub fn fuzz() {
         };
 
         // In either fork/snapshot mode, we link the observer to QEMU
-        #[cfg(feature = "fork")]
-        let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
-            .const_map_observer(edges_observer.as_mut())
-            .build()?);
         #[cfg(feature = "snapshot")]
         let modules = tuple_list!(
             StdEdgeCoverageChildModule::builder()
@@ -237,38 +231,6 @@ pub fn fuzz() {
         // Rust harness: this closure copies an input buffer to our private region
         // for target function input and updates registers to a single iteration
         // before telling QEMU to resume execution.
-        #[cfg(feature = "fork")]
-        let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
-            let target = input.target_bytes();
-            let mut buf = target.as_slice();
-            let mut len = buf.len();
-            if len > MAX_INPUT_SIZE {
-                buf = &buf[0..MAX_INPUT_SIZE];
-                len = MAX_INPUT_SIZE;
-            }
-            let len = len as GuestReg;
-
-            unsafe {
-                qemu.write_mem(input_addr, buf).expect("qemu write failed.");
-
-                qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
-                qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
-                qemu.write_return_address(ret_addr).unwrap();
-                qemu.write_function_argument(0, input_addr).unwrap();
-                qemu.write_function_argument(1, len).unwrap();
-
-                match qemu.run() {
-                    Ok(QemuExitReason::Breakpoint(_)) => {}
-                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
-                        Signal::SigInterrupt,
-                    ))) => process::exit(0),
-                    Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                    _ => panic!("Unexpected QEMU exit."),
-                }
-            }
-
-            ExitKind::Ok
-        };
         #[cfg(feature = "snapshot")]
         let mut harness =
             |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
@@ -341,17 +303,6 @@ pub fn fuzz() {
         });
 
         // The executor. Nothing exciting here.
-        #[cfg(feature = "fork")]
-        let mut executor = QemuForkExecutor::new(
-            emulator,
-            &mut harness,
-            tuple_list!(edges_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            shmem_provider,
-            core::time::Duration::from_millis(5000),
-        )?;
         #[cfg(feature = "snapshot")]
         let mut executor = QemuExecutor::new(
             emulator,
