@@ -661,19 +661,17 @@ impl Default for _IO_FILE {
 impl _IO_FILE {
     #[inline]
     pub fn _flags2(&self) -> ::std::os::raw::c_int {
-        unsafe { ::std::mem::transmute(self._bitfield_1.get(0usize, 24u8) as u32) }
+        u32::cast_signed(self._bitfield_1.get(0usize, 24u8) as u32)
     }
     #[inline]
     pub fn set__flags2(&mut self, val: ::std::os::raw::c_int) {
-        unsafe {
-            let val: u32 = ::std::mem::transmute(val);
-            self._bitfield_1.set(0usize, 24u8, val as u64)
-        }
+        let val: u32 = i32::cast_unsigned(val);
+        self._bitfield_1.set(0usize, 24u8, val as u64)
     }
     #[inline]
     pub unsafe fn _flags2_raw(this: *const Self) -> ::std::os::raw::c_int {
         unsafe {
-            ::std::mem::transmute(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
+            u32::cast_signed(<__BindgenBitfieldUnit<[u8; 3usize]>>::raw_get(
                 ::std::ptr::addr_of!((*this)._bitfield_1),
                 0usize,
                 24u8,
@@ -683,7 +681,7 @@ impl _IO_FILE {
     #[inline]
     pub unsafe fn set__flags2_raw(this: *mut Self, val: ::std::os::raw::c_int) {
         unsafe {
-            let val: u32 = ::std::mem::transmute(val);
+            let val: u32 = i32::cast_unsigned(val);
             <__BindgenBitfieldUnit<[u8; 3usize]>>::raw_set(
                 ::std::ptr::addr_of_mut!((*this)._bitfield_1),
                 0usize,
@@ -696,7 +694,7 @@ impl _IO_FILE {
     pub fn new_bitfield_1(_flags2: ::std::os::raw::c_int) -> __BindgenBitfieldUnit<[u8; 3usize]> {
         let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 3usize]> = Default::default();
         __bindgen_bitfield_unit.set(0usize, 24u8, {
-            let _flags2: u32 = unsafe { ::std::mem::transmute(_flags2) };
+            let _flags2: u32 = i32::cast_unsigned(_flags2);
             _flags2 as u64
         });
         __bindgen_bitfield_unit

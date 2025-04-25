@@ -14,7 +14,7 @@ use libafl::{
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations, HavocScheduledMutator},
     observers::{ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
     stages::{ObserverEqualityFactory, StagesTuple, StdTMinMutationalStage},
@@ -22,7 +22,6 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{
-    core_affinity::Cores,
     os::unix_signals::Signal,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -253,7 +252,7 @@ pub fn fuzz() -> Result<(), Error> {
     // current input will be tested; and the ObservreEqualityFactory will
     // provide an observer that ensures additions to the corpus have the same
     // coverage.
-    let minimizer = StdScheduledMutator::new(havoc_mutations());
+    let minimizer = HavocScheduledMutator::new(havoc_mutations());
     let factory = ObserverEqualityFactory::new(&edges_observer);
     let mut stages = tuple_list!(StdTMinMutationalStage::new(
         minimizer,

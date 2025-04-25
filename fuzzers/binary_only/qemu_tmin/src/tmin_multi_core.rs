@@ -16,7 +16,7 @@ use libafl::{
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations, HavocScheduledMutator},
     observers::{ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
     stages::{ObserverEqualityFactory, StagesTuple, StdTMinMutationalStage},
@@ -163,8 +163,8 @@ pub fn fuzz() {
             .iter()
             .skip(files_per_core * core_idx)
             .take(files_per_core)
-            .map(|x| x.clone())
-            .collect();
+            .cloned()
+            .collect::<Vec<PathBuf>>();
 
         if files.is_empty() {
             mgr.send_exiting()?;
@@ -278,7 +278,7 @@ pub fn fuzz() {
         // current input will be tested; and the ObservreEqualityFactory will
         // provide an observer that ensures additions to the corpus have the same
         // coverage.
-        let minimizer = StdScheduledMutator::new(havoc_mutations());
+        let minimizer = HavocScheduledMutator::new(havoc_mutations());
         let factory = ObserverEqualityFactory::new(&edges_observer);
         let mut stages = tuple_list!(StdTMinMutationalStage::new(
             minimizer,
@@ -351,7 +351,6 @@ pub fn fuzz() {
         Ok(()) => (),
         Err(Error::ShuttingDown) => {
             println!("Run finished successfully.");
-            ()
         }
         Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
