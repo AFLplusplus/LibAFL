@@ -91,12 +91,6 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Timeout in seconds", default_value_t = 1_u64)]
     timeout: u64,
 
-    #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]
-    port: u16,
-
-    #[arg(long, help = "Cpu cores to use", default_value = "all", value_parser = Cores::from_cmdline)]
-    cores: Cores,
-
     #[arg(
         long,
         help = "Number of iterations for minimization",
@@ -363,4 +357,14 @@ pub fn fuzz() -> Result<(), Error> {
 
     mgr.send_exiting()?;
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+pub fn main() {
+    fuzz().unwrap();
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn main() {
+    panic!("qemu-user and libafl_qemu is only supported on linux!");
 }

@@ -15,6 +15,14 @@ edition = "2021"
 #opt-level = 3
 debug = true
 
+[[bin]]
+name = "tmin_single_core"
+path = "src/tmin_single_core.rs"
+
+[[bin]]
+name = "tmin_multi_core"
+path = "src/tmin_multi_core.rs"
+
 [features]
 default = ["std", "snapshot"]
 fork = []

@@ -1,6 +1,8 @@
 import "../../../just/libafl-qemu-libpng.just"
 
-FUZZER_NAME := "qemu_tmin"
+FUZZER_NAME := ""
+FUZZER_SINGLE := BUILD_DIR / "tmin_single_core" + FUZZER_EXTENSION
+FUZZER_MULTI := BUILD_DIR / "tmin_multi_core" + FUZZER_EXTENSION
 HARNESS := TARGET_DIR / ("libpng-harness-" + PROFILE)
 
 [unix]
@@ -28,17 +30,28 @@ harness: libpng
         -lm -static
 
 [unix]
-run: harness build
-    {{ FUZZER }} \
+run_single: harness build
+    {{ FUZZER_SINGLE }} \
         --output ./output \
         --input ./corpus \
         --verbose \
         -- {{ HARNESS }}
 
 [unix]
+run_multi: harness build
+    {{ FUZZER_MULTI }} \
+        --output ./output \
+        --input ./corpus \
+        --cores 5,6 \
+        --verbose \
+        -- {{ HARNESS }}
+
+[unix]
 test:
-    ARCH=x86_64 just run
-    ARCH=arm just run
+    ARCH=x86_64 just run_single
+    ARCH=x86_64 just run_multi
+    ARCH=arm just run_single
+    ARCH=arm just run_multi
 
 [unix]
 clean:

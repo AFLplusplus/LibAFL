@@ -411,3 +411,13 @@ pub fn fuzz() {
     // it is left undone.
 
 }
+
+#[cfg(target_os = "linux")]
+pub fn main() {
+    fuzz();
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn main() {
+    panic!("qemu-user and libafl_qemu is only supported on linux!");
+}
