@@ -404,4 +404,10 @@ pub fn fuzz() {
         }
         Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
+
+    // Here it would be nice to sum the number of cases processed by each fork
+    // to provide an exit summary (as is done for the "snapshot" version), but
+    // to do so would require more communication between child and parent. So
+    // it is left undone.
+
 }
