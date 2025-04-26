@@ -1,0 +1,6 @@
+# These files are ignored since they are copied verbatim from musl
+memcmp.c
+memcpy.c
+memmove.c
+memset.c
+strlen.c

@@ -1,49 +1,26 @@
+fn compile(file: &str, output: &str) {
+    cc::Build::new()
+        .define("_GNU_SOURCE", None)
+        .opt_level(3)
+        .flag("-Werror")
+        .flag("-fno-stack-protector")
+        .flag("-ffunction-sections")
+        .include("cc/include/")
+        .file(file)
+        .compile(output);
+}
+
 fn main() {
-    println!("cargo:rerun-if-changed=cc/include/hooks.h");
-    println!("cargo:rerun-if-changed=cc/include/trace.h");
-    println!("cargo:rerun-if-changed=cc/include/printf.h");
-    println!("cargo:rerun-if-changed=cc/src/asprintf.c");
-    println!("cargo:rerun-if-changed=cc/src/log.c");
-    println!("cargo:rerun-if-changed=cc/src/printf.c");
-    println!("cargo:rerun-if-changed=cc/src/vasprintf.c");
+    println!("cargo:rerun-if-changed=cc");
 
-    cc::Build::new()
-        .define("_GNU_SOURCE", None)
-        .opt_level(3)
-        .flag("-Werror")
-        .flag("-fno-stack-protector")
-        .flag("-ffunction-sections")
-        .include("cc/include/")
-        .file("cc/src/asprintf.c")
-        .compile("asprintf");
+    compile("cc/src/asprintf.c", "asprintf");
+    compile("cc/src/log.c", "log");
+    compile("cc/src/printf.c", "printf");
+    compile("cc/src/vasprintf.c", "vasprintf");
 
-    cc::Build::new()
-        .define("_GNU_SOURCE", None)
-        .opt_level(3)
-        .flag("-Werror")
-        .flag("-fno-stack-protector")
-        .flag("-ffunction-sections")
-        .include("cc/include/")
-        .file("cc/src/log.c")
-        .compile("log");
-
-    cc::Build::new()
-        .define("_GNU_SOURCE", None)
-        .opt_level(3)
-        .flag("-Werror")
-        .flag("-fno-stack-protector")
-        .flag("-ffunction-sections")
-        .include("cc/include/")
-        .file("cc/src/printf.c")
-        .compile("printf");
-
-    cc::Build::new()
-        .define("_GNU_SOURCE", None)
-        .opt_level(3)
-        .flag("-Werror")
-        .flag("-fno-stack-protector")
-        .flag("-ffunction-sections")
-        .include("cc/include/")
-        .file("cc/src/vasprintf.c")
-        .compile("vasprintf");
+    compile("cc/src/memcmp.c", "memcmp");
+    compile("cc/src/memcpy.c", "memcpy");
+    compile("cc/src/memmove.c", "memmove");
+    compile("cc/src/memset.c", "memset");
+    compile("cc/src/strlen.c", "strlen");
 }
