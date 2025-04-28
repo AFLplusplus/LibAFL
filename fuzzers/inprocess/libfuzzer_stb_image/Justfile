@@ -19,7 +19,7 @@ fuzzer: cxx
     #!/bin/bash
     cargo build --profile {{PROFILE}}
     cp {{FUZZER}} .
-    [ ! -d ./corpus ] && cp -r {{PROJECT_DIR}}/../../../seeds/pngs ./corpus
+    [ ! -d ./corpus ] && cp -r {{PROJECT_DIR}}/../../../seeds/pngs ./corpus || exit 0
 
 [linux]
 [macos]
