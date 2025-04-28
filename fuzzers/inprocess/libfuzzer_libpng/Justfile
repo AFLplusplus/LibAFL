@@ -25,7 +25,6 @@ fuzzer feat="": (lib feat) (cxx feat)
         -L"{{ZLIB_LIB}}" \
         -o {{FUZZER_NAME}} \
         -lm -lz
-    [ ! -d ./corpus ] && cp -r {{PROJECT_DIR}}/../../../seeds/pngs ./corpus || exit 0
 
 # Feat is either nothing or "crash"
 [unix]

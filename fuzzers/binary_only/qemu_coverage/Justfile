@@ -9,7 +9,6 @@ build:
       --profile {{ PROFILE }} \
       --features {{ ARCH }} \
       --target-dir {{ TARGET_DIR }}
-    [ ! -d ./corpus ] && cp -r {{PROJECT_DIR}}/../../../seeds/pngs ./corpus || exit 0
 
 [unix]
 harness: libpng
