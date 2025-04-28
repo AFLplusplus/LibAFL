@@ -23,7 +23,6 @@ lib: libpng
 harness: lib
     clang++ -O3 -c -fPIC harness.cc -o harness.o
     clang++ -O3 harness.o libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.so
-    [ ! -d ./corpus ] && cp -r {{PROJECT_DIR}}/../../../seeds/pngs ./corpus || exit 0
 
 [windows]
 zlib:
@@ -50,7 +49,6 @@ lib2: libpng
 harness: lib lib2
     copy libpng-1.6.37\Release\libpng16.lib . && copy libpng-1.6.37\Release\libpng16.dll . && copy zlib\Release\zlib.lib . && copy zlib\Release\zlib.dll . && copy target\release\frida_fuzzer.exe .
     cl /O2 /c /I .\libpng-1.6.37 harness.cc /Fo:harness.obj && link /DLL /OUT:libpng-harness.dll harness.obj libpng16.lib zlib.lib
-    if not exist corpus mkdir corpus && xcopy /E /I {{PROJECT_DIR}}\..\..\..\seeds\pngs corpus
 
 [unix]
 [windows]

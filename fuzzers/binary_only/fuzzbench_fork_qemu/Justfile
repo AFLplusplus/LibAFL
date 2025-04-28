@@ -14,7 +14,6 @@ harness:
 [unix]
 build:
     cargo build --profile {{ PROFILE }}
-    [ ! -d ./corpus ] && cp -r {{PROJECT_DIR}}/../../../seeds/pngs ./corpus || exit 0
 
 [unix]
 run: build harness
