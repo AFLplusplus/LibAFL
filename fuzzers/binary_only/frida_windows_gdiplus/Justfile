@@ -16,7 +16,7 @@ harness_cmplog_test:
 build:
     cargo build --profile {{ PROFILE }}
     copy {{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME}} .
-    copy -r {{PROJECT_DIR}}\..\..\..\seeds\pngs .\corpus
+    if not exist corpus mkdir corpus && xcopy /E /I {{PROJECT_DIR}}\..\..\..\seeds\pngs corpus
 
 [windows]
 run: build harness
