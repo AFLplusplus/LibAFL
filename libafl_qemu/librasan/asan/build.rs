@@ -5,22 +5,22 @@ fn compile(file: &str, output: &str) {
         .flag("-Werror")
         .flag("-fno-stack-protector")
         .flag("-ffunction-sections")
-        .include("cc/include/")
+        .include("libc/include/")
         .file(file)
         .compile(output);
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=cc");
+    println!("cargo:rerun-if-changed=libc");
 
-    compile("cc/src/asprintf.c", "asprintf");
-    compile("cc/src/log.c", "log");
-    compile("cc/src/printf.c", "printf");
-    compile("cc/src/vasprintf.c", "vasprintf");
+    compile("libc/src/asprintf.c", "asprintf");
+    compile("libc/src/log.c", "log");
+    compile("libc/src/printf.c", "printf");
+    compile("libc/src/vasprintf.c", "vasprintf");
 
-    compile("cc/src/memcmp.c", "memcmp");
-    compile("cc/src/memcpy.c", "memcpy");
-    compile("cc/src/memmove.c", "memmove");
-    compile("cc/src/memset.c", "memset");
-    compile("cc/src/strlen.c", "strlen");
+    compile("libc/src/memcmp.c", "memcmp");
+    compile("libc/src/memcpy.c", "memcpy");
+    compile("libc/src/memmove.c", "memmove");
+    compile("libc/src/memset.c", "memset");
+    compile("libc/src/strlen.c", "strlen");
 }
