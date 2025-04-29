@@ -21,6 +21,7 @@ default = [
   "mimalloc",
   "test",
   "tracking",
+  "optimized-assembly",
 ]
 ## Enable support for the `dlmalloc` allocator backend
 dlmalloc = ["dep:dlmalloc"]
@@ -46,6 +47,8 @@ mimalloc = ["dep:baby-mimalloc"]
 test = []
 ## Enable support for memory tracking
 tracking = []
+## Enable the optimized assembly implementations of various libc functions
+optimized-assembly = []
 
 [dependencies]
 baby-mimalloc = { version = "0.2.1", default-features = false, features = [

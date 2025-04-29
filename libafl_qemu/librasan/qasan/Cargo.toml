@@ -20,6 +20,7 @@ asan = { path = "../asan", default-features = false, features = [
   "libc",
   "mimalloc",
   "tracking",
+  "optimized-assembly",
 ] }
 dummy_libc = { path = "../dummy_libc", default-features = false }
 libc = { version = "0.2.169", default-features = false }
