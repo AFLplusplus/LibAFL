@@ -262,7 +262,7 @@ fn main() {
         println!("cargo:warning=ios not supported");
         return;
     }
-    println!("cargo:warning=building libafl_cc ...");
+    println!("cargo:warning=building libafl_cc ... {}", std::env::consts::OS);
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
