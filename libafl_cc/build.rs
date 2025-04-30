@@ -541,7 +541,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         src_dir,
         "dump-cfg-pass.cc",
         None,
-        true,
+        false,
     );
 
     cc::Build::new()
