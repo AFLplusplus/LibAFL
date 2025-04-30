@@ -46,7 +46,7 @@ jobs:
         uses: ./.github/workflows/ubuntu-prepare
       - name: Install LLVM
         if: runner.os == 'MacOS'
-        run: wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh ${{env.MAIN_LLVM_VERSION}} all && sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{env.MAIN_LLVM_VERSION}} 200
+        run: brew install clang-${{env.MAIN_LLVM_VERSION}}
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
         if: runner.os == 'Linux'
