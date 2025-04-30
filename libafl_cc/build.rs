@@ -258,11 +258,14 @@ fn build_pass(
 
 #[expect(clippy::too_many_lines)]
 fn main() {
-    if cfg!(target_os = "ios"){
-        println!("cargo:warning=ios not supported");
+    if cfg!(target_os = "macos") {
+        println!("cargo:warning=Skipping LLVM Pass Build on MacOS");
         return;
     }
-    println!("cargo:warning=building libafl_cc ... {}", std::env::consts::OS);
+    println!(
+        "cargo:warning=building libafl_cc ... {}",
+        std::env::consts::OS
+    );
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
