@@ -55,33 +55,12 @@ static cl::opt<bool> CmplogExtended("cmplog_instructions_extended",
                                     cl::init(false), cl::NotHidden);
 namespace {
 
-#if USE_NEW_PM
 class CmpLogInstructions : public PassInfoMixin<CmpLogInstructions> {
  public:
   CmpLogInstructions() {
   }
-#else
 
-class CmpLogInstructions : public ModulePass {
- public:
-  static char ID;
-  CmpLogInstructions() : ModulePass(ID) {
-  }
-#endif
-
-#if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-#else
-  bool runOnModule(Module &M) override;
-
-  #if LLVM_VERSION_MAJOR < 4
-  const char *getPassName() const override {
-  #else
-  StringRef getPassName() const override {
-  #endif
-    return "cmplog instructions";
-  }
-#endif
 
  private:
   bool hookInstrs(Module &M);
@@ -90,28 +69,24 @@ class CmpLogInstructions : public ModulePass {
 
 }  // namespace
 
-#if USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "CmpLogInstructions", "v0.1",
           [](PassBuilder &PB) {
-  #if LLVM_VERSION_MAJOR >= 16
-    #if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 16
+  #if LLVM_VERSION_MAJOR >= 20
             PB.registerPipelineStartEPCallback(
-    #else
-            PB.registerOptimizerEarlyEPCallback(
-    #endif
   #else
-            PB.registerOptimizerLastEPCallback(
+            PB.registerOptimizerEarlyEPCallback(
   #endif
+#else
+            PB.registerOptimizerLastEPCallback(
+#endif
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
                   MPM.addPass(CmpLogInstructions());
                 });
           }};
 }
-#else
-char CmpLogInstructions::ID = 0;
-#endif
 
 template <class Iterator>
 Iterator Unique(Iterator first, Iterator last) {
@@ -624,42 +599,12 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
   return true;
 }
 
-#if USE_NEW_PM
 PreservedAnalyses CmpLogInstructions::run(Module                &M,
                                           ModuleAnalysisManager &MAM) {
-#else
-bool CmpLogInstructions::runOnModule(Module &M) {
-#endif
   hookInstrs(M);
 
-#if USE_NEW_PM
   auto PA = PreservedAnalyses::all();
-#endif
   verifyModule(M);
 
-#if USE_NEW_PM
   return PA;
-#else
-  return true;
-#endif
 }
-
-#if USE_NEW_PM
-#else
-static void registerCmpLogInstructionsPass(const PassManagerBuilder &,
-                                           legacy::PassManagerBase &PM) {
-  auto p = new CmpLogInstructions();
-  PM.add(p);
-}
-
-static RegisterStandardPasses RegisterCmpLogInstructionsPass(
-    PassManagerBuilder::EP_OptimizerLast, registerCmpLogInstructionsPass);
-
-static RegisterStandardPasses RegisterCmpLogInstructionsPass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerCmpLogInstructionsPass);
-
-static RegisterStandardPasses RegisterCmpLogInstructionsPassLTO(
-    PassManagerBuilder::EP_FullLinkTimeOptimizationLast,
-    registerCmpLogInstructionsPass);
-
-#endif

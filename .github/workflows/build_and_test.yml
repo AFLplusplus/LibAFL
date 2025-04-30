@@ -199,7 +199,7 @@ jobs:
   cargo-fmt:
     runs-on: ubuntu-24.04
     env:
-      MAIN_LLVM_VERSION: 19
+      MAIN_LLVM_VERSION: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare

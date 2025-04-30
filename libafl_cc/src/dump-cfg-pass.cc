@@ -33,32 +33,7 @@
 #include <fstream>
 #include <set>
 
-#include "llvm/Config/llvm-config.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/IR/IRBuilder.h"
-
-#if USE_NEW_PM
-  #include "llvm/Passes/PassPlugin.h"
-  #include "llvm/Passes/PassBuilder.h"
-  #include "llvm/IR/PassManager.h"
-#else
-  #include "llvm/IR/LegacyPassManager.h"
-  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#endif
-
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/CFG.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/ValueTracking.h"
-#include "llvm/Pass.h"
-#include "llvm/IR/Constants.h"
-
+#include "common-llvm.h"
 #include <iostream>
 
 #include <nlohmann/json.hpp>
@@ -74,24 +49,12 @@ using namespace llvm;
 
 namespace {
 
-#if USE_NEW_PM
 class DumpCfgPass : public PassInfoMixin<DumpCfgPass> {
  public:
   DumpCfgPass() {
-#else
-class DumpCfgPass : public ModulePass {
- public:
-  static char ID;
-
-  DumpCfgPass() : ModulePass(ID) {
-#endif
   }
 
-#if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-#else
-  bool runOnModule(Module &M) override;
-#endif
 
  protected:
   DenseMap<BasicBlock *, uint32_t>               bb_to_cur_loc;
@@ -115,7 +78,6 @@ class DumpCfgPass : public ModulePass {
 
 }  // namespace
 
-#if USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "DumpCfgPass", "v0.1",
@@ -123,24 +85,16 @@ llvmGetPassPluginInfo() {
           [](PassBuilder &PB) {
             PB.registerOptimizerLastEPCallback(
                 [](ModulePassManager &MPM, OptimizationLevel OL
-  #if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 20
                    ,
                    ThinOrFullLTOPhase Phase
-  #endif
+#endif
 
                 ) { MPM.addPass(DumpCfgPass()); });
           }};
 }
-#else
-char DumpCfgPass::ID = 0;
-#endif
 
-#if USE_NEW_PM
 PreservedAnalyses DumpCfgPass::run(Module &M, ModuleAnalysisManager &MAM) {
-#else
-bool DumpCfgPass::runOnModule(Module &M) {
-
-#endif
   LLVMContext &Ctx = M.getContext();
   auto         moduleName = M.getName();
 
@@ -222,28 +176,6 @@ bool DumpCfgPass::runOnModule(Module &M) {
     FATAL("CFG_OUTPUT_PATH not set!");
   }
 
-#if USE_NEW_PM
   auto PA = PreservedAnalyses::all();
   return PA;
-#else
-  return true;
-#endif
 }
-
-#if USE_NEW_PM
-
-#else
-static void registerDumpCfgPass(const PassManagerBuilder &,
-                                legacy::PassManagerBase &PM) {
-  PM.add(new DumpCfgPass());
-}
-
-static RegisterPass<DumpCfgPass> X("dumpcfg", "dumpcfg instrumentation pass",
-                                   false, false);
-
-static RegisterStandardPasses RegisterDumpCfgPass(
-    PassManagerBuilder::EP_OptimizerLast, registerDumpCfgPass);
-
-static RegisterStandardPasses RegisterDumpCfgPass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerDumpCfgPass);
-#endif
