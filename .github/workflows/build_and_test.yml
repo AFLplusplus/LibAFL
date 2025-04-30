@@ -44,6 +44,13 @@ jobs:
       - uses: actions/checkout@v4
       - if: runner.os == 'Linux'
         uses: ./.github/workflows/ubuntu-prepare
+      - if: runner.os == 'MacOS'
+      - name: Install LLVM
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh ${{env.MAIN_LLVM_VERSION}} all
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{env.MAIN_LLVM_VERSION}} 200
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
         if: runner.os == 'Linux'
