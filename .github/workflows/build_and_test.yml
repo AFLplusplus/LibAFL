@@ -46,7 +46,7 @@ jobs:
         uses: ./.github/workflows/ubuntu-prepare
       - name: Install LLVM
         if: runner.os == 'MacOS'
-        run: brew install clang-${{env.MAIN_LLVM_VERSION}}
+        run: brew install llvm@${{env.MAIN_LLVM_VERSION}}
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
         if: runner.os == 'Linux'
