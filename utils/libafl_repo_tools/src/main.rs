@@ -84,7 +84,7 @@ use tokio::{process::Command, task::JoinSet};
 use walkdir::{DirEntry, WalkDir};
 use which::which;
 
-const REF_LLVM_VERSION: u32 = 19;
+const REF_LLVM_VERSION: u32 = 20;
 
 fn is_workspace_toml(path: &Path) -> bool {
     for line in read_to_string(path).unwrap().lines() {

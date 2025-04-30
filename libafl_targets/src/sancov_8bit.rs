@@ -207,7 +207,7 @@ mod observers {
             let elem = self.intervals.query(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { (*counters_maps_ptr())[*i].as_slice()[j] }
+            unsafe { (&(*counters_maps_ptr()))[*i].as_slice()[j] }
         }
 
         #[inline]
@@ -215,7 +215,7 @@ mod observers {
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { (*counters_maps_ptr_mut())[*i].as_slice_mut()[j] = val };
+            unsafe { (&mut (*counters_maps_ptr_mut()))[*i].as_slice_mut()[j] = val };
         }
 
         #[inline]

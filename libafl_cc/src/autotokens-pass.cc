@@ -35,22 +35,6 @@
 
 #include "common-llvm.h"
 
-#include "llvm/ADT/Statistic.h"
-#include "llvm/IR/IRBuilder.h"
-
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/CFG.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/ValueTracking.h"
-#include "llvm/Pass.h"
-#include "llvm/IR/Constants.h"
-
 #ifndef O_DSYNC
   #define O_DSYNC O_SYNC
 #endif
@@ -67,24 +51,12 @@ using namespace llvm;
 
 namespace {
 
-#if USE_NEW_PM
 class AutoTokensPass : public PassInfoMixin<AutoTokensPass> {
  public:
   AutoTokensPass() {
-#else
-class AutoTokensPass : public ModulePass {
- public:
-  static char ID;
-
-  AutoTokensPass() : ModulePass(ID) {
-#endif
   }
 
-#if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-#else
-  bool runOnModule(Module &M) override;
-#endif
 
  protected:
  private:
@@ -93,7 +65,6 @@ class AutoTokensPass : public ModulePass {
 
 }  // namespace
 
-#if USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "AutoTokensPass", "v0.1",
@@ -101,16 +72,13 @@ llvmGetPassPluginInfo() {
           [](PassBuilder &PB) {
             PB.registerOptimizerLastEPCallback(
                 [](ModulePassManager &MPM, OptimizationLevel OL
-  #if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 20
                    ,
                    ThinOrFullLTOPhase Phase
-  #endif
+#endif
                 ) { MPM.addPass(AutoTokensPass()); });
           }};
 }
-#else
-char AutoTokensPass::ID = 0;
-#endif
 
 void dict2file(int fd, uint8_t *mem, uint32_t len) {
   uint32_t i, j, binary = 0;
@@ -144,12 +112,7 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
 #endif
 }
 
-#if USE_NEW_PM
 PreservedAnalyses AutoTokensPass::run(Module &M, ModuleAnalysisManager &MAM) {
-#else
-bool AutoTokensPass::runOnModule(Module &M) {
-#endif
-
   DenseMap<Value *, std::string *> valueMap;
   char                            *ptr;
   int                              fd, found = 0;
@@ -547,12 +510,8 @@ bool AutoTokensPass::runOnModule(Module &M) {
 
   if (use_file) {
     close(fd);
-#if USE_NEW_PM
     auto PA = PreservedAnalyses::all();
     return PA;
-#else
-    return true;
-#endif
   }
 
   LLVMContext &Ctx = M.getContext();
@@ -602,29 +561,6 @@ bool AutoTokensPass::runOnModule(Module &M) {
     }
   }
 
-#if USE_NEW_PM
   auto PA = PreservedAnalyses::all();
   return PA;
-#else
-  return true;
-#endif
 }
-
-#if USE_NEW_PM
-
-#else
-static void registerAutoTokensPass(const PassManagerBuilder &,
-                                   legacy::PassManagerBase &PM) {
-  PM.add(new AutoTokensPass());
-}
-
-static RegisterPass<AutoTokensPass> X("autotokens",
-                                      "autotokens instrumentation pass", false,
-                                      false);
-
-static RegisterStandardPasses RegisterAutoTokensPass(
-    PassManagerBuilder::EP_OptimizerLast, registerAutoTokensPass);
-
-static RegisterStandardPasses RegisterAutoTokensPass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerAutoTokensPass);
-#endif

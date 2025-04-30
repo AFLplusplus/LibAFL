@@ -12,19 +12,13 @@ use alloc::borrow::Cow;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{Error, mutators::Tokens};
 
-use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_ALLOCATED_SIZE, EDGES_MAP_DEFAULT_SIZE};
+use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_ALLOCATED_SIZE, EDGES_MAP_DEFAULT_SIZE};
 
 /// The map for edges.
 #[unsafe(no_mangle)]
 #[allow(non_upper_case_globals)] // expect breaks here for some reason
 pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_ALLOCATED_SIZE] = [0; EDGES_MAP_ALLOCATED_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
-
-/// The map for data dependency
-#[unsafe(no_mangle)]
-#[allow(non_upper_case_globals)] // expect breaks here for some reason
-pub static mut __ddg_area_ptr_local: [u8; DDG_MAP_SIZE] = [0; DDG_MAP_SIZE];
-pub use __ddg_area_ptr_local as DDG_MAP;
 
 /// The map for accounting mem writes.
 #[unsafe(no_mangle)]
@@ -42,9 +36,6 @@ unsafe extern "C" {
     /// The area pointer points to the edges map.
     pub static mut __afl_area_ptr: *mut u8;
 
-    /// The area pointer points to the data flow map
-    pub static mut __ddg_area_ptr: *mut u8;
-
     /// The area pointer points to the accounting mem operations map.
     pub static mut __afl_acc_memop_ptr: *mut u32;
 
@@ -58,7 +49,6 @@ unsafe extern "C" {
 }
 pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
 pub use __afl_area_ptr as EDGES_MAP_PTR;
-pub use __ddg_area_ptr as DDG_MAP_PTR;
 
 /// Return Tokens from the compile-time token section
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]

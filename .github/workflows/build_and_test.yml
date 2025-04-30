@@ -44,6 +44,9 @@ jobs:
       - uses: actions/checkout@v4
       - if: runner.os == 'Linux'
         uses: ./.github/workflows/ubuntu-prepare
+      - name: Install LLVM
+        if: runner.os == 'MacOS'
+        run: brew install llvm@${{env.MAIN_LLVM_VERSION}}
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
         if: runner.os == 'Linux'
@@ -199,7 +202,7 @@ jobs:
   cargo-fmt:
     runs-on: ubuntu-24.04
     env:
-      MAIN_LLVM_VERSION: 19
+      MAIN_LLVM_VERSION: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
@@ -585,7 +588,7 @@ jobs:
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
       - name: Install deps
-        run: brew install z3 gtk+3 python
+        run: brew install z3 gtk+3 python llvm@${{env.MAIN_LLVM_VERSION}}
       - name: Install cxxbridge
         run: cargo install cxxbridge-cmd
       - uses: actions/checkout@v4
@@ -596,17 +599,6 @@ jobs:
         run: ./scripts/shmem_limits_macos.sh
       - name: Clippy
         run: cargo +nightly clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
-
-  ios:
-    runs-on: macOS-latest
-    steps:
-      - uses: dtolnay/rust-toolchain@stable
-      - name: install ios
-        run: rustup target add aarch64-apple-ios
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-      - name: Build iOS
-        run: PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
 
   android:
     runs-on: ubuntu-24.04
