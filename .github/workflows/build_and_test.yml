@@ -600,17 +600,6 @@ jobs:
       - name: Clippy
         run: cargo +nightly clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
 
-  ios:
-    runs-on: macOS-latest
-    steps:
-      - uses: dtolnay/rust-toolchain@stable
-      - name: install ios
-        run: rustup target add aarch64-apple-ios
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-      - name: Build iOS
-        run: PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
-
   android:
     runs-on: ubuntu-24.04
     steps:
