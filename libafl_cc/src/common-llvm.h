@@ -7,15 +7,10 @@
 #include "llvm/Config/llvm-config.h"
 
 /* #if LLVM_VERSION_STRING >= "4.0.1" */
-#if LLVM_VERSION_MAJOR > 4 || \
-    (LLVM_VERSION_MAJOR == 4 && LLVM_VERSION_PATCH >= 1)
   #define HAVE_VECTOR_INTRINSICS 1
-#endif
 
-#if LLVM_VERSION_MAJOR >= 16
   #include <optional>
 constexpr std::nullopt_t None = std::nullopt;
-#endif
 
 // all llvm includes and friends
 #include "llvm/Support/CommandLine.h"

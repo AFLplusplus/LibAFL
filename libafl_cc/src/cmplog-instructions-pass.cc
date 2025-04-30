@@ -37,15 +37,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Analysis/ValueTracking.h"
 
-#if LLVM_VERSION_MAJOR > 3 || \
-    (LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR > 4)
   #include "llvm/IR/Verifier.h"
   #include "llvm/IR/DebugInfo.h"
-#else
-  #include "llvm/Analysis/Verifier.h"
-  #include "llvm/DebugInfo.h"
-  #define nullptr 0
-#endif
 
 #include <set>
 
@@ -73,15 +66,11 @@ extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "CmpLogInstructions", "v0.1",
           [](PassBuilder &PB) {
-#if LLVM_VERSION_MAJOR >= 16
   #if LLVM_VERSION_MAJOR >= 20
             PB.registerPipelineStartEPCallback(
   #else
             PB.registerOptimizerEarlyEPCallback(
   #endif
-#else
-            PB.registerOptimizerLastEPCallback(
-#endif
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
                   MPM.addPass(CmpLogInstructions());
                 });
@@ -261,16 +250,12 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
             continue;
           }
 
-#if (LLVM_VERSION_MAJOR >= 12)
           vector_cnt = tt->getElementCount().getKnownMinValue();
           ty0 = tt->getElementType();
-#endif
         }
 
         if (ty0->isHalfTy()
-#if LLVM_VERSION_MAJOR >= 11
             || ty0->isBFloatTy()
-#endif
         )
           max_size = 16;
         else if (ty0->isFloatTy())
@@ -281,11 +266,9 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           max_size = 80;
         else if (ty0->isFP128Ty() || ty0->isPPC_FP128Ty())
           max_size = 128;
-#if (LLVM_VERSION_MAJOR >= 12)
         else if (ty0->getTypeID() != llvm::Type::PointerTyID && !be_quiet)
           fprintf(stderr, "Warning: unsupported cmp type for cmplog: %u!\n",
                   ty0->getTypeID());
-#endif
 
         attr += 8;
         is_fp = 1;
@@ -293,7 +276,6 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 
       } else {
         if (ty0->isVectorTy()) {
-#if (LLVM_VERSION_MAJOR >= 12)
           VectorType *tt = dyn_cast<VectorType>(ty0);
           if (!tt) {
             fprintf(stderr, "Warning: cmplog cmp vector is not a vector!\n");
@@ -302,7 +284,6 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 
           vector_cnt = tt->getElementCount().getKnownMinValue();
           ty1 = ty0 = tt->getElementType();
-#endif
         }
 
         intTyOp0 = dyn_cast<IntegerType>(ty0);
@@ -314,13 +295,10 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
                          : intTyOp1->getBitWidth();
 
         } else {
-#if (LLVM_VERSION_MAJOR >= 12)
           if (ty0->getTypeID() != llvm::Type::PointerTyID && !be_quiet) {
             fprintf(stderr, "Warning: unsupported cmp type for cmplog: %u\n",
                     ty0->getTypeID());
           }
-
-#endif
         }
       }
 

@@ -18,11 +18,11 @@ use which::which;
 
 /// The max version of `LLVM` we're looking for
 #[cfg(not(target_vendor = "apple"))]
-const LLVM_VERSION_MAX: u32 = 33;
+const LLVM_VERSION_MAX: u32 = 999;
 
 /// The min version of `LLVM` we're looking for
 #[cfg(not(target_vendor = "apple"))]
-const LLVM_VERSION_MIN: u32 = 6;
+const LLVM_VERSION_MIN: u32 = 15;
 
 /// Get the extension for a shared object
 #[cfg(any(
