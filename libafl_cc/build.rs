@@ -380,7 +380,6 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
     cxxflags.push(format!("-DACCOUNTING_MAP_SIZE={acc_map_size}"));
 
-
     let llvm_version = find_llvm_version();
 
     write!(

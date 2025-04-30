@@ -293,27 +293,21 @@ PreservedAnalyses AFLCoverage::run(Module &M, ModuleAnalysisManager &MAM) {
 
       /* Load prev_loc */
 
-      LoadInst *PrevLoc = IRB.CreateLoad(
-          Int32Ty,
-          AFLPrevLoc);
+      LoadInst *PrevLoc = IRB.CreateLoad(Int32Ty, AFLPrevLoc);
       PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
       /* Load SHM pointer */
 
-      LoadInst *MemReadPtr = IRB.CreateLoad(
-          PointerType::get(Int32Ty, 0),
-          AFLMemOpPtr);
+      LoadInst *MemReadPtr =
+          IRB.CreateLoad(PointerType::get(Int32Ty, 0), AFLMemOpPtr);
       MemReadPtr->setMetadata(M.getMDKindID("nosanitize"),
                               MDNode::get(C, None));
-      Value *MemReadPtrIdx = IRB.CreateGEP(
-          Int32Ty,
-          MemReadPtr, IRB.CreateXor(PrevLoc, CurLoc));
+      Value *MemReadPtrIdx =
+          IRB.CreateGEP(Int32Ty, MemReadPtr, IRB.CreateXor(PrevLoc, CurLoc));
 
       /* Update bitmap */
 
-      LoadInst *MemReadCount = IRB.CreateLoad(
-          Int32Ty,
-          MemReadPtrIdx);
+      LoadInst *MemReadCount = IRB.CreateLoad(Int32Ty, MemReadPtrIdx);
       MemReadCount->setMetadata(M.getMDKindID("nosanitize"),
                                 MDNode::get(C, None));
       Value *MemReadIncr =

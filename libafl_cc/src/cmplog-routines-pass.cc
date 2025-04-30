@@ -28,7 +28,6 @@
 
 #include "common-llvm.h"
 
-
 #include <set>
 
 using namespace llvm;

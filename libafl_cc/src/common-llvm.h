@@ -7,9 +7,9 @@
 #include "llvm/Config/llvm-config.h"
 
 /* #if LLVM_VERSION_STRING >= "4.0.1" */
-  #define HAVE_VECTOR_INTRINSICS 1
+#define HAVE_VECTOR_INTRINSICS 1
 
-  #include <optional>
+#include <optional>
 constexpr std::nullopt_t None = std::nullopt;
 
 // all llvm includes and friends

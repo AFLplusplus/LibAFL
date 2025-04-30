@@ -37,8 +37,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Analysis/ValueTracking.h"
 
-  #include "llvm/IR/Verifier.h"
-  #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/IR/DebugInfo.h"
 
 #include <set>
 
@@ -66,11 +66,11 @@ extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "CmpLogInstructions", "v0.1",
           [](PassBuilder &PB) {
-  #if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 20
             PB.registerPipelineStartEPCallback(
-  #else
+#else
             PB.registerOptimizerEarlyEPCallback(
-  #endif
+#endif
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
                   MPM.addPass(CmpLogInstructions());
                 });
@@ -254,9 +254,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           ty0 = tt->getElementType();
         }
 
-        if (ty0->isHalfTy()
-            || ty0->isBFloatTy()
-        )
+        if (ty0->isHalfTy() || ty0->isBFloatTy())
           max_size = 16;
         else if (ty0->isFloatTy())
           max_size = 32;
