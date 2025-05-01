@@ -368,7 +368,7 @@ static FORKSERVER_GUARD: OnceLock<()> = OnceLock::new();
 /// the loop will never return if everything is OK.
 ///
 /// Before invoking this function, you should initialize [`EDGES_MAP_PTR`],
-/// [`INPUT_PTR`] and [`INPUT_LENTH_PTR`] properly. [`map_shared_memory`] and
+/// [`INPUT_PTR`] and [`INPUT_LENGTH_PTR`] properly. [`map_shared_memory`] and
 /// [`map_input_shared_memory`] can be used, for example.
 pub fn start_forkserver<P: ForkServerParent>(
     forkserver_parent: &mut P,
