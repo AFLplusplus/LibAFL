@@ -49,45 +49,65 @@ use crate::{
     state::HasExecutions,
 };
 
-const FORKSRV_FD: i32 = 198;
+/// Pinned fd number for forkserver communication
+pub const FORKSRV_FD: i32 = 198;
 #[expect(clippy::cast_possible_wrap)]
 const FS_NEW_ERROR: i32 = 0xeffe0000_u32 as i32;
 
-const FS_NEW_VERSION_MIN: u32 = 1;
-const FS_NEW_VERSION_MAX: u32 = 1;
+/// Minimum number for new version
+pub const FS_NEW_VERSION_MIN: u32 = 1;
+/// Maximum number for new version
+pub const FS_NEW_VERSION_MAX: u32 = 1;
 
+/// Whether forkserver option customization for old forkserver is enabled
 #[expect(clippy::cast_possible_wrap)]
-const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
+pub const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 
+/// Set map size option for new forkserver
 #[expect(clippy::cast_possible_wrap)]
-const FS_NEW_OPT_MAPSIZE: i32 = 1_u32 as i32;
+pub const FS_NEW_OPT_MAPSIZE: i32 = 1_u32 as i32;
+/// Set map size option for old forkserver
 #[expect(clippy::cast_possible_wrap)]
-const FS_OPT_MAPSIZE: i32 = 0x40000000_u32 as i32;
+pub const FS_OPT_MAPSIZE: i32 = 0x40000000_u32 as i32;
 
+/// Enable shared memory fuzzing option for old forkserver
 #[expect(clippy::cast_possible_wrap)]
-const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
+pub const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
+/// Enable shared memory fuzzing option for new forkserver
 #[expect(clippy::cast_possible_wrap)]
-const FS_NEW_OPT_SHDMEM_FUZZ: i32 = 2_u32 as i32;
+pub const FS_NEW_OPT_SHDMEM_FUZZ: i32 = 2_u32 as i32;
 
+/// Enable autodict option for new forkserver
 #[expect(clippy::cast_possible_wrap)]
-const FS_NEW_OPT_AUTODTCT: i32 = 0x00000800_u32 as i32;
+pub const FS_NEW_OPT_AUTODTCT: i32 = 0x00000800_u32 as i32;
+/// Enable autodict option for old forkserver
 #[expect(clippy::cast_possible_wrap)]
-const FS_OPT_AUTODTCT: i32 = 0x10000000_u32 as i32;
+pub const FS_OPT_AUTODTCT: i32 = 0x10000000_u32 as i32;
 
+/// Failed to set map size
 #[expect(clippy::cast_possible_wrap)]
-const FS_ERROR_MAP_SIZE: i32 = 1_u32 as i32;
+pub const FS_ERROR_MAP_SIZE: i32 = 1_u32 as i32;
+/// Failed to map address
 #[expect(clippy::cast_possible_wrap)]
-const FS_ERROR_MAP_ADDR: i32 = 2_u32 as i32;
+pub const FS_ERROR_MAP_ADDR: i32 = 2_u32 as i32;
+/// Failed to open shared memory
 #[expect(clippy::cast_possible_wrap)]
-const FS_ERROR_SHM_OPEN: i32 = 4_u32 as i32;
+pub const FS_ERROR_SHM_OPEN: i32 = 4_u32 as i32;
+/// Failed to do `shmat`
 #[expect(clippy::cast_possible_wrap)]
-const FS_ERROR_SHMAT: i32 = 8_u32 as i32;
+pub const FS_ERROR_SHMAT: i32 = 8_u32 as i32;
+/// Failed to do `mmap`
 #[expect(clippy::cast_possible_wrap)]
-const FS_ERROR_MMAP: i32 = 16_u32 as i32;
+pub const FS_ERROR_MMAP: i32 = 16_u32 as i32;
+/// Old cmplog error
 #[expect(clippy::cast_possible_wrap)]
-const FS_ERROR_OLD_CMPLOG: i32 = 32_u32 as i32;
+pub const FS_ERROR_OLD_CMPLOG: i32 = 32_u32 as i32;
+/// Old QEMU cmplog error
 #[expect(clippy::cast_possible_wrap)]
-const FS_ERROR_OLD_CMPLOG_QEMU: i32 = 64_u32 as i32;
+pub const FS_ERROR_OLD_CMPLOG_QEMU: i32 = 64_u32 as i32;
+/// Flag indicating this is an error
+#[expect(clippy::cast_possible_wrap)]
+pub const FS_OPT_ERROR: i32 = 0xf800008f_u32 as i32;
 
 /// Forkserver message. We'll reuse it in a testcase.
 const FAILED_TO_START_FORKSERVER_MSG: &str = "Failed to start forkserver";
@@ -121,6 +141,10 @@ fn report_error_and_exit(status: i32) -> Result<(), Error> {
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
 const MIN_INPUT_SIZE_DEFAULT: usize = 1;
+/// Environment variable key for shared memory id for input and its len
+pub const SHM_FUZZ_ENV_VAR: &str = "__AFL_SHM_FUZZ_ID";
+/// Environment variable key for shared memory id for edge map
+pub const SHM_ENV_VAR: &str = "__AFL_SHM_ID";
 
 /// The default signal to use to kill child processes
 const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;
@@ -341,7 +365,7 @@ impl Forkserver {
             log::warn!("AFL_MAP_SIZE not set. If it is unset, the forkserver may fail to start up");
         }
 
-        if env::var("__AFL_SHM_ID").is_err() {
+        if env::var(SHM_ENV_VAR).is_err() {
             return Err(Error::unknown("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer".to_string()));
         }
 
@@ -980,7 +1004,7 @@ where
                 // # Safety
                 // This is likely single threade here, we're likely fine if it's not.
                 unsafe {
-                    shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
+                    shmem.write_to_env(SHM_FUZZ_ENV_VAR)?;
                 }
 
                 let size_in_bytes = (self.max_input_size + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();

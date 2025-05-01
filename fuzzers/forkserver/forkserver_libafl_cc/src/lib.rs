@@ -1,9 +1,17 @@
-use libafl_targets::{map_shared_memory, start_forkserver};
+use libafl_targets::{map_input_shared_memory, map_shared_memory, start_forkserver};
 
 #[no_mangle]
 pub extern "C" fn libafl_start_forkserver() {
     // Map shared memory region for the edge coverage map
-    map_shared_memory();
+    if map_shared_memory().is_err() {
+        std::process::exit(1);
+    }
+    // Map shared memory region for input and its len
+    if map_input_shared_memory().is_err() {
+        std::process::exit(1);
+    };
     // Start the forkserver
-    start_forkserver();
+    if start_forkserver().is_err() {
+        std::process::exit(1);
+    };
 }
