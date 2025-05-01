@@ -89,11 +89,10 @@ fn read_u32_from_forkserver() -> Result<u32, Error> {
 static SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
 
 /// Map a shared memory region for the edge coverage map.
-/// The [`EDGES_MAP_PTR`][crate::coverage::EDGES_MAP_PTR]
-/// will be updated.
+/// The [`EDGES_MAP_PTR`] will be updated.
 ///
 /// If anything failed, the forkserver will be notified with
-/// [`FS_ERROR_SHM_OPEN`][libafl::executors::forkserver::FS_ERROR_SHM_OPEN].
+/// [`FS_ERROR_SHM_OPEN`].
 pub fn map_shared_memory() -> Result<(), Error> {
     if SHM_MAP_GUARD.set(()).is_err() {
         return Err(Error::illegal_state("shared memory has been mapped before"));
@@ -127,11 +126,10 @@ fn map_shared_memory_internal() -> Result<(), Error> {
 static INPUT_SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
 
 /// Map the input shared memory region.
-/// The [`INPUT_LENGTH_PTR`][crate::coverage::INPUT_LENGTH_PTR] and
-/// [`INPUT_PTR`][crate::coverage::INPUT_PTR] will be updated.
+/// The [`INPUT_LENGTH_PTR`] and [`INPUT_PTR`] will be updated.
 ///
 /// If anything failed, the forkserver will be notified with
-/// [`FS_ERROR_SHM_OPEN`][libafl::executors::forkserver::FS_ERROR_SHM_OPEN].
+/// [`FS_ERROR_SHM_OPEN`].
 pub fn map_input_shared_memory() -> Result<(), Error> {
     if INPUT_SHM_MAP_GUARD.set(()).is_err() {
         return Err(Error::illegal_state("shared memory has been mapped before"));
@@ -268,7 +266,7 @@ impl ForkServerParent for StdForkServerParent {
     fn handle_child_requests(&mut self) -> Result<i32, Error> {
         let mut status = 0i32;
         // unwrap here: the field is assigned if we are parent process in `spawn_child`
-        if unsafe { libc::waitpid(self.last_child_pid.take().unwrap(), &mut status, 0) < 0 } {
+        if unsafe { libc::waitpid(self.last_child_pid.take().unwrap(), &raw mut status, 0) < 0 } {
             return Err(Error::illegal_state("waitpid"));
         }
         Ok(status)
@@ -336,7 +334,7 @@ impl ForkServerParent for PersistentForkServerParent {
         if unsafe {
             libc::waitpid(
                 *self.std_parent.last_child_pid.as_ref().unwrap(),
-                &mut status,
+                &raw mut status,
                 libc::WUNTRACED,
             ) < 0
         } {
