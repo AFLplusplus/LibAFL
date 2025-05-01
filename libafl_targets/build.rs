@@ -244,24 +244,6 @@ fn main() {
     #[cfg(any(feature = "forkserver", feature = "windows_asan"))]
     let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
 
-    #[cfg(feature = "forkserver")]
-    {
-        if target_family == "unix" {
-            println!("cargo:rerun-if-changed=src/forkserver.c");
-
-            let mut forkserver = cc::Build::new();
-
-            #[cfg(feature = "whole_archive")]
-            {
-                forkserver.link_lib_modifier("+whole-archive");
-            }
-
-            forkserver
-                .file(src_dir.join("forkserver.c"))
-                .compile("forkserver");
-        }
-    }
-
     #[cfg(feature = "windows_asan")]
     if target_family == "windows" {
         println!("cargo:rerun-if-changed=src/windows_asan.c");
