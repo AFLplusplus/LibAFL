@@ -454,6 +454,32 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
     fn store_input_from(&self, _: &Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
+
+    #[inline]
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        if let Some(testcase) = self.storage.enabled.remove(id) {
+            let tc = testcase.take();
+            self.storage.insert_disabled(RefCell::new(tc));
+            Ok(())
+        } else {
+            Err(Error::key_not_found(format!(
+                "Index {id} not found in enabled testcases"
+            )))
+        }
+    }
+
+    #[inline]
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
+        if let Some(testcase) = self.storage.disabled.remove(id) {
+            let tc = testcase.take();
+            self.storage.insert(RefCell::new(tc));
+            Ok(())
+        } else {
+            Err(Error::key_not_found(format!(
+                "Index {id} not found in disabled testcases"
+            )))
+        }
+    }
 }
 
 impl<I> HasTestcase<I> for InMemoryCorpus<I> {

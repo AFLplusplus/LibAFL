@@ -157,6 +157,12 @@ pub trait Corpus<I>: Sized {
     /// Get the last inserted corpus id
     fn last(&self) -> Option<CorpusId>;
 
+    /// Disables a testcase, moving it to the disabled map
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error>;
+
+    /// Enables a testcase, moving it to the enabled map
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error>;
+
     /// An iterator over very active corpus id
     fn ids(&self) -> CorpusIdIterator<'_, Self, I> {
         CorpusIdIterator {

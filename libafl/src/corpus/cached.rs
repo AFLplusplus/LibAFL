@@ -176,6 +176,18 @@ where
     fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         self.inner.store_input_from(testcase)
     }
+
+    #[inline]
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.cached_indexes.borrow_mut().retain(|e| *e != id);
+        self.inner.disable(id)
+    }
+
+    #[inline]
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.cached_indexes.borrow_mut().retain(|e| *e != id);
+        self.inner.enable(id)
+    }
 }
 
 impl<I> HasTestcase<I> for CachedOnDiskCorpus<I>

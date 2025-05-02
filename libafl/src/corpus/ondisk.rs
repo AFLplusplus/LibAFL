@@ -173,6 +173,16 @@ where
     fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         self.inner.store_input_from(testcase)
     }
+
+    #[inline]
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.inner.disable(id)
+    }
+
+    #[inline]
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.inner.enable(id)
+    }
 }
 
 impl<I> HasTestcase<I> for OnDiskCorpus<I>

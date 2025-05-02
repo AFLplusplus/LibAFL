@@ -212,6 +212,24 @@ where
         };
         input.to_file(file_path)
     }
+
+    #[inline]
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.inner.disable(id)?;
+        // Ensure testcase is saved to disk correctly with its new status
+        let testcase_cell = &mut self.get_from_all(id).unwrap().borrow_mut();
+        self.save_testcase(testcase_cell, Some(id))?;
+        Ok(())
+    }
+
+    #[inline]
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.inner.enable(id)?;
+        // Ensure testcase is saved to disk correctly with its new status
+        let testcase_cell = &mut self.get_from_all(id).unwrap().borrow_mut();
+        self.save_testcase(testcase_cell, Some(id))?;
+        Ok(())
+    }
 }
 
 impl<I> HasTestcase<I> for InMemoryOnDiskCorpus<I>
