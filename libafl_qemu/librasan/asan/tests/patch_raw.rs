@@ -148,50 +148,50 @@ mod tests {
         };
     }
 
-    define_test_function!(test_arm1, 0xdeadface);
-    define_test_function!(test_arm2, 0xd00df00d);
-    define_test_function!(test_arm3, 0xfeeddeaf);
+    define_test_function!(arm_patch_target, 0xdeadface);
+    define_test_function!(patched_arm_to_arm, 0xd00df00d);
+    define_test_function!(patched_arm_to_thumb, 0xfeeddeaf);
     define_test_function!(
         target_feature(enable = "thumb-mode"),
-        test_thumb1,
+        thumb_patch_target,
         0xcafebabe
     );
     define_test_function!(
         target_feature(enable = "thumb-mode"),
-        test_thumb2,
+        patched_thumb_to_thumb,
         0xbeeffade
     );
     define_test_function!(
         target_feature(enable = "thumb-mode"),
-        test_thumb3,
+        patched_thumb_to_arm,
         0xdeedcede
     );
 
     define_test!(
         test_patch_arm_to_arm,
-        test_arm2,
-        test_arm1,
+        patched_arm_to_arm,
+        arm_patch_target,
         0xd00df00d,
         0xdeadface
     );
     define_test!(
         test_patch_arm_to_thumb,
-        test_arm3,
-        test_thumb1,
+        patched_arm_to_thumb,
+        thumb_patch_target,
         0xfeeddeaf,
         0xcafebabe
     );
     define_test!(
         test_patch_thumb_to_arm,
-        test_thumb3,
-        test_arm1,
+        patched_thumb_to_arm,
+        arm_patch_target,
         0xdeedcede,
         0xdeadface
     );
     define_test!(
         test_patch_thumb_to_thumb,
-        test_thumb2,
-        test_thumb1,
+        patched_thumb_to_thumb,
+        thumb_patch_target,
         0xbeeffade,
         0xcafebabe
     );
