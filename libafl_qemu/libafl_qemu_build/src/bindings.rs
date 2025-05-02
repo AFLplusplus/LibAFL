@@ -53,9 +53,8 @@ const WRAPPER_HEADER: &str = r#"
 #include "migration/savevm.h"
 #include "hw/core/sysemu-cpu-ops.h"
 #include "exec/address-spaces.h"
-#include "sysemu/tcg.h"
-#include "sysemu/runstate.h"
-#include "sysemu/replay.h"
+#include "exec/target_page.h"
+#include "system/system.h"
 
 #include "libafl/system.h"
 #include "libafl/qemu_snapshot.h"
@@ -120,6 +119,7 @@ pub fn generate(
         .derive_default(true)
         .impl_debug(true)
         .generate_comments(true)
+        .wrap_static_fns(true)
         .default_enum_style(bindgen::EnumVariation::NewType {
             is_global: true,
             is_bitfield: true,
