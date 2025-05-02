@@ -164,7 +164,7 @@ fn map_input_shared_memory_internal() -> Result<(), Error> {
 }
 
 /// Parent to handle all logics with forkserver children
-pub trait ForkServerParent {
+pub trait ForkserverParent {
     /// Conduct initializing routine before fuzzing loop.
     ///
     /// Usually, several signal handlers are registered in this function.
@@ -199,21 +199,21 @@ extern "C" fn std_handle_sigterm(_signal: libc::c_int) {
 
 /// Standard forkserver parent. It will fork a child in every round.
 #[derive(Debug, Default)]
-pub struct StdForkServerParent {
+pub struct StdForkserverParent {
     last_child_pid: Option<i32>,
     old_sigchld_handler: Option<SigHandler>,
     old_sigterm_handler: Option<SigHandler>,
 }
 
-impl StdForkServerParent {
+impl StdForkserverParent {
     /// Create a new forkserver parent.
     #[must_use]
     pub fn new() -> Self {
-        StdForkServerParent::default()
+        StdForkserverParent::default()
     }
 }
 
-impl ForkServerParent for StdForkServerParent {
+impl ForkserverParent for StdForkserverParent {
     fn pre_fuzzing(&mut self) -> Result<(), Error> {
         let old_sigchld_handler =
             (unsafe { nix::sys::signal::signal(Signal::SIGCHLD, SigHandler::SigDfl) })
@@ -276,20 +276,20 @@ impl ForkServerParent for StdForkServerParent {
 /// Persistent forkserver parent. It will communicate with forked child
 /// with signals.
 #[derive(Debug, Default)]
-pub struct PersistentForkServerParent {
+pub struct PersistentForkserverParent {
     child_stopped: bool,
-    std_parent: StdForkServerParent,
+    std_parent: StdForkserverParent,
 }
 
-impl PersistentForkServerParent {
+impl PersistentForkserverParent {
     /// Create a new forkserver parent.
     #[must_use]
     pub fn new() -> Self {
-        PersistentForkServerParent::default()
+        PersistentForkserverParent::default()
     }
 }
 
-impl ForkServerParent for PersistentForkServerParent {
+impl ForkserverParent for PersistentForkserverParent {
     fn pre_fuzzing(&mut self) -> Result<(), Error> {
         self.std_parent.pre_fuzzing()
     }
@@ -349,7 +349,7 @@ impl ForkServerParent for PersistentForkServerParent {
 
 /// Success state when [`start_forkserver`] returned.
 #[derive(Debug)]
-pub enum ForkServerState {
+pub enum ForkserverState {
     /// There is no AFL forkserver responded. In such case,
     /// we should allow user to do a normal execution.
     NoAfl,
@@ -370,9 +370,9 @@ static FORKSERVER_GUARD: OnceLock<()> = OnceLock::new();
 /// Before invoking this function, you should initialize [`EDGES_MAP_PTR`],
 /// [`INPUT_PTR`] and [`INPUT_LENGTH_PTR`] properly. [`map_shared_memory`] and
 /// [`map_input_shared_memory`] can be used, for example.
-pub fn start_forkserver<P: ForkServerParent>(
+pub fn start_forkserver<P: ForkserverParent>(
     forkserver_parent: &mut P,
-) -> Result<ForkServerState, Error> {
+) -> Result<ForkserverState, Error> {
     if FORKSERVER_GUARD.set(()).is_err() {
         return Err(Error::illegal_state("forkserver has been started before"));
     }
@@ -380,9 +380,9 @@ pub fn start_forkserver<P: ForkServerParent>(
 }
 
 const VERSION: u32 = 0x41464c00 + FS_NEW_VERSION_MAX;
-fn start_forkserver_internal<P: ForkServerParent>(
+fn start_forkserver_internal<P: ForkserverParent>(
     forkserver_parent: &mut P,
-) -> Result<ForkServerState, Error> {
+) -> Result<ForkserverState, Error> {
     #[cfg(any(target_os = "linux", target_vendor = "apple"))]
     let autotokens_on = unsafe { !__token_start.is_null() && !__token_stop.is_null() };
     let sharedmem_fuzzing = unsafe { SHM_FUZZING == 1 };
@@ -391,7 +391,7 @@ fn start_forkserver_internal<P: ForkServerParent>(
     // Phone home and tell the parent that we're OK. If parent isn't there, assume we're
     // not running in forkserver mode and just execute program.
     if write_u32_to_forkserver(VERSION).is_err() {
-        return Ok(ForkServerState::NoAfl);
+        return Ok(ForkserverState::NoAfl);
     }
 
     let reply = read_u32_from_forkserver()?;
@@ -450,7 +450,7 @@ fn start_forkserver_internal<P: ForkServerParent>(
                 // FORKSRV_FD is for communication with AFL, we don't need it in the child
                 let _ = nix::unistd::close(FORKSRV_R_FD.as_raw_fd());
                 let _ = nix::unistd::close(FORKSRV_W_FD.as_raw_fd());
-                return Ok(ForkServerState::Child);
+                return Ok(ForkserverState::Child);
             }
             ForkResult::Parent(child_pid) => {
                 #[expect(clippy::cast_sign_loss)]
