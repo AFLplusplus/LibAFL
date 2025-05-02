@@ -197,23 +197,26 @@ extern "C" fn std_handle_sigterm(_signal: libc::c_int) {
     STOP_SOON.store(true, Ordering::Relaxed);
 }
 
-/// Standard forkserver parent. It will fork a child in every round.
+/// Forkserver parent that can handle both non-persistent and persistent mode
 #[derive(Debug, Default)]
-pub struct StdForkserverParent {
+pub struct MaybePersistentForkserverParent {
     last_child_pid: Option<i32>,
+    /// This field is only touched for persistent mode to indicating
+    /// whether the child is temporarily stopped or terminated
+    child_stopped: bool,
     old_sigchld_handler: Option<SigHandler>,
     old_sigterm_handler: Option<SigHandler>,
 }
 
-impl StdForkserverParent {
+impl MaybePersistentForkserverParent {
     /// Create a new forkserver parent.
     #[must_use]
     pub fn new() -> Self {
-        StdForkserverParent::default()
+        MaybePersistentForkserverParent::default()
     }
 }
 
-impl ForkserverParent for StdForkserverParent {
+impl ForkserverParent for MaybePersistentForkserverParent {
     fn pre_fuzzing(&mut self) -> Result<(), Error> {
         let old_sigchld_handler =
             (unsafe { nix::sys::signal::signal(Signal::SIGCHLD, SigHandler::SigDfl) })
@@ -232,69 +235,13 @@ impl ForkserverParent for StdForkserverParent {
         Ok(())
     }
 
-    fn spawn_child(&mut self, _was_killed: bool) -> Result<ForkResult, Error> {
+    fn spawn_child(&mut self, was_killed: bool) -> Result<ForkResult, Error> {
         if STOP_SOON.load(Ordering::Relaxed) {
             if let Some(child_pid) = self.last_child_pid.take() {
                 nix::sys::signal::kill(Pid::from_raw(child_pid), Signal::SIGKILL)?;
             }
             std::process::exit(0);
         }
-        // Once woken up, create a clone of our process.
-        let fork_result = (unsafe { libafl_bolts::os::fork() }).inspect_err(|_| {
-            log::error!("fork");
-        })?;
-        match &fork_result {
-            ForkResult::Parent(child_pid) => {
-                self.last_child_pid = Some(child_pid.pid);
-            }
-            ForkResult::Child => unsafe {
-                // unwrap here: the field is assigned in `pre_fuzzing`
-                nix::sys::signal::signal(Signal::SIGCHLD, self.old_sigchld_handler.take().unwrap())
-                    .inspect_err(|_| {
-                        log::error!("Fail to restore signal handler for SIGCHLD.");
-                    })?;
-                // unwrap here: the field is assigned in `pre_fuzzing`
-                nix::sys::signal::signal(Signal::SIGTERM, self.old_sigterm_handler.take().unwrap())
-                    .inspect_err(|_| {
-                        log::error!("Fail to restore signal handler for SIGTERM.");
-                    })?;
-            },
-        }
-        Ok(fork_result)
-    }
-
-    fn handle_child_requests(&mut self) -> Result<i32, Error> {
-        let mut status = 0i32;
-        // unwrap here: the field is assigned if we are parent process in `spawn_child`
-        if unsafe { libc::waitpid(self.last_child_pid.take().unwrap(), &raw mut status, 0) < 0 } {
-            return Err(Error::illegal_state("waitpid"));
-        }
-        Ok(status)
-    }
-}
-
-/// Persistent forkserver parent. It will communicate with forked child
-/// with signals.
-#[derive(Debug, Default)]
-pub struct PersistentForkserverParent {
-    child_stopped: bool,
-    std_parent: StdForkserverParent,
-}
-
-impl PersistentForkserverParent {
-    /// Create a new forkserver parent.
-    #[must_use]
-    pub fn new() -> Self {
-        PersistentForkserverParent::default()
-    }
-}
-
-impl ForkserverParent for PersistentForkserverParent {
-    fn pre_fuzzing(&mut self) -> Result<(), Error> {
-        self.std_parent.pre_fuzzing()
-    }
-
-    fn spawn_child(&mut self, was_killed: bool) -> Result<ForkResult, Error> {
         // If we stopped the child in persistent mode, but there was a race
         // condition and afl-fuzz already issued SIGKILL, write off the old
         // process.
@@ -305,7 +252,7 @@ impl ForkserverParent for PersistentForkserverParent {
             // true only if the forkserver killed such child. In all cases, the
             // last_child_pid will never be None.
             if nix::sys::wait::waitpid(
-                Pid::from_raw(self.std_parent.last_child_pid.take().unwrap()),
+                Pid::from_raw(self.last_child_pid.take().unwrap()),
                 None,
             )
             .is_err()
@@ -313,31 +260,46 @@ impl ForkserverParent for PersistentForkserverParent {
                 return Err(Error::illegal_state("child_stopped && was_killed"));
             }
         }
+
         if !self.child_stopped {
-            return self.std_parent.spawn_child(was_killed);
+            // Once woken up, create a clone of our process.
+            let fork_result = (unsafe { libafl_bolts::os::fork() }).inspect_err(|_| {
+                log::error!("fork");
+            })?;
+            match &fork_result {
+                ForkResult::Parent(child_pid) => {
+                    self.last_child_pid = Some(child_pid.pid);
+                }
+                ForkResult::Child => unsafe {
+                    // unwrap here: the field is assigned in `pre_fuzzing`
+                    nix::sys::signal::signal(Signal::SIGCHLD, self.old_sigchld_handler.take().unwrap())
+                        .inspect_err(|_| {
+                            log::error!("Fail to restore signal handler for SIGCHLD.");
+                        })?;
+                    // unwrap here: the field is assigned in `pre_fuzzing`
+                    nix::sys::signal::signal(Signal::SIGTERM, self.old_sigterm_handler.take().unwrap())
+                        .inspect_err(|_| {
+                            log::error!("Fail to restore signal handler for SIGTERM.");
+                        })?;
+                },
+            }
+            Ok(fork_result)
+        } else {
+            // Special handling for persistent mode: if the child is alive but
+            // currently stopped, simply restart it with SIGCONT.
+    
+            // unwrap here: child_stopped is true only if last_child_pid is some.
+            let child_pid = *self.last_child_pid.as_ref().unwrap();
+            nix::sys::signal::kill(Pid::from_raw(child_pid), Signal::SIGCONT)?;
+            self.child_stopped = false;
+            Ok(ForkResult::Parent(ChildHandle { pid: child_pid }))
         }
-        // Follow: child_stopped is true
-
-        // Special handling for persistent mode: if the child is alive but
-        // currently stopped, simply restart it with SIGCONT.
-
-        // unwrap here: child_stopped is true only if last_child_pid is some.
-        let child_pid = *self.std_parent.last_child_pid.as_ref().unwrap();
-        nix::sys::signal::kill(Pid::from_raw(child_pid), Signal::SIGCONT)?;
-        self.child_stopped = false;
-        Ok(ForkResult::Parent(ChildHandle { pid: child_pid }))
     }
 
     fn handle_child_requests(&mut self) -> Result<i32, Error> {
         let mut status = 0i32;
         // unwrap here: the field is assigned if we are parent process in `spawn_child`
-        if unsafe {
-            libc::waitpid(
-                *self.std_parent.last_child_pid.as_ref().unwrap(),
-                &raw mut status,
-                libc::WUNTRACED,
-            ) < 0
-        } {
+        if unsafe { libc::waitpid(self.last_child_pid.take().unwrap(), &raw mut status, 0) < 0 } {
             return Err(Error::illegal_state("waitpid"));
         }
         if libc::WIFSTOPPED(status) {
