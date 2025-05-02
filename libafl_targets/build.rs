@@ -241,23 +241,23 @@ fn main() {
         }
     }
 
-    #[cfg(any(feature = "forkserver", feature = "windows_asan"))]
-    let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
-
     #[cfg(feature = "windows_asan")]
-    if target_family == "windows" {
-        println!("cargo:rerun-if-changed=src/windows_asan.c");
-
-        let mut windows_asan = cc::Build::new();
-
-        #[cfg(feature = "whole_archive")]
-        {
-            windows_asan.link_lib_modifier("+whole-archive");
+    {
+        let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+        if target_family == "windows" {
+            println!("cargo:rerun-if-changed=src/windows_asan.c");
+    
+            let mut windows_asan = cc::Build::new();
+    
+            #[cfg(feature = "whole_archive")]
+            {
+                windows_asan.link_lib_modifier("+whole-archive");
+            }
+    
+            windows_asan
+                .file(src_dir.join("windows_asan.c"))
+                .compile("windows_asan");
         }
-
-        windows_asan
-            .file(src_dir.join("windows_asan.c"))
-            .compile("windows_asan");
     }
 
     // NOTE: Sanitizer interfaces doesn't require common
