@@ -261,7 +261,16 @@ impl ForkserverParent for MaybePersistentForkserverParent {
             }
         }
 
-        if !self.child_stopped {
+        if self.child_stopped {
+            // Special handling for persistent mode: if the child is alive but
+            // currently stopped, simply restart it with SIGCONT.
+    
+            // unwrap here: child_stopped is true only if last_child_pid is some.
+            let child_pid = *self.last_child_pid.as_ref().unwrap();
+            nix::sys::signal::kill(Pid::from_raw(child_pid), Signal::SIGCONT)?;
+            self.child_stopped = false;
+            Ok(ForkResult::Parent(ChildHandle { pid: child_pid }))
+        } else {
             // Once woken up, create a clone of our process.
             let fork_result = (unsafe { libafl_bolts::os::fork() }).inspect_err(|_| {
                 log::error!("fork");
@@ -284,15 +293,6 @@ impl ForkserverParent for MaybePersistentForkserverParent {
                 },
             }
             Ok(fork_result)
-        } else {
-            // Special handling for persistent mode: if the child is alive but
-            // currently stopped, simply restart it with SIGCONT.
-    
-            // unwrap here: child_stopped is true only if last_child_pid is some.
-            let child_pid = *self.last_child_pid.as_ref().unwrap();
-            nix::sys::signal::kill(Pid::from_raw(child_pid), Signal::SIGCONT)?;
-            self.child_stopped = false;
-            Ok(ForkResult::Parent(ChildHandle { pid: child_pid }))
         }
     }
 
