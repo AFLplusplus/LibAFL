@@ -108,10 +108,11 @@ pub type off_t = isize;
 #[allow(non_camel_case_types)]
 pub type off_t = libc::off_t;
 
+use core::mem::transmute;
+
 #[cfg(not(feature = "test"))]
 use ::core::ffi::{c_char, c_void};
-
-use nostd_printf::{vsnprintf,__va_list_tag};
+use nostd_printf::vsnprintf;
 
 #[cfg(not(feature = "test"))]
 unsafe extern "C" {
@@ -134,4 +135,4 @@ unsafe extern "C" {
  * still need it even though it isn't referenced from rust.
  */
 #[used]
-static LINK_VSNPRINTF: unsafe extern "C" fn(*mut i8, u64, *const i8, *mut __va_list_tag) -> i32 = vsnprintf;
+static LINK_VSNPRINTF: unsafe extern "C" fn() = unsafe { transmute(vsnprintf as *const ()) };
