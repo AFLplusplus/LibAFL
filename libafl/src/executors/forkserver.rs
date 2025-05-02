@@ -17,12 +17,14 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
+#[cfg(feature = "regex")]
+use libafl_bolts::tuples::{Handle, Handled, MatchNameRef};
 use libafl_bolts::{
     AsSlice, AsSliceMut, InputLocation, TargetArgs, Truncate,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
-    tuples::{Handle, Handled, MatchNameRef, Prepend, RefIndexable},
+    tuples::{Prepend, RefIndexable},
 };
 use libc::RLIM_INFINITY;
 use nix::{
@@ -415,6 +417,8 @@ impl Forkserver {
             };
             command.env("ASAN_OPTIONS", asan_options);
         }
+        #[cfg(not(feature = "regex"))]
+        let _ = dump_asan_logs;
 
         let fsrv_handle = match command
             .env("LD_BIND_NOW", "1")

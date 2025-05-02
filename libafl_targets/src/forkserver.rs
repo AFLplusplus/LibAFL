@@ -70,7 +70,7 @@ fn write_error_to_forkserver(error: i32) -> Result<(), Error> {
 }
 
 fn read_from_forkserver(message: &mut [u8]) -> Result<(), Error> {
-    let bytes_read = nix::unistd::read(FORKSRV_W_FD.as_fd().as_raw_fd(), message)?;
+    let bytes_read = nix::unistd::read(FORKSRV_R_FD.as_fd().as_raw_fd(), message)?;
     if bytes_read != message.len() {
         return Err(Error::illegal_state(format!(
             "Could not read from st pipe. Expected {} bytes, got {bytes_read} bytes",
