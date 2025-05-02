@@ -9,6 +9,7 @@ mod tests {
         mmap::{Mmap, MmapProt, linux::LinuxMmap},
         patch::{Patch, raw::RawPatch},
     };
+    use libc::{_SC_PAGESIZE, sysconf};
     use log::info;
 
     #[unsafe(no_mangle)]
@@ -45,10 +46,12 @@ mod tests {
         let ptest2 = test2 as *const () as GuestAddr;
         info!("pfn: {:#x}", ptest1);
         let aligned_pfn = ptest1 & !0xfff;
+        let page_size = unsafe { sysconf(_SC_PAGESIZE) as usize };
         info!("aligned_pfn: {:#x}", aligned_pfn);
+        info!("page_size: {:#x}", page_size);
         LinuxMmap::protect(
             aligned_pfn,
-            0x4096,
+            page_size * 2,
             MmapProt::READ | MmapProt::WRITE | MmapProt::EXEC,
         )
         .unwrap();
@@ -56,6 +59,7 @@ mod tests {
         RawPatch::patch(ptest1, ptest2).unwrap();
         let ret = test1(1, 2, 3, 4, 5, 6);
         assert_eq!(ret, 0xd00df00d);
+        LinuxMmap::protect(aligned_pfn, page_size * 2, MmapProt::READ | MmapProt::EXEC).unwrap();
     }
 }
 
@@ -68,6 +72,7 @@ mod tests {
         mmap::{Mmap, MmapProt, linux::LinuxMmap},
         patch::{Patch, raw::RawPatch},
     };
+    use libc::{_SC_PAGESIZE, sysconf};
     use log::info;
 
     macro_rules! define_test_function {
@@ -123,10 +128,12 @@ mod tests {
                     let ptest2 = $test_fn2 as *const () as GuestAddr;
                     info!("pfn: {:#x}", ptest1);
                     let aligned_pfn = ptest1 & !0xfff;
+                    let page_size = unsafe { sysconf(_SC_PAGESIZE) as usize };
                     info!("aligned_pfn: {:#x}", aligned_pfn);
+                    info!("page_size: {:#x}", page_size);
                     LinuxMmap::protect(
                         aligned_pfn,
-                        0x4096,
+                        page_size * 2,
                         MmapProt::READ | MmapProt::WRITE | MmapProt::EXEC,
                     )
                     .unwrap();
@@ -134,6 +141,8 @@ mod tests {
                     RawPatch::patch(ptest1, ptest2).unwrap();
                     let ret = $test_fn1(1, 2, 3, 4, 5, 6);
                     assert_eq!(ret, $test_ret_val2);
+                    LinuxMmap::protect(aligned_pfn, page_size * 2, MmapProt::READ | MmapProt::EXEC)
+                        .unwrap();
                 }
             }
         };
