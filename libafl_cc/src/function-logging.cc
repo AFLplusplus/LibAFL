@@ -38,14 +38,9 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
 
-#if USE_NEW_PM
-  #include "llvm/Passes/PassPlugin.h"
-  #include "llvm/Passes/PassBuilder.h"
-  #include "llvm/IR/PassManager.h"
-#else
-  #include "llvm/IR/LegacyPassManager.h"
-  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#endif
+#include "llvm/Passes/PassPlugin.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/IR/PassManager.h"
 
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Module.h"
@@ -68,24 +63,12 @@ using namespace llvm;
 
 namespace {
 
-#if USE_NEW_PM
 class FunctionLogging : public PassInfoMixin<FunctionLogging> {
  public:
   FunctionLogging() {
-#else
-class FunctionLogging : public ModulePass {
- public:
-  static char ID;
-
-  FunctionLogging() : ModulePass(ID) {
-#endif
   }
 
-#if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-#else
-  bool runOnModule(Module &M) override;
-#endif
 
  protected:
   uint32_t map_size = MAP_SIZE;
@@ -107,7 +90,6 @@ class FunctionLogging : public ModulePass {
 
 }  // namespace
 
-#if USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "FunctionLoggingPass", "v0.1",
@@ -115,23 +97,15 @@ llvmGetPassPluginInfo() {
           [](PassBuilder &PB) {
             PB.registerOptimizerLastEPCallback(
                 [](ModulePassManager &MPM, OptimizationLevel OL
-  #if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 20
                    ,
                    ThinOrFullLTOPhase Phase
-  #endif
+#endif
                 ) { MPM.addPass(FunctionLogging()); });
           }};
 }
-#else
-char FunctionLogging::ID = 0;
-#endif
 
-#if USE_NEW_PM
 PreservedAnalyses FunctionLogging::run(Module &M, ModuleAnalysisManager &MAM) {
-#else
-bool FunctionLogging::runOnModule(Module &M) {
-
-#endif
   LLVMContext   &C = M.getContext();
   auto           moduleName = M.getName();
   Type          *VoidTy = Type::getVoidTy(C);
@@ -163,28 +137,6 @@ bool FunctionLogging::runOnModule(Module &M) {
     IRB.CreateCall(callHook, args);
   }
 
-#if USE_NEW_PM
   auto PA = PreservedAnalyses::all();
   return PA;
-#else
-  return true;
-#endif
 }
-
-#if USE_NEW_PM
-
-#else
-static void registerFunctionLoggingPass(const PassManagerBuilder &,
-                                        legacy::PassManagerBase &PM) {
-  PM.add(new FunctionLoggingPass());
-}
-
-static RegisterPass<FunctionLogging> X("function-logging",
-                                       "function logging pass", false, false);
-
-static RegisterStandardPasses RegisterFunctionLogging(
-    PassManagerBuilder::EP_OptimizerLast, registerFunctionLoggingPass);
-
-static RegisterStandardPasses RegisterFunctionLogging0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerFunctionLoggingPass);
-#endif

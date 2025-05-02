@@ -28,25 +28,6 @@
 
 #include "common-llvm.h"
 
-#include "llvm/ADT/Statistic.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Pass.h"
-#include "llvm/Analysis/ValueTracking.h"
-
-#if LLVM_VERSION_MAJOR > 3 || \
-    (LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR > 4)
-  #include "llvm/IR/Verifier.h"
-  #include "llvm/IR/DebugInfo.h"
-#else
-  #include "llvm/Analysis/Verifier.h"
-  #include "llvm/DebugInfo.h"
-  #define nullptr 0
-#endif
-
 #include <set>
 
 using namespace llvm;
@@ -55,32 +36,12 @@ static cl::opt<bool> CmplogExtended("cmplog_routines_extended",
                                     cl::init(false), cl::NotHidden);
 namespace {
 
-#if USE_NEW_PM
 class CmpLogRoutines : public PassInfoMixin<CmpLogRoutines> {
  public:
   CmpLogRoutines() {
-#else
-
-class CmpLogRoutines : public ModulePass {
- public:
-  static char ID;
-  CmpLogRoutines() : ModulePass(ID) {
-#endif
   }
 
-#if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-#else
-  bool runOnModule(Module &M) override;
-
-  #if LLVM_VERSION_MAJOR < 4
-  const char *getPassName() const override {
-  #else
-  StringRef getPassName() const override {
-  #endif
-    return "cmplog routines";
-  }
-#endif
 
  private:
   bool hookRtns(Module &M);
@@ -88,24 +49,20 @@ class CmpLogRoutines : public ModulePass {
 
 }  // namespace
 
-#if USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "CmpLogRoutines", "v0.1",
           [](PassBuilder &PB) {
             PB.registerOptimizerLastEPCallback(
                 [](ModulePassManager &MPM, OptimizationLevel OL
-  #if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 20
                    ,
                    ThinOrFullLTOPhase Phase
-  #endif
+#endif
 
                 ) { MPM.addPass(CmpLogRoutines()); });
           }};
 }
-#else
-char CmpLogRoutines::ID = 0;
-#endif
 #include <iostream>
 
 bool CmpLogRoutines::hookRtns(Module &M) {
@@ -514,41 +471,11 @@ bool CmpLogRoutines::hookRtns(Module &M) {
   return true;
 }
 
-#if USE_NEW_PM
 PreservedAnalyses CmpLogRoutines::run(Module &M, ModuleAnalysisManager &MAM) {
-#else
-bool CmpLogRoutines::runOnModule(Module &M) {
-#endif
   hookRtns(M);
 
-#if USE_NEW_PM
   auto PA = PreservedAnalyses::all();
-#endif
   verifyModule(M);
 
-#if USE_NEW_PM
   return PA;
-#else
-  return true;
-#endif
 }
-
-#if USE_NEW_PM
-#else
-static void registerCmpLogRoutinesPass(const PassManagerBuilder &,
-                                       legacy::PassManagerBase &PM) {
-  auto p = new CmpLogRoutines();
-  PM.add(p);
-}
-
-static RegisterStandardPasses RegisterCmpLogRoutinesPass(
-    PassManagerBuilder::EP_OptimizerLast, registerCmpLogRoutinesPass);
-
-static RegisterStandardPasses RegisterCmpLogRoutinesPass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerCmpLogRoutinesPass);
-
-static RegisterStandardPasses RegisterCmpLogRoutinesPassLTO(
-    PassManagerBuilder::EP_FullLinkTimeOptimizationLast,
-    registerCmpLogRoutinesPass);
-
-#endif
