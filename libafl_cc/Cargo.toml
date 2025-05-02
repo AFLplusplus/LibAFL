@@ -22,7 +22,6 @@ categories = [
 
 [features]
 default = [
-  "ddg-instr",
   "function-logging",
   "cmplog-routines",
   "autotokens",
@@ -30,11 +29,9 @@ default = [
   "cmplog-instructions",
   "ctx",
   "dump-cfg",
-  "profiling",
 ]
 
 # llvm passes
-ddg-instr = []
 function-logging = []
 cmplog-routines = []
 autotokens = []
@@ -42,7 +39,6 @@ coverage-accounting = []
 cmplog-instructions = []
 ctx = []
 dump-cfg = []
-profiling = []
 
 [build-dependencies]
 cc = { workspace = true, features = ["parallel"] }
