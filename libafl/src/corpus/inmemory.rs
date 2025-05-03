@@ -286,6 +286,45 @@ impl<I> TestcaseStorage<I> {
     }
 
     /// Insert a testcase assigning a `CorpusId` to it
+    fn insert_inner_with_id(
+        &mut self,
+        testcase: RefCell<Testcase<I>>,
+        is_disabled: bool,
+        id: CorpusId,
+    ) -> Result<(), Error> {
+        if self.progressive_id < id.into() {
+            return Err(Error::illegal_state(
+                "trying to insert a testcase with an id bigger than the internal Id counter",
+            ));
+        }
+        let corpus = if is_disabled {
+            &mut self.disabled
+        } else {
+            &mut self.enabled
+        };
+        let prev = if let Some(last_id) = corpus.last_id {
+            corpus.map.get_mut(&last_id).unwrap().next = Some(id);
+            Some(last_id)
+        } else {
+            None
+        };
+        if corpus.first_id.is_none() {
+            corpus.first_id = Some(id);
+        }
+        corpus.last_id = Some(id);
+        corpus.insert_key(id);
+        corpus.map.insert(
+            id,
+            TestcaseStorageItem {
+                testcase,
+                prev,
+                next: None,
+            },
+        );
+        Ok(())
+    }
+
+    /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(feature = "corpus_btreemap")]
     fn insert_inner(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
         let id = CorpusId::from(self.progressive_id);
@@ -458,9 +497,7 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
     #[inline]
     fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
         if let Some(testcase) = self.storage.enabled.remove(id) {
-            let tc = testcase.take();
-            self.storage.insert_disabled(RefCell::new(tc));
-            Ok(())
+            self.storage.insert_inner_with_id(testcase, true, id)
         } else {
             Err(Error::key_not_found(format!(
                 "Index {id} not found in enabled testcases"
@@ -471,9 +508,7 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
     #[inline]
     fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
         if let Some(testcase) = self.storage.disabled.remove(id) {
-            let tc = testcase.take();
-            self.storage.insert(RefCell::new(tc));
-            Ok(())
+            self.storage.insert_inner_with_id(testcase, false, id)
         } else {
             Err(Error::key_not_found(format!(
                 "Index {id} not found in disabled testcases"
@@ -501,5 +536,155 @@ impl<I> InMemoryCorpus<I> {
             storage: TestcaseStorage::new(),
             current: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        Error,
+        corpus::Testcase,
+        inputs::{HasMutatorBytes, bytes::BytesInput},
+    };
+
+    /// Helper function to create a corpus with predefined test cases
+    fn setup_corpus() -> (InMemoryCorpus<BytesInput>, Vec<CorpusId>) {
+        let mut corpus = InMemoryCorpus::<BytesInput>::new();
+        let mut ids = Vec::new();
+
+        // Add initial test cases with distinct byte patterns ([1,2,3],[4,5,6],[7,8,9])
+        for i in 0..3 {
+            let input = BytesInput::new(vec![i as u8 + 1, i as u8 + 2, i as u8 + 3]);
+            let tc_id = corpus.add(Testcase::new(input)).unwrap();
+            ids.push(tc_id);
+        }
+
+        (corpus, ids)
+    }
+
+    /// Helper function to verify corpus counts
+    fn assert_corpus_counts(corpus: &InMemoryCorpus<BytesInput>, enabled: usize, disabled: usize) {
+        let total = enabled + disabled; // if a testcase is not in the enabled map, then it's in the disabled one.
+        assert_eq!(corpus.count(), enabled, "Wrong number of enabled testcases");
+        assert_eq!(
+            corpus.count_disabled(),
+            disabled,
+            "Wrong number of disabled testcases"
+        );
+        assert_eq!(corpus.count_all(), total, "Wrong total number of testcases");
+    }
+
+    #[test]
+    fn test_corpus_basic_operations() -> Result<(), Error> {
+        let (corpus, ids) = setup_corpus();
+        assert_corpus_counts(&corpus, 3, 0);
+
+        for id in &ids {
+            assert!(corpus.get(*id).is_ok(), "Failed to get testcase {id:?}");
+            assert!(
+                corpus.get_from_all(*id).is_ok(),
+                "Failed to get testcase from all {id:?}"
+            );
+        }
+
+        // Non-existent ID should fail
+        let invalid_id = CorpusId(999);
+        assert!(corpus.get(invalid_id).is_err());
+        assert!(corpus.get_from_all(invalid_id).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_corpus_disable_enable() -> Result<(), Error> {
+        let (mut corpus, ids) = setup_corpus();
+        let invalid_id = CorpusId(999);
+
+        corpus.disable(ids[1])?;
+        assert_corpus_counts(&corpus, 2, 1);
+
+        // Verify disabled testcase is not in enabled list but is in all list
+        assert!(
+            corpus.get(ids[1]).is_err(),
+            "Disabled testcase should not be accessible via get()"
+        );
+        assert!(
+            corpus.get_from_all(ids[1]).is_ok(),
+            "Disabled testcase should be accessible via get_from_all()"
+        );
+
+        // Other testcases are still accessible
+        assert!(corpus.get(ids[0]).is_ok());
+        assert!(corpus.get(ids[2]).is_ok());
+
+        corpus.enable(ids[1])?;
+        assert_corpus_counts(&corpus, 3, 0);
+
+        // Verify all testcases are accessible from the enabled map again
+        for id in &ids {
+            assert!(corpus.get(*id).is_ok());
+        }
+
+        // Corner cases
+        assert!(
+            corpus.disable(ids[1]).is_ok(),
+            "Should be able to disable testcase"
+        );
+        assert!(
+            corpus.disable(ids[1]).is_err(),
+            "Should not be able to disable already disabled testcase"
+        );
+        assert!(
+            corpus.enable(ids[0]).is_err(),
+            "Should not be able to enable already enabled testcase"
+        );
+        assert!(
+            corpus.disable(invalid_id).is_err(),
+            "Should not be able to disable non-existent testcase"
+        );
+        assert!(
+            corpus.enable(invalid_id).is_err(),
+            "Should not be able to enable non-existent testcase"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_corpus_operations_after_disabled() -> Result<(), Error> {
+        let (mut corpus, ids) = setup_corpus();
+
+        corpus.disable(ids[0])?;
+        assert_corpus_counts(&corpus, 2, 1);
+
+        let removed = corpus.remove(ids[0])?;
+        let removed_data = removed.input().as_ref().unwrap().mutator_bytes();
+        assert_eq!(
+            removed_data,
+            &vec![1, 2, 3],
+            "Removed testcase has incorrect data"
+        );
+        assert_corpus_counts(&corpus, 2, 0);
+
+        let removed = corpus.remove(ids[1])?;
+        let removed_data = removed.input().as_ref().unwrap().mutator_bytes();
+        assert_eq!(
+            removed_data,
+            &vec![2, 3, 4],
+            "Removed testcase has incorrect data"
+        );
+        assert_corpus_counts(&corpus, 1, 0);
+
+        // Not possible to get removed testcases
+        assert!(corpus.get(ids[0]).is_err());
+        assert!(corpus.get_from_all(ids[0]).is_err());
+        assert!(corpus.get(ids[1]).is_err());
+        assert!(corpus.get_from_all(ids[1]).is_err());
+
+        // Only the third testcase should remain
+        assert!(corpus.get(ids[2]).is_ok());
+
+        Ok(())
     }
 }
