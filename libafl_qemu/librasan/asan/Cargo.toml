@@ -59,6 +59,11 @@ log = { version = "0.4.22", default-features = false, features = [
   "release_max_level_info",
 ] }
 libc = { version = "0.2.169", default-features = false, optional = true }
+nostd-musl = { version = "0.1.5", default-features = false, features = [
+  "optimized-assembly",
+] }
+nostd-printf = { version = "0.1.4", default-features = false }
+
 readonly = { version = "0.2.12", default-features = false }
 rustix = { version = "1.0.0", default-features = false, features = [
   "fs",
