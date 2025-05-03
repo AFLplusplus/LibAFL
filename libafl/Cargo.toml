@@ -187,15 +187,9 @@ llmp_small_maps = [
 ] # reduces initial map size for llmp
 
 ## Grammar mutator. Requires nightly.
-nautilus = [
-  "std",
-  "serde_json/std",
-  "rand_trait",
-  "regex-syntax",
-  "regex",
-]
+nautilus = ["std", "serde_json/std", "rand_trait", "regex-syntax", "regex"]
 
-nautilus_py = [ "nautilus", "dep:pyo3" ]
+nautilus_py = ["nautilus", "dep:pyo3"]
 
 ## Use the best SIMD implementation by our benchmark
 simd = ["libafl_bolts/simd"]

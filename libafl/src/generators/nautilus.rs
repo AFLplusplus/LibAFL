@@ -9,12 +9,12 @@ use std::{fs, io::BufReader, path::Path};
 use libafl_bolts::rands::Rand;
 
 pub use crate::common::nautilus::grammartec::newtypes::NTermId;
+#[cfg(feature = "nautilus_py")]
+use crate::nautilus::grammartec::python_grammar_loader;
 use crate::{
     Error, common::nautilus::grammartec::context::Context, generators::Generator,
     inputs::nautilus::NautilusInput, state::HasRand,
 };
-#[cfg(feature = "nautilus_py")]
-use crate::nautilus::grammartec::python_grammar_loader;
 
 /// The nautilus context for a generator
 pub struct NautilusContext {
