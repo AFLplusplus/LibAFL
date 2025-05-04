@@ -12,6 +12,8 @@ Even though we will gladly assist you in finishing up your PR, try to:
 - run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
 - Please add and describe your changes to MIGRATION.md if you change the APIs.
 
+You can also run ./scripts/precommit.sh to execute checks that will be performed on a PR.
+
 Some of the parts in this list may be hard, don't be afraid to open a PR if you cannot fix them by yourself, so we can help.
 
 ### Pre-commit Hooks
