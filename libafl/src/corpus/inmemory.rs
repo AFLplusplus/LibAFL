@@ -285,7 +285,7 @@ impl<I> TestcaseStorage<I> {
         id
     }
 
-    /// Insert a testcase assigning a `CorpusId` to it
+    #[cfg(not(feature = "corpus_btreemap"))]
     fn insert_inner_with_id(
         &mut self,
         testcase: RefCell<Testcase<I>>,
@@ -321,6 +321,28 @@ impl<I> TestcaseStorage<I> {
                 next: None,
             },
         );
+        Ok(())
+    }
+
+    #[cfg(feature = "corpus_btreemap")]
+    fn insert_inner_with_id(
+        &mut self,
+        testcase: RefCell<Testcase<I>>,
+        is_disabled: bool,
+        id: CorpusId,
+    ) -> Result<(), Error> {
+        if self.progressive_id < id.into() {
+            return Err(Error::illegal_state(
+                "trying to insert a testcase with an id bigger than the internal Id counter",
+            ));
+        }
+        let corpus = if is_disabled {
+            &mut self.disabled
+        } else {
+            &mut self.enabled
+        };
+        corpus.insert_key(id);
+        corpus.map.insert(id, testcase);
         Ok(())
     }
 
@@ -540,6 +562,7 @@ impl<I> InMemoryCorpus<I> {
 }
 
 #[cfg(test)]
+#[cfg(not(feature = "corpus_btreemap"))]
 mod tests {
     use super::*;
     use crate::{
@@ -549,13 +572,14 @@ mod tests {
     };
 
     /// Helper function to create a corpus with predefined test cases
+    #[cfg(not(feature = "corpus_btreemap"))]
     fn setup_corpus() -> (InMemoryCorpus<BytesInput>, Vec<CorpusId>) {
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
         let mut ids = Vec::new();
 
-        // Add initial test cases with distinct byte patterns ([1,2,3],[4,5,6],[7,8,9])
-        for i in 0..3 {
-            let input = BytesInput::new(vec![i as u8 + 1, i as u8 + 2, i as u8 + 3]);
+        // Add initial test cases with distinct byte patterns ([1,2,3],[2,3,4],[3,4,5])
+        for i in 0..3u8 {
+            let input = BytesInput::new(vec![i + 1, i + 2, i + 3]);
             let tc_id = corpus.add(Testcase::new(input)).unwrap();
             ids.push(tc_id);
         }
@@ -564,6 +588,7 @@ mod tests {
     }
 
     /// Helper function to verify corpus counts
+    #[cfg(not(feature = "corpus_btreemap"))]
     fn assert_corpus_counts(corpus: &InMemoryCorpus<BytesInput>, enabled: usize, disabled: usize) {
         let total = enabled + disabled; // if a testcase is not in the enabled map, then it's in the disabled one.
         assert_eq!(corpus.count(), enabled, "Wrong number of enabled testcases");
@@ -576,7 +601,8 @@ mod tests {
     }
 
     #[test]
-    fn test_corpus_basic_operations() -> Result<(), Error> {
+    #[cfg(not(feature = "corpus_btreemap"))]
+    fn test_corpus_basic_operations() {
         let (corpus, ids) = setup_corpus();
         assert_corpus_counts(&corpus, 3, 0);
 
@@ -592,11 +618,10 @@ mod tests {
         let invalid_id = CorpusId(999);
         assert!(corpus.get(invalid_id).is_err());
         assert!(corpus.get_from_all(invalid_id).is_err());
-
-        Ok(())
     }
 
     #[test]
+    #[cfg(not(feature = "corpus_btreemap"))]
     fn test_corpus_disable_enable() -> Result<(), Error> {
         let (mut corpus, ids) = setup_corpus();
         let invalid_id = CorpusId(999);
@@ -652,6 +677,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "corpus_btreemap"))]
     fn test_corpus_operations_after_disabled() -> Result<(), Error> {
         let (mut corpus, ids) = setup_corpus();
 
