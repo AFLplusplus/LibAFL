@@ -359,7 +359,7 @@ impl Tree {
         max_len: usize,
         ctx: &Context,
     ) {
-        let plain_or_script_rule = || {
+        let mut plain_or_script_rule = || {
             self.truncate();
             self.rules.push(RuleIdOrCustom::Rule(ruleid));
             self.sizes.push(0);
