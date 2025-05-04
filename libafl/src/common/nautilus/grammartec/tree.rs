@@ -359,24 +359,18 @@ impl Tree {
         max_len: usize,
         ctx: &Context,
     ) {
+        let plain_or_script_rule = || {
+            self.truncate();
+            self.rules.push(RuleIdOrCustom::Rule(ruleid));
+            self.sizes.push(0);
+            self.paren.push(NodeId::from(0));
+            ctx.get_rule(ruleid).generate(rand, self, ctx, max_len);
+            self.sizes[0] = self.rules.len();
+        };
         match ctx.get_rule(ruleid) {
-            Rule::Plain(..) => {
-                self.truncate();
-                self.rules.push(RuleIdOrCustom::Rule(ruleid));
-                self.sizes.push(0);
-                self.paren.push(NodeId::from(0));
-                ctx.get_rule(ruleid).generate(rand, self, ctx, max_len);
-                self.sizes[0] = self.rules.len();
-            }
+            Rule::Plain(..) => plain_or_script_rule(),
             #[cfg(feature = "nautilus_py")]
-            Rule::Script(..) => {
-                self.truncate();
-                self.rules.push(RuleIdOrCustom::Rule(ruleid));
-                self.sizes.push(0);
-                self.paren.push(NodeId::from(0));
-                ctx.get_rule(ruleid).generate(rand, self, ctx, max_len);
-                self.sizes[0] = self.rules.len();
-            }
+            Rule::Script(..) => plain_or_script_rule(),
             Rule::RegExp(RegExpRule { hir, .. }) => {
                 let rid = RuleIdOrCustom::Custom(ruleid, regex_mutator::generate(rand, hir));
                 self.truncate();
