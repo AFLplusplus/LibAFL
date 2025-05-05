@@ -4,6 +4,7 @@ use std::io::{Cursor, Write, stdout};
 
 use hashbrown::HashSet;
 use libafl_bolts::rands::Rand;
+#[cfg(feature = "nautilus_py")]
 use pyo3::{
     PyTypeInfo,
     prelude::{PyObject, PyResult, Python},
@@ -11,18 +12,22 @@ use pyo3::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "nautilus_py")]
+use super::rule::ScriptRule;
 use super::{
     super::regex_mutator,
     context::Context,
     newtypes::{NTermId, NodeId, RuleId},
     recursion_info::RecursionInfo,
-    rule::{PlainRule, RegExpRule, Rule, RuleChild, RuleIdOrCustom, ScriptRule},
+    rule::{PlainRule, RegExpRule, Rule, RuleChild, RuleIdOrCustom},
 };
 
 enum UnparseStep<'dat> {
     Term(&'dat [u8]),
     Nonterm(NTermId),
+    #[cfg(feature = "nautilus_py")]
     Script(usize, PyObject),
+    #[cfg(feature = "nautilus_py")]
     PushBuffer(),
 }
 
@@ -55,7 +60,9 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
         match self.stack.pop() {
             Some(UnparseStep::Term(data)) => self.write(data),
             Some(UnparseStep::Nonterm(nt)) => self.nonterm(nt),
+            #[cfg(feature = "nautilus_py")]
             Some(UnparseStep::Script(num, expr)) => self.unwrap_script(num, &expr),
+            #[cfg(feature = "nautilus_py")]
             Some(UnparseStep::PushBuffer()) => self.push_buffer(),
             None => return false,
         }
@@ -73,6 +80,8 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
     fn nonterm(&mut self, nt: NTermId) {
         self.next_rule(nt);
     }
+
+    #[cfg(feature = "nautilus_py")]
     fn unwrap_script(&mut self, num: usize, expr: &PyObject) {
         Python::with_gil(|py| {
             self.script(py, num, expr)
@@ -80,6 +89,8 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
                 .unwrap();
         });
     }
+
+    #[cfg(feature = "nautilus_py")]
     fn script(&mut self, py: Python, num: usize, expr: &PyObject) -> PyResult<()> {
         let bufs = self.buffers.split_off(self.buffers.len() - num);
         let bufs = bufs.into_iter().map(Cursor::into_inner).collect::<Vec<_>>();
@@ -100,6 +111,7 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
         Ok(())
     }
 
+    #[cfg(feature = "nautilus_py")]
     fn push_buffer(&mut self) {
         self.buffers.push(Cursor::new(vec![]));
     }
@@ -111,6 +123,7 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
         self.i += 1;
         match rule {
             Rule::Plain(r) => self.next_plain(r),
+            #[cfg(feature = "nautilus_py")]
             Rule::Script(r) => self.next_script(r),
             Rule::RegExp(_) => self.next_regexp(self.tree.get_custom_rule_data(nid)),
         }
@@ -126,6 +139,7 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
         }
     }
 
+    #[cfg(feature = "nautilus_py")]
     fn next_script(&mut self, r: &ScriptRule) {
         Python::with_gil(|py| {
             self.stack.push(UnparseStep::Script(
@@ -345,15 +359,18 @@ impl Tree {
         max_len: usize,
         ctx: &Context,
     ) {
+        let mut plain_or_script_rule = || {
+            self.truncate();
+            self.rules.push(RuleIdOrCustom::Rule(ruleid));
+            self.sizes.push(0);
+            self.paren.push(NodeId::from(0));
+            ctx.get_rule(ruleid).generate(rand, self, ctx, max_len);
+            self.sizes[0] = self.rules.len();
+        };
         match ctx.get_rule(ruleid) {
-            Rule::Plain(..) | Rule::Script(..) => {
-                self.truncate();
-                self.rules.push(RuleIdOrCustom::Rule(ruleid));
-                self.sizes.push(0);
-                self.paren.push(NodeId::from(0));
-                ctx.get_rule(ruleid).generate(rand, self, ctx, max_len);
-                self.sizes[0] = self.rules.len();
-            }
+            Rule::Plain(..) => plain_or_script_rule(),
+            #[cfg(feature = "nautilus_py")]
+            Rule::Script(..) => plain_or_script_rule(),
             Rule::RegExp(RegExpRule { hir, .. }) => {
                 let rid = RuleIdOrCustom::Custom(ruleid, regex_mutator::generate(rand, hir));
                 self.truncate();
