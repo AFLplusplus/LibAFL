@@ -17,7 +17,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error,
-    corpus::{CachedOnDiskCorpus, Corpus, CorpusId, HasTestcase, Testcase},
+    corpus::{
+        CachedOnDiskCorpus, Corpus, CorpusId, HasCorpusEnablementOperations, HasTestcase, Testcase,
+    },
     inputs::Input,
 };
 
@@ -173,16 +175,6 @@ where
     fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         self.inner.store_input_from(testcase)
     }
-
-    #[inline]
-    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
-        self.inner.disable(id)
-    }
-
-    #[inline]
-    fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
-        self.inner.enable(id)
-    }
 }
 
 impl<I> HasTestcase<I> for OnDiskCorpus<I>
@@ -195,6 +187,21 @@ where
 
     fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
+    }
+}
+
+impl<I> HasCorpusEnablementOperations for OnDiskCorpus<I>
+where
+    I: Input,
+{
+    #[inline]
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.inner.disable(id)
+    }
+
+    #[inline]
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.inner.enable(id)
     }
 }
 

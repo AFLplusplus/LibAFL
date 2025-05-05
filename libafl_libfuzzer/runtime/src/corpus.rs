@@ -251,13 +251,6 @@ where
             res => res,
         }
     }
-
-    fn disable(&mut self, _: CorpusId) -> Result<(), Error> {
-        unimplemented!("disable is not implemented and not used in this corpus variant!");
-    }
-    fn enable(&mut self, _: CorpusId) -> Result<(), Error> {
-        unimplemented!("enable is not implemented and not used in this corpus variant!");
-    }
 }
 
 /// A corpus which attempts to mimic the behaviour of libFuzzer's crash output.
@@ -393,13 +386,6 @@ where
     }
 
     fn store_input_from(&self, _testcase: &Testcase<I>) -> Result<(), Error> {
-        unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
-    }
-
-    fn disable(&mut self, _: CorpusId) -> Result<(), Error> {
-        unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
-    }
-    fn enable(&mut self, _: CorpusId) -> Result<(), Error> {
         unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
     }
 }

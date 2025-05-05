@@ -157,12 +157,6 @@ pub trait Corpus<I>: Sized {
     /// Get the last inserted corpus id
     fn last(&self) -> Option<CorpusId>;
 
-    /// Disables a testcase, moving it to the disabled map
-    fn disable(&mut self, id: CorpusId) -> Result<(), Error>;
-
-    /// Enables a testcase, moving it to the enabled map
-    fn enable(&mut self, id: CorpusId) -> Result<(), Error>;
-
     /// An iterator over very active corpus id
     fn ids(&self) -> CorpusIdIterator<'_, Self, I> {
         CorpusIdIterator {
@@ -199,6 +193,15 @@ pub trait Corpus<I>: Sized {
         let mut testcase = self.get(id)?.borrow_mut();
         Ok(testcase.load_input(self)?.clone())
     }
+}
+
+/// Marker trait for corpus implementations that actually support enable/disable functionality
+pub trait HasCorpusEnablementOperations {
+    /// Disables a testcase, moving it to the disabled map
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error>;
+
+    /// Enables a testcase, moving it to the enabled map
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error>;
 }
 
 /// Trait for types which track the current corpus index

@@ -20,7 +20,7 @@ use libafl_bolts::compress::GzipCompressor;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    HasTestcase,
+    HasCorpusEnablementOperations, HasTestcase,
     ondisk::{OnDiskMetadata, OnDiskMetadataFormat},
 };
 use crate::{
@@ -212,7 +212,12 @@ where
         };
         input.to_file(file_path)
     }
+}
 
+impl<I> HasCorpusEnablementOperations for InMemoryOnDiskCorpus<I>
+where
+    I: Input,
+{
     #[inline]
     fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
         self.inner.disable(id)?;

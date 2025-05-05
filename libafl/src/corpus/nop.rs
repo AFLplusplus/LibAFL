@@ -128,16 +128,6 @@ impl<I> Corpus<I> for NopCorpus<I> {
     fn store_input_from(&self, _testcase: &Testcase<I>) -> Result<(), Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
-
-    #[inline]
-    fn disable(&mut self, _id: CorpusId) -> Result<(), Error> {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
-    }
-
-    #[inline]
-    fn enable(&mut self, _id: CorpusId) -> Result<(), Error> {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
-    }
 }
 
 impl<I> NopCorpus<I> {
