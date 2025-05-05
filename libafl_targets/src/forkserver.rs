@@ -299,7 +299,7 @@ impl ForkserverParent for MaybePersistentForkserverParent {
     fn handle_child_requests(&mut self) -> Result<i32, Error> {
         let mut status = 0i32;
         // unwrap here: the field is assigned if we are parent process in `spawn_child`
-        if unsafe { libc::waitpid(self.last_child_pid.take().unwrap(), &raw mut status, 0) < 0 } {
+        if unsafe { libc::waitpid(*self.last_child_pid.as_ref().unwrap(), &raw mut status, 0) < 0 } {
             return Err(Error::illegal_state("waitpid"));
         }
         if libc::WIFSTOPPED(status) {
