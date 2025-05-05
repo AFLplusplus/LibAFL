@@ -17,9 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error,
-    corpus::{
-        CachedOnDiskCorpus, Corpus, CorpusId, EnableDisableCorpus, HasTestcase, Testcase,
-    },
+    corpus::{CachedOnDiskCorpus, Corpus, CorpusId, EnableDisableCorpus, HasTestcase, Testcase},
     inputs::Input,
 };
 
