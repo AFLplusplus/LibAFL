@@ -1,5 +1,6 @@
 //! The null corpus does not store any [`Testcase`]s.
 use core::{cell::RefCell, marker::PhantomData};
+use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 
@@ -53,19 +54,19 @@ impl<I> Corpus<I> for NopCorpus<I> {
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
-    fn remove(&mut self, _id: CorpusId) -> Result<Testcase<I>, Error> {
+    fn remove(&mut self, _id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     /// Get by id; considers only enabled testcases
     #[inline]
-    fn get(&self, _id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, _id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
-    fn get_from_all(&self, _id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get_from_all(&self, _id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
@@ -84,12 +85,6 @@ impl<I> Corpus<I> for NopCorpus<I> {
     #[inline]
     fn next(&self, _id: CorpusId) -> Option<CorpusId> {
         None
-    }
-
-    /// Peek the next free corpus id
-    #[inline]
-    fn peek_free_id(&self) -> CorpusId {
-        CorpusId::from(0_usize)
     }
 
     #[inline]
@@ -117,16 +112,6 @@ impl<I> Corpus<I> for NopCorpus<I> {
     #[inline]
     fn nth_from_all(&self, _nth: usize) -> CorpusId {
         CorpusId::from(0_usize)
-    }
-
-    #[inline]
-    fn load_input_into(&self, _testcase: &mut Testcase<I>) -> Result<(), Error> {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
-    }
-
-    #[inline]
-    fn store_input_from(&self, _testcase: &Testcase<I>) -> Result<(), Error> {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 }
 
