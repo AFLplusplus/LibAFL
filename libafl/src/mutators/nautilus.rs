@@ -19,7 +19,7 @@ use crate::{
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
-    state::{HasCorpus, HasRand},
+    state::HasRand,
 };
 
 /// The randomic mutator for `Nautilus` grammar.
@@ -178,7 +178,7 @@ impl Debug for NautilusSpliceMutator<'_> {
 
 impl<S> Mutator<NautilusInput, S> for NautilusSpliceMutator<'_>
 where
-    S: HasCorpus<NautilusInput> + HasMetadata + HasRand,
+    S: HasMetadata + HasRand,
 {
     fn mutate(
         &mut self,
