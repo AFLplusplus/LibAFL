@@ -196,7 +196,7 @@ pub trait Corpus<I>: Sized {
 }
 
 /// Marker trait for corpus implementations that actually support enable/disable functionality
-pub trait HasCorpusEnablementOperations {
+pub trait EnableDisableCorpus {
     /// Disables a testcase, moving it to the disabled map
     fn disable(&mut self, id: CorpusId) -> Result<(), Error>;
 

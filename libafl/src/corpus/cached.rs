@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Error,
     corpus::{
-        Corpus, CorpusId, HasCorpusEnablementOperations, HasTestcase, Testcase,
+        Corpus, CorpusId, EnableDisableCorpus, HasTestcase, Testcase,
         inmemory_ondisk::InMemoryOnDiskCorpus, ondisk::OnDiskMetadataFormat,
     },
     inputs::Input,
@@ -191,7 +191,7 @@ where
     }
 }
 
-impl<I> HasCorpusEnablementOperations for CachedOnDiskCorpus<I>
+impl<I> EnableDisableCorpus for CachedOnDiskCorpus<I>
 where
     I: Input,
 {

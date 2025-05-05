@@ -5,7 +5,7 @@ use core::cell::{Ref, RefCell, RefMut};
 
 use serde::{Deserialize, Serialize};
 
-use super::{HasCorpusEnablementOperations, HasTestcase};
+use super::{EnableDisableCorpus, HasTestcase};
 use crate::{
     Error,
     corpus::{Corpus, CorpusId, Testcase},
@@ -517,7 +517,7 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
     }
 }
 
-impl<I> HasCorpusEnablementOperations for InMemoryCorpus<I> {
+impl<I> EnableDisableCorpus for InMemoryCorpus<I> {
     #[inline]
     fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
         if let Some(testcase) = self.storage.enabled.remove(id) {

@@ -20,7 +20,7 @@ use libafl_bolts::compress::GzipCompressor;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    HasCorpusEnablementOperations, HasTestcase,
+    EnableDisableCorpus, HasTestcase,
     ondisk::{OnDiskMetadata, OnDiskMetadataFormat},
 };
 use crate::{
@@ -214,7 +214,7 @@ where
     }
 }
 
-impl<I> HasCorpusEnablementOperations for InMemoryOnDiskCorpus<I>
+impl<I> EnableDisableCorpus for InMemoryOnDiskCorpus<I>
 where
     I: Input,
 {
