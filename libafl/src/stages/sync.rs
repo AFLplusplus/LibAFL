@@ -8,16 +8,16 @@ use core::{marker::PhantomData, time::Duration};
 use std::path::{Path, PathBuf};
 
 use libafl_bolts::{
-    Named, current_time,
+    current_time,
     fs::find_new_files_rec,
     shmem::{ShMem, ShMemProvider},
+    Named,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
-    events::{Event, EventConfig, EventFirer, EventWithStats, llmp::LlmpEventConverter},
+    events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer, EventWithStats},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor, HasObjective},
     inputs::{Input, InputConverter},
@@ -26,6 +26,7 @@ use crate::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,
     },
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// Default name for `SyncFromDiskStage`; derived from AFL++
@@ -75,7 +76,7 @@ impl<CB, E, EM, I, S, Z> Named for SyncFromDiskStage<CB, E, EM, I, S, Z> {
 
 impl<CB, E, EM, I, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
+    CB: FnMut(&mut Z, &mut S, &Path) -> Result<Option<I>, Error>,
     Z: Evaluator<E, EM, I, S>,
     S: HasCorpus<I>
         + HasRand
@@ -134,6 +135,9 @@ where
                 .unwrap()
                 .left_to_sync
                 .retain(|p| p != &path);
+            let Some(input) = input else {
+                continue;
+            };
             log::debug!("Syncing and evaluating {path:?}");
             fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
@@ -174,7 +178,7 @@ impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z> {
 }
 
 /// Function type when the callback in `SyncFromDiskStage` is not a lambda
-pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
+pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<Option<I>, Error>;
 
 impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, S, Z>
 where
@@ -185,12 +189,15 @@ where
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
     pub fn with_from_file(sync_dirs: Vec<PathBuf>, interval: Duration) -> Self {
-        fn load_callback<I, S, Z>(_: &mut Z, _: &mut S, p: &Path) -> Result<I, Error>
+        fn load_callback<I, S, Z>(_: &mut Z, _: &mut S, p: &Path) -> Result<Option<I>, Error>
         where
             I: Input,
             S: HasCorpus<I>,
         {
-            Input::from_file(p)
+            match Input::from_file(p) {
+                Err(err) => Err(err),
+                Ok(input) => Ok(Some(input)),
+            }
         }
         Self {
             interval,
