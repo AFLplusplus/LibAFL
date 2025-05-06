@@ -40,6 +40,7 @@ default = [
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
   "simd",
+  "errors_backtrace",
 ]
 document-features = ["dep:document-features"]
 
