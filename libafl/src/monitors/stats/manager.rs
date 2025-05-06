@@ -6,7 +6,7 @@ use alloc::{borrow::Cow, string::String};
 use core::time::Duration;
 
 use hashbrown::HashMap;
-use libafl_bolts::{ClientId, Error, current_time, format_duration_hms};
+use libafl_bolts::{ClientId, Error, current_time, format_duration};
 #[cfg(feature = "std")]
 use serde_json::Value;
 
@@ -171,7 +171,7 @@ impl ClientStatsManager {
         // Time-related data are always re-computed, since it is related with current time.
         let cur_time = current_time();
         global_stats.run_time = cur_time - self.start_time;
-        global_stats.run_time_pretty = format_duration_hms(&global_stats.run_time);
+        global_stats.run_time_pretty = format_duration(&global_stats.run_time);
         global_stats.execs_per_sec = self
             .client_stats
             .iter_mut()
