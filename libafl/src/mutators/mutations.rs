@@ -1000,7 +1000,7 @@ impl BytesInsertCopyMutator {
     /// Creates a new [`BytesInsertCopyMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self::default()
+        Self
     }
 }
 
