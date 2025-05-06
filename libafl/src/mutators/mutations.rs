@@ -934,9 +934,7 @@ impl BytesCopyMutator {
 
 /// Bytes insert and self copy mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
-pub struct BytesInsertCopyMutator {
-    tmp_buf: Vec<u8>,
-}
+pub struct BytesInsertCopyMutator;
 
 impl<I, S> Mutator<I, S> for BytesInsertCopyMutator
 where
@@ -965,26 +963,16 @@ where
         let range = rand_range(state, size, max_insert_len);
 
         input.resize(size + range.len(), 0);
-        self.tmp_buf.resize(range.len(), 0);
         unsafe {
-            buffer_copy(
-                &mut self.tmp_buf,
-                input.mutator_bytes(),
-                range.start,
-                0,
-                range.len(),
-            );
-
             buffer_self_copy(
                 input.mutator_bytes_mut(),
                 target,
                 target + range.len(),
                 size - target,
             );
-            buffer_copy(
+            buffer_self_copy(
                 input.mutator_bytes_mut(),
-                &self.tmp_buf,
-                0,
+                target + range.len(),
                 target,
                 range.len(),
             );
