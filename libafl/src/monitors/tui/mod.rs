@@ -26,7 +26,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use hashbrown::HashMap;
-use libafl_bolts::{ClientId, Error, current_time, format_big_number, format_duration_hms};
+use libafl_bolts::{ClientId, Error, current_time, format_big_number, format_duration};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use typed_builder::TypedBuilder;
 
