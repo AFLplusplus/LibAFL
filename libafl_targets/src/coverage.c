@@ -16,7 +16,7 @@ uint32_t       *__afl_acc_memop_ptr = __afl_acc_memop_ptr_local;
 
 // Set by this macro
 // https://github.com/AFLplusplus/AFLplusplus/blob/stable/src/afl-cc.c#L993
-int __afl_sharedmem_fuzzing __attribute__((weak));
+EXT_VAR(__afl_sharedmem_fuzzing, int);
 
 // Weak symbols, LLVM Passes overwrites them if we really use it
 #if defined(__linux__)
