@@ -970,12 +970,6 @@ where
                 target + range.len(),
                 size - target,
             );
-            buffer_self_copy(
-                input.mutator_bytes_mut(),
-                target + range.len(),
-                target,
-                range.len(),
-            );
         }
         Ok(MutationResult::Mutated)
     }
