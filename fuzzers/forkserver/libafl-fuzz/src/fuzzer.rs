@@ -16,7 +16,7 @@ use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::ProgressReporter,
-    executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
+    executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder, SHM_CMPLOG_ENV_VAR},
     feedback_and, feedback_or, feedback_or_fast,
     feedbacks::{
         CaptureTimeoutFeedback, ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback,
@@ -476,7 +476,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
 
         // Let the Forkserver know the CmpLog shared memory map ID.
         unsafe {
-            cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
+            cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
         }
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
