@@ -246,14 +246,14 @@ fn main() {
         let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
         if target_family == "windows" {
             println!("cargo:rerun-if-changed=src/windows_asan.c");
-    
+
             let mut windows_asan = cc::Build::new();
-    
+
             #[cfg(feature = "whole_archive")]
             {
                 windows_asan.link_lib_modifier("+whole-archive");
             }
-    
+
             windows_asan
                 .file(src_dir.join("windows_asan.c"))
                 .compile("windows_asan");
