@@ -11,7 +11,7 @@ use libafl::{
     Error,
     executors::forkserver::{
         FORKSRV_FD, FS_ERROR_SHM_OPEN, FS_NEW_OPT_AUTODTCT, FS_NEW_OPT_MAPSIZE,
-        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, SHM_ENV_VAR, SHM_FUZZ_ENV_VAR,
+        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, SHM_ENV_VAR, SHM_FUZZ_ENV_VAR, SHM_CMPLOG_ENV_VAR,
     },
 };
 use libafl_bolts::os::{ChildHandle, ForkResult};
@@ -22,6 +22,8 @@ use nix::{
 };
 
 use crate::coverage::{__afl_map_size, EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
+#[cfg(feature = "cmplog")]
+use crate::cmps::CMPLOG_MAP_PTR;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use crate::coverage::{__token_start, __token_stop};
 
@@ -159,6 +161,46 @@ fn map_input_shared_memory_internal() -> Result<(), Error> {
     unsafe {
         INPUT_LENGTH_PTR = map;
         INPUT_PTR = map.add(1).cast();
+    }
+    Ok(())
+}
+
+/// Guard [`map_cmplog_shared_memory`] is invoked only once
+#[cfg(feature = "cmplog")]
+static CMPLOG_SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
+
+/// Map the cmplog shared memory region.
+/// The [`CMPLOG_MAP_PTR`] will be updated.
+///
+/// If anything failed, the forkserver will be notified with
+/// [`FS_ERROR_SHM_OPEN`].
+#[cfg(feature = "cmplog")]
+pub fn map_cmplog_shared_memory() -> Result<(), Error> {
+    if CMPLOG_SHM_MAP_GUARD.set(()).is_err() {
+        return Err(Error::illegal_state("shared memory has been mapped before"));
+    }
+    map_cmplog_shared_memory_internal()
+}
+
+#[cfg(feature = "cmplog")]
+fn map_cmplog_shared_memory_internal() -> Result<(), Error> {
+    let Ok(id_str) = std::env::var(SHM_CMPLOG_ENV_VAR) else {
+        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
+        return Err(Error::illegal_argument(
+            "Error: variable for cmplog shared memory is not set",
+        ));
+    };
+    let Ok(shm_id) = id_str.parse() else {
+        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
+        return Err(Error::illegal_argument("Invalid __AFL_CMPLOG_SHM_ID value"));
+    };
+    let map = unsafe { libc::shmat(shm_id, core::ptr::null(), 0) };
+    if map.is_null() || core::ptr::eq(map, libc::MAP_FAILED) {
+        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
+        return Err(Error::illegal_state("shmat for map"));
+    }
+    unsafe {
+        CMPLOG_MAP_PTR = map.cast();
     }
     Ok(())
 }
