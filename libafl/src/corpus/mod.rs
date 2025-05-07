@@ -195,6 +195,15 @@ pub trait Corpus<I>: Sized {
     }
 }
 
+/// Marker trait for corpus implementations that actually support enable/disable functionality
+pub trait EnableDisableCorpus {
+    /// Disables a testcase, moving it to the disabled map
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error>;
+
+    /// Enables a testcase, moving it to the enabled map
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error>;
+}
+
 /// Trait for types which track the current corpus index
 pub trait HasCurrentCorpusId {
     /// Set the current corpus index; we have started processing this corpus entry
