@@ -147,6 +147,8 @@ const MIN_INPUT_SIZE_DEFAULT: usize = 1;
 pub const SHM_FUZZ_ENV_VAR: &str = "__AFL_SHM_FUZZ_ID";
 /// Environment variable key for shared memory id for edge map
 pub const SHM_ENV_VAR: &str = "__AFL_SHM_ID";
+/// Environment variable key for shared memory id for cmplog map
+pub const SHM_CMPLOG_ENV_VAR: &str = "__AFL_CMPLOG_SHM_ID";
 
 /// The default signal to use to kill child processes
 const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;

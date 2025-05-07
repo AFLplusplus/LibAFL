@@ -11,7 +11,10 @@ use clap::{Arg, ArgAction, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{forkserver::ForkserverExecutor, sand::SANDExecutor},
+    executors::{
+        forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+        sand::SANDExecutor,
+    },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -398,7 +401,7 @@ fn fuzz(
         let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
         // let the forkserver know the shmid
         unsafe {
-            cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
+            cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
         }
         let cmpmap = unsafe { OwnedRefMut::<AFLppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
 

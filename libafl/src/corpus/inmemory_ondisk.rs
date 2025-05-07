@@ -20,7 +20,7 @@ use libafl_bolts::compress::GzipCompressor;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    HasTestcase,
+    EnableDisableCorpus, HasTestcase,
     ondisk::{OnDiskMetadata, OnDiskMetadataFormat},
 };
 use crate::{
@@ -211,6 +211,29 @@ where
             ));
         };
         input.to_file(file_path)
+    }
+}
+
+impl<I> EnableDisableCorpus for InMemoryOnDiskCorpus<I>
+where
+    I: Input,
+{
+    #[inline]
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.inner.disable(id)?;
+        // Ensure testcase is saved to disk correctly with its new status
+        let testcase_cell = &mut self.get_from_all(id).unwrap().borrow_mut();
+        self.save_testcase(testcase_cell, Some(id))?;
+        Ok(())
+    }
+
+    #[inline]
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.inner.enable(id)?;
+        // Ensure testcase is saved to disk correctly with its new status
+        let testcase_cell = &mut self.get_from_all(id).unwrap().borrow_mut();
+        self.save_testcase(testcase_cell, Some(id))?;
+        Ok(())
     }
 }
 

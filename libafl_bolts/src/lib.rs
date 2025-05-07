@@ -952,9 +952,33 @@ pub fn current_milliseconds() -> u64 {
 /// Format a `Duration` into a HMS string
 #[cfg(feature = "alloc")]
 #[must_use]
-pub fn format_duration_hms(duration: &time::Duration) -> String {
-    let secs = duration.as_secs();
-    format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
+pub fn format_duration(duration: &time::Duration) -> String {
+    const MINS_PER_HOUR: u64 = 60;
+    const HOURS_PER_DAY: u64 = 24;
+
+    const SECS_PER_MINUTE: u64 = 60;
+    const SECS_PER_HOUR: u64 = SECS_PER_MINUTE * MINS_PER_HOUR;
+    const SECS_PER_DAY: u64 = SECS_PER_HOUR * HOURS_PER_DAY;
+
+    let total_secs = duration.as_secs();
+    let secs = total_secs % SECS_PER_MINUTE;
+
+    if total_secs < SECS_PER_MINUTE {
+        format!("{secs}s")
+    } else {
+        let mins = (total_secs / SECS_PER_MINUTE) % MINS_PER_HOUR;
+        if total_secs < SECS_PER_HOUR {
+            format!("{mins}m-{secs}s")
+        } else {
+            let hours = (total_secs / SECS_PER_HOUR) % HOURS_PER_DAY;
+            if total_secs < SECS_PER_DAY {
+                format!("{hours}h-{mins}m-{secs}s")
+            } else {
+                let days = total_secs / SECS_PER_DAY;
+                format!("{days}days {hours}h-{mins}m-{secs}s")
+            }
+        }
+    }
 }
 
 /// Format a number with thousands separators

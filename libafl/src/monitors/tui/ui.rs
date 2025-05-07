@@ -17,7 +17,7 @@ use ratatui::{
 
 use super::{
     Duration, ItemGeometry, ProcessTiming, String, TimedStats, TuiContext, current_time,
-    format_duration_hms,
+    format_duration,
 };
 
 #[derive(Default, Debug)]
@@ -318,9 +318,9 @@ impl TuiUi {
         }
         let start = stats.series.front().unwrap().time;
         let end = stats.series.back().unwrap().time;
-        let min_lbl_x = format_duration_hms(&start);
-        let med_lbl_x = format_duration_hms(&((end - start) / 2));
-        let max_lbl_x = format_duration_hms(&end);
+        let min_lbl_x = format_duration(&start);
+        let med_lbl_x = format_duration(&((end - start) / 2));
+        let max_lbl_x = format_duration(&end);
 
         let x_labels = vec![
             Span::styled(min_lbl_x, Style::default().add_modifier(Modifier::BOLD)),
@@ -538,7 +538,7 @@ impl TuiUi {
         let items = vec![
             Row::new(vec![
                 Cell::from(Span::raw("run time")),
-                Cell::from(Span::raw(format_duration_hms(&(current_time() - tup.0)))),
+                Cell::from(Span::raw(format_duration(&(current_time() - tup.0)))),
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("exec speed")),
@@ -550,11 +550,11 @@ impl TuiUi {
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("last new entry")),
-                Cell::from(Span::raw(format_duration_hms(&(tup.1.last_new_entry)))),
+                Cell::from(Span::raw(format_duration(&(tup.1.last_new_entry)))),
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("last solution")),
-                Cell::from(Span::raw(format_duration_hms(&(tup.1.last_saved_solution)))),
+                Cell::from(Span::raw(format_duration(&(tup.1.last_saved_solution)))),
             ]),
         ];
 
