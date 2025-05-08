@@ -1,0 +1,113 @@
+use std::{
+    env, fs,
+    path::PathBuf,
+    process::{Command, exit},
+};
+
+fn run() -> Result<(), Box<dyn std::error::Error>> {
+    let me = env::args().next().ok_or("no argv[0]")?;
+    let exe_path = fs::canonicalize(&me)?;
+    let project_dir = exe_path
+        .parent()
+        .ok_or("failed to get libafl root dir")?
+        .parent()
+        .ok_or("failed to get libafl root dir")?
+        .parent()
+        .ok_or("failed to get libafl root dir")?;
+
+    env::set_current_dir(&project_dir)?;
+    println!("{:#?}", project_dir);
+    let args: Vec<String> = env::args().collect();
+    let mut fuzzers_to_test = Vec::new();
+
+    // take the first arg as the fuzzer name
+    if args.len() < 2 {
+        eprintln!("Expected fuzzer name as argument when RUN_ON_CI is set");
+        exit(1);
+    }
+    fuzzers_to_test.push(PathBuf::from(&args[1]));
+    unsafe {
+        env::set_var("PROFILE", "dev");
+        env::set_var("PROFILE_DIR", "debug");
+    }
+
+    print!("Testing {:#?} {:#?}", fuzzers_to_test, args[1]);
+    for f in &fuzzers_to_test {
+        print!(" {}", f.to_string_lossy());
+    }
+    println!();
+
+    // 5) set cargo profile envs
+    for profile in &["DEV", "RELEASE"] {
+        unsafe {
+            env::set_var(format!("CARGO_PROFILE_{}_OPT_LEVEL", profile), "z");
+            env::set_var(format!("CARGO_PROFILE_{}_INCREMENTAL", profile), "true");
+        }
+    }
+
+    // 6) for each fuzzer
+    for fuzzer in fuzzers_to_test {
+        let fuzzer_name = fuzzer.to_string_lossy();
+        let name = fuzzer
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_else(|| fuzzer_name.as_ref())
+            .to_string();
+
+        // skip nyx_ on non-Linux
+        if name.contains("nyx_") && env::consts::OS != "linux" {
+            continue;
+        }
+
+        let path = project_dir.join(&fuzzer);
+
+        // Clippy
+        let do_clippy = args.get(1).map(|s| s != "--no-clippy").unwrap_or(true);
+        if do_clippy {
+            println!("[*] Running clippy for {}, {:#?}", name, path);
+            let status = Command::new("cargo")
+                .arg("clippy")
+                .current_dir(&path)
+                .status()?;
+            if !status.success() {
+                exit(1);
+            }
+        } else {
+            println!(
+                "[+] Skipping fmt and clippy for {} (--no-clippy specified)",
+                name
+            );
+        }
+
+        if path.join("Justfile").exists() {
+            println!("[*] Testing {}", name);
+            let status = Command::new("just")
+                .arg("test")
+                .current_dir(&path)
+                .status()?;
+            if !status.success() {
+                exit(1);
+            }
+            println!("[+] Done testing {}", name);
+        } else {
+            println!("[*] Building {}", name);
+            let status = Command::new("cargo")
+                .arg("build")
+                .current_dir(&path)
+                .status()?;
+            if !status.success() {
+                exit(1);
+            }
+            println!("[+] Done building {}", name);
+        }
+    }
+
+    Ok(())
+}
+
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("error: {}", e);
+        exit(1);
+    }
+}
