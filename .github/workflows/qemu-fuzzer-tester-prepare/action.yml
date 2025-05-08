@@ -20,6 +20,6 @@ runs:
       with:
         submodules: true
         fetch-depth: 0
-    - uses: ./.github/workflows/ubuntu-prepare
+    - uses: ./.github/workflows/ubuntu-prepare # aa
     - uses: Swatinem/rust-cache@v2
       with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }
