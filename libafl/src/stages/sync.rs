@@ -58,6 +58,7 @@ impl SyncFromDiskMetadata {
 }
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
+/// When syncing, the stage will ignore `Error::InvalidInput` and will skip the file.
 #[derive(Debug)]
 pub struct SyncFromDiskStage<CB, E, EM, I, S, Z> {
     name: Cow<'static, str>,
@@ -75,7 +76,7 @@ impl<CB, E, EM, I, S, Z> Named for SyncFromDiskStage<CB, E, EM, I, S, Z> {
 
 impl<CB, E, EM, I, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    CB: FnMut(&mut Z, &mut S, &Path) -> Result<Option<I>, Error>,
+    CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     Z: Evaluator<E, EM, I, S>,
     S: HasCorpus<I>
         + HasRand
@@ -125,18 +126,23 @@ where
         let to_sync = sync_from_disk_metadata.left_to_sync.clone();
         log::debug!("Number of files to sync: {:?}", to_sync.len());
         for path in to_sync {
-            let input = (self.load_callback)(fuzzer, state, &path)?;
+            let input = (self.load_callback)(fuzzer, state, &path);
+            let input_is_invalid = matches!(input, Err(Error::InvalidInput(_)));
             // Removing each path from the `left_to_sync` Vec before evaluating
             // prevents duplicate processing and ensures that each file is evaluated only once. This approach helps
-            // avoid potential infinite loops that may occur if a file is an objective.
-            state
-                .metadata_mut::<SyncFromDiskMetadata>()
-                .unwrap()
-                .left_to_sync
-                .retain(|p| p != &path);
-            let Some(input) = input else {
+            // avoid potential infinite loops that may occur if a file is an objective or an invalid input.
+            if input.is_ok() || input_is_invalid {
+                state
+                    .metadata_mut::<SyncFromDiskMetadata>()
+                    .unwrap()
+                    .left_to_sync
+                    .retain(|p| p != &path);
+            }
+            if input_is_invalid {
+                log::debug!("Invalid input found in {path:?} when syncing; skipping;");
                 continue;
-            };
+            }
+            let input = input?;
             log::debug!("Syncing and evaluating {path:?}");
             fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
@@ -164,6 +170,7 @@ where
 
 impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z> {
     /// Creates a new [`SyncFromDiskStage`]
+    /// To skip a file, you can return `Error::invalid_input` in `load_callback`
     #[must_use]
     pub fn new(sync_dirs: Vec<PathBuf>, load_callback: CB, interval: Duration, name: &str) -> Self {
         Self {
@@ -177,7 +184,7 @@ impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z> {
 }
 
 /// Function type when the callback in `SyncFromDiskStage` is not a lambda
-pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<Option<I>, Error>;
+pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
 
 impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, S, Z>
 where
@@ -188,15 +195,12 @@ where
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
     pub fn with_from_file(sync_dirs: Vec<PathBuf>, interval: Duration) -> Self {
-        fn load_callback<I, S, Z>(_: &mut Z, _: &mut S, p: &Path) -> Result<Option<I>, Error>
+        fn load_callback<I, S, Z>(_: &mut Z, _: &mut S, p: &Path) -> Result<I, Error>
         where
             I: Input,
             S: HasCorpus<I>,
         {
-            match Input::from_file(p) {
-                Err(err) => Err(err),
-                Ok(input) => Ok(Some(input)),
-            }
+            Input::from_file(p)
         }
         Self {
             interval,
