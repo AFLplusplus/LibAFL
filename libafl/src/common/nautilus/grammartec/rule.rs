@@ -2,6 +2,7 @@ use alloc::{string::String, vec::Vec};
 use std::sync::OnceLock;
 
 use libafl_bolts::rands::Rand;
+#[cfg(feature = "nautilus_py")]
 use pyo3::prelude::{PyObject, Python};
 use regex_syntax::hir::Hir;
 use serde::{Deserialize, Serialize};
@@ -91,6 +92,7 @@ impl RuleIdOrCustom {
 #[derive(Clone, Debug)]
 pub enum Rule {
     Plain(PlainRule),
+    #[cfg(feature = "nautilus_py")]
     Script(ScriptRule),
     RegExp(RegExpRule),
 }
@@ -108,6 +110,7 @@ impl RegExpRule {
     }
 }
 
+#[cfg(feature = "nautilus_py")]
 #[derive(Debug)]
 pub struct ScriptRule {
     pub nonterm: NTermId,
@@ -115,6 +118,7 @@ pub struct ScriptRule {
     pub script: PyObject,
 }
 
+#[cfg(feature = "nautilus_py")]
 impl ScriptRule {
     #[must_use]
     pub fn debug_show(&self, ctx: &Context) -> String {
@@ -148,6 +152,7 @@ impl PlainRule {
     }
 }
 
+#[cfg(feature = "nautilus_py")]
 impl Clone for ScriptRule {
     fn clone(&self) -> Self {
         Python::with_gil(|py| ScriptRule {
@@ -159,6 +164,7 @@ impl Clone for ScriptRule {
 }
 
 impl Rule {
+    #[cfg(feature = "nautilus_py")]
     pub fn from_script(
         ctx: &mut Context,
         nonterm: &str,
@@ -189,6 +195,7 @@ impl Rule {
     pub fn debug_show(&self, ctx: &Context) -> String {
         match self {
             Self::Plain(r) => r.debug_show(ctx),
+            #[cfg(feature = "nautilus_py")]
             Self::Script(r) => r.debug_show(ctx),
             Self::RegExp(r) => r.debug_show(ctx),
         }
@@ -281,6 +288,7 @@ impl Rule {
     #[must_use]
     pub fn nonterms(&self) -> &[NTermId] {
         match self {
+            #[cfg(feature = "nautilus_py")]
             Rule::Script(r) => &r.nonterms,
             Rule::Plain(r) => &r.nonterms,
             Rule::RegExp(_) => &[],
@@ -295,6 +303,7 @@ impl Rule {
     #[must_use]
     pub fn nonterm(&self) -> NTermId {
         match self {
+            #[cfg(feature = "nautilus_py")]
             Rule::Script(r) => r.nonterm,
             Rule::Plain(r) => r.nonterm,
             Rule::RegExp(r) => r.nonterm,
@@ -340,7 +349,9 @@ impl Rule {
             //get a rule that can be used with the remaining length
             let rid = ctx.get_random_rule_for_nt(rand, *nt, cur_child_max_len);
             let rule_or_custom = match ctx.get_rule(rid) {
-                Rule::Plain(_) | Rule::Script(_) => RuleIdOrCustom::Rule(rid),
+                Rule::Plain(_) => RuleIdOrCustom::Rule(rid),
+                #[cfg(feature = "nautilus_py")]
+                Rule::Script(_) => RuleIdOrCustom::Rule(rid),
                 Rule::RegExp(RegExpRule { hir, .. }) => {
                     RuleIdOrCustom::Custom(rid, regex_mutator::generate(rand, hir))
                 }
