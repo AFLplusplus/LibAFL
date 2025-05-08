@@ -3,6 +3,10 @@ description: Sets up the Rust environment for the CI workflow
 runs:
   using: composite
   steps:
+    - name: Uninstall all currently installed rust
+      shell: bash
+      run: |
+        sudo apt purge -y 'cargo*' 'rust*'
     - name: Install and cache deps
       shell: bash
       run: |
