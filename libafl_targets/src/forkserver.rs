@@ -10,7 +10,8 @@ use libafl::{
     Error,
     executors::forkserver::{
         FORKSRV_FD, FS_ERROR_SHM_OPEN, FS_NEW_OPT_AUTODTCT, FS_NEW_OPT_MAPSIZE,
-        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, SHM_ENV_VAR, SHM_FUZZ_ENV_VAR, SHM_CMPLOG_ENV_VAR,
+        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, SHM_CMPLOG_ENV_VAR, SHM_ENV_VAR,
+        SHM_FUZZ_ENV_VAR,
     },
 };
 use libafl_bolts::os::{ChildHandle, ForkResult};
@@ -19,9 +20,9 @@ use nix::{
     unistd::Pid,
 };
 
-use crate::coverage::{__afl_map_size, EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
 #[cfg(feature = "cmplog")]
 use crate::cmps::CMPLOG_MAP_PTR;
+use crate::coverage::{__afl_map_size, EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use crate::coverage::{__token_start, __token_stop};
 

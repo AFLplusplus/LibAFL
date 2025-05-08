@@ -12,7 +12,7 @@ use std::process::Command;
 #[cfg(unix)]
 use libc::siginfo_t;
 #[cfg(target_vendor = "apple")]
-use mach::{
+use mach2::{
     message::mach_msg_type_number_t,
     port::mach_port_t,
     traps::mach_task_self,
