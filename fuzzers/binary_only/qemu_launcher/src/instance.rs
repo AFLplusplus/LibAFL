@@ -1,13 +1,12 @@
 use core::fmt::Debug;
 use std::{fs, marker::PhantomData, ops::Range, process};
 
-#[cfg(feature = "simplemgr")]
-use libafl::events::SimpleEventManager;
-#[cfg(not(feature = "simplemgr"))]
-use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, HasCurrentCorpusId, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{ClientDescription, EventRestarter},
+    events::{
+        ClientDescription, EventFirer, EventReceiver, EventRestarter, MonitorTypedEventManager,
+        ProgressReporter, SendExiting,
+    },
     executors::{Executor, ExitKind, ShadowExecutor},
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -31,8 +30,6 @@ use libafl::{
     state::{HasCorpus, HasExecutions, HasSolutions, StdState},
     Error, HasMetadata,
 };
-#[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::shmem::{StdShMem, StdShMemProvider};
 use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
@@ -57,13 +54,7 @@ use crate::{harness::Harness, options::FuzzerOptions};
 pub type ClientState =
     StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
-#[cfg(feature = "simplemgr")]
-pub type ClientMgr<M> = SimpleEventManager<BytesInput, M, ClientState>;
-#[cfg(not(feature = "simplemgr"))]
-pub type ClientMgr<M> = MonitorTypedEventManager<
-    LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMem, StdShMemProvider>,
-    M,
->;
+pub type ClientMgr<EM, M> = MonitorTypedEventManager<EM, M>;
 
 /*
  * The snapshot and iterations options interact as follows:
@@ -87,9 +78,9 @@ pub type ClientMgr<M> = MonitorTypedEventManager<
  */
 
 #[derive(TypedBuilder)]
-pub struct Instance<'a, M: Monitor> {
+pub struct Instance<'a, EM, M: Monitor> {
     options: &'a FuzzerOptions,
-    mgr: ClientMgr<M>,
+    mgr: ClientMgr<EM, M>,
     client_description: ClientDescription,
     #[builder(default)]
     extra_tokens: Vec<String>,
@@ -97,7 +88,14 @@ pub struct Instance<'a, M: Monitor> {
     phantom: PhantomData<M>,
 }
 
-impl<M: Monitor> Instance<'_, M> {
+impl<MTEM, M: Monitor> Instance<'_, MTEM, M>
+where
+    MTEM: EventFirer<BytesInput, ClientState>
+        + EventRestarter<ClientState>
+        + ProgressReporter<ClientState>
+        + SendExiting
+        + EventReceiver<BytesInput, ClientState>,
+{
     fn coverage_filter(&self, qemu: Qemu) -> Result<StdAddressFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
         if let Some(includes) = &self.options.include {
@@ -438,10 +436,10 @@ impl<M: Monitor> Instance<'_, M> {
         stages: &mut ST,
     ) -> Result<(), Error>
     where
-        ST: StagesTuple<E, ClientMgr<M>, ClientState, Z>,
+        ST: StagesTuple<E, ClientMgr<MTEM, M>, ClientState, Z>,
         RSM: Fn(&mut E, Qemu),
-        Z: Fuzzer<E, ClientMgr<M>, BytesInput, ClientState, ST>
-            + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
+        Z: Fuzzer<E, ClientMgr<MTEM, M>, BytesInput, ClientState, ST>
+            + Evaluator<E, ClientMgr<MTEM, M>, BytesInput, ClientState>,
     {
         if state.must_load_initial_inputs() {
             let corpus_dirs = [self.options.input_dir()];
