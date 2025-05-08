@@ -61,7 +61,7 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
         let path = project_dir.join(&fuzzer);
 
         // Clippy
-        let do_clippy = args.get(1).map_or(true, |s| s != "--no-clippy");
+        let do_clippy = args.get(1).is_none_or(|s| s != "--no-clippy");
         if do_clippy {
             println!("[*] Running clippy for {name}");
             let status = Command::new("cargo")
@@ -103,7 +103,7 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
 
 fn main() {
     if let Err(e) = run() {
-        eprintln!("error: {}", e);
+        eprintln!("error: {e}");
         exit(1);
     }
 }
