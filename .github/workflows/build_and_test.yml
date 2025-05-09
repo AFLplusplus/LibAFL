@@ -403,6 +403,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash

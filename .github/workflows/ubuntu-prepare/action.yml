@@ -12,7 +12,7 @@ runs:
       run: |
         sudo apt-get update
         sudo apt-get install -y curl lsb-release wget software-properties-common gnupg shellcheck pax-utils libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@nightly
     - name: install just
       uses: extractions/setup-just@v2
       with:
@@ -26,9 +26,6 @@ runs:
     - name: Install cargo-hack
       shell: bash
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
-    - name: Add nightly
-      shell: bash
-      run: rustup toolchain install nightly --allow-downgrade
     - name: Default to nightly
       shell: bash
       run: rustup default nightly
