@@ -53,11 +53,6 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
             .unwrap_or_else(|| fuzzer_name.as_ref())
             .to_string();
 
-        // skip nyx_ on non-Linux
-        if name.contains("nyx_") && env::consts::OS != "linux" {
-            continue;
-        }
-
         let path = project_dir.join(&fuzzer);
 
         // Clippy
@@ -102,8 +97,5 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
 }
 
 fn main() {
-    if let Err(e) = run() {
-        eprintln!("error: {e}");
-        exit(1);
-    }
+    run.unwrap();
 }
