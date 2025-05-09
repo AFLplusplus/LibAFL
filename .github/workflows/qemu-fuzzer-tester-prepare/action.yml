@@ -10,6 +10,8 @@ runs:
         apt-get install -y qemu-utils sudo python3-msgpack python3-jinja2 curl python3-dev gcc-arm-none-eabi \
           gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
     - uses: dtolnay/rust-toolchain@stable
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
