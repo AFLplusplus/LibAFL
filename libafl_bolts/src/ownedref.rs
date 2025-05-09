@@ -1241,7 +1241,7 @@ mod test {
     use crate::Truncate;
 
     #[test]
-    fn test_truncate_does_not_crash() {
+    fn test_truncate() {
         let mut data = [0;1024];
         let mut slice = &mut data as &mut [_];
 
