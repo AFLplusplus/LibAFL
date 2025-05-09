@@ -1241,9 +1241,19 @@ mod test {
     use crate::Truncate;
 
     #[test]
-    fn test_truncate_of_zero_does_not_crash() {
-        let mut data = [0];
+    fn test_truncate_does_not_crash() {
+        let mut data = [0;1024];
         let mut slice = &mut data as &mut [_];
+
+        slice.truncate(1);
+        assert_eq!(0, slice[0]);
+        assert_eq!(1, slice.len());
+
+        slice.truncate(100);
+        assert_eq!(0, slice[0]);
+        assert_eq!(1, slice.len());
+
+        slice.truncate(0);
         slice.truncate(100);
         assert_eq!(0, slice.len());
     }
