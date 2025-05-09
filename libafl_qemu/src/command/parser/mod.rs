@@ -77,7 +77,8 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let input_virt_addr: GuestVirtAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
+        let input_virt_addr: GuestVirtAddr =
+            qemu.read_reg(arch_regs_map[ExitArgs::Arg1])? as GuestVirtAddr;
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
         Ok(InputCommand::new(
@@ -134,7 +135,8 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let input_virt_addr: GuestVirtAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
+        let input_virt_addr: GuestVirtAddr =
+            qemu.read_reg(arch_regs_map[ExitArgs::Arg1])? as GuestVirtAddr;
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
         Ok(StartCommand::new(QemuMemoryChunk::virt(

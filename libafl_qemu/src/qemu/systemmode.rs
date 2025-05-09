@@ -97,7 +97,7 @@ impl CPU {
                 attrs.as_mut_ptr(),
             );
             let mask = Qemu::get_unchecked().target_page_mask();
-            let offset = vaddr & (mask as GuestVirtAddr);
+            let offset = (vaddr & (mask as GuestVirtAddr)) as GuestPhysAddr;
             #[expect(clippy::cast_sign_loss)]
             if paddr == (-1i64 as GuestPhysAddr) {
                 None
@@ -123,7 +123,7 @@ impl CPU {
                     libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_R
                 },
             );
-            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr as GuestVirtAddr);
+            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr as u64);
             if phwaddr.is_null() {
                 None
             } else {
@@ -438,7 +438,7 @@ impl Iterator for PhysMemoryIter {
             );
 
             self.remaining_len -= size_taken;
-            *vaddr += size_taken as GuestPhysAddr;
+            *vaddr += size_taken as GuestVirtAddr;
 
             // Now self.addr is host-page aligned
             while self.remaining_len > 0 {
@@ -458,7 +458,7 @@ impl Iterator for PhysMemoryIter {
                 size_taken += std::cmp::min(self.remaining_len, phys_page_size);
 
                 self.remaining_len -= size_taken;
-                *vaddr += size_taken as GuestPhysAddr;
+                *vaddr += size_taken as GuestVirtAddr;
             }
 
             // We finished to explore the memory, return the last slice.
