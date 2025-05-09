@@ -1242,7 +1242,7 @@ mod test {
 
     #[test]
     fn test_truncate() {
-        let mut data = [0;1024];
+        let mut data = [0; 1024];
         let mut slice = &mut data as &mut [_];
 
         slice.truncate(1);
