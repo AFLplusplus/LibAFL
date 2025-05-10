@@ -8,7 +8,7 @@ authors = [
 edition = "2021"
 
 [features]
-default = ["std", "injections"]
+default = ["std", "injections", "simplemgr"]
 std = []
 clippy = []                     # Only for clippy, don't use.
 

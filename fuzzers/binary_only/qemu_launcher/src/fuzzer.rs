@@ -5,20 +5,16 @@ use std::{
 };
 
 use clap::Parser;
-#[cfg(feature = "simplemgr")]
-use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
-use libafl::events::{EventConfig, Launcher, LlmpEventManagerBuilder, MonitorTypedEventManager};
+use libafl::events::{EventConfig, Launcher};
 use libafl::{
-    events::ClientDescription,
+    events::{ClientDescription, MonitorTypedEventManager, SimpleEventManager},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{core_affinity::CoreId, current_time};
-#[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::{llmp::LlmpBroker, staterestore::StateRestorer, tuples::tuple_list};
 #[cfg(unix)]
 use {
     nix::unistd::dup,
@@ -82,9 +78,6 @@ impl Fuzzer {
     where
         M: Monitor + Clone,
     {
-        // The shared memory allocator
-        #[cfg(not(feature = "simplemgr"))]
-        let mut shmem_provider = StdShMemProvider::new()?;
         /* If we are running in verbose, don't provide a replacement stdout, otherwise, use /dev/null */
         #[cfg(not(feature = "simplemgr"))]
         let stdout = if self.options.verbose {
@@ -95,45 +88,10 @@ impl Fuzzer {
 
         let client = Client::new(&self.options);
 
-        #[cfg(not(feature = "simplemgr"))]
-        if self.options.rerun_input.is_some() {
-            // If we want to rerun a single input but we use a restarting mgr, we'll have to create a fake restarting mgr that doesn't actually restart.
-            // It's not pretty but better than recompiling with simplemgr.
-
-            // Just a random number, let's hope it's free :)
-            let broker_port = 13120;
-            let _fake_broker = LlmpBroker::create_attach_to_tcp(
-                shmem_provider.clone(),
-                tuple_list!(),
-                broker_port,
-            )
-            .unwrap();
-
-            // To rerun an input, instead of using a launcher, we create dummy parameters and run the client directly.
-            // NOTE: This is a hack for debugging that that will only work for non-crashing inputs.
-            return client.run(
-                None,
-                MonitorTypedEventManager::<_, M>::new(
-                    LlmpEventManagerBuilder::builder()
-                        .build_on_port(
-                            shmem_provider.clone(),
-                            broker_port,
-                            EventConfig::AlwaysUnique,
-                            Some(StateRestorer::new(
-                                shmem_provider.new_shmem(0x1000).unwrap(),
-                            )),
-                        )
-                        .unwrap(),
-                ),
-                ClientDescription::new(0, 0, CoreId(0)),
-            );
-        }
-
-        #[cfg(feature = "simplemgr")]
         if self.options.rerun_input.is_some() {
             return client.run(
                 None,
-                SimpleEventManager::new(monitor),
+                MonitorTypedEventManager::<_, M>::new(SimpleEventManager::new(monitor)),
                 ClientDescription::new(0, 0, CoreId(0)),
             );
         }
@@ -141,7 +99,7 @@ impl Fuzzer {
         #[cfg(feature = "simplemgr")]
         return client.run(
             None,
-            SimpleEventManager::new(monitor),
+            MonitorTypedEventManager::<_, M>::new(SimpleEventManager::new(monitor)),
             ClientDescription::new(0, 0, CoreId(0)),
         );
 

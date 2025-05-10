@@ -2,7 +2,9 @@ use std::env;
 
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::ClientDescription,
+    events::{
+        ClientDescription, EventFirer, EventReceiver, EventRestarter, ProgressReporter, SendExiting,
+    },
     inputs::BytesInput,
     monitors::Monitor,
     state::StdState,
@@ -51,12 +53,19 @@ impl Client<'_> {
     }
 
     #[expect(clippy::too_many_lines)]
-    pub fn run<M: Monitor>(
+    pub fn run<EM, M: Monitor>(
         &self,
         state: Option<ClientState>,
-        mgr: ClientMgr<M>,
+        mgr: ClientMgr<EM, M>,
         client_description: ClientDescription,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        EM: EventFirer<BytesInput, ClientState>
+            + EventRestarter<ClientState>
+            + ProgressReporter<ClientState>
+            + SendExiting
+            + EventReceiver<BytesInput, ClientState>,
+    {
         let core_id = client_description.core_id();
         let mut args = self.args()?;
         Harness::edit_args(&mut args);
