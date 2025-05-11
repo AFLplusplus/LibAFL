@@ -56,6 +56,7 @@ jobs:
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
       - name: Build libafl debug
+        if: runner.os == 'Linux'
         run: cargo build -p libafl
       - name: Build libafl book
         run: cd docs/listings/baby_fuzzer/ && just build-all
