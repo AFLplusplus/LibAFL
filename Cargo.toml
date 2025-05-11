@@ -38,6 +38,7 @@ default-members = [
 
 exclude = [
   "bindings/pylibafl",
+  "docs",
   "fuzzers",
   "libafl_libfuzzer_runtime",
   "utils/noaslr",

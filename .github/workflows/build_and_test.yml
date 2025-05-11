@@ -57,6 +57,8 @@ jobs:
         run: ./scripts/check_for_blobs.sh
       - name: Build libafl debug
         run: cargo build -p libafl
+      - name: Build libafl book
+        run: cd docs/listings/baby_fuzzer/ && just build-all
       - name: Test the book (Linux)
         # TODO: fix books test fail with updated windows-rs
         if: runner.os == 'Linux'
