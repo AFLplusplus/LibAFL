@@ -62,7 +62,9 @@ type String = &'static str;
 /// Good enough for simple errors, for anything else, use the `alloc` feature.
 #[cfg(not(feature = "alloc"))]
 macro_rules! format {
-    ($fmt:literal) => {{ $fmt }};
+    ($fmt:literal) => {{
+        $fmt
+    }};
 }
 
 #[cfg(feature = "std")]
@@ -164,7 +166,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
 use std::{
     fs::File,
-    io::{Write, stderr, stdout},
+    io::{stderr, stdout, Write},
     os::fd::{AsRawFd, FromRawFd, RawFd},
     panic,
 };
@@ -342,7 +344,7 @@ pub enum Error {
     /// Error specific to a runtime like QEMU or Frida
     Runtime(String, ErrorBacktrace),
     /// The `Input` was invalid.
-    InvalidInput(ErrorBacktrace),
+    InvalidInput(String, ErrorBacktrace),
 }
 
 impl Error {
@@ -373,8 +375,11 @@ impl Error {
 
     /// The `Input` was invalid
     #[must_use]
-    pub fn invalid_input() -> Self {
-        Error::InvalidInput(ErrorBacktrace::new())
+    pub fn invalid_input<S>(reason: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::InvalidInput(reason.into(), ErrorBacktrace::new())
     }
 
     /// Key not in Map
@@ -588,8 +593,8 @@ impl Display for Error {
                 write!(f, "Runtime error: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
-            Self::InvalidInput(b) => {
-                write!(f, "Encountered an invalid input")?;
+            Self::InvalidInput(s, b) => {
+                write!(f, "Encountered an invalid input: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
         }
@@ -1076,7 +1081,7 @@ pub fn get_thread_id() -> u64 {
 #[allow(clippy::cast_sign_loss)]
 /// Return thread ID without using TLS
 pub fn get_thread_id() -> u64 {
-    use libc::{SYS_gettid, syscall};
+    use libc::{syscall, SYS_gettid};
 
     unsafe { syscall(SYS_gettid) as u64 }
 }
@@ -1429,7 +1434,7 @@ macro_rules! nonnull_raw_mut {
 #[allow(missing_docs)] // expect somehow breaks here
 pub mod pybind {
 
-    use pyo3::{Bound, PyResult, pymodule, types::PyModule};
+    use pyo3::{pymodule, types::PyModule, Bound, PyResult};
 
     #[macro_export]
     macro_rules! unwrap_me_body {

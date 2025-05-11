@@ -137,8 +137,10 @@ where
                 .retain(|p| p != &path);
             let input = match (self.load_callback)(fuzzer, state, &path) {
                 Ok(input) => input,
-                Err(Error::InvalidInput(_)) => {
-                    log::debug!("Invalid input found in {path:?} when syncing; skipping;");
+                Err(Error::InvalidInput(reason, _)) => {
+                    log::debug!(
+                        "Invalid input found in {path:?} when syncing; reason {reason}; skipping;"
+                    );
                     continue;
                 }
                 Err(e) => return Err(e),
