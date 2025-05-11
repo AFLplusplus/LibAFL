@@ -11,7 +11,7 @@ use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
     executors::{ExitKind, ShadowExecutor},
-    feedback_or, feedback_or_fast,
+    feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
@@ -25,7 +25,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{ShadowTracingStage, StdMutationalStage},
+    stages::{AflStatsStage, CalibrationStage, ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{

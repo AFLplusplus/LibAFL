@@ -449,7 +449,7 @@ pub mod pybind {
         /// Run the fuzzer
         #[expect(clippy::needless_pass_by_value)]
         pub fn run(&self, harness: PyObject) {
-            inmemory::InProcessBytesCoverageSugar::builder()
+            inprocess::InProcessBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
                 .broker_port(self.broker_port)
