@@ -8,16 +8,16 @@ use core::{marker::PhantomData, time::Duration};
 use std::path::{Path, PathBuf};
 
 use libafl_bolts::{
-    Named, current_time,
+    current_time,
     fs::find_new_files_rec,
     shmem::{ShMem, ShMemProvider},
+    Named,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
-    events::{Event, EventConfig, EventFirer, EventWithStats, llmp::LlmpEventConverter},
+    events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer, EventWithStats},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor, HasObjective},
     inputs::{Input, InputConverter},
@@ -26,6 +26,7 @@ use crate::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,
     },
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// Default name for `SyncFromDiskStage`; derived from AFL++
@@ -126,23 +127,22 @@ where
         let to_sync = sync_from_disk_metadata.left_to_sync.clone();
         log::debug!("Number of files to sync: {:?}", to_sync.len());
         for path in to_sync {
-            let input = (self.load_callback)(fuzzer, state, &path);
-            let input_is_invalid = matches!(input, Err(Error::InvalidInput(_)));
             // Removing each path from the `left_to_sync` Vec before evaluating
             // prevents duplicate processing and ensures that each file is evaluated only once. This approach helps
             // avoid potential infinite loops that may occur if a file is an objective or an invalid input.
-            if input.is_ok() || input_is_invalid {
-                state
-                    .metadata_mut::<SyncFromDiskMetadata>()
-                    .unwrap()
-                    .left_to_sync
-                    .retain(|p| p != &path);
-            }
-            if input_is_invalid {
-                log::debug!("Invalid input found in {path:?} when syncing; skipping;");
-                continue;
-            }
-            let input = input?;
+            state
+                .metadata_mut::<SyncFromDiskMetadata>()
+                .unwrap()
+                .left_to_sync
+                .retain(|p| p != &path);
+            let input = match (self.load_callback)(fuzzer, state, &path) {
+                Ok(input) => input,
+                Err(Error::InvalidInput(_)) => {
+                    log::debug!("Invalid input found in {path:?} when syncing; skipping;");
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
             log::debug!("Syncing and evaluating {path:?}");
             fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
