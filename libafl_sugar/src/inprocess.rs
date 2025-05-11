@@ -1,4 +1,4 @@
-//! In-Memory fuzzing made easy.
+//! In-Process fuzzing made easy.
 //! Use this sugar for scaling `libfuzzer`-style fuzzers.
 
 use core::{
@@ -13,7 +13,7 @@ use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
     executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
-    feedback_or, feedback_or_fast,
+    feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
@@ -26,7 +26,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{ShadowTracingStage, StdMutationalStage},
+    stages::{AflStatsStage, CalibrationStage, ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
@@ -38,15 +38,15 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{Merge, tuple_list},
 };
-use libafl_targets::{CmpLogObserver, edges_map_mut_ptr};
+use libafl_targets::{CmpLogObserver, EDGES_MAP_ALLOCATED_SIZE, edges_map_mut_ptr};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
-/// In-Memory fuzzing made easy.
+/// In-Process fuzzing made easy.
 /// Use this sugar for scaling `libfuzzer`-style fuzzers.
 #[derive(TypedBuilder)]
-pub struct InMemoryBytesCoverageSugar<'a, H>
+pub struct InProcessBytesCoverageSugar<'a, H>
 where
     H: FnMut(&[u8]),
 {
@@ -78,20 +78,17 @@ where
     /// Bytes harness
     #[builder(setter(strip_option))]
     harness: Option<H>,
-    /// The map size used for the fuzzer
-    #[builder(default = 65536usize)]
-    map_size: usize,
     /// Fuzz `iterations` number of times, instead of indefinitely; implies use of `fuzz_loop_for`
     #[builder(default = None)]
     iterations: Option<u64>,
 }
 
-impl<H> Debug for InMemoryBytesCoverageSugar<'_, H>
+impl<H> Debug for InProcessBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("InMemoryBytesCoverageSugar")
+        f.debug_struct("InProcessBytesCoverageSugar")
             .field("configuration", &self.configuration)
             .field("timeout", &self.timeout)
             .field("input_dirs", &self.input_dirs)
@@ -113,7 +110,7 @@ where
     }
 }
 
-impl<H> InMemoryBytesCoverageSugar<'_, H>
+impl<H> InProcessBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {
@@ -158,24 +155,43 @@ where
             let edges_observer = HitcountsMapObserver::new(unsafe {
                 StdMapObserver::from_mut_slice(
                     "edges",
-                    OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), self.map_size),
+                    OwnedMutSlice::from_raw_parts_mut(
+                        edges_map_mut_ptr(),
+                        EDGES_MAP_ALLOCATED_SIZE,
+                    ),
                 )
             })
             .track_indices();
 
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
+            // New maximization map feedback linked to the edges observer and the feedback state
+            let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);
+            // Extra MapFeedback to deduplicate finds according to the cov map
+            let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
+
+            let calibration = CalibrationStage::new(&map_feedback);
+
+            let stats_stage = AflStatsStage::builder()
+                .map_observer(&edges_observer)
+                .build()?;
+            let stats_stage_cmplog = AflStatsStage::builder()
+                .map_observer(&edges_observer)
+                .build()?;
+
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
-                // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::new(&edges_observer),
+                map_feedback,
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::new(&time_observer)
             );
 
             // A feedback to choose if an input is a solution or not
-            let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+            let mut objective = feedback_and_fast!(
+                feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new()),
+                map_objective
+            );
 
             // If not restarting, create a State from scratch
             let mut state = state.unwrap_or_else(|| {
@@ -276,7 +292,8 @@ where
 
                 // The order of the stages matter!
                 if self.use_cmplog.unwrap_or(false) {
-                    let mut stages = tuple_list!(tracing, i2s, mutational);
+                    let mut stages =
+                        tuple_list!(stats_stage_cmplog, calibration, tracing, i2s, mutational);
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
                             &mut stages,
@@ -291,7 +308,7 @@ where
                         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
                 } else {
-                    let mut stages = tuple_list!(mutational);
+                    let mut stages = tuple_list!(stats_stage, calibration, mutational);
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
                             &mut stages,
@@ -313,7 +330,7 @@ where
 
                 // The order of the stages matter!
                 if self.use_cmplog.unwrap_or(false) {
-                    let mut stages = tuple_list!(tracing, i2s, mutational);
+                    let mut stages = tuple_list!(calibration, tracing, i2s, mutational);
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
                             &mut stages,
@@ -375,13 +392,13 @@ pub mod pybind {
     use libafl_bolts::core_affinity::Cores;
     use pyo3::{prelude::*, types::PyBytes};
 
-    use crate::inmemory;
+    use crate::inprocess;
 
-    /// In-Memory fuzzing made easy.
+    /// In-Process fuzzing made easy.
     /// Use this sugar for scaling `libfuzzer`-style fuzzers.
     #[pyclass(unsendable)]
     #[derive(Debug)]
-    struct InMemoryBytesCoverageSugar {
+    struct InProcessBytesCoverageSugar {
         input_dirs: Vec<PathBuf>,
         output_dir: PathBuf,
         broker_port: u16,
@@ -393,8 +410,8 @@ pub mod pybind {
     }
 
     #[pymethods]
-    impl InMemoryBytesCoverageSugar {
-        /// Create a new [`InMemoryBytesCoverageSugar`]
+    impl InProcessBytesCoverageSugar {
+        /// Create a new [`InProcessBytesCoverageSugar`]
         #[new]
         #[expect(clippy::too_many_arguments)]
         #[pyo3(signature = (
@@ -432,7 +449,7 @@ pub mod pybind {
         /// Run the fuzzer
         #[expect(clippy::needless_pass_by_value)]
         pub fn run(&self, harness: PyObject) {
-            inmemory::InMemoryBytesCoverageSugar::builder()
+            inmemory::InProcessBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
                 .broker_port(self.broker_port)
@@ -456,7 +473,7 @@ pub mod pybind {
 
     /// Register the module
     pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-        m.add_class::<InMemoryBytesCoverageSugar>()?;
+        m.add_class::<InProcessBytesCoverageSugar>()?;
         Ok(())
     }
 }
