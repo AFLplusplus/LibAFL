@@ -21,7 +21,8 @@ use std::{
 };
 
 #[cfg(feature = "regex")]
-use libafl_bolts::tuples::{Handle, Handled, MatchNameRef};
+use libafl_bolts::tuples::{Handled, MatchNameRef};
+use libafl_bolts::tuples::Handle;
 use libafl_bolts::{
     AsSlice, AsSliceMut, InputLocation, TargetArgs, Truncate,
     fs::{InputFile, get_unique_std_input_file},
