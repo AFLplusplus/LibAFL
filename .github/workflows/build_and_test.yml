@@ -406,9 +406,7 @@ jobs:
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        env:
-          RUSTC: ""
-        run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} cargo run --manifest-path ./utils/ci_runner/Cargo.toml --  ${{ matrix.fuzzer }}
+        run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} unset RUSTC && cargo run --manifest-path ./utils/ci_runner/Cargo.toml --  ${{ matrix.fuzzer }}
 
   librasan-build:
       runs-on: ubuntu-24.04
