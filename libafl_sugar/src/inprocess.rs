@@ -26,7 +26,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{AflStatsStage, CalibrationStage, ShadowTracingStage, StdMutationalStage},
+    stages::{CalibrationStage, ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
@@ -172,13 +172,6 @@ where
 
             let calibration = CalibrationStage::new(&map_feedback);
 
-            let stats_stage = AflStatsStage::builder()
-                .map_observer(&edges_observer)
-                .build()?;
-            let stats_stage_cmplog = AflStatsStage::builder()
-                .map_observer(&edges_observer)
-                .build()?;
-
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
@@ -292,8 +285,7 @@ where
 
                 // The order of the stages matter!
                 if self.use_cmplog.unwrap_or(false) {
-                    let mut stages =
-                        tuple_list!(stats_stage_cmplog, calibration, tracing, i2s, mutational);
+                    let mut stages = tuple_list!(calibration, tracing, i2s, mutational);
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
                             &mut stages,
@@ -308,7 +300,7 @@ where
                         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
                 } else {
-                    let mut stages = tuple_list!(stats_stage, calibration, mutational);
+                    let mut stages = tuple_list!(calibration, mutational);
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
                             &mut stages,

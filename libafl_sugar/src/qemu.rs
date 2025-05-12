@@ -25,7 +25,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{AflStatsStage, CalibrationStage, ShadowTracingStage, StdMutationalStage},
+    stages::{CalibrationStage, ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
@@ -174,15 +174,6 @@ where
             // Extra MapFeedback to deduplicate finds according to the cov map
             let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
-            let calibration = CalibrationStage::new(&map_feedback);
-
-            let stats_stage = AflStatsStage::builder()
-                .map_observer(&edges_observer)
-                .build()?;
-            let stats_stage_cmplog = AflStatsStage::builder()
-                .map_observer(&edges_observer)
-                .build()?;
-
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
@@ -190,6 +181,9 @@ where
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::new(&time_observer)
             );
+
+            let calibration = CalibrationStage::new(&map_feedback);
+            let calibration_cmplog = CalibrationStage::new(&map_feedback);
 
             // A feedback to choose if an input is a solution or not
             let mut objective = feedback_and_fast!(
@@ -329,8 +323,7 @@ where
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages =
-                        tuple_list!(stats_stage_cmplog, calibration, tracing, i2s, mutational);
+                    let mut stages = tuple_list!(calibration_cmplog, tracing, i2s, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
@@ -351,8 +344,7 @@ where
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages =
-                        tuple_list!(stats_stage_cmplog, calibration, tracing, i2s, mutational);
+                    let mut stages = tuple_list!(calibration_cmplog, tracing, i2s, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
@@ -445,7 +437,7 @@ where
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages = tuple_list!(stats_stage, calibration, mutational);
+                    let mut stages = tuple_list!(calibration, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
@@ -466,7 +458,7 @@ where
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages = tuple_list!(stats_stage, calibration, mutational);
+                    let mut stages = tuple_list!(calibration, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(

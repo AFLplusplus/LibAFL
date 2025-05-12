@@ -23,7 +23,7 @@ use libafl::{
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{
-        AflStatsStage, CalibrationStage, ColorizationStage, IfStage, StdMutationalStage,
+        CalibrationStage, ColorizationStage, IfStage, StdMutationalStage,
         mutational::MultiMutationalStage,
     },
     state::{HasCorpus, HasCurrentTestcase, StdState},
@@ -150,10 +150,6 @@ impl ForkserverBytesCoverageSugar<'_> {
             let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
             let calibration = CalibrationStage::new(&map_feedback);
-
-            let stats_stage = AflStatsStage::builder()
-                .map_observer(&edges_observer)
-                .build()?;
 
             let colorization = ColorizationStage::new(&edges_observer);
 
@@ -303,7 +299,7 @@ impl ForkserverBytesCoverageSugar<'_> {
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!
-                let mut stages = tuple_list!(stats_stage, calibration, cmplog, mutational);
+                let mut stages = tuple_list!(calibration, cmplog, mutational);
 
                 if let Some(iters) = self.iterations {
                     fuzzer.fuzz_loop_for(
@@ -324,7 +320,7 @@ impl ForkserverBytesCoverageSugar<'_> {
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!
-                let mut stages = tuple_list!(stats_stage, calibration, cmplog, mutational);
+                let mut stages = tuple_list!(calibration, cmplog, mutational);
 
                 if let Some(iters) = self.iterations {
                     fuzzer.fuzz_loop_for(
