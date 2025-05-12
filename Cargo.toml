@@ -172,7 +172,6 @@ unsafe_derive_deserialize = "allow"
 similar_names = "allow"
 too_many_lines = "allow"
 comparison_chain = "allow"             # This lint makes **ZERO** sense
-unnecessary_debug_formatting = "allow" # :thumbsdown: :thumbsdown: :thumbsdown: :thumbsdown: :thumbsdown: :thumbsdown: 
 struct_field_names = "allow"           # ????
 
 [workspace.lints.rustdoc]

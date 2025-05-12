@@ -174,6 +174,9 @@ where
             // Extra MapFeedback to deduplicate finds according to the cov map
             let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
+            let calibration = CalibrationStage::new(&map_feedback);
+            let calibration_cmplog = CalibrationStage::new(&map_feedback);
+
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
@@ -181,9 +184,6 @@ where
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::new(&time_observer)
             );
-
-            let calibration = CalibrationStage::new(&map_feedback);
-            let calibration_cmplog = CalibrationStage::new(&map_feedback);
 
             // A feedback to choose if an input is a solution or not
             let mut objective = feedback_and_fast!(

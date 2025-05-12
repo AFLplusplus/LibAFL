@@ -6,7 +6,7 @@ use std::{fs, path::PathBuf};
 use libafl::{
     Error, HasMetadata,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
+    events::{EventConfig, LlmpRestartingEventManager, launcher::Launcher},
     executors::forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -15,18 +15,17 @@ use libafl::{
     inputs::BytesInput,
     monitors::MultiMonitor,
     mutators::{
-        AFLppRedQueen,
+        I2SRandReplace, StdMOptMutator,
         havoc_mutations::havoc_mutations,
         scheduled::{HavocScheduledMutator, tokens_mutations},
         token_mutations::Tokens,
     },
-    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{
-        CalibrationStage, ColorizationStage, IfStage, StdMutationalStage,
-        mutational::MultiMutationalStage,
+    observers::{CanTrack, HitcountsMapObserver, StdCmpObserver, StdMapObserver, TimeObserver},
+    schedulers::{
+        IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
     },
-    state::{HasCorpus, HasCurrentTestcase, StdState},
+    stages::{CalibrationStage, StdMutationalStage, StdPowerMutationalStage, TracingStage},
+    state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
     AsSliceMut, TargetArgs,
@@ -35,9 +34,9 @@ use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{Handled, Merge, tuple_list},
+    tuples::{Merge, tuple_list},
 };
-use libafl_targets::{AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
+use libafl_targets::AFLppCmpLogMap;
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -58,9 +57,9 @@ pub struct ForkserverBytesCoverageSugar<'a> {
     /// Dictionary
     #[builder(default = None)]
     tokens_file: Option<PathBuf>,
-    // Flag if use CmpLog
-    #[builder(default = false)]
-    use_cmplog: bool,
+    // CmpLog binary to execute. If `None`, we will skip CmpLog.
+    #[builder(default = None)]
+    cmplog_binary: Option<PathBuf>,
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -70,7 +69,7 @@ pub struct ForkserverBytesCoverageSugar<'a> {
     #[builder(default = None, setter(strip_option))]
     remote_broker_addr: Option<SocketAddr>,
     /// Path to program to execute
-    program: String,
+    binary: String,
     /// Arguments of the program to execute
     arguments: &'a [String],
     #[builder(default = false)]
@@ -151,55 +150,6 @@ impl ForkserverBytesCoverageSugar<'_> {
 
             let calibration = CalibrationStage::new(&map_feedback);
 
-            let colorization = ColorizationStage::new(&edges_observer);
-
-            // The cmplog map shared between observer and executor
-            let mut cmplog_shmem = shmem_provider_client
-                .uninit_on_shmem::<AFLppCmpLogMap>()
-                .unwrap();
-            // let the forkserver know the shmid
-            unsafe {
-                cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
-            }
-            let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
-
-            let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
-            let cmplog_ref = cmplog_observer.handle();
-
-            let cmplog_executor = ForkserverExecutor::builder()
-                .program(self.program.clone())
-                .parse_afl_cmdline(self.arguments)
-                .is_persistent(true)
-                .coverage_map_size(MAP_SIZE)
-                // increase timeouts for cmplog
-                .timeout(timeout * 10)
-                .debug_child(self.debug_output)
-                .shmem_provider(&mut shmem_provider_client)
-                .build(tuple_list!(cmplog_observer))
-                .unwrap();
-
-            let tracing = AFLppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
-
-            // Setup a randomic Input2State stage
-            let rq: MultiMutationalStage<_, _, BytesInput, _, _, _> =
-                MultiMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));
-
-            let cb = |_fuzzer: &mut _,
-                      _executor: &mut _,
-                      state: &mut StdState<CachedOnDiskCorpus<_>, _, _, _>,
-                      _event_manager: &mut _|
-             -> Result<bool, Error> {
-                if !self.use_cmplog {
-                    return Ok(false);
-                }
-                let testcase = state.current_testcase()?;
-                let res = testcase.scheduled_count() == 1; // let's try on the 2nd trial
-
-                Ok(res)
-            };
-
-            let cmplog = IfStage::new(cb, tuple_list!(colorization, tracing, rq));
-
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
@@ -231,15 +181,32 @@ impl ForkserverBytesCoverageSugar<'_> {
                 .unwrap()
             });
 
+            // Setup a MOPT mutator
+            let mutator = StdMOptMutator::new(
+                &mut state,
+                havoc_mutations().merge(tokens_mutations()),
+                7,
+                5,
+            )?;
+
+            let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
+                StdPowerMutationalStage::new(mutator);
+
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler =
-                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
+            let scheduler = IndexesLenTimeMinimizerScheduler::new(
+                &edges_observer,
+                StdWeightedScheduler::with_schedule(
+                    &mut state,
+                    &edges_observer,
+                    Some(PowerSchedule::explore()),
+                ),
+            );
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             let forkserver = ForkserverExecutor::builder()
-                .program(self.program.clone())
+                .program(self.binary.clone())
                 .parse_afl_cmdline(self.arguments)
                 .is_persistent(true)
                 .autotokens(&mut tokens)
@@ -292,14 +259,40 @@ impl ForkserverBytesCoverageSugar<'_> {
                 }
             }
 
-            if self.tokens_file.is_some() {
-                // Setup a basic mutator
-                let mutator =
-                    HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-                let mutational = StdMutationalStage::new(mutator);
+            if let Some(exec) = &self.cmplog_binary {
+                // The cmplog map shared between observer and executor
+                let mut cmplog_shmem = shmem_provider_client
+                    .uninit_on_shmem::<AFLppCmpLogMap>()
+                    .unwrap();
+                // let the forkserver know the shmid
+                unsafe {
+                    cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
+                }
+                let cmpmap =
+                    unsafe { OwnedRefMut::<AFLppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
+
+                let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
+
+                let cmplog_executor = ForkserverExecutor::builder()
+                    .program(exec)
+                    .debug_child(self.debug_output)
+                    .shmem_provider(&mut shmem_provider_client)
+                    .parse_afl_cmdline(self.arguments)
+                    .is_persistent(true)
+                    // We give more time to the cmplog run
+                    .timeout(timeout * 10)
+                    .build(tuple_list!(cmplog_observer))
+                    .unwrap();
+
+                let tracing = TracingStage::new(cmplog_executor);
+
+                // Setup a randomic Input2State stage
+                let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+                    I2SRandReplace::new()
+                )));
 
                 // The order of the stages matter!
-                let mut stages = tuple_list!(calibration, cmplog, mutational);
+                let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
                 if let Some(iters) = self.iterations {
                     fuzzer.fuzz_loop_for(
@@ -309,18 +302,12 @@ impl ForkserverBytesCoverageSugar<'_> {
                         &mut mgr,
                         iters,
                     )?;
-                    mgr.on_restart(&mut state)?;
-                    std::process::exit(0);
                 } else {
                     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             } else {
-                // Setup a basic mutator
-                let mutator = HavocScheduledMutator::new(havoc_mutations());
-                let mutational = StdMutationalStage::new(mutator);
-
                 // The order of the stages matter!
-                let mut stages = tuple_list!(calibration, cmplog, mutational);
+                let mut stages = tuple_list!(calibration, power);
 
                 if let Some(iters) = self.iterations {
                     fuzzer.fuzz_loop_for(
@@ -330,13 +317,10 @@ impl ForkserverBytesCoverageSugar<'_> {
                         &mut mgr,
                         iters,
                     )?;
-                    mgr.on_restart(&mut state)?;
-                    std::process::exit(0);
                 } else {
                     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             }
-
             Ok(())
         };
 
