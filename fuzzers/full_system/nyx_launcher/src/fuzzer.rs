@@ -7,7 +7,7 @@ use std::{
 use clap::Parser;
 use libafl::{
     events::{
-        ClientDescription, EventConfig, Launcher, LlmpEventManagerBuilder, MonitorTypedEventManager,
+        ClientDescription, EventConfig, Launcher, LlmpEventManagerBuilder, SimpleEventManager,
     },
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
@@ -83,7 +83,7 @@ impl Fuzzer {
         M: Monitor + Clone,
     {
         // The shared memory allocator
-        let mut shmem_provider = StdShMemProvider::new()?;
+        let shmem_provider = StdShMemProvider::new()?;
 
         /* If we are running in verbose, don't provide a replacement stdout, otherwise, use /dev/null */
         let stdout = if self.options.verbose {
@@ -95,45 +95,28 @@ impl Fuzzer {
         let client = Client::new(&self.options);
 
         if self.options.rerun_input.is_some() {
-            // If we want to rerun a single input but we use a restarting mgr, we'll have to create a fake restarting mgr that doesn't actually restart.
-            // It's not pretty but better than recompiling with simplemgr.
-
-            // Just a random number, let's hope it's free :)
-            let broker_port = 13120;
-            let _fake_broker = LlmpBroker::create_attach_to_tcp(
-                shmem_provider.clone(),
-                tuple_list!(),
-                broker_port,
-            )
-            .unwrap();
-
-            // To rerun an input, instead of using a launcher, we create dummy parameters and run the client directly.
             return client.run(
                 None,
-                MonitorTypedEventManager::<_, M>::new(
-                    LlmpEventManagerBuilder::builder().build_on_port(
-                        shmem_provider.clone(),
-                        broker_port,
-                        EventConfig::AlwaysUnique,
-                        Some(StateRestorer::new(
-                            shmem_provider.new_shmem(0x1000).unwrap(),
-                        )),
-                    )?,
-                ),
+                SimpleEventManager::new(monitor.clone()),
                 ClientDescription::new(0, 0, CoreId(0)),
             );
         }
 
         #[cfg(feature = "simplemgr")]
-        return client.run(None, SimpleEventManager::new(monitor), CoreId(0));
+        return client.run(
+            None,
+            SimpleEventManager::new(monitor.clone()),
+            ClientDescription::new(0, 0, CoreId(0)),
+        );
 
         // Build and run a Launcher
+        #[cfg(not(feature = "simplemgr"))]
         match Launcher::builder()
             .shmem_provider(shmem_provider)
             .broker_port(self.options.port)
             .configuration(EventConfig::from_build_id())
             .monitor(monitor)
-            .run_client(|s, m, c| client.run(s, MonitorTypedEventManager::<_, M>::new(m), c))
+            .run_client(|s, m, c| client.run(s, m, c))
             .cores(&self.options.cores)
             .stdout_file(stdout)
             .stderr_file(stdout)
