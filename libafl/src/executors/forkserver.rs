@@ -9,11 +9,11 @@ use core::{
 };
 use std::{
     env,
-    ffi::{CString, OsString},
+    ffi::OsString,
     fs::File,
     io::{self, ErrorKind, Read, Seek, SeekFrom, Write},
     os::{
-        fd::{AsRawFd, BorrowedFd, FromRawFd, OwnedFd},
+        fd::{AsRawFd, BorrowedFd},
         unix::{io::RawFd, process::CommandExt},
     },
     path::PathBuf,
@@ -286,10 +286,23 @@ struct MemFd {
 }
 
 impl MemFd {
+    // This is the best we can do on macOS because
+    // - macos doesn't have memfd_create
+    // - fd returned from shm_open can't be written (https://stackoverflow.com/questions/73752631/cant-write-to-fd-from-shm-open-on-macos)
+    // - there is even no native tmpfs implementation!
+    // therefore we create a file and immediately remove it to get a writtable fd.
+    //
+    // In most cases, capturing stdout/stderr every loop is very slow and mostly for debugging purpose and thus this should be acceptable.
+    #[cfg(target_os = "macos")]
     fn new() -> Result<Self, Error> {
-        let name = CString::new("fsrvmemfd").unwrap();
-        let fd = nix::sys::memfd::memfd_create(&name, MemFdCreateFlag::empty())?;
+        let fp = File::create_new("fsrvmemfd")?;
+        nix::unistd::unlink("fsrvmemfd")?;
+        Ok(Self { file: fp })
+    }
 
+    #[cfg(not(target_os = "macos"))]
+    fn new() -> Result<Self, Error> {
+        let fd = nix::sys::memfd::memfd_create(c"fsrvmemfd", MemFdCreateFlag::empty())?;
         Ok(Self {
             file: File::from(fd),
         })
