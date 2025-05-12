@@ -8,7 +8,7 @@ use clap::Parser;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher};
 use libafl::{
-    events::{ClientDescription, MonitorTypedEventManager, SimpleEventManager},
+    events::{ClientDescription, SimpleEventManager},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
@@ -78,6 +78,10 @@ impl Fuzzer {
     where
         M: Monitor + Clone,
     {
+        // The shared memory allocator
+        #[cfg(not(feature = "simplemgr"))]
+        let shmem_provider = StdShMemProvider::new()?;
+
         /* If we are running in verbose, don't provide a replacement stdout, otherwise, use /dev/null */
         #[cfg(not(feature = "simplemgr"))]
         let stdout = if self.options.verbose {
@@ -91,7 +95,7 @@ impl Fuzzer {
         if self.options.rerun_input.is_some() {
             return client.run(
                 None,
-                MonitorTypedEventManager::<_, M>::new(SimpleEventManager::new(monitor)),
+                SimpleEventManager::new(monitor.clone()),
                 ClientDescription::new(0, 0, CoreId(0)),
             );
         }
@@ -99,7 +103,7 @@ impl Fuzzer {
         #[cfg(feature = "simplemgr")]
         return client.run(
             None,
-            MonitorTypedEventManager::<_, M>::new(SimpleEventManager::new(monitor)),
+            SimpleEventManager::new(monitor.clone()),
             ClientDescription::new(0, 0, CoreId(0)),
         );
 
@@ -110,7 +114,7 @@ impl Fuzzer {
             .broker_port(self.options.port)
             .configuration(EventConfig::from_build_id())
             .monitor(monitor)
-            .run_client(|s, m, c| client.run(s, MonitorTypedEventManager::<_, M>::new(m), c))
+            .run_client(|s, m, c| client.run(s, m, c))
             .cores(&self.options.cores)
             .stdout_file(stdout)
             .stderr_file(stdout)

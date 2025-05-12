@@ -8,9 +8,9 @@ authors = [
 edition = "2021"
 
 [features]
-default = ["std", "injections", "simplemgr"]
+default = ["std", "injections"]
 std = []
-clippy = []                                  # Only for clippy, don't use.
+clippy = []                     # Only for clippy, don't use.
 
 ## Build with a simple event manager instead of Launcher - don't fork, and crash after the first bug.
 simplemgr = []

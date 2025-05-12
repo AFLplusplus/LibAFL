@@ -6,7 +6,6 @@ use libafl::{
         ClientDescription, EventFirer, EventReceiver, EventRestarter, ProgressReporter, SendExiting,
     },
     inputs::BytesInput,
-    monitors::Monitor,
     state::StdState,
     Error,
 };
@@ -16,11 +15,7 @@ use libafl_qemu::modules::{
     utils::filters::StdAddressFilter, DrCovModule, InjectionModule,
 };
 
-use crate::{
-    harness::Harness,
-    instance::{ClientMgr, Instance},
-    options::FuzzerOptions,
-};
+use crate::{harness::Harness, instance::Instance, options::FuzzerOptions};
 
 #[expect(clippy::module_name_repetitions)]
 pub type ClientState =
@@ -53,10 +48,10 @@ impl Client<'_> {
     }
 
     #[expect(clippy::too_many_lines)]
-    pub fn run<EM, M: Monitor>(
+    pub fn run<EM>(
         &self,
         state: Option<ClientState>,
-        mgr: ClientMgr<EM, M>,
+        mgr: EM,
         client_description: ClientDescription,
     ) -> Result<(), Error>
     where

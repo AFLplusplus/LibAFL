@@ -1,18 +1,16 @@
 use core::fmt::Debug;
-use std::{fs, marker::PhantomData, ops::Range, process};
+use std::{fs, ops::Range, process};
 
 use libafl::{
     corpus::{Corpus, HasCurrentCorpusId, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
-        ClientDescription, EventFirer, EventReceiver, EventRestarter, MonitorTypedEventManager,
-        ProgressReporter, SendExiting,
+        ClientDescription, EventFirer, EventReceiver, EventRestarter, ProgressReporter, SendExiting,
     },
     executors::{Executor, ExitKind, ShadowExecutor},
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     inputs::{BytesInput, Input},
-    monitors::Monitor,
     mutators::{
         havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, HavocScheduledMutator,
         StdMOptMutator, Tokens,
@@ -54,8 +52,6 @@ use crate::{harness::Harness, options::FuzzerOptions};
 pub type ClientState =
     StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
-pub type ClientMgr<EM, M> = MonitorTypedEventManager<EM, M>;
-
 /*
  * The snapshot and iterations options interact as follows:
  *
@@ -78,17 +74,15 @@ pub type ClientMgr<EM, M> = MonitorTypedEventManager<EM, M>;
  */
 
 #[derive(TypedBuilder)]
-pub struct Instance<'a, EM, M: Monitor> {
+pub struct Instance<'a, EM> {
     options: &'a FuzzerOptions,
-    mgr: ClientMgr<EM, M>,
+    mgr: EM,
     client_description: ClientDescription,
     #[builder(default)]
     extra_tokens: Vec<String>,
-    #[builder(default=PhantomData)]
-    phantom: PhantomData<M>,
 }
 
-impl<MTEM, M: Monitor> Instance<'_, MTEM, M>
+impl<MTEM> Instance<'_, MTEM>
 where
     MTEM: EventFirer<BytesInput, ClientState>
         + EventRestarter<ClientState>
@@ -436,10 +430,10 @@ where
         stages: &mut ST,
     ) -> Result<(), Error>
     where
-        ST: StagesTuple<E, ClientMgr<MTEM, M>, ClientState, Z>,
+        ST: StagesTuple<E, MTEM, ClientState, Z>,
         RSM: Fn(&mut E, Qemu),
-        Z: Fuzzer<E, ClientMgr<MTEM, M>, BytesInput, ClientState, ST>
-            + Evaluator<E, ClientMgr<MTEM, M>, BytesInput, ClientState>,
+        Z: Fuzzer<E, MTEM, BytesInput, ClientState, ST>
+            + Evaluator<E, MTEM, BytesInput, ClientState>,
     {
         if state.must_load_initial_inputs() {
             let corpus_dirs = [self.options.input_dir()];
