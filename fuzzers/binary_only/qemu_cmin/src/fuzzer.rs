@@ -180,7 +180,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
-    let monitor = SimpleMonitor::with_user_monitor(|s| {
+    let monitor = SimpleMonitor::new(|s| {
         println!("{s}");
     });
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)

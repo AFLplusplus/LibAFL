@@ -1,26 +1,27 @@
 //! Forkserver logic into targets
 
+use core::sync::atomic::{AtomicBool, Ordering};
 use std::{
     os::fd::{AsFd, AsRawFd, BorrowedFd},
     sync::OnceLock,
 };
 
-use core::sync::atomic::{AtomicBool, Ordering};
-
 use libafl::{
     Error,
     executors::forkserver::{
         FORKSRV_FD, FS_ERROR_SHM_OPEN, FS_NEW_OPT_AUTODTCT, FS_NEW_OPT_MAPSIZE,
-        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, SHM_ENV_VAR, SHM_FUZZ_ENV_VAR,
+        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, SHM_CMPLOG_ENV_VAR, SHM_ENV_VAR,
+        SHM_FUZZ_ENV_VAR,
     },
 };
 use libafl_bolts::os::{ChildHandle, ForkResult};
-
 use nix::{
     sys::signal::{SigHandler, Signal},
     unistd::Pid,
 };
 
+#[cfg(feature = "cmplog")]
+use crate::cmps::CMPLOG_MAP_PTR;
 use crate::coverage::{__afl_map_size, EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use crate::coverage::{__token_start, __token_stop};
@@ -163,6 +164,46 @@ fn map_input_shared_memory_internal() -> Result<(), Error> {
     Ok(())
 }
 
+/// Guard [`map_cmplog_shared_memory`] is invoked only once
+#[cfg(feature = "cmplog")]
+static CMPLOG_SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
+
+/// Map the cmplog shared memory region.
+/// The [`CMPLOG_MAP_PTR`] will be updated.
+///
+/// If anything failed, the forkserver will be notified with
+/// [`FS_ERROR_SHM_OPEN`].
+#[cfg(feature = "cmplog")]
+pub fn map_cmplog_shared_memory() -> Result<(), Error> {
+    if CMPLOG_SHM_MAP_GUARD.set(()).is_err() {
+        return Err(Error::illegal_state("shared memory has been mapped before"));
+    }
+    map_cmplog_shared_memory_internal()
+}
+
+#[cfg(feature = "cmplog")]
+fn map_cmplog_shared_memory_internal() -> Result<(), Error> {
+    let Ok(id_str) = std::env::var(SHM_CMPLOG_ENV_VAR) else {
+        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
+        return Err(Error::illegal_argument(
+            "Error: variable for cmplog shared memory is not set",
+        ));
+    };
+    let Ok(shm_id) = id_str.parse() else {
+        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
+        return Err(Error::illegal_argument("Invalid __AFL_CMPLOG_SHM_ID value"));
+    };
+    let map = unsafe { libc::shmat(shm_id, core::ptr::null(), 0) };
+    if map.is_null() || core::ptr::eq(map, libc::MAP_FAILED) {
+        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
+        return Err(Error::illegal_state("shmat for map"));
+    }
+    unsafe {
+        CMPLOG_MAP_PTR = map.cast();
+    }
+    Ok(())
+}
+
 /// Parent to handle all logics with forkserver children
 pub trait ForkserverParent {
     /// Conduct initializing routine before fuzzing loop.
@@ -251,11 +292,8 @@ impl ForkserverParent for MaybePersistentForkserverParent {
             // a child, wait it, and get a stopped signal. Moreover, was_killed is
             // true only if the forkserver killed such child. In all cases, the
             // last_child_pid will never be None.
-            if nix::sys::wait::waitpid(
-                Pid::from_raw(self.last_child_pid.take().unwrap()),
-                None,
-            )
-            .is_err()
+            if nix::sys::wait::waitpid(Pid::from_raw(self.last_child_pid.take().unwrap()), None)
+                .is_err()
             {
                 return Err(Error::illegal_state("child_stopped && was_killed"));
             }
@@ -264,7 +302,7 @@ impl ForkserverParent for MaybePersistentForkserverParent {
         if self.child_stopped {
             // Special handling for persistent mode: if the child is alive but
             // currently stopped, simply restart it with SIGCONT.
-    
+
             // unwrap here: child_stopped is true only if last_child_pid is some.
             let child_pid = *self.last_child_pid.as_ref().unwrap();
             nix::sys::signal::kill(Pid::from_raw(child_pid), Signal::SIGCONT)?;
@@ -281,15 +319,21 @@ impl ForkserverParent for MaybePersistentForkserverParent {
                 }
                 ForkResult::Child => unsafe {
                     // unwrap here: the field is assigned in `pre_fuzzing`
-                    nix::sys::signal::signal(Signal::SIGCHLD, self.old_sigchld_handler.take().unwrap())
-                        .inspect_err(|_| {
-                            log::error!("Fail to restore signal handler for SIGCHLD.");
-                        })?;
+                    nix::sys::signal::signal(
+                        Signal::SIGCHLD,
+                        self.old_sigchld_handler.take().unwrap(),
+                    )
+                    .inspect_err(|_| {
+                        log::error!("Fail to restore signal handler for SIGCHLD.");
+                    })?;
                     // unwrap here: the field is assigned in `pre_fuzzing`
-                    nix::sys::signal::signal(Signal::SIGTERM, self.old_sigterm_handler.take().unwrap())
-                        .inspect_err(|_| {
-                            log::error!("Fail to restore signal handler for SIGTERM.");
-                        })?;
+                    nix::sys::signal::signal(
+                        Signal::SIGTERM,
+                        self.old_sigterm_handler.take().unwrap(),
+                    )
+                    .inspect_err(|_| {
+                        log::error!("Fail to restore signal handler for SIGTERM.");
+                    })?;
                 },
             }
             Ok(fork_result)
@@ -299,7 +343,8 @@ impl ForkserverParent for MaybePersistentForkserverParent {
     fn handle_child_requests(&mut self) -> Result<i32, Error> {
         let mut status = 0i32;
         // unwrap here: the field is assigned if we are parent process in `spawn_child`
-        if unsafe { libc::waitpid(*self.last_child_pid.as_ref().unwrap(), &raw mut status, 0) < 0 } {
+        if unsafe { libc::waitpid(*self.last_child_pid.as_ref().unwrap(), &raw mut status, 0) < 0 }
+        {
             return Err(Error::illegal_state("waitpid"));
         }
         if libc::WIFSTOPPED(status) {

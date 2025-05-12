@@ -490,7 +490,7 @@ where
                 #[cfg(all(unix, feature = "std", not(miri)))]
                 if child_status == SIGNAL_RECURSION_EXIT {
                     return Err(Error::illegal_state(
-                        "The client is stuck in an unexpected signal handler recursion. It is most likely a fuzzer bug.",
+                        "The fuzzer crashed inside a crash handler, this is likely a bug in fuzzer or libafl.",
                     ));
                 }
 

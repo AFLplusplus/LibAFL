@@ -8,7 +8,7 @@ authors = [
 description = "Slot your own fuzzers together and extend their features using Rust"
 documentation = "https://docs.rs/libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"
-readme = "../README.md"
+readme = "../../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 edition = "2024"
@@ -40,6 +40,7 @@ default = [
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
   "simd",
+  "errors_backtrace",
 ]
 document-features = ["dep:document-features"]
 
