@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 use core::{fmt::Debug, time::Duration};
+#[cfg(feature = "std")]
 use std::path::PathBuf;
 
 pub use combined::CombinedExecutor;
@@ -231,6 +232,7 @@ pub fn common_signals() -> Vec<Signal> {
     ]
 }
 
+#[cfg(feature = "std")]
 /// The inner shared members of [`ChildArgs`]
 #[derive(Debug, Clone)]
 pub struct ChildArgsInner {
@@ -246,6 +248,7 @@ pub struct ChildArgsInner {
     pub debug_child: bool,
 }
 
+#[cfg(feature = "std")]
 impl Default for ChildArgsInner {
     fn default() -> Self {
         Self {
@@ -258,6 +261,7 @@ impl Default for ChildArgsInner {
     }
 }
 
+#[cfg(feature = "std")]
 /// The shared implementation for children with stdout/stderr/timeouts.
 pub trait ChildArgs: Sized {
     /// The inner struct of child environment.
