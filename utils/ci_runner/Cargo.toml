@@ -1,0 +1,22 @@
+[package]
+name = "ci_runner"
+edition = "2024"
+authors = ["Dongjia Zhang <tokazerkje@outlook.com>"]
+version.workspace = true
+license.workspace = true
+description = "libafl CI tools for testing fuzzers"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+keywords = ["fuzzing", "testing", "security"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
+readme = "../README.md"
+
+[dependencies]
+
+[lints]
+workspace = true
