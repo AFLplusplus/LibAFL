@@ -427,6 +427,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     if cfg!(unix) {
         cxxflags.push(String::from("-shared"));
         cxxflags.push(String::from("-fPIC"));
+        cxxflags.push(String::from("-std=c++17")); // std::nullopt_t requires this
     }
     if cfg!(windows) {
         cxxflags.push(String::from("-fuse-ld=lld"));
