@@ -32,7 +32,6 @@ use libafl_bolts::{
 use libc::RLIM_INFINITY;
 use nix::{
     sys::{
-        memfd::MemFdCreateFlag,
         select::{FdSet, pselect},
         signal::{SigSet, Signal, kill},
         time::TimeSpec,
@@ -302,7 +301,8 @@ impl MemFd {
 
     #[cfg(not(target_os = "macos"))]
     fn new() -> Result<Self, Error> {
-        let fd = nix::sys::memfd::memfd_create(c"fsrvmemfd", MemFdCreateFlag::empty())?;
+        let fd =
+            nix::sys::memfd::memfd_create(c"fsrvmemfd", nix::sys::memfd::MemFdCreateFlag::empty())?;
         Ok(Self {
             file: File::from(fd),
         })
