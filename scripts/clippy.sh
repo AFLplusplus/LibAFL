@@ -69,10 +69,7 @@ for project in "${PROJECTS[@]}"; do
       echo "Warning: Directory $project does not exist. Skipping."
    fi
 done
-
+# Last run it on all
 eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"
 
 echo "Clippy run completed for all specified projects."
-
-# Last run it on all
-eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"
