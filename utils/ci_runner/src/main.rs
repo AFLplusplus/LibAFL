@@ -30,7 +30,6 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
         env::set_var("PROFILE_DIR", "debug");
     }
 
-    print!("Testing {:#?} {:#?}", fuzzers_to_test, args[1]);
     for f in &fuzzers_to_test {
         print!(" {}", f.to_string_lossy());
     }
