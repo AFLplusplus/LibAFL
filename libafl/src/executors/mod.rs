@@ -298,10 +298,6 @@ pub trait ChildArgs: Sized {
     /// If set to true, the child's output won't be redirecited to `/dev/null` and will go to parent's stdout/stderr
     /// Defaults to `false`.
     fn debug_child(mut self, debug_child: bool) -> Self {
-        assert!(
-            self.inner().stderr_observer.is_none() && self.inner().stdout_observer.is_none(),
-            "You have request to collect stdout/stderr from children and thus can not output them to parent stdout/stderr by debug_child"
-        );
         self.inner_mut().debug_child = debug_child;
         self
     }
