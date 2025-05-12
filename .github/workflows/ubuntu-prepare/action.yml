@@ -3,12 +3,16 @@ description: Sets up the Rust environment for the CI workflow
 runs:
   using: composite
   steps:
+    - name: Uninstall all currently installed rust
+      shell: bash
+      run: |
+        sudo apt purge -y 'cargo*' 'rust*'
     - name: Install and cache deps
       shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install -y curl lsb-release wget software-properties-common gnupg shellcheck pax-utils libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@nightly
     - name: install just
       uses: extractions/setup-just@v2
       with:
