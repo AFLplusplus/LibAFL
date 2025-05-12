@@ -11,7 +11,7 @@ runs:
           gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
     - name: Remove old rust
       shell: bash
-      run: sudo apt purge -y 'rust*' 'cargo*''
+      run: sudo apt purge -y 'rust*' 'cargo*'
     - uses: dtolnay/rust-toolchain@stable
       env:
         RUSTUP_HOME: /usr/local/rustup
