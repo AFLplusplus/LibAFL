@@ -153,7 +153,6 @@ where
     F: FnMut(&str),
 {
     print_fn: F,
-    print_user_monitor: bool,
 }
 
 impl<F> Debug for SimpleMonitor<F>
@@ -188,12 +187,10 @@ where
             global_stats.execs_per_sec_pretty
         );
 
-        if self.print_user_monitor {
-            client_stats_manager.client_stats_insert(sender_id)?;
-            let client = client_stats_manager.client_stats_for(sender_id)?;
-            for (key, val) in client.user_stats() {
-                write!(fmt, ", {key}: {val}").unwrap();
-            }
+        client_stats_manager.client_stats_insert(sender_id)?;
+        let client = client_stats_manager.client_stats_for(sender_id)?;
+        for (key, val) in client.user_stats() {
+            write!(fmt, ", {key}: {val}").unwrap();
         }
 
         (self.print_fn)(&fmt);
@@ -222,10 +219,7 @@ where
 {
     /// Creates the monitor, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
-        Self {
-            print_fn,
-            print_user_monitor: false,
-        }
+        Self { print_fn }
     }
 
     /// Creates the monitor with a given `start_time`.
@@ -235,14 +229,6 @@ where
     )]
     pub fn with_time(print_fn: F, _start_time: Duration) -> Self {
         Self::new(print_fn)
-    }
-
-    /// Creates the monitor that also prints the user monitor
-    pub fn with_user_monitor(print_fn: F) -> Self {
-        Self {
-            print_fn,
-            print_user_monitor: true,
-        }
     }
 }
 

@@ -149,7 +149,7 @@ pub fn main() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::with_user_monitor(|s| {
+    let monitor = SimpleMonitor::new(|s| {
         println!("{s}");
     });
 

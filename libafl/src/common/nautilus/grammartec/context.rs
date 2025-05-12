@@ -5,6 +5,7 @@ use libafl_bolts::{
     nonzero,
     rands::{Rand, RomuDuoJrRand},
 };
+#[cfg(feature = "nautilus_py")]
 use pyo3::prelude::PyObject;
 
 use super::{
@@ -83,6 +84,7 @@ impl Context {
         rid
     }
 
+    #[cfg(feature = "nautilus_py")]
     pub fn add_script(&mut self, nt: &str, nts: &[String], script: PyObject) -> RuleId {
         let rid = self.rules.len().into();
         let rule = Rule::from_script(self, nt, nts, script);

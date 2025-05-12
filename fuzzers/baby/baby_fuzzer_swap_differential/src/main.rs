@@ -203,7 +203,7 @@ pub fn main() {
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
     #[cfg(not(feature = "tui"))]
-    let mon = SimpleMonitor::with_user_monitor(|s| println!("{s}"));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
     #[cfg(feature = "tui")]
     let mon = TuiMonitor::builder()
         .title("Baby Fuzzer")
