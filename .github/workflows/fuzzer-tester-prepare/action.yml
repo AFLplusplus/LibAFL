@@ -27,7 +27,6 @@ runs:
       uses: extractions/setup-just@v2
       with:
         just-version: '1.40.0'
-    
     - name: Add wasm target
       if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
       shell: bash
