@@ -100,8 +100,8 @@ use crate::{Error, observers::Observer};
 ///    let mut executor = CommandExecutor::builder()
 ///        .program("base64")
 ///        .arg("--decode")
-///        .stdout_observer(stdout_observer.handle())
-///        .stderr_observer(stderr_observer.handle())
+///        .stdout(stdout_observer.handle())
+///        .stderr(stderr_observer.handle())
 ///        .build(tuple_list!(stdout_observer, stderr_observer))
 ///        .unwrap();
 ///
