@@ -27,6 +27,7 @@ members = [
   "utils/libafl_benches",
   "utils/libafl_jumper",
   "utils/ci_runner",
+  "utils/ci_splitter",
 ]
 
 default-members = [
