@@ -403,11 +403,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
+        env:
+          RUSTC: ""
         run: ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} cargo run --manifest-path ./utils/ci_runner/Cargo.toml --  ${{ matrix.fuzzer }}
 
   librasan-build:
