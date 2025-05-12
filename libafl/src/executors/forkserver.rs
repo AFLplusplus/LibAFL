@@ -1002,7 +1002,7 @@ where
         log::info!(
             "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
             target,
-            self.arguments.clone(),
+            self.target_inner.arguments.clone(),
             self.use_stdin()
         );
 
@@ -1025,7 +1025,7 @@ where
 
         Ok(ForkserverExecutor {
             target,
-            args: self.arguments.clone(),
+            args: self.target_inner.arguments.clone(),
             input_file,
             uses_shmem_testcase: self.uses_shmem_testcase,
             forkserver,
@@ -1064,7 +1064,7 @@ where
         log::info!(
             "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}, map_size: {:?}",
             target,
-            self.arguments.clone(),
+            self.target_inner.arguments.clone(),
             self.use_stdin(),
             self.map_size
         );
@@ -1085,7 +1085,7 @@ where
 
         Ok(ForkserverExecutor {
             target,
-            args: self.arguments.clone(),
+            args: self.target_inner.arguments.clone(),
             input_file,
             uses_shmem_testcase: self.uses_shmem_testcase,
             forkserver,
@@ -1107,7 +1107,7 @@ where
 
     #[expect(clippy::pedantic)]
     fn build_helper(&mut self) -> Result<(Forkserver, InputFile, Option<SHM>), Error> {
-        let input_file = match &self.input_location {
+        let input_file = match &self.target_inner.input_location {
             InputLocation::StdIn => InputFile::create(OsString::from(get_unique_std_input_file()))?,
             InputLocation::Arg { argnum: _ } => {
                 return Err(Error::illegal_argument(

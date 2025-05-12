@@ -13,7 +13,7 @@ use core::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use std::os::fd::AsRawFd;
 use std::{
-    ffi::{OsStr, OsString},
+    ffi::OsStr,
     io::{Read, Write},
     os::unix::ffi::OsStrExt,
     path::PathBuf,
@@ -662,7 +662,7 @@ impl CommandExecutorBuilder {
         };
 
         let mut command = Command::new(program);
-        match &self.input_location {
+        match &self.target_inner.input_location {
             InputLocation::StdIn => {
                 command.stdin(Stdio::piped());
             }
@@ -697,7 +697,7 @@ impl CommandExecutorBuilder {
             debug_child: self.debug_child,
             stdout_observer: self.stdout.clone(),
             stderr_observer: self.stderr.clone(),
-            input_location: self.input_location.clone(),
+            input_location: self.target_inner.input_location.clone(),
             timeout: self.timeout,
             command,
         };
