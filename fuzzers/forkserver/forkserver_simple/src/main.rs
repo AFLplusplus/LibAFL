@@ -1,19 +1,22 @@
 use core::time::Duration;
-use std::path::PathBuf;
+use std::{ops::Index, path::PathBuf};
 
 use clap::Parser;
 use libafl::{
     HasMetadata,
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{HasObservers, forkserver::ForkserverExecutor},
+    executors::{HasObservers, command::ChildrenArgs, forkserver::ForkserverExecutor},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{HavocScheduledMutator, Tokens, havoc_mutations, tokens_mutations},
-    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{
+        CanTrack, HitcountsMapObserver, StdErrObserver, StdMapObserver, StdOutObserver,
+        TimeObserver,
+    },
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
@@ -166,17 +169,30 @@ pub fn main() {
 
     let observer_ref = edges_observer.handle();
 
+    // By deisgn use observers to collect stdout/stderr to illustrate usages
+    let stdout = StdOutObserver::new("simple_stdout");
+    let stderr = StdErrObserver::new("simple_stderr");
+
+    let stdout_handle = stdout.handle();
+    let stderr_handle = stderr.handle();
+
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable)
-        .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
         .parse_afl_cmdline(args)
         .coverage_map_size(MAP_SIZE)
         .timeout(Duration::from_millis(opt.timeout))
-        .kill_signal(opt.signal)
-        .build(tuple_list!(time_observer, edges_observer))
+        .kill_signal(opt.signal);
+
+    if debug_child {
+        executor = executor
+            .stderr(stderr_handle.clone())
+            .stdout(stdout_handle.clone());
+    }
+    let mut executor = executor
+        .build(tuple_list!(time_observer, edges_observer, stdout, stderr))
         .unwrap();
 
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
@@ -205,7 +221,35 @@ pub fn main() {
         HavocScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 6);
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-    fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
-        .expect("Error in the fuzzing loop");
+    if !debug_child {
+        fuzzer
+            .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+            .expect("Error in the fuzzing loop");
+    } else {
+        loop {
+            fuzzer
+                .fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)
+                .expect("Error in fuzz_one");
+
+            println!(
+                "Stdout:\n{}\nStderr:\n{}",
+                String::from_utf8_lossy(
+                    executor
+                        .observers()
+                        .index(&stdout_handle)
+                        .output
+                        .as_ref()
+                        .unwrap()
+                ),
+                String::from_utf8_lossy(
+                    executor
+                        .observers()
+                        .index(&stderr_handle)
+                        .output
+                        .as_ref()
+                        .unwrap()
+                )
+            );
+        }
+    }
 }

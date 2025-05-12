@@ -12,6 +12,7 @@ use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
+        command::ChildrenArgs,
         forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
         sand::SANDExecutor,
     },

@@ -16,7 +16,9 @@ use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::ProgressReporter,
-    executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder, SHM_CMPLOG_ENV_VAR},
+    executors::forkserver::{
+        command::ChildrenArgs, ForkserverExecutor, ForkserverExecutorBuilder, SHM_CMPLOG_ENV_VAR,
+    },
     feedback_and, feedback_or, feedback_or_fast,
     feedbacks::{
         CaptureTimeoutFeedback, ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback,

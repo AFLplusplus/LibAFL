@@ -11,7 +11,7 @@ use clap::{Arg, ArgAction, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+    executors::forkserver::{command::ChildrenArgs, ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},

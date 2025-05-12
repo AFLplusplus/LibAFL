@@ -24,6 +24,7 @@ int main(int argc, char **argv) {
   unsigned char *buf = __AFL_FUZZ_TESTCASE_BUF;
 
   printf("input: %s\n", buf);
+  fprintf(stderr, "input(stderr): %s\n", buf);
   if (buf[0] == 'b') {
     if (buf[1] == 'a') {
       if (buf[2] == 'd') { abort(); }
