@@ -16,7 +16,6 @@ use std::{
     ffi::OsStr,
     io::{Read, Write},
     os::unix::ffi::OsStrExt,
-    path::PathBuf,
     process::{Child, Command, Stdio},
 };
 
@@ -46,7 +45,7 @@ use nix::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use typed_builder::TypedBuilder;
 
-use super::HasTimeout;
+use super::{ChildArgs, ChildArgsInner, HasTimeout};
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
@@ -493,85 +492,11 @@ where
     }
 }
 
-/// The shared implementation for children with stdout/stderr/timeouts.
-pub trait ChildrenArgs: Sized {
-    /// The timeout of the children
-    fn timeout_ref(&self) -> &Duration;
-    /// The mutable refernce of the timeout of the children
-    fn timeout_mut(&mut self) -> &mut Duration;
-
-    /// The stderr handle of the children
-    fn stderr_ref(&self) -> &Option<Handle<StdErrObserver>>;
-    /// The mutable stderr handle of the children
-    fn stderr_mut(&mut self) -> &mut Option<Handle<StdErrObserver>>;
-
-    /// The stdout handle of the children
-    fn stdout_ref(&self) -> &Option<Handle<StdOutObserver>>;
-    /// The mutable stdout handle of the children
-    fn stdout_mut(&mut self) -> &mut Option<Handle<StdOutObserver>>;
-
-    /// The current directory of the spawned children
-    fn current_dir_ref(&self) -> &Option<PathBuf>;
-    /// The mutable current directory of the spanwed children
-    fn current_dir_mut(&mut self) -> &mut Option<PathBuf>;
-
-    /// Whether debug child by inheriting stdout/stderr
-    fn debug_child_ref(&self) -> &bool;
-    /// Whether debug child by inheriting stdout/stderr
-    fn debug_child_mut(&mut self) -> &mut bool;
-
-    // --- Builder methods ----
-
-    #[must_use]
-    /// Sets the execution timeout duration.
-    fn timeout(mut self, timeout: Duration) -> Self {
-        *self.timeout_mut() = timeout;
-        self
-    }
-
-    #[must_use]
-    /// Sets the stdout observer
-    fn stdout(mut self, stdout: Handle<StdOutObserver>) -> Self {
-        *self.stdout_mut() = Some(stdout);
-        self
-    }
-
-    #[must_use]
-    /// Sets the stderr observer
-    fn stderr(mut self, stderr: Handle<StdErrObserver>) -> Self {
-        *self.stderr_mut() = Some(stderr);
-        self
-    }
-
-    #[must_use]
-    /// Sets the working directory for the child process.
-    fn current_dir(mut self, current_dir: PathBuf) -> Self {
-        *self.current_dir_mut() = Some(current_dir);
-        self
-    }
-
-    #[must_use]
-    /// If set to true, the child's output won't be redirecited to `/dev/null` and will go to parent's stdout/stderr
-    /// Defaults to `false`.
-    fn debug_child(mut self) -> Self {
-        assert!(
-            self.stderr_ref().is_none() && self.stdout_ref().is_none(),
-            "You have request to collect stdout/stderr from children and thus can not output them to parent stdout/stderr by debug_child"
-        );
-        *self.debug_child_mut() = true;
-        self
-    }
-}
-
 /// The builder for a default [`CommandExecutor`] that should fit most use-cases.
 #[derive(Debug, Clone)]
 pub struct CommandExecutorBuilder {
     target_inner: TargetArgsInner,
-    stdout: Option<Handle<StdOutObserver>>,
-    stderr: Option<Handle<StdErrObserver>>,
-    debug_child: bool,
-    cwd: Option<PathBuf>,
-    timeout: Duration,
+    child_env_inner: ChildArgsInner,
 }
 
 impl TargetArgs for CommandExecutorBuilder {
@@ -584,45 +509,13 @@ impl TargetArgs for CommandExecutorBuilder {
     }
 }
 
-impl ChildrenArgs for CommandExecutorBuilder {
-    fn current_dir_ref(&self) -> &Option<PathBuf> {
-        &self.cwd
+impl ChildArgs for CommandExecutorBuilder {
+    fn inner(&self) -> &ChildArgsInner {
+        &self.child_env_inner
     }
 
-    fn current_dir_mut(&mut self) -> &mut Option<PathBuf> {
-        &mut self.cwd
-    }
-
-    fn timeout_ref(&self) -> &Duration {
-        &self.timeout
-    }
-
-    fn timeout_mut(&mut self) -> &mut Duration {
-        &mut self.timeout
-    }
-
-    fn debug_child_ref(&self) -> &bool {
-        &self.debug_child
-    }
-
-    fn debug_child_mut(&mut self) -> &mut bool {
-        &mut self.debug_child
-    }
-
-    fn stderr_ref(&self) -> &Option<Handle<StdErrObserver>> {
-        &self.stderr
-    }
-
-    fn stderr_mut(&mut self) -> &mut Option<Handle<StdErrObserver>> {
-        &mut self.stderr
-    }
-
-    fn stdout_ref(&self) -> &Option<Handle<StdOutObserver>> {
-        &self.stdout
-    }
-
-    fn stdout_mut(&mut self) -> &mut Option<Handle<StdOutObserver>> {
-        &mut self.stdout
+    fn inner_mut(&mut self) -> &mut ChildArgsInner {
+        &mut self.child_env_inner
     }
 }
 
@@ -638,11 +531,7 @@ impl CommandExecutorBuilder {
     fn new() -> CommandExecutorBuilder {
         CommandExecutorBuilder {
             target_inner: TargetArgsInner::default(),
-            stdout: None,
-            stderr: None,
-            cwd: None,
-            timeout: Duration::from_secs(5),
-            debug_child: false,
+            child_env_inner: ChildArgsInner::default(),
         }
     }
 
@@ -677,28 +566,28 @@ impl CommandExecutorBuilder {
                 .iter()
                 .map(|(k, v)| (k.as_os_str(), v.as_os_str())),
         );
-        if let Some(cwd) = &self.cwd {
+        if let Some(cwd) = &self.child_env_inner.current_directory {
             command.current_dir(cwd);
         }
-        if !self.debug_child {
+        if !self.child_env_inner.debug_child {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
 
-        if self.stdout.is_some() {
+        if self.child_env_inner.stdout_observer.is_some() {
             command.stdout(Stdio::piped());
         }
 
-        if self.stderr.is_some() {
+        if self.child_env_inner.stderr_observer.is_some() {
             command.stderr(Stdio::piped());
         }
 
         let configurator = StdCommandConfigurator {
-            debug_child: self.debug_child,
-            stdout_observer: self.stdout.clone(),
-            stderr_observer: self.stderr.clone(),
+            debug_child: self.child_env_inner.debug_child,
+            stdout_observer: self.child_env_inner.stdout_observer.clone(),
+            stderr_observer: self.child_env_inner.stderr_observer.clone(),
             input_location: self.target_inner.input_location.clone(),
-            timeout: self.timeout,
+            timeout: self.child_env_inner.timeout,
             command,
         };
         Ok(

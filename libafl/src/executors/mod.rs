@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 use core::{fmt::Debug, time::Duration};
+use std::path::PathBuf;
 
 pub use combined::CombinedExecutor;
 #[cfg(all(feature = "std", unix))]
@@ -14,12 +15,15 @@ pub use inprocess::InProcessExecutor;
 pub use inprocess_fork::InProcessForkExecutor;
 #[cfg(unix)]
 use libafl_bolts::os::unix_signals::Signal;
-use libafl_bolts::tuples::RefIndexable;
+use libafl_bolts::tuples::{Handle, RefIndexable};
 use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
-use crate::Error;
+use crate::{
+    Error,
+    observers::{StdErrObserver, StdOutObserver},
+};
 
 pub mod combined;
 #[cfg(all(feature = "std", unix))]
@@ -225,6 +229,82 @@ pub fn common_signals() -> Vec<Signal> {
         Signal::SigSegmentationFault,
         Signal::SigTrap,
     ]
+}
+
+/// The inner shared members of [`ChildArgs`]
+#[derive(Debug, Clone)]
+pub struct ChildArgsInner {
+    /// The timeout of the children
+    pub timeout: Duration,
+    /// The stderr handle of the children
+    pub stderr_observer: Option<Handle<StdErrObserver>>,
+    /// The stdout handle of the children
+    pub stdout_observer: Option<Handle<StdOutObserver>>,
+    /// The current directory of the spawned children
+    pub current_directory: Option<PathBuf>,
+    /// Whether debug child by inheriting stdout/stderr
+    pub debug_child: bool,
+}
+
+impl Default for ChildArgsInner {
+    fn default() -> Self {
+        Self {
+            timeout: Duration::from_millis(5000),
+            stderr_observer: None,
+            stdout_observer: None,
+            current_directory: None,
+            debug_child: false,
+        }
+    }
+}
+
+/// The shared implementation for children with stdout/stderr/timeouts.
+pub trait ChildArgs: Sized {
+    /// The inner struct of child environment.
+    fn inner(&self) -> &ChildArgsInner;
+
+    /// The mutable inner struct of child environment.
+    fn inner_mut(&mut self) -> &mut ChildArgsInner;
+
+    #[must_use]
+    /// Sets the execution timeout duration.
+    fn timeout(mut self, timeout: Duration) -> Self {
+        self.inner_mut().timeout = timeout;
+        self
+    }
+
+    #[must_use]
+    /// Sets the stdout observer
+    fn stdout(mut self, stdout: Handle<StdOutObserver>) -> Self {
+        self.inner_mut().stdout_observer = Some(stdout);
+        self
+    }
+
+    #[must_use]
+    /// Sets the stderr observer
+    fn stderr(mut self, stderr: Handle<StdErrObserver>) -> Self {
+        self.inner_mut().stderr_observer = Some(stderr);
+        self
+    }
+
+    #[must_use]
+    /// Sets the working directory for the child process.
+    fn current_dir(mut self, current_dir: PathBuf) -> Self {
+        self.inner_mut().current_directory = Some(current_dir);
+        self
+    }
+
+    #[must_use]
+    /// If set to true, the child's output won't be redirecited to `/dev/null` and will go to parent's stdout/stderr
+    /// Defaults to `false`.
+    fn debug_child(mut self, debug_child: bool) -> Self {
+        assert!(
+            self.inner().stderr_observer.is_none() && self.inner().stdout_observer.is_none(),
+            "You have request to collect stdout/stderr from children and thus can not output them to parent stdout/stderr by debug_child"
+        );
+        self.inner_mut().debug_child = debug_child;
+        self
+    }
 }
 
 #[cfg(test)]

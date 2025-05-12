@@ -40,7 +40,7 @@ use nix::{
     unistd::Pid,
 };
 
-use super::{HasTimeout, command::ChildrenArgs};
+use super::{ChildArgs, ChildArgsInner, HasTimeout};
 #[cfg(feature = "regex")]
 use crate::observers::{
     AsanBacktraceObserver, get_asan_runtime_flags, get_asan_runtime_flags_with_log_path,
@@ -903,7 +903,7 @@ where
 #[expect(clippy::struct_excessive_bools)]
 pub struct ForkserverExecutorBuilder<'a, SP> {
     target_inner: TargetArgsInner,
-    debug_child: bool,
+    child_env_inner: ChildArgsInner,
     uses_shmem_testcase: bool,
     is_persistent: bool,
     is_deferred_frksrv: bool,
@@ -913,54 +913,18 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     min_input_size: usize,
     map_size: Option<usize>,
     kill_signal: Option<Signal>,
-    timeout: Duration,
-    stdout: Option<Handle<StdOutObserver>>,
-    stderr: Option<Handle<StdErrObserver>>,
-    cwd: Option<PathBuf>,
     #[cfg(feature = "regex")]
     asan_obs: Option<Handle<AsanBacktraceObserver>>,
     crash_exitcode: Option<i8>,
 }
 
-impl<SP> ChildrenArgs for ForkserverExecutorBuilder<'_, SP> {
-    fn current_dir_ref(&self) -> &Option<PathBuf> {
-        &self.cwd
+impl<SP> ChildArgs for ForkserverExecutorBuilder<'_, SP> {
+    fn inner(&self) -> &ChildArgsInner {
+        &self.child_env_inner
     }
 
-    fn current_dir_mut(&mut self) -> &mut Option<PathBuf> {
-        &mut self.cwd
-    }
-
-    fn timeout_ref(&self) -> &Duration {
-        &self.timeout
-    }
-
-    fn timeout_mut(&mut self) -> &mut Duration {
-        &mut self.timeout
-    }
-
-    fn debug_child_ref(&self) -> &bool {
-        &self.debug_child
-    }
-
-    fn debug_child_mut(&mut self) -> &mut bool {
-        &mut self.debug_child
-    }
-
-    fn stderr_ref(&self) -> &Option<Handle<StdErrObserver>> {
-        &self.stderr
-    }
-
-    fn stderr_mut(&mut self) -> &mut Option<Handle<StdErrObserver>> {
-        &mut self.stderr
-    }
-
-    fn stdout_ref(&self) -> &Option<Handle<StdOutObserver>> {
-        &self.stdout
-    }
-
-    fn stdout_mut(&mut self) -> &mut Option<Handle<StdOutObserver>> {
-        &mut self.stdout
+    fn inner_mut(&mut self) -> &mut ChildArgsInner {
+        &mut self.child_env_inner
     }
 }
 
@@ -1012,7 +976,7 @@ where
             ));
         }
 
-        let timeout: TimeSpec = self.timeout.into();
+        let timeout: TimeSpec = self.child_env_inner.timeout.into();
         if self.min_input_size > self.max_input_size {
             return Err(Error::illegal_argument(
                 format!(
@@ -1081,7 +1045,7 @@ where
             ));
         }
 
-        let timeout: TimeSpec = self.timeout.into();
+        let timeout: TimeSpec = self.child_env_inner.timeout.into();
 
         Ok(ForkserverExecutor {
             target,
@@ -1134,13 +1098,13 @@ where
             }
         };
 
-        let stdout = if let Some(handle) = &self.stdout {
+        let stdout = if let Some(handle) = &self.child_env_inner.stdout_observer {
             Some((MemFd::new()?, handle.clone()))
         } else {
             None
         };
 
-        let stderr = if let Some(handle) = &self.stderr {
+        let stderr = if let Some(handle) = &self.child_env_inner.stderr_observer {
             Some((MemFd::new()?, handle.clone()))
         } else {
             None
@@ -1158,11 +1122,11 @@ where
                 self.is_deferred_frksrv,
                 self.has_asan_obs(),
                 self.map_size,
-                self.debug_child,
+                self.child_env_inner.debug_child,
                 self.kill_signal.unwrap_or(KILL_SIGNAL_DEFAULT),
                 stdout,
                 stderr,
-                self.cwd.clone(),
+                self.child_env_inner.current_directory.clone(),
             )?,
             None => {
                 return Err(Error::illegal_argument(
@@ -1422,13 +1386,6 @@ where
         self
     }
 
-    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    #[must_use]
-    pub fn debug_child(mut self, debug_child: bool) -> Self {
-        self.debug_child = debug_child;
-        self
-    }
-
     /// Call this if you want to run it under persistent mode; default is false
     #[must_use]
     pub fn is_persistent(mut self, is_persistent: bool) -> Self {
@@ -1490,7 +1447,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
         ForkserverExecutorBuilder {
             target_inner: TargetArgsInner::default(),
-            debug_child: false,
+            child_env_inner: ChildArgsInner::default(),
             uses_shmem_testcase: false,
             is_persistent: false,
             is_deferred_frksrv: false,
@@ -1500,10 +1457,6 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
             min_input_size: MIN_INPUT_SIZE_DEFAULT,
             kill_signal: None,
-            timeout: Duration::from_millis(5000),
-            stderr: None,
-            stdout: None,
-            cwd: None,
             #[cfg(feature = "regex")]
             asan_obs: None,
             crash_exitcode: None,
@@ -1522,7 +1475,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             shmem_provider: Some(shmem_provider),
             // Copy all other values from the old Builder
             target_inner: self.target_inner,
-            debug_child: self.debug_child,
+            child_env_inner: self.child_env_inner,
             uses_shmem_testcase: self.uses_shmem_testcase,
             is_persistent: self.is_persistent,
             is_deferred_frksrv: self.is_deferred_frksrv,
@@ -1531,10 +1484,6 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             max_input_size: self.max_input_size,
             min_input_size: self.min_input_size,
             kill_signal: self.kill_signal,
-            timeout: self.timeout,
-            stderr: self.stderr,
-            stdout: self.stdout,
-            cwd: self.cwd,
             #[cfg(feature = "regex")]
             asan_obs: self.asan_obs,
             crash_exitcode: self.crash_exitcode,
@@ -1613,7 +1562,10 @@ mod tests {
     use crate::{
         Error,
         corpus::NopCorpus,
-        executors::forkserver::{FAILED_TO_START_FORKSERVER_MSG, ForkserverExecutor},
+        executors::{
+            ChildArgs,
+            forkserver::{FAILED_TO_START_FORKSERVER_MSG, ForkserverExecutor},
+        },
         inputs::BytesInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
     };

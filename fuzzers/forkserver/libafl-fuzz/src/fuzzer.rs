@@ -17,8 +17,8 @@ use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::ProgressReporter,
     executors::{
-        command::ChildrenArgs,
         forkserver::{ForkserverExecutor, ForkserverExecutorBuilder, SHM_CMPLOG_ENV_VAR},
+        ChildArgs,
     },
     feedback_and, feedback_or, feedback_or_fast,
     feedbacks::{
