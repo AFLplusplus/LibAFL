@@ -97,5 +97,5 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
 }
 
 fn main() {
-    run.unwrap();
+    run().unwrap();
 }
