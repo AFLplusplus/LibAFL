@@ -23,7 +23,7 @@ use std::{
 #[cfg(feature = "regex")]
 use libafl_bolts::tuples::{Handled, MatchNameRef};
 use libafl_bolts::{
-    AsSlice, AsSliceMut, InputLocation, TargetArgs, Truncate,
+    AsSlice, AsSliceMut, InputLocation, TargetArgs, TargetArgsInner, Truncate,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
@@ -902,15 +902,12 @@ where
 #[derive(Debug)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct ForkserverExecutorBuilder<'a, SP> {
-    program: Option<OsString>,
-    arguments: Vec<OsString>,
-    envs: Vec<(OsString, OsString)>,
+    target_inner: TargetArgsInner,
     debug_child: bool,
     uses_shmem_testcase: bool,
     is_persistent: bool,
     is_deferred_frksrv: bool,
     autotokens: Option<&'a mut Tokens>,
-    input_location: InputLocation,
     shmem_provider: Option<&'a mut SP>,
     max_input_size: usize,
     min_input_size: usize,
@@ -968,35 +965,12 @@ impl<SP> ChildrenArgs for ForkserverExecutorBuilder<'_, SP> {
 }
 
 impl<SP> TargetArgs for ForkserverExecutorBuilder<'_, SP> {
-    fn arguments_ref(&self) -> &Vec<OsString> {
-        &self.arguments
-    }
-    fn arguments_mut(&mut self) -> &mut Vec<OsString> {
-        &mut self.arguments
+    fn inner(&self) -> &TargetArgsInner {
+        &self.target_inner
     }
 
-    fn envs_ref(&self) -> &Vec<(OsString, OsString)> {
-        &self.envs
-    }
-
-    fn envs_mut(&mut self) -> &mut Vec<(OsString, OsString)> {
-        &mut self.envs
-    }
-
-    fn program_ref(&self) -> &Option<OsString> {
-        &self.program
-    }
-
-    fn program_mut(&mut self) -> &mut Option<OsString> {
-        &mut self.program
-    }
-
-    fn input_location_ref(&self) -> &InputLocation {
-        &self.input_location
-    }
-
-    fn input_location_mut(&mut self) -> &mut InputLocation {
-        &mut self.input_location
+    fn inner_mut(&mut self) -> &mut TargetArgsInner {
+        &mut self.target_inner
     }
 
     fn arg_input_arg(self) -> Self {
@@ -1024,7 +998,7 @@ where
     {
         let (forkserver, input_file, map) = self.build_helper()?;
 
-        let target = self.program.take().unwrap();
+        let target = self.target_inner.program.take().unwrap();
         log::info!(
             "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
             target,
@@ -1086,7 +1060,7 @@ where
     {
         let (forkserver, input_file, map) = self.build_helper()?;
 
-        let target = self.program.take().unwrap();
+        let target = self.target_inner.program.take().unwrap();
         log::info!(
             "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}, map_size: {:?}",
             target,
@@ -1172,11 +1146,11 @@ where
             None
         };
 
-        let mut forkserver = match &self.program {
+        let mut forkserver = match &self.target_inner.program {
             Some(t) => Forkserver::new(
                 t.clone(),
-                self.arguments.clone(),
-                self.envs.clone(),
+                self.target_inner.arguments.clone(),
+                self.target_inner.envs.clone(),
                 input_file.as_raw_fd(),
                 self.use_stdin(),
                 0,
@@ -1515,15 +1489,12 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     #[must_use]
     pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
         ForkserverExecutorBuilder {
-            program: None,
-            arguments: vec![],
-            envs: vec![],
+            target_inner: TargetArgsInner::default(),
             debug_child: false,
             uses_shmem_testcase: false,
             is_persistent: false,
             is_deferred_frksrv: false,
             autotokens: None,
-            input_location: InputLocation::StdIn,
             shmem_provider: None,
             map_size: None,
             max_input_size: MAX_INPUT_SIZE_DEFAULT,
@@ -1550,15 +1521,12 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             // Set the new provider
             shmem_provider: Some(shmem_provider),
             // Copy all other values from the old Builder
-            program: self.program,
-            arguments: self.arguments,
-            envs: self.envs,
+            target_inner: self.target_inner,
             debug_child: self.debug_child,
             uses_shmem_testcase: self.uses_shmem_testcase,
             is_persistent: self.is_persistent,
             is_deferred_frksrv: self.is_deferred_frksrv,
             autotokens: self.autotokens,
-            input_location: InputLocation::StdIn,
             map_size: self.map_size,
             max_input_size: self.max_input_size,
             min_input_size: self.min_input_size,

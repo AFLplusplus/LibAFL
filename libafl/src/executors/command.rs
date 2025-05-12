@@ -23,7 +23,7 @@ use std::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
-    AsSlice, InputLocation, TargetArgs,
+    AsSlice, InputLocation, TargetArgs, TargetArgsInner,
     tuples::{Handle, MatchName, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
@@ -566,48 +566,21 @@ pub trait ChildrenArgs: Sized {
 /// The builder for a default [`CommandExecutor`] that should fit most use-cases.
 #[derive(Debug, Clone)]
 pub struct CommandExecutorBuilder {
+    target_inner: TargetArgsInner,
     stdout: Option<Handle<StdOutObserver>>,
     stderr: Option<Handle<StdErrObserver>>,
     debug_child: bool,
-    program: Option<OsString>,
-    args: Vec<OsString>,
-    input_location: InputLocation,
     cwd: Option<PathBuf>,
-    envs: Vec<(OsString, OsString)>,
     timeout: Duration,
 }
 
 impl TargetArgs for CommandExecutorBuilder {
-    fn arguments_ref(&self) -> &Vec<OsString> {
-        &self.args
+    fn inner(&self) -> &TargetArgsInner {
+        &self.target_inner
     }
 
-    fn arguments_mut(&mut self) -> &mut Vec<OsString> {
-        &mut self.args
-    }
-
-    fn envs_ref(&self) -> &Vec<(OsString, OsString)> {
-        &self.envs
-    }
-
-    fn envs_mut(&mut self) -> &mut Vec<(OsString, OsString)> {
-        &mut self.envs
-    }
-
-    fn program_ref(&self) -> &Option<OsString> {
-        &self.program
-    }
-
-    fn program_mut(&mut self) -> &mut Option<OsString> {
-        &mut self.program
-    }
-
-    fn input_location_ref(&self) -> &InputLocation {
-        &self.input_location
-    }
-
-    fn input_location_mut(&mut self) -> &mut InputLocation {
-        &mut self.input_location
+    fn inner_mut(&mut self) -> &mut TargetArgsInner {
+        &mut self.target_inner
     }
 }
 
@@ -664,13 +637,10 @@ impl CommandExecutorBuilder {
     #[must_use]
     fn new() -> CommandExecutorBuilder {
         CommandExecutorBuilder {
+            target_inner: TargetArgsInner::default(),
             stdout: None,
             stderr: None,
-            program: None,
-            args: vec![],
-            input_location: InputLocation::StdIn,
             cwd: None,
-            envs: vec![],
             timeout: Duration::from_secs(5),
             debug_child: false,
         }
@@ -685,7 +655,7 @@ impl CommandExecutorBuilder {
         I: HasTargetBytes,
         OT: MatchName + ObserversTuple<I, S>,
     {
-        let Some(program) = &self.program else {
+        let Some(program) = &self.target_inner.program else {
             return Err(Error::illegal_argument(
                 "CommandExecutor::builder: no program set!",
             ));
@@ -700,9 +670,10 @@ impl CommandExecutorBuilder {
                 command.stdin(Stdio::null());
             }
         }
-        command.args(&self.args);
+        command.args(&self.target_inner.arguments);
         command.envs(
-            self.envs
+            self.target_inner
+                .envs
                 .iter()
                 .map(|(k, v)| (k.as_os_str(), v.as_os_str())),
         );
