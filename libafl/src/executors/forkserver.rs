@@ -309,7 +309,7 @@ impl MemFd {
     }
 
     fn length(&mut self) -> Result<u64, Error> {
-        Ok(self.file.seek(SeekFrom::Current(0))?)
+        Ok(self.file.stream_position()?)
     }
 
     fn reset(&mut self) -> Result<(), Error> {
@@ -447,7 +447,7 @@ impl Forkserver {
             command.setdup2(input_filefd, libc::STDIN_FILENO);
         } else {
             command.stdin(Stdio::null());
-        };
+        }
 
         if debug_output {
             command.stdout(Stdio::inherit());
@@ -455,7 +455,7 @@ impl Forkserver {
             command.setdup2(fd.file.as_raw_fd(), libc::STDOUT_FILENO);
         } else {
             command.stdout(Stdio::null());
-        };
+        }
 
         if debug_output {
             command.stderr(Stdio::inherit());
@@ -463,7 +463,7 @@ impl Forkserver {
             command.setdup2(fd.file.as_raw_fd(), libc::STDERR_FILENO);
         } else {
             command.stderr(Stdio::null());
-        };
+        }
 
         command.env("AFL_MAP_SIZE", format!("{coverage_map_size}"));
 

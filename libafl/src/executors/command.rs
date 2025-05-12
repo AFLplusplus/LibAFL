@@ -520,7 +520,7 @@ pub trait ChildrenArgs: Sized {
     /// Whether debug child by inheriting stdout/stderr
     fn debug_child_mut(&mut self) -> &mut bool;
 
-    /// --- Builder methods ----
+    // --- Builder methods ----
 
     #[must_use]
     /// Sets the execution timeout duration.
