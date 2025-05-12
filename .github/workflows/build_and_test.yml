@@ -168,7 +168,7 @@ jobs:
       - name: Check each feature
         # Skipping `python` as it has to be built with the `maturin` tool
         # `sancov_pcguard_edges` is tested seperatelyc
-        run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} CI_INSTANCES=18 cargo run --manifest-path ./utils/ci_splitter/Cargo.toml -- ${{ matrix.fuzzer }}
+        run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} CI_INSTANCES=18 cargo run --manifest-path ./utils/ci_splitter/Cargo.toml -- ${{ matrix.instance_idx }}
 
   ubuntu-concolic:
     runs-on: ubuntu-24.04
