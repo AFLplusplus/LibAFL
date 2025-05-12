@@ -22,13 +22,12 @@ use std::{
 
 #[cfg(feature = "regex")]
 use libafl_bolts::tuples::{Handled, MatchNameRef};
-use libafl_bolts::tuples::Handle;
 use libafl_bolts::{
     AsSlice, AsSliceMut, InputLocation, TargetArgs, Truncate,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
-    tuples::{Prepend, RefIndexable},
+    tuples::{Handle, Prepend, RefIndexable},
 };
 use libc::RLIM_INFINITY;
 use nix::{
