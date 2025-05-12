@@ -30,7 +30,6 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
         env::set_var("PROFILE_DIR", "debug");
     }
 
-    print!("Testing {:#?} {:#?}", fuzzers_to_test, args[1]);
     for f in &fuzzers_to_test {
         print!(" {}", f.to_string_lossy());
     }
@@ -52,11 +51,6 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
             .and_then(|n| n.to_str())
             .unwrap_or_else(|| fuzzer_name.as_ref())
             .to_string();
-
-        // skip nyx_ on non-Linux
-        if name.contains("nyx_") && env::consts::OS != "linux" {
-            continue;
-        }
 
         let path = project_dir.join(&fuzzer);
 
@@ -102,8 +96,5 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
 }
 
 fn main() {
-    if let Err(e) = run() {
-        eprintln!("error: {e}");
-        exit(1);
-    }
+    run().unwrap();
 }
