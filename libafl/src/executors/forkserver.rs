@@ -32,6 +32,7 @@ use libafl_bolts::{
 use libc::RLIM_INFINITY;
 use nix::{
     sys::{
+        memfd::MemFdCreateFlag,
         select::{FdSet, pselect},
         signal::{SigSet, Signal, kill},
         time::TimeSpec,
@@ -287,15 +288,8 @@ struct MemFd {
 impl MemFd {
     fn new() -> Result<Self, Error> {
         let name = CString::new("fsrvmemfd").unwrap();
-        let ret = unsafe { libc::memfd_create(name.as_ptr(), 0) };
-        if ret < 0 {
-            return Err(Error::last_os_error("memfd create"));
-        }
+        let fd = nix::sys::memfd::memfd_create(&name, MemFdCreateFlag::empty())?;
 
-        // Safety: We are the only owner and only close is needed
-        let fd = unsafe { OwnedFd::from_raw_fd(ret.into()) };
-
-        dbg!(&fd);
         Ok(Self {
             file: File::from(fd),
         })
@@ -1164,8 +1158,6 @@ where
         } else {
             None
         };
-
-        dbg!("???");
 
         let mut forkserver = match &self.program {
             Some(t) => Forkserver::new(
