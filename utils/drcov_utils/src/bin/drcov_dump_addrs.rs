@@ -43,7 +43,7 @@ pub struct Opt {
 
 fn process(opts: &Opt, input: &PathBuf) -> Result<(), std::io::Error> {
     let Ok(drcov) = DrCovReader::read(&input)
-        .map_err(|err| eprintln!("Ignored coverage file {input:?}, reason: {err:?}"))
+        .map_err(|err| eprintln!("Ignored coverage file {}, reason: {err:?}", input.display()))
     else {
         return Ok(());
     };
@@ -63,12 +63,19 @@ fn process(opts: &Opt, input: &PathBuf) -> Result<(), std::io::Error> {
         );
 
         let Ok(file) = File::create_new(&out_file).map_err(|err| {
-            eprintln!("Could not create file {out_file:?} - continuing: {err:?}");
+            eprintln!(
+                "Could not create file {} - continuing: {err:?}",
+                out_file.display()
+            );
         }) else {
             return Ok(());
         };
 
-        println!("Dumping traces from drcov file {input:?} to {out_file:?}",);
+        println!(
+            "Dumping traces from drcov file {} to {}",
+            input.display(),
+            out_file.display()
+        );
 
         Box::new(file)
     } else {
@@ -90,7 +97,12 @@ fn process(opts: &Opt, input: &PathBuf) -> Result<(), std::io::Error> {
                 module.path.display()
             )?;
         }
-        writeln!(writer, "# {} Blocks covered in {input:?}.", blocks.len())?;
+        writeln!(
+            writer,
+            "# {} Blocks covered in {}.",
+            input.display(),
+            blocks.len()
+        )?;
 
         if opts.addrs {
             writeln!(writer)?;
@@ -128,11 +140,15 @@ fn main() {
     if let Some(out_dir) = &opts.out_dir {
         if !out_dir.exists() {
             if let Err(err) = create_dir_all(out_dir) {
-                eprintln!("Failed to create dir {out_dir:?}: {err:?}");
+                eprintln!("Failed to create dir {}: {err:?}", out_dir.display());
             }
         }
 
-        assert!(out_dir.is_dir(), "Out_dir {out_dir:?} not a directory!");
+        assert!(
+            out_dir.is_dir(),
+            "Out_dir {} not a directory!",
+            out_dir.display()
+        );
     }
 
     for input in &opts.inputs {
