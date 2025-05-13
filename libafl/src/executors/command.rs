@@ -805,17 +805,19 @@ fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::StdTargetArgs;
+    use libafl_bolts::{StdTargetArgs, tuples::Handled};
+    use tuple_list::tuple_list;
 
     use crate::{
         events::SimpleEventManager,
         executors::{
-            Executor,
+            Executor, StdChildArgs,
             command::{CommandExecutor, InputLocation},
         },
         fuzzer::NopFuzzer,
         inputs::{BytesInput, NopInput},
         monitors::SimpleMonitor,
+        observers::StdOutObserver,
         state::NopState,
     };
 
@@ -841,5 +843,34 @@ mod tests {
                 &BytesInput::new(b"test".to_vec()),
             )
             .unwrap();
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_capture() {
+        let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
+            SimpleEventManager::new(SimpleMonitor::new(|status| {
+                log::info!("{status}");
+            }));
+
+        let stdout = StdOutObserver::new("stdout").unwrap();
+        let handle = stdout.handle();
+        let executor = CommandExecutor::builder()
+            .program("ls")
+            .stdout_observer(handle.clone())
+            .input(InputLocation::Arg { argnum: 0 });
+        let executor = executor.build(tuple_list!(stdout));
+        let mut executor = executor.unwrap();
+
+        executor
+            .run_target(
+                &mut NopFuzzer::new(),
+                &mut NopState::<NopInput>::new(),
+                &mut mgr,
+                &BytesInput::new(b".".to_vec()),
+            )
+            .unwrap();
+
+        assert!(executor.observers.0.output.is_some())
     }
 }
