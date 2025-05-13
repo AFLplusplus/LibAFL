@@ -234,7 +234,7 @@ pub fn common_signals() -> Vec<Signal> {
 }
 
 #[cfg(feature = "std")]
-/// The inner shared members of [`ChildArgs`]
+/// The inner shared members of [`StdChildArgs`]
 #[derive(Debug, Clone)]
 pub struct StdChildArgsInner {
     /// The timeout of the children
