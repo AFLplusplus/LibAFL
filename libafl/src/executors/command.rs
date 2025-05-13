@@ -722,7 +722,7 @@ impl CommandExecutorBuilder {
 /// where
 ///     S: HasExecutions,
 /// {
-///     MyExecutor.into_executor(())
+///     MyExecutor.into_executor((), None, None)
 /// }
 /// ```
 pub trait CommandConfigurator<I, C = Child>: Sized {
