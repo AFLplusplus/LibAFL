@@ -41,8 +41,8 @@
     )
 )]
 
-pub mod inmemory;
-pub use inmemory::InMemoryBytesCoverageSugar;
+pub mod inprocess;
+pub use inprocess::InProcessBytesCoverageSugar;
 
 #[cfg(target_os = "linux")]
 pub mod qemu;
@@ -68,7 +68,7 @@ use pyo3::prelude::*;
 #[pymodule]
 #[pyo3(name = "libafl_sugar")]
 pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    inmemory::pybind::register(m)?;
+    inprocess::pybind::register(m)?;
     #[cfg(target_os = "linux")]
     {
         qemu::pybind::register(m)?;

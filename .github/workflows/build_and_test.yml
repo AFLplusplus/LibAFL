@@ -171,7 +171,7 @@ jobs:
       - name: Check each feature
         # Skipping `python` as it has to be built with the `maturin` tool
         # `sancov_pcguard_edges` is tested seperatelyc
-        run: python3 ./scripts/parallellize_cargo_check.py ${{ matrix.instance_idx }}
+        run: LLVM_VERSION=18 CI_INSTANCES=18 cargo run --manifest-path ./utils/ci_splitter/Cargo.toml -- ${{ matrix.instance_idx }}
 
   ubuntu-concolic:
     runs-on: ubuntu-24.04

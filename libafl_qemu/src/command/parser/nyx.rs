@@ -6,7 +6,7 @@ use libafl_qemu_sys::GuestVirtAddr;
 use libc::c_uint;
 
 use crate::{
-    IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
+    GuestReg, IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
     command::{
         CommandError, NativeExitKind,
         nyx::{
@@ -26,7 +26,7 @@ fn get_guest_string(qemu: Qemu, string_ptr_reg: Regs) -> Result<String, CommandE
 
     let mut msg_chunk: [u8; bindings::HPRINTF_MAX_SIZE as usize] =
         [0; bindings::HPRINTF_MAX_SIZE as usize];
-    qemu.read_mem(str_addr, &mut msg_chunk)?;
+    qemu.read_mem(str_addr.try_into().unwrap(), &mut msg_chunk)?;
 
     Ok(CStr::from_bytes_until_nul(&msg_chunk)
         .unwrap()
@@ -117,7 +117,7 @@ where
 
         // # Safety
         // Range submit is represented with an array of 3 u64 in the Nyx API.
-        let allowed_range: [u64; 3] = unsafe { qemu.read_mem_val(allowed_range_addr)? };
+        let allowed_range: [u64; 3] = unsafe { qemu.read_mem_val(allowed_range_addr as u64)? };
 
         Ok(RangeSubmitCommand::new(allowed_range[0]..allowed_range[1]))
     }
@@ -245,7 +245,7 @@ where
 
         Ok(GetHostConfigCommand::new(QemuMemoryChunk::virt(
             host_config_addr,
-            GuestVirtAddr::try_from(size_of::<bindings::host_config_t>()).unwrap(),
+            GuestReg::try_from(size_of::<bindings::host_config_t>()).unwrap(),
             qemu.current_cpu().unwrap(),
         )))
     }
@@ -270,7 +270,7 @@ where
         // # Safety
         // We use the C struct directly to get the agent config
         let agent_config: bindings::agent_config_t =
-            unsafe { qemu.read_mem_val(agent_config_addr)? };
+            unsafe { qemu.read_mem_val(agent_config_addr as u64)? };
 
         Ok(SetAgentConfigCommand::new(agent_config))
     }
