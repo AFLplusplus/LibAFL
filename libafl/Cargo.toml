@@ -187,10 +187,14 @@ llmp_small_maps = [
   "libafl_bolts/llmp_small_maps",
 ] # reduces initial map size for llmp
 
-## Grammar mutator. Requires nightly.
+## Grammar mutator.
 nautilus = ["std", "serde_json/std", "rand_trait", "regex-syntax", "regex"]
 
+## Python grammar support for nautilus
 nautilus_py = ["nautilus", "dep:pyo3"]
+
+## Lua Mutator support (mutators implemented in Lua)
+lua_mutator = ["mlua"]
 
 ## Use the best SIMD implementation by our benchmark
 simd = ["libafl_bolts/simd"]
@@ -298,6 +302,8 @@ document-features = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
 fastbloom = { workspace = true, optional = true }
+# For Lua Mutators
+mlua = { version = "0.10.3", features = ["lua54", "vendored"], optional = true }
 
 [lints]
 workspace = true
