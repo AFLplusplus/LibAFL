@@ -1,4 +1,4 @@
-//! This module implements the [`LuaMuator`], where each mutation drops into a lua VM to mutate bytes in a target-specific way.
+//! This module implements the [`LuaMutator`], where each mutation drops into a Lua VM to mutate bytes in a target-specific way.
 #[cfg(feature = "std")]
 use alloc::boxed::Box;
 use alloc::{
