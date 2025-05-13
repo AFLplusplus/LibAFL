@@ -136,6 +136,8 @@ pub fn main() {
             command_configurator,
             tuple_list!(observer),
             tuple_list!(hook),
+            None,
+            None,
         );
 
     // Generator of printable bytearrays of max size 32

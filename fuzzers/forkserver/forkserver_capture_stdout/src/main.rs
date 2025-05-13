@@ -1,38 +1,40 @@
 use core::time::Duration;
-use std::path::PathBuf;
+use std::{ops::Index, path::PathBuf};
 
 use clap::Parser;
 use libafl::{
+    HasMetadata,
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
+    executors::{
+        CommandExecutor, DiffExecutor, HasObservers, StdChildArgs, forkserver::ForkserverExecutor,
+    },
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations, tokens_mutations, HavocScheduledMutator, Tokens},
-    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
+    mutators::{HavocScheduledMutator, Tokens, havoc_mutations, tokens_mutations},
+    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, StdOutObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
-    HasMetadata,
 };
 use libafl_bolts::{
+    AsSliceMut, StdTargetArgs, Truncate, current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, StdTargetArgs, Truncate,
+    tuples::{Handled, Merge, tuple_list},
 };
-use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 use nix::sys::signal::Signal;
+use serde::Deserialize;
 
 /// The commandline args this fuzzer accepts
 #[derive(Debug, Parser)]
 #[command(
-    name = "forkserver_libafl_cc",
-    about = "This is a simple example fuzzer to fuzz a executable instrumented by libafl_cc.",
-    author = "ergrelet <ergrelet@users.noreply.github.com>"
+    name = "forkserver_simple",
+    about = "This is a simple example fuzzer to fuzz a executable instrumented by afl-cc.",
+    author = "tokatoka <tokazerkje@outlook.com>"
 )]
 struct Opt {
     #[arg(
@@ -83,15 +85,20 @@ struct Opt {
     signal: Signal,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct ProgramOutput {
+    len: i32,
+}
+
 pub fn main() {
     env_logger::init();
+    const MAP_SIZE: usize = 65536;
 
-    const MAP_SIZE: usize = EDGES_MAP_DEFAULT_SIZE; //65536;
     let opt = Opt::parse();
 
     let corpus_dirs: Vec<PathBuf> = [opt.in_dir].to_vec();
 
-    // The unix shmem provider supported by LibAFL for shared memory
+    // The unix shmem provider supported by AFL++ for shared memory
     let mut shmem_provider = UnixShMemProvider::new().unwrap();
 
     // The coverage map shared between observer and executor
@@ -101,8 +108,6 @@ pub fn main() {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
     let shmem_buf = shmem.as_slice_mut();
-    // the next line is not needed
-    // unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
 
     // Create an observation channel using the signals map
     let edges_observer = unsafe {
@@ -134,7 +139,7 @@ pub fn main() {
     // create a State from scratch
     let mut state = StdState::new(
         // RNG
-        StdRand::new(),
+        StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::<BytesInput>::new(),
         // Corpus in which we store solutions (crashes in this example),
@@ -149,9 +154,7 @@ pub fn main() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::new(|s| {
-        println!("{s}");
-    });
+    let monitor = SimpleMonitor::new(|s| println!("{s}"));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
@@ -169,27 +172,43 @@ pub fn main() {
     // Create the executor for the forkserver
     let args = opt.arguments;
 
-    let observer_handle = edges_observer.handle();
+    let observer_ref = edges_observer.handle();
+    let stdout = StdOutObserver::new("stdout".into()).expect("observer");
+    let stdout_handle = stdout.handle();
+
+    let cmd_stdout = StdOutObserver::new("cmd_stdout".into()).expect("observer");
+    let cmd_stdout_handle = cmd_stdout.handle();
 
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()
-        .program(opt.executable)
+        .program(opt.executable.clone())
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
-        .parse_afl_cmdline(args)
+        .parse_afl_cmdline(args.clone())
         .coverage_map_size(MAP_SIZE)
         .timeout(Duration::from_millis(opt.timeout))
         .kill_signal(opt.signal)
-        .build(tuple_list!(time_observer, edges_observer))
+        .stdout_observer(stdout_handle.clone())
+        .build(tuple_list!(time_observer, edges_observer, stdout))
+        .unwrap();
+
+    let cmd_executor = CommandExecutor::builder()
+        .program(opt.executable)
+        .debug_child(debug_child)
+        .parse_afl_cmdline(args)
+        .timeout(Duration::from_millis(opt.timeout))
+        .stdout_observer(cmd_stdout_handle.clone())
+        .build(tuple_list!(cmd_stdout))
         .unwrap();
 
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
-        executor.observers_mut()[&observer_handle]
+        executor.observers_mut()[&observer_ref]
             .as_mut()
             .truncate(dynamic_map_size);
     }
 
+    let mut executor = DiffExecutor::new(executor, cmd_executor, ());
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
         state
@@ -210,7 +229,33 @@ pub fn main() {
         HavocScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 6);
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-    fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
-        .expect("Error in the fuzzing loop");
+    for _ in 0..5 {
+        fuzzer
+            .fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)
+            .unwrap();
+
+        let stdout = executor
+            .observers()
+            .index(&stdout_handle)
+            .output
+            .clone()
+            .expect("no stdout");
+        let out: ProgramOutput = serde_json::from_slice(&stdout).unwrap();
+        println!(
+            "Program output from Forkserver after serde_json::from_slice is {:?}",
+            &out
+        );
+
+        let cmd_stdout = executor
+            .observers()
+            .index(&cmd_stdout_handle)
+            .output
+            .clone()
+            .expect("no stdout");
+        let out: ProgramOutput = serde_json::from_slice(&stdout).unwrap();
+        println!(
+            "Program output from CommandExecutor after serde_json::from_slice is {:?}",
+            &out
+        );
+    }
 }

@@ -11,7 +11,10 @@ use clap::{Arg, ArgAction, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+    executors::{
+        forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+        StdChildArgs,
+    },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -37,7 +40,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, TargetArgs,
+    AsSliceMut, StdTargetArgs,
 };
 use libafl_targets::{
     cmps::{observers::AFLppCmpLogObserver, stages::AFLppCmplogTracingStage},

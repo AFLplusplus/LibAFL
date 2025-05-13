@@ -7,7 +7,10 @@ use libafl::{
     Error, HasMetadata,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{EventConfig, LlmpRestartingEventManager, launcher::Launcher},
-    executors::forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+    executors::{
+        StdChildArgs,
+        forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+    },
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -28,7 +31,7 @@ use libafl::{
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSliceMut, TargetArgs,
+    AsSliceMut, StdTargetArgs,
     core_affinity::Cores,
     nonzero,
     ownedref::OwnedRefMut,

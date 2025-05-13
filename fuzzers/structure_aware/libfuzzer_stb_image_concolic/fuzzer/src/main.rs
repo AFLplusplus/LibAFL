@@ -217,9 +217,11 @@ fn fuzz(
         let mut stages = tuple_list!(
             // Create a concolic trace
             ConcolicTracingStage::new(
-                TracingStage::new(
-                    MyCommandConfigurator.into_executor(tuple_list!(concolic_observer)),
-                ),
+                TracingStage::new(MyCommandConfigurator.into_executor(
+                    tuple_list!(concolic_observer),
+                    None,
+                    None
+                ),),
                 concolic_ref,
             ),
             // Use the concolic trace for z3-based solving
