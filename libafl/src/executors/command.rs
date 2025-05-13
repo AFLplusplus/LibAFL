@@ -854,7 +854,7 @@ mod tests {
                 log::info!("{status}");
             }));
 
-        let stdout = StdOutObserver::new("stdout").unwrap();
+        let stdout = StdOutObserver::new("stdout".into()).unwrap();
         let handle = stdout.handle();
         let executor = CommandExecutor::builder()
             .program("ls")

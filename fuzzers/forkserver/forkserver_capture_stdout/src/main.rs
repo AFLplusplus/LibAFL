@@ -173,10 +173,10 @@ pub fn main() {
     let args = opt.arguments;
 
     let observer_ref = edges_observer.handle();
-    let stdout = StdOutObserver::new("stdout").expect("observer");
+    let stdout = StdOutObserver::new("stdout".into()).expect("observer");
     let stdout_handle = stdout.handle();
 
-    let cmd_stdout = StdOutObserver::new("cmd_stdout").expect("observer");
+    let cmd_stdout = StdOutObserver::new("cmd_stdout".into()).expect("observer");
     let cmd_stdout_handle = cmd_stdout.handle();
 
     let mut tokens = Tokens::new();

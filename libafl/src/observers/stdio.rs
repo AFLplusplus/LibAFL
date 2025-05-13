@@ -91,8 +91,8 @@ use crate::{Error, observers::Observer};
 ///    let input_text = "Hello, World!";
 ///    let encoded_input_text = "SGVsbG8sIFdvcmxkIQo=";
 ///
-///    let stdout_observer = StdOutObserver::new("stdout-observer").unwrap();
-///    let stderr_observer = StdErrObserver::new("stderr-observer").unwrap();
+///    let stdout_observer = StdOutObserver::new("stdout-observer".into()).unwrap();
+///    let stderr_observer = StdErrObserver::new("stderr-observer".into()).unwrap();
 ///
 ///    let mut feedback = ExportStdXObserver {
 ///        stdout_observer: stdout_observer.handle(),
@@ -195,7 +195,7 @@ fn new_file<'de, D, T>(_d: D) -> Result<Option<File>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    OutputObserver::<T>::new_file().map_err(|e| serde::de::Error::custom(e.to_string()))
+    OutputObserver::<T>::file().map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
 /// Marker traits to mark stdout for the `OutputObserver`
@@ -215,7 +215,7 @@ impl<T> OutputObserver<T> {
     //
     // In most cases, capturing stdout/stderr every loop is very slow and mostly for debugging purpose and thus this should be acceptable.
     #[cfg(target_os = "macos")]
-    fn new_file() -> Result<Option<File>, Error> {
+    fn file() -> Result<Option<File>, Error> {
         let fp = File::create_new("fsrvmemfd")?;
         nix::unistd::unlink("fsrvmemfd")?;
         Ok(Some(fp))
@@ -223,7 +223,7 @@ impl<T> OutputObserver<T> {
 
     /// Cool, we can have [`MemfdShMemProvider`] to create a memfd.
     #[cfg(target_os = "linux")]
-    fn new_file() -> Result<Option<File>, Error> {
+    fn file() -> Result<Option<File>, Error> {
         Ok(Some(
             libafl_bolts::shmem::unix_shmem::memfd::MemfdShMemProvider::new_file()?,
         ))
@@ -231,30 +231,41 @@ impl<T> OutputObserver<T> {
 
     /// This will use standard but portable pipe mechanism to capture outputs
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-    pub fn new_file() -> Result<Option<File>, Error> {
+    pub fn file() -> Result<Option<File>, Error> {
         Ok(None)
     }
 
     /// Create a new [`OutputObserver`] with the given name. This will use the memory fd backend
     /// on Linux and macOS, which is compatible with forkserver.
-    pub fn new(name: &'static str) -> Result<Self, Error> {
+    pub fn new(name: Cow<'static, str>) -> Result<Self, Error> {
         Ok(Self {
-            name: Cow::from(name),
+            name: name,
             output: None,
-            file: Self::new_file()?,
+            file: Self::file()?,
             phantom: PhantomData,
         })
     }
 
     /// Create a new `OutputObserver` with the given name. This use portable piped backend, which
     /// only works with [`std::process::Command`].
-    pub fn new_piped(name: &'static str) -> Result<Self, Error> {
+    pub fn new_piped(name: Cow<'static, str>) -> Result<Self, Error> {
         Ok(Self {
             name: Cow::from(name),
             output: None,
             file: None,
             phantom: PhantomData,
         })
+    }
+
+    /// Create a new `OutputObserver` with given name and file.
+    /// Useful for targets like nyx which writes to the same file again and again.
+    pub fn new_file(name: Cow<'static, str>, file: File) -> Self {
+        Self {
+            name: name,
+            output: None,
+            file: Some(file),
+            phantom: PhantomData,
+        }
     }
 
     /// React to new stream data
