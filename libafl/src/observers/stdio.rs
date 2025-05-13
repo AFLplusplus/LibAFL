@@ -32,7 +32,7 @@ use crate::{Error, observers::Observer};
 ///     Error, Fuzzer, StdFuzzer,
 ///     corpus::{Corpus, InMemoryCorpus, Testcase},
 ///     events::{EventFirer, NopEventManager},
-///     executors::{ChildArgs, CommandExecutor, ExitKind},
+///     executors::{StdChildArgs, CommandExecutor, ExitKind},
 ///     feedbacks::{Feedback, StateInitializer},
 ///     inputs::BytesInput,
 ///     mutators::{MutationResult, NopMutator},
@@ -42,7 +42,7 @@ use crate::{Error, observers::Observer};
 /// };
 /// use libafl_bolts::{
 ///     Named, current_nanos,
-///     TargetArgs,
+///     StdTargetArgs,
 ///     rands::StdRand,
 ///     tuples::{Handle, Handled, MatchNameRef, tuple_list},
 /// };

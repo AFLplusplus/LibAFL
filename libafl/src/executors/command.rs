@@ -23,7 +23,7 @@ use std::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
-    AsSlice, InputLocation, TargetArgs, TargetArgsInner,
+    AsSlice, InputLocation, StdTargetArgs, StdTargetArgsInner,
     tuples::{Handle, MatchName, MatchNameRef, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
@@ -46,7 +46,7 @@ use nix::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use typed_builder::TypedBuilder;
 
-use super::{ChildArgs, ChildArgsInner, HasTimeout, forkserver::ConfigTarget};
+use super::{HasTimeout, StdChildArgs, StdChildArgsInner, forkserver::ConfigTarget};
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
@@ -471,26 +471,26 @@ where
 /// The builder for a default [`CommandExecutor`] that should fit most use-cases.
 #[derive(Debug, Clone)]
 pub struct CommandExecutorBuilder {
-    target_inner: TargetArgsInner,
-    child_env_inner: ChildArgsInner,
+    target_inner: StdTargetArgsInner,
+    child_env_inner: StdChildArgsInner,
 }
 
-impl TargetArgs for CommandExecutorBuilder {
-    fn inner(&self) -> &TargetArgsInner {
+impl StdTargetArgs for CommandExecutorBuilder {
+    fn inner(&self) -> &StdTargetArgsInner {
         &self.target_inner
     }
 
-    fn inner_mut(&mut self) -> &mut TargetArgsInner {
+    fn inner_mut(&mut self) -> &mut StdTargetArgsInner {
         &mut self.target_inner
     }
 }
 
-impl ChildArgs for CommandExecutorBuilder {
-    fn inner(&self) -> &ChildArgsInner {
+impl StdChildArgs for CommandExecutorBuilder {
+    fn inner(&self) -> &StdChildArgsInner {
         &self.child_env_inner
     }
 
-    fn inner_mut(&mut self) -> &mut ChildArgsInner {
+    fn inner_mut(&mut self) -> &mut StdChildArgsInner {
         &mut self.child_env_inner
     }
 }
@@ -506,8 +506,8 @@ impl CommandExecutorBuilder {
     #[must_use]
     fn new() -> CommandExecutorBuilder {
         CommandExecutorBuilder {
-            target_inner: TargetArgsInner::default(),
-            child_env_inner: ChildArgsInner::default(),
+            target_inner: StdTargetArgsInner::default(),
+            child_env_inner: StdChildArgsInner::default(),
         }
     }
 
@@ -709,7 +709,7 @@ fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::TargetArgs;
+    use libafl_bolts::StdTargetArgs;
 
     use crate::{
         events::SimpleEventManager,

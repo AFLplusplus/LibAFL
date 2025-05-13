@@ -31,7 +31,7 @@ pub enum InputLocation {
 
 /// The shared inner structs of trait [`TargetArgs`]
 #[derive(Debug, Clone, Default)]
-pub struct TargetArgsInner {
+pub struct StdTargetArgsInner {
     /// Program arguments
     pub arguments: Vec<OsString>,
     /// Program main program
@@ -43,12 +43,12 @@ pub struct TargetArgsInner {
 }
 
 /// The main implementation trait of afl style arguments handling
-pub trait TargetArgs: Sized {
+pub trait StdTargetArgs: Sized {
     /// Get inner common arguments
-    fn inner(&self) -> &TargetArgsInner;
+    fn inner(&self) -> &StdTargetArgsInner;
 
     /// Get mutable inner common arguments
-    fn inner_mut(&mut self) -> &mut TargetArgsInner;
+    fn inner_mut(&mut self) -> &mut StdTargetArgsInner;
 
     /// Adds an environmental var to the harness's commandline
     #[must_use]

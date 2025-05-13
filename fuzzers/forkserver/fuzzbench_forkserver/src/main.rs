@@ -13,7 +13,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{
         forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
-        ChildArgs,
+        StdChildArgs,
     },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
@@ -41,7 +41,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSliceMut, TargetArgs,
+    AsSliceMut, StdTargetArgs,
 };
 use libafl_targets::cmps::AFLppCmpLogMap;
 use nix::sys::signal::Signal;

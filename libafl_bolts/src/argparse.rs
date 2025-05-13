@@ -6,20 +6,20 @@ use core::{
 };
 use std::os::unix::ffi::OsStrExt;
 
-use crate::{Error, TargetArgs, TargetArgsInner};
+use crate::{Error, StdTargetArgs, StdTargetArgsInner};
 
 /// For creating an C-compatible argument
 #[derive(Debug)]
 pub struct CMainArgsBuilder {
-    inner: TargetArgsInner,
+    inner: StdTargetArgsInner,
 }
 
-impl TargetArgs for CMainArgsBuilder {
-    fn inner(&self) -> &TargetArgsInner {
+impl StdTargetArgs for CMainArgsBuilder {
+    fn inner(&self) -> &StdTargetArgsInner {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut TargetArgsInner {
+    fn inner_mut(&mut self) -> &mut StdTargetArgsInner {
         &mut self.inner
     }
 }
@@ -35,7 +35,7 @@ impl CMainArgsBuilder {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            inner: TargetArgsInner::default(),
+            inner: StdTargetArgsInner::default(),
         }
     }
 

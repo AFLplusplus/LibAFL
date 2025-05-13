@@ -234,7 +234,7 @@ pub fn common_signals() -> Vec<Signal> {
 #[cfg(feature = "std")]
 /// The inner shared members of [`ChildArgs`]
 #[derive(Debug, Clone)]
-pub struct ChildArgsInner {
+pub struct StdChildArgsInner {
     /// The timeout of the children
     pub timeout: Duration,
     /// The stderr handle of the children
@@ -248,7 +248,7 @@ pub struct ChildArgsInner {
 }
 
 #[cfg(feature = "std")]
-impl Default for ChildArgsInner {
+impl Default for StdChildArgsInner {
     fn default() -> Self {
         Self {
             timeout: Duration::from_millis(5000),
@@ -262,12 +262,12 @@ impl Default for ChildArgsInner {
 
 #[cfg(feature = "std")]
 /// The shared implementation for children with stdout/stderr/timeouts.
-pub trait ChildArgs: Sized {
+pub trait StdChildArgs: Sized {
     /// The inner struct of child environment.
-    fn inner(&self) -> &ChildArgsInner;
+    fn inner(&self) -> &StdChildArgsInner;
 
     /// The mutable inner struct of child environment.
-    fn inner_mut(&mut self) -> &mut ChildArgsInner;
+    fn inner_mut(&mut self) -> &mut StdChildArgsInner;
 
     #[must_use]
     /// Sets the execution timeout duration.

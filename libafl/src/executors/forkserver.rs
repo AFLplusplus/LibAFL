@@ -21,7 +21,7 @@ use std::{
 #[cfg(feature = "regex")]
 use libafl_bolts::tuples::{Handled, MatchNameRef};
 use libafl_bolts::{
-    AsSlice, AsSliceMut, InputLocation, TargetArgs, TargetArgsInner, Truncate,
+    AsSlice, AsSliceMut, InputLocation, StdTargetArgs, StdTargetArgsInner, Truncate,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
@@ -38,7 +38,7 @@ use nix::{
     unistd::Pid,
 };
 
-use super::{ChildArgs, ChildArgsInner, HasTimeout};
+use super::{HasTimeout, StdChildArgs, StdChildArgsInner};
 #[cfg(feature = "regex")]
 use crate::observers::{
     AsanBacktraceObserver, get_asan_runtime_flags, get_asan_runtime_flags_with_log_path,
@@ -816,8 +816,8 @@ where
 #[derive(Debug)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct ForkserverExecutorBuilder<'a, SP> {
-    target_inner: TargetArgsInner,
-    child_env_inner: ChildArgsInner,
+    target_inner: StdTargetArgsInner,
+    child_env_inner: StdChildArgsInner,
     uses_shmem_testcase: bool,
     is_persistent: bool,
     is_deferred_frksrv: bool,
@@ -832,22 +832,22 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     crash_exitcode: Option<i8>,
 }
 
-impl<SP> ChildArgs for ForkserverExecutorBuilder<'_, SP> {
-    fn inner(&self) -> &ChildArgsInner {
+impl<SP> StdChildArgs for ForkserverExecutorBuilder<'_, SP> {
+    fn inner(&self) -> &StdChildArgsInner {
         &self.child_env_inner
     }
 
-    fn inner_mut(&mut self) -> &mut ChildArgsInner {
+    fn inner_mut(&mut self) -> &mut StdChildArgsInner {
         &mut self.child_env_inner
     }
 }
 
-impl<SP> TargetArgs for ForkserverExecutorBuilder<'_, SP> {
-    fn inner(&self) -> &TargetArgsInner {
+impl<SP> StdTargetArgs for ForkserverExecutorBuilder<'_, SP> {
+    fn inner(&self) -> &StdTargetArgsInner {
         &self.target_inner
     }
 
-    fn inner_mut(&mut self) -> &mut TargetArgsInner {
+    fn inner_mut(&mut self) -> &mut StdTargetArgsInner {
         &mut self.target_inner
     }
 
@@ -1364,8 +1364,8 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     #[must_use]
     pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
         ForkserverExecutorBuilder {
-            target_inner: TargetArgsInner::default(),
-            child_env_inner: ChildArgsInner::default(),
+            target_inner: StdTargetArgsInner::default(),
+            child_env_inner: StdChildArgsInner::default(),
             uses_shmem_testcase: false,
             is_persistent: false,
             is_deferred_frksrv: false,
@@ -1474,7 +1474,7 @@ mod tests {
     use std::ffi::OsString;
 
     use libafl_bolts::{
-        AsSliceMut, TargetArgs,
+        AsSliceMut, StdTargetArgs,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::tuple_list,
     };
@@ -1484,7 +1484,7 @@ mod tests {
         Error,
         corpus::NopCorpus,
         executors::{
-            ChildArgs,
+            StdChildArgs,
             forkserver::{FAILED_TO_START_FORKSERVER_MSG, ForkserverExecutor},
         },
         inputs::BytesInput,
