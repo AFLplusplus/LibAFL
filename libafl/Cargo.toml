@@ -305,7 +305,8 @@ document-features = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
 fastbloom = { workspace = true, optional = true }
-# For Lua Mutators (TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>)
+# For Lua Mutators
+# TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>
 mlua = { version = "0.10.3", features = [
   "lua54",
   "vendored",
