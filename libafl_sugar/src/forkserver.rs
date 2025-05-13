@@ -101,11 +101,11 @@ impl ForkserverBytesCoverageSugar<'_> {
 
         let mut out_dir = self.output_dir.clone();
         if fs::create_dir(&out_dir).is_err() {
-            log::info!("Out dir at {:?} already exists.", &out_dir);
+            log::info!("Out dir at {} already exists.", &out_dir.display());
             assert!(
                 out_dir.is_dir(),
-                "Out dir at {:?} is not a valid directory!",
-                &out_dir
+                "Out dir at {} is not a valid directory!",
+                &out_dir.display()
             );
         }
         let mut crashes = out_dir.clone();
