@@ -30,7 +30,7 @@ use crate::{
     mutators::{
         MultiMutator, MutationResult, Mutator, Named, buffer_self_copy, mutations::buffer_copy,
     },
-    observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
+    observers::cmp::{AflPpCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
     state::{HasCorpus, HasMaxSize, HasRand},
 };
@@ -849,7 +849,7 @@ const CMP_ATTRIBUTE_IS_TRANSFORM: u8 = 64;
 
 /// AFL++ redqueen mutation
 #[derive(Debug, Default)]
-pub struct AFLppRedQueen {
+pub struct AflPpRedQueen {
     enable_transform: bool,
     enable_arith: bool,
     text_type: TextType,
@@ -858,7 +858,7 @@ pub struct AFLppRedQueen {
     last_corpus_id: Option<CorpusId>,
 }
 
-impl AFLppRedQueen {
+impl AflPpRedQueen {
     #[inline]
     fn swapa(x: u8) -> u8 {
         (x & 0xf8) + ((x & 7) ^ 0x07)
@@ -1321,7 +1321,7 @@ impl AFLppRedQueen {
     }
 }
 
-impl<I, S> MultiMutator<I, S> for AFLppRedQueen
+impl<I, S> MultiMutator<I, S> for AflPpRedQueen
 where
     S: HasMetadata + HasRand + HasMaxSize + HasCorpus<I> + HasCurrentCorpusId,
     I: ResizableMutator<u8> + From<Vec<u8>> + HasMutatorBytes,
@@ -1342,7 +1342,7 @@ where
 
         let (cmp_len, cmp_meta, taint_meta) = {
             let (Some(cmp_meta), Some(taint_meta)) = (
-                state.metadata_map().get::<AFLppCmpValuesMetadata>(),
+                state.metadata_map().get::<AflPpCmpValuesMetadata>(),
                 state.metadata_map().get::<TaintMetadata>(),
             ) else {
                 return Ok(vec![]);
@@ -1370,7 +1370,7 @@ where
         // println!("orig: {:#?} new: {:#?}", orig_cmpvals, new_cmpvals);
 
         // Compute when mutating it for the 1st time.
-        let current_corpus_id = state.current_corpus_id()?.ok_or_else(|| Error::key_not_found("No corpus-id is currently being fuzzed, but called AFLppRedQueen::multi_mutated()."))?;
+        let current_corpus_id = state.current_corpus_id()?.ok_or_else(|| Error::key_not_found("No corpus-id is currently being fuzzed, but called AflPpRedQueen::multi_mutated()."))?;
         if self.last_corpus_id.is_none() || self.last_corpus_id.unwrap() != current_corpus_id {
             self.text_type = check_if_text(orig_bytes, orig_bytes.len());
             self.last_corpus_id = Some(current_corpus_id);
@@ -1920,15 +1920,15 @@ where
     }
 }
 
-impl Named for AFLppRedQueen {
+impl Named for AflPpRedQueen {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("AFLppRedQueen");
+        static NAME: Cow<'static, str> = Cow::Borrowed("AflPpRedQueen");
         &NAME
     }
 }
 
-impl AFLppRedQueen {
-    /// Create a new `AFLppRedQueen` Mutator
+impl AflPpRedQueen {
+    /// Create a new `AflPpRedQueen` Mutator
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -2111,7 +2111,7 @@ mod tests {
     use std::fs;
 
     #[cfg(feature = "std")]
-    use super::{AFLppRedQueen, Tokens};
+    use super::{AflPpRedQueen, Tokens};
 
     #[cfg(feature = "std")]
     #[test]
@@ -2134,7 +2134,7 @@ token2="B"
     #[cfg(feature = "std")]
     #[test]
     fn test_token_mutations() {
-        let rq = AFLppRedQueen::with_cmplog_options(true, true);
+        let rq = AflPpRedQueen::with_cmplog_options(true, true);
         let pattern = 0;
         let repl = 0;
         let another_pattern = 0;

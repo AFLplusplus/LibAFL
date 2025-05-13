@@ -21,7 +21,7 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{
-        havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations, StdMOptMutator, Tokens,
+        havoc_mutations, token_mutations::AflPpRedQueen, tokens_mutations, StdMOptMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
@@ -43,8 +43,8 @@ use libafl_bolts::{
     AsSliceMut, StdTargetArgs,
 };
 use libafl_targets::{
-    cmps::{observers::AFLppCmpLogObserver, stages::AFLppCmplogTracingStage},
-    AFLppCmpLogMap,
+    cmps::{observers::AflPpCmpLogObserver, stages::AflPpCmplogTracingStage},
+    AflPpCmpLogMap,
 };
 use nix::sys::signal::Signal;
 
@@ -354,14 +354,14 @@ fn fuzz(
 
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
-        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
+        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AflPpCmpLogMap>().unwrap();
         // let the forkserver know the shmid
         unsafe {
             cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
         }
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
-        let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AflPpCmpLogObserver::new("cmplog", cmpmap, true);
         let cmplog_ref = cmplog_observer.handle();
 
         let cmplog_executor = ForkserverExecutor::builder()
@@ -376,11 +376,11 @@ fn fuzz(
             .build(tuple_list!(cmplog_observer))
             .unwrap();
 
-        let tracing = AFLppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
+        let tracing = AflPpCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 
         // Setup a randomic Input2State stage
         let rq: MultiMutationalStage<_, _, BytesInput, _, _, _> =
-            MultiMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));
+            MultiMutationalStage::new(AflPpRedQueen::with_cmplog_options(true, true));
 
         let cb = |_fuzzer: &mut _,
                   _executor: &mut _,

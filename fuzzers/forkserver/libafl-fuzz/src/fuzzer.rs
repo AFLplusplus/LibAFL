@@ -26,7 +26,7 @@ use libafl::{
     },
     fuzzer::StdFuzzer,
     inputs::BytesInput,
-    mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, HavocScheduledMutator, Tokens},
+    mutators::{havoc_mutations, tokens_mutations, AflPpRedQueen, HavocScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::{BaseSchedule, PowerSchedule},
@@ -58,7 +58,7 @@ use libafl_bolts::{
 };
 #[cfg(feature = "nyx")]
 use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
-use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
+use libafl_targets::{cmps::AflPpCmpLogMap, AflPpCmpLogObserver, AflPpCmplogTracingStage};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -475,7 +475,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
 
     if run_cmplog {
         // The CmpLog map shared between the CmpLog observer and CmpLog executor
-        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
+        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AflPpCmpLogMap>().unwrap();
 
         // Let the Forkserver know the CmpLog shared memory map ID.
         unsafe {
@@ -484,7 +484,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
         // Create the CmpLog observer.
-        let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AflPpCmpLogObserver::new("cmplog", cmpmap, true);
         let cmplog_ref = cmplog_observer.handle();
 
         // Create the CmpLog executor.
@@ -496,11 +496,11 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
             .unwrap();
 
         // Create the CmpLog tracing stage.
-        let tracing = AFLppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
+        let tracing = AflPpCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 
         // Create a randomic Input2State stage
         let rq = MultiMutationalStage::<_, _, BytesInput, _, _, _>::new(
-            AFLppRedQueen::with_cmplog_options(true, true),
+            AflPpRedQueen::with_cmplog_options(true, true),
         );
 
         // Create an IfStage and wrap the CmpLog stages in it.

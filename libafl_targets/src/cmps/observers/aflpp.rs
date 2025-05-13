@@ -6,13 +6,13 @@ use libafl::{
     executors::ExitKind,
     observers::{
         Observer,
-        cmp::{AFLppCmpValuesMetadata, CmpMap, CmpObserver, CmpValues},
+        cmp::{AflPpCmpValuesMetadata, CmpMap, CmpObserver, CmpValues},
     },
 };
 use libafl_bolts::{Named, ownedref::OwnedRefMut};
 use serde::{Deserialize, Serialize};
 
-use crate::cmps::AFLppCmpLogMap;
+use crate::cmps::AflPpCmpLogMap;
 #[cfg(feature = "cmplog_extended_instrumentation")]
 use crate::cmps::CMPLOG_ENABLED;
 
@@ -64,16 +64,16 @@ struct cmp_map {
 
 /// A [`CmpObserver`] observer for AFL++ redqueen
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AFLppCmpLogObserver<'a> {
-    cmp_map: OwnedRefMut<'a, AFLppCmpLogMap>,
+pub struct AflPpCmpLogObserver<'a> {
+    cmp_map: OwnedRefMut<'a, AflPpCmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: Cow<'static, str>,
     add_meta: bool,
     original: bool,
 }
 
-impl CmpObserver for AFLppCmpLogObserver<'_> {
-    type Map = AFLppCmpLogMap;
+impl CmpObserver for AflPpCmpLogObserver<'_> {
+    type Map = AflPpCmpLogMap;
 
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -83,16 +83,16 @@ impl CmpObserver for AFLppCmpLogObserver<'_> {
         }
     }
 
-    fn cmp_map(&self) -> &AFLppCmpLogMap {
+    fn cmp_map(&self) -> &AflPpCmpLogMap {
         self.cmp_map.as_ref()
     }
 
-    fn cmp_map_mut(&mut self) -> &mut AFLppCmpLogMap {
+    fn cmp_map_mut(&mut self) -> &mut AflPpCmpLogMap {
         self.cmp_map.as_mut()
     }
 }
 
-impl<I, S> Observer<I, S> for AFLppCmpLogObserver<'_>
+impl<I, S> Observer<I, S> for AflPpCmpLogObserver<'_>
 where
     S: HasMetadata,
 {
@@ -123,18 +123,18 @@ where
     }
 }
 
-impl Named for AFLppCmpLogObserver<'_> {
+impl Named for AflPpCmpLogObserver<'_> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a> AFLppCmpLogObserver<'a> {
-    /// Creates a new [`AFLppCmpLogObserver`] with the given name and map.
+impl<'a> AflPpCmpLogObserver<'a> {
+    /// Creates a new [`AflPpCmpLogObserver`] with the given name and map.
     #[must_use]
     pub fn new(
         name: &'static str,
-        cmp_map: OwnedRefMut<'a, AFLppCmpLogMap>,
+        cmp_map: OwnedRefMut<'a, AflPpCmpLogMap>,
         add_meta: bool,
     ) -> Self {
         Self {
@@ -150,11 +150,11 @@ impl<'a> AFLppCmpLogObserver<'a> {
         self.original = v;
     }
 
-    /// Creates a new [`AFLppCmpLogObserver`] with the given name, map and reference to variable size.
+    /// Creates a new [`AflPpCmpLogObserver`] with the given name, map and reference to variable size.
     #[must_use]
     pub fn with_size(
         name: &'static str,
-        cmp_map: OwnedRefMut<'a, AFLppCmpLogMap>,
+        cmp_map: OwnedRefMut<'a, AflPpCmpLogMap>,
         add_meta: bool,
         original: bool,
         size: OwnedRefMut<'a, usize>,
@@ -168,21 +168,21 @@ impl<'a> AFLppCmpLogObserver<'a> {
         }
     }
 
-    /// Add `AFLppCmpValuesMetadata` to the State including the logged values.
+    /// Add `AflPpCmpValuesMetadata` to the State including the logged values.
     /// This routine does a basic loop filtering because loop index cmps are not interesting.
     fn add_cmpvalues_meta<S>(&mut self, state: &mut S)
     where
         S: HasMetadata,
     {
         #[expect(clippy::option_if_let_else)] // we can't mutate state in a closure
-        let meta = if let Some(meta) = state.metadata_map_mut().get_mut::<AFLppCmpValuesMetadata>()
+        let meta = if let Some(meta) = state.metadata_map_mut().get_mut::<AflPpCmpValuesMetadata>()
         {
             meta
         } else {
-            state.add_metadata(AFLppCmpValuesMetadata::new());
+            state.add_metadata(AflPpCmpValuesMetadata::new());
             state
                 .metadata_map_mut()
-                .get_mut::<AFLppCmpValuesMetadata>()
+                .get_mut::<AflPpCmpValuesMetadata>()
                 .unwrap()
         };
 
@@ -205,9 +205,9 @@ impl<'a> AFLppCmpLogObserver<'a> {
 
 /// Add the metadata
 pub fn add_to_aflpp_cmp_metadata(
-    meta: &mut AFLppCmpValuesMetadata,
+    meta: &mut AflPpCmpValuesMetadata,
     usable_count: usize,
-    cmp_map: &mut AFLppCmpLogMap,
+    cmp_map: &mut AflPpCmpLogMap,
     original: bool,
 ) {
     let count = usable_count;
