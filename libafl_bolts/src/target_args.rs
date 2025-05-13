@@ -29,7 +29,7 @@ pub enum InputLocation {
     },
 }
 
-/// The shared inner structs of trait [`TargetArgs`]
+/// The shared inner structs of trait [`StdTargetArgs`]
 #[derive(Debug, Clone, Default)]
 pub struct StdTargetArgsInner {
     /// Program arguments
