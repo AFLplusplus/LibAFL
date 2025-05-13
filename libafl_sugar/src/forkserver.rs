@@ -31,7 +31,7 @@ use libafl::{
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSliceMut, StdStdTargetArgs,
+    AsSliceMut, StdTargetArgs,
     core_affinity::Cores,
     nonzero,
     ownedref::OwnedRefMut,
