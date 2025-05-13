@@ -48,7 +48,7 @@ fn main() {
             eprintln!(
                 "Warning: failed to read drcov file at {}: {err:?}",
                 input.display()
-            )
+            );
         }) {
             println!("Merging {}", input.display());
             if let Err(err) = main_drcov.merge(&current_drcov, opts.unique) {
