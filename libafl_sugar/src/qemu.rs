@@ -1,4 +1,4 @@
-//! In-memory fuzzer with `QEMU`-based binary-only instrumentation
+//! In-Process fuzzer with `QEMU`-based binary-only instrumentation
 use core::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
@@ -11,7 +11,7 @@ use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
     executors::{ExitKind, ShadowExecutor},
-    feedback_or, feedback_or_fast,
+    feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
@@ -25,7 +25,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{ShadowTracingStage, StdMutationalStage},
+    stages::{CalibrationStage, ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
@@ -169,17 +169,27 @@ where
             // Keep tracks of CMPs
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
+            // New maximization map feedback linked to the edges observer and the feedback state
+            let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);
+            // Extra MapFeedback to deduplicate finds according to the cov map
+            let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
+
+            let calibration = CalibrationStage::new(&map_feedback);
+            let calibration_cmplog = CalibrationStage::new(&map_feedback);
+
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
-                // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::new(&edges_observer),
+                map_feedback,
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::new(&time_observer)
             );
 
             // A feedback to choose if an input is a solution or not
-            let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+            let mut objective = feedback_and_fast!(
+                feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new()),
+                map_objective
+            );
 
             // If not restarting, create a State from scratch
             let mut state = state.unwrap_or_else(|| {
@@ -313,7 +323,7 @@ where
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages = tuple_list!(tracing, i2s, mutational);
+                    let mut stages = tuple_list!(calibration_cmplog, tracing, i2s, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
@@ -334,7 +344,7 @@ where
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages = tuple_list!(tracing, i2s, mutational);
+                    let mut stages = tuple_list!(calibration_cmplog, tracing, i2s, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
@@ -427,7 +437,7 @@ where
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages = tuple_list!(mutational);
+                    let mut stages = tuple_list!(calibration, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
@@ -448,7 +458,7 @@ where
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages = tuple_list!(mutational);
+                    let mut stages = tuple_list!(calibration, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(

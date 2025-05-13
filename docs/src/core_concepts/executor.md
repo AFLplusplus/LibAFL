@@ -1,7 +1,7 @@
 # Executor
 
 In different fuzzers, this concept of executing the program under test means each run is now always the same.
-For instance, for in-memory fuzzers like libFuzzer an execution is a call to an harness function, for hypervisor-based fuzzers like [kAFL](https://github.com/IntelLabs/kAFL) instead an entire operating system is started from a snapshot for each run.
+For instance, for in-process fuzzers like libFuzzer an execution is a call to an harness function, for hypervisor-based fuzzers like [kAFL](https://github.com/IntelLabs/kAFL) instead an entire operating system is started from a snapshot for each run.
 
 In our model, an Executor is the entity that defines not only how to execute the target, but all the volatile operations that are related to just a single run of the target.
 
