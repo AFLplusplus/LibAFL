@@ -61,6 +61,7 @@ use crate::{
 
 /// How do we capture stdout/stderr. Not intended for public use.
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 enum StdCommandCaptureMethod {
     Fd(RawFd),
     #[default]
