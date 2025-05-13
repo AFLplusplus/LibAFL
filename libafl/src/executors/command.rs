@@ -68,10 +68,18 @@ enum StdCommandCaptureMethod {
 }
 
 impl StdCommandCaptureMethod {
+    fn pipe_capture(cmd: &mut Command, stdout: bool) {
+        if stdout {
+            cmd.stdout(Stdio::piped());
+        } else {
+            cmd.stderr(Stdio::piped());
+        }
+    }
+
     fn pre_capture(&self, cmd: &mut Command, stdout: bool) {
-        let do_pipe = if let Self::Fd(old) = self {
-            #[cfg(feature = "fork")]
-            {
+        #[cfg(feature = "fork")]
+        {
+            if let Self::Fd(old) = self {
                 if stdout {
                     cmd.setdup2(*old, libc::STDOUT_FILENO);
                     cmd.stdout(Stdio::null());
@@ -79,24 +87,13 @@ impl StdCommandCaptureMethod {
                     cmd.setdup2(*old, libc::STDERR_FILENO);
                     cmd.stderr(Stdio::null());
                 }
-                false
-            }
-
-            #[cfg(not(feature = "fork"))]
-            {
-                true
-            }
-        } else {
-            false
-        };
-
-        if do_pipe {
-            if stdout {
-                cmd.stdout(Stdio::piped());
             } else {
-                cmd.stderr(Stdio::piped());
+                Self::pipe_capture(cmd, stdout);
             }
         }
+
+        #[cfg(not(feature = "fork"))]
+        Self::pipe_capture(cmd, stdout);
     }
 }
 
