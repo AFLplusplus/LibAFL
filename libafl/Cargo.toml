@@ -305,6 +305,10 @@ fastbloom = { workspace = true, optional = true }
 # For Lua Mutators
 mlua = { version = "0.10.3", features = ["lua54", "vendored"], optional = true }
 
+[target.'cfg(docrs)'.dependencies]
+# Fix linking of Lua Mutators in doc mode. TODO: See if we can get rid of this in future version
+mlua_derive = { version = "0.10.1" }
+
 [lints]
 workspace = true
 
