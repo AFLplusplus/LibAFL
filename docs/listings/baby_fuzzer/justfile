@@ -1,0 +1,17 @@
+# Justfile to build all example projects
+
+default: build-all
+
+build PROJECT:
+	@echo "Building project in directory: {{PROJECT}}"
+	@cd {{PROJECT}} && cargo build
+	@echo "Finished building project in directory: {{PROJECT}}"
+
+build-all: listing-01 listing-02 listing-03 listing-04 listing-05 listing-06
+
+listing-01: (build "listing-01")
+listing-02: (build "listing-02")
+listing-03: (build "listing-03")
+listing-04: (build "listing-04")
+listing-05: (build "listing-05")
+listing-06: (build "listing-06")

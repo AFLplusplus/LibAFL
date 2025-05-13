@@ -64,6 +64,9 @@ jobs:
       - name: Test the book (MacOS)
         if: runner.os == 'MacOS'
         run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
+      - name: Build individual libafl book examples (linux)
+        if: runner.os == 'Linux'
+        run: cd docs/listings/baby_fuzzer/ && just build-all
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: cargo test -- --test-threads 1
