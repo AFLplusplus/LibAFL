@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
 
   // The following line is also needed for shared memory testcase fuzzing
   unsigned char *buf = __AFL_FUZZ_TESTCASE_BUF;
-  int len = __AFL_FUZZ_TESTCASE_LEN;
+  int            len = __AFL_FUZZ_TESTCASE_LEN;
 
   printf("{\"len\": %d}", len);
 
