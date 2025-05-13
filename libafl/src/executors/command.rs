@@ -847,7 +847,7 @@ mod tests {
     }
 
     #[test]
-    // #[cfg_attr(miri, ignore)]
+    #[cfg_attr(miri, ignore)]
     fn test_capture() {
         let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
             SimpleEventManager::new(SimpleMonitor::new(|status| {
