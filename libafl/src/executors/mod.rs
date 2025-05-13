@@ -278,14 +278,14 @@ pub trait StdChildArgs: Sized {
 
     #[must_use]
     /// Sets the stdout observer
-    fn stdout(mut self, stdout: Handle<StdOutObserver>) -> Self {
+    fn stdout_observer(mut self, stdout: Handle<StdOutObserver>) -> Self {
         self.inner_mut().stdout_observer = Some(stdout);
         self
     }
 
     #[must_use]
     /// Sets the stderr observer
-    fn stderr(mut self, stderr: Handle<StdErrObserver>) -> Self {
+    fn stderr_observer(mut self, stderr: Handle<StdErrObserver>) -> Self {
         self.inner_mut().stderr_observer = Some(stderr);
         self
     }

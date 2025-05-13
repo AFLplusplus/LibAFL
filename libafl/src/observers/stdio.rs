@@ -16,7 +16,7 @@ use std::{
     string::ToString,
 };
 
-use libafl_bolts::{Named, shmem::unix_shmem::memfd::MemfdShMemProvider};
+use libafl_bolts::Named;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{Error, observers::Observer};
@@ -106,8 +106,8 @@ use crate::{Error, observers::Observer};
 ///    let mut executor = CommandExecutor::builder()
 ///        .program("base64")
 ///        .arg("--decode")
-///        .stdout(stdout_observer.handle())
-///        .stderr(stderr_observer.handle())
+///        .stdout_observer(stdout_observer.handle())
+///        .stderr_observer(stderr_observer.handle())
 ///        .build(tuple_list!(stdout_observer, stderr_observer))
 ///        .unwrap();
 ///
@@ -226,7 +226,7 @@ impl<T> OutputObserver<T> {
     /// Cool, we can have [`MemfdShMemProvider`] to create a memfd.
     #[cfg(not(target_os = "macos"))]
     fn new_file() -> Result<File, Error> {
-        MemfdShMemProvider::new_file()
+        libafl_bolts::shmem::unix_shmem::memfd::MemfdShMemProvider::new_file()
     }
 
     /// Create a new `OutputObserver` with the given name.
