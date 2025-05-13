@@ -370,6 +370,7 @@ fn fuzz(
             .shmem_provider(&mut shmem_provider)
             .parse_afl_cmdline(arguments)
             .is_persistent(true)
+            // increase timeouts for cmplog
             .timeout(timeout * 10)
             .kill_signal(signal)
             .build(tuple_list!(cmplog_observer))

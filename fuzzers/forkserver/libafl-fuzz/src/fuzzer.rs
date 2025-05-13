@@ -179,7 +179,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     let mut tokens = Tokens::new();
     tokens = tokens.add_from_files(&opt.dicts)?;
 
-    // Create a AFLStatsStage;
+    // Create a AflStatsStage;
     let afl_stats_stage = AflStatsStage::builder()
         .stats_file(fuzzer_dir.join("fuzzer_stats"))
         .plot_file(fuzzer_dir.join("plot_data"))
