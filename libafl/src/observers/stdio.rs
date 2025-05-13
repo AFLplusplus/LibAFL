@@ -236,7 +236,7 @@ impl<T> OutputObserver<T> {
     }
 
     /// Create a new [`OutputObserver`] with the given name. This will use the memory fd backend
-    /// on Linux and macOS, which is compatible with [`crate::executors::ForkserverExecutor`].
+    /// on Linux and macOS, which is compatible with forkserver.
     pub fn new(name: &'static str) -> Result<Self, Error> {
         Ok(Self {
             name: Cow::from(name),
@@ -247,7 +247,7 @@ impl<T> OutputObserver<T> {
     }
 
     /// Create a new `OutputObserver` with the given name. This use portable piped backend, which
-    /// only works with [`crate::executors::CommandExecutor`].
+    /// only works with [`std::process::Command`].
     pub fn new_piped(name: &'static str) -> Result<Self, Error> {
         Ok(Self {
             name: Cow::from(name),
