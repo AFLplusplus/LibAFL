@@ -250,7 +250,7 @@ impl<T> OutputObserver<T> {
     /// only works with [`std::process::Command`].
     pub fn new_piped(name: Cow<'static, str>) -> Result<Self, Error> {
         Ok(Self {
-            name: Cow::from(name),
+            name: name,
             output: None,
             file: None,
             phantom: PhantomData,
@@ -259,6 +259,7 @@ impl<T> OutputObserver<T> {
 
     /// Create a new `OutputObserver` with given name and file.
     /// Useful for targets like nyx which writes to the same file again and again.
+    #[must_use]
     pub fn new_file(name: Cow<'static, str>, file: File) -> Self {
         Self {
             name: name,
