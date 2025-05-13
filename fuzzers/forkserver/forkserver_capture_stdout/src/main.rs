@@ -25,6 +25,7 @@ use libafl_bolts::{
     tuples::{Handled, Merge, tuple_list},
 };
 use nix::sys::signal::Signal;
+use serde::Deserialize;
 
 /// The commandline args this fuzzer accepts
 #[derive(Debug, Parser)]
@@ -80,6 +81,11 @@ struct Opt {
         default_value = "SIGKILL"
     )]
     signal: Signal,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ProgramOutput {
+    len: i32
 }
 
 pub fn main() {
@@ -219,7 +225,7 @@ pub fn main() {
             .output
             .clone()
             .expect("no stdout");
-        assert!(String::from_utf8_lossy(&stdout).starts_with("Buf: "));
+        let out: ProgramOutput = serde_json::from_slice(&stdout).unwrap();
+        println!("Program output after serde_json::from_slice is {:?}", &out);
     }
-    println!("All stdout we captured is started with \"Buf: \"!")
 }
