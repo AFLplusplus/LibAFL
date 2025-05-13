@@ -19,13 +19,13 @@ use std::{
 };
 
 #[cfg(feature = "regex")]
-use libafl_bolts::tuples::Handled;
+use libafl_bolts::tuples::{Handle, Handled};
 use libafl_bolts::{
     AsSlice, AsSliceMut, InputLocation, StdTargetArgs, StdTargetArgsInner, Truncate,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
-    tuples::{Handle, MatchNameRef, Prepend, RefIndexable},
+    tuples::{MatchNameRef, Prepend, RefIndexable},
 };
 use libc::RLIM_INFINITY;
 use nix::{
