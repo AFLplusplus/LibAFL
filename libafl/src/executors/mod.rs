@@ -16,7 +16,9 @@ pub use inprocess::InProcessExecutor;
 pub use inprocess_fork::InProcessForkExecutor;
 #[cfg(unix)]
 use libafl_bolts::os::unix_signals::Signal;
-use libafl_bolts::tuples::{Handle, RefIndexable};
+#[cfg(feature = "std")]
+use libafl_bolts::tuples::Handle;
+use libafl_bolts::tuples::RefIndexable;
 use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
