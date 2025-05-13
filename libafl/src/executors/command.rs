@@ -363,6 +363,7 @@ where
     fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
         use wait_timeout::ChildExt;
 
+        self.observers_mut().pre_exec_all(state, input)?;
         *state.executions_mut() += 1;
         let mut child = self.configurer.spawn_child(input)?;
 
@@ -399,6 +400,8 @@ where
             }
         }
 
+        self.observers_mut()
+            .post_exec_child_all(state, input, &exit_kind)?;
         Ok(exit_kind)
     }
 }
@@ -844,7 +847,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore)]
+    // #[cfg_attr(miri, ignore)]
     fn test_capture() {
         let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
             SimpleEventManager::new(SimpleMonitor::new(|status| {

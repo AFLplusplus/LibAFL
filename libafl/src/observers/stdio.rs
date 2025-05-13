@@ -294,7 +294,7 @@ where
         self.pre_exec_child(_state, _input)
     }
 
-    fn post_exec(
+    fn post_exec_child(
         &mut self,
         _state: &mut S,
         _input: &I,
@@ -317,13 +317,13 @@ where
         Ok(())
     }
 
-    fn post_exec_child(
+    fn post_exec(
         &mut self,
         _state: &mut S,
         _input: &I,
         _exit_kind: &crate::executors::ExitKind,
     ) -> Result<(), Error> {
-        self.post_exec(_state, _input, _exit_kind)
+        self.post_exec_child(_state, _input, _exit_kind)
     }
 }
 
