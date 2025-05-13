@@ -1434,9 +1434,7 @@ where
     ) -> Result<ExitKind, Error> {
         let converter = fuzzer.converter_mut();
         let bytes = converter.to_bytes(input);
-        self.observers_mut().pre_exec_all(state, input)?;
         let exit = self.execute_input(state, bytes.as_slice())?;
-        self.observers_mut().post_exec_all(state, input, &exit)?;
         Ok(exit)
     }
 }

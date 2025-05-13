@@ -364,8 +364,6 @@ where
         use wait_timeout::ChildExt;
 
         *state.executions_mut() += 1;
-        self.observers.pre_exec_all(state, input)?;
-
         let mut child = self.configurer.spawn_child(input)?;
 
         let exit_kind = child
@@ -400,8 +398,6 @@ where
                 self.observers_mut().index_mut(&stdout_handle).observe(buf);
             }
         }
-
-        self.observers.post_exec_all(state, input, &exit_kind)?;
 
         Ok(exit_kind)
     }
