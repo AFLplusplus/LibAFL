@@ -3,12 +3,16 @@ description: Sets up the Rust environment for the CI workflow
 runs:
   using: composite
   steps:
+    - name: Uninstall all currently installed rust
+      shell: bash
+      run: |
+        sudo apt purge -y 'cargo*' 'rust*'
     - name: Install and cache deps
       shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install -y curl lsb-release wget software-properties-common gnupg shellcheck pax-utils libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@nightly
     - name: install just
       uses: extractions/setup-just@v2
       with:
@@ -19,9 +23,7 @@ runs:
     - name: Add nightly clippy
       shell: bash
       run: rustup toolchain install nightly --component clippy --allow-downgrade
-    - name: Install cargo-hack
-      shell: bash
-      run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
+    - uses: taiki-e/install-action@cargo-hack
     - name: Add nightly
       shell: bash
       run: rustup toolchain install nightly --allow-downgrade
