@@ -1390,7 +1390,7 @@ pub mod unix_shmem {
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::os::fd::IntoRawFd;
+        use std::{fs::File, os::fd::IntoRawFd};
 
         use libc::{MAP_SHARED, PROT_READ, PROT_WRITE, close, fstat, ftruncate, mmap, munmap};
         use nix::sys::memfd::{MemFdCreateFlag, memfd_create};
@@ -1530,6 +1530,21 @@ pub mod unix_shmem {
         impl Default for MemfdShMemProvider {
             fn default() -> Self {
                 Self::new().unwrap()
+            }
+        }
+
+        /// Dedicated Implementation to yield a [`std::fs::File`]
+        #[cfg(unix)]
+        impl MemfdShMemProvider {
+            /// Unlike [`MemfdShMemProvider::new`], this returns a file instead, without any mmap and truncate.
+            /// By default, the file size is capped by the tmpfs installed by the operating system, which is big
+            /// enough to hold all output and avoid spurious read/write errors from children. However, you are free
+            /// to set the size via [`std::fs::File::set_len`]
+            pub fn new_file() -> Result<File, Error> {
+                Ok(File::from(memfd_create(
+                    c"libafl_file",
+                    MemFdCreateFlag::empty(),
+                )?))
             }
         }
 
