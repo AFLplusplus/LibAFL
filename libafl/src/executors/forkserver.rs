@@ -398,7 +398,7 @@ impl Forkserver {
             command.stdout(Stdio::inherit());
         } else if let Some(fd) = &stdout_memfd {
             command.setdup2(*fd, libc::STDOUT_FILENO);
-            command.stdout(Stdio::inherit());
+            command.stdout(Stdio::null());
         } else {
             command.stdout(Stdio::null());
         }
@@ -407,7 +407,7 @@ impl Forkserver {
             command.stderr(Stdio::inherit());
         } else if let Some(fd) = &stderr_memfd {
             command.setdup2(*fd, libc::STDERR_FILENO);
-            command.stderr(Stdio::inherit());
+            command.stderr(Stdio::null());
         } else {
             command.stderr(Stdio::null());
         }
@@ -1037,12 +1037,14 @@ where
                         .as_ref()
                         .expect("stdout observer not passed in the builder")
                         .as_raw_fd()
+                        .expect("only memory fd backend is allowed for forkserver executor")
                 }),
                 self.child_env_inner.stderr_observer.as_ref().map(|t| {
                     obs.get(t)
                         .as_ref()
                         .expect("stderr observer not passed in the builder")
                         .as_raw_fd()
+                        .expect("only memory fd backend is allowed for forkserver executor")
                 }),
                 self.child_env_inner.current_directory.clone(),
             )?,

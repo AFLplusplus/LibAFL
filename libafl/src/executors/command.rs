@@ -6,17 +6,15 @@ use core::ffi::CStr;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    ops::IndexMut,
     time::Duration,
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use std::os::fd::AsRawFd;
 use std::{
     ffi::OsStr,
-    io::Write,
-    os::{
-        fd::{AsRawFd, RawFd},
-        unix::ffi::OsStrExt,
-    },
+    io::{Read, Write},
+    os::{fd::RawFd, unix::ffi::OsStrExt},
     process::{Child, Command, Stdio},
 };
 
@@ -46,7 +44,9 @@ use nix::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use typed_builder::TypedBuilder;
 
-use super::{HasTimeout, StdChildArgs, StdChildArgsInner, forkserver::ConfigTarget};
+#[cfg(all(target_family = "unix", feature = "fork"))]
+use super::forkserver::ConfigTarget;
+use super::{HasTimeout, StdChildArgs, StdChildArgsInner};
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
@@ -57,6 +57,47 @@ use crate::{
     state::HasExecutions,
 };
 
+/// How do we capture stdout/stderr. Not intended for public use.
+#[derive(Debug, Default)]
+enum StdCommandCaptureMethod {
+    Fd(RawFd),
+    #[default]
+    Pipe,
+}
+
+impl StdCommandCaptureMethod {
+    fn pre_capture(&self, cmd: &mut Command, stdout: bool) {
+        let do_pipe = if let Self::Fd(old) = self {
+            #[cfg(feature = "fork")]
+            {
+                if stdout {
+                    cmd.setdup2(*old, libc::STDOUT_FILENO);
+                    cmd.stdout(Stdio::null());
+                } else {
+                    cmd.setdup2(*old, libc::STDERR_FILENO);
+                    cmd.stderr(Stdio::null());
+                }
+                false
+            }
+
+            #[cfg(not(feature = "fork"))]
+            {
+                true
+            }
+        } else {
+            false
+        };
+
+        if do_pipe {
+            if stdout {
+                cmd.stdout(Stdio::piped());
+            } else {
+                cmd.stderr(Stdio::piped());
+            }
+        }
+    }
+}
+
 /// A simple Configurator that takes the most common parameters
 /// Writes the input either to stdio or to a file
 /// Use [`CommandExecutor::builder()`] to use this configurator.
@@ -65,8 +106,8 @@ pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
     /// By default, the child output is hidden to increase execution speed
     debug_child: bool,
-    stdout_fd: Option<RawFd>,
-    stderr_fd: Option<RawFd>,
+    stdout_cap: Option<StdCommandCaptureMethod>,
+    stderr_cap: Option<StdCommandCaptureMethod>,
     timeout: Duration,
     /// true: input gets delivered via stdink
     input_location: InputLocation,
@@ -79,25 +120,23 @@ where
     I: HasTargetBytes,
 {
     fn spawn_child(&mut self, input: &I) -> Result<Child, Error> {
+        let mut cmd = Command::new(self.command.get_program());
         match &mut self.input_location {
             InputLocation::Arg { argnum } => {
                 let args = self.command.get_args();
-                let mut cmd = Command::new(self.command.get_program());
 
                 if self.debug_child {
                     cmd.stdout(Stdio::inherit());
-                } else if let Some(fd) = self.stdout_fd {
-                    cmd.setdup2(fd, libc::STDOUT_FILENO);
-                    cmd.stdout(Stdio::inherit());
+                } else if let Some(cap) = &self.stdout_cap {
+                    cap.pre_capture(&mut cmd, true);
                 } else {
                     cmd.stdout(Stdio::null());
                 };
 
                 if self.debug_child {
                     cmd.stderr(Stdio::inherit());
-                } else if let Some(fd) = self.stderr_fd {
-                    cmd.setdup2(fd, libc::STDERR_FILENO);
-                    cmd.stderr(Stdio::inherit());
+                } else if let Some(cap) = &self.stderr_cap {
+                    cap.pre_capture(&mut cmd, false);
                 } else {
                     cmd.stderr(Stdio::null());
                 };
@@ -266,6 +305,8 @@ pub struct CommandExecutor<I, OT, S, T, HT = (), C = Child> {
     configurer: T,
     /// The observers used by this executor
     observers: OT,
+    stdout_observer: Option<Handle<StdOutObserver>>,
+    stderr_observer: Option<Handle<StdErrObserver>>,
     hooks: HT,
     phantom: PhantomData<(C, I, S)>,
 }
@@ -337,6 +378,26 @@ where
                 drop(child.wait());
                 ExitKind::Timeout
             });
+
+        // Manualy update stdout/stderr here if we use piped implementation.
+        // Reason of not putting into state and pass by post_exec_all is that
+        // - Save extra at least two hashmap lookups since we already know the handle
+        // - Doesn't pose HasNamedMetadata bound on S (note we might have many stdout/stderr observers)
+        if let Some(mut stderr) = child.stderr {
+            if let Some(stderr_handle) = self.stderr_observer.clone() {
+                let mut buf = vec![];
+                stderr.read_to_end(&mut buf)?;
+                self.observers_mut().index_mut(&stderr_handle).observe(buf);
+            }
+        }
+
+        if let Some(mut stdout) = child.stdout {
+            if let Some(stdout_handle) = self.stdout_observer.clone() {
+                let mut buf = vec![];
+                stdout.read_to_end(&mut buf)?;
+                self.observers_mut().index_mut(&stdout_handle).observe(buf);
+            }
+        }
 
         self.observers.post_exec_all(state, input, &exit_kind)?;
 
@@ -545,9 +606,42 @@ impl CommandExecutorBuilder {
         if let Some(cwd) = &self.child_env_inner.current_directory {
             command.current_dir(cwd);
         }
-        if !self.child_env_inner.debug_child {
-            command.stdout(Stdio::null());
-            command.stderr(Stdio::null());
+
+        let stdout_cap = self.child_env_inner.stdout_observer.as_ref().map(|hdl| {
+            observers
+                .get(hdl)
+                .as_ref()
+                .expect("stdout observer not in observers tuple")
+                .as_raw_fd()
+                .map(|t| StdCommandCaptureMethod::Fd(t))
+                .unwrap_or_default()
+        });
+
+        let stderr_cap = self.child_env_inner.stderr_observer.as_ref().map(|hdl| {
+            observers
+                .get(hdl)
+                .as_ref()
+                .expect("stderr observer not in observers tuple")
+                .as_raw_fd()
+                .map(|t| StdCommandCaptureMethod::Fd(t))
+                .unwrap_or_default()
+        });
+
+        if self.child_env_inner.debug_child {
+            command.stdout(Stdio::piped());
+            command.stderr(Stdio::piped());
+        } else {
+            if let Some(cap) = &stdout_cap {
+                cap.pre_capture(&mut command, true);
+            } else {
+                command.stdout(Stdio::null());
+            }
+
+            if let Some(cap) = &stderr_cap {
+                cap.pre_capture(&mut command, false);
+            } else {
+                command.stderr(Stdio::null());
+            }
         }
 
         if self.child_env_inner.stdout_observer.is_some() {
@@ -560,28 +654,19 @@ impl CommandExecutorBuilder {
 
         let configurator = StdCommandConfigurator {
             debug_child: self.child_env_inner.debug_child,
-            stdout_fd: self.child_env_inner.stdout_observer.as_ref().map(|t| {
-                observers
-                    .get(t)
-                    .as_ref()
-                    .expect("stdout observer not passed in the builder")
-                    .as_raw_fd()
-            }),
-            stderr_fd: self.child_env_inner.stderr_observer.as_ref().map(|t| {
-                observers
-                    .get(t)
-                    .as_ref()
-                    .expect("stderr observer not passed in the builder")
-                    .as_raw_fd()
-            }),
+            stdout_cap,
+            stderr_cap,
             input_location: self.target_inner.input_location.clone(),
             timeout: self.child_env_inner.timeout,
             command,
         };
+
         Ok(
             <StdCommandConfigurator as CommandConfigurator<I>>::into_executor::<OT, S>(
                 configurator,
                 observers,
+                self.child_env_inner.stdout_observer.clone(),
+                self.child_env_inner.stderr_observer.clone(),
             ),
         )
     }
@@ -667,11 +752,18 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     }
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<I, OT, S, Self, (), C> {
+    fn into_executor<OT, S>(
+        self,
+        observers: OT,
+        stdout_observer: Option<Handle<StdOutObserver>>,
+        stderr_observer: Option<Handle<StdErrObserver>>,
+    ) -> CommandExecutor<I, OT, S, Self, (), C> {
         CommandExecutor {
             configurer: self,
             observers,
             hooks: (),
+            stderr_observer,
+            stdout_observer,
             phantom: PhantomData,
         }
     }
@@ -681,11 +773,15 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
         self,
         observers: OT,
         hooks: HT,
+        stdout_observer: Option<Handle<StdOutObserver>>,
+        stderr_observer: Option<Handle<StdErrObserver>>,
     ) -> CommandExecutor<I, OT, S, Self, HT, C> {
         CommandExecutor {
             configurer: self,
             observers,
             hooks,
+            stderr_observer,
+            stdout_observer,
             phantom: PhantomData,
         }
     }

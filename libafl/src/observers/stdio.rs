@@ -183,8 +183,8 @@ pub struct OutputObserver<T> {
     /// The captured stdout/stderr data during last execution.
     pub output: Option<Vec<u8>>,
     #[serde(skip_serializing, deserialize_with = "new_file::<_, T>")]
-    /// File backend of the memory to capture output
-    pub file: File,
+    /// File backend of the memory to capture output, if [`None`] we use portable piped output
+    pub file: Option<File>,
     #[serde(skip)]
     /// Phantom data to hold the stream type
     phantom: PhantomData<T>,
@@ -193,7 +193,7 @@ pub struct OutputObserver<T> {
 /// Blanket implementation for a [`std::fs::File`]. Fortunately the contents of the file
 /// is transient and thus we can safely create a new one on deserialization (and skip it)
 /// when doing serialization
-fn new_file<'de, D, T>(_d: D) -> Result<File, D::Error>
+fn new_file<'de, D, T>(_d: D) -> Result<Option<File>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -217,19 +217,28 @@ impl<T> OutputObserver<T> {
     //
     // In most cases, capturing stdout/stderr every loop is very slow and mostly for debugging purpose and thus this should be acceptable.
     #[cfg(target_os = "macos")]
-    fn new_file() -> Result<File, Error> {
+    fn new_file() -> Result<Option<File>, Error> {
         let fp = File::create_new("fsrvmemfd")?;
         nix::unistd::unlink("fsrvmemfd")?;
-        Ok(fp)
+        Ok(Some(fp))
     }
 
     /// Cool, we can have [`MemfdShMemProvider`] to create a memfd.
-    #[cfg(not(target_os = "macos"))]
-    fn new_file() -> Result<File, Error> {
-        libafl_bolts::shmem::unix_shmem::memfd::MemfdShMemProvider::new_file()
+    #[cfg(target_os = "linux")]
+    fn new_file() -> Result<Option<File>, Error> {
+        Ok(Some(
+            libafl_bolts::shmem::unix_shmem::memfd::MemfdShMemProvider::new_file()?,
+        ))
     }
 
-    /// Create a new `OutputObserver` with the given name.
+    /// This will use standard but portable pipe mechanism to capture outputs
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    pub fn new_file() -> Result<Option<File>, Error> {
+        Ok(None)
+    }
+
+    /// Create a new [`OutputObserver`] with the given name. This will use the memory fd backend
+    /// on Linux and macOS, which is compatible with [`crate::executors::ForkserverExecutor`].
     #[must_use]
     pub fn new(name: &'static str) -> Result<Self, Error> {
         Ok(Self {
@@ -240,21 +249,26 @@ impl<T> OutputObserver<T> {
         })
     }
 
+    /// Create a new `OutputObserver` with the given name. This use portable piped backend, which
+    /// only works with [`crate::executors::CommandExecutor`].
+    #[must_use]
+    pub fn new_piped(name: &'static str) -> Result<Self, Error> {
+        Ok(Self {
+            name: Cow::from(name),
+            output: None,
+            file: None,
+            phantom: PhantomData,
+        })
+    }
+
     /// React to new stream data
     pub fn observe(&mut self, data: Vec<u8>) {
         self.output = Some(data);
     }
 
-    fn reset(&mut self) -> Result<(), Error> {
-        self.file.seek(SeekFrom::Start(0))?;
-        self.output = None;
-        Ok(())
-    }
-}
-
-impl<T> AsRawFd for OutputObserver<T> {
-    fn as_raw_fd(&self) -> RawFd {
-        self.file.as_raw_fd()
+    /// Return the raw fd, if any
+    pub fn as_raw_fd(&self) -> Option<RawFd> {
+        self.file.as_ref().map(|t| t.as_raw_fd())
     }
 }
 
@@ -264,9 +278,15 @@ impl<T> Named for OutputObserver<T> {
     }
 }
 
-impl<I, S, T> Observer<I, S> for OutputObserver<T> {
+impl<I, S, T> Observer<I, S> for OutputObserver<T>
+where
+    T: 'static,
+{
     fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.reset()?;
+        if let Some(file) = self.file.as_mut() {
+            file.seek(SeekFrom::Start(0))?;
+        }
+        self.output = None;
         Ok(())
     }
 
@@ -280,17 +300,18 @@ impl<I, S, T> Observer<I, S> for OutputObserver<T> {
         _input: &I,
         _exit_kind: &crate::executors::ExitKind,
     ) -> Result<(), Error> {
-        let pos = self.file.stream_position()?;
+        if let Some(file) = self.file.as_mut() {
+            let pos = file.stream_position()?;
 
-        if pos != 0 {
-            self.reset()?;
+            if pos != 0 {
+                file.seek(SeekFrom::Start(0))?;
 
-            let mut buf = vec![0; pos as usize];
-            self.file.read_exact(&mut buf)?;
+                let mut buf = vec![0; pos as usize];
+                file.read_exact(&mut buf)?;
 
-            self.observe(buf);
+                self.observe(buf);
+            }
         }
-
         Ok(())
     }
 
