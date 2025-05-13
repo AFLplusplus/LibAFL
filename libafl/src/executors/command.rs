@@ -2,10 +2,9 @@
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::ffi::CString;
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use core::ffi::CStr;
-#[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::vec::Vec;
-
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use core::ffi::CStr;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -134,7 +133,7 @@ where
                     cap.pre_capture(&mut cmd, true);
                 } else {
                     cmd.stdout(Stdio::null());
-                };
+                }
 
                 if self.debug_child {
                     cmd.stderr(Stdio::inherit());
@@ -142,7 +141,7 @@ where
                     cap.pre_capture(&mut cmd, false);
                 } else {
                     cmd.stderr(Stdio::null());
-                };
+                }
 
                 for (i, arg) in args.enumerate() {
                     if i == *argnum {
@@ -343,6 +342,8 @@ where
             .field("inner", &self.configurer)
             .field("observers", &self.observers)
             .field("hooks", &self.hooks)
+            .field("stdout_observer", &self.stdout_observer)
+            .field("stderr_observer", &self.stderr_observer)
             .finish()
     }
 }
@@ -616,7 +617,7 @@ impl CommandExecutorBuilder {
                 .as_ref()
                 .expect("stdout observer not in observers tuple")
                 .as_raw_fd()
-                .map(|t| StdCommandCaptureMethod::Fd(t))
+                .map(StdCommandCaptureMethod::Fd)
                 .unwrap_or_default()
         });
 
@@ -626,7 +627,7 @@ impl CommandExecutorBuilder {
                 .as_ref()
                 .expect("stderr observer not in observers tuple")
                 .as_raw_fd()
-                .map(|t| StdCommandCaptureMethod::Fd(t))
+                .map(StdCommandCaptureMethod::Fd)
                 .unwrap_or_default()
         });
 
@@ -874,6 +875,6 @@ mod tests {
             )
             .unwrap();
 
-        assert!(executor.observers.0.output.is_some())
+        assert!(executor.observers.0.output.is_some());
     }
 }

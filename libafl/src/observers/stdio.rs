@@ -7,13 +7,12 @@
     doc = r"For example, they are supported on the [`crate::executors::CommandExecutor`] and [`crate::executors::ForkserverExecutor`]."
 )]
 
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::marker::PhantomData;
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
-    os::{fd::AsRawFd, unix::prelude::RawFd},
-    string::ToString,
+    os::unix::prelude::RawFd,
 };
 
 use libafl_bolts::Named;
@@ -239,7 +238,6 @@ impl<T> OutputObserver<T> {
 
     /// Create a new [`OutputObserver`] with the given name. This will use the memory fd backend
     /// on Linux and macOS, which is compatible with [`crate::executors::ForkserverExecutor`].
-    #[must_use]
     pub fn new(name: &'static str) -> Result<Self, Error> {
         Ok(Self {
             name: Cow::from(name),
@@ -251,7 +249,6 @@ impl<T> OutputObserver<T> {
 
     /// Create a new `OutputObserver` with the given name. This use portable piped backend, which
     /// only works with [`crate::executors::CommandExecutor`].
-    #[must_use]
     pub fn new_piped(name: &'static str) -> Result<Self, Error> {
         Ok(Self {
             name: Cow::from(name),
@@ -266,9 +263,10 @@ impl<T> OutputObserver<T> {
         self.output = Some(data);
     }
 
+    #[must_use]
     /// Return the raw fd, if any
     pub fn as_raw_fd(&self) -> Option<RawFd> {
-        self.file.as_ref().map(|t| t.as_raw_fd())
+        self.file.as_ref().map(std::os::fd::AsRawFd::as_raw_fd)
     }
 }
 
