@@ -1,25 +1,25 @@
 /* ANCHOR: use */
 extern crate libafl;
 extern crate libafl_bolts;
-use std::num::NonZeroUsize;
+
+use std::path::PathBuf;
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{ExitKind, inprocess::InProcessExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::scheduled::{havoc_mutations, HavocScheduledMutator},
-    observers::StdMapObserver,
+    mutators::{havoc_mutations, scheduled::HavocScheduledMutator},
+    observers::ConstMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice, nonzero};
-use std::path::PathBuf;
+use libafl_bolts::{AsSlice, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list};
 /* ANCHOR_END: use */
 
 // Coverage map with explicit assignments due to the lack of instrumentation
@@ -35,11 +35,11 @@ fn main() {
         let target = input.target_bytes();
         let buf = target.as_slice();
         signals_set(0); // set SIGNALS[0]
-        if buf.len() > 0 && buf[0] == 'a' as u8 {
+        if buf.len() > 0 && buf[0] == b'a' {
             signals_set(1); // set SIGNALS[1]
-            if buf.len() > 1 && buf[1] == 'b' as u8 {
+            if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2); // set SIGNALS[2]
-                if buf.len() > 2 && buf[2] == 'c' as u8 {
+                if buf.len() > 2 && buf[2] == b'c' {
                     panic!("=)");
                 }
             }
@@ -48,11 +48,11 @@ fn main() {
     };
     // To test the panic:
     let input = BytesInput::new(Vec::from("abc"));
-    #[cfg(feature = "panic")]
+    #[cfg(feature = "test-panic")]
     harness(&input);
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", &mut SIGNALS) };
+    let observer = unsafe { ConstMapObserver::from_mut_ptr("signals", nonnull_raw_mut!(SIGNALS)) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);

@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 use std::{
     io::{Read, Seek},
+    ops::IndexMut,
     os::fd::AsRawFd,
 };
 
@@ -11,7 +12,10 @@ use libafl::{
     observers::{ObserversTuple, StdOutObserver},
     state::HasExecutions,
 };
-use libafl_bolts::{AsSlice, tuples::RefIndexable};
+use libafl_bolts::{
+    AsSlice,
+    tuples::{Handle, RefIndexable},
+};
 use libnyx::NyxReturnValue;
 
 use crate::{cmplog::CMPLOG_ENABLED, helper::NyxHelper};
@@ -21,7 +25,7 @@ pub struct NyxExecutor<S, OT> {
     /// implement nyx function
     pub helper: NyxHelper,
     /// stdout
-    stdout: Option<StdOutObserver>,
+    stdout: Option<Handle<StdOutObserver>>,
     /// stderr
     // stderr: Option<StdErrObserver>,
     /// observers
@@ -112,7 +116,7 @@ where
             }
         };
 
-        if let Some(ob) = self.stdout.as_mut() {
+        if let Some(ob) = self.stdout.clone() {
             let mut stdout = Vec::new();
             self.helper.nyx_stdout.rewind()?;
             self.helper
@@ -120,7 +124,7 @@ where
                 .read_to_end(&mut stdout)
                 .map_err(|e| Error::illegal_state(format!("Failed to read Nyx stdout: {e}")))?;
 
-            ob.observe(&stdout);
+            self.observers_mut().index_mut(&ob).observe(stdout);
         }
 
         unsafe {
@@ -169,7 +173,7 @@ impl<S, OT> NyxExecutor<S, OT> {
 }
 
 pub struct NyxExecutorBuilder {
-    stdout: Option<StdOutObserver>,
+    stdout: Option<Handle<StdOutObserver>>,
     // stderr: Option<StdErrObserver>,
 }
 
@@ -188,7 +192,7 @@ impl NyxExecutorBuilder {
         }
     }
 
-    pub fn stdout(&mut self, stdout: StdOutObserver) -> &mut Self {
+    pub fn stdout(&mut self, stdout: Handle<StdOutObserver>) -> &mut Self {
         self.stdout = Some(stdout);
         self
     }

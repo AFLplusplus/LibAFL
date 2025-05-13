@@ -533,7 +533,10 @@ mod tests {
 
         match try_create_new(&path) {
             Ok(None) => (),
-            Ok(_) => panic!("File {path:?} did not exist even though it should have?"),
+            Ok(_) => panic!(
+                "File {} did not exist even though it should have?",
+                &path.display()
+            ),
             Err(e) => panic!("An unexpected error occurred: {e}"),
         }
         drop(f);

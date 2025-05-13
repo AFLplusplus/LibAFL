@@ -109,7 +109,7 @@ where
 
         let mut new_files = vec![];
         for dir in &self.sync_dirs {
-            log::debug!("Syncing from dir: {dir:?}");
+            log::debug!("Syncing from dir: {}", dir.display());
             let new_dir_files = find_new_files_rec(dir, &last)?;
             new_files.extend(new_dir_files);
         }
@@ -145,7 +145,7 @@ where
                 }
                 Err(e) => return Err(e),
             };
-            log::debug!("Syncing and evaluating {path:?}");
+            log::debug!("Syncing and evaluating {}", path.display());
             fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
 

@@ -117,7 +117,7 @@ pub struct AflStatsStage<C, E, EM, I, O, S, Z> {
 
 /// AFL++'s `fuzzer_stats`
 #[derive(Debug, Clone)]
-pub struct AFLFuzzerStats<'a> {
+pub struct AflFuzzerStats<'a> {
     /// unix time indicating the start time of afl-fuzz
     start_time: u64,
     /// unix time corresponding to the last interval
@@ -320,7 +320,7 @@ where
         } else {
             0
         };
-        let stats = AFLFuzzerStats {
+        let stats = AflFuzzerStats {
             start_time: self.start_time,
             last_update: self.last_report_time.as_secs(),
             run_time: self.last_report_time.as_secs() - self.start_time,
@@ -460,7 +460,7 @@ where
     }
 
     /// Writes a stats file, if a `stats_file_path` is set.
-    fn maybe_write_fuzzer_stats(&self, stats: &AFLFuzzerStats) -> Result<(), Error> {
+    fn maybe_write_fuzzer_stats(&self, stats: &AflFuzzerStats) -> Result<(), Error> {
         if let Some(stats_file_path) = &self.stats_file_path {
             let tmp_file = stats_file_path
                 .parent()
@@ -586,7 +586,7 @@ impl AFLPlotData<'_> {
         "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found"
     }
 }
-impl Display for AFLFuzzerStats<'_> {
+impl Display for AflFuzzerStats<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "start_time        : {}", &self.start_time)?;
         writeln!(f, "start_time        : {}", &self.start_time)?;

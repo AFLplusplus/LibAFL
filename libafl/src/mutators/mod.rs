@@ -28,6 +28,9 @@ pub use mapping::*;
 pub mod tuneable;
 pub use tuneable::*;
 
+#[cfg(feature = "lua_mutator")]
+pub mod lua;
+
 #[cfg(feature = "std")]
 pub mod hash;
 #[cfg(feature = "std")]

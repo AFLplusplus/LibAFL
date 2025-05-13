@@ -16,14 +16,17 @@ use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::ProgressReporter,
-    executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder, SHM_CMPLOG_ENV_VAR},
+    executors::{
+        forkserver::{ForkserverExecutor, ForkserverExecutorBuilder, SHM_CMPLOG_ENV_VAR},
+        StdChildArgs,
+    },
     feedback_and, feedback_or, feedback_or_fast,
     feedbacks::{
         CaptureTimeoutFeedback, ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback,
     },
     fuzzer::StdFuzzer,
     inputs::BytesInput,
-    mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, HavocScheduledMutator, Tokens},
+    mutators::{havoc_mutations, tokens_mutations, AflppRedQueen, HavocScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::{BaseSchedule, PowerSchedule},
@@ -51,11 +54,11 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, TargetArgs,
+    AsSliceMut, StdTargetArgs,
 };
 #[cfg(feature = "nyx")]
 use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
-use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
+use libafl_targets::{cmps::AflppCmpLogMap, AflppCmpLogObserver, AflppCmplogTracingStage};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -176,7 +179,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     let mut tokens = Tokens::new();
     tokens = tokens.add_from_files(&opt.dicts)?;
 
-    // Create a AFLStatsStage;
+    // Create a AflStatsStage;
     let afl_stats_stage = AflStatsStage::builder()
         .stats_file(fuzzer_dir.join("fuzzer_stats"))
         .plot_file(fuzzer_dir.join("plot_data"))
@@ -472,7 +475,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
 
     if run_cmplog {
         // The CmpLog map shared between the CmpLog observer and CmpLog executor
-        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
+        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AflppCmpLogMap>().unwrap();
 
         // Let the Forkserver know the CmpLog shared memory map ID.
         unsafe {
@@ -481,7 +484,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
         // Create the CmpLog observer.
-        let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AflppCmpLogObserver::new("cmplog", cmpmap, true);
         let cmplog_ref = cmplog_observer.handle();
 
         // Create the CmpLog executor.
@@ -493,11 +496,11 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
             .unwrap();
 
         // Create the CmpLog tracing stage.
-        let tracing = AFLppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
+        let tracing = AflppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 
         // Create a randomic Input2State stage
         let rq = MultiMutationalStage::<_, _, BytesInput, _, _, _>::new(
-            AFLppRedQueen::with_cmplog_options(true, true),
+            AflppRedQueen::with_cmplog_options(true, true),
         );
 
         // Create an IfStage and wrap the CmpLog stages in it.
