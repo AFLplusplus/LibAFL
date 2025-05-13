@@ -239,7 +239,7 @@ impl<T> OutputObserver<T> {
     /// on Linux and macOS, which is compatible with forkserver.
     pub fn new(name: Cow<'static, str>) -> Result<Self, Error> {
         Ok(Self {
-            name: name,
+            name,
             output: None,
             file: Self::file()?,
             phantom: PhantomData,
@@ -250,7 +250,7 @@ impl<T> OutputObserver<T> {
     /// only works with [`std::process::Command`].
     pub fn new_piped(name: Cow<'static, str>) -> Result<Self, Error> {
         Ok(Self {
-            name: name,
+            name,
             output: None,
             file: None,
             phantom: PhantomData,
@@ -262,7 +262,7 @@ impl<T> OutputObserver<T> {
     #[must_use]
     pub fn new_file(name: Cow<'static, str>, file: File) -> Self {
         Self {
-            name: name,
+            name,
             output: None,
             file: Some(file),
             phantom: PhantomData,
