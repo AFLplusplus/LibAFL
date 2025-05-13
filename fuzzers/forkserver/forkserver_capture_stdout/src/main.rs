@@ -178,7 +178,7 @@ pub fn main() {
         .coverage_map_size(MAP_SIZE)
         .timeout(Duration::from_millis(opt.timeout))
         .kill_signal(opt.signal)
-        .stdout(stdout_handle.clone())
+        .stdout_observer(stdout_handle.clone())
         .build(tuple_list!(time_observer, edges_observer, stdout))
         .unwrap();
 
