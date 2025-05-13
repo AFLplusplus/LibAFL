@@ -13,9 +13,11 @@ use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
     os::{fd::AsRawFd, unix::prelude::RawFd},
+    string::ToString,
 };
 
 use libafl_bolts::{Named, shmem::unix_shmem::memfd::MemfdShMemProvider};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{Error, observers::Observer};
 
@@ -174,16 +176,28 @@ use crate::{Error, observers::Observer};
 /// }
 /// ```
 ///
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OutputObserver<T> {
     /// The name of the observer.
     pub name: Cow<'static, str>,
     /// The captured stdout/stderr data during last execution.
     pub output: Option<Vec<u8>>,
+    #[serde(skip_serializing, deserialize_with = "new_file::<_, T>")]
     /// File backend of the memory to capture output
     pub file: File,
+    #[serde(skip)]
     /// Phantom data to hold the stream type
     phantom: PhantomData<T>,
+}
+
+/// Blanket implementation for a [`std::fs::File`]. Fortunately the contents of the file
+/// is transient and thus we can safely create a new one on deserialization (and skip it)
+/// when doing serialization
+fn new_file<'de, D, T>(_d: D) -> Result<File, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    OutputObserver::<T>::new_file().map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
 /// Marker traits to mark stdout for the `OutputObserver`
