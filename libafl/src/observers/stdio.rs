@@ -266,7 +266,7 @@ impl<T> OutputObserver<T> {
 
     #[must_use]
     /// Return the raw fd, if any
-    pub fn as_raw_fd(&self) -> Option<RawFd> {
+    pub fn as_raw_fd(&self) -> Option<i32> {
         #[cfg(target_family = "unix")]
         return self.file.as_ref().map(std::os::fd::AsRawFd::as_raw_fd);
         #[cfg(not(target_family = "unix"))]
