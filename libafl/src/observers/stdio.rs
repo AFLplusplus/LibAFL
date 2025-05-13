@@ -9,8 +9,6 @@
 
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::marker::PhantomData;
-#[cfg(target_family = "unix")]
-use std::os::unix::prelude::RawFd;
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
