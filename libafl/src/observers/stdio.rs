@@ -91,8 +91,8 @@ use crate::{Error, observers::Observer};
 ///    let input_text = "Hello, World!";
 ///    let encoded_input_text = "SGVsbG8sIFdvcmxkIQo=";
 ///
-///    let stdout_observer = StdOutObserver::new("stdout-observer");
-///    let stderr_observer = StdErrObserver::new("stderr-observer");
+///    let stdout_observer = StdOutObserver::new("stdout-observer").unwrap();
+///    let stderr_observer = StdErrObserver::new("stderr-observer").unwrap();
 ///
 ///    let mut feedback = ExportStdXObserver {
 ///        stdout_observer: stdout_observer.handle(),
