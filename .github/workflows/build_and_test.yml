@@ -279,6 +279,7 @@ jobs:
           - ./fuzzers/forkserver/forkserver_simple
           - ./fuzzers/forkserver/forkserver_libafl
           - ./fuzzers/forkserver/forkserver_capture_stdout
+          - ./fuzzers/forkserver/forkserver_libafl_cc
           - ./fuzzers/forkserver/fuzzbench_forkserver
           - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
           - ./fuzzers/forkserver/fuzzbench_forkserver_sand
