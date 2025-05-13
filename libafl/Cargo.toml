@@ -309,7 +309,7 @@ fastbloom = { workspace = true, optional = true }
 mlua = { version = "0.10.3", features = [
   "lua54",
   "vendored",
-  "mlua_derive",
+  "macros",
 ], optional = true }
 
 [target.'cfg(unix)'.dependencies]
