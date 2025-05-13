@@ -9,10 +9,11 @@
 
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::marker::PhantomData;
+#[cfg(target_family = "unix")]
+use std::os::unix::prelude::RawFd;
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
-    os::unix::prelude::RawFd,
 };
 
 use libafl_bolts::Named;
@@ -266,7 +267,10 @@ impl<T> OutputObserver<T> {
     #[must_use]
     /// Return the raw fd, if any
     pub fn as_raw_fd(&self) -> Option<RawFd> {
-        self.file.as_ref().map(std::os::fd::AsRawFd::as_raw_fd)
+        #[cfg(target_family = "unix")]
+        return self.file.as_ref().map(std::os::fd::AsRawFd::as_raw_fd);
+        #[cfg(not(target_family = "unix"))]
+        return None;
     }
 }
 
