@@ -120,7 +120,7 @@ impl CmpValuesMetadata {
 
     /// Add comparisons to a metadata from a `CmpObserver`. `cmp_map` is mutable in case
     /// it is needed for a custom map, but this is not utilized for `CmpObserver` or
-    /// `AflPpCmpLogObserver`.
+    /// `AflppCmpLogObserver`.
     pub fn add_from<CM>(&mut self, usable_count: usize, cmp_map: &mut CM)
     where
         CM: CmpMap,
@@ -360,22 +360,22 @@ struct cmp_map {
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
-pub struct AflPpCmpValuesMetadata {
-    /// The first map of `AflPpCmpLogVals` retrieved by running the un-mutated input
+pub struct AflppCmpValuesMetadata {
+    /// The first map of `AflppCmpLogVals` retrieved by running the un-mutated input
     #[serde(skip)]
     pub orig_cmpvals: HashMap<usize, Vec<CmpValues>>,
-    /// The second map of `AflPpCmpLogVals` retrieved by runnning the mutated input
+    /// The second map of `AflppCmpLogVals` retrieved by runnning the mutated input
     #[serde(skip)]
     pub new_cmpvals: HashMap<usize, Vec<CmpValues>>,
     /// The list of logged idx and headers retrieved by runnning the mutated input
     #[serde(skip)]
-    pub headers: Vec<(usize, AflPpCmpLogHeader)>,
+    pub headers: Vec<(usize, AflppCmpLogHeader)>,
 }
 
-libafl_bolts::impl_serdeany!(AflPpCmpValuesMetadata);
+libafl_bolts::impl_serdeany!(AflppCmpValuesMetadata);
 
-impl AflPpCmpValuesMetadata {
-    /// Constructor for `AflPpCmpValuesMetadata`
+impl AflppCmpValuesMetadata {
+    /// Constructor for `AflppCmpValuesMetadata`
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -399,7 +399,7 @@ impl AflPpCmpValuesMetadata {
 
     /// Getter for `headers`
     #[must_use]
-    pub fn headers(&self) -> &Vec<(usize, AflPpCmpLogHeader)> {
+    pub fn headers(&self) -> &Vec<(usize, AflppCmpLogHeader)> {
         &self.headers
     }
 }
@@ -418,7 +418,7 @@ impl AflPpCmpValuesMetadata {
 /// - reserved:  Reserved for future use
 #[bitfield(u16)]
 #[derive(Debug)]
-pub struct AflPpCmpLogHeader {
+pub struct AflppCmpLogHeader {
     /// The number of hits of a particular comparison
     ///
     /// 6 bits up to 63 entries, we have CMP_MAP_H = 32 (so using half of it)

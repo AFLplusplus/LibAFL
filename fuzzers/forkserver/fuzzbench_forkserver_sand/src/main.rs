@@ -44,7 +44,7 @@ use libafl_bolts::{
     tuples::{tuple_list, Handled, Merge},
     AsSliceMut, StdTargetArgs,
 };
-use libafl_targets::cmps::AflPpCmpLogMap;
+use libafl_targets::cmps::AflppCmpLogMap;
 use nix::sys::signal::Signal;
 
 pub fn main() {
@@ -399,12 +399,12 @@ fn fuzz(
 
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
-        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AflPpCmpLogMap>().unwrap();
+        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AflppCmpLogMap>().unwrap();
         // let the forkserver know the shmid
         unsafe {
             cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
         }
-        let cmpmap = unsafe { OwnedRefMut::<AflPpCmpLogMap>::from_shmem(&mut cmplog_shmem) };
+        let cmpmap = unsafe { OwnedRefMut::<AflppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
 

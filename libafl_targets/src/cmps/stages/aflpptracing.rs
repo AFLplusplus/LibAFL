@@ -15,26 +15,26 @@ use libafl_bolts::{
     tuples::{Handle, MatchNameRef},
 };
 
-use crate::cmps::observers::AflPpCmpLogObserver;
+use crate::cmps::observers::AflppCmpLogObserver;
 
 /// Trace with tainted input
 #[derive(Clone, Debug)]
-pub struct AflPpCmplogTracingStage<'a, EM, TE, S, Z> {
+pub struct AflppCmplogTracingStage<'a, EM, TE, S, Z> {
     name: Cow<'static, str>,
     tracer_executor: TE,
-    cmplog_observer_handle: Handle<AflPpCmpLogObserver<'a>>,
+    cmplog_observer_handle: Handle<AflppCmpLogObserver<'a>>,
     phantom: PhantomData<(EM, TE, S, Z)>,
 }
 /// The name for aflpp tracing stage
 pub static AFLPP_CMPLOG_TRACING_STAGE_NAME: &str = "aflpptracing";
 
-impl<EM, TE, S, Z> Named for AflPpCmplogTracingStage<'_, EM, TE, S, Z> {
+impl<EM, TE, S, Z> Named for AflppCmplogTracingStage<'_, EM, TE, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for AflPpCmplogTracingStage<'_, EM, TE, S, Z>
+impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for AflppCmplogTracingStage<'_, EM, TE, S, Z>
 where
     TE: HasObservers + Executor<EM, BytesInput, S, Z>,
     TE::Observers: MatchNameRef + ObserversTuple<BytesInput, S>,
@@ -64,7 +64,7 @@ where
             // Set it to false
             ob.set_original(true);
         }
-        // I can't think of any use of this stage if you don't use AflPpCmpLogObserver
+        // I can't think of any use of this stage if you don't use AflppCmpLogObserver
         // but do nothing ofcourse
 
         self.tracer_executor
@@ -94,7 +94,7 @@ where
             // Set it to false
             ob.set_original(false);
         }
-        // I can't think of any use of this stage if you don't use AflPpCmpLogObserver
+        // I can't think of any use of this stage if you don't use AflppCmpLogObserver
         // but do nothing ofcourse
 
         self.tracer_executor
@@ -113,7 +113,7 @@ where
     }
 }
 
-impl<EM, TE, S, Z> Restartable<S> for AflPpCmplogTracingStage<'_, EM, TE, S, Z>
+impl<EM, TE, S, Z> Restartable<S> for AflppCmplogTracingStage<'_, EM, TE, S, Z>
 where
     S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
@@ -129,9 +129,9 @@ where
     }
 }
 
-impl<'a, EM, TE, S, Z> AflPpCmplogTracingStage<'a, EM, TE, S, Z> {
+impl<'a, EM, TE, S, Z> AflppCmplogTracingStage<'a, EM, TE, S, Z> {
     /// With cmplog observer
-    pub fn new(tracer_executor: TE, observer_handle: Handle<AflPpCmpLogObserver<'a>>) -> Self {
+    pub fn new(tracer_executor: TE, observer_handle: Handle<AflppCmpLogObserver<'a>>) -> Self {
         let observer_name = observer_handle.name().clone();
         Self {
             name: Cow::Owned(

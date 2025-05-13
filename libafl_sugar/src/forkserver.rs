@@ -39,7 +39,7 @@ use libafl_bolts::{
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{Merge, tuple_list},
 };
-use libafl_targets::AflPpCmpLogMap;
+use libafl_targets::AflppCmpLogMap;
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -265,14 +265,14 @@ impl ForkserverBytesCoverageSugar<'_> {
             if let Some(exec) = &self.cmplog_binary {
                 // The cmplog map shared between observer and executor
                 let mut cmplog_shmem = shmem_provider_client
-                    .uninit_on_shmem::<AflPpCmpLogMap>()
+                    .uninit_on_shmem::<AflppCmpLogMap>()
                     .unwrap();
                 // let the forkserver know the shmid
                 unsafe {
                     cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
                 }
                 let cmpmap =
-                    unsafe { OwnedRefMut::<AflPpCmpLogMap>::from_shmem(&mut cmplog_shmem) };
+                    unsafe { OwnedRefMut::<AflppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
 
                 let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
 
