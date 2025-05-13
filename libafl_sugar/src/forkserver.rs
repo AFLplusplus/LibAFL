@@ -7,7 +7,10 @@ use libafl::{
     Error, HasMetadata,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{EventConfig, LlmpRestartingEventManager, launcher::Launcher},
-    executors::{StdChildArgs, forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR}},
+    executors::{
+        StdChildArgs,
+        forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+    },
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
