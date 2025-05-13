@@ -110,7 +110,8 @@ impl NautilusContext {
         let reader = BufReader::new(file);
         let rules: Vec<Vec<String>> = serde_json::from_reader(reader).map_err(|err| {
             Error::illegal_argument(format!(
-                "Error loading context from json grammar file {grammar_file:?}: {err:?}"
+                "Error loading context from json grammar file {}: {err:?}",
+                grammar_file.display()
             ))
         })?;
         Ok(Self::new(tree_depth, &rules))

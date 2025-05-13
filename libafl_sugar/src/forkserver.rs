@@ -69,7 +69,7 @@ pub struct ForkserverBytesCoverageSugar<'a> {
     #[builder(default = None, setter(strip_option))]
     remote_broker_addr: Option<SocketAddr>,
     /// Path to program to execute
-    binary: String,
+    binary: PathBuf,
     /// Arguments of the program to execute
     arguments: &'a [String],
     #[builder(default = false)]
@@ -361,7 +361,6 @@ pub mod pybind {
         output_dir: PathBuf,
         broker_port: u16,
         cores: Cores,
-        use_cmplog: Option<bool>,
         iterations: Option<u64>,
         tokens_file: Option<PathBuf>,
         timeout: Option<u64>,
@@ -371,13 +370,11 @@ pub mod pybind {
     impl ForkserverBytesCoverageSugar {
         /// Create a new [`ForkserverBytesCoverageSugar`]
         #[new]
-        #[expect(clippy::too_many_arguments)]
         #[pyo3(signature = (
             input_dirs,
             output_dir,
             broker_port,
             cores,
-            use_cmplog=None,
             iterations=None,
             tokens_file=None,
             timeout=None
@@ -387,7 +384,6 @@ pub mod pybind {
             output_dir: PathBuf,
             broker_port: u16,
             cores: Vec<usize>,
-            use_cmplog: Option<bool>,
             iterations: Option<u64>,
             tokens_file: Option<PathBuf>,
             timeout: Option<u64>,
@@ -397,7 +393,6 @@ pub mod pybind {
                 output_dir,
                 broker_port,
                 cores: cores.into(),
-                use_cmplog,
                 iterations,
                 tokens_file,
                 timeout,
@@ -406,15 +401,15 @@ pub mod pybind {
 
         /// Run the fuzzer
         #[expect(clippy::needless_pass_by_value)]
-        pub fn run(&self, program: String, arguments: Vec<String>) {
+        pub fn run(&self, binary: String, arguments: Vec<String>, cmplog_binary: Option<String>) {
             forkserver::ForkserverBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
                 .broker_port(self.broker_port)
                 .cores(&self.cores)
-                .program(program)
+                .binary(binary.into())
+                .cmplog_binary(cmplog_binary.map(PathBuf::from))
                 .arguments(&arguments)
-                .use_cmplog(self.use_cmplog)
                 .timeout(self.timeout)
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
