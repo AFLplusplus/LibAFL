@@ -21,10 +21,9 @@ use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
-use crate::{
-    Error,
-    observers::{StdErrObserver, StdOutObserver},
-};
+use crate::Error;
+#[cfg(feature = "std")]
+use crate::observers::{StdErrObserver, StdOutObserver};
 
 pub mod combined;
 #[cfg(all(feature = "std", unix))]

@@ -1,21 +1,22 @@
 //! The command executor executes a sub program for each run
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::ffi::CString;
-use alloc::vec::Vec;
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use core::ffi::CStr;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ops::IndexMut,
     time::Duration,
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use std::os::fd::AsRawFd;
 use std::{
     ffi::OsStr,
-    io::{Read, Write},
-    os::unix::ffi::OsStrExt,
+    io::Write,
+    os::{
+        fd::{AsRawFd, RawFd},
+        unix::ffi::OsStrExt,
+    },
     process::{Child, Command, Stdio},
 };
 
@@ -23,7 +24,7 @@ use std::{
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
     AsSlice, InputLocation, TargetArgs, TargetArgsInner,
-    tuples::{Handle, MatchName, RefIndexable},
+    tuples::{Handle, MatchName, MatchNameRef, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libc::STDIN_FILENO;
@@ -45,7 +46,7 @@ use nix::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use typed_builder::TypedBuilder;
 
-use super::{ChildArgs, ChildArgsInner, HasTimeout};
+use super::{ChildArgs, ChildArgsInner, HasTimeout, forkserver::ConfigTarget};
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
@@ -64,8 +65,8 @@ pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
     /// By default, the child output is hidden to increase execution speed
     debug_child: bool,
-    stdout_observer: Option<Handle<StdOutObserver>>,
-    stderr_observer: Option<Handle<StdErrObserver>>,
+    stdout_fd: Option<RawFd>,
+    stderr_fd: Option<RawFd>,
     timeout: Duration,
     /// true: input gets delivered via stdink
     input_location: InputLocation,
@@ -77,31 +78,29 @@ impl<I> CommandConfigurator<I> for StdCommandConfigurator
 where
     I: HasTargetBytes,
 {
-    fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
-        self.stdout_observer.clone()
-    }
-
-    fn stderr_observer(&self) -> Option<Handle<StdErrObserver>> {
-        self.stderr_observer.clone()
-    }
-
     fn spawn_child(&mut self, input: &I) -> Result<Child, Error> {
         match &mut self.input_location {
             InputLocation::Arg { argnum } => {
                 let args = self.command.get_args();
                 let mut cmd = Command::new(self.command.get_program());
 
-                if !self.debug_child {
+                if self.debug_child {
+                    cmd.stdout(Stdio::inherit());
+                } else if let Some(fd) = self.stdout_fd {
+                    cmd.setdup2(fd, libc::STDOUT_FILENO);
+                    cmd.stdout(Stdio::inherit());
+                } else {
                     cmd.stdout(Stdio::null());
-                    cmd.stderr(Stdio::null());
-                }
+                };
 
-                if self.stdout_observer.is_some() {
-                    cmd.stdout(Stdio::piped());
-                }
-                if self.stderr_observer.is_some() {
-                    cmd.stderr(Stdio::piped());
-                }
+                if self.debug_child {
+                    cmd.stderr(Stdio::inherit());
+                } else if let Some(fd) = self.stderr_fd {
+                    cmd.setdup2(fd, libc::STDERR_FILENO);
+                    cmd.stderr(Stdio::inherit());
+                } else {
+                    cmd.stderr(Stdio::null());
+                };
 
                 for (i, arg) in args.enumerate() {
                     if i == *argnum {
@@ -322,7 +321,7 @@ where
         use wait_timeout::ChildExt;
 
         *state.executions_mut() += 1;
-        self.observers.pre_exec_child_all(state, input)?;
+        self.observers.pre_exec_all(state, input)?;
 
         let mut child = self.configurer.spawn_child(input)?;
 
@@ -339,31 +338,8 @@ where
                 ExitKind::Timeout
             });
 
-        self.observers
-            .post_exec_child_all(state, input, &exit_kind)?;
+        self.observers.post_exec_all(state, input, &exit_kind)?;
 
-        if let Some(h) = &mut self.configurer.stdout_observer() {
-            let mut stdout = Vec::new();
-            child.stdout.as_mut().ok_or_else(|| {
-                 Error::illegal_state(
-                     "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
-                 )
-             })?.read_to_end(&mut stdout)?;
-            let mut observers = self.observers_mut();
-            let obs = observers.index_mut(h);
-            obs.observe(&stdout);
-        }
-        if let Some(h) = &mut self.configurer.stderr_observer() {
-            let mut stderr = Vec::new();
-            child.stderr.as_mut().ok_or_else(|| {
-                 Error::illegal_state(
-                     "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
-                 )
-             })?.read_to_end(&mut stderr)?;
-            let mut observers = self.observers_mut();
-            let obs = observers.index_mut(h);
-            obs.observe(&stderr);
-        }
         Ok(exit_kind)
     }
 }
@@ -584,8 +560,20 @@ impl CommandExecutorBuilder {
 
         let configurator = StdCommandConfigurator {
             debug_child: self.child_env_inner.debug_child,
-            stdout_observer: self.child_env_inner.stdout_observer.clone(),
-            stderr_observer: self.child_env_inner.stderr_observer.clone(),
+            stdout_fd: self.child_env_inner.stdout_observer.as_ref().map(|t| {
+                observers
+                    .get(t)
+                    .as_ref()
+                    .expect("stdout observer not passed in the builder")
+                    .as_raw_fd()
+            }),
+            stderr_fd: self.child_env_inner.stderr_observer.as_ref().map(|t| {
+                observers
+                    .get(t)
+                    .as_ref()
+                    .expect("stderr observer not passed in the builder")
+                    .as_raw_fd()
+            }),
             input_location: self.target_inner.input_location.clone(),
             timeout: self.child_env_inner.timeout,
             command,

@@ -4,14 +4,12 @@ use alloc::{string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ops::IndexMut,
     time::Duration,
 };
 use std::{
     env,
     ffi::OsString,
-    fs::File,
-    io::{self, ErrorKind, Read, Seek, SeekFrom, Write},
+    io::{self, ErrorKind, Read, Write},
     os::{
         fd::{AsRawFd, BorrowedFd},
         unix::{io::RawFd, process::CommandExt},
@@ -50,7 +48,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{Input, InputToBytes},
     mutators::Tokens,
-    observers::{MapObserver, Observer, ObserversTuple, StdErrObserver, StdOutObserver},
+    observers::{MapObserver, Observer, ObserversTuple},
     state::HasExecutions,
 };
 
@@ -278,55 +276,6 @@ impl ConfigTarget for Command {
     }
 }
 
-/// Thin wrapper of memfd
-#[derive(Debug)]
-struct MemFd {
-    file: File,
-}
-
-impl MemFd {
-    // This is the best we can do on macOS because
-    // - macos doesn't have memfd_create
-    // - fd returned from shm_open can't be written (https://stackoverflow.com/questions/73752631/cant-write-to-fd-from-shm-open-on-macos)
-    // - there is even no native tmpfs implementation!
-    // therefore we create a file and immediately remove it to get a writtable fd.
-    //
-    // In most cases, capturing stdout/stderr every loop is very slow and mostly for debugging purpose and thus this should be acceptable.
-    #[cfg(target_os = "macos")]
-    fn new() -> Result<Self, Error> {
-        let fp = File::create_new("fsrvmemfd")?;
-        nix::unistd::unlink("fsrvmemfd")?;
-        Ok(Self { file: fp })
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    fn new() -> Result<Self, Error> {
-        let fd =
-            nix::sys::memfd::memfd_create(c"fsrvmemfd", nix::sys::memfd::MemFdCreateFlag::empty())?;
-        Ok(Self {
-            file: File::from(fd),
-        })
-    }
-
-    fn length(&mut self) -> Result<u64, Error> {
-        Ok(self.file.stream_position()?)
-    }
-
-    fn reset(&mut self) -> Result<(), Error> {
-        self.file.seek(SeekFrom::Start(0))?;
-        Ok(())
-    }
-
-    fn read_content(&mut self) -> Result<Vec<u8>, Error> {
-        let len = self.length()?;
-        self.reset()?;
-
-        let mut buf = vec![0; len as _];
-        self.file.read_exact(&mut buf)?;
-        Ok(buf)
-    }
-}
-
 /// The [`Forkserver`] is communication channel with a child process that forks on request of the fuzzer.
 /// The communication happens via pipe.
 #[derive(Debug)]
@@ -345,10 +294,6 @@ pub struct Forkserver {
     last_run_timed_out: i32,
     /// The signal this [`Forkserver`] will use to kill (defaults to [`self.kill_signal`])
     kill_signal: Signal,
-    /// If we collect stdout of children
-    stdout_memfd: Option<(MemFd, Handle<StdOutObserver>)>,
-    /// If we collect stderr of children
-    stderr_memfd: Option<(MemFd, Handle<StdErrObserver>)>,
 }
 
 impl Drop for Forkserver {
@@ -410,8 +355,8 @@ impl Forkserver {
         coverage_map_size: Option<usize>,
         debug_output: bool,
         kill_signal: Signal,
-        stdout_memfd: Option<(MemFd, Handle<StdOutObserver>)>,
-        stderr_memfd: Option<(MemFd, Handle<StdErrObserver>)>,
+        stdout_memfd: Option<RawFd>,
+        stderr_memfd: Option<RawFd>,
         cwd: Option<PathBuf>,
     ) -> Result<Self, Error> {
         let Some(coverage_map_size) = coverage_map_size else {
@@ -451,16 +396,18 @@ impl Forkserver {
 
         if debug_output {
             command.stdout(Stdio::inherit());
-        } else if let Some((fd, _)) = &stdout_memfd {
-            command.setdup2(fd.file.as_raw_fd(), libc::STDOUT_FILENO);
+        } else if let Some(fd) = &stdout_memfd {
+            command.setdup2(*fd, libc::STDOUT_FILENO);
+            command.stdout(Stdio::inherit());
         } else {
             command.stdout(Stdio::null());
         }
 
         if debug_output {
             command.stderr(Stdio::inherit());
-        } else if let Some((fd, _)) = &stderr_memfd {
-            command.setdup2(fd.file.as_raw_fd(), libc::STDERR_FILENO);
+        } else if let Some(fd) = &stderr_memfd {
+            command.setdup2(*fd, libc::STDERR_FILENO);
+            command.stderr(Stdio::inherit());
         } else {
             command.stderr(Stdio::null());
         }
@@ -526,8 +473,6 @@ impl Forkserver {
             status: 0,
             last_run_timed_out: 0,
             kill_signal,
-            stdout_memfd,
-            stderr_memfd,
         })
     }
 
@@ -811,15 +756,6 @@ where
             self.map_input_to_shmem(input, input_size)?;
         }
 
-        // clear observers
-        if let Some((stdout, _)) = self.forkserver.stdout_memfd.as_mut() {
-            stdout.reset()?;
-        }
-
-        if let Some((stderr, _)) = self.forkserver.stderr_memfd.as_mut() {
-            stderr.reset()?;
-        }
-
         self.forkserver.set_last_run_timed_out(false);
         if let Err(err) = self.forkserver.write_ctl(last_run_timed_out) {
             return Err(Error::unknown(format!(
@@ -870,28 +806,6 @@ where
 
         if !libc::WIFSTOPPED(self.forkserver().status()) {
             self.forkserver.reset_child_pid();
-        }
-
-        // Collect stdin/stdout
-        let stdout = self
-            .forkserver
-            .stdout_memfd
-            .as_mut()
-            .map(|t| t.0.read_content().map(|v| (v, t.1.clone())))
-            .transpose()?;
-        let stderr = self
-            .forkserver
-            .stderr_memfd
-            .as_mut()
-            .map(|t| t.0.read_content().map(|v| (v, t.1.clone())))
-            .transpose()?;
-
-        let mut obs = self.observers_mut();
-        if let Some((stdout, handle)) = stdout {
-            obs.index_mut(&handle).observe(&stdout);
-        }
-        if let Some((stderr, handle)) = stderr {
-            obs.index_mut(&handle).observe(&stderr);
         }
 
         Ok(exit_kind)
@@ -960,7 +874,7 @@ where
     where
         OT: ObserversTuple<I, S>,
     {
-        let (forkserver, input_file, map) = self.build_helper()?;
+        let (forkserver, input_file, map) = self.build_helper(&observers)?;
 
         let target = self.target_inner.program.take().unwrap();
         log::info!(
@@ -1022,7 +936,7 @@ where
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
         OT: ObserversTuple<I, S> + Prepend<MO>,
     {
-        let (forkserver, input_file, map) = self.build_helper()?;
+        let (forkserver, input_file, map) = self.build_helper(&other_observers)?;
 
         let target = self.target_inner.program.take().unwrap();
         log::info!(
@@ -1070,7 +984,13 @@ where
     }
 
     #[expect(clippy::pedantic)]
-    fn build_helper(&mut self) -> Result<(Forkserver, InputFile, Option<SHM>), Error> {
+    fn build_helper<I, OT, S>(
+        &mut self,
+        obs: &OT,
+    ) -> Result<(Forkserver, InputFile, Option<SHM>), Error>
+    where
+        OT: ObserversTuple<I, S>,
+    {
         let input_file = match &self.target_inner.input_location {
             InputLocation::StdIn => InputFile::create(OsString::from(get_unique_std_input_file()))?,
             InputLocation::Arg { argnum: _ } => {
@@ -1098,18 +1018,6 @@ where
             }
         };
 
-        let stdout = if let Some(handle) = &self.child_env_inner.stdout_observer {
-            Some((MemFd::new()?, handle.clone()))
-        } else {
-            None
-        };
-
-        let stderr = if let Some(handle) = &self.child_env_inner.stderr_observer {
-            Some((MemFd::new()?, handle.clone()))
-        } else {
-            None
-        };
-
         let mut forkserver = match &self.target_inner.program {
             Some(t) => Forkserver::new(
                 t.clone(),
@@ -1124,8 +1032,18 @@ where
                 self.map_size,
                 self.child_env_inner.debug_child,
                 self.kill_signal.unwrap_or(KILL_SIGNAL_DEFAULT),
-                stdout,
-                stderr,
+                self.child_env_inner.stdout_observer.as_ref().map(|t| {
+                    obs.get(t)
+                        .as_ref()
+                        .expect("stdout observer not passed in the builder")
+                        .as_raw_fd()
+                }),
+                self.child_env_inner.stderr_observer.as_ref().map(|t| {
+                    obs.get(t)
+                        .as_ref()
+                        .expect("stderr observer not passed in the builder")
+                        .as_raw_fd()
+                }),
                 self.child_env_inner.current_directory.clone(),
             )?,
             None => {
@@ -1515,7 +1433,10 @@ where
     ) -> Result<ExitKind, Error> {
         let converter = fuzzer.converter_mut();
         let bytes = converter.to_bytes(input);
-        self.execute_input(state, bytes.as_slice())
+        self.observers_mut().pre_exec_all(state, input)?;
+        let exit = self.execute_input(state, bytes.as_slice())?;
+        self.observers_mut().post_exec_all(state, input, &exit)?;
+        Ok(exit)
     }
 }
 

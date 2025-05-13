@@ -4,14 +4,18 @@
 //! The executor must explicitly support these observers.
 #![cfg_attr(
     unix,
-    doc = r"For example, they are supported on the [`crate::executors::CommandExecutor`]."
+    doc = r"For example, they are supported on the [`crate::executors::CommandExecutor`] and [`crate::executors::ForkserverExecutor`]."
 )]
 
 use alloc::{borrow::Cow, vec::Vec};
 use core::marker::PhantomData;
+use std::{
+    fs::File,
+    io::{Read, Seek, SeekFrom},
+    os::{fd::AsRawFd, unix::prelude::RawFd},
+};
 
-use libafl_bolts::Named;
-use serde::{Deserialize, Serialize};
+use libafl_bolts::{Named, shmem::unix_shmem::memfd::MemfdShMemProvider};
 
 use crate::{Error, observers::Observer};
 
@@ -170,12 +174,14 @@ use crate::{Error, observers::Observer};
 /// }
 /// ```
 ///
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct OutputObserver<T> {
     /// The name of the observer.
     pub name: Cow<'static, str>,
     /// The captured stdout/stderr data during last execution.
     pub output: Option<Vec<u8>>,
+    /// File backend of the memory to capture output
+    pub file: File,
     /// Phantom data to hold the stream type
     phantom: PhantomData<T>,
 }
@@ -189,19 +195,52 @@ pub struct StdOutMarker;
 pub struct StdErrMarker;
 
 impl<T> OutputObserver<T> {
+    // This is the best we can do on macOS because
+    // - macos doesn't have memfd_create
+    // - fd returned from shm_open can't be written (https://stackoverflow.com/questions/73752631/cant-write-to-fd-from-shm-open-on-macos)
+    // - there is even no native tmpfs implementation!
+    // therefore we create a file and immediately remove it to get a writtable fd.
+    //
+    // In most cases, capturing stdout/stderr every loop is very slow and mostly for debugging purpose and thus this should be acceptable.
+    #[cfg(target_os = "macos")]
+    fn new_file() -> Result<File, Error> {
+        let fp = File::create_new("fsrvmemfd")?;
+        nix::unistd::unlink("fsrvmemfd")?;
+        Ok(fp)
+    }
+
+    /// Cool, we can have [`MemfdShMemProvider`] to create a memfd.
+    #[cfg(not(target_os = "macos"))]
+    fn new_file() -> Result<File, Error> {
+        MemfdShMemProvider::new_file()
+    }
+
     /// Create a new `OutputObserver` with the given name.
     #[must_use]
-    pub fn new(name: &'static str) -> Self {
-        Self {
+    pub fn new(name: &'static str) -> Result<Self, Error> {
+        Ok(Self {
             name: Cow::from(name),
             output: None,
+            file: Self::new_file()?,
             phantom: PhantomData,
-        }
+        })
     }
 
     /// React to new stream data
-    pub fn observe(&mut self, data: &[u8]) {
-        self.output = Some(data.into());
+    pub fn observe(&mut self, data: Vec<u8>) {
+        self.output = Some(data);
+    }
+
+    fn reset(&mut self) -> Result<(), Error> {
+        self.file.seek(SeekFrom::Start(0))?;
+        self.output = None;
+        Ok(())
+    }
+}
+
+impl<T> AsRawFd for OutputObserver<T> {
+    fn as_raw_fd(&self) -> RawFd {
+        self.file.as_raw_fd()
     }
 }
 
@@ -213,13 +252,41 @@ impl<T> Named for OutputObserver<T> {
 
 impl<I, S, T> Observer<I, S> for OutputObserver<T> {
     fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.output = None;
+        self.reset()?;
         Ok(())
     }
 
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.output = None;
+        self.pre_exec_child(_state, _input)
+    }
+
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &crate::executors::ExitKind,
+    ) -> Result<(), Error> {
+        let pos = self.file.stream_position()?;
+
+        if pos != 0 {
+            self.reset()?;
+
+            let mut buf = vec![0; pos as usize];
+            self.file.read_exact(&mut buf)?;
+
+            self.observe(buf);
+        }
+
         Ok(())
+    }
+
+    fn post_exec_child(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &crate::executors::ExitKind,
+    ) -> Result<(), Error> {
+        self.post_exec(_state, _input, _exit_kind)
     }
 }
 
