@@ -278,12 +278,17 @@ pub fn build(
         env::var_os("LIBAFL_QEMU_CLONE_DIR").map(|x| x.to_string_lossy().to_string());
     let libafl_qemu_force_configure = env::var("LIBAFL_QEMU_FORCE_CONFIGURE").is_ok();
     let libafl_qemu_no_build = env::var("LIBAFL_QEMU_NO_BUILD").is_ok();
+    let libafl_qemu_url = env::var_os("LIBAFL_QEMU_URL").map(|x| x.to_string_lossy().to_string());
+    let libafl_qemu_revision =
+        env::var_os("LIBAFL_QEMU_REVISION").map(|x| x.to_string_lossy().to_string());
 
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_DIR");
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_CLONE_DIR");
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_FORCE_BUILD");
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_FORCE_CONFIGURE");
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_NO_BUILD");
+    println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_URL");
+    println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_REVISION");
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
@@ -305,6 +310,18 @@ pub fn build(
             );
         }
 
+        if libafl_qemu_url.is_some() {
+            println!(
+                "cargo:warning=LIBAFL_QEMU_DIR and LIBAFL_QEMU_URL are both set. LIBAFL_QEMU_DIR will be considered in priority"
+            );
+        }
+
+        if libafl_qemu_revision.is_some() {
+            println!(
+                "cargo:warning=LIBAFL_QEMU_DIR and LIBAFL_QEMU_REVISION are both set. LIBAFL_QEMU_DIR will be considered in priority"
+            );
+        }
+
         Path::new(&qemu_dir).to_path_buf()
     } else {
         let qemu_path = if let Some(clone_dir) = &libafl_qemu_clone_dir {
@@ -313,15 +330,18 @@ pub fn build(
             target_dir.join(QEMU_DIRNAME)
         };
 
+        let qemu_url = libafl_qemu_url.as_deref().unwrap_or(QEMU_URL);
+        let qemu_revision = libafl_qemu_revision.as_deref().unwrap_or(QEMU_REVISION);
+
         let qemu_rev = target_dir.join("QEMU_REVISION");
         if qemu_rev.exists()
-            && fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != QEMU_REVISION
+            && fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != qemu_revision
         {
             drop(fs::remove_dir_all(&qemu_path));
         }
 
         if !qemu_path.is_dir() {
-            println!("cargo:warning=Qemu not found, cloning with git ({QEMU_REVISION})...");
+            println!("cargo:warning=Qemu not found, cloning with git ({qemu_revision})...");
             fs::create_dir_all(&qemu_path).unwrap();
             assert!(
                 Command::new("git")
@@ -337,7 +357,7 @@ pub fn build(
                     .arg("remote")
                     .arg("add")
                     .arg("origin")
-                    .arg(QEMU_URL)
+                    .arg(qemu_url)
                     .status()
                     .unwrap()
                     .success()
@@ -349,7 +369,7 @@ pub fn build(
                     .arg("--depth")
                     .arg("1")
                     .arg("origin")
-                    .arg(QEMU_REVISION)
+                    .arg(qemu_revision)
                     .status()
                     .unwrap()
                     .success()
@@ -363,7 +383,7 @@ pub fn build(
                     .unwrap()
                     .success()
             );
-            fs::write(&qemu_rev, QEMU_REVISION).unwrap();
+            fs::write(&qemu_rev, qemu_revision).unwrap();
         }
 
         qemu_path
