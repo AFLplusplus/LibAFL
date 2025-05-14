@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
-use libc::{_exit, prctl, PR_SET_PDEATHSIG};
+use anyhow::{Result, anyhow};
+use libc::{_exit, PR_SET_PDEATHSIG, prctl};
 use nix::{
     sys::{
-        signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, SIGCHLD, SIGKILL},
-        wait::{waitpid, WaitStatus::Exited},
+        signal::{SIGCHLD, SIGKILL, SaFlags, SigAction, SigHandler, SigSet, sigaction},
+        wait::{WaitStatus::Exited, waitpid},
     },
     unistd::Pid,
 };
