@@ -10,14 +10,19 @@
 //! re-used for a period of time.
 use alloc::{
     alloc::{GlobalAlloc, Layout, LayoutError},
-    collections::{BTreeMap, VecDeque},
+    collections::VecDeque,
     fmt::Debug,
 };
+use core::hash::BuildHasherDefault;
 #[cfg(feature = "initialize")]
 use core::ptr::write_bytes;
 
+use ahash::AHasher;
+use hashbrown::HashMap;
 use log::debug;
 use thiserror::Error;
+
+type Hasher = BuildHasherDefault<AHasher>;
 
 use crate::{
     GuestAddr,
@@ -38,7 +43,7 @@ pub struct DefaultFrontend<B: GlobalAlloc + Send, S: Shadow, T: Tracking> {
     shadow: S,
     tracking: T,
     red_zone_size: usize,
-    allocations: BTreeMap<GuestAddr, Allocation>,
+    allocations: HashMap<GuestAddr, Allocation, Hasher>,
     quarantine: VecDeque<Allocation>,
     quarantine_size: usize,
     quaratine_used: usize,
@@ -176,7 +181,7 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> DefaultFrontend<B, S, T> {
             shadow,
             tracking,
             red_zone_size,
-            allocations: BTreeMap::new(),
+            allocations: HashMap::with_capacity_and_hasher(4096, Hasher::default()),
             quarantine: VecDeque::new(),
             quarantine_size,
             quaratine_used: 0,

@@ -8,6 +8,8 @@ use crate::GuestAddr;
 
 #[cfg(feature = "guest")]
 pub mod guest;
+#[cfg(feature = "guest")]
+pub mod guest_fast;
 #[cfg(feature = "host")]
 pub mod host;
 
