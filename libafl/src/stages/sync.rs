@@ -137,7 +137,7 @@ where
             let input = match (self.load_callback)(fuzzer, state, &path) {
                 Ok(input) => input,
                 Err(Error::InvalidInput(reason, _)) => {
-                    log::warning!(
+                    log::warn!(
                         "Invalid input found in {} when syncing; reason {reason}; skipping;", path.display()
                     );
                     continue;
