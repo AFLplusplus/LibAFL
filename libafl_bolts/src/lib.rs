@@ -62,9 +62,7 @@ type String = &'static str;
 /// Good enough for simple errors, for anything else, use the `alloc` feature.
 #[cfg(not(feature = "alloc"))]
 macro_rules! format {
-    ($fmt:literal) => {{
-        $fmt
-    }};
+    ($fmt:literal) => {{ $fmt }};
 }
 
 #[cfg(feature = "std")]
@@ -166,7 +164,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
 use std::{
     fs::File,
-    io::{stderr, stdout, Write},
+    io::{Write, stderr, stdout},
     os::fd::{AsRawFd, FromRawFd, RawFd},
     panic,
 };
@@ -1105,7 +1103,7 @@ pub fn get_thread_id() -> u64 {
 #[allow(clippy::cast_sign_loss)]
 /// Return thread ID without using TLS
 pub fn get_thread_id() -> u64 {
-    use libc::{syscall, SYS_gettid};
+    use libc::{SYS_gettid, syscall};
 
     unsafe { syscall(SYS_gettid) as u64 }
 }
@@ -1458,7 +1456,7 @@ macro_rules! nonnull_raw_mut {
 #[allow(missing_docs)] // expect somehow breaks here
 pub mod pybind {
 
-    use pyo3::{pymodule, types::PyModule, Bound, PyResult};
+    use pyo3::{Bound, PyResult, pymodule, types::PyModule};
 
     #[macro_export]
     macro_rules! unwrap_me_body {
