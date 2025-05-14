@@ -6,7 +6,7 @@ use std::{
 use anyhow::{anyhow, Result};
 use nix::unistd::{dup2, execvp};
 
-use crate::{args::StdChildArgs, exit::Exit};
+use crate::{args::ChildArgs, exit::Exit};
 
 pub struct Child {
     argv: Vec<String>,
@@ -47,7 +47,7 @@ impl Child {
         Ok(())
     }
 
-    pub fn new(args: &impl StdChildArgs, fd1: RawFd, fd2: RawFd) -> Child {
+    pub fn new(args: &impl ChildArgs, fd1: RawFd, fd2: RawFd) -> Child {
         Child {
             argv: args.argv().to_vec(),
             fd1,
