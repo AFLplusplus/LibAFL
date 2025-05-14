@@ -8,16 +8,16 @@ use core::{marker::PhantomData, time::Duration};
 use std::path::{Path, PathBuf};
 
 use libafl_bolts::{
-    current_time,
+    Named, current_time,
     fs::find_new_files_rec,
     shmem::{ShMem, ShMemProvider},
-    Named,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
-    events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer, EventWithStats},
+    events::{Event, EventConfig, EventFirer, EventWithStats, llmp::LlmpEventConverter},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor, HasObjective},
     inputs::{Input, InputConverter},
@@ -26,7 +26,6 @@ use crate::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,
     },
-    Error, HasMetadata, HasNamedMetadata,
 };
 
 /// Default name for `SyncFromDiskStage`; derived from AFL++
@@ -138,8 +137,8 @@ where
             let input = match (self.load_callback)(fuzzer, state, &path) {
                 Ok(input) => input,
                 Err(Error::InvalidInput(reason, _)) => {
-                    log::debug!(
-                        "Invalid input found in {path:?} when syncing; reason {reason}; skipping;"
+                    log::warning!(
+                        "Invalid input found in {} when syncing; reason {reason}; skipping;", path.display()
                     );
                     continue;
                 }
