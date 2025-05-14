@@ -58,7 +58,7 @@ impl SyncFromDiskMetadata {
 }
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
-/// When syncing, the stage will ignore `Error::InvalidInput` and will skip the file.
+/// When syncing, the stage will ignore [`Error::InvalidInput`] and will skip the file.
 #[derive(Debug)]
 pub struct SyncFromDiskStage<CB, E, EM, I, S, Z> {
     name: Cow<'static, str>,
@@ -172,7 +172,7 @@ where
 
 impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z> {
     /// Creates a new [`SyncFromDiskStage`]
-    /// To skip a file, you can return `Error::invalid_input` in `load_callback`
+    /// To skip a file, you can return [`Error::invalid_input()`] from the provided `load_callback`
     #[must_use]
     pub fn new(sync_dirs: Vec<PathBuf>, load_callback: CB, interval: Duration, name: &str) -> Self {
         Self {
