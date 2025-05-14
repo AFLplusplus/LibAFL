@@ -138,7 +138,8 @@ where
                 Ok(input) => input,
                 Err(Error::InvalidInput(reason, _)) => {
                     log::warn!(
-                        "Invalid input found in {} when syncing; reason {reason}; skipping;", path.display()
+                        "Invalid input found in {} when syncing; reason {reason}; skipping;",
+                        path.display()
                     );
                     continue;
                 }
