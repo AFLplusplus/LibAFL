@@ -58,6 +58,7 @@ impl SyncFromDiskMetadata {
 }
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
+/// When syncing, the stage will ignore `Error::InvalidInput` and will skip the file.
 #[derive(Debug)]
 pub struct SyncFromDiskStage<CB, E, EM, I, S, Z> {
     name: Cow<'static, str>,
@@ -125,15 +126,25 @@ where
         let to_sync = sync_from_disk_metadata.left_to_sync.clone();
         log::debug!("Number of files to sync: {:?}", to_sync.len());
         for path in to_sync {
-            let input = (self.load_callback)(fuzzer, state, &path)?;
             // Removing each path from the `left_to_sync` Vec before evaluating
             // prevents duplicate processing and ensures that each file is evaluated only once. This approach helps
-            // avoid potential infinite loops that may occur if a file is an objective.
+            // avoid potential infinite loops that may occur if a file is an objective or an invalid input.
             state
                 .metadata_mut::<SyncFromDiskMetadata>()
                 .unwrap()
                 .left_to_sync
                 .retain(|p| p != &path);
+            let input = match (self.load_callback)(fuzzer, state, &path) {
+                Ok(input) => input,
+                Err(Error::InvalidInput(reason, _)) => {
+                    log::warn!(
+                        "Invalid input found in {} when syncing; reason {reason}; skipping;",
+                        path.display()
+                    );
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
             log::debug!("Syncing and evaluating {}", path.display());
             fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
@@ -161,6 +172,7 @@ where
 
 impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z> {
     /// Creates a new [`SyncFromDiskStage`]
+    /// To skip a file, you can return `Error::invalid_input` in `load_callback`
     #[must_use]
     pub fn new(sync_dirs: Vec<PathBuf>, load_callback: CB, interval: Duration, name: &str) -> Self {
         Self {
