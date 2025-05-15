@@ -4,77 +4,23 @@
 //! conventional symbol lookup is not possible, e.g. if libc is statically
 //! linked
 use alloc::fmt::Debug;
-use core::{
-    ffi::{CStr, c_char, c_void},
-    ptr::null_mut,
-    sync::atomic::{AtomicPtr, Ordering},
-};
+use core::ffi::{CStr, c_char, c_void};
 
 use thiserror::Error;
 
 use crate::{GuestAddr, patch::Patches};
 
+pub mod atomic_guest_addr;
+
+#[cfg(not(feature = "single-threaded"))]
+pub use atomic_guest_addr::multi_threaded::AtomicGuestAddr;
+#[cfg(feature = "single-threaded")]
+pub use atomic_guest_addr::single_threaded::AtomicGuestAddr;
+
 #[cfg(feature = "libc")]
 pub mod dlsym;
 
 pub mod nop;
-
-pub struct AtomicGuestAddr {
-    addr: AtomicPtr<c_void>,
-}
-
-impl AtomicGuestAddr {
-    pub const fn new() -> Self {
-        AtomicGuestAddr {
-            addr: AtomicPtr::new(null_mut()),
-        }
-    }
-
-    pub fn load(&self) -> Option<GuestAddr> {
-        let addr = self.addr.load(Ordering::SeqCst) as GuestAddr;
-        match addr {
-            GuestAddr::MIN => None,
-            _ => Some(addr),
-        }
-    }
-
-    pub fn store(&self, addr: GuestAddr) {
-        self.addr.store(addr as *mut c_void, Ordering::SeqCst);
-    }
-
-    pub fn get_or_insert_with<F>(&self, f: F) -> GuestAddr
-    where
-        F: FnOnce() -> GuestAddr,
-    {
-        if let Some(addr) = self.load() {
-            addr
-        } else {
-            let addr = f();
-            self.store(addr);
-            addr
-        }
-    }
-
-    pub fn try_get_or_insert_with<F, E>(&self, f: F) -> Result<GuestAddr, E>
-    where
-        F: FnOnce() -> Result<GuestAddr, E>,
-        E: Debug,
-    {
-        if let Some(addr) = self.load() {
-            Ok(addr)
-        } else {
-            let addr = f()?;
-            self.store(addr);
-            Ok(addr)
-        }
-    }
-}
-
-impl Default for AtomicGuestAddr {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 pub trait Symbols: Debug + Sized + Send {
     type Error: Debug;

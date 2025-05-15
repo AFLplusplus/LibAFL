@@ -3,6 +3,9 @@ use core::ffi::{CStr, c_int, c_void};
 
 use libc::{STDERR_FILENO, size_t, ssize_t};
 use log::{Level, LevelFilter, Log, Metadata, Record};
+#[cfg(feature = "single-threaded")]
+use nospin::Once;
+#[cfg(not(feature = "single-threaded"))]
 use spin::Once;
 
 use crate::{

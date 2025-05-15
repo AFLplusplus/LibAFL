@@ -10,6 +10,9 @@ use core::{marker::PhantomData, mem::forget, ptr::null_mut};
 
 use dlmalloc::{Allocator, Dlmalloc};
 use log::debug;
+#[cfg(feature = "single-threaded")]
+use nospin::Mutex;
+#[cfg(not(feature = "single-threaded"))]
 use spin::Mutex;
 
 use crate::mmap::Mmap;

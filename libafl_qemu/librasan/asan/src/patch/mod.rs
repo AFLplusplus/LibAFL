@@ -6,6 +6,9 @@ pub mod raw;
 use alloc::fmt::Debug;
 
 use log::trace;
+#[cfg(feature = "single-threaded")]
+use nospin::{Mutex, Once};
+#[cfg(not(feature = "single-threaded"))]
 use spin::{Mutex, Once};
 use thiserror::Error;
 

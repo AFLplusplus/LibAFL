@@ -4,6 +4,9 @@ use core::{
 };
 
 use log::{Level, error, trace};
+#[cfg(feature = "single-threaded")]
+use nospin::{Lazy, Mutex};
+#[cfg(not(feature = "single-threaded"))]
 use spin::{Lazy, Mutex};
 
 use crate::{

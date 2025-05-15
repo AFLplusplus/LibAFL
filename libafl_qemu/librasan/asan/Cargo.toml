@@ -42,6 +42,8 @@ libc = ["dep:libc"]
 linux = ["dep:rustix"]
 ## Enable the `baby_mimalloc` allocator
 mimalloc = ["dep:baby-mimalloc"]
+## Support single-threaded targets by using dummy synchronization primitives
+single-threaded = ["dep:nospin"]
 ##  Disable the magic used to support `no_std` environments for running unit and integration tests
 test = []
 ## Enable support for memory tracking
@@ -59,11 +61,15 @@ log = { version = "0.4.22", default-features = false, features = [
   "release_max_level_info",
 ] }
 libc = { version = "0.2.169", default-features = false, optional = true }
+nospin = { version = "0.2.4", default-features = false, optional = true, features = [
+  "lazy",
+  "mutex",
+  "once",
+] }
 nostd-musl = { version = "0.1.5", default-features = false, features = [
   "optimized-assembly",
 ] }
 nostd-printf = { version = "0.1.4", default-features = false }
-
 readonly = { version = "0.2.12", default-features = false }
 rustix = { version = "1.0.0", default-features = false, features = [
   "fs",

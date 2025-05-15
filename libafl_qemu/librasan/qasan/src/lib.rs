@@ -23,6 +23,9 @@ use asan::{
     tracking::{Tracking, host::HostTracking},
 };
 use log::{Level, trace};
+#[cfg(feature = "single-threaded")]
+use nospin::{Lazy, Mutex};
+#[cfg(not(feature = "single-threaded"))]
 use spin::{Lazy, Mutex};
 
 type Syms = DlSymSymbols<LookupTypeNext>;

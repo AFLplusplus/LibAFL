@@ -25,7 +25,10 @@ use asan::{
     tracking::{Tracking, guest_fast::GuestFastTracking},
 };
 use log::{Level, debug, trace};
-use spin::{Lazy, mutex::Mutex};
+#[cfg(feature = "single-threaded")]
+use nospin::{Lazy, Mutex};
+#[cfg(not(feature = "single-threaded"))]
+use spin::{Lazy, Mutex};
 
 type Syms = DlSymSymbols<LookupTypeNext>;
 
