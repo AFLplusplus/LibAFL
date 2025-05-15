@@ -15,9 +15,9 @@ use libafl::{
     },
 };
 #[cfg(feature = "cmplog")]
-use libafl::SHM_CMPLOG_ENV_VAR;
+use libafl::executors::forkserver::SHM_CMPLOG_ENV_VAR;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
-use libafl::FS_NEW_OPT_AUTODTCT;
+use libafl::executors::forkserver::FS_NEW_OPT_AUTODTCT;
 use libafl_bolts::os::{ChildHandle, ForkResult};
 use nix::{
     sys::signal::{SigHandler, Signal},
