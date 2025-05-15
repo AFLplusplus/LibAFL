@@ -3,7 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 cd "$SCRIPT_DIR/.." || exit 1
 
-CLIPPY_CMD="RUST_BACKTRACE=full cargo +nightly clippy --no-deps --tests --examples --benches"
+CLIPPY_CMD="RUST_BACKTRACE=full cargo clippy --no-deps --tests --examples --benches"
 RUSTC_FLAGS="-Z macro-backtrace"
 
 set -e
