@@ -10,6 +10,7 @@ use core::{mem::align_of, slice};
     feature = "sancov_ctx",
     feature = "sancov_ngram8"
 ))]
+#[rustversion::nightly]
 use libafl::executors::hooks::ExecutorHook;
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
@@ -74,6 +75,7 @@ use alloc::vec::Vec;
     feature = "sancov_ngram8",
     feature = "sancov_ctx"
 ))]
+#[rustversion::nightly]
 use core::marker::PhantomData;
 
 /// The hook to initialize ngram everytime we run the harness
