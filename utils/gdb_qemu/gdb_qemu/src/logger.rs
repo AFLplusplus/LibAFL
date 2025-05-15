@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use simplelog::{Config, LevelFilter, WriteLogger};
 
 use crate::args::LogArgs;

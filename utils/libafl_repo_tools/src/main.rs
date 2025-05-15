@@ -286,7 +286,6 @@ async fn main() -> io::Result<()> {
     let rust_excluded_directories = RegexSet::new([
         r".*target.*",
         r".*utils/noaslr.*",
-        r".*utils/gdb_qemu.*",
         r".*docs/listings/baby_fuzzer/listing-.*",
         r".*LibAFL/Cargo.toml.*",
         r".*AFLplusplus.*",
