@@ -132,7 +132,6 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
     let mut gen_lockfile_cmd = Command::new("cargo");
 
     gen_lockfile_cmd
-        .arg("+nightly")
         .arg("generate-lockfile")
         .arg("--manifest-path")
         .arg(cargo_file_path.as_path());
