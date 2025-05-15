@@ -22,7 +22,7 @@ use asan::{
         Symbols,
         dlsym::{DlSymSymbols, LookupTypeNext},
     },
-    tracking::{Tracking, guest::GuestTracking},
+    tracking::{Tracking, guest_fast::GuestFastTracking},
 };
 use log::{Level, debug, trace};
 use spin::{Lazy, mutex::Mutex};
@@ -34,7 +34,7 @@ type GasanMmap = LibcMmap<Syms>;
 type GasanBackend = MimallocBackend<DlmallocBackend<GasanMmap>>;
 
 pub type GasanFrontend =
-    DefaultFrontend<GasanBackend, GuestShadow<GasanMmap, DefaultShadowLayout>, GuestTracking>;
+    DefaultFrontend<GasanBackend, GuestShadow<GasanMmap, DefaultShadowLayout>, GuestFastTracking>;
 
 pub type GasanSyms = DlSymSymbols<LookupTypeNext>;
 
@@ -45,7 +45,7 @@ static FRONTEND: Lazy<Mutex<GasanFrontend>> = Lazy::new(|| {
     debug!("init");
     let backend = GasanBackend::new(DlmallocBackend::new(PAGE_SIZE));
     let shadow = GuestShadow::<GasanMmap, DefaultShadowLayout>::new().unwrap();
-    let tracking = GuestTracking::new().unwrap();
+    let tracking = GuestFastTracking::new().unwrap();
     let frontend = GasanFrontend::new(
         backend,
         shadow,
