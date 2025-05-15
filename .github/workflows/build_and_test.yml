@@ -448,6 +448,7 @@ jobs:
           shell: bash
           run: |
             RUN_ON_CI=1 \
+            RUSTC_BOOTSTRAP=1 \
             LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
             just \
               -f ./libafl_qemu/librasan/Justfile \
@@ -467,6 +468,7 @@ jobs:
           shell: bash
           run: |
             RUN_ON_CI=1 \
+            RUSTC_BOOTSTRAP=1 \
             LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
             just \
               -f ./libafl_qemu/librasan/Justfile \
@@ -498,7 +500,7 @@ jobs:
   nostd-build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
       - name: Add targets
@@ -515,7 +517,7 @@ jobs:
   nostd-clippy:
     runs-on: ubuntu-24.04
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rust-src
       - name: Add targets

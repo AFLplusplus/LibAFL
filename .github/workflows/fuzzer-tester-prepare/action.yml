@@ -16,9 +16,9 @@ runs:
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - name: Add nightly toolchain
-      if: ${{ inputs.fuzzer-name == './fuzzers/inprocess/fuzzbench_ctx' }}
+      if: ${{ inputs.fuzzer-name == './fuzzers/inprocess/fuzzbench_ctx' || inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_no_std' || inputs.fuzzer-name == './fuzzers/baby/tutorial'}}
       shell: bash
-      run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup default nightly
+      run: rustup toolchain install nightly-x86_64-unknown-linux-gnu; rustup component add clippy rustfmt --toolchain nightly-x86_64-unknown-linux-gnu; rustup default nightly
     - name: Add no_std toolchain
       if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_no_std' }}
       shell: bash
