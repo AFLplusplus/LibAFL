@@ -107,6 +107,7 @@ impl<I, S> CtxHook<I, S> {
 }
 
 #[cfg(feature = "sancov_ctx")]
+#[rustversion::nightly]
 impl<I, S> Default for CtxHook<I, S> {
     fn default() -> Self {
         Self::new()
@@ -152,6 +153,7 @@ impl<I, S> Default for NgramHook<I, S> {
 }
 
 #[cfg(feature = "sancov_ctx")]
+#[rustversion::nightly]
 impl<I, S> ExecutorHook<I, S> for CtxHook<I, S> {
     fn init(&mut self, _state: &mut S) {}
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {
