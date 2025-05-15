@@ -1,6 +1,9 @@
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
-use libafl::{stages::afl_stats::AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS, Error};
+use libafl::{
+    executors::forkserver::AFL_MAP_SIZE_ENV_VAR,
+    stages::afl_stats::AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS, Error,
+};
 use libafl_bolts::core_affinity::Cores;
 
 use crate::Opt;
