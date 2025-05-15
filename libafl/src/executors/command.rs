@@ -658,9 +658,10 @@ impl CommandExecutorBuilder {
             command.bind(core);
 
             #[cfg(not(feature = "fork"))]
-            return Err(Error::illegal_argument(
-                "Your host doesn't support fork and thus libafl can not bind to a core right after children get spawned",
-            ));
+            return Err(Error::illegal_argument(format!(
+                "Your host doesn't support fork and thus libafl can not bind to core {:?} right after children get spawned",
+                core
+            )));
         }
 
         let configurator = StdCommandConfigurator {
