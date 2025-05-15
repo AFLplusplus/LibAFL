@@ -37,7 +37,7 @@ pub fn parse_envs(opt: &mut Opt) -> Result<(), Error> {
     if let Ok(res) = std::env::var("AFL_NO_AUTODICT") {
         opt.no_autodict = parse_bool(&res)?;
     }
-    if let Ok(res) = std::env::var("AFL_MAP_SIZE") {
+    if let Ok(res) = std::env::var(AFL_MAP_SIZE_ENV_VAR) {
         let map_size = validate_map_size(res.parse()?)?;
         opt.map_size = Some(map_size);
     }
