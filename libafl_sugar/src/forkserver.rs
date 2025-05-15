@@ -9,7 +9,7 @@ use libafl::{
     events::{EventConfig, LlmpRestartingEventManager, launcher::Launcher},
     executors::{
         StdChildArgs,
-        forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+        forkserver::{AFL_MAP_SIZE_ENV_VAR, ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
     },
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
