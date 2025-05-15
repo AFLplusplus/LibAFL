@@ -837,6 +837,7 @@ impl AsanRuntime {
 
     #[expect(non_snake_case)]
     #[allow(unknown_lints)] // the compiler is contradicting itself
+    #[allow(clippy::used_underscore_items)]
     #[inline]
     pub fn hook__Znwm(
         &mut self,

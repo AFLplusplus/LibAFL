@@ -88,12 +88,14 @@ pub struct NgramHook<I, S> {
 
 /// The hook to initialize ctx everytime we run the harness
 #[cfg(feature = "sancov_ctx")]
+#[rustversion::nightly]
 #[derive(Debug, Clone, Copy)]
 pub struct CtxHook<I, S> {
     phantom: PhantomData<(I, S)>,
 }
 
 #[cfg(feature = "sancov_ctx")]
+#[rustversion::nightly]
 impl<I, S> CtxHook<I, S> {
     /// The constructor for this struct
     #[must_use]
