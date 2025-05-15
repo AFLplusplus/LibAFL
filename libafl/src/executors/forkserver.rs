@@ -148,7 +148,7 @@ const MIN_INPUT_SIZE_DEFAULT: usize = 1;
 /// Environment variable key for shared memory id for input and its len
 pub const SHM_FUZZ_ENV_VAR: &str = "__AFL_SHM_FUZZ_ID";
 /// Environment variable key for the page size (at least/usually `testcase_size_max + sizeof::<u32>()`)
-pub const SHM_FUZZ_PAGE_SIZE_ENV_VAR: &str = "__AFL_SHM_FUZZ_PAGE_SIZE";
+pub const SHM_FUZZ_MAP_SIZE_ENV_VAR: &str = "__AFL_SHM_FUZZ_MAP_SIZE";
 
 /// Environment variable key for shared memory id for edge map
 pub const SHM_ENV_VAR: &str = "__AFL_SHM_ID";
@@ -1018,7 +1018,7 @@ where
                 // This is likely single threade here, we're likely fine if it's not.
                 unsafe {
                     shmem.write_to_env(SHM_FUZZ_ENV_VAR)?;
-                    env::set_var(SHM_FUZZ_PAGE_SIZE_ENV_VAR, format!("{}", shmem.len()));
+                    env::set_var(SHM_FUZZ_MAP_SIZE_ENV_VAR, format!("{}", shmem.len()));
                 }
 
                 let size_in_bytes = (self.max_input_size + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
