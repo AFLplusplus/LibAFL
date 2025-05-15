@@ -5,7 +5,6 @@ Have a look at `libafl_qemu` for higher-level abstractions.
 __Warning__: The documentation is built by default for `x86_64` in `usermode`. To access the documentation of other architectures or systemmode, the documentation must be rebuilt with the right features.
 */
 
-#![cfg_attr(nightly, feature(used_with_arg))]
 #![allow(clippy::std_instead_of_core)]
 
 use core::ffi::c_void;
@@ -41,7 +40,6 @@ macro_rules! extern_c_checked {
 
     ($visibility:vis fn $c_fn:ident($($param_ident:ident : $param_ty:ty),*) $( -> $ret_ty:ty )?; $($tail:tt)*) =>  {
         paste! {
-            #[cfg_attr(nightly, used(linker))]
             static [<__ $c_fn:upper __>]: unsafe extern "C" fn($($param_ty),*) $( -> $ret_ty )? = $c_fn;
         }
 
@@ -60,7 +58,6 @@ macro_rules! extern_c_checked {
 
             unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
 
-            #[cfg_attr(nightly, used(linker))]
             #[expect(unused_unsafe)]
             static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: &raw const $c_var } };
         }
@@ -80,7 +77,6 @@ macro_rules! extern_c_checked {
 
             unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
 
-            #[cfg_attr(nightly, used(linker))]
             #[expect(unused_unsafe)]
             static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: &raw const $c_var } };
         }
