@@ -8,7 +8,11 @@ rust-version.workspace = true
 crate-type = ["staticlib"]
 
 [features]
-default = []
+default = ["single-threaded"]
+## Support multi-threaded targets by using real synchronization primitives
+multi-threaded = ["dep:spin", "asan/multi-threaded"]
+## Support single-threaded targets by using dummy synchronization primitives
+single-threaded = ["dep:nospin", "asan/single-threaded"]
 test = ["asan/test", "dummy_libc/test"]
 
 [dependencies]
@@ -26,7 +30,12 @@ libc = { version = "0.2.169", default-features = false }
 log = { version = "0.4.22", default-features = false, features = [
   "release_max_level_info",
 ] }
-spin = { version = "0.9.8", default-features = false, features = [
+nospin = { version = "0.2.4", default-features = false, optional = true, features = [
+  "lazy",
+  "mutex",
+  "once",
+] }
+spin = { version = "0.9.8", default-features = false, optional = true, features = [
   "lazy",
   "mutex",
   "spin_mutex",
