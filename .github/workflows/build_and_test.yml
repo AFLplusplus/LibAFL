@@ -112,6 +112,27 @@ jobs:
       # --- miri undefined behavior test --
       - name: Run miri tests
         run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
+  
+  ubuntu-ndk-x86_64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: Swatinem/rust-cache@v2
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+          add-to-path: false
+      - name: cargo-ndk
+        run: cargo install cargo-ndk
+      - name: cargo android targets
+        run: |
+          rustup target add x86_64-linux-android 
+      - name: Build Android
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: cargo ndk -t x86_64 build
 
   ubuntu:
     runs-on: ubuntu-24.04
