@@ -24,7 +24,22 @@ build: format
 run: demo
     cargo run -p gdb_qemu --profile {{PROFILE}} -- -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{DEMO_DIR}}/gdb_demo
 
-gdb:
-    gdb-multiarch -ex "set architecture powerpc:MPC8XX" -ex "set pagination off" -ex "set confirm off" -ex "file {{DEMO_DIR}}/gdb_demo" -ex "target remote | {{HOST_DIR}}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{DEMO_DIR}}/gdb_demo"
+gdb: demo build
+    gdb-multiarch \
+        -ex "set architecture powerpc:MPC8XX" \
+        -ex "set pagination off" \
+        -ex "set confirm off" \
+        -ex "file {{DEMO_DIR}}/gdb_demo" \
+        -ex "target remote | {{HOST_DIR}}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{DEMO_DIR}}/gdb_demo"
+
+test: demo build
+    gdb-multiarch \
+        -ex "set architecture powerpc:MPC8XX" \
+        -ex "set pagination off" \
+        -ex "set confirm off" \
+        -ex "file {{DEMO_DIR}}/gdb_demo" \
+        -ex "target remote | {{HOST_DIR}}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{DEMO_DIR}}/gdb_demo" \
+        -ex "c" \
+        -ex "q"
 
 all: demo build

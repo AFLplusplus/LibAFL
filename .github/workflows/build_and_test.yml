@@ -64,6 +64,9 @@ jobs:
       - name: Test the book (MacOS)
         if: runner.os == 'MacOS'
         run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
+      - name: Build individual libafl book examples (linux)
+        if: runner.os == 'Linux'
+        run: cd docs/listings/baby_fuzzer/ && just build-all
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: cargo test -- --test-threads 1
@@ -277,6 +280,7 @@ jobs:
 
           # Forkserver
           - ./fuzzers/forkserver/forkserver_simple
+          - ./fuzzers/forkserver/forkserver_capture_stdout
           - ./fuzzers/forkserver/forkserver_libafl_cc
           - ./fuzzers/forkserver/fuzzbench_forkserver
           - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
@@ -407,6 +411,38 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: unset RUSTC && ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} cargo run --manifest-path ./utils/ci_runner/Cargo.toml --  ${{ matrix.fuzzer }}
+
+  utils:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04]
+        fuzzer:
+          # Binary only
+          - ./utils/gdb_qemu
+        arch:
+          # unless somebody pays us for the servers.
+          # - aarch64
+          # - arm
+          # - i386
+          # - ppc
+          - x86_64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
+      - name: Add rustfmt nightly
+        shell: bash
+        run: rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y g++-powerpc-linux-gnu gcc-powerpc-linux-gnu gdb-multiarch
+      - name: Add rust targets
+        shell: bash
+        run: rustup target add --toolchain nightly-x86_64-unknown-linux-gnu powerpc-unknown-linux-gnu
+      - name: Build and run utils (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: just -d ${{ matrix.fuzzer }} --justfile ${{ matrix.fuzzer }}/Justfile test
 
   librasan-build:
       runs-on: ubuntu-24.04

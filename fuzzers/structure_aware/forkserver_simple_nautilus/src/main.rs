@@ -5,7 +5,7 @@ use clap::Parser;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{forkserver::ForkserverExecutor, HasObservers},
+    executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
     feedback_and_fast, feedback_or,
     feedbacks::{
         CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback, TimeFeedback,
@@ -29,7 +29,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled},
-    AsSliceMut, TargetArgs, Truncate,
+    AsSliceMut, StdTargetArgs, Truncate,
 };
 use nix::sys::signal::Signal;
 

@@ -10,7 +10,11 @@
 #define HAVE_VECTOR_INTRINSICS 1
 
 #include <optional>
+#if LLVM_VERSION_MAJOR >= 16
+// None constant being deprecated for LLVM-16, it is recommended
+// to use the std::nullopt_t type instead. (#1010)
 constexpr std::nullopt_t None = std::nullopt;
+#endif
 
 // all llvm includes and friends
 #include "llvm/Support/CommandLine.h"

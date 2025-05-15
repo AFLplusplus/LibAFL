@@ -16,7 +16,7 @@ use asan::{
         guest::{DefaultShadowLayout, GuestShadow},
     },
     symbols::{Symbols, nop::NopSymbols},
-    tracking::{Tracking, guest::GuestTracking},
+    tracking::{Tracking, guest_fast::GuestFastTracking},
 };
 use log::{Level, trace};
 use spin::{Lazy, Mutex};
@@ -24,7 +24,7 @@ use spin::{Lazy, Mutex};
 pub type ZasanFrontend = DefaultFrontend<
     DlmallocBackend<LinuxMmap>,
     GuestShadow<LinuxMmap, DefaultShadowLayout>,
-    GuestTracking,
+    GuestFastTracking,
 >;
 
 pub type ZasanSyms = NopSymbols;
@@ -35,7 +35,7 @@ static FRONTEND: Lazy<Mutex<ZasanFrontend>> = Lazy::new(|| {
     LinuxLogger::initialize(Level::Info);
     let backend = DlmallocBackend::<LinuxMmap>::new(PAGE_SIZE);
     let shadow = GuestShadow::<LinuxMmap, DefaultShadowLayout>::new().unwrap();
-    let tracking = GuestTracking::new().unwrap();
+    let tracking = GuestFastTracking::new().unwrap();
     let frontend = ZasanFrontend::new(
         backend,
         shadow,

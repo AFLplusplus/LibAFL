@@ -3,7 +3,7 @@ use std::{
     os::fd::{AsRawFd, RawFd},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use nix::unistd::{dup2, execvp};
 
 use crate::{args::ChildArgs, exit::Exit};
