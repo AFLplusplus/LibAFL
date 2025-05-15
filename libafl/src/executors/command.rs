@@ -654,7 +654,13 @@ impl CommandExecutorBuilder {
         }
 
         if let Some(core) = self.child_env_inner.core {
+            #[cfg(feature = "fork")]
             command.bind(core);
+
+            #[cfg(not(feature = "fork"))]
+            return Err(Error::illegal_argument(
+                "Your host doesn't support fork and thus libafl can not bind to a core right after children get spawned",
+            ));
         }
 
         let configurator = StdCommandConfigurator {
