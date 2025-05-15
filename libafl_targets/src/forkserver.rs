@@ -9,11 +9,15 @@ use std::{
 use libafl::{
     Error,
     executors::forkserver::{
-        FORKSRV_FD, FS_ERROR_SHM_OPEN, FS_NEW_OPT_AUTODTCT, FS_NEW_OPT_MAPSIZE,
-        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, SHM_CMPLOG_ENV_VAR, SHM_ENV_VAR,
+        FORKSRV_FD, FS_ERROR_SHM_OPEN, FS_NEW_OPT_MAPSIZE,
+        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, SHM_ENV_VAR,
         SHM_FUZZ_ENV_VAR,
     },
 };
+#[cfg(feature = "cmplog")]
+use libafl::SHM_CMPLOG_ENV_VAR;
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
+use libafl::FS_NEW_OPT_AUTODTCT;
 use libafl_bolts::os::{ChildHandle, ForkResult};
 use nix::{
     sys::signal::{SigHandler, Signal},
@@ -51,6 +55,7 @@ fn write_to_forkserver(message: &[u8]) -> Result<(), Error> {
     }
     Ok(())
 }
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 fn write_all_to_forkserver(message: &[u8]) -> Result<(), Error> {
     let mut remain_len = message.len();
     while remain_len > 0 {
@@ -86,6 +91,30 @@ fn read_u32_from_forkserver() -> Result<u32, Error> {
     Ok(u32::from_ne_bytes(buf))
 }
 
+#[cfg(target_os = "android")]
+const ASHMEM_GET_SIZE: core::ffi::c_int = 0x00007704;
+#[cfg(target_os = "android")]
+unsafe fn android_shmat(shm_id: i32) -> *mut core::ffi::c_void {
+    let size = unsafe { libc::ioctl(shm_id, ASHMEM_GET_SIZE) };
+    if size < 0 {
+        return core::ptr::null_mut();
+    }
+    let ptr = unsafe {
+        libc::mmap(
+            core::ptr::null_mut(),
+            size as usize,
+            libc::PROT_READ | libc::PROT_WRITE,
+            libc::MAP_SHARED,
+            shm_id,
+            0,
+        )
+    };
+    if core::ptr::eq(ptr, libc::MAP_FAILED) {
+        return core::ptr::null_mut();
+    }
+    ptr
+}
+
 /// Guard [`map_shared_memory`] is invoked only once
 static SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
 
@@ -112,7 +141,10 @@ fn map_shared_memory_internal() -> Result<(), Error> {
         write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
         return Err(Error::illegal_argument("Invalid __AFL_SHM_ID value"));
     };
+    #[cfg(not(target_os = "android"))]
     let map = unsafe { libc::shmat(shm_id, core::ptr::null(), 0) };
+    #[cfg(target_os = "android")]
+    let map = unsafe { android_shmat(shm_id) };
     if map.is_null() || core::ptr::eq(map, libc::MAP_FAILED) {
         write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
         return Err(Error::illegal_state("shmat for map"));
@@ -149,7 +181,10 @@ fn map_input_shared_memory_internal() -> Result<(), Error> {
         write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
         return Err(Error::illegal_argument("Invalid __AFL_SHM_FUZZ_ID value"));
     };
+    #[cfg(not(target_os = "android"))]
     let map = unsafe { libc::shmat(shm_id, core::ptr::null(), 0) };
+    #[cfg(target_os = "android")]
+    let map = unsafe { android_shmat(shm_id) };
     if map.is_null() || core::ptr::eq(map, libc::MAP_FAILED) {
         write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
         return Err(Error::illegal_state(
@@ -193,7 +228,10 @@ fn map_cmplog_shared_memory_internal() -> Result<(), Error> {
         write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
         return Err(Error::illegal_argument("Invalid __AFL_CMPLOG_SHM_ID value"));
     };
+    #[cfg(not(target_os = "android"))]
     let map = unsafe { libc::shmat(shm_id, core::ptr::null(), 0) };
+    #[cfg(target_os = "android")]
+    let map = unsafe { android_shmat(shm_id) };
     if map.is_null() || core::ptr::eq(map, libc::MAP_FAILED) {
         write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
         return Err(Error::illegal_state("shmat for map"));
