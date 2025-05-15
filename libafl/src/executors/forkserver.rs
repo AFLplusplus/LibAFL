@@ -22,6 +22,7 @@ use std::{
 use libafl_bolts::tuples::{Handle, Handled};
 use libafl_bolts::{
     AsSlice, AsSliceMut, InputLocation, StdTargetArgs, StdTargetArgsInner, Truncate,
+    core_affinity::CoreId,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
@@ -172,6 +173,8 @@ pub trait ConfigTarget {
     ) -> &mut Self;
     /// dup2 the specific fd, used for stdio
     fn setdup2(&mut self, old_fd: RawFd, new_fd: RawFd) -> &mut Self;
+    /// Bind children to a single core
+    fn bind(&mut self, core: CoreId) -> &mut Self;
 }
 
 impl ConfigTarget for Command {
@@ -274,6 +277,19 @@ impl ConfigTarget for Command {
         // This calls our non-shady function from above.
         unsafe { self.pre_exec(func) }
     }
+
+    fn bind(&mut self, core: CoreId) -> &mut Self {
+        let func = move || {
+            if let Err(e) = core.set_affinity_forced() {
+                return Err(io::Error::other(e));
+            }
+
+            Ok(())
+        };
+        // # Safety
+        // This calls our non-shady function from above.
+        unsafe { self.pre_exec(func) }
+    }
 }
 
 /// The [`Forkserver`] is communication channel with a child process that forks on request of the fuzzer.
@@ -358,6 +374,7 @@ impl Forkserver {
         stdout_memfd: Option<RawFd>,
         stderr_memfd: Option<RawFd>,
         cwd: Option<PathBuf>,
+        core: Option<CoreId>,
     ) -> Result<Self, Error> {
         let Some(coverage_map_size) = coverage_map_size else {
             return Err(Error::unknown(
@@ -410,6 +427,10 @@ impl Forkserver {
             command.stderr(Stdio::null());
         } else {
             command.stderr(Stdio::null());
+        }
+
+        if let Some(core) = core {
+            command.bind(core);
         }
 
         command.env("AFL_MAP_SIZE", format!("{coverage_map_size}"));
@@ -1046,6 +1067,7 @@ where
                         .expect("only memory fd backend is allowed for forkserver executor")
                 }),
                 self.child_env_inner.current_directory.clone(),
+                self.child_env_inner.core,
             )?,
             None => {
                 return Err(Error::illegal_argument(

@@ -653,6 +653,10 @@ impl CommandExecutorBuilder {
             command.stderr(Stdio::piped());
         }
 
+        if let Some(core) = self.child_env_inner.core {
+            command.bind(core);
+        }
+
         let configurator = StdCommandConfigurator {
             debug_child: self.child_env_inner.debug_child,
             stdout_cap,

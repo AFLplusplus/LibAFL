@@ -16,9 +16,9 @@ pub use inprocess::InProcessExecutor;
 pub use inprocess_fork::InProcessForkExecutor;
 #[cfg(unix)]
 use libafl_bolts::os::unix_signals::Signal;
-#[cfg(feature = "std")]
-use libafl_bolts::tuples::Handle;
 use libafl_bolts::tuples::RefIndexable;
+#[cfg(feature = "std")]
+use libafl_bolts::{core_affinity::CoreId, tuples::Handle};
 use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
@@ -247,6 +247,8 @@ pub struct StdChildArgsInner {
     pub current_directory: Option<PathBuf>,
     /// Whether debug child by inheriting stdout/stderr
     pub debug_child: bool,
+    /// Core to bind for the children
+    pub core: Option<CoreId>,
 }
 
 #[cfg(feature = "std")]
@@ -258,6 +260,7 @@ impl Default for StdChildArgsInner {
             stdout_observer: None,
             current_directory: None,
             debug_child: false,
+            core: None,
         }
     }
 }
@@ -310,6 +313,13 @@ pub trait StdChildArgs: Sized {
             );
         }
         self.inner_mut().debug_child = debug_child;
+        self
+    }
+
+    #[must_use]
+    /// Set the core to bind for the children
+    fn core(mut self, core: CoreId) -> Self {
+        self.inner_mut().core = Some(core);
         self
     }
 }
