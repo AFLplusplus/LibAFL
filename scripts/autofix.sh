@@ -17,7 +17,7 @@ echo "[+] Done fixing build"
 echo 
 
 echo 'Fixing clippy (might need a "git commit" and a rerun, if "cargo fix" changed the source)'
-RUST_BACKTRACE=full cargo clippy --fix --release --all --all-features --tests --examples --benches --allow-dirty --allow-staged --broken-code -- -Z macro-backtrace
+RUST_BACKTRACE=full cargo clippy --fix --release --all --all-features --tests --examples --benches --allow-dirty --allow-staged --broken-code
 
 cargo fmt
 
