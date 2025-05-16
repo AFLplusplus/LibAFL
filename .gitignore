@@ -4,7 +4,10 @@ out
 vendor
 
 # cargo lockfiles except from binaries
-**/Cargo.lock
+Cargo.lock
+./**/Cargo.lock
+# Un-ignore Cargo.lock files within the fuzzers directory
+!./fuzzers/**/Cargo.lock
 
 .DS_Store
 .env

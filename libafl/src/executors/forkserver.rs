@@ -120,7 +120,8 @@ fn report_error_and_exit(status: i32) -> Result<(), Error> {
     match status {
     FS_ERROR_MAP_SIZE =>
         Err(Error::unknown(
-            "AFL_MAP_SIZE is not set and fuzzing target reports that the required size is very large. Solution: Run the fuzzing target stand-alone with the environment variable AFL_DEBUG=1 set and set the value for __afl_final_loc in the AFL_MAP_SIZE environment variable for afl-fuzz.".to_string())),
+            format!(
+            "{AFL_MAP_SIZE_ENV_VAR} is not set and fuzzing target reports that the required size is very large. Solution: Run the fuzzing target stand-alone with the environment variable AFL_DEBUG=1 set and set the value for __afl_final_loc in the {AFL_MAP_SIZE_ENV_VAR} environment variable for afl-fuzz."))),
     FS_ERROR_MAP_ADDR =>
         Err(Error::unknown(
             "the fuzzing target reports that hardcoded map address might be the reason the mmap of the shared memory failed. Solution: recompile the target with either afl-clang-lto and do not set AFL_LLVM_MAP_ADDR or recompile with afl-clang-fast.".to_string())),
@@ -146,10 +147,16 @@ const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
 const MIN_INPUT_SIZE_DEFAULT: usize = 1;
 /// Environment variable key for shared memory id for input and its len
 pub const SHM_FUZZ_ENV_VAR: &str = "__AFL_SHM_FUZZ_ID";
+/// Environment variable key for the page size (at least/usually `testcase_size_max + sizeof::<u32>()`)
+pub const SHM_FUZZ_MAP_SIZE_ENV_VAR: &str = "__AFL_SHM_FUZZ_MAP_SIZE";
+
 /// Environment variable key for shared memory id for edge map
 pub const SHM_ENV_VAR: &str = "__AFL_SHM_ID";
 /// Environment variable key for shared memory id for cmplog map
 pub const SHM_CMPLOG_ENV_VAR: &str = "__AFL_CMPLOG_SHM_ID";
+
+/// Environment variable key for a custom AFL coverage map size
+pub const AFL_MAP_SIZE_ENV_VAR: &str = "AFL_MAP_SIZE";
 
 /// The default signal to use to kill child processes
 const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;
@@ -365,8 +372,10 @@ impl Forkserver {
             ));
         };
 
-        if env::var("AFL_MAP_SIZE").is_err() {
-            log::warn!("AFL_MAP_SIZE not set. If it is unset, the forkserver may fail to start up");
+        if env::var(AFL_MAP_SIZE_ENV_VAR).is_err() {
+            log::warn!(
+                "{AFL_MAP_SIZE_ENV_VAR} not set. If it is unset, the forkserver may fail to start up"
+            );
         }
 
         if env::var(SHM_ENV_VAR).is_err() {
@@ -412,7 +421,7 @@ impl Forkserver {
             command.stderr(Stdio::null());
         }
 
-        command.env("AFL_MAP_SIZE", format!("{coverage_map_size}"));
+        command.env(AFL_MAP_SIZE_ENV_VAR, format!("{coverage_map_size}"));
 
         // Persistent, deferred forkserver
         if is_persistent {
@@ -1009,6 +1018,7 @@ where
                 // This is likely single threade here, we're likely fine if it's not.
                 unsafe {
                     shmem.write_to_env(SHM_FUZZ_ENV_VAR)?;
+                    env::set_var(SHM_FUZZ_MAP_SIZE_ENV_VAR, format!("{}", shmem.len()));
                 }
 
                 let size_in_bytes = (self.max_input_size + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
