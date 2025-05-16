@@ -3,7 +3,7 @@ use std::io::{PipeReader, PipeWriter};
 #[cfg(feature = "std")]
 use std::{
     io::{self, ErrorKind, Read, Write},
-    os::{fd::AsRawFd, unix::io::RawFd},
+    os::unix::io::RawFd,
 };
 
 #[cfg(feature = "std")]
@@ -68,13 +68,13 @@ impl Pipe {
     /// The read end
     #[must_use]
     pub fn read_end(&self) -> Option<RawFd> {
-        self.read_end.as_ref().map(|fd| fd.as_raw_fd())
+        self.read_end.as_ref().map(std::os::fd::AsRawFd::as_raw_fd)
     }
 
     /// The write end
     #[must_use]
     pub fn write_end(&self) -> Option<RawFd> {
-        self.write_end.as_ref().map(|fd| fd.as_raw_fd())
+        self.write_end.as_ref().map(std::os::fd::AsRawFd::as_raw_fd)
     }
 }
 
