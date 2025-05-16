@@ -51,6 +51,9 @@ unsafe extern "C" {
     /// Logs an instruction for feedback during fuzzing
     pub fn __libafl_targets_cmplog_instructions(k: usize, shape: u8, arg1: u64, arg2: u64);
 
+    /// Logs an AFL++ style instruction for feedback during fuzzing
+    pub fn __libafl_targets_cmplog_instructions_extended(k: usize, shape: u8, arg1: u64, arg2: u64);
+
     /// Logs a routine for feedback during fuzzing
     pub fn __libafl_targets_cmplog_routines(k: usize, ptr1: *const u8, ptr2: *const u8);
 
