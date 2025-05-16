@@ -9,7 +9,7 @@ use which::which;
 
 use crate::cargo_add_rpath;
 
-pub const LIBAFL_QEMU_GIT_REMOTE: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
+pub const LIBAFL_QEMU_GIT_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 pub const LIBAFL_QEMU_DIRNAME: &str = "qemu-libafl-bridge";
 pub const LIBAFL_QEMU_GIT_REV: &str = "0bea78a122b249cbffafdb130af04cc7331c9aee";
 
@@ -278,8 +278,8 @@ pub fn build(
         env::var_os("LIBAFL_QEMU_CLONE_DIR").map(|x| x.to_string_lossy().to_string());
     let libafl_qemu_force_configure = env::var("LIBAFL_QEMU_FORCE_CONFIGURE").is_ok();
     let libafl_qemu_no_build = env::var("LIBAFL_QEMU_NO_BUILD").is_ok();
-    let libafl_qemu_git_remote =
-        env::var_os("LIBAFL_QEMU_GIT_REMOTE").map(|x| x.to_string_lossy().to_string());
+    let libafl_qemu_git_url =
+        env::var_os("LIBAFL_QEMU_GIT_URL").map(|x| x.to_string_lossy().to_string());
     let libafl_qemu_git_rev =
         env::var_os("LIBAFL_QEMU_GIT_REV").map(|x| x.to_string_lossy().to_string());
 
@@ -288,7 +288,7 @@ pub fn build(
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_FORCE_BUILD");
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_FORCE_CONFIGURE");
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_NO_BUILD");
-    println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_GIT_REMOTE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_GIT_URL");
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_GIT_REV");
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
@@ -311,8 +311,8 @@ pub fn build(
         );
 
         assert!(
-            libafl_qemu_git_remote.is_none(),
-            "cargo:warning=LIBAFL_QEMU_DIR and LIBAFL_QEMU_GIT_REMOTE are both set."
+            libafl_qemu_git_url.is_none(),
+            "cargo:warning=LIBAFL_QEMU_DIR and LIBAFL_QEMU_GIT_URL are both set."
         );
 
         assert!(
@@ -328,9 +328,9 @@ pub fn build(
             target_dir.join(LIBAFL_QEMU_DIRNAME)
         };
 
-        let qemu_git_remote = libafl_qemu_git_remote
+        let qemu_git_url = libafl_qemu_git_url
             .as_deref()
-            .unwrap_or(LIBAFL_QEMU_GIT_REMOTE);
+            .unwrap_or(LIBAFL_QEMU_GIT_URL);
         let qemu_git_rev = libafl_qemu_git_rev
             .as_deref()
             .unwrap_or(LIBAFL_QEMU_GIT_REV);
@@ -359,7 +359,7 @@ pub fn build(
                     .arg("remote")
                     .arg("add")
                     .arg("origin")
-                    .arg(qemu_git_remote)
+                    .arg(qemu_git_url)
                     .status()
                     .unwrap()
                     .success()
