@@ -6,7 +6,6 @@
 #![expect(improper_ctypes)]
 #![expect(unsafe_op_in_unsafe_fn)]
 #![allow(unused_imports)]
-#![allow(unnecessary_transmutes)]
 
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
 #[rustfmt::skip]

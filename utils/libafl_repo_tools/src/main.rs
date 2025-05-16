@@ -132,7 +132,6 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
     let mut gen_lockfile_cmd = Command::new("cargo");
 
     gen_lockfile_cmd
-        .arg("+nightly")
         .arg("generate-lockfile")
         .arg("--manifest-path")
         .arg(cargo_file_path.as_path());
@@ -177,7 +176,6 @@ async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) 
     let mut fmt_command = Command::new("cargo");
 
     fmt_command
-        .arg("+nightly")
         .arg("fmt")
         .arg("--manifest-path")
         .arg(cargo_file_path.as_path());
@@ -325,16 +323,10 @@ async fn main() -> io::Result<()> {
         .collect();
 
     // cargo version
-    println!(
-        "Using {}",
-        get_version_string("cargo", &["+nightly"]).await?
-    );
+    println!("Using {}", get_version_string("cargo", &[]).await?);
 
     // rustfmt version
-    println!(
-        "Using {}",
-        get_version_string("cargo", &["+nightly", "fmt"]).await?
-    );
+    println!("Using {}", get_version_string("cargo", &["fmt"]).await?);
 
     let mut tokio_joinset = JoinSet::new();
 
