@@ -175,7 +175,7 @@ pub fn find_new_files_rec<P: AsRef<Path>>(
 
 impl Drop for InputFile {
     fn drop(&mut self) {
-        if Arc::try_unwrap(core::mem::take(&mut self.rc)).is_ok() {
+        if Arc::into_inner(core::mem::take(&mut self.rc)).is_some() {
             // try to remove the file, but ignore errors
             drop(remove_file(&self.path));
         }
