@@ -201,6 +201,10 @@ fn map_cmplog_shared_memory_internal() -> Result<(), Error> {
     unsafe {
         CMPLOG_MAP_PTR = map.cast();
     }
+    #[cfg(feature = "cmplog_extended_instrumentation")]
+    unsafe {
+        EXTENDED_CMPLOG_MAP_PTR = map.cast();
+    }
     Ok(())
 }
 
