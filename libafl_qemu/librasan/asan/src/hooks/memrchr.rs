@@ -13,7 +13,7 @@ use crate::{asan_load, asan_panic, size_t};
 #[unsafe(export_name = "patch_memrchr")]
 pub unsafe extern "C" fn memrchr(cx: *const c_void, c: c_int, n: size_t) -> *mut c_void {
     unsafe {
-        trace!("memrchr - cx: {:p}, c: {:#x}, n: {:#x}", cx, c, n);
+        trace!("memrchr - cx: {cx:p}, c: {c:#x}, n: {n:#x}");
 
         if n == 0 {
             return null_mut();

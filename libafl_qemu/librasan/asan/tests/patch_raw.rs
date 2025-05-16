@@ -20,7 +20,7 @@ mod tests {
         assert_eq!(a4, 4);
         assert_eq!(a5, 5);
         assert_eq!(a6, 6);
-        return 0xdeadface;
+        0xdeadface
     }
 
     #[unsafe(no_mangle)]
@@ -31,7 +31,7 @@ mod tests {
         assert_eq!(a4, 4);
         assert_eq!(a5, 5);
         assert_eq!(a6, 6);
-        return 0xd00df00d;
+        0xd00df00d
     }
 
     #[test]
@@ -44,11 +44,11 @@ mod tests {
 
         let ptest1 = test1 as *const () as GuestAddr;
         let ptest2 = test2 as *const () as GuestAddr;
-        info!("pfn: {:#x}", ptest1);
+        info!("pfn: {ptest1:#x}");
         let aligned_pfn = ptest1 & !0xfff;
         let page_size = unsafe { sysconf(_SC_PAGESIZE) as usize };
-        info!("aligned_pfn: {:#x}", aligned_pfn);
-        info!("page_size: {:#x}", page_size);
+        info!("aligned_pfn: {aligned_pfn:#x}");
+        info!("page_size: {page_size:#x}");
         LinuxMmap::protect(
             aligned_pfn,
             page_size * 2,

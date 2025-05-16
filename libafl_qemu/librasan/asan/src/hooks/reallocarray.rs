@@ -17,8 +17,7 @@ pub unsafe extern "C" fn reallocarray(
 ) -> *mut c_void {
     unsafe {
         trace!(
-            "reallocarray - ptr: {:p}, nmemb: {:#x}, size: {:#x}",
-            ptr, nmemb, size
+            "reallocarray - ptr: {ptr:p}, nmemb: {nmemb:#x}, size: {size:#x}"
         );
         match nmemb.checked_mul(size) {
             Some(size) => {

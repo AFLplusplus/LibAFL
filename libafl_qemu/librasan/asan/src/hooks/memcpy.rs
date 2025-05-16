@@ -12,7 +12,7 @@ use crate::{asan_load, asan_panic, asan_store, size_t};
 #[unsafe(export_name = "patch_memcpy")]
 pub unsafe extern "C" fn memcpy(dest: *mut c_void, src: *const c_void, n: size_t) -> *mut c_void {
     unsafe {
-        trace!("memcpy - dest: {:p}, src: {:p}, n: {:#x}", dest, src, n);
+        trace!("memcpy - dest: {dest:p}, src: {src:p}, n: {n:#x}");
 
         if n == 0 {
             return dest;

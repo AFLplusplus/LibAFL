@@ -26,7 +26,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
     type Error = GuestShadowError<M>;
 
     fn load(&self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        debug!("load - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("load - start: 0x{start:x}, len: 0x{len:x}");
         if self.is_poison(start, len)? {
             Err(GuestShadowError::Poisoned(start, len))
         } else {
@@ -35,7 +35,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
     }
 
     fn store(&self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        debug!("store - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("store - start: 0x{start:x}, len: 0x{len:x}");
         if self.is_poison(start, len)? {
             Err(GuestShadowError::Poisoned(start, len))
         } else {
@@ -50,8 +50,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
         poison: PoisonType,
     ) -> Result<(), Self::Error> {
         debug!(
-            "poison - start: 0x{:x}, len: 0x{:x}, pioson: {:?}",
-            start, len, poison
+            "poison - start: 0x{start:x}, len: 0x{len:x}, pioson: {poison:?}"
         );
 
         if Self::is_out_of_bounds(start, len) {
@@ -97,7 +96,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
     }
 
     fn unpoison(&mut self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        debug!("unpoison - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("unpoison - start: 0x{start:x}, len: 0x{len:x}");
 
         if Self::is_out_of_bounds(start, len) {
             Err(GuestShadowError::AddressRangeOverflow(start, len))?;
@@ -147,7 +146,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
     }
 
     fn is_poison(&self, start: GuestAddr, len: usize) -> Result<bool, Self::Error> {
-        debug!("is_poison - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("is_poison - start: 0x{start:x}, len: 0x{len:x}");
 
         if Self::is_out_of_bounds(start, len) {
             Err(GuestShadowError::AddressRangeOverflow(start, len))?;
@@ -183,14 +182,12 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
                 let test_len = (len + skipped) as i8;
                 if first_k != 0 && test_len > first_k {
                     trace!(
-                        "is_poison #1 - start: 0x{:x}, len: 0x{:x}, first_k: 0x{:x}, first_len: 0x{:x}",
-                        start, len, first_k, test_len
+                        "is_poison #1 - start: 0x{start:x}, len: 0x{len:x}, first_k: 0x{first_k:x}, first_len: 0x{test_len:x}"
                     );
                     return Ok(true);
                 } else {
                     trace!(
-                        "!is_poison #1 - start: 0x{:x}, len: 0x{:x}, first_k: 0x{:x}, first_len: 0x{:x}",
-                        start, len, first_k, test_len
+                        "!is_poison #1 - start: 0x{start:x}, len: 0x{len:x}, first_k: 0x{first_k:x}, first_len: 0x{test_len:x}"
                     );
                     return Ok(false);
                 }
@@ -204,8 +201,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
              */
             if first_k != 0 {
                 trace!(
-                    "is_poison #2 - start: 0x{:x}, len: 0x{:x}, first_k: 0x{:x}",
-                    start, len, first_k
+                    "is_poison #2 - start: 0x{start:x}, len: 0x{len:x}, first_k: 0x{first_k:x}"
                 );
                 return Ok(true);
             }
@@ -221,8 +217,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
             let last_k = k_end[0] as i8;
             if last_k != 0 && last_len as i8 > last_k {
                 trace!(
-                    "is_poison #3 - start: 0x{:x}, len: 0x{:x}, last_k: 0x{:x}, last_len: 0x{:x}",
-                    start, len, last_k, last_len
+                    "is_poison #3 - start: 0x{start:x}, len: 0x{len:x}, last_k: 0x{last_k:x}, last_len: 0x{last_len:x}"
                 );
                 return Ok(true);
             }
@@ -243,14 +238,12 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
 
         if poisoned {
             trace!(
-                "is_poison #4 - start_aligned: 0x{:x}, remaining_len: 0x{:x}",
-                start_aligned, remaining_len
+                "is_poison #4 - start_aligned: 0x{start_aligned:x}, remaining_len: 0x{remaining_len:x}"
             );
             Ok(true)
         } else {
             trace!(
-                "!is_poison #4 - start_aligned: 0x{:x}, remaining_len: 0x{:x}",
-                start_aligned, remaining_len
+                "!is_poison #4 - start_aligned: 0x{start_aligned:x}, remaining_len: 0x{remaining_len:x}"
             );
             Ok(false)
         }
@@ -363,7 +356,7 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
     }
 
     pub fn get_shadow(&self, addr: GuestAddr, len: usize) -> Result<&[u8], GuestShadowError<M>> {
-        trace!("get_shadow - addr: 0x{:x}, len: 0x{:x}", addr, len);
+        trace!("get_shadow - addr: 0x{addr:x}, len: 0x{len:x}");
         assert!(addr % Self::ALLOC_ALIGN_SIZE == 0);
         assert!(len % Self::ALLOC_ALIGN_SIZE == 0);
         let shadow_addr = (addr >> Self::ALLOC_ALIGN_POW) + Self::SHADOW_OFFSET;
@@ -384,7 +377,7 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
         addr: GuestAddr,
         len: usize,
     ) -> Result<&mut [u8], GuestShadowError<M>> {
-        trace!("get_shadow_mut - addr: 0x{:x}, len: 0x{:x}", addr, len);
+        trace!("get_shadow_mut - addr: 0x{addr:x}, len: 0x{len:x}");
         assert!(addr % Self::ALLOC_ALIGN_SIZE == 0);
         assert!(len % Self::ALLOC_ALIGN_SIZE == 0);
         let shadow_addr = (addr >> Self::ALLOC_ALIGN_POW) + Self::SHADOW_OFFSET;

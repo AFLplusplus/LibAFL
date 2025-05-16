@@ -12,7 +12,7 @@ use crate::{asan_load, asan_panic};
 #[unsafe(export_name = "patch_strcasecmp")]
 pub unsafe extern "C" fn strcasecmp(s1: *const c_char, s2: *const c_char) -> c_int {
     unsafe {
-        trace!("strcasecmp - s1: {:p}, s2: {:p}", s1, s2);
+        trace!("strcasecmp - s1: {s1:p}, s2: {s2:p}");
 
         if s1.is_null() {
             asan_panic(c"strcasecmp - s1 is null".as_ptr() as *const c_char);

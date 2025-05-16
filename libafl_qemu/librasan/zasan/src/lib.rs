@@ -81,11 +81,10 @@ pub unsafe extern "C" fn asan_store(addr: *const c_void, size: usize) {
 #[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_alloc(len: usize, align: usize) -> *mut c_void {
-    trace!("alloc - len: {:#x}, align: {:#x}", len, align);
+    trace!("alloc - len: {len:#x}, align: {align:#x}");
     let ptr = FRONTEND.lock().alloc(len, align).unwrap() as *mut c_void;
     trace!(
-        "alloc - len: {:#x}, align: {:#x}, ptr: {:p}",
-        len, align, ptr
+        "alloc - len: {len:#x}, align: {align:#x}, ptr: {ptr:p}"
     );
     ptr
 }
@@ -93,14 +92,14 @@ pub unsafe extern "C" fn asan_alloc(len: usize, align: usize) -> *mut c_void {
 #[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_dealloc(addr: *const c_void) {
-    trace!("free - addr: {:p}", addr);
+    trace!("free - addr: {addr:p}");
     FRONTEND.lock().dealloc(addr as GuestAddr).unwrap();
 }
 
 #[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_get_size(addr: *const c_void) -> usize {
-    trace!("get_size - addr: {:p}", addr);
+    trace!("get_size - addr: {addr:p}");
     FRONTEND.lock().get_size(addr as GuestAddr).unwrap()
 }
 
@@ -119,7 +118,7 @@ pub unsafe extern "C" fn asan_page_size() -> usize {
 #[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_unpoison(addr: *const c_void, len: usize) {
-    trace!("unpoison - addr: {:p}, len: {:#x}", addr, len);
+    trace!("unpoison - addr: {addr:p}, len: {len:#x}");
     FRONTEND
         .lock()
         .shadow_mut()
@@ -130,7 +129,7 @@ pub unsafe extern "C" fn asan_unpoison(addr: *const c_void, len: usize) {
 #[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_track(addr: *const c_void, len: usize) {
-    trace!("track - addr: {:p}, len: {:#x}", addr, len);
+    trace!("track - addr: {addr:p}, len: {len:#x}");
     FRONTEND
         .lock()
         .tracking_mut()
@@ -141,7 +140,7 @@ pub unsafe extern "C" fn asan_track(addr: *const c_void, len: usize) {
 #[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_untrack(addr: *const c_void) {
-    trace!("untrack - addr: {:p}", addr);
+    trace!("untrack - addr: {addr:p}");
     FRONTEND
         .lock()
         .tracking_mut()
@@ -152,7 +151,7 @@ pub unsafe extern "C" fn asan_untrack(addr: *const c_void) {
 #[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_panic(msg: *const c_char) -> ! {
-    trace!("panic - msg: {:p}", msg);
+    trace!("panic - msg: {msg:p}");
     let msg = unsafe { CStr::from_ptr(msg as *const c_char) };
     panic!("{}", msg.to_str().unwrap());
 }

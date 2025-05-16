@@ -14,7 +14,7 @@ use crate::{asan_load, asan_panic};
 #[unsafe(export_name = "patch_strcasestr")]
 pub unsafe extern "C" fn strcasestr(cs: *const c_char, ct: *const c_char) -> *mut c_char {
     unsafe {
-        trace!("strcasestr - cs: {:p}, ct: {:p}", cs, ct);
+        trace!("strcasestr - cs: {cs:p}, ct: {ct:p}");
 
         if cs.is_null() {
             asan_panic(c"strcasestr - cs is null".as_ptr() as *const c_char);

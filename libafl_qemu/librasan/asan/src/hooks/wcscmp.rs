@@ -13,7 +13,7 @@ use crate::{asan_load, asan_panic, wchar_t};
 #[unsafe(export_name = "patch_wcscmp")]
 pub unsafe extern "C" fn wcscmp(cs: *const wchar_t, ct: *const wchar_t) -> c_int {
     unsafe {
-        trace!("wcscmp - cs: {:p}, ct: {:p}", cs, ct);
+        trace!("wcscmp - cs: {cs:p}, ct: {ct:p}");
 
         if cs.is_null() {
             asan_panic(c"wcscmp - cs is null".as_ptr() as *const c_char);

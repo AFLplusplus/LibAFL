@@ -9,7 +9,7 @@ use crate::{asan_alloc, asan_page_size, size_t};
 #[unsafe(export_name = "patch_pvalloc")]
 pub unsafe extern "C" fn pvalloc(size: size_t) -> *mut c_void {
     unsafe {
-        trace!("pvalloc - size: {:#x}", size);
+        trace!("pvalloc - size: {size:#x}");
         let page_size = asan_page_size();
         let aligned_size = if size == 0 {
             page_size

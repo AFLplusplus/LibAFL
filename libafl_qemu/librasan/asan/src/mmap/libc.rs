@@ -168,7 +168,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
             )
         };
         unsafe { asan_swap(true) };
-        if map == libc::MAP_FAILED {
+        if core::ptr::eq(map, libc::MAP_FAILED) {
             let errno = Self::errno()?;
             Err(LibcMapError::FailedToMap(len, errno))
         } else {
@@ -200,7 +200,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
         };
         unsafe { asan_swap(true) };
         trace!("Mapped: 0x{:x}-0x{:x}", addr, addr + len);
-        if map == libc::MAP_FAILED {
+        if core::ptr::eq(map, libc::MAP_FAILED) {
             let errno = Self::errno()?;
             Err(LibcMapError::FailedToMapAt(addr, len, errno))
         } else {
@@ -214,8 +214,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
 
     fn protect(addr: GuestAddr, len: usize, prot: MmapProt) -> Result<(), Self::Error> {
         trace!(
-            "protect - addr: {:#x}, len: {:#x}, prot: {:#x}",
-            addr, len, prot
+            "protect - addr: {addr:#x}, len: {len:#x}, prot: {prot:#x}"
         );
         let fn_mprotect = Self::get_mprotect()?;
         unsafe { asan_swap(false) };
@@ -238,7 +237,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
     }
 
     fn huge_pages(addr: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        trace!("huge_pages - addr: {:#x}, len: {:#x}", addr, len);
+        trace!("huge_pages - addr: {addr:#x}, len: {len:#x}");
         let fn_madvise = Self::get_madvise()?;
         unsafe { asan_swap(false) };
         let ret = unsafe { fn_madvise(addr as *mut c_void, len, MADV_HUGEPAGE) };
@@ -251,7 +250,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
     }
 
     fn dont_dump(addr: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        trace!("dont_dump - addr: {:#x}, len: {:#x}", addr, len);
+        trace!("dont_dump - addr: {addr:#x}, len: {len:#x}");
         let fn_madvise = Self::get_madvise()?;
         unsafe { asan_swap(false) };
         let ret = unsafe { fn_madvise(addr as *mut c_void, len, MADV_DONTDUMP) };
@@ -288,7 +287,7 @@ impl<S: Symbols> Drop for LibcMmap<S> {
         unsafe { asan_swap(true) };
         if ret < 0 {
             let errno = Self::errno().unwrap();
-            panic!("Errno: {}", errno);
+            panic!("Errno: {errno}");
         }
         trace!("Unmapped: 0x{:x}-0x{:x}", self.addr, self.addr + self.len);
     }

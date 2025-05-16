@@ -9,7 +9,7 @@ use crate::{asan_load, asan_panic, size_t};
 #[unsafe(export_name = "patch_strnlen")]
 pub unsafe extern "C" fn strnlen(cs: *const c_char, maxlen: size_t) -> size_t {
     unsafe {
-        trace!("strnlen - cs: {:p}, maxlen: {:#x}", cs, maxlen);
+        trace!("strnlen - cs: {cs:p}, maxlen: {maxlen:#x}");
 
         if maxlen == 0 {
             return 0;

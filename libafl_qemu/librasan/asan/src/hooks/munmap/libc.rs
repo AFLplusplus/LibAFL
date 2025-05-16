@@ -23,7 +23,7 @@ static MUNMAP_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 #[unsafe(export_name = "patch_munmap")]
 pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
     unsafe {
-        trace!("munmap - addr: {:p}, len: {:#x}", addr, len);
+        trace!("munmap - addr: {addr:p}, len: {len:#x}");
         let mmap_addr = MUNMAP_ADDR.get_or_insert_with(|| {
             asan_sym(FunctionMunmap::NAME.as_ptr() as *const c_char) as GuestAddr
         });

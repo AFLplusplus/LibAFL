@@ -1,7 +1,7 @@
 extern crate alloc;
 
 #[cfg(test)]
-#[cfg(all(feature = "linux"))]
+#[cfg(feature = "linux")]
 mod tests {
     use alloc::alloc::{GlobalAlloc, Layout};
 
@@ -84,7 +84,7 @@ mod tests {
         let mut frontend = frontend();
 
         let base = MAP.as_slice().as_ptr() as GuestAddr;
-        info!("base: 0x{:x}", base);
+        info!("base: 0x{base:x}");
 
         let inputs = [[4, 8, 0], [0x3ff, 0, 0]];
         for [len, align, addr] in inputs {
@@ -112,7 +112,7 @@ mod tests {
                 });
 
             let buf = frontend.alloc(len, align).unwrap();
-            info!("buf: 0x{:x}", buf);
+            info!("buf: 0x{buf:x}");
             for i in buf - DF::DEFAULT_REDZONE_SIZE..buf + len + DF::DEFAULT_REDZONE_SIZE {
                 let expected = i < buf || i >= buf + len;
                 let poisoned = frontend.shadow().is_poison(i, 1).unwrap();

@@ -12,7 +12,7 @@ use crate::{asan_alloc, asan_load, asan_panic, size_t};
 #[unsafe(export_name = "patch_strndup")]
 pub unsafe extern "C" fn strndup(cs: *const c_char, n: size_t) -> *mut c_char {
     unsafe {
-        trace!("strndup - cs: {:p}, n: {:#x}", cs, n);
+        trace!("strndup - cs: {cs:p}, n: {n:#x}");
 
         if cs.is_null() {
             if n == 0 {

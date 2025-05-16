@@ -9,7 +9,7 @@ use crate::{asan_alloc, asan_page_size, size_t};
 #[unsafe(export_name = "patch_valloc")]
 pub unsafe extern "C" fn valloc(size: size_t) -> *mut c_void {
     unsafe {
-        trace!("valloc - size: {:#x}", size);
+        trace!("valloc - size: {size:#x}");
 
         if size == 0 {
             null_mut()

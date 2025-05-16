@@ -35,7 +35,7 @@ fuzz_target!(|data: Vec<GuestAddr>| {
     if data.len() < 4 {
         return;
     }
-    info!("data: {:x?}", data);
+    info!("data: {data:x?}");
     let start = data[0] & MAX_ADDR;
     let len = data[1] & MAX_LENGTH;
     let test_offset = data[2] & MAX_OFFSET;
@@ -80,8 +80,7 @@ fuzz_target!(|data: Vec<GuestAddr>| {
         let mut sorted = Vec::from([start, end, test_start, test_end]);
         sorted.sort();
         debug!(
-            "start: {:x}, end: {:x}, test_start: {:x}, test_end: {:x}, sorted: {:x?}, a: {}, b: {}, overlaps: {}",
-            start, end, test_start, test_end, sorted, a, b, overlaps,
+            "start: {start:x}, end: {end:x}, test_start: {test_start:x}, test_end: {test_end:x}, sorted: {sorted:x?}, a: {a}, b: {b}, overlaps: {overlaps}",
         );
         if overlaps {
             assert_eq!(

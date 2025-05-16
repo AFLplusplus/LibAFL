@@ -9,7 +9,7 @@ use crate::{asan_load, asan_panic};
 #[unsafe(export_name = "patch_rawmemchr")]
 pub unsafe extern "C" fn rawmemchr(s: *const c_void, c: c_int) -> *mut c_void {
     unsafe {
-        trace!("rawmemchr - s: {:p}, c: {:#x}", s, c);
+        trace!("rawmemchr - s: {s:p}, c: {c:#x}");
 
         if s.is_null() {
             asan_panic(c"rawmemchr - s is null".as_ptr() as *const c_char);

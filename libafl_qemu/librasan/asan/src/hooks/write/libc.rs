@@ -23,7 +23,7 @@ static SYSCALL_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 #[unsafe(export_name = "patch_write")]
 pub unsafe extern "C" fn write(fd: c_int, buf: *const c_void, count: size_t) -> ssize_t {
     unsafe {
-        trace!("write - fd: {:#x}, buf: {:p}, count: {:#x}", fd, buf, count);
+        trace!("write - fd: {fd:#x}, buf: {buf:p}, count: {count:#x}");
 
         if buf.is_null() && count != 0 {
             asan_panic(c"msg is null".as_ptr() as *const c_char);

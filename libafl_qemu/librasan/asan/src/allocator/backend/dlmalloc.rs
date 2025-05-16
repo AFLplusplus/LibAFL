@@ -33,7 +33,7 @@ unsafe impl<M: Mmap + Send> Allocator for DlmallocBackendMap<M> {
                 result
             }
             Err(e) => {
-                debug!("alloc failed: {:#?}", e);
+                debug!("alloc failed: {e:#?}");
                 (null_mut(), 0, 0)
             }
         }

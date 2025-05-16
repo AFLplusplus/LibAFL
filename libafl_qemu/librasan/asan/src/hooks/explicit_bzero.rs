@@ -12,7 +12,7 @@ use crate::{asan_panic, asan_store, size_t};
 #[unsafe(export_name = "patch_explicit_bzero")]
 pub unsafe extern "C" fn explicit_bzero(s: *mut c_void, len: size_t) {
     unsafe {
-        trace!("explicit_bzero - s: {:p}, len: {:#x}", s, len);
+        trace!("explicit_bzero - s: {s:p}, len: {len:#x}");
 
         if len == 0 {
             return;

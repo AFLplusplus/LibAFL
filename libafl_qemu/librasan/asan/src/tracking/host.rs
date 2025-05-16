@@ -20,13 +20,13 @@ impl<H: Host> Tracking for HostTracking<H> {
     type Error = HostTrackingError<H>;
 
     fn track(&mut self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        debug!("alloc - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("alloc - start: 0x{start:x}, len: 0x{len:x}");
         /* Here QEMU expects a start and end, rather than start and length */
         H::track(start, start + len).map_err(|e| HostTrackingError::HostError(e))
     }
 
     fn untrack(&mut self, start: GuestAddr) -> Result<(), Self::Error> {
-        debug!("free - start: 0x{:x}", start);
+        debug!("free - start: 0x{start:x}");
         H::untrack(start).map_err(|e| HostTrackingError::HostError(e))
     }
 }

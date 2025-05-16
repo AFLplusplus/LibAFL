@@ -12,7 +12,7 @@ use crate::{asan_alloc, asan_panic, size_t};
 #[unsafe(export_name = "patch_calloc")]
 pub unsafe extern "C" fn calloc(nobj: size_t, size: size_t) -> *mut c_void {
     unsafe {
-        trace!("calloc - nobj: {:#x}, size: {:#x}", nobj, size);
+        trace!("calloc - nobj: {nobj:#x}, size: {size:#x}");
         match nobj.checked_mul(size) {
             Some(0) => null_mut(),
             Some(size) => {

@@ -13,7 +13,7 @@ use crate::{asan_load, asan_panic, size_t};
 #[unsafe(export_name = "patch_strncmp")]
 pub unsafe extern "C" fn strncmp(cs: *const c_char, ct: *const c_char, n: size_t) -> c_int {
     unsafe {
-        trace!("strncmp - cs: {:p}, ct: {:p}, n: {:#x}", cs, ct, n);
+        trace!("strncmp - cs: {cs:p}, ct: {ct:p}, n: {n:#x}");
 
         if n == 0 {
             return 0;

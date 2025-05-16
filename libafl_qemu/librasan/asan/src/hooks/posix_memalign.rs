@@ -18,8 +18,7 @@ pub unsafe extern "C" fn posix_memalign(
 ) -> c_int {
     unsafe {
         trace!(
-            "posix_memalign - memptr: {:p}, align: {:#x}, size: {:#x}",
-            memptr, align, size
+            "posix_memalign - memptr: {memptr:p}, align: {align:#x}, size: {size:#x}"
         );
 
         if memptr.is_null() {

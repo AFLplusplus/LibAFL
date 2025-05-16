@@ -55,7 +55,7 @@ impl Tracking for GuestTracking {
     type Error = GuestTrackingError;
 
     fn track(&mut self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        debug!("alloc - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("alloc - start: 0x{start:x}, len: 0x{len:x}");
         if Self::is_out_of_bounds(start, len) {
             Err(GuestTrackingError::AddressRangeOverflow(start, len))?;
         }
@@ -74,7 +74,7 @@ impl Tracking for GuestTracking {
     }
 
     fn untrack(&mut self, start: GuestAddr) -> Result<(), Self::Error> {
-        debug!("dealloc - start: 0x{:x}", start);
+        debug!("dealloc - start: 0x{start:x}");
         let item = Range { start, len: 1 };
 
         if !self.ranges.remove(&item) {

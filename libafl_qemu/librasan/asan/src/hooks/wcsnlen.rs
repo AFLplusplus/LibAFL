@@ -9,7 +9,7 @@ use crate::{asan_load, asan_panic, size_t, wchar_t};
 #[unsafe(export_name = "patch_wcsnlen")]
 pub unsafe extern "C" fn wcsnlen(cs: *const wchar_t, maxlen: size_t) -> size_t {
     unsafe {
-        trace!("wcsnlen - cs: {:p}, maxlen: {:#x}", cs, maxlen);
+        trace!("wcsnlen - cs: {cs:p}, maxlen: {maxlen:#x}");
 
         if maxlen == 0 {
             return 0;

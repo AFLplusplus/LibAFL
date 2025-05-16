@@ -48,7 +48,7 @@ impl Patches {
         target: GuestAddr,
         destination: GuestAddr,
     ) -> Result<(), PatchesError<P, M>> {
-        trace!("patch: {:#x} -> {:#x}", target, destination);
+        trace!("patch: {target:#x} -> {destination:#x}");
         let patches = PATCHES.get().ok_or(PatchesError::Uninitialized())?.lock();
         let prot = patches
             .maps
@@ -64,7 +64,7 @@ impl Patches {
     pub fn is_patched(addr: GuestAddr) -> bool {
         PATCHED
             .get()
-            .map_or(false, |p| p.lock().contains_key(&addr))
+            .is_some_and(|p| p.lock().contains_key(&addr))
     }
 }
 
