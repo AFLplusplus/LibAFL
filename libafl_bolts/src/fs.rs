@@ -1,21 +1,20 @@
 //! `LibAFL` functionality for filesystem interaction
 
-use alloc::string::String;
-
 #[cfg(unix)]
 use std::os::unix::prelude::{AsRawFd, RawFd};
 
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::{borrow::ToOwned, vec::Vec};
+use core::time::Duration;
+
+use crate::Error;
+use std::time::SystemTime;
 use std::{
-    borrow::ToOwned,
     fs::{self, File, OpenOptions, remove_file},
     io::{Seek, Write},
     path::{Path, PathBuf},
-    sync::Arc,
-    time::{Duration, SystemTime},
-    vec::Vec,
 };
-
-use crate::Error;
 
 /// The default filename to use to deliver testcases to the target
 pub const INPUTFILE_STD: &str = ".cur_input";
@@ -176,7 +175,7 @@ pub fn find_new_files_rec<P: AsRef<Path>>(
 
 impl Drop for InputFile {
     fn drop(&mut self) {
-        if Arc::try_unwrap(std::mem::take(&mut self.rc)).is_ok() {
+        if Arc::try_unwrap(core::mem::take(&mut self.rc)).is_ok() {
             // try to remove the file, but ignore errors
             drop(remove_file(&self.path));
         }
