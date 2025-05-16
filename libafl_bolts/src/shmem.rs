@@ -715,6 +715,8 @@ pub mod unix_shmem {
             shm_fd: c_int,
         }
 
+        unsafe impl Send for MmapShMem {}
+
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
             ///
@@ -1036,6 +1038,8 @@ pub mod unix_shmem {
             map_size: usize,
         }
 
+        unsafe impl Send for CommonUnixShMem {}
+
         impl CommonUnixShMem {
             /// Create a new shared memory mapping, using shmget/shmat
             pub fn new(map_size: usize) -> Result<Self, Error> {
@@ -1188,6 +1192,8 @@ pub mod unix_shmem {
             map: *mut u8,
             map_size: usize,
         }
+
+        unsafe impl Send for AshmemShMem {}
 
         #[allow(non_camel_case_types)] // expect somehow breaks here
         #[derive(Copy, Clone)]
@@ -1409,6 +1415,8 @@ pub mod unix_shmem {
             map_size: usize,
         }
 
+        unsafe impl Send for MemfdShMem {}
+
         impl MemfdShMem {
             /// Create a new shared memory mapping, using shmget/shmat
             pub fn new(map_size: usize) -> Result<Self, Error> {
@@ -1611,6 +1619,8 @@ pub mod win32_shmem {
         map: *mut u8,
         map_size: usize,
     }
+
+    unsafe impl Send for Win32ShMem {}
 
     impl Debug for Win32ShMem {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
