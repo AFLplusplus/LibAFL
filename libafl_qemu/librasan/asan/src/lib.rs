@@ -38,7 +38,11 @@ pub mod allocator;
 #[cfg(not(feature = "test"))]
 pub mod arch;
 
+pub mod env;
+
 pub mod exit;
+
+pub mod file;
 
 #[cfg(feature = "hooks")]
 pub mod hooks;

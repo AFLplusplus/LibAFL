@@ -2,7 +2,8 @@
 #[cfg(feature = "libc")]
 mod tests {
     use asan::{
-        maps::{MapReader, entry::MapEntry, iterator::MapIterator, libc::LibcMapReader},
+        file::libc::LibcFileReader,
+        maps::{entry::MapEntry, iterator::MapIterator},
         mmap::MmapProt,
         symbols::{
             SymbolsLookupStr,
@@ -15,8 +16,7 @@ mod tests {
 
     #[test]
     fn test_libc_map_reader() {
-        let reader = LibcMapReader::<Syms>::new().unwrap();
-        let iterator = MapIterator::new(reader);
+        let iterator = MapIterator::<LibcFileReader<Syms>>::new().unwrap();
         let maps = iterator.collect::<Vec<MapEntry>>();
         for entry in &maps {
             println!("{:?}", entry);
