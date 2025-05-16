@@ -12,7 +12,7 @@ use dlmalloc::{Allocator, Dlmalloc};
 use log::debug;
 #[cfg(feature = "single-threaded")]
 use nospin::Mutex;
-#[cfg(feature = "multi-threaded")]
+#[cfg(not(feature = "single-threaded"))]
 use spin::Mutex;
 
 use crate::mmap::Mmap;

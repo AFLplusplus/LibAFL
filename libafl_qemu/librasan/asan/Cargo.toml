@@ -19,7 +19,6 @@ default = [
   "libc",
   "linux",
   "mimalloc",
-  "multi-threaded",
   "test",
   "tracking",
 ]
@@ -43,8 +42,6 @@ libc = ["dep:libc"]
 linux = ["dep:rustix"]
 ## Enable the `baby_mimalloc` allocator
 mimalloc = ["dep:baby-mimalloc"]
-## Support multi-threaded targets by using real synchronization primitives
-multi-threaded = ["dep:spin"]
 ## Support single-threaded targets by using dummy synchronization primitives
 single-threaded = ["dep:nospin"]
 ##  Disable the magic used to support `no_std` environments for running unit and integration tests
@@ -80,7 +77,7 @@ rustix = { version = "1.0.0", default-features = false, features = [
   "process",
   "stdio",
 ], optional = true }
-spin = { version = "0.9.8", default-features = false, optional = true, features = [
+spin = { version = "0.9.8", default-features = false, features = [
   "lazy",
   "mutex",
   "spin_mutex",

@@ -17,7 +17,6 @@ asan = { path = "../asan", default-features = false, features = [
   "host",
   "libc",
   "linux",
-  "multi-threaded",
   "test",
   "tracking",
 ] }

@@ -27,7 +27,7 @@ use asan::{
 use log::{Level, debug, trace};
 #[cfg(feature = "single-threaded")]
 use nospin::{Lazy, Mutex};
-#[cfg(feature = "multi-threaded")]
+#[cfg(not(feature = "single-threaded"))]
 use spin::{Lazy, Mutex};
 
 type Syms = DlSymSymbols<LookupTypeNext>;
