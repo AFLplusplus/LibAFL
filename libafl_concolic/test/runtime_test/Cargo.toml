@@ -2,7 +2,7 @@
 name = "runtime_test"
 version.workspace = true
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 description = "Runtime test of LibAFL fuzzing with symbolic execution"
 documentation = "https://docs.rs/libafl"
