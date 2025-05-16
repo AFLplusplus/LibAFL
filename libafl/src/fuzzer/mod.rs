@@ -1150,19 +1150,34 @@ where
 
 /// A [`NopFuzzer`] that does nothing
 #[derive(Clone, Debug)]
-pub struct NopFuzzer {}
+pub struct NopFuzzer {
+    converter: NopBytesConverter,
+}
 
 impl NopFuzzer {
     /// Creates a new [`NopFuzzer`]
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self {
+            converter: NopBytesConverter::default(),
+        }
     }
 }
 
 impl Default for NopFuzzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl HasBytesConverter for NopFuzzer {
+    type Converter = NopBytesConverter;
+    fn converter(&self) -> &Self::Converter {
+        &self.converter
+    }
+
+    fn converter_mut(&mut self) -> &mut Self::Converter {
+        &mut self.converter
     }
 }
 
