@@ -53,6 +53,7 @@ jobs:
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
+      - run: rustup upgrade
       - name: Build libafl debug
         run: cargo build -p libafl
       - name: Test the book (Linux)
