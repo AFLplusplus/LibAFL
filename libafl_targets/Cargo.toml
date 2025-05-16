@@ -67,6 +67,7 @@ forkserver = [
 windows_asan = ["common"] # Compile C code for ASAN on Windows
 whole_archive = [] # use +whole-archive to ensure the presence of weak symbols
 cmplog_extended_instrumentation = [
+  "cmplog", # without `cmplog`, extended instrumentation won't compile
 ] # support for aflpp cmplog map, we will remove this once aflpp and libafl cmplog shares the same LLVM passes.
 function-logging = ["common"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
