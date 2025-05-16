@@ -6,10 +6,7 @@ use thiserror::Error;
 
 use crate::{
     GuestAddr,
-    maps::{
-        entry::{MapEntry, WriteableMapProtection},
-        iterator::MapIterator,
-    },
+    maps::entry::{MapEntry, WriteableMapProtection},
     mmap::Mmap,
 };
 
@@ -18,28 +15,15 @@ pub mod entry;
 
 pub mod iterator;
 
-#[cfg(feature = "libc")]
-pub mod libc;
-
-#[cfg(feature = "linux")]
-pub mod linux;
-
-pub trait MapReader: Sized {
-    type Error: Debug;
-    fn new() -> Result<Self, Self::Error>;
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error>;
-    fn mappings() -> Result<Maps, Self::Error> {
-        let reader = Self::new()?;
-        let maps = MapIterator::new(reader).collect::<Vec<MapEntry>>();
-        Ok(Maps { maps })
-    }
-}
-
 pub struct Maps {
     maps: Vec<MapEntry>,
 }
 
 impl Maps {
+    pub fn new(maps: Vec<MapEntry>) -> Self {
+        Self { maps }
+    }
+
     pub fn writeable<M: Mmap>(
         &self,
         addr: GuestAddr,
