@@ -33,9 +33,7 @@ impl<H: Host> Shadow for HostShadow<H> {
     }
 
     fn poison(&mut self, start: GuestAddr, len: usize, val: PoisonType) -> Result<(), Self::Error> {
-        debug!(
-            "poison - start: 0x{start:x}, len: 0x{len:x}, pioson: {val:?}"
-        );
+        debug!("poison - start: 0x{start:x}, len: 0x{len:x}, pioson: {val:?}");
         H::poison(start, len, val).map_err(|e| HostShadowError::HostError(e))
     }
 

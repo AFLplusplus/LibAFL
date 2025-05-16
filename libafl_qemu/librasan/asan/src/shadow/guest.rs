@@ -49,9 +49,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
         len: usize,
         poison: PoisonType,
     ) -> Result<(), Self::Error> {
-        debug!(
-            "poison - start: 0x{start:x}, len: 0x{len:x}, pioson: {poison:?}"
-        );
+        debug!("poison - start: 0x{start:x}, len: 0x{len:x}, pioson: {poison:?}");
 
         if Self::is_out_of_bounds(start, len) {
             Err(GuestShadowError::AddressRangeOverflow(start, len))?;
@@ -200,9 +198,7 @@ impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
              * zero
              */
             if first_k != 0 {
-                trace!(
-                    "is_poison #2 - start: 0x{start:x}, len: 0x{len:x}, first_k: 0x{first_k:x}"
-                );
+                trace!("is_poison #2 - start: 0x{start:x}, len: 0x{len:x}, first_k: 0x{first_k:x}");
                 return Ok(true);
             }
         }

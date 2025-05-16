@@ -83,9 +83,7 @@ pub unsafe extern "C" fn asan_store(addr: *const c_void, size: usize) {
 pub unsafe extern "C" fn asan_alloc(len: usize, align: usize) -> *mut c_void {
     trace!("alloc - len: {len:#x}, align: {align:#x}");
     let ptr = FRONTEND.lock().alloc(len, align).unwrap() as *mut c_void;
-    trace!(
-        "alloc - len: {len:#x}, align: {align:#x}, ptr: {ptr:p}"
-    );
+    trace!("alloc - len: {len:#x}, align: {align:#x}, ptr: {ptr:p}");
     ptr
 }
 

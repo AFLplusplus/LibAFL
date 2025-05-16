@@ -70,9 +70,7 @@ impl Mmap for LinuxMmap {
     }
 
     fn protect(addr: GuestAddr, len: usize, prot: MmapProt) -> Result<(), Self::Error> {
-        trace!(
-            "protect - addr: {addr:#x}, len: {len:#x}, prot: {prot:#x}"
-        );
+        trace!("protect - addr: {addr:#x}, len: {len:#x}, prot: {prot:#x}");
         unsafe {
             mprotect(addr as *mut c_void, len, MprotectFlags::from(&prot))
                 .map_err(|errno| LinuxMapError::FailedToMprotect(addr, len, prot, errno))

@@ -17,9 +17,7 @@ pub unsafe extern "C" fn stpncpy(
     dsize: size_t,
 ) -> *mut c_char {
     unsafe {
-        trace!(
-            "stpncpy - dst: {dst:p}, src: {src:p}, dsize: {dsize:#x}"
-        );
+        trace!("stpncpy - dst: {dst:p}, src: {src:p}, dsize: {dsize:#x}");
 
         if dsize == 0 {
             return dst;

@@ -17,9 +17,7 @@ pub unsafe extern "C" fn posix_memalign(
     size: size_t,
 ) -> c_int {
     unsafe {
-        trace!(
-            "posix_memalign - memptr: {memptr:p}, align: {align:#x}, size: {size:#x}"
-        );
+        trace!("posix_memalign - memptr: {memptr:p}, align: {align:#x}, size: {size:#x}");
 
         if memptr.is_null() {
             asan_panic(c"posix_memalign - memptr is null".as_ptr() as *const c_char);

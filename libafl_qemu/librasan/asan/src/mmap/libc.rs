@@ -213,9 +213,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
     }
 
     fn protect(addr: GuestAddr, len: usize, prot: MmapProt) -> Result<(), Self::Error> {
-        trace!(
-            "protect - addr: {addr:#x}, len: {len:#x}, prot: {prot:#x}"
-        );
+        trace!("protect - addr: {addr:#x}, len: {len:#x}, prot: {prot:#x}");
         let fn_mprotect = Self::get_mprotect()?;
         unsafe { asan_swap(false) };
         let ret = unsafe { fn_mprotect(addr as *mut c_void, len, c_int::from(&prot)) };

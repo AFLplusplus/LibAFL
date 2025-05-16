@@ -13,9 +13,7 @@ use crate::{GuestAddr, asan_alloc, asan_panic, size_t};
 #[unsafe(export_name = "patch_aligned_alloc")]
 pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut c_void {
     unsafe {
-        trace!(
-            "aligned_alloc - alignment: {alignment:#x}, size: {size:#x}"
-        );
+        trace!("aligned_alloc - alignment: {alignment:#x}, size: {size:#x}");
 
         fn is_power_of_two(n: size_t) -> bool {
             n != 0 && (n & (n - 1)) == 0
