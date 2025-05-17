@@ -158,6 +158,12 @@ pub const SHM_CMPLOG_ENV_VAR: &str = "__AFL_CMPLOG_SHM_ID";
 /// Environment variable key for a custom AFL coverage map size
 pub const AFL_MAP_SIZE_ENV_VAR: &str = "AFL_MAP_SIZE";
 
+/// Environment variable keys to skip instrumentation (LLVM variant).
+pub const AFL_LLVM_ONLY_FSRV_VAR: &str = "AFL_LLVM_ONLY_FSRV";
+
+/// Environment variable keys to skip instrumentation (GCC variant).
+pub const AFL_GCC_ONLY_FSRV_VAR: &str = "AFL_GCC_ONLY_FSRV";
+
 /// The default signal to use to kill child processes
 const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;
 
@@ -358,6 +364,7 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        is_fsrv_only: bool,
         dump_asan_logs: bool,
         coverage_map_size: Option<usize>,
         debug_output: bool,
@@ -430,6 +437,11 @@ impl Forkserver {
 
         if is_deferred_frksrv {
             command.env("__AFL_DEFER_FORKSRV", "1");
+        }
+
+        if is_fsrv_only {
+            command.env(AFL_GCC_ONLY_FSRV_VAR, "1");
+            command.env(AFL_LLVM_ONLY_FSRV_VAR, "1");
         }
 
         #[cfg(feature = "regex")]
@@ -829,6 +841,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     uses_shmem_testcase: bool,
     is_persistent: bool,
     is_deferred_frksrv: bool,
+    is_fsrv_only: bool,
     autotokens: Option<&'a mut Tokens>,
     shmem_provider: Option<&'a mut SP>,
     max_input_size: usize,
@@ -1037,6 +1050,7 @@ where
                 0,
                 self.is_persistent,
                 self.is_deferred_frksrv,
+                self.is_fsrv_only,
                 self.has_asan_obs(),
                 self.map_size,
                 self.child_env_inner.debug_child,
@@ -1294,6 +1308,14 @@ where
         Ok(actual_map_size as usize)
     }
 
+    #[must_use]
+    /// If set to true, we will only spin up a forkserver without any coverage collected. This is useful for several
+    /// scenario like slave executors of SAND or cmplog executors.
+    pub fn fsrv_only(mut self, fsrv_only: bool) -> Self {
+        self.is_fsrv_only = fsrv_only;
+        self
+    }
+
     /// Use autodict?
     #[must_use]
     pub fn autotokens(mut self, tokens: &'a mut Tokens) -> Self {
@@ -1380,6 +1402,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             uses_shmem_testcase: false,
             is_persistent: false,
             is_deferred_frksrv: false,
+            is_fsrv_only: false,
             autotokens: None,
             shmem_provider: None,
             map_size: None,
@@ -1408,6 +1431,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             uses_shmem_testcase: self.uses_shmem_testcase,
             is_persistent: self.is_persistent,
             is_deferred_frksrv: self.is_deferred_frksrv,
+            is_fsrv_only: self.is_fsrv_only,
             autotokens: self.autotokens,
             map_size: self.map_size,
             max_input_size: self.max_input_size,

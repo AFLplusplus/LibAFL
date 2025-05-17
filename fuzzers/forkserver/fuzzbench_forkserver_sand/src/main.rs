@@ -388,6 +388,7 @@ fn fuzz(
             .shmem_provider(&mut shmem_provider)
             .parse_afl_cmdline(arguments)
             .coverage_map_size(MAP_SIZE)
+            .fsrv_only(true)
             .timeout(timeout)
             .kill_signal(signal)
             .is_persistent(true)
