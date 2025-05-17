@@ -125,7 +125,3 @@ winapi = { version = "0.3", features = [
 errno = "0.3"
 [target.'cfg(target_vendor="apple")'.dependencies]
 mach-sys = { version = "0.5.4" }
-
-[patch.crates-io]
-# Track issue: https://github.com/dtolnay/proc-macro2/pull/501
-proc-marco2 = { git = "https://github.com/wtdcode/proc-macro2", branch = "impl-proc-macro-span" }
