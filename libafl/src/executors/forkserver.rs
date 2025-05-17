@@ -22,6 +22,7 @@ use std::{
 use libafl_bolts::tuples::{Handle, Handled};
 use libafl_bolts::{
     AsSlice, AsSliceMut, InputLocation, StdTargetArgs, StdTargetArgsInner, Truncate,
+    core_affinity::CoreId,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
@@ -158,6 +159,12 @@ pub const SHM_CMPLOG_ENV_VAR: &str = "__AFL_CMPLOG_SHM_ID";
 /// Environment variable key for a custom AFL coverage map size
 pub const AFL_MAP_SIZE_ENV_VAR: &str = "AFL_MAP_SIZE";
 
+/// Environment variable keys to skip instrumentation (LLVM variant).
+pub const AFL_LLVM_ONLY_FSRV_VAR: &str = "AFL_LLVM_ONLY_FSRV";
+
+/// Environment variable keys to skip instrumentation (GCC variant).
+pub const AFL_GCC_ONLY_FSRV_VAR: &str = "AFL_GCC_ONLY_FSRV";
+
 /// The default signal to use to kill child processes
 const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;
 
@@ -179,6 +186,8 @@ pub trait ConfigTarget {
     ) -> &mut Self;
     /// dup2 the specific fd, used for stdio
     fn setdup2(&mut self, old_fd: RawFd, new_fd: RawFd) -> &mut Self;
+    /// Bind children to a single core
+    fn bind(&mut self, core: CoreId) -> &mut Self;
 }
 
 impl ConfigTarget for Command {
@@ -281,6 +290,19 @@ impl ConfigTarget for Command {
         // This calls our non-shady function from above.
         unsafe { self.pre_exec(func) }
     }
+
+    fn bind(&mut self, core: CoreId) -> &mut Self {
+        let func = move || {
+            if let Err(e) = core.set_affinity_forced() {
+                return Err(io::Error::other(e));
+            }
+
+            Ok(())
+        };
+        // # Safety
+        // This calls our non-shady function from above.
+        unsafe { self.pre_exec(func) }
+    }
 }
 
 /// The [`Forkserver`] is communication channel with a child process that forks on request of the fuzzer.
@@ -358,6 +380,7 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        is_fsrv_only: bool,
         dump_asan_logs: bool,
         coverage_map_size: Option<usize>,
         debug_output: bool,
@@ -365,6 +388,7 @@ impl Forkserver {
         stdout_memfd: Option<RawFd>,
         stderr_memfd: Option<RawFd>,
         cwd: Option<PathBuf>,
+        core: Option<CoreId>,
     ) -> Result<Self, Error> {
         let Some(coverage_map_size) = coverage_map_size else {
             return Err(Error::unknown(
@@ -421,6 +445,10 @@ impl Forkserver {
             command.stderr(Stdio::null());
         }
 
+        if let Some(core) = core {
+            command.bind(core);
+        }
+
         command.env(AFL_MAP_SIZE_ENV_VAR, format!("{coverage_map_size}"));
 
         // Persistent, deferred forkserver
@@ -430,6 +458,11 @@ impl Forkserver {
 
         if is_deferred_frksrv {
             command.env("__AFL_DEFER_FORKSRV", "1");
+        }
+
+        if is_fsrv_only {
+            command.env(AFL_GCC_ONLY_FSRV_VAR, "1");
+            command.env(AFL_LLVM_ONLY_FSRV_VAR, "1");
         }
 
         #[cfg(feature = "regex")]
@@ -823,12 +856,14 @@ where
 
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct ForkserverExecutorBuilder<'a, SP> {
     target_inner: StdTargetArgsInner,
     child_env_inner: StdChildArgsInner,
     uses_shmem_testcase: bool,
     is_persistent: bool,
     is_deferred_frksrv: bool,
+    is_fsrv_only: bool,
     autotokens: Option<&'a mut Tokens>,
     shmem_provider: Option<&'a mut SP>,
     max_input_size: usize,
@@ -1037,6 +1072,7 @@ where
                 0,
                 self.is_persistent,
                 self.is_deferred_frksrv,
+                self.is_fsrv_only,
                 self.has_asan_obs(),
                 self.map_size,
                 self.child_env_inner.debug_child,
@@ -1056,6 +1092,7 @@ where
                         .expect("only memory fd backend is allowed for forkserver executor")
                 }),
                 self.child_env_inner.current_directory.clone(),
+                self.child_env_inner.core,
             )?,
             None => {
                 return Err(Error::illegal_argument(
@@ -1294,6 +1331,14 @@ where
         Ok(actual_map_size as usize)
     }
 
+    #[must_use]
+    /// If set to true, we will only spin up a forkserver without any coverage collected. This is useful for several
+    /// scenario like slave executors of SAND or cmplog executors.
+    pub fn fsrv_only(mut self, fsrv_only: bool) -> Self {
+        self.is_fsrv_only = fsrv_only;
+        self
+    }
+
     /// Use autodict?
     #[must_use]
     pub fn autotokens(mut self, tokens: &'a mut Tokens) -> Self {
@@ -1380,6 +1425,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             uses_shmem_testcase: false,
             is_persistent: false,
             is_deferred_frksrv: false,
+            is_fsrv_only: false,
             autotokens: None,
             shmem_provider: None,
             map_size: None,
@@ -1408,6 +1454,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             uses_shmem_testcase: self.uses_shmem_testcase,
             is_persistent: self.is_persistent,
             is_deferred_frksrv: self.is_deferred_frksrv,
+            is_fsrv_only: self.is_fsrv_only,
             autotokens: self.autotokens,
             map_size: self.map_size,
             max_input_size: self.max_input_size,
