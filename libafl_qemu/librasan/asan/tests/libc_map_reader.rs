@@ -19,7 +19,7 @@ mod tests {
         let iterator = MapIterator::new(reader);
         let maps = iterator.collect::<Vec<MapEntry>>();
         for entry in &maps {
-            println!("{:?}", entry);
+            println!("{entry:?}");
         }
         let memcpy_addr = Syms::lookup_str(c"memcpy").unwrap();
         assert_ne!(maps.len(), 0);

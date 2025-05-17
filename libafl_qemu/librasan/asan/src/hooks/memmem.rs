@@ -19,8 +19,7 @@ pub unsafe extern "C" fn memmem(
 ) -> *mut c_void {
     unsafe {
         trace!(
-            "memmem - haystack: {:p}, haystacklen: {:#x}, needle: {:p}, needlelen: {:#x}",
-            haystack, haystacklen, needle, needlelen
+            "memmem - haystack: {haystack:p}, haystacklen: {haystacklen:#x}, needle: {needle:p}, needlelen: {needlelen:#x}"
         );
 
         if needlelen == 0 {

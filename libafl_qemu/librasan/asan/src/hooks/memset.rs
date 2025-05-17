@@ -12,7 +12,7 @@ use crate::{asan_panic, asan_store, size_t};
 #[unsafe(export_name = "patch_memset")]
 pub unsafe extern "C" fn memset(dest: *mut c_void, c: c_int, n: size_t) -> *mut c_void {
     unsafe {
-        trace!("memset - dest: {:p}, c: {:#x}, n: {:#x}", dest, c, n);
+        trace!("memset - dest: {dest:p}, c: {c:#x}, n: {n:#x}");
 
         if n == 0 {
             return dest;

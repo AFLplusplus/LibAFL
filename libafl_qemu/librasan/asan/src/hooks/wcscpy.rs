@@ -12,7 +12,7 @@ use crate::{asan_load, asan_panic, asan_store, wchar_t};
 #[unsafe(export_name = "patch_wcscpy")]
 pub unsafe extern "C" fn wcscpy(dst: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t {
     unsafe {
-        trace!("wcscpy - dst: {:p}, src: {:p}", dst, src);
+        trace!("wcscpy - dst: {dst:p}, src: {src:p}");
 
         if dst.is_null() {
             asan_panic(c"wcscpy - dst is null".as_ptr() as *const c_char);

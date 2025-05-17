@@ -13,7 +13,7 @@ use crate::{asan_load, asan_panic};
 #[unsafe(export_name = "patch_strrchr")]
 pub unsafe extern "C" fn strrchr(cs: *const c_char, c: c_int) -> *mut c_char {
     unsafe {
-        trace!("strrchr - cs: {:p}, c: {:#x}", cs, c);
+        trace!("strrchr - cs: {cs:p}, c: {c:#x}");
 
         if cs.is_null() {
             asan_panic(c"strrchr - cs is null".as_ptr() as *const c_char);

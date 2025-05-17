@@ -23,7 +23,7 @@ impl Tracking for GuestFastTracking {
     type Error = GuestFastTrackingError;
 
     fn track(&mut self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        debug!("alloc - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("alloc - start: 0x{start:x}, len: 0x{len:x}");
         if Self::is_out_of_bounds(start, len) {
             Err(GuestFastTrackingError::AddressRangeOverflow(start, len))?;
         }
@@ -40,7 +40,7 @@ impl Tracking for GuestFastTracking {
     }
 
     fn untrack(&mut self, start: GuestAddr) -> Result<(), Self::Error> {
-        debug!("dealloc - start: 0x{:x}", start);
+        debug!("dealloc - start: 0x{start:x}");
 
         if !self.ranges.remove(&start) {
             Err(GuestFastTrackingError::AllocationNotFound(start))?;

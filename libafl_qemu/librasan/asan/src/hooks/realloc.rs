@@ -12,7 +12,7 @@ use crate::{asan_alloc, asan_dealloc, asan_get_size, asan_load, size_t};
 #[unsafe(export_name = "patch_realloc")]
 pub unsafe extern "C" fn realloc(p: *mut c_void, size: size_t) -> *mut c_void {
     unsafe {
-        trace!("realloc - p: {:p}, size: {:#x}", p, size);
+        trace!("realloc - p: {p:p}, size: {size:#x}");
         if p.is_null() && size == 0 {
             null_mut()
         } else if p.is_null() {

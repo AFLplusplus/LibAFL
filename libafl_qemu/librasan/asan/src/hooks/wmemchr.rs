@@ -13,7 +13,7 @@ use crate::{asan_load, asan_panic, size_t, wchar_t};
 #[unsafe(export_name = "patch_wmemchr")]
 pub unsafe extern "C" fn wmemchr(cx: *const wchar_t, c: wchar_t, n: size_t) -> *mut wchar_t {
     unsafe {
-        trace!("wmemchr - cx: {:p}, c: {:#x}, n: {:#x}", cx, c, n);
+        trace!("wmemchr - cx: {cx:p}, c: {c:#x}, n: {n:#x}");
 
         if n == 0 {
             return null_mut();

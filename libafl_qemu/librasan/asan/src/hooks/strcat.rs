@@ -12,7 +12,7 @@ use crate::{asan_load, asan_panic, asan_store};
 #[unsafe(export_name = "patch_strcat")]
 pub unsafe extern "C" fn strcat(s: *mut c_char, ct: *const c_char) -> *mut c_char {
     unsafe {
-        trace!("strcat - s: {:p}, ct: {:p}", s, ct);
+        trace!("strcat - s: {s:p}, ct: {ct:p}");
 
         if s.is_null() {
             asan_panic(c"strcat - s is null".as_ptr() as *const c_char);

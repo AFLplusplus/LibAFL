@@ -1,7 +1,10 @@
 use alloc::{boxed::Box, format};
 
 use log::{Level, LevelFilter, Log, Metadata, Record};
+#[cfg(feature = "single-threaded")]
+use nospin::Once;
 use rustix::{io::write, stdio::stderr};
+#[cfg(not(feature = "single-threaded"))]
 use spin::Once;
 
 static ONCE: Once<&'static LinuxLogger> = Once::new();

@@ -12,7 +12,7 @@ use crate::{asan_load, asan_panic};
 #[unsafe(export_name = "patch_atol")]
 pub unsafe extern "C" fn atol(s: *const c_char) -> c_long {
     unsafe {
-        trace!("atol - s: {:p}", s);
+        trace!("atol - s: {s:p}");
 
         if s.is_null() {
             asan_panic(c"atol - s is null".as_ptr() as *const c_char);

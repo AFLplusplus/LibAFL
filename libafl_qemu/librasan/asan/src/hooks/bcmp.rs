@@ -13,7 +13,7 @@ use crate::{asan_load, asan_panic, size_t};
 #[unsafe(export_name = "patch_bcmp")]
 pub unsafe extern "C" fn bcmp(cx: *const c_void, ct: *const c_void, n: size_t) -> c_int {
     unsafe {
-        trace!("bcmp - cx: {:p}, ct: {:p}, n: {:#x}", cx, ct, n);
+        trace!("bcmp - cx: {cx:p}, ct: {ct:p}, n: {n:#x}");
 
         if n == 0 {
             return 0;

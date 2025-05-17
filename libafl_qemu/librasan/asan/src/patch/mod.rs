@@ -6,6 +6,9 @@ pub mod raw;
 use alloc::fmt::Debug;
 
 use log::trace;
+#[cfg(feature = "single-threaded")]
+use nospin::{Mutex, Once};
+#[cfg(not(feature = "single-threaded"))]
 use spin::{Mutex, Once};
 use thiserror::Error;
 
@@ -45,7 +48,7 @@ impl Patches {
         target: GuestAddr,
         destination: GuestAddr,
     ) -> Result<(), PatchesError<P, M>> {
-        trace!("patch: {:#x} -> {:#x}", target, destination);
+        trace!("patch: {target:#x} -> {destination:#x}");
         let patches = PATCHES.get().ok_or(PatchesError::Uninitialized())?.lock();
         let prot = patches
             .maps
@@ -59,9 +62,7 @@ impl Patches {
     }
 
     pub fn is_patched(addr: GuestAddr) -> bool {
-        PATCHED
-            .get()
-            .map_or(false, |p| p.lock().contains_key(&addr))
+        PATCHED.get().is_some_and(|p| p.lock().contains_key(&addr))
     }
 }
 

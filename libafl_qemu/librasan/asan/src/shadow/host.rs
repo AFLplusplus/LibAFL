@@ -23,30 +23,27 @@ impl<H: Host> Shadow for HostShadow<H> {
     type Error = HostShadowError<H>;
 
     fn load(&self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        debug!("load - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("load - start: 0x{start:x}, len: 0x{len:x}");
         H::load(start, len).map_err(|e| HostShadowError::HostError(e))
     }
 
     fn store(&self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        debug!("store - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("store - start: 0x{start:x}, len: 0x{len:x}");
         H::store(start, len).map_err(|e| HostShadowError::HostError(e))
     }
 
     fn poison(&mut self, start: GuestAddr, len: usize, val: PoisonType) -> Result<(), Self::Error> {
-        debug!(
-            "poison - start: 0x{:x}, len: 0x{:x}, pioson: {:?}",
-            start, len, val
-        );
+        debug!("poison - start: 0x{start:x}, len: 0x{len:x}, pioson: {val:?}");
         H::poison(start, len, val).map_err(|e| HostShadowError::HostError(e))
     }
 
     fn unpoison(&mut self, start: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        debug!("unpoison - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("unpoison - start: 0x{start:x}, len: 0x{len:x}");
         H::unpoison(start, len).map_err(|e| HostShadowError::HostError(e))
     }
 
     fn is_poison(&self, start: GuestAddr, len: usize) -> Result<bool, Self::Error> {
-        debug!("is_poison - start: 0x{:x}, len: 0x{:x}", start, len);
+        debug!("is_poison - start: 0x{start:x}, len: 0x{len:x}");
         H::is_poison(start, len).map_err(|e| HostShadowError::HostError(e))
     }
 }

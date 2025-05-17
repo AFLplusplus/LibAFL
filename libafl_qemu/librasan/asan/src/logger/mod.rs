@@ -21,6 +21,6 @@ pub unsafe extern "C" fn log_trace(msg: *const c_char) {
     }
     let c_str = unsafe { CStr::from_ptr(msg) };
     if let Ok(rust_str) = c_str.to_str() {
-        trace!("{}", rust_str);
+        trace!("{rust_str}");
     }
 }

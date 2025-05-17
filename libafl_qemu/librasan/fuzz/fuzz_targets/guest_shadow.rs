@@ -35,7 +35,7 @@ fuzz_target!(|data: Vec<GuestAddr>| {
     if data.len() < 4 {
         return;
     }
-    info!("data: {:x?}", data);
+    info!("data: {data:x?}");
     let start = data[0] & MAX_ADDR;
     let len = data[1] & MAX_LENGTH;
     let test_offset = data[2] & MAX_OFFSET;

@@ -12,7 +12,7 @@ use crate::{asan_load, asan_panic, asan_store};
 #[unsafe(export_name = "patch_stpcpy")]
 pub unsafe extern "C" fn stpcpy(dst: *mut c_char, src: *const c_char) -> *mut c_char {
     unsafe {
-        trace!("stpcpy - dst: {:p}, src: {:p}", dst, src);
+        trace!("stpcpy - dst: {dst:p}, src: {src:p}");
 
         if dst.is_null() {
             asan_panic(c"stpcpy - dst is null".as_ptr() as *const c_char);

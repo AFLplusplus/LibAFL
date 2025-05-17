@@ -48,7 +48,7 @@ mod tests {
         expected
             .as_bytes()
             .iter()
-            .zip(unsafe { from_raw_parts(dest.as_ptr() as *const u8, dest.len()) })
+            .zip(unsafe { from_raw_parts(dest.as_ptr(), dest.len()) })
             .for_each(|(x, y)| assert_eq!(*x, *y));
     }
 
@@ -69,7 +69,7 @@ mod tests {
         expected
             .as_bytes()
             .iter()
-            .zip(unsafe { from_raw_parts(dest.as_ptr() as *const u8, dest.len()) })
+            .zip(unsafe { from_raw_parts(dest.as_ptr(), dest.len()) })
             .for_each(|(x, y)| assert_eq!(*x, *y));
     }
 }

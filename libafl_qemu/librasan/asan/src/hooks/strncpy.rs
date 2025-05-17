@@ -12,7 +12,7 @@ use crate::{asan_load, asan_panic, asan_store, size_t};
 #[unsafe(export_name = "patch_strncpy")]
 pub unsafe extern "C" fn strncpy(dst: *mut c_char, src: *const c_char, n: size_t) -> *mut c_char {
     unsafe {
-        trace!("strncpy - dst: {:p}, src: {:p}, n: {:#x}", dst, src, n);
+        trace!("strncpy - dst: {dst:p}, src: {src:p}, n: {n:#x}");
 
         if n == 0 {
             return dst;

@@ -1,6 +1,9 @@
 use alloc::alloc::{GlobalAlloc, Layout};
 
 use baby_mimalloc::Mimalloc;
+#[cfg(feature = "single-threaded")]
+use nospin::Mutex;
+#[cfg(not(feature = "single-threaded"))]
 use spin::Mutex;
 
 pub struct MimallocBackend<G: GlobalAlloc> {

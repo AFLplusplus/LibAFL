@@ -9,7 +9,7 @@ use crate::{asan_alloc, size_t};
 #[unsafe(export_name = "patch_malloc")]
 pub unsafe extern "C" fn malloc(size: size_t) -> *mut c_void {
     unsafe {
-        trace!("malloc - size: {:#x}", size);
+        trace!("malloc - size: {size:#x}");
         if size == 0 {
             null_mut()
         } else {

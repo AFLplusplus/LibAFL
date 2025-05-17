@@ -24,7 +24,7 @@ static FGETS_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 #[cfg_attr(feature = "test", unsafe(export_name = "patch_fgets"))]
 pub unsafe extern "C" fn fgets(buf: *mut c_char, n: c_int, stream: *mut FILE) -> *mut c_char {
     unsafe {
-        trace!("fgets - buf: {:p}, n: {:#x}, stream: {:p}", buf, n, stream);
+        trace!("fgets - buf: {buf:p}, n: {n:#x}, stream: {stream:p}");
 
         if buf.is_null() && n != 0 {
             asan_panic(c"fgets - buf is null".as_ptr() as *const c_char);

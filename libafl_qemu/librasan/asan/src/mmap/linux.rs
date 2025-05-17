@@ -70,10 +70,7 @@ impl Mmap for LinuxMmap {
     }
 
     fn protect(addr: GuestAddr, len: usize, prot: MmapProt) -> Result<(), Self::Error> {
-        trace!(
-            "protect - addr: {:#x}, len: {:#x}, prot: {:#x}",
-            addr, len, prot
-        );
+        trace!("protect - addr: {addr:#x}, len: {len:#x}, prot: {prot:#x}");
         unsafe {
             mprotect(addr as *mut c_void, len, MprotectFlags::from(&prot))
                 .map_err(|errno| LinuxMapError::FailedToMprotect(addr, len, prot, errno))
@@ -81,7 +78,7 @@ impl Mmap for LinuxMmap {
     }
 
     fn huge_pages(addr: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        trace!("huge_pages - addr: {:#x}, len: {:#x}", addr, len);
+        trace!("huge_pages - addr: {addr:#x}, len: {len:#x}");
         unsafe {
             madvise(addr as *mut c_void, len, Advice::LinuxHugepage)
                 .map_err(|errno| LinuxMapError::FailedToMadviseHugePage(addr, len, errno))
@@ -89,7 +86,7 @@ impl Mmap for LinuxMmap {
     }
 
     fn dont_dump(addr: GuestAddr, len: usize) -> Result<(), Self::Error> {
-        trace!("dont_dump - addr: {:#x}, len: {:#x}", addr, len);
+        trace!("dont_dump - addr: {addr:#x}, len: {len:#x}");
         unsafe {
             madvise(addr as *mut c_void, len, Advice::LinuxDontDump)
                 .map_err(|errno| LinuxMapError::FailedToMadviseDontDump(addr, len, errno))

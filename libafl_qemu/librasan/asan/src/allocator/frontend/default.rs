@@ -53,7 +53,7 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
     type Error = DefaultFrontendError<S, T>;
 
     fn alloc(&mut self, len: usize, align: usize) -> Result<GuestAddr, Self::Error> {
-        debug!("alloc - len: 0x{:x}, align: 0x{:x}", len, align);
+        debug!("alloc - len: 0x{len:x}, align: 0x{align:x}");
         if align % size_of::<GuestAddr>() != 0 {
             Err(DefaultFrontendError::InvalidAlignment(align))?;
         }
@@ -121,7 +121,7 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
     }
 
     fn dealloc(&mut self, addr: GuestAddr) -> Result<(), Self::Error> {
-        debug!("dealloc - addr: 0x{:x}", addr);
+        debug!("dealloc - addr: 0x{addr:x}");
         if addr == 0 {
             return Ok(());
         }
@@ -147,7 +147,7 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
     }
 
     fn get_size(&self, addr: GuestAddr) -> Result<usize, Self::Error> {
-        debug!("get_size - addr: 0x{:x}", addr);
+        debug!("get_size - addr: 0x{addr:x}");
         let alloc = self
             .allocations
             .get(&addr)

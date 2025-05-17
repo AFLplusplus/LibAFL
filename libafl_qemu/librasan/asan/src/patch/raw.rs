@@ -15,7 +15,7 @@ pub struct RawPatch;
 impl Patch for RawPatch {
     type Error = RawPatchError;
     fn patch(target: GuestAddr, destination: GuestAddr) -> Result<(), Self::Error> {
-        debug!("patch - addr: {:#x}, target: {:#x}", target, destination);
+        debug!("patch - addr: {target:#x}, target: {destination:#x}");
         if target == destination {
             Err(RawPatchError::IdentityPatch(target))?;
         }
@@ -25,7 +25,7 @@ impl Patch for RawPatch {
         #[cfg(target_arch = "arm")]
         let target = target & !1;
 
-        trace!("patch: {:02x?}", patch);
+        trace!("patch: {patch:02x?}");
         let dest = unsafe { from_raw_parts_mut(target as *mut u8, patch.len()) };
         dest.copy_from_slice(&patch);
         Ok(())
