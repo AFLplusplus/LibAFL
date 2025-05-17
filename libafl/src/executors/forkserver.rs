@@ -442,7 +442,6 @@ impl Forkserver {
             command.bind(core);
         }
 
-        command.env("AFL_MAP_SIZE", format!("{coverage_map_size}"));
         command.env(AFL_MAP_SIZE_ENV_VAR, format!("{coverage_map_size}"));
 
         // Persistent, deferred forkserver
