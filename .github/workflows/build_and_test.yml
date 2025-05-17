@@ -53,7 +53,6 @@ jobs:
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
-      - run: rustup upgrade
       - name: Build libafl debug
         run: cargo build -p libafl
       - name: Test the book (Linux)
@@ -228,8 +227,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-hack
-      - run: rustup upgrade
       # Note: We currently only specify minimum rust versions for the default workspace members
       - run: cargo hack check --rust-version -p libafl -p libafl_bolts -p libafl_derive -p libafl_cc -p libafl_targets
 
