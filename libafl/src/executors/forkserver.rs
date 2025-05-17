@@ -835,6 +835,7 @@ where
 
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct ForkserverExecutorBuilder<'a, SP> {
     target_inner: StdTargetArgsInner,
     child_env_inner: StdChildArgsInner,
