@@ -671,7 +671,7 @@ pub struct ForkserverExecutor<I, OT, S, SHM> {
     forkserver: Forkserver,
     observers: OT,
     map: Option<SHM>,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<fn() -> (I, S)>, // For Send/Sync
     map_size: Option<usize>,
     min_input_size: usize,
     max_input_size: usize,
