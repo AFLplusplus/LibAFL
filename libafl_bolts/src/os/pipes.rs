@@ -1,8 +1,7 @@
 //! Unix `pipe` wrapper for `LibAFL`
-use std::io::{PipeReader, PipeWriter};
 #[cfg(feature = "std")]
 use std::{
-    io::{self, ErrorKind, Read, Write},
+    io::{self, ErrorKind, PipeReader, PipeWriter, Read, Write},
     os::unix::io::RawFd,
 };
 
