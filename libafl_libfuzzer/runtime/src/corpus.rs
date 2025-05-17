@@ -154,7 +154,7 @@ where
     }
     #[inline]
     fn count_all(&self) -> usize {
-        self.count_disabled().saturating_add(self.count_disabled())
+        self.count().saturating_add(self.count_disabled())
     }
 
     #[expect(clippy::used_underscore_items)]
