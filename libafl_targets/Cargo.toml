@@ -53,7 +53,7 @@ sancov_cmplog = [
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
 sanitizer_interfaces = []
 clippy = [] # Ignore compiler warnings during clippy
-observers = ["meminterval", "ahash"]
+observers = ["meminterval"]
 common = [
 ] # Compile common C code defining sanitizer options and cross-platform intrinsics
 coverage = ["common"] # Compile C code definining coverage maps
@@ -90,7 +90,6 @@ serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] } # serialization lib
 meminterval = { workspace = true, features = ["serde"], optional = true }
-ahash = { workspace = true, default-features = false, optional = true }
 
 [lints]
 workspace = true
