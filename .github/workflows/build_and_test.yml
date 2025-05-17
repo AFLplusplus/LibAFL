@@ -43,7 +43,7 @@ jobs:
       - if: runner.os == 'Linux'
         uses: ./.github/workflows/ubuntu-prepare
       - if: runner.os != 'Linux'
-        use: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@stable
       - name: Install LLVM
         if: runner.os == 'MacOS'
         run: brew install llvm@${{env.MAIN_LLVM_VERSION}}
