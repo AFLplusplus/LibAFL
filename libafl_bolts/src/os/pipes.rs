@@ -19,6 +19,7 @@ pub struct Pipe {
     write_end: Option<PipeWriter>,
 }
 
+#[cfg(feature = "std")]
 impl Clone for Pipe {
     fn clone(&self) -> Self {
         // try_clone only fails if we run out of fds (dup2) so this should be rather safe
