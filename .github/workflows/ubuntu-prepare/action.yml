@@ -12,24 +12,14 @@ runs:
       run: |
         sudo apt-get update
         sudo apt-get install -y curl lsb-release wget software-properties-common gnupg shellcheck pax-utils libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev
-    - uses: dtolnay/rust-toolchain@nightly
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
     - name: install just
       uses: extractions/setup-just@v2
       with:
         just-version: '1.40.0'
-    - name: Add stable clippy
-      shell: bash
-      run: rustup toolchain install stable --component clippy --allow-downgrade
-    - name: Add nightly clippy
-      shell: bash
-      run: rustup toolchain install nightly --component clippy --allow-downgrade
     - uses: taiki-e/install-action@cargo-hack
-    - name: Add nightly
-      shell: bash
-      run: rustup toolchain install nightly --allow-downgrade
-    - name: Default to nightly
-      shell: bash
-      run: rustup default nightly
     - name: Install LLVM
       shell: bash
       run: |

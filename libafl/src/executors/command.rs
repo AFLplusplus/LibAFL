@@ -653,6 +653,17 @@ impl CommandExecutorBuilder {
             command.stderr(Stdio::piped());
         }
 
+        if let Some(core) = self.child_env_inner.core {
+            #[cfg(feature = "fork")]
+            command.bind(core);
+
+            #[cfg(not(feature = "fork"))]
+            return Err(Error::illegal_argument(format!(
+                "Your host doesn't support fork and thus libafl can not bind to core {:?} right after children get spawned",
+                core
+            )));
+        }
+
         let configurator = StdCommandConfigurator {
             debug_child: self.child_env_inner.debug_child,
             stdout_cap,

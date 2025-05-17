@@ -9,7 +9,7 @@ use libafl::{
     events::{EventConfig, LlmpRestartingEventManager, launcher::Launcher},
     executors::{
         StdChildArgs,
-        forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+        forkserver::{AFL_MAP_SIZE_ENV_VAR, ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
     },
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -137,7 +137,7 @@ impl ForkserverBytesCoverageSugar<'_> {
 
             // To let know the AFL++ binary that we have a big map
             unsafe {
-                std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
+                std::env::set_var(AFL_MAP_SIZE_ENV_VAR, format!("{MAP_SIZE}"));
             }
 
             // Create an observation channel using the coverage map

@@ -3,7 +3,7 @@ description: Sets up the Rust environment for the CI workflow
 runs:
   using: composite
   steps:
-    - uses: dtolnay/rust-toolchain@nightly
+    - uses: dtolnay/rust-toolchain@stable
       with:
         components: llvm-tools, clippy, rustfmt
     - uses: actions/checkout@v4

@@ -234,7 +234,8 @@ static inline void cmplog_routines_checked_extended(uintptr_t      k,
 
 void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
                                           uint64_t arg1, uint64_t arg2);
-
+void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t shape,
+                                          uint64_t arg1, uint64_t arg2);
 void __libafl_targets_cmplog_routines(uintptr_t k, const uint8_t *ptr1,
                                       const uint8_t *ptr2);
 

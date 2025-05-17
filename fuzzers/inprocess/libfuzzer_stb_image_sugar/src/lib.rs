@@ -10,7 +10,8 @@ use libafl_bolts::core_affinity::Cores;
 use libafl_sugar::InProcessBytesCoverageSugar;
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input};
 
-pub fn main() {
+#[no_mangle]
+pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
