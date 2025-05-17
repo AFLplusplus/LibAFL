@@ -9,10 +9,12 @@ use asan::{
         backend::{dlmalloc::DlmallocBackend, mimalloc::MimallocBackend},
         frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
+    env::Env,
+    file::libc::LibcFileReader,
     hooks::PatchedHooks,
     host::{Host, libc::LibcHost},
     logger::libc::LibcLogger,
-    maps::{MapReader, libc::LibcMapReader},
+    maps::{Maps, iterator::MapIterator},
     mmap::libc::LibcMmap,
     patch::{Patches, raw::RawPatch},
     shadow::{Shadow, host::HostShadow},
@@ -22,7 +24,7 @@ use asan::{
     },
     tracking::{Tracking, host::HostTracking},
 };
-use log::{Level, trace};
+use log::{Level, info, trace};
 use spin::{Lazy, Mutex};
 
 type Syms = DlSymSymbols<LookupTypeNext>;
@@ -38,10 +40,17 @@ pub type QasanFrontend =
 
 pub type QasanSyms = DlSymSymbols<LookupTypeNext>;
 
+pub type QasanEnv = Env<LibcFileReader<QasanSyms>>;
+
 const PAGE_SIZE: usize = 4096;
 
 static FRONTEND: Lazy<Mutex<QasanFrontend>> = Lazy::new(|| {
-    LibcLogger::initialize::<QasanSyms>(Level::Info);
+    let level = QasanEnv::initialize()
+        .ok()
+        .and_then(|e| e.log_level())
+        .unwrap_or(Level::Warn);
+    LibcLogger::initialize::<QasanSyms>(level);
+    info!("Qasan initializing...");
     let backend = QasanBackend::new(DlmallocBackend::new(PAGE_SIZE));
     let shadow = HostShadow::<QasanHost>::new().unwrap();
     let tracking = HostTracking::<QasanHost>::new().unwrap();
@@ -53,12 +62,17 @@ static FRONTEND: Lazy<Mutex<QasanFrontend>> = Lazy::new(|| {
         QasanFrontend::DEFAULT_QUARANTINE_SIZE,
     )
     .unwrap();
-    let mappings = LibcMapReader::<QasanSyms>::mappings().unwrap();
+    let mappings = Maps::new(
+        MapIterator::<LibcFileReader<Syms>>::new()
+            .unwrap()
+            .collect(),
+    );
     Patches::init(mappings);
     for hook in PatchedHooks::default() {
         let target = hook.lookup::<QasanSyms>().unwrap();
         Patches::apply::<RawPatch, QasanMmap>(target, hook.destination).unwrap();
     }
+    info!("Qasan initialized.");
     Mutex::new(frontend)
 });
 
