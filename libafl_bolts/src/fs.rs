@@ -1,7 +1,10 @@
 //! `LibAFL` functionality for filesystem interaction
 
+use core::sync::atomic::AtomicU64;
+use core::sync::atomic::Ordering;
 #[cfg(unix)]
 use std::os::unix::prelude::{AsRawFd, RawFd};
+use std::sync::OnceLock;
 
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -23,7 +26,11 @@ pub const INPUTFILE_STD: &str = ".cur_input";
 /// Derives a filename from [`INPUTFILE_STD`] that may be used to deliver testcases to the target.
 /// It ensures the filename is unique to the fuzzer process.
 pub fn get_unique_std_input_file() -> String {
-    format!("{}_{}", INPUTFILE_STD, std::process::id())
+    static STD_COUNT: OnceLock<AtomicU64> = OnceLock::new();
+    let next = STD_COUNT
+        .get_or_init(|| AtomicU64::new(0))
+        .fetch_add(1, Ordering::SeqCst);
+    format!("{}_{}_{}", INPUTFILE_STD, std::process::id(), next)
 }
 
 /// Write a file atomically
