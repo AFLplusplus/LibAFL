@@ -1,4 +1,4 @@
-use libafl_bolts::shmem::StdShMemProvider;
+use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_targets::{
     map_input_shared_memory, map_shared_memory, start_forkserver, MaybePersistentForkserverParent,
 };
