@@ -187,8 +187,3 @@ lto = true
 codegen-units = 1
 opt-level = 3
 debug = true
-
-
-[patch.crates-io]
-# Track issue: https://github.com/dtolnay/proc-macro2/pull/501
-proc-macro2 = { git = "https://github.com/wtdcode/proc-macro2", branch = "impl-proc-macro-span" }
