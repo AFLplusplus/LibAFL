@@ -143,9 +143,11 @@ fn report_error_and_exit(status: i32) -> Result<(), Error> {
 }
 
 /// The length of header bytes which tells shmem size
-const SHMEM_FUZZ_HDR_SIZE: usize = 4;
-const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
-const MIN_INPUT_SIZE_DEFAULT: usize = 1;
+pub const SHMEM_FUZZ_HDR_SIZE: usize = 4;
+/// Maximum default length for input
+pub const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
+/// Minimum default length for input
+pub const MIN_INPUT_SIZE_DEFAULT: usize = 1;
 /// Environment variable key for shared memory id for input and its len
 pub const SHM_FUZZ_ENV_VAR: &str = "__AFL_SHM_FUZZ_ID";
 /// Environment variable key for the page size (at least/usually `testcase_size_max + sizeof::<u32>()`)
