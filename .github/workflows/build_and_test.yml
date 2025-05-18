@@ -166,6 +166,16 @@ jobs:
         with: { shared-key: "ubuntu" }
       # ---- build and feature check ----
       # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
+
+      # Tracking: https://github.com/CensoredUsername/dynasm-rs/issues/114
+      # One dep of libafl_frida fails on `DOCS_RS` for stable toolchain. Therefore, we _only_ run nightly for that.
+      # For the rest of other crates, we still use stable toolchain.
+      - name: "Setup nightly"
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy, rustfmt
+      - name: "But default to stable"
+        run: rustup default stable
       - name: Check each feature
         # Skipping `python` as it has to be built with the `maturin` tool
         # `sancov_pcguard_edges` is tested seperatelyc
