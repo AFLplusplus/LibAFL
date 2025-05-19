@@ -247,15 +247,6 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
         }
     }
 
-    /// Consume current shared memory structure, and get the raw pointer to
-    /// this shared memory.
-    ///
-    /// Note that calling this method will result in a memory leak.
-    fn into_raw<T: Sized>(self) -> *mut T {
-        let mut manually_dropped = ManuallyDrop::new(self);
-        manually_dropped.as_mut_ptr().cast()
-    }
-
     /// Get the description of the shared memory mapping
     fn description(&self) -> ShMemDescription {
         ShMemDescription {

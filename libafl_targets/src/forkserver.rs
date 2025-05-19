@@ -97,6 +97,15 @@ fn read_u32_from_forkserver() -> Result<u32, Error> {
     Ok(u32::from_ne_bytes(buf))
 }
 
+/// Consume current shared memory structure, and get the raw pointer to
+/// this shared memory.
+///
+/// Note that calling this method will result in a memory leak.
+fn shmem_into_raw<T: Sized>(shmem: impl ShMem) -> *mut T {
+    let mut manually_dropped = std::mem::ManuallyDrop::new(shmem);
+    manually_dropped.as_mut_ptr().cast()
+}
+
 fn map_shared_memory_common<SHM: ShMemProvider>(
     shmem_provider: &mut SHM,
     map_env_var: &str,
@@ -118,7 +127,7 @@ fn map_shared_memory_common<SHM: ShMemProvider>(
     };
     let shmem = shmem_provider.shmem_from_id_and_size(ShMemId::from_string(&id_str), map_size)?;
 
-    Ok(shmem.into_raw())
+    Ok(shmem_into_raw(shmem))
 }
 
 /// Guard [`map_shared_memory`] is invoked only once
@@ -207,7 +216,7 @@ fn map_cmplog_shared_memory_internal<SHM: ShMemProvider>(
     let map_size = size_of::<AflppCmpLogMap>();
     let shmem = shmem_provider.shmem_from_id_and_size(ShMemId::from_string(&id_str), map_size)?;
 
-    let target_ptr = shmem.into_raw();
+    let target_ptr = shmem_into_raw(shmem);
     unsafe {
         CMPLOG_MAP_PTR = target_ptr;
     }
