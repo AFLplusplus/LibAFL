@@ -5,20 +5,27 @@ use libafl_targets::{
 
 #[no_mangle]
 pub extern "C" fn libafl_start_forkserver() {
-    let Ok(mut shm_provider) = StdShMemProvider::new() else {
-        std::process::exit(1);
+    let mut shm_provider = match StdShMemProvider::new() {
+        Ok(shm_provider) => shm_provider,
+        Err(err) => {
+            eprintln!("Forkserver failed to create shared memory provider: {err}");
+            std::process::exit(1);
+        }
     };
 
     // Map shared memory region for the edge coverage map
-    if map_shared_memory(&mut shm_provider).is_err() {
+    if let Err(err) = map_shared_memory(&mut shm_provider) {
+        eprintln!("Forkserver failed to create edge map: {err}");
         std::process::exit(1);
     }
     // Map shared memory region for input and its len
-    if map_input_shared_memory(&mut shm_provider).is_err() {
+    if let Err(err) = map_input_shared_memory(&mut shm_provider) {
+        eprintln!("Forkserver failed to create input map: {err}");
         std::process::exit(1);
-    };
+    }
     // Start the forkserver
-    if start_forkserver(&mut MaybePersistentForkserverParent::new()).is_err() {
+    if let Err(err) = start_forkserver(&mut MaybePersistentForkserverParent::new()) {
+        eprintln!("Forkserver unexpected error: {err}");
         std::process::exit(1);
-    };
+    }
 }
