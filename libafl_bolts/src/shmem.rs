@@ -4,10 +4,10 @@
 #[cfg(feature = "alloc")]
 use alloc::{rc::Rc, string::ToString, vec::Vec};
 #[cfg(feature = "alloc")]
-use core::{cell::RefCell, fmt, fmt::Display};
+use core::{cell::RefCell, fmt, fmt::Display, mem::ManuallyDrop};
 use core::{
     fmt::Debug,
-    mem::{ManuallyDrop, size_of},
+    mem::size_of,
     ops::{Deref, DerefMut},
 };
 #[cfg(feature = "std")]
