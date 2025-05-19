@@ -102,7 +102,7 @@ fn read_u32_from_forkserver() -> Result<u32, Error> {
 ///
 /// Note that calling this method will result in a memory leak.
 fn shmem_into_raw<T: Sized>(shmem: impl ShMem) -> *mut T {
-    let mut manually_dropped = std::mem::ManuallyDrop::new(shmem);
+    let mut manually_dropped = core::mem::ManuallyDrop::new(shmem);
     manually_dropped.as_mut_ptr().cast()
 }
 
