@@ -26,7 +26,7 @@ fix: fix_asan fix_dummy fix_fuzz fix_gasan fix_qasan fix_runner fix_zasan
 
 clippy:
   #!/bin/sh
-  cargo clippy
+  cargo clippy -F test
 
 doc:
   #!/bin/sh

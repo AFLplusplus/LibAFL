@@ -20,7 +20,7 @@ mod tests {
         assert_eq!(a4, 4);
         assert_eq!(a5, 5);
         assert_eq!(a6, 6);
-        return 0xdeadface;
+        0xdeadface
     }
 
     #[unsafe(no_mangle)]
@@ -31,7 +31,7 @@ mod tests {
         assert_eq!(a4, 4);
         assert_eq!(a5, 5);
         assert_eq!(a6, 6);
-        return 0xd00df00d;
+        0xd00df00d
     }
 
     #[test]
