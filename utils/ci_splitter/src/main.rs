@@ -67,9 +67,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // run each task, with DOCS_RS override for libafl_frida
         let mut cmd = Command::new("bash");
-        cmd.arg("-c").arg(task);
+        cmd.arg("-c");
         if task.contains("libafl_frida") {
             cmd.env("DOCS_RS", "1");
+            let task = task.replace("cargo ", "cargo +nightly ");
+            cmd.arg(task);
+        } else {
+            cmd.arg(task);
         }
         let status = cmd.status()?;
         if !status.success() {

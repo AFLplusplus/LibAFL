@@ -22,6 +22,7 @@ use std::{
 use libafl_bolts::tuples::{Handle, Handled};
 use libafl_bolts::{
     AsSlice, AsSliceMut, InputLocation, StdTargetArgs, StdTargetArgsInner, Truncate,
+    core_affinity::CoreId,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
@@ -120,7 +121,8 @@ fn report_error_and_exit(status: i32) -> Result<(), Error> {
     match status {
     FS_ERROR_MAP_SIZE =>
         Err(Error::unknown(
-            "AFL_MAP_SIZE is not set and fuzzing target reports that the required size is very large. Solution: Run the fuzzing target stand-alone with the environment variable AFL_DEBUG=1 set and set the value for __afl_final_loc in the AFL_MAP_SIZE environment variable for afl-fuzz.".to_string())),
+            format!(
+            "{AFL_MAP_SIZE_ENV_VAR} is not set and fuzzing target reports that the required size is very large. Solution: Run the fuzzing target stand-alone with the environment variable AFL_DEBUG=1 set and set the value for __afl_final_loc in the {AFL_MAP_SIZE_ENV_VAR} environment variable for afl-fuzz."))),
     FS_ERROR_MAP_ADDR =>
         Err(Error::unknown(
             "the fuzzing target reports that hardcoded map address might be the reason the mmap of the shared memory failed. Solution: recompile the target with either afl-clang-lto and do not set AFL_LLVM_MAP_ADDR or recompile with afl-clang-fast.".to_string())),
@@ -141,15 +143,29 @@ fn report_error_and_exit(status: i32) -> Result<(), Error> {
 }
 
 /// The length of header bytes which tells shmem size
-const SHMEM_FUZZ_HDR_SIZE: usize = 4;
-const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
-const MIN_INPUT_SIZE_DEFAULT: usize = 1;
+pub const SHMEM_FUZZ_HDR_SIZE: usize = 4;
+/// Maximum default length for input
+pub const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
+/// Minimum default length for input
+pub const MIN_INPUT_SIZE_DEFAULT: usize = 1;
 /// Environment variable key for shared memory id for input and its len
 pub const SHM_FUZZ_ENV_VAR: &str = "__AFL_SHM_FUZZ_ID";
+/// Environment variable key for the page size (at least/usually `testcase_size_max + sizeof::<u32>()`)
+pub const SHM_FUZZ_MAP_SIZE_ENV_VAR: &str = "__AFL_SHM_FUZZ_MAP_SIZE";
+
 /// Environment variable key for shared memory id for edge map
 pub const SHM_ENV_VAR: &str = "__AFL_SHM_ID";
 /// Environment variable key for shared memory id for cmplog map
 pub const SHM_CMPLOG_ENV_VAR: &str = "__AFL_CMPLOG_SHM_ID";
+
+/// Environment variable key for a custom AFL coverage map size
+pub const AFL_MAP_SIZE_ENV_VAR: &str = "AFL_MAP_SIZE";
+
+/// Environment variable keys to skip instrumentation (LLVM variant).
+pub const AFL_LLVM_ONLY_FSRV_VAR: &str = "AFL_LLVM_ONLY_FSRV";
+
+/// Environment variable keys to skip instrumentation (GCC variant).
+pub const AFL_GCC_ONLY_FSRV_VAR: &str = "AFL_GCC_ONLY_FSRV";
 
 /// The default signal to use to kill child processes
 const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;
@@ -172,6 +188,8 @@ pub trait ConfigTarget {
     ) -> &mut Self;
     /// dup2 the specific fd, used for stdio
     fn setdup2(&mut self, old_fd: RawFd, new_fd: RawFd) -> &mut Self;
+    /// Bind children to a single core
+    fn bind(&mut self, core: CoreId) -> &mut Self;
 }
 
 impl ConfigTarget for Command {
@@ -274,6 +292,19 @@ impl ConfigTarget for Command {
         // This calls our non-shady function from above.
         unsafe { self.pre_exec(func) }
     }
+
+    fn bind(&mut self, core: CoreId) -> &mut Self {
+        let func = move || {
+            if let Err(e) = core.set_affinity_forced() {
+                return Err(io::Error::other(e));
+            }
+
+            Ok(())
+        };
+        // # Safety
+        // This calls our non-shady function from above.
+        unsafe { self.pre_exec(func) }
+    }
 }
 
 /// The [`Forkserver`] is communication channel with a child process that forks on request of the fuzzer.
@@ -351,6 +382,7 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        is_fsrv_only: bool,
         dump_asan_logs: bool,
         coverage_map_size: Option<usize>,
         debug_output: bool,
@@ -358,16 +390,13 @@ impl Forkserver {
         stdout_memfd: Option<RawFd>,
         stderr_memfd: Option<RawFd>,
         cwd: Option<PathBuf>,
+        core: Option<CoreId>,
     ) -> Result<Self, Error> {
         let Some(coverage_map_size) = coverage_map_size else {
             return Err(Error::unknown(
                 "Coverage map size unknown. Use coverage_map_size() to tell the forkserver about the map size.",
             ));
         };
-
-        if env::var("AFL_MAP_SIZE").is_err() {
-            log::warn!("AFL_MAP_SIZE not set. If it is unset, the forkserver may fail to start up");
-        }
 
         if env::var(SHM_ENV_VAR).is_err() {
             return Err(Error::unknown("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer".to_string()));
@@ -412,7 +441,11 @@ impl Forkserver {
             command.stderr(Stdio::null());
         }
 
-        command.env("AFL_MAP_SIZE", format!("{coverage_map_size}"));
+        if let Some(core) = core {
+            command.bind(core);
+        }
+
+        command.env(AFL_MAP_SIZE_ENV_VAR, format!("{coverage_map_size}"));
 
         // Persistent, deferred forkserver
         if is_persistent {
@@ -421,6 +454,11 @@ impl Forkserver {
 
         if is_deferred_frksrv {
             command.env("__AFL_DEFER_FORKSRV", "1");
+        }
+
+        if is_fsrv_only {
+            command.env(AFL_GCC_ONLY_FSRV_VAR, "1");
+            command.env(AFL_LLVM_ONLY_FSRV_VAR, "1");
         }
 
         #[cfg(feature = "regex")]
@@ -629,7 +667,7 @@ pub struct ForkserverExecutor<I, OT, S, SHM> {
     forkserver: Forkserver,
     observers: OT,
     map: Option<SHM>,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<fn() -> (I, S)>, // For Send/Sync
     map_size: Option<usize>,
     min_input_size: usize,
     max_input_size: usize,
@@ -814,12 +852,14 @@ where
 
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct ForkserverExecutorBuilder<'a, SP> {
     target_inner: StdTargetArgsInner,
     child_env_inner: StdChildArgsInner,
     uses_shmem_testcase: bool,
     is_persistent: bool,
     is_deferred_frksrv: bool,
+    is_fsrv_only: bool,
     autotokens: Option<&'a mut Tokens>,
     shmem_provider: Option<&'a mut SP>,
     max_input_size: usize,
@@ -1009,6 +1049,7 @@ where
                 // This is likely single threade here, we're likely fine if it's not.
                 unsafe {
                     shmem.write_to_env(SHM_FUZZ_ENV_VAR)?;
+                    env::set_var(SHM_FUZZ_MAP_SIZE_ENV_VAR, format!("{}", shmem.len()));
                 }
 
                 let size_in_bytes = (self.max_input_size + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
@@ -1027,6 +1068,7 @@ where
                 0,
                 self.is_persistent,
                 self.is_deferred_frksrv,
+                self.is_fsrv_only,
                 self.has_asan_obs(),
                 self.map_size,
                 self.child_env_inner.debug_child,
@@ -1046,6 +1088,7 @@ where
                         .expect("only memory fd backend is allowed for forkserver executor")
                 }),
                 self.child_env_inner.current_directory.clone(),
+                self.child_env_inner.core,
             )?,
             None => {
                 return Err(Error::illegal_argument(
@@ -1284,6 +1327,14 @@ where
         Ok(actual_map_size as usize)
     }
 
+    #[must_use]
+    /// If set to true, we will only spin up a forkserver without any coverage collected. This is useful for several
+    /// scenario like slave executors of SAND or cmplog executors.
+    pub fn fsrv_only(mut self, fsrv_only: bool) -> Self {
+        self.is_fsrv_only = fsrv_only;
+        self
+    }
+
     /// Use autodict?
     #[must_use]
     pub fn autotokens(mut self, tokens: &'a mut Tokens) -> Self {
@@ -1370,6 +1421,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             uses_shmem_testcase: false,
             is_persistent: false,
             is_deferred_frksrv: false,
+            is_fsrv_only: false,
             autotokens: None,
             shmem_provider: None,
             map_size: None,
@@ -1398,6 +1450,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             uses_shmem_testcase: self.uses_shmem_testcase,
             is_persistent: self.is_persistent,
             is_deferred_frksrv: self.is_deferred_frksrv,
+            is_fsrv_only: self.is_fsrv_only,
             autotokens: self.autotokens,
             map_size: self.map_size,
             max_input_size: self.max_input_size,

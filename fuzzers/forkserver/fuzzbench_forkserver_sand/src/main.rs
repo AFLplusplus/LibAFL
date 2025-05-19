@@ -12,7 +12,7 @@ use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
-        forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+        forkserver::{ForkserverExecutor, AFL_MAP_SIZE_ENV_VAR, SHM_CMPLOG_ENV_VAR},
         sand::SANDExecutor,
         StdChildArgs,
     },
@@ -264,7 +264,7 @@ fn fuzz(
     }
     let shmem_buf = shmem.as_slice_mut();
     // To let know the AFL++ binary that we have a big map
-    std::env::set_var("AFL_MAP_SIZE", format!("{}", MAP_SIZE));
+    std::env::set_var(AFL_MAP_SIZE_ENV_VAR, format!("{}", MAP_SIZE));
 
     // Create an observation channel using the hitcounts map of AFL++
     let edges_observer = unsafe {
@@ -388,6 +388,7 @@ fn fuzz(
             .shmem_provider(&mut shmem_provider)
             .parse_afl_cmdline(arguments)
             .coverage_map_size(MAP_SIZE)
+            .fsrv_only(true)
             .timeout(timeout)
             .kill_signal(signal)
             .is_persistent(true)
