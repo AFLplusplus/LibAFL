@@ -203,6 +203,10 @@ jobs:
     env:
       MAIN_LLVM_VERSION: 20
     steps:
+    steps:
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
