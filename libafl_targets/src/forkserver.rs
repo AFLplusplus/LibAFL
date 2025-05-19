@@ -31,7 +31,6 @@ use nix::{
 use crate::cmps::EXTENDED_CMPLOG_MAP_PTR;
 #[cfg(feature = "cmplog")]
 use crate::cmps::{AflppCmpLogMap, CMPLOG_MAP_PTR};
-
 use crate::coverage::{__afl_map_size, EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use crate::coverage::{__token_start, __token_stop};

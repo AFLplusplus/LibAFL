@@ -64,10 +64,10 @@ unsafe extern "C" {
     pub static mut libafl_cmplog_map_extended_ptr: *mut CmpLogMap;
 }
 
-#[cfg(feature = "cmplog")]
-pub use libafl_cmplog_map_ptr as CMPLOG_MAP_PTR;
 #[cfg(feature = "cmplog_extended_instrumentation")]
 pub use libafl_cmplog_map_extended_ptr as EXTENDED_CMPLOG_MAP_PTR;
+#[cfg(feature = "cmplog")]
+pub use libafl_cmplog_map_ptr as CMPLOG_MAP_PTR;
 
 /// Value indicating if cmplog is enabled.
 #[unsafe(no_mangle)]
