@@ -8,7 +8,6 @@ compile_dummy:
   #!/bin/sh
   . {{ DOTENV }}
   cargo \
-    +nightly \
     build \
     --package dummy_libc \
     --target $CROSS_TARGET \
@@ -20,7 +19,6 @@ fix_dummy:
   #!/bin/sh
   . {{ DOTENV }}
   cargo \
-    +nightly \
     fix \
     --package dummy_libc \
     --target ${CROSS_TARGET} \

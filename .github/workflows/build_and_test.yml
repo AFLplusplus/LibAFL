@@ -42,6 +42,8 @@ jobs:
       - uses: actions/checkout@v4
       - if: runner.os == 'Linux'
         uses: ./.github/workflows/ubuntu-prepare
+      - if: runner.os != 'Linux'
+        uses: dtolnay/rust-toolchain@stable
       - name: Install LLVM
         if: runner.os == 'MacOS'
         run: brew install llvm@${{env.MAIN_LLVM_VERSION}}
@@ -86,7 +88,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Build Docs
-        run: RUSTFLAGS="--cfg docsrs" cargo doc --all-features --no-deps
+        run: cargo doc --all-features --no-deps
 
   ubuntu-doc-test:
     runs-on: ubuntu-24.04
@@ -96,7 +98,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Test Docs
-        run: RUSTFLAGS="--cfg docsrs" cargo test --doc --all-features
+        run: cargo test --doc --all-features
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
@@ -164,6 +166,16 @@ jobs:
         with: { shared-key: "ubuntu" }
       # ---- build and feature check ----
       # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
+
+      # Tracking: https://github.com/CensoredUsername/dynasm-rs/issues/114
+      # One dep of libafl_frida fails on `DOCS_RS` for stable toolchain. Therefore, we _only_ run nightly for that.
+      # For the rest of other crates, we still use stable toolchain.
+      - name: "Setup nightly"
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy, rustfmt
+      - name: "But default to stable"
+        run: rustup default stable
       - name: Check each feature
         # Skipping `python` as it has to be built with the `maturin` tool
         # `sancov_pcguard_edges` is tested seperatelyc
@@ -231,8 +243,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-hack
-      - run: rustup upgrade
       # Note: We currently only specify minimum rust versions for the default workspace members
       - run: cargo hack check --rust-version -p libafl -p libafl_bolts -p libafl_derive -p libafl_cc -p libafl_targets
 
@@ -247,6 +259,7 @@ jobs:
     needs:
       - fuzzers-preflight
     strategy:
+      fail-fast: false
       matrix:
         os: [ ubuntu-24.04 ]
         fuzzer:
@@ -451,6 +464,7 @@ jobs:
           shell: bash
           run: |
             RUN_ON_CI=1 \
+            RUSTC_BOOTSTRAP=1 \
             LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
             just \
               -f ./libafl_qemu/librasan/Justfile \
@@ -470,6 +484,7 @@ jobs:
           shell: bash
           run: |
             RUN_ON_CI=1 \
+            RUSTC_BOOTSTRAP=1 \
             LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
             just \
               -f ./libafl_qemu/librasan/Justfile \
@@ -630,7 +645,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
 
-  android:
+  ubuntu-cross-android-arm64:
     runs-on: ubuntu-24.04
     steps:
       - uses: dtolnay/rust-toolchain@stable
@@ -646,6 +661,27 @@ jobs:
       - name: Build Android
         run: cd libafl && PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo ndk -t arm64-v8a build --release
 
+  ubuntu-cross-android-x86_64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: Swatinem/rust-cache@v2
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r27c
+          add-to-path: false
+      - name: cargo-ndk
+        run: cargo install cargo-ndk
+      - name: cargo android targets
+        run: |
+          rustup target add x86_64-linux-android 
+      - name: Build Android
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: cargo ndk -t x86_64 build
     #run: cargo build --target aarch64-linux-android
     # TODO: Figure out how to properly build stuff with clang
     #- name: Add clang path to $PATH env

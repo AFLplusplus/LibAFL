@@ -23,7 +23,7 @@
 	// "forwardPorts": [],
 	// Uncomment the next line to run commands after the container is created - for example installing curl.
 	// Install development components that shouldn't be in the main Dockerfile
-	"postCreateCommand": "rustup component add --toolchain nightly rustfmt clippy llvm-tools-preview",
+	"postCreateCommand": "rustup component add rustfmt clippy llvm-tools-preview",
 	// Uncomment when using a ptrace-based debugger like C++, Go, and Rust
 	"runArgs": [
 		"--cap-add=SYS_PTRACE",

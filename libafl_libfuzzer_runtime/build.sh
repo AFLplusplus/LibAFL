@@ -12,12 +12,12 @@ else
   profile="$1"
 fi
 
-if ! cargo +nightly --version >& /dev/null; then
-  echo -e "You must install a recent Rust nightly to build the libafl_libfuzzer runtime!"
+if ! cargo --version >& /dev/null; then
+  echo -e "You must install a recent Rust to build the libafl_libfuzzer runtime!"
   exit 1
 fi
 
-cargo +nightly build --profile "$profile"
+cargo build --profile "$profile"
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # MacOS and iOS
@@ -26,7 +26,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     -o libafl_libfuzzer_runtime.dylib
 else
   # Linux and *BSD
-  RUSTC_BIN="$(cargo +nightly rustc -Zunstable-options --print target-libdir)/../bin"
+  RUSTC_BIN="$(cargo rustc -Zunstable-options --print target-libdir)/../bin"
   RUST_LLD="${RUSTC_BIN}/rust-lld"
   RUST_AR="${RUSTC_BIN}/llvm-ar"
 

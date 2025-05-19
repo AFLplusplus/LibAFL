@@ -9,7 +9,7 @@
 
 #include "stb_image.h"
 
-int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   int x, y, channels;
 
   if (!stbi_info_from_memory(data, size, &x, &y, &channels)) { return 0; }

@@ -15,10 +15,14 @@ runs:
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
+    - name: Add nightly toolchain
+      if: ${{ inputs.fuzzer-name == './fuzzers/inprocess/fuzzbench_ctx' || inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_no_std' || inputs.fuzzer-name == './fuzzers/baby/tutorial'}}
+      shell: bash
+      run: rustup toolchain install nightly-x86_64-unknown-linux-gnu; rustup component add clippy rustfmt --toolchain nightly-x86_64-unknown-linux-gnu; rustup default nightly
     - name: Add no_std toolchain
       if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_no_std' }}
       shell: bash
-      run: rustup toolchain install stable-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain stable-x86_64-unknown-linux-gnu
+      run: rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
     - name: Add nyx deps
       if: ${{ inputs.fuzzer-name == './fuzzers/full_system/nyx_launcher' || inputs.fuzzer-name == './fuzzers/full_system/nyx_libxml2_standalone' || inputs.fuzzer-name == './fuzzers/full_system/nyx_libxml2_parallel' }}
       shell: bash

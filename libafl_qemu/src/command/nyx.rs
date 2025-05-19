@@ -49,7 +49,6 @@ pub(crate) mod bindings {
     #![allow(unused_variables)]
     #![expect(clippy::all)]
     #![expect(clippy::pedantic)]
-    #![allow(unnecessary_transmutes)]
 
     include!(concat!(env!("OUT_DIR"), "/nyx_bindings.rs"));
 }

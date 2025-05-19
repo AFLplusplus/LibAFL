@@ -6,7 +6,7 @@ resolver = "2"
 version = "0.15.2"
 license = "MIT OR Apache-2.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 
 [profile.dev]
 panic = "abort"
