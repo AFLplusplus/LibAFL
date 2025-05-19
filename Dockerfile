@@ -87,11 +87,13 @@ RUN wget https://download.qemu.org/qemu-${QEMU_VER}.tar.xz && \
       i386-linux-user,\
       ppc-linux-user,\
       mips-linux-user,\
+      x86_64-linux-user,\
       arm-softmmu,\
       aarch64-softmmu,\
       i386-softmmu,\
       ppc-softmmu,\
-      mips-softmmu" && \
+      mips-softmmu,\
+      x86_64-softmmu" && \
     make -j && \
     make install && \
     cd /root && \
