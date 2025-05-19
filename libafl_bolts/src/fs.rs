@@ -1,23 +1,21 @@
 //! `LibAFL` functionality for filesystem interaction
 
-use core::sync::atomic::AtomicU64;
-use core::sync::atomic::Ordering;
+use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
+use core::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 #[cfg(unix)]
 use std::os::unix::prelude::{AsRawFd, RawFd};
-use std::sync::OnceLock;
-
-use alloc::string::String;
-use alloc::sync::Arc;
-use alloc::{borrow::ToOwned, vec::Vec};
-use core::time::Duration;
-
-use crate::Error;
-use std::time::SystemTime;
 use std::{
     fs::{self, File, OpenOptions, remove_file},
     io::{Seek, Write},
     path::{Path, PathBuf},
+    sync::OnceLock,
+    time::SystemTime,
 };
+
+use crate::Error;
 
 /// The default filename to use to deliver testcases to the target
 pub const INPUTFILE_STD: &str = ".cur_input";
