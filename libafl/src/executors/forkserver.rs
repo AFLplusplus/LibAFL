@@ -396,12 +396,6 @@ impl Forkserver {
             ));
         };
 
-        if env::var(AFL_MAP_SIZE_ENV_VAR).is_err() {
-            log::warn!(
-                "{AFL_MAP_SIZE_ENV_VAR} not set. If it is unset, the forkserver may fail to start up"
-            );
-        }
-
         if env::var(SHM_ENV_VAR).is_err() {
             return Err(Error::unknown("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer".to_string()));
         }
