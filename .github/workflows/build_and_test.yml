@@ -534,7 +534,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: llvm-tools, clippy, rustfmt
-      - name: Build fuzzers/binary_only/frida_libpng
+      - name: Build fuzzers/inprocess/libafl_libfuzzer_windows
         run: cd fuzzers/inprocess/libafl_libfuzzer_windows && just test
 
   windows-libfuzzer-stb-image:
