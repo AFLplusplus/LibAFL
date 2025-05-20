@@ -12,17 +12,6 @@ if ($args.Count -eq 0) {
     $profile = $args[0]
 }
 
-try {
-    $nightly_version = Invoke-Expression "cargo +nightly --version" 2>$null
-    if (-not $nightly_version) {
-        Write-Host "You must install a recent Rust nightly to build the libafl_libfuzzer runtime!" -ForegroundColor Red
-        exit 1
-    }
-} catch {
-    Write-Host "You must install a recent Rust nightly to build the libafl_libfuzzer runtime!" -ForegroundColor Red
-    exit 1
-}
-
 Write-Host "Building libafl_libfuzzer runtime with profile '$profile'" -ForegroundColor Green
 Invoke-Expression "cargo build --profile $profile"
 
