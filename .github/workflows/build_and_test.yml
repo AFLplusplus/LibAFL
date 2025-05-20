@@ -522,6 +522,16 @@ jobs:
       - name: Build fuzzers/binary_only/frida_libpng
         run: cd fuzzers/binary_only/frida_libpng/ && just test
 
+  windows-libafl-libfuzzer:
+    runs-on: windows-latest
+    needs:
+      - common
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
+      - name: Build fuzzers/binary_only/frida_libpng
+        run: cd fuzzers/inprocess/libafl_libfuzzer_windows && just test
+
   windows-libfuzzer-stb-image:
     runs-on: windows-latest
     needs:
