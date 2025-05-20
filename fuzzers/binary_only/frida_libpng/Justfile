@@ -54,7 +54,6 @@ harness: lib lib2
 [windows]
 build:
     cargo build --profile {{ PROFILE }}
-    copy target\release\frida_fuzzer.exe .
 
 [unix]
 run: build harness
