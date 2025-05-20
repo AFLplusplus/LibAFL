@@ -133,7 +133,7 @@ pub unsafe extern "C" fn asan_get_size(addr: *const c_void) -> usize {
 #[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_sym(name: *const c_char) -> *const c_void {
-    GasanSyms::lookup(name).unwrap() as *const c_void
+    unsafe { GasanSyms::lookup_raw(name).unwrap() as *const c_void }
 }
 
 #[unsafe(no_mangle)]

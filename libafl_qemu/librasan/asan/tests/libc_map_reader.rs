@@ -6,7 +6,7 @@ mod tests {
         maps::{entry::MapEntry, iterator::MapIterator},
         mmap::MmapProt,
         symbols::{
-            SymbolsLookupStr,
+            Symbols,
             dlsym::{DlSymSymbols, LookupTypeNext},
         },
     };
@@ -21,7 +21,7 @@ mod tests {
         for entry in &maps {
             println!("{:?}", entry);
         }
-        let memcpy_addr = Syms::lookup_str(c"memcpy").unwrap();
+        let memcpy_addr = Syms::lookup(c"memcpy").unwrap();
         assert_ne!(maps.len(), 0);
         assert!(maps.iter().any(|e| e.contains(memcpy_addr)));
         let entry = maps

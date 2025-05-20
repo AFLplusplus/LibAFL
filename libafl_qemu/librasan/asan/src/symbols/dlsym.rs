@@ -41,7 +41,7 @@ impl<L: LookupType> Symbols for DlSymSymbols<L> {
     type Error = DlSymSymbolsError;
 
     #[allow(clippy::not_unsafe_ptr_arg_deref)]
-    fn lookup(name: *const c_char) -> Result<GuestAddr, Self::Error> {
+    unsafe fn lookup_raw(name: *const c_char) -> Result<GuestAddr, Self::Error> {
         if name.is_null() {
             Err(DlSymSymbolsError::NullName())?;
         }

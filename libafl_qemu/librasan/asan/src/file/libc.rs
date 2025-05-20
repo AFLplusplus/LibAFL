@@ -11,41 +11,39 @@ use crate::{
     asan_swap,
     file::FileReader,
     size_t, ssize_t,
-    symbols::{
-        AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols, SymbolsLookupStr,
-    },
+    symbols::{AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols},
 };
 
 #[derive(Debug)]
 struct FunctionOpen;
 
 impl Function for FunctionOpen {
+    const NAME: &CStr = c"open";
     type Func = unsafe extern "C" fn(*const c_char, c_int, c_int) -> c_int;
-    const NAME: &'static CStr = c"open";
 }
 
 #[derive(Debug)]
 struct FunctionClose;
 
 impl Function for FunctionClose {
+    const NAME: &CStr = c"close";
     type Func = unsafe extern "C" fn(c_int) -> c_int;
-    const NAME: &'static CStr = c"close";
 }
 
 #[derive(Debug)]
 struct FunctionRead;
 
 impl Function for FunctionRead {
+    const NAME: &CStr = c"read";
     type Func = unsafe extern "C" fn(c_int, *mut c_char, size_t) -> ssize_t;
-    const NAME: &'static CStr = c"read";
 }
 
 #[derive(Debug)]
 struct FunctionErrnoLocation;
 
 impl Function for FunctionErrnoLocation {
+    const NAME: &CStr = c"__errno_location";
     type Func = unsafe extern "C" fn() -> *mut c_int;
-    const NAME: &'static CStr = c"__errno_location";
 }
 
 static OPEN_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
@@ -62,8 +60,7 @@ pub struct LibcFileReader<S: Symbols> {
 impl<S: Symbols> LibcFileReader<S> {
     fn get_open() -> Result<<FunctionOpen as Function>::Func, LibcFileReaderError<S>> {
         let addr = OPEN_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionOpen::NAME)
-                .map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
+            S::lookup(FunctionOpen::NAME).map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
         })?;
         let f =
             FunctionOpen::as_ptr(addr).map_err(|e| LibcFileReaderError::InvalidPointerType(e))?;
@@ -72,8 +69,7 @@ impl<S: Symbols> LibcFileReader<S> {
 
     fn get_close() -> Result<<FunctionClose as Function>::Func, LibcFileReaderError<S>> {
         let addr = CLOSE_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionClose::NAME)
-                .map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
+            S::lookup(FunctionClose::NAME).map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
         })?;
         let f =
             FunctionClose::as_ptr(addr).map_err(|e| LibcFileReaderError::InvalidPointerType(e))?;
@@ -82,8 +78,7 @@ impl<S: Symbols> LibcFileReader<S> {
 
     fn get_read() -> Result<<FunctionRead as Function>::Func, LibcFileReaderError<S>> {
         let addr = READ_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionRead::NAME)
-                .map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
+            S::lookup(FunctionRead::NAME).map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
         })?;
         let f =
             FunctionRead::as_ptr(addr).map_err(|e| LibcFileReaderError::InvalidPointerType(e))?;
@@ -93,7 +88,7 @@ impl<S: Symbols> LibcFileReader<S> {
     fn get_errno_location()
     -> Result<<FunctionErrnoLocation as Function>::Func, LibcFileReaderError<S>> {
         let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionErrnoLocation::NAME)
+            S::lookup(FunctionErrnoLocation::NAME)
                 .map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
         })?;
         let f = FunctionErrnoLocation::as_ptr(addr)
@@ -112,7 +107,7 @@ impl<S: Symbols> LibcFileReader<S> {
 
 impl<S: Symbols> FileReader for LibcFileReader<S> {
     type Error = LibcFileReaderError<S>;
-    fn new(path: &'static CStr) -> Result<LibcFileReader<S>, Self::Error> {
+    fn new(path: &CStr) -> Result<LibcFileReader<S>, Self::Error> {
         let fn_open = Self::get_open()?;
         unsafe { asan_swap(false) };
         let fd = unsafe { fn_open(path.as_ptr() as *const c_char, O_NONBLOCK | O_RDONLY, 0) };

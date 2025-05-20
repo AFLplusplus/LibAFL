@@ -7,7 +7,7 @@ use core::{hash::BuildHasherDefault, marker::PhantomData};
 
 use ahash::AHasher;
 use hashbrown::HashMap;
-use log::{Level, debug};
+use log::Level;
 use thiserror::Error;
 
 use crate::file::FileReader;
@@ -59,13 +59,13 @@ impl<R: FileReader> Env<R> {
                     }
 
                     let pair = String::from_utf8_lossy(&buffer[start..i]).to_string();
-                    debug!("pair: {pair}");
+                    log::debug!("pair: {pair}");
 
                     let (key, value) = pair
                         .split_once('=')
                         .map(|(k, v)| (k.to_string(), v.to_string()))
                         .ok_or(EnvError::Split(pair))?;
-                    debug!("key: {key} value: {value}");
+                    log::debug!("key: {key} value: {value}");
 
                     envs.insert(key, value);
                     start = i + 1;
