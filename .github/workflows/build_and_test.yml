@@ -530,6 +530,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
+      # Ensure we're using nightly, because libafl-libfuzzer requries it
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: llvm-tools, clippy, rustfmt
       - name: Build fuzzers/binary_only/frida_libpng
         run: cd fuzzers/inprocess/libafl_libfuzzer_windows && just test
 
