@@ -86,22 +86,35 @@ To do so, [ensure a recent nightly version of Rust is installed](https://rustup.
 [`libafl_libfuzzer_runtime`](../libafl_libfuzzer_runtime) folder and build the runtime with the following command:
 
 ```bash
-./build.sh
+just build
 ```
 
-The static library will be available at `libFuzzer.a` in the [`libafl_libfuzzer_runtime`](../libafl_libfuzzer_runtime)
-directory.
-If you encounter build failures without clear error outputs that help you resolve the issue, please [submit an issue].
+Or you can call `build.sh` (Unix) or `build.ps1` (Windows).
 
-This library may now be used in place of libFuzzer.
-To do so, change your CFLAGS/CXXFLAGS from `-fsanitize=fuzzer` to:
+The static library will be available at `libFuzzer.a` (`libFuzzer.lib` for Windows) in
+the [`libafl_libfuzzer_runtime`](../libafl_libfuzzer_runtime) directory.  If you
+encounter build failures without clear error outputs that help you resolve the issue,
+please [submit an issue].
 
-```
--fsanitize=fuzzer-no-link -L/path/to/libafl_libfuzzer_runtime -lFuzzer
-```
+#### Unix
 
-Alternatively, you may directly overwrite the system libFuzzer library and use `-fsanitize=fuzzer` as normal.
-This changes per system, but on my machine is located at `/usr/lib64/clang/16/lib/linux/libclang_rt.fuzzer-x86_64.a`.
+This library may now be used in place of libFuzzer.  To do so, change your
+CFLAGS/CXXFLAGS from `-fsanitize=fuzzer` to:
+
+``` -fsanitize=fuzzer-no-link -L/path/to/libafl_libfuzzer_runtime -lFuzzer ```
+
+Alternatively, you may directly overwrite the system libFuzzer library and use
+`-fsanitize=fuzzer` as normal.  This changes per system, but on my machine is located at
+`/usr/lib64/clang/16/lib/linux/libclang_rt.fuzzer-x86_64.a`.
+
+#### Windows
+
+For Windows, change your CFLAGS/CXXFLAGS from `-fsanitize=fuzzer` to:
+
+```/fsanitize-coverage=inline-8bit-counters /fsanitize-coverage=edge /fsanitize-coverage=trace-cmp /fsanitize-coverage=trace-div```
+
+And then ensure you link with `sancov.lib` when producing your final executable. See
+`fuzzers\inprocess\libafl_libfuzzer_windows` for an example.
 
 #### Caveats
 

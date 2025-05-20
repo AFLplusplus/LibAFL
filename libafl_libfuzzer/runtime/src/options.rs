@@ -365,42 +365,42 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         "close_fd_mask" => self.close_fd_mask = parse_or_bail!(name, value, u8),
                         "help" => {
                             println!(
-                                r#"Usage:
-
-                                To run fuzzing pass 0 or more directories.
-                                {name} [-flag1=val1 [-flag2=val2 ...] ] [dir1 [dir2 ...] ]
-
-                                To run individual tests without fuzzing pass 1 or more files:
-                                {name} [-flag1=val1 [-flag2=val2 ...] ] file1 [file2 ...]
-
-                                Flags: (strictly in form -flag=value)");
-                                artifact_prefix                        0       Write fuzzing artifacts (crash, timeout, or slow inputs) as $(artifact_prefix)file
-                                timeout                                1200    Timeout in seconds. If one unit runs more than this number of seconds the process will abort.
-                                grimoire                               0       If 1, enable the Grimoire mutator that is structure-aware.
-                                use_value_profile                      0       Use value profile to guide fuzzing.
-                                unicode                                1       If 1, generate Unicode inputs.
-                                dict                                   0       Use the dictionary file.
-                                fork                                   0       Number of forks to use (>1 requires Unix-like OS).
-                                jobs                                   0       Same as fork. Number of jobs to run with stdout/stderr redirected.
-                                ignore_crashes                         0       If 1, ignore crashes in fork mode.
-                                ignore_timeouts                        0       If 1, ignore timeouts in fork mode.
-                                ignore_ooms                            0       If 1, ignore out-of-memory errors in fork mode.
-                                rss_limit_mb                           2048    If non-zero, the fuzzer will exit upon reaching this limit of RSS memory usage (in Mb).
-                                malloc_limit_mb                        2048    If non-zero, the fuzzer will exit if the target tries to allocate this number of Mb with one malloc call.
-                                ignore_remaining_args                  0       If 1, ignore all arguments passed after this one.
-                                dedup                                  0       If 1, deduplicate corpus elements.
-                                shrink                                 0       If 1, try to shrink corpus elements.
-                                skip_tracing                           0       If 1, skip coverage tracing for faster execution.
-                                tui                                    0       If 1, use the terminal UI interface.
-                                runs                                   0       Number of individual test runs (0 for infinite runs).
-                                close_fd_mask                          0       If 1, close stdout; if 2, close stderr; if 3, close both.
-                                merge                                  0       If 1, merge multiple corpora into a single one.
-                                minimize_crash                         0       If 1, minimize crashes to their smallest reproducing input.
-                                report                                 0       If 1, report statistics without actually fuzzing.
-                                help                                   0       Print this help message.
-
-                                Flags starting with '--' will be ignored and will be passed verbatim to subprocesses.
-                            "#
+                                "Usage:\n\
+                                \n\
+                                To run fuzzing pass 0 or more directories.\n\
+                                {name} [-flag1=val1 [-flag2=val2 ...] ] [dir1 [dir2 ...] ]\n\
+                                \n\
+                                To run individual tests without fuzzing pass 1 or more files:\n\
+                                {name} [-flag1=val1 [-flag2=val2 ...] ] file1 [file2 ...]\n\
+                                \n\
+                                Flags: (strictly in form -flag=value)\n\
+                                artifact_prefix                        0       Write fuzzing artifacts (crash, timeout, or slow inputs) as $(artifact_prefix)file\n\
+                                timeout                                1200    Timeout in seconds. If one unit runs more than this number of seconds the process will abort.\n\
+                                grimoire                               0       If 1, enable the Grimoire mutator that is structure-aware.\n\
+                                use_value_profile                      0       Use value profile to guide fuzzing.\n\
+                                unicode                                1       If 1, generate Unicode inputs.\n\
+                                dict                                   0       Use the dictionary file.\n\
+                                fork                                   0       Number of forks to use (>1 requires Unix-like OS).\n\
+                                jobs                                   0       Same as fork. Number of jobs to run with stdout/stderr redirected.\n\
+                                ignore_crashes                         0       If 1, ignore crashes in fork mode.\n\
+                                ignore_timeouts                        0       If 1, ignore timeouts in fork mode.\n\
+                                ignore_ooms                            0       If 1, ignore out-of-memory errors in fork mode.\n\
+                                rss_limit_mb                           2048    If non-zero, the fuzzer will exit upon reaching this limit of RSS memory usage (in Mb).\n\
+                                malloc_limit_mb                        2048    If non-zero, the fuzzer will exit if the target tries to allocate this number of Mb with one malloc call.\n\
+                                ignore_remaining_args                  0       If 1, ignore all arguments passed after this one.\n\
+                                dedup                                  0       If 1, deduplicate corpus elements.\n\
+                                shrink                                 0       If 1, try to shrink corpus elements.\n\
+                                skip_tracing                           0       If 1, skip coverage tracing for faster execution.\n\
+                                tui                                    0       If 1, use the terminal UI interface.\n\
+                                runs                                   0       Number of individual test runs (0 for infinite runs).\n\
+                                close_fd_mask                          0       If 1, close stdout; if 2, close stderr; if 3, close both.\n\
+                                merge                                  0       If 1, merge multiple corpora into a single one.\n\
+                                minimize_crash                         0       If 1, minimize crashes to their smallest reproducing input.\n\
+                                report                                 0       If 1, report statistics without actually fuzzing.\n\
+                                help                                   0       Print this help message.\n\
+                                \n\
+                                Flags starting with '--' will be ignored and will be passed verbatim to subprocesses.\n\
+                            "
                             );
                             std::process::exit(0);
                         }
