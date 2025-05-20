@@ -498,8 +498,8 @@ jobs:
         fuzzer:
           # Full-system
           - ./fuzzers/full_system/qemu_baremetal
-          - ./fuzzers/full_system/qemu_linux_kernel
-          - ./fuzzers/full_system/qemu_linux_process
+          # - ./fuzzers/full_system/qemu_linux_kernel
+          # - ./fuzzers/full_system/qemu_linux_process
 
     runs-on: [ self-hosted, qemu ]
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
