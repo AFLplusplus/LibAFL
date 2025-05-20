@@ -100,7 +100,13 @@ where
             return Err(Error::shutting_down());
         }
     }
-    fuzzer.fuzz_loop(stages, executor, state, mgr)?;
+    if options.runs() == 0 {
+        fuzzer.fuzz_loop(stages, executor, state, mgr)?;
+    } else {
+        for _ in 0..options.runs() {
+            fuzzer.fuzz_one(stages, executor, state, mgr)?;
+        }
+    }
     Ok(())
 }
 
