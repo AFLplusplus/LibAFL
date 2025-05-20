@@ -9,43 +9,41 @@ use thiserror::Error;
 
 use crate::{
     asan_swap,
-    maps::MapReader,
+    file::FileReader,
     size_t, ssize_t,
-    symbols::{
-        AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols, SymbolsLookupStr,
-    },
+    symbols::{AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols},
 };
 
 #[derive(Debug)]
 struct FunctionOpen;
 
 impl Function for FunctionOpen {
+    const NAME: &CStr = c"open";
     type Func = unsafe extern "C" fn(*const c_char, c_int, c_int) -> c_int;
-    const NAME: &'static CStr = c"open";
 }
 
 #[derive(Debug)]
 struct FunctionClose;
 
 impl Function for FunctionClose {
+    const NAME: &CStr = c"close";
     type Func = unsafe extern "C" fn(c_int) -> c_int;
-    const NAME: &'static CStr = c"close";
 }
 
 #[derive(Debug)]
 struct FunctionRead;
 
 impl Function for FunctionRead {
+    const NAME: &CStr = c"read";
     type Func = unsafe extern "C" fn(c_int, *mut c_char, size_t) -> ssize_t;
-    const NAME: &'static CStr = c"read";
 }
 
 #[derive(Debug)]
 struct FunctionErrnoLocation;
 
 impl Function for FunctionErrnoLocation {
+    const NAME: &CStr = c"__errno_location";
     type Func = unsafe extern "C" fn() -> *mut c_int;
-    const NAME: &'static CStr = c"__errno_location";
 }
 
 static OPEN_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
@@ -54,52 +52,51 @@ static READ_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 static GET_ERRNO_LOCATION_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 
 #[derive(Debug)]
-pub struct LibcMapReader<S: Symbols> {
+pub struct LibcFileReader<S: Symbols> {
     fd: c_int,
     _phantom: PhantomData<S>,
 }
 
-impl<S: Symbols> LibcMapReader<S> {
-    fn get_open() -> Result<<FunctionOpen as Function>::Func, LibcMapReaderError<S>> {
+impl<S: Symbols> LibcFileReader<S> {
+    fn get_open() -> Result<<FunctionOpen as Function>::Func, LibcFileReaderError<S>> {
         let addr = OPEN_ADDR.try_get_or_insert_with(|| {
-            S::lookup(FunctionOpen::NAME).map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
+            S::lookup(FunctionOpen::NAME).map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
         })?;
         let f =
-            FunctionOpen::as_ptr(addr).map_err(|e| LibcMapReaderError::InvalidPointerType(e))?;
+            FunctionOpen::as_ptr(addr).map_err(|e| LibcFileReaderError::InvalidPointerType(e))?;
         Ok(f)
     }
 
-    fn get_close() -> Result<<FunctionClose as Function>::Func, LibcMapReaderError<S>> {
+    fn get_close() -> Result<<FunctionClose as Function>::Func, LibcFileReaderError<S>> {
         let addr = CLOSE_ADDR.try_get_or_insert_with(|| {
-            S::lookup(FunctionClose::NAME)
-                .map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
+            S::lookup(FunctionClose::NAME).map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
         })?;
         let f =
-            FunctionClose::as_ptr(addr).map_err(|e| LibcMapReaderError::InvalidPointerType(e))?;
+            FunctionClose::as_ptr(addr).map_err(|e| LibcFileReaderError::InvalidPointerType(e))?;
         Ok(f)
     }
 
-    fn get_read() -> Result<<FunctionRead as Function>::Func, LibcMapReaderError<S>> {
+    fn get_read() -> Result<<FunctionRead as Function>::Func, LibcFileReaderError<S>> {
         let addr = READ_ADDR.try_get_or_insert_with(|| {
-            S::lookup(FunctionRead::NAME).map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
+            S::lookup(FunctionRead::NAME).map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
         })?;
         let f =
-            FunctionRead::as_ptr(addr).map_err(|e| LibcMapReaderError::InvalidPointerType(e))?;
+            FunctionRead::as_ptr(addr).map_err(|e| LibcFileReaderError::InvalidPointerType(e))?;
         Ok(f)
     }
 
     fn get_errno_location()
-    -> Result<<FunctionErrnoLocation as Function>::Func, LibcMapReaderError<S>> {
+    -> Result<<FunctionErrnoLocation as Function>::Func, LibcFileReaderError<S>> {
         let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
             S::lookup(FunctionErrnoLocation::NAME)
-                .map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
+                .map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
         })?;
         let f = FunctionErrnoLocation::as_ptr(addr)
-            .map_err(|e| LibcMapReaderError::InvalidPointerType(e))?;
+            .map_err(|e| LibcFileReaderError::InvalidPointerType(e))?;
         Ok(f)
     }
 
-    fn errno() -> Result<c_int, LibcMapReaderError<S>> {
+    fn errno() -> Result<c_int, LibcFileReaderError<S>> {
         unsafe { asan_swap(false) };
         let errno_location = Self::get_errno_location()?;
         unsafe { asan_swap(true) };
@@ -108,30 +105,22 @@ impl<S: Symbols> LibcMapReader<S> {
     }
 }
 
-impl<S: Symbols> MapReader for LibcMapReader<S> {
-    type Error = LibcMapReaderError<S>;
-
-    fn new() -> Result<LibcMapReader<S>, LibcMapReaderError<S>> {
+impl<S: Symbols> FileReader for LibcFileReader<S> {
+    type Error = LibcFileReaderError<S>;
+    fn new(path: &CStr) -> Result<LibcFileReader<S>, Self::Error> {
         let fn_open = Self::get_open()?;
         unsafe { asan_swap(false) };
-        let fd = unsafe {
-            fn_open(
-                c"/proc/self/maps".as_ptr() as *const c_char,
-                O_NONBLOCK | O_RDONLY,
-                0,
-            )
-        };
+        let fd = unsafe { fn_open(path.as_ptr() as *const c_char, O_NONBLOCK | O_RDONLY, 0) };
         unsafe { asan_swap(true) };
         if fd < 0 {
             let errno = Self::errno().unwrap();
-            return Err(LibcMapReaderError::FailedToOpen(errno));
+            return Err(LibcFileReaderError::FailedToOpen(errno));
         }
-        Ok(LibcMapReader {
+        Ok(LibcFileReader {
             fd,
             _phantom: PhantomData,
         })
     }
-
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         let fn_read = Self::get_read()?;
         unsafe { asan_swap(false) };
@@ -139,13 +128,13 @@ impl<S: Symbols> MapReader for LibcMapReader<S> {
         unsafe { asan_swap(true) };
         if ret < 0 {
             let errno = Self::errno().unwrap();
-            return Err(LibcMapReaderError::FailedToRead(self.fd, errno));
+            return Err(LibcFileReaderError::FailedToRead(self.fd, errno));
         }
         Ok(ret as usize)
     }
 }
 
-impl<S: Symbols> Drop for LibcMapReader<S> {
+impl<S: Symbols> Drop for LibcFileReader<S> {
     fn drop(&mut self) {
         let fn_close = Self::get_close().unwrap();
         unsafe { asan_swap(false) };
@@ -160,7 +149,7 @@ impl<S: Symbols> Drop for LibcMapReader<S> {
 }
 
 #[derive(Error, Debug, PartialEq)]
-pub enum LibcMapReaderError<S: Symbols> {
+pub enum LibcFileReaderError<S: Symbols> {
     #[error("Failed to find mmap functions")]
     FailedToFindSymbol(S::Error),
     #[error("Invalid pointer type: {0:?}")]

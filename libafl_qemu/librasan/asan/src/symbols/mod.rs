@@ -78,22 +78,16 @@ impl Default for AtomicGuestAddr {
 
 pub trait Symbols: Debug + Sized + Send {
     type Error: Debug;
-    fn lookup(name: *const c_char) -> Result<GuestAddr, Self::Error>;
+    unsafe fn lookup_raw(name: *const c_char) -> Result<GuestAddr, Self::Error>;
+
+    fn lookup(name: &CStr) -> Result<GuestAddr, Self::Error> {
+        unsafe { Self::lookup_raw(name.as_ptr() as *const c_char) }
+    }
 }
 
 pub trait Function {
     const NAME: &'static CStr;
     type Func: Copy;
-}
-
-pub trait SymbolsLookupStr: Symbols {
-    fn lookup_str(name: &CStr) -> Result<GuestAddr, Self::Error>;
-}
-
-impl<S: Symbols> SymbolsLookupStr for S {
-    fn lookup_str(name: &CStr) -> Result<GuestAddr, Self::Error> {
-        S::lookup(name.as_ptr() as *const c_char)
-    }
 }
 
 pub trait FunctionPointer: Function {

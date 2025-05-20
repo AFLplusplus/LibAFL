@@ -7,7 +7,7 @@ use spin::Once;
 
 use crate::{
     GuestAddr, asan_swap,
-    symbols::{Function, FunctionPointer, Symbols, SymbolsLookupStr},
+    symbols::{Function, FunctionPointer, Symbols},
 };
 
 #[derive(Debug)]
@@ -27,7 +27,7 @@ pub struct LibcLogger {
 impl LibcLogger {
     pub fn initialize<S: Symbols>(level: Level) {
         ONCE.call_once(|| {
-            let write = S::lookup_str(FunctionWrite::NAME).unwrap();
+            let write = S::lookup(FunctionWrite::NAME).unwrap();
             let logger = Box::leak(Box::new(LibcLogger { level, write }));
             log::set_logger(logger).unwrap();
             log::set_max_level(LevelFilter::Trace);
