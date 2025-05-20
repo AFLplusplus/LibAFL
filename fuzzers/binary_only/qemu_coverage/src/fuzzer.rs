@@ -156,7 +156,7 @@ pub fn fuzz() {
         qemu.entry_break(test_one_input_ptr);
 
         let mappings = QemuMappingsViewer::new(&qemu);
-        println!("{:#?}", mappings);
+        log::info!("{:#?}", mappings);
 
         let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
         log::info!("Break at {pc:#x}");

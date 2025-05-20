@@ -32,8 +32,10 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, Emulator, GuestAddr,
-    GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuShutdownCause, Regs,
+    elf::EasyElf,
+    modules::{edges::StdEdgeCoverageChildModule, RedirectStdoutModule},
+    ArchExtras, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason,
+    QemuShutdownCause, Regs,
 };
 #[cfg(feature = "snapshot")]
 use libafl_qemu::{modules::SnapshotModule, QemuExecutor};
@@ -147,6 +149,13 @@ pub fn fuzz() {
     // Clear LD_LIBRARY_PATH
     env::remove_var("LD_LIBRARY_PATH");
 
+    let stdout_callback = |s: &str| {
+        let msg = s.trim_end();
+        if msg.len() != 0 {
+            log::info!("{msg}");
+        }
+    };
+
     // The client closure is a 'fuzzing' process for a single core.
     // Because it is used inside the Launcher (below) it is a fork()ed separate
     // process from our main process here.
@@ -188,13 +197,22 @@ pub fn fuzz() {
             ))
         };
 
+        let redirect_stdout_module = if options.verbose {
+            RedirectStdoutModule::new()
+                .with_stderr(stdout_callback)
+                .with_stdout(stdout_callback)
+        } else {
+            RedirectStdoutModule::new()
+        };
+
         // In either fork/snapshot mode, we link the observer to QEMU
         #[cfg(feature = "snapshot")]
         let modules = tuple_list!(
             StdEdgeCoverageChildModule::builder()
                 .const_map_observer(edges_observer.as_mut())
                 .build()?,
-            SnapshotModule::new()
+            SnapshotModule::new(),
+            redirect_stdout_module
         );
 
         // Create our QEMU emulator
@@ -342,7 +360,7 @@ pub fn fuzz() {
         .shmem_provider(shmem_provider.clone())
         .broker_port(options.port)
         .configuration(EventConfig::from_build_id())
-        .monitor(MultiMonitor::new(|s| println!("{s}")))
+        .monitor(MultiMonitor::new(stdout_callback))
         .run_client(&mut run_client)
         .cores(&options.cores)
         .build()
