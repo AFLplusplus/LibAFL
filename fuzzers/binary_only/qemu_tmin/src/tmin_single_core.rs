@@ -1,6 +1,7 @@
 //! A binary-only testcase minimizer using qemu, similar to AFL++ afl-tmin
 #[cfg(feature = "i386")]
 use core::mem::size_of;
+use core::str::from_utf8;
 #[cfg(feature = "snapshot")]
 use core::time::Duration;
 use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
@@ -148,10 +149,12 @@ pub fn fuzz() -> Result<(), Error> {
         ))
     };
 
-    let stdout_callback = |s: &str| {
-        let msg = s.trim_end();
-        if msg.len() != 0 {
-            log::info!("{msg}");
+    let stdout_callback = |buf: &[u8]| {
+        if let Ok(s) = from_utf8(buf) {
+            let msg = s.trim_end();
+            if msg.len() != 0 {
+                log::info!("{msg}");
+            }
         }
     };
 
@@ -241,7 +244,7 @@ pub fn fuzz() -> Result<(), Error> {
         };
 
     // Set up the most basic monitor possible.
-    let monitor = SimpleMonitor::new(stdout_callback);
+    let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
         Ok(res) => res,

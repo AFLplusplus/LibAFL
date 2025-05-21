@@ -1,7 +1,6 @@
 use core::{
     fmt::{self, Debug},
     slice::from_raw_parts,
-    str::from_utf8_unchecked,
 };
 
 use libafl_bolts::HasLen;
@@ -29,7 +28,7 @@ const SYS_write: u8 = 64;
 #[derive(Clone)]
 pub struct RedirectStdoutModule<F>
 where
-    F: FnMut(&str),
+    F: FnMut(&[u8]),
 {
     stdout: Option<F>,
     stderr: Option<F>,
@@ -37,7 +36,7 @@ where
 
 impl<F> Debug for RedirectStdoutModule<F>
 where
-    F: FnMut(&str),
+    F: FnMut(&[u8]),
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RedirectStdoutModule")
@@ -47,7 +46,7 @@ where
 
 impl<F> Default for RedirectStdoutModule<F>
 where
-    F: FnMut(&str),
+    F: FnMut(&[u8]),
 {
     fn default() -> Self {
         Self::new()
@@ -56,7 +55,7 @@ where
 
 impl<F> RedirectStdoutModule<F>
 where
-    F: FnMut(&str),
+    F: FnMut(&[u8]),
 {
     #[must_use]
     /// constuctor
@@ -70,7 +69,7 @@ where
 
 impl<F> RedirectStdoutModule<F>
 where
-    F: FnMut(&str) + Clone,
+    F: FnMut(&[u8]) + Clone,
 {
     #[must_use]
     /// Create with specified stdout callback
@@ -95,7 +94,7 @@ impl<F, I, S> EmulatorModule<I, S> for RedirectStdoutModule<F>
 where
     I: Unpin + HasLen + Debug,
     S: Unpin,
-    F: FnMut(&str) + 'static,
+    F: FnMut(&[u8]) + 'static,
 {
     fn first_exec<ET>(
         &mut self,
@@ -128,7 +127,7 @@ where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin + HasLen + Debug,
     S: Unpin,
-    F: FnMut(&str) + 'static,
+    F: FnMut(&[u8]) + 'static,
 {
     let h = emulator_modules
         .get_mut::<RedirectStdoutModule<F>>()
@@ -148,7 +147,7 @@ where
     };
 
     if let Some(callback) = callback {
-        let buf = unsafe { from_utf8_unchecked(from_raw_parts(buf, len as usize)) };
+        let buf = unsafe { from_raw_parts(buf, len as usize) };
         (callback)(buf);
     }
 

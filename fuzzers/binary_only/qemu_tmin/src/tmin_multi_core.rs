@@ -1,6 +1,7 @@
 //! A binary-only testcase minimizer using qemu, similar to AFL++ afl-tmin
 #[cfg(feature = "i386")]
 use core::mem::size_of;
+use core::str::from_utf8;
 #[cfg(feature = "snapshot")]
 use core::time::Duration;
 use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
@@ -149,13 +150,6 @@ pub fn fuzz() {
     // Clear LD_LIBRARY_PATH
     env::remove_var("LD_LIBRARY_PATH");
 
-    let stdout_callback = |s: &str| {
-        let msg = s.trim_end();
-        if msg.len() != 0 {
-            log::info!("{msg}");
-        }
-    };
-
     // The client closure is a 'fuzzing' process for a single core.
     // Because it is used inside the Launcher (below) it is a fork()ed separate
     // process from our main process here.
@@ -195,6 +189,15 @@ pub fn fuzz() {
                     .expect("The edge map pointer is null.")
                     .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
             ))
+        };
+
+        let stdout_callback = |buf: &[u8]| {
+            if let Ok(s) = from_utf8(buf) {
+                let msg = s.trim_end();
+                if msg.len() != 0 {
+                    log::info!("{msg}");
+                }
+            }
         };
 
         let redirect_stdout_module = if options.verbose {
@@ -360,7 +363,7 @@ pub fn fuzz() {
         .shmem_provider(shmem_provider.clone())
         .broker_port(options.port)
         .configuration(EventConfig::from_build_id())
-        .monitor(MultiMonitor::new(stdout_callback))
+        .monitor(MultiMonitor::new(|s| log::info!("{s}")))
         .run_client(&mut run_client)
         .cores(&options.cores)
         .build()
