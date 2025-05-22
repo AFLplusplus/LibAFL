@@ -356,7 +356,7 @@ jobs:
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: qemu-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
+          shared-key: fuzzers-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
           cache-all-crates: true
           # The code is built in the fuzzers own directory, not in the target
           # directory in the root of the workspace
