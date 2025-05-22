@@ -335,9 +335,9 @@ pub fn build(
             .as_deref()
             .unwrap_or(LIBAFL_QEMU_GIT_REV);
 
-        let qemu_rev = target_dir.join("QEMU_REVISION");
-        if qemu_rev.exists()
-            && fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != qemu_git_rev
+        let qemu_rev = qemu_path.join("QEMU_REVISION");
+        if !qemu_rev.exists()
+            || fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != qemu_git_rev
         {
             drop(fs::remove_dir_all(&qemu_path));
         }
