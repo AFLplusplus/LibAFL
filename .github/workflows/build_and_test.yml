@@ -259,7 +259,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-24.04 ]
         fuzzer:
           # Baby
           - ./fuzzers/baby/baby_fuzzer_swap_differential
@@ -338,7 +337,7 @@ jobs:
           - ./fuzzers/fuzz_anything/baby_no_std
           - ./fuzzers/fuzz_anything/baby_fuzzer_wasm
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     steps:
         # Get the name of the fuzzer so that we can use it as the key for a cache
         # of the built artefacts. The key cannot have any special characters.
@@ -429,7 +428,6 @@ jobs:
     if: ${{ needs.qemu-changes.outputs.qemu == 'true' }}
     strategy:
       matrix:
-        os: [ubuntu-24.04]
         fuzzer:
             # Binary only
             - fuzzers/binary_only/qemu_cmin
@@ -478,12 +476,11 @@ jobs:
   utils:
     strategy:
       matrix:
-        os: [ubuntu-24.04]
         fuzzer:
           # Binary only
           - ./utils/gdb_qemu
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
