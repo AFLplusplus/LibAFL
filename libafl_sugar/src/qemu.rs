@@ -115,13 +115,22 @@ where
     }
 }
 
+/// Enum to allow passing either qemu cli parameters or a running qemu instance
+#[derive(Debug)]
+pub enum QemuSugarParameter<'a> {
+    /// Argument list to pass to initialize Qemu
+    QemuCli(&'a [String]),
+    /// Already existing Qemu instance
+    Qemu(&'a Qemu),
+}
+
 impl<H> QemuBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {
     /// Run the fuzzer
     #[expect(clippy::too_many_lines)]
-    pub fn run(&mut self, qemu_cli: &[String]) {
+    pub fn run(&mut self, qemu: QemuSugarParameter) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -254,11 +263,17 @@ where
                     ExitKind::Ok
                 };
 
-                let emulator = Emulator::empty()
-                    .qemu_parameters(qemu_cli.to_owned())
-                    .modules(modules)
-                    .build()
-                    .expect("Could not initialize Emulator");
+                let emulator = match qemu {
+                    QemuSugarParameter::QemuCli(qemu_cli) => Emulator::empty()
+                        .qemu_parameters(qemu_cli.to_owned())
+                        .modules(modules)
+                        .build()
+                        .expect("Could not initialize Emulator"),
+                    QemuSugarParameter::Qemu(qemu) => Emulator::empty()
+                        .modules(modules)
+                        .build_with_qemu(*qemu)
+                        .expect("Could not initialize Emulator"),
+                };
 
                 let executor = QemuExecutor::new(
                     emulator,
@@ -377,11 +392,17 @@ where
                     ExitKind::Ok
                 };
 
-                let emulator = Emulator::empty()
-                    .qemu_parameters(qemu_cli.to_owned())
-                    .modules(modules)
-                    .build()
-                    .expect("Could not initialize Emulator");
+                let emulator = match qemu {
+                    QemuSugarParameter::QemuCli(qemu_cli) => Emulator::empty()
+                        .qemu_parameters(qemu_cli.to_owned())
+                        .modules(modules)
+                        .build()
+                        .expect("Could not initialize Emulator"),
+                    QemuSugarParameter::Qemu(qemu) => Emulator::empty()
+                        .modules(modules)
+                        .build_with_qemu(*qemu)
+                        .expect("Could not initialize Emulator"),
+                };
 
                 let mut executor = QemuExecutor::new(
                     emulator,
@@ -500,8 +521,10 @@ pub mod pybind {
     use std::path::PathBuf;
 
     use libafl_bolts::core_affinity::Cores;
+    use libafl_qemu::pybind::Qemu;
     use pyo3::{prelude::*, types::PyBytes};
 
+    use super::QemuSugarParameter;
     use crate::qemu;
 
     #[pyclass(unsendable)]
@@ -575,7 +598,31 @@ pub mod pybind {
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
                 .build()
-                .run(&qemu_cli);
+                .run(QemuSugarParameter::QemuCli(&qemu_cli));
+        }
+
+        /// Run the fuzzer using the Qemu objects passed as argument
+        #[expect(clippy::needless_pass_by_value)]
+        pub fn run_with_qemu(&self, qemu: &Qemu, harness: PyObject) {
+            qemu::QemuBytesCoverageSugar::builder()
+                .input_dirs(&self.input_dirs)
+                .output_dir(self.output_dir.clone())
+                .broker_port(self.broker_port)
+                .cores(&self.cores)
+                .harness(|buf| {
+                    Python::with_gil(|py| -> PyResult<()> {
+                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
+                        harness.call1(py, args)?;
+                        Ok(())
+                    })
+                    .unwrap();
+                })
+                .use_cmplog(self.use_cmplog)
+                .timeout(self.timeout)
+                .tokens_file(self.tokens_file.clone())
+                .iterations(self.iterations)
+                .build()
+                .run(QemuSugarParameter::Qemu(&qemu.qemu));
         }
     }
 

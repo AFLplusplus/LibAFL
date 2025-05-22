@@ -6,7 +6,7 @@ import lief
 MAX_SIZE = 0x100
 BINARY_PATH = "./a.out"
 
-emu = qemu.Qemu(["qemu-x86_64", BINARY_PATH], [])
+emu = qemu.Qemu(["qemu-x86_64", BINARY_PATH])
 
 elf = lief.parse(BINARY_PATH)
 test_one_input = elf.get_function_address("LLVMFuzzerTestOneInput")
@@ -41,5 +41,6 @@ def harness(b):
     emu.run()
 
 
-fuzz = sugar.QemuBytesCoverageSugar(["./in"], "./out", 3456, [0, 1, 2, 3])
-fuzz.run(emu, harness)
+fuzz = sugar.QemuBytesCoverageSugar(["./in"], "./out", 3456, [0])
+#fuzz.run_with_qemu(emu, harness)
+fuzz.run(["qemu-x86_64", BINARY_PATH], harness)
