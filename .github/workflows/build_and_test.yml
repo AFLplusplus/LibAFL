@@ -254,12 +254,12 @@ jobs:
         run: ./scripts/check_tested_fuzzers.sh
 
   fuzzers:
+    name: 🚀 ${{ matrix.fuzzer }}
     needs:
       - fuzzers-preflight
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-24.04 ]
         fuzzer:
           # Baby
           - ./fuzzers/baby/baby_fuzzer_swap_differential
@@ -338,26 +338,59 @@ jobs:
           - ./fuzzers/fuzz_anything/baby_no_std
           - ./fuzzers/fuzz_anything/baby_fuzzer_wasm
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/fuzzer-tester-prepare
+        # Get the name of the fuzzer so that we can use it as the key for a cache
+        # of the built artefacts. The key cannot have any special characters.
+      - name: Get fuzzer name
+        id: fuzzer_name
+        run: |
+          fname=$(basename "${{ matrix.fuzzer }}")
+          echo "fuzzer_name=$fname" >> $GITHUB_OUTPUT
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare
+        uses: ./.github/workflows/fuzzer-tester-prepare
         with:
           fuzzer-name: ${{ matrix.fuzzer }}
-      - name: Build and run example fuzzers (Linux)
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # We will have these guys all share a cache (since they should share
+          # and awful lot of their dependencies). That way we won't use up
+          # as much space.
+          shared-key: fuzzers-x86_64
+          cache-all-crates: true
+          # The code is built in the fuzzers own directory, not in the target
+          # directory in the root of the workspace
+          workspaces: |
+            ${{ matrix.fuzzer }}
+      - name: Test
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} cargo run --manifest-path ./utils/ci_runner/Cargo.toml -- ${{ matrix.fuzzer }}
+        run: |
+          RUN_ON_CI=1 \
+          LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+          cargo \
+            run \
+            --manifest-path ./utils/ci_runner/Cargo.toml \
+            -- \
+            ${{ matrix.fuzzer }}
 
-  changes:
+  # This job checks whether any changes have been made to the QEMU code to avoid
+  # rebuilding and testing the QEMU related fuzzers unnecessarily as they are 
+  # more expensive to build
+  qemu-changes:
     runs-on: ubuntu-24.04
     permissions:
       pull-requests: read
     outputs:
       qemu: ${{ steps.filter.outputs.qemu }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Filter
+        uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
@@ -368,6 +401,7 @@ jobs:
               - 'libafl_targets/**'
               - 'libafl_qemu/**'
               - 'fuzzers/**/*qemu*/**'
+
   fuzzer-unicorn:
     runs-on: ubuntu-24.04
     needs:
@@ -390,53 +424,69 @@ jobs:
         shell: bash
         run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} cargo run --manifest-path ./utils/ci_runner/Cargo.toml -- ${{ matrix.fuzzer }}
 
-  fuzzers-qemu-user:
+  # Job to build and test the QEMU fuzzers
+  qemu:
+    name: 🤖 ${{ matrix.fuzzer }}
     needs:
-      - changes
-    if: ${{ needs.changes.outputs.qemu == 'true' }}
+      - fuzzers-preflight # Check that all the fuzzers listed for testing or explicitly ignored
+      - qemu-changes # Only build if the QEMU code has changed
+    if: ${{ needs.qemu-changes.outputs.qemu == 'true' }}
     strategy:
       matrix:
-        os: [ubuntu-24.04]
         fuzzer:
-          # Binary only
-          - ./fuzzers/binary_only/qemu_cmin
-          - ./fuzzers/binary_only/qemu_tmin
-          - ./fuzzers/binary_only/qemu_coverage
-          - ./fuzzers/binary_only/qemu_launcher
-        arch:
-          # unless somebody pays us for the servers.
-          # - aarch64
-          # - arm
-          # - i386
-          # - ppc
-          - x86_64
-
-    runs-on: [ self-hosted, qemu ]
+            - fuzzers/binary_only/qemu_cmin
+            - fuzzers/binary_only/qemu_tmin
+            - fuzzers/binary_only/qemu_coverage
+            - fuzzers/binary_only/qemu_launcher
+            - fuzzers/full_system/qemu_baremetal
+            # - fuzzers/full_system/qemu_linux_kernel
+            # - fuzzers/full_system/qemu_linux_process
+    runs-on: ubuntu-24.04
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
-      - name: Build and run example QEMU fuzzers (Linux)
-        if: runner.os == 'Linux'
+        # Get the name of the fuzzer so that we can use it as the key for a cache
+        # of the built artefacts. The key cannot have any special characters.
+      - name: Get fuzzer name
+        id: fuzzer_name
+        run: |
+          fname=$(basename "${{ matrix.fuzzer }}")
+          echo "fuzzer_name=$fname" >> $GITHUB_OUTPUT
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare
+        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # We will have each of these fuzzers have it's own cache since these
+          # are some of the heaviest fuzzers to build.
+          shared-key: qemu-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
+          cache-all-crates: true
+          # The code is built in the fuzzers own directory, not in the target
+          # directory in the root of the workspace
+          workspaces: |
+            ${{ matrix.fuzzer }}
+      - name: Test
         shell: bash
-        run: unset RUSTC && ARCH=${{ matrix.arch }} RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} cargo run --manifest-path ./utils/ci_runner/Cargo.toml --  ${{ matrix.fuzzer }}
+        run: |
+          unset RUSTC && \
+          ARCH=x86_64 \
+          RUN_ON_CI=1 \
+          LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+          cargo \
+            run \
+            --manifest-path ./utils/ci_runner/Cargo.toml \
+            --  \
+            ${{ matrix.fuzzer }}
 
   utils:
+    name: 🔧 ${{ matrix.util }}
     strategy:
       matrix:
-        os: [ubuntu-24.04]
-        fuzzer:
-          # Binary only
+        util:
           - ./utils/gdb_qemu
-        arch:
-          # unless somebody pays us for the servers.
-          # - aarch64
-          # - arm
-          # - i386
-          # - ppc
-          - x86_64
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
@@ -448,69 +498,67 @@ jobs:
       - name: Build and run utils (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: just -d ${{ matrix.fuzzer }} --justfile ${{ matrix.fuzzer }}/Justfile test
+        run: just -d ${{ matrix.util }} --justfile ${{ matrix.util }}/Justfile test
 
-  librasan-build:
-      runs-on: ubuntu-24.04
-      needs:
-        - changes
-      if: ${{ needs.changes.outputs.qemu == 'true' }}
-      steps:
-        - uses: actions/checkout@v4
-        - uses: ./.github/workflows/librasan-prepare
-        - name: Build
-          if: runner.os == 'Linux'
-          shell: bash
-          run: |
-            RUN_ON_CI=1 \
-            RUSTC_BOOTSTRAP=1 \
-            LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
-            just \
-              -f ./libafl_qemu/librasan/Justfile \
-              build_everything_dev \
-              build_x86_64_release
-
-  librasan-test:
-      runs-on: ubuntu-24.04
-      needs:
-        - changes
-      if: ${{ needs.changes.outputs.qemu == 'true' }}
-      steps:
-        - uses: actions/checkout@v4
-        - uses: ./.github/workflows/librasan-prepare
-        - name: Build
-          if: runner.os == 'Linux'
-          shell: bash
-          run: |
-            RUN_ON_CI=1 \
-            RUSTC_BOOTSTRAP=1 \
-            LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
-            just \
-              -f ./libafl_qemu/librasan/Justfile \
-              test_everything
-
-  fuzzers-qemu-system:
-    needs:
-      - changes
-    if: ${{ needs.changes.outputs.qemu == 'true' }}
+  # Build and test librasan. The setup is common, so we use a matrix build and
+  # use the task name at the end to select which target to build
+  librasan:
+    name: 🔧 librasan - ${{ matrix.task }}
     strategy:
       matrix:
-        os: [ubuntu-24.04]
-        fuzzer:
-          # Full-system
-          - ./fuzzers/full_system/qemu_baremetal
-          # - ./fuzzers/full_system/qemu_linux_kernel
-          # - ./fuzzers/full_system/qemu_linux_process
-
-    runs-on: [ self-hosted, qemu ]
-    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+        task:
+          - build
+          - test
+      # If one task fails, then don't abandon the other
+      fail-fast: false
+    # Only build this if the QEMU code changes for now. Though agnostic, nobody
+    # else has integrated librasan with other fuzzers for now.
+    needs:
+        - qemu-changes
+    if: ${{ needs.qemu-changes.outputs.qemu == 'true' }}
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
-      - name: Build and run example QEMU fuzzers (Linux)
-        if: runner.os == 'Linux'
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+      - name: Prepare
+        uses: ./.github/workflows/librasan-prepare
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Use the task name to build the cache key. We will have a separate 
+          # cache for each since they are both expensive to build and one builds
+          # for many different architectures.
+          shared-key: librasan-${{ matrix.task }}
+          cache-all-crates: true
+          # Again the artefacts aren't built in the target root directory.
+          workspaces: |
+            libafl_qemu/librasan
+        # Run only for the build task
+      - name: Build
+        if: ${{ matrix.task == 'build' }}
         shell: bash
-        run: unset RUSTC && RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} cargo run --manifest-path ./utils/ci_runner/Cargo.toml --  ${{ matrix.fuzzer }}
+        run: |
+          RUN_ON_CI=1 \
+          RUSTC_BOOTSTRAP=1 \
+          LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+          just \
+            -f ./libafl_qemu/librasan/Justfile \
+            build_everything_dev \
+            build_x86_64_release
+        # Run only for the test task
+      - name: Test
+        if: ${{ matrix.task == 'test' }}
+        shell: bash
+        run: |
+          RUN_ON_CI=1 \
+          RUSTC_BOOTSTRAP=1 \
+          LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+          just \
+            -f ./libafl_qemu/librasan/Justfile \
+            test_everything
 
   nostd-build:
     runs-on: ubuntu-24.04
@@ -522,6 +570,8 @@ jobs:
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: no-std
       - name: Build aarch64-unknown-none
         run: cd ./fuzzers/fuzz_anything/baby_no_std && cargo build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
       - name: run x86_64 until panic!
@@ -539,6 +589,8 @@ jobs:
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: no-std
       - name: libafl armv6m-none-eabi (32 bit no_std) clippy
         run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
       - name: Build no_std no_alloc bolts
@@ -555,72 +607,126 @@ jobs:
 
   build-docker:
     runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build docker
-        run: docker build -t libafl .
 
-  windows-frida-libpng:
+    permissions:
+      packages: write
+      contents: read
+
+    outputs:
+      image: ghcr.io/aflplusplus/libafl:latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Check Dockerfile for changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            changed:
+              - 'Dockerfile'
+              - '.github/workflows/build_and_test.yml'
+
+      - name: Restore Docker build cache
+        if: steps.filter.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          # We want to be able to update the cache if the Dockerfile is changed,
+          # but still be able to use previous versions if available.
+          key: ${{ runner.os }}-buildx-${{ github.ref }}-${{ hashFiles('Dockerfile') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-${{ github.ref }}-
+            ${{ runner.os }}-buildx-
+
+      - name: Set up Docker Buildx
+        if: steps.filter.outputs.changed == 'true'
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: Log in to GitHub Container Registry
+        if: steps.filter.outputs.changed == 'true' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        if: steps.filter.outputs.changed == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.ref == 'refs/heads/main' }}
+          load: ${{ github.ref != 'refs/heads/main' }}
+          tags: 
+            ghcr.io/aflplusplus/libafl:latest
+          cache-from: |
+            type=registry,ref=ghcr.io/aflplusplus/libafl:cache
+            type=local,src=/tmp/.buildx-cache
+          cache-to: |
+            ${{ github.ref == 'refs/heads/main' && 'type=registry,ref=ghcr.io/aflplusplus/libafl:cache,mode=max' || 'type=local,dest=/tmp/.buildx-cache' }}
+
+      - name: Save Docker build cache
+        if: steps.filter.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          # We want to be able to update the cache if the Dockerfile is changed,
+          # but still be able to use previous versions if available.
+          key: ${{ runner.os }}-buildx-${{ github.ref }}-${{ hashFiles('Dockerfile') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-${{ github.ref }}-
+            ${{ runner.os }}-buildx-
+
+  # The windows fuzzers require the same setup, so we will use a matrix build
+  windows:
+    name: 🚙 ${{ matrix.fuzzer }}
+    strategy:
+      matrix:
+        fuzzer:
+            - fuzzers/binary_only/frida_libpng
+            - fuzzers/inprocess/libafl_libfuzzer_windows
+            - fuzzers/inprocess/libfuzzer_stb_image
+            - fuzzers/binary_only/frida_windows_gdiplus
+            - fuzzers/binary_only/tinyinst_simple
+            # - fuzzers/inprocess/libfuzzer_windows_asan
+      fail-fast: false
     runs-on: windows-latest
     needs:
+      - fuzzers-preflight
       - common
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/binary_only/frida_libpng
-        run: cd fuzzers/binary_only/frida_libpng/ && just test
-
-  windows-libafl-libfuzzer:
-    runs-on: windows-latest
-    needs:
-      - common
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/inprocess/libafl_libfuzzer_windows
-        run: cd fuzzers/inprocess/libafl_libfuzzer_windows && just test
-
-  windows-libfuzzer-stb-image:
-    runs-on: windows-latest
-    needs:
-      - common
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/inprocess/libfuzzer_stb_image
-        run: cd fuzzers/inprocess/libfuzzer_stb_image && cargo build --release
-
-  # windows-libfuzzer-asan:
-  #   runs-on: windows-latest
-  #   needs:
-  #     - common
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: ./.github/workflows/windows-tester-prepare
-  #     - name: Build fuzzers/inprocess/libfuzzer_windows_asan
-  #       run: cd fuzzers/inprocess/libfuzzer_windows_asan && just test
-
-  windows-frida-gdiplus:
-    runs-on: windows-latest
-    needs:
-      - common
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/binary_only/frida_windows_gdiplus
-        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && just test && just test_cmplog
-
-  windows-tinyinst-simple:
-    runs-on: windows-latest
-    needs:
-      - common
-    steps:
+        # Get the name of the fuzzer so that we can use it as the key for a cache
+        # of the built artefacts. The key cannot have any special characters.
+      - name: Get fuzzer name
+        id: fuzzer_name
+        shell: pwsh
+        run: |
+          $fname = Split-Path -Leaf "${{ matrix.fuzzer }}"
+          "fuzzer_name=$fname" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare
+        uses: ./.github/workflows/windows-tester-prepare
       - name: install cxx bridge
         run: cargo install cxxbridge-cmd
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/binary_only/tinyinst_simple
-        run: cd fuzzers/binary_only/tinyinst_simple/ && just test
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # There aren't too many of these fuzzers, so lets just give them a 
+          # separate cache each for now.
+          shared-key: fuzzers-windows-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
+          cache-all-crates: true
+          # The code is built in the fuzzers own directory, not in the target
+          # directory in the root of the workspace
+          workspaces: |
+            ${{ matrix.fuzzer }}
+      - name: Test
+        run: cd ${{ matrix.fuzzer }} && just test
 
   windows-clippy:
     runs-on: windows-latest
@@ -631,6 +737,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-clippy
       - name: Run real clippy, not the fake one
         shell: pwsh
         run: .\scripts\clippy.ps1
