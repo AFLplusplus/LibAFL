@@ -262,81 +262,81 @@ jobs:
       matrix:
         fuzzer:
           # Baby
-          - fuzzers/baby/baby_fuzzer_swap_differential
-          - fuzzers/baby/tutorial
-          - fuzzers/baby/baby_fuzzer
-          # - fuzzers/baby/backtrace_baby_fuzzers
-          - fuzzers/baby/baby_fuzzer_unicode
-          - fuzzers/baby/baby_fuzzer_minimizing
-          - fuzzers/baby/backtrace_baby_fuzzers/c_code_with_fork_executor
-          - fuzzers/baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor
-          - fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_fork_executor
-          - fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
-          - fuzzers/baby/backtrace_baby_fuzzers/command_executor
-          - fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor
-          - fuzzers/baby/baby_fuzzer_custom_executor
+          - baby/baby_fuzzer_swap_differential
+          - baby/tutorial
+          - baby/baby_fuzzer
+          # - baby/backtrace_baby_fuzzers
+          - baby/baby_fuzzer_unicode
+          - baby/baby_fuzzer_minimizing
+          - baby/backtrace_baby_fuzzers/c_code_with_fork_executor
+          - baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor
+          - baby/backtrace_baby_fuzzers/rust_code_with_fork_executor
+          - baby/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
+          - baby/backtrace_baby_fuzzers/command_executor
+          - baby/backtrace_baby_fuzzers/forkserver_executor
+          - baby/baby_fuzzer_custom_executor
 
           # Binary-only
-          - fuzzers/binary_only/fuzzbench_fork_qemu
-          - fuzzers/binary_only/frida_executable_libpng
-          # - fuzzers/binary_only/frida_windows_gdiplus
-          - fuzzers/binary_only/frida_libpng
-          - fuzzers/binary_only/fuzzbench_qemu
-          - fuzzers/binary_only/intel_pt_baby_fuzzer
-          - fuzzers/binary_only/intel_pt_command_executor
-          # - fuzzers/binary_only/tinyinst_simple
+          - binary_only/fuzzbench_fork_qemu
+          - binary_only/frida_executable_libpng
+          # - binary_only/frida_windows_gdiplus
+          - binary_only/frida_libpng
+          - binary_only/fuzzbench_qemu
+          - binary_only/intel_pt_baby_fuzzer
+          - binary_only/intel_pt_command_executor
+          # - binary_only/tinyinst_simple
 
           # Forkserver
-          - fuzzers/forkserver/forkserver_simple
-          - fuzzers/forkserver/forkserver_capture_stdout
-          - fuzzers/forkserver/forkserver_libafl_cc
-          - fuzzers/forkserver/fuzzbench_forkserver
-          - fuzzers/forkserver/fuzzbench_forkserver_cmplog
-          - fuzzers/forkserver/fuzzbench_forkserver_sand
-          - fuzzers/forkserver/libafl-fuzz
-          - fuzzers/forkserver/baby_fuzzer_with_forkexecutor
+          - forkserver/forkserver_simple
+          - forkserver/forkserver_capture_stdout
+          - forkserver/forkserver_libafl_cc
+          - forkserver/fuzzbench_forkserver
+          - forkserver/fuzzbench_forkserver_cmplog
+          - forkserver/fuzzbench_forkserver_sand
+          - forkserver/libafl-fuzz
+          - forkserver/baby_fuzzer_with_forkexecutor
 
           # Full-system
-          - fuzzers/full_system/nyx_launcher
-          - fuzzers/full_system/nyx_libxml2_standalone
-          - fuzzers/full_system/nyx_libxml2_parallel
+          - full_system/nyx_launcher
+          - full_system/nyx_libxml2_standalone
+          - full_system/nyx_libxml2_parallel
 
           # Structure-aware
-          - fuzzers/structure_aware/nautilus_sync
-          - fuzzers/structure_aware/baby_fuzzer_grimoire
-          - fuzzers/structure_aware/baby_fuzzer_gramatron
-          - fuzzers/structure_aware/baby_fuzzer_tokens
-          - fuzzers/structure_aware/baby_fuzzer_multi
-          - fuzzers/structure_aware/baby_fuzzer_custom_input
-          - fuzzers/structure_aware/baby_fuzzer_nautilus
-          - fuzzers/structure_aware/forkserver_simple_nautilus
+          - structure_aware/nautilus_sync
+          - structure_aware/baby_fuzzer_grimoire
+          - structure_aware/baby_fuzzer_gramatron
+          - structure_aware/baby_fuzzer_tokens
+          - structure_aware/baby_fuzzer_multi
+          - structure_aware/baby_fuzzer_custom_input
+          - structure_aware/baby_fuzzer_nautilus
+          - structure_aware/forkserver_simple_nautilus
 
           # In-process
-          - fuzzers/fuzz_anything/cargo_fuzz
-          - fuzzers/inprocess/fuzzbench
-          - fuzzers/inprocess/fuzzbench_text
-          - fuzzers/inprocess/fuzzbench_ctx
-          - fuzzers/inprocess/libfuzzer_libmozjpeg
-          - fuzzers/inprocess/libfuzzer_libpng
-          - fuzzers/inprocess/libfuzzer_libpng_launcher
-          - fuzzers/inprocess/libfuzzer_libpng_accounting
-          - fuzzers/inprocess/libfuzzer_libpng_centralized
-          - fuzzers/inprocess/libfuzzer_libpng_cmin
-          - fuzzers/inprocess/libfuzzer_libpng_norestart
-          # - fuzzers/inprocess/libfuzzer_libpng_tcp_manager
-          # - fuzzers/inprocess/libfuzzer_windows_asan
-          - fuzzers/inprocess/libfuzzer_stb_image_sugar
-          - fuzzers/inprocess/libfuzzer_stb_image
-          # - fuzzers/structure_aware/libfuzzer_stb_image_concolic
-          # - fuzzers/inprocess/sqlite_centralized_multi_machine
-          # - fuzzers/inprocess/libafl_libfuzzer_windows
+          - fuzz_anything/cargo_fuzz
+          - inprocess/fuzzbench
+          - inprocess/fuzzbench_text
+          - inprocess/fuzzbench_ctx
+          - inprocess/libfuzzer_libmozjpeg
+          - inprocess/libfuzzer_libpng
+          - inprocess/libfuzzer_libpng_launcher
+          - inprocess/libfuzzer_libpng_accounting
+          - inprocess/libfuzzer_libpng_centralized
+          - inprocess/libfuzzer_libpng_cmin
+          - inprocess/libfuzzer_libpng_norestart
+          # - inprocess/libfuzzer_libpng_tcp_manager
+          # - inprocess/libfuzzer_windows_asan
+          - inprocess/libfuzzer_stb_image_sugar
+          - inprocess/libfuzzer_stb_image
+          # - structure_aware/libfuzzer_stb_image_concolic
+          # - inprocess/sqlite_centralized_multi_machine
+          # - inprocess/libafl_libfuzzer_windows
 
           # Fuzz Anything
-          - fuzzers/fuzz_anything/push_harness
-          - fuzzers/fuzz_anything/push_stage_harness
-          - fuzzers/fuzz_anything/libafl_atheris
-          - fuzzers/fuzz_anything/baby_no_std
-          - fuzzers/fuzz_anything/baby_fuzzer_wasm
+          - fuzz_anything/push_harness
+          - fuzz_anything/push_stage_harness
+          - fuzz_anything/libafl_atheris
+          - fuzz_anything/baby_no_std
+          - fuzz_anything/baby_fuzzer_wasm
 
     runs-on: ubuntu-24.04
     steps:
@@ -368,12 +368,12 @@ jobs:
           # they would all share the same key (combining the `shared-key` and 
           # `key`) our build would generate a load of warnings. Why this 
           # particular fuzzer? No real reason, but we had to choose one.
-          save-if: ${{ matrix.fuzzer = 'fuzzers/binary_only/frida_libpng' }}
+          save-if: ${{ matrix.fuzzer = 'binary_only/frida_libpng' }}
           cache-all-crates: true
           # The code is built in the fuzzers own directory, not in the target
           # directory in the root of the workspace
           workspaces: |
-            ${{ matrix.fuzzer }}
+            fuzzers/${{ matrix.fuzzer }}
       - name: Test
         if: runner.os == 'Linux'
         shell: bash
@@ -384,7 +384,7 @@ jobs:
             run \
             --manifest-path ./utils/ci_runner/Cargo.toml \
             -- \
-            ${{ matrix.fuzzer }}
+            fuzzers/${{ matrix.fuzzer }}
 
   # This job checks whether any changes have been made to the QEMU code to avoid
   # rebuilding and testing the QEMU related fuzzers unnecessarily as they are 
@@ -412,6 +412,7 @@ jobs:
               - 'fuzzers/**/*qemu*/**'
 
   fuzzer-unicorn:
+    name: 🚀 full_system/unicorn
     runs-on: ubuntu-24.04
     needs:
       - fuzzers-preflight
@@ -443,13 +444,13 @@ jobs:
     strategy:
       matrix:
         fuzzer:
-            - fuzzers/binary_only/qemu_cmin
-            - fuzzers/binary_only/qemu_tmin
-            - fuzzers/binary_only/qemu_coverage
-            - fuzzers/binary_only/qemu_launcher
-            - fuzzers/full_system/qemu_baremetal
-            # - fuzzers/full_system/qemu_linux_kernel
-            # - fuzzers/full_system/qemu_linux_process
+            - binary_only/qemu_cmin
+            - binary_only/qemu_tmin
+            - binary_only/qemu_coverage
+            - binary_only/qemu_launcher
+            - full_system/qemu_baremetal
+            # - full_system/qemu_linux_kernel
+            # - full_system/qemu_linux_process
     runs-on: ubuntu-24.04
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
@@ -477,7 +478,7 @@ jobs:
           # The code is built in the fuzzers own directory, not in the target
           # directory in the root of the workspace
           workspaces: |
-            ${{ matrix.fuzzer }}
+            fuzzers/${{ matrix.fuzzer }}
       - name: Test
         shell: bash
         run: |
@@ -489,14 +490,14 @@ jobs:
             run \
             --manifest-path ./utils/ci_runner/Cargo.toml \
             --  \
-            ${{ matrix.fuzzer }}
+            fuzzers/${{ matrix.fuzzer }}
 
   utils:
     name: 🔧 ${{ matrix.util }}
     strategy:
       matrix:
         util:
-          - ./utils/gdb_qemu
+          - utils/gdb_qemu
 
     runs-on: ubuntu-24.04
     steps:
@@ -703,12 +704,12 @@ jobs:
     strategy:
       matrix:
         fuzzer:
-            - fuzzers/binary_only/frida_libpng
-            - fuzzers/inprocess/libafl_libfuzzer_windows
-            - fuzzers/inprocess/libfuzzer_stb_image
-            - fuzzers/binary_only/frida_windows_gdiplus
-            - fuzzers/binary_only/tinyinst_simple
-            # - fuzzers/inprocess/libfuzzer_windows_asan
+            - binary_only/frida_libpng
+            - inprocess/libafl_libfuzzer_windows
+            - inprocess/libfuzzer_stb_image
+            - binary_only/frida_windows_gdiplus
+            - binary_only/tinyinst_simple
+            # - inprocess/libfuzzer_windows_asan
       fail-fast: false
     runs-on: windows-latest
     needs:
@@ -742,9 +743,9 @@ jobs:
           # The code is built in the fuzzers own directory, not in the target
           # directory in the root of the workspace
           workspaces: |
-            ${{ matrix.fuzzer }}
+            fuzzers/${{ matrix.fuzzer }}
       - name: Test
-        run: cd ${{ matrix.fuzzer }} && just test
+        run: cd fuzzers/${{ matrix.fuzzer }} && just test
 
   windows-clippy:
     runs-on: windows-latest
