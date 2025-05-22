@@ -147,7 +147,10 @@ where
                 monitor.display(client_stats_manager, event.name(), id)?;
                 Ok(BrokerEventResult::Forward)
             }
-            Event::Heartbeat => Ok(BrokerEventResult::Handled),
+            Event::Heartbeat => {
+                monitor.display(client_stats_manager, event.name(), client_id)?;
+                Ok(BrokerEventResult::Handled)
+            }
             Event::UpdateUserStats { name, value, .. } => {
                 client_stats_manager.client_stats_insert(client_id)?;
                 client_stats_manager.update_client_stats_for(client_id, |client_stat| {

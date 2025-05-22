@@ -426,7 +426,7 @@ jobs:
 
   # Job to build and test the QEMU fuzzers
   qemu:
-    name: 🚀 ${{ matrix.fuzzer }}
+    name: 🤖 ${{ matrix.fuzzer }}
     needs:
       - fuzzers-preflight # Check that all the fuzzers listed for testing or explicitly ignored
       - qemu-changes # Only build if the QEMU code has changed
@@ -570,6 +570,8 @@ jobs:
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: no-std
       - name: Build aarch64-unknown-none
         run: cd ./fuzzers/fuzz_anything/baby_no_std && cargo build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
       - name: run x86_64 until panic!
@@ -587,6 +589,8 @@ jobs:
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: no-std
       - name: libafl armv6m-none-eabi (32 bit no_std) clippy
         run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
       - name: Build no_std no_alloc bolts
@@ -680,7 +684,7 @@ jobs:
 
   # The windows fuzzers require the same setup, so we will use a matrix build
   windows:
-    name: 🚀 ${{ matrix.fuzzer }}
+    name: 🚙 ${{ matrix.fuzzer }}
     strategy:
       matrix:
         fuzzer:
@@ -733,6 +737,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-clippy
       - name: Run real clippy, not the fake one
         shell: pwsh
         run: .\scripts\clippy.ps1
