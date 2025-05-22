@@ -434,7 +434,6 @@ jobs:
     strategy:
       matrix:
         fuzzer:
-            # Binary only
             - fuzzers/binary_only/qemu_cmin
             - fuzzers/binary_only/qemu_tmin
             - fuzzers/binary_only/qemu_coverage
@@ -481,10 +480,10 @@ jobs:
             ${{ matrix.fuzzer }}
 
   utils:
+    name: 🔧 ${{ matrix.util }}
     strategy:
       matrix:
-        fuzzer:
-          # Binary only
+        util:
           - ./utils/gdb_qemu
 
     runs-on: ubuntu-24.04
@@ -499,7 +498,7 @@ jobs:
       - name: Build and run utils (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: just -d ${{ matrix.fuzzer }} --justfile ${{ matrix.fuzzer }}/Justfile test
+        run: just -d ${{ matrix.util }} --justfile ${{ matrix.util }}/Justfile test
 
   # Build and test librasan. The setup is common, so we use a matrix build and
   # use the task name at the end to select which target to build
