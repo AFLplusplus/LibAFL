@@ -19,3 +19,6 @@ pub mod asan_guest;
 pub use asan_guest::AsanGuestModule;
 pub mod redirect_stdin;
 pub use redirect_stdin::*;
+
+pub mod redirect_stdout;
+pub use redirect_stdout::*;
