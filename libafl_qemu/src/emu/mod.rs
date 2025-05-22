@@ -371,13 +371,13 @@ where
         // # Safety
         // Pre-init hooks have been called above.
         unsafe {
-            Self::new_with_qemu(
+            Ok(Self::new_with_qemu(
                 qemu,
                 emulator_modules,
                 driver,
                 snapshot_manager,
                 command_manager,
-            )
+            ))
         }
     }
 
@@ -393,7 +393,7 @@ where
         driver: ED,
         snapshot_manager: SM,
         command_manager: CM,
-    ) -> Result<Self, QemuInitError> {
+    ) -> Self {
         let mut emulator = Emulator {
             modules: emulator_modules,
             command_manager,
@@ -406,7 +406,7 @@ where
 
         emulator.modules.post_qemu_init_all(qemu);
 
-        Ok(emulator)
+        emulator
     }
 }
 

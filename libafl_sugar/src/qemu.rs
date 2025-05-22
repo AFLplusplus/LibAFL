@@ -116,7 +116,7 @@ where
 }
 
 /// Enum to allow passing either qemu cli parameters or a running qemu instance
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum QemuSugarParameter<'a> {
     /// Argument list to pass to initialize Qemu
     QemuCli(&'a [String]),

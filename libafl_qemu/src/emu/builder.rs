@@ -176,13 +176,13 @@ where
         let emulator_modules = unsafe { super::EmulatorModules::new(emulator_hooks, self.modules) };
 
         unsafe {
-            Emulator::new_with_qemu(
+            Ok(Emulator::new_with_qemu(
                 qemu,
                 emulator_modules,
                 self.driver,
                 self.snapshot_manager,
                 self.command_manager,
-            )
+            ))
         }
     }
 }
