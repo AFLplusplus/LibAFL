@@ -1,7 +1,7 @@
 extern crate alloc;
 
 #[cfg(test)]
-#[cfg(all(feature = "linux"))]
+#[cfg(feature = "linux")]
 mod tests {
     use alloc::alloc::{GlobalAlloc, Layout};
 

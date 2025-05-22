@@ -102,6 +102,12 @@ void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
   cmplog_instructions_checked(k, shape, arg1, arg2, 0);
 }
 
+// Very generic afl++ style cmplog instructions callback
+void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t shape,
+  uint64_t arg1, uint64_t arg2) {
+  cmplog_instructions_extended_checked(k, shape, arg1, arg2, 0);
+}
+
 // Very generic cmplog routines callback
 void __libafl_targets_cmplog_routines(uintptr_t k, const uint8_t *ptr1,
                                       const uint8_t *ptr2) {

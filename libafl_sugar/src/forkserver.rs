@@ -6,31 +6,40 @@ use std::{fs, path::PathBuf};
 use libafl::{
     Error, HasMetadata,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
-    executors::forkserver::ForkserverExecutor,
-    feedback_or, feedback_or_fast,
+    events::{EventConfig, LlmpRestartingEventManager, launcher::Launcher},
+    executors::{
+        StdChildArgs,
+        forkserver::{AFL_MAP_SIZE_ENV_VAR, ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+    },
+    feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
+    inputs::BytesInput,
     monitors::MultiMonitor,
     mutators::{
+        I2SRandReplace, StdMOptMutator,
         havoc_mutations::havoc_mutations,
         scheduled::{HavocScheduledMutator, tokens_mutations},
         token_mutations::Tokens,
     },
-    observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::StdMutationalStage,
+    observers::{CanTrack, HitcountsMapObserver, StdCmpObserver, StdMapObserver, TimeObserver},
+    schedulers::{
+        IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
+    },
+    stages::{CalibrationStage, StdMutationalStage, StdPowerMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSliceMut, TargetArgs,
+    AsSliceMut, StdTargetArgs,
     core_affinity::Cores,
     nonzero,
+    ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{Merge, tuple_list},
 };
+use libafl_targets::AflppCmpLogMap;
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -51,9 +60,9 @@ pub struct ForkserverBytesCoverageSugar<'a> {
     /// Dictionary
     #[builder(default = None)]
     tokens_file: Option<PathBuf>,
-    // Flag if use CmpLog
+    // CmpLog binary to execute. If `None`, we will skip CmpLog.
     #[builder(default = None)]
-    use_cmplog: Option<bool>,
+    cmplog_binary: Option<PathBuf>,
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -63,12 +72,9 @@ pub struct ForkserverBytesCoverageSugar<'a> {
     #[builder(default = None, setter(strip_option))]
     remote_broker_addr: Option<SocketAddr>,
     /// Path to program to execute
-    program: String,
+    binary: PathBuf,
     /// Arguments of the program to execute
     arguments: &'a [String],
-    #[builder(default = false)]
-    /// Use shared mem testcase delivery
-    shmem_testcase: bool,
     #[builder(default = false)]
     /// Print target program output
     debug_output: bool,
@@ -91,19 +97,15 @@ impl ForkserverBytesCoverageSugar<'_> {
             None => EventConfig::AlwaysUnique,
         };
 
-        if self.use_cmplog.unwrap_or(false) {
-            log::warn!("use of cmplog not currently supported, use_cmplog ignored.");
-        }
-
         let timeout = Duration::from_secs(self.timeout.unwrap_or(DEFAULT_TIMEOUT_SECS));
 
         let mut out_dir = self.output_dir.clone();
         if fs::create_dir(&out_dir).is_err() {
-            log::info!("Out dir at {:?} already exists.", &out_dir);
+            log::info!("Out dir at {} already exists.", out_dir.display());
             assert!(
                 out_dir.is_dir(),
-                "Out dir at {:?} is not a valid directory!",
-                &out_dir
+                "Out dir at {} is not a valid directory!",
+                out_dir.display()
             );
         }
         let mut crashes = out_dir.clone();
@@ -123,6 +125,9 @@ impl ForkserverBytesCoverageSugar<'_> {
                               _core_id| {
             let time_observer = time_observer.clone();
 
+            // Create an empty set of tokens, first populated by the target program
+            let mut tokens = Tokens::new();
+
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
             unsafe {
@@ -132,7 +137,7 @@ impl ForkserverBytesCoverageSugar<'_> {
 
             // To let know the AFL++ binary that we have a big map
             unsafe {
-                std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
+                std::env::set_var(AFL_MAP_SIZE_ENV_VAR, format!("{MAP_SIZE}"));
             }
 
             // Create an observation channel using the coverage map
@@ -140,6 +145,13 @@ impl ForkserverBytesCoverageSugar<'_> {
                 HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_map))
                     .track_indices()
             };
+
+            // New maximization map feedback linked to the edges observer and the feedback state
+            let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);
+            // Extra MapFeedback to deduplicate finds according to the cov map
+            let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
+
+            let calibration = CalibrationStage::new(&map_feedback);
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
@@ -151,7 +163,10 @@ impl ForkserverBytesCoverageSugar<'_> {
             );
 
             // A feedback to choose if an input is a solution or not
-            let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+            let mut objective = feedback_and_fast!(
+                feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new()),
+                map_objective
+            );
 
             // If not restarting, create a State from scratch
             let mut state = state.unwrap_or_else(|| {
@@ -169,38 +184,40 @@ impl ForkserverBytesCoverageSugar<'_> {
                 .unwrap()
             });
 
-            // Create an empty set of tokens, first populated by the target program
-            let mut tokens = Tokens::new();
+            // Setup a MOPT mutator
+            let mutator = StdMOptMutator::new(
+                &mut state,
+                havoc_mutations().merge(tokens_mutations()),
+                7,
+                5,
+            )?;
+
+            let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
+                StdPowerMutationalStage::new(mutator);
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler =
-                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
+            let scheduler = IndexesLenTimeMinimizerScheduler::new(
+                &edges_observer,
+                StdWeightedScheduler::with_schedule(
+                    &mut state,
+                    &edges_observer,
+                    Some(PowerSchedule::explore()),
+                ),
+            );
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-            let forkserver = if self.shmem_testcase {
-                ForkserverExecutor::builder()
-                    .program(self.program.clone())
-                    .parse_afl_cmdline(self.arguments)
-                    .is_persistent(true)
-                    .autotokens(&mut tokens)
-                    .coverage_map_size(MAP_SIZE)
-                    .timeout(timeout)
-                    .debug_child(self.debug_output)
-                    .shmem_provider(&mut shmem_provider_client)
-                    .build_dynamic_map(edges_observer, tuple_list!(time_observer))
-            } else {
-                ForkserverExecutor::builder()
-                    .program(self.program.clone())
-                    .parse_afl_cmdline(self.arguments)
-                    .is_persistent(true)
-                    .autotokens(&mut tokens)
-                    .coverage_map_size(MAP_SIZE)
-                    .timeout(timeout)
-                    .debug_child(self.debug_output)
-                    .build_dynamic_map(edges_observer, tuple_list!(time_observer))
-            };
+            let forkserver = ForkserverExecutor::builder()
+                .program(self.binary.clone())
+                .parse_afl_cmdline(self.arguments)
+                .is_persistent(true)
+                .autotokens(&mut tokens)
+                .coverage_map_size(MAP_SIZE)
+                .timeout(timeout)
+                .debug_child(self.debug_output)
+                .shmem_provider(&mut shmem_provider_client)
+                .build_dynamic_map(edges_observer, tuple_list!(time_observer));
 
             let mut executor = forkserver.unwrap();
             if let Some(tokens_file) = &self.tokens_file {
@@ -245,14 +262,40 @@ impl ForkserverBytesCoverageSugar<'_> {
                 }
             }
 
-            if self.tokens_file.is_some() {
-                // Setup a basic mutator
-                let mutator =
-                    HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-                let mutational = StdMutationalStage::new(mutator);
+            if let Some(exec) = &self.cmplog_binary {
+                // The cmplog map shared between observer and executor
+                let mut cmplog_shmem = shmem_provider_client
+                    .uninit_on_shmem::<AflppCmpLogMap>()
+                    .unwrap();
+                // let the forkserver know the shmid
+                unsafe {
+                    cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
+                }
+                let cmpmap =
+                    unsafe { OwnedRefMut::<AflppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
+
+                let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
+
+                let cmplog_executor = ForkserverExecutor::builder()
+                    .program(exec)
+                    .debug_child(self.debug_output)
+                    .shmem_provider(&mut shmem_provider_client)
+                    .parse_afl_cmdline(self.arguments)
+                    .is_persistent(true)
+                    // We give more time to the cmplog run
+                    .timeout(timeout * 10)
+                    .build(tuple_list!(cmplog_observer))
+                    .unwrap();
+
+                let tracing = TracingStage::new(cmplog_executor);
+
+                // Setup a randomic Input2State stage
+                let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+                    I2SRandReplace::new()
+                )));
 
                 // The order of the stages matter!
-                let mut stages = tuple_list!(mutational);
+                let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
                 if let Some(iters) = self.iterations {
                     fuzzer.fuzz_loop_for(
@@ -262,18 +305,12 @@ impl ForkserverBytesCoverageSugar<'_> {
                         &mut mgr,
                         iters,
                     )?;
-                    mgr.on_restart(&mut state)?;
-                    std::process::exit(0);
                 } else {
                     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             } else {
-                // Setup a basic mutator
-                let mutator = HavocScheduledMutator::new(havoc_mutations());
-                let mutational = StdMutationalStage::new(mutator);
-
                 // The order of the stages matter!
-                let mut stages = tuple_list!(mutational);
+                let mut stages = tuple_list!(calibration, power);
 
                 if let Some(iters) = self.iterations {
                     fuzzer.fuzz_loop_for(
@@ -283,13 +320,10 @@ impl ForkserverBytesCoverageSugar<'_> {
                         &mut mgr,
                         iters,
                     )?;
-                    mgr.on_restart(&mut state)?;
-                    std::process::exit(0);
                 } else {
                     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             }
-
             Ok(())
         };
 
@@ -330,7 +364,6 @@ pub mod pybind {
         output_dir: PathBuf,
         broker_port: u16,
         cores: Cores,
-        use_cmplog: Option<bool>,
         iterations: Option<u64>,
         tokens_file: Option<PathBuf>,
         timeout: Option<u64>,
@@ -340,13 +373,11 @@ pub mod pybind {
     impl ForkserverBytesCoverageSugar {
         /// Create a new [`ForkserverBytesCoverageSugar`]
         #[new]
-        #[expect(clippy::too_many_arguments)]
         #[pyo3(signature = (
             input_dirs,
             output_dir,
             broker_port,
             cores,
-            use_cmplog=None,
             iterations=None,
             tokens_file=None,
             timeout=None
@@ -356,7 +387,6 @@ pub mod pybind {
             output_dir: PathBuf,
             broker_port: u16,
             cores: Vec<usize>,
-            use_cmplog: Option<bool>,
             iterations: Option<u64>,
             tokens_file: Option<PathBuf>,
             timeout: Option<u64>,
@@ -366,7 +396,6 @@ pub mod pybind {
                 output_dir,
                 broker_port,
                 cores: cores.into(),
-                use_cmplog,
                 iterations,
                 tokens_file,
                 timeout,
@@ -375,15 +404,15 @@ pub mod pybind {
 
         /// Run the fuzzer
         #[expect(clippy::needless_pass_by_value)]
-        pub fn run(&self, program: String, arguments: Vec<String>) {
+        pub fn run(&self, binary: String, arguments: Vec<String>, cmplog_binary: Option<String>) {
             forkserver::ForkserverBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
                 .broker_port(self.broker_port)
                 .cores(&self.cores)
-                .program(program)
+                .binary(binary.into())
+                .cmplog_binary(cmplog_binary.map(PathBuf::from))
                 .arguments(&arguments)
-                .use_cmplog(self.use_cmplog)
                 .timeout(self.timeout)
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)

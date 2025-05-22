@@ -6,7 +6,7 @@ mod tests {
     use asan::{
         GuestAddr,
         symbols::{
-            Function, SymbolsLookupStr,
+            Function, Symbols,
             dlsym::{DlSymSymbols, LookupTypeDefault},
         },
     };
@@ -29,14 +29,14 @@ mod tests {
         const NAME: &'static CStr = c"munmap";
     }
 
-    type DLSYM = DlSymSymbols<LookupTypeDefault>;
+    type DlSym = DlSymSymbols<LookupTypeDefault>;
 
     #[test]
     fn test_dlsym() {
         use asan::symbols::FunctionPointer;
 
-        let mmap = DLSYM::lookup_str(c"mmap").unwrap();
-        let mmap2 = DLSYM::lookup_str(c"mmap").unwrap();
+        let mmap = DlSym::lookup(c"mmap").unwrap();
+        let mmap2 = DlSym::lookup(c"mmap").unwrap();
         assert_eq!(mmap, mmap2);
         let fnmmap = FunctionMmap::as_ptr(mmap).unwrap();
         let mapping = unsafe {
@@ -51,8 +51,8 @@ mod tests {
         };
         let addr = mapping as GuestAddr;
         assert!(addr & 0xfff == 0);
-        let munmap = DLSYM::lookup_str(c"munmap").unwrap();
-        let munmap2 = DLSYM::lookup_str(c"munmap").unwrap();
+        let munmap = DlSym::lookup(c"munmap").unwrap();
+        let munmap2 = DlSym::lookup(c"munmap").unwrap();
         assert_eq!(munmap, munmap2);
         let fnmunmap = FunctionMunmap::as_ptr(munmap).unwrap();
         let ret = unsafe { fnmunmap(mapping, 4096) };

@@ -7,10 +7,11 @@ static GLOBAL: MiMalloc = MiMalloc;
 use std::{env, path::PathBuf};
 
 use libafl_bolts::core_affinity::Cores;
-use libafl_sugar::InMemoryBytesCoverageSugar;
+use libafl_sugar::InProcessBytesCoverageSugar;
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input};
 
-pub fn main() {
+#[no_mangle]
+pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
@@ -35,7 +36,7 @@ fn fuzz(input_dirs: &[PathBuf], output_dir: PathBuf, cores: &Cores, broker_port:
         println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
-    InMemoryBytesCoverageSugar::builder()
+    InProcessBytesCoverageSugar::builder()
         .input_dirs(input_dirs)
         .output_dir(output_dir)
         .cores(cores)

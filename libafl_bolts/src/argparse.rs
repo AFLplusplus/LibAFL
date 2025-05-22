@@ -4,50 +4,23 @@ use core::{
     ffi::{c_char, c_int},
     pin::Pin,
 };
-use std::{ffi::OsString, os::unix::ffi::OsStrExt};
+use std::os::unix::ffi::OsStrExt;
 
-use crate::{Error, InputLocation, TargetArgs};
+use crate::{Error, StdTargetArgs, StdTargetArgsInner};
 
 /// For creating an C-compatible argument
 #[derive(Debug)]
 pub struct CMainArgsBuilder {
-    program: Option<OsString>,
-    input_location: InputLocation,
-    envs: Vec<(OsString, OsString)>,
-    args: Vec<OsString>,
+    inner: StdTargetArgsInner,
 }
 
-impl TargetArgs for CMainArgsBuilder {
-    fn arguments_ref(&self) -> &Vec<OsString> {
-        &self.args
+impl StdTargetArgs for CMainArgsBuilder {
+    fn inner(&self) -> &StdTargetArgsInner {
+        &self.inner
     }
 
-    fn arguments_mut(&mut self) -> &mut Vec<OsString> {
-        &mut self.args
-    }
-
-    fn input_location_ref(&self) -> &InputLocation {
-        &self.input_location
-    }
-
-    fn input_location_mut(&mut self) -> &mut InputLocation {
-        &mut self.input_location
-    }
-
-    fn envs_ref(&self) -> &Vec<(OsString, OsString)> {
-        &self.envs
-    }
-
-    fn envs_mut(&mut self) -> &mut Vec<(OsString, OsString)> {
-        &mut self.envs
-    }
-
-    fn program_ref(&self) -> &Option<OsString> {
-        &self.program
-    }
-
-    fn program_mut(&mut self) -> &mut Option<OsString> {
-        &mut self.program
+    fn inner_mut(&mut self) -> &mut StdTargetArgsInner {
+        &mut self.inner
     }
 }
 
@@ -62,10 +35,7 @@ impl CMainArgsBuilder {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            program: None,
-            input_location: InputLocation::StdIn,
-            envs: Vec::new(),
-            args: Vec::new(),
+            inner: StdTargetArgsInner::default(),
         }
     }
 
@@ -73,13 +43,13 @@ impl CMainArgsBuilder {
     pub fn build(&self) -> Result<CMainArgs, Error> {
         let mut argv: Vec<Pin<Box<CString>>> = Vec::new();
 
-        if let Some(program) = &self.program {
+        if let Some(program) = &self.inner().program {
             argv.push(Box::pin(CString::new(program.as_bytes()).unwrap()));
         } else {
             return Err(Error::illegal_argument("Program not specified"));
         }
 
-        for args in &self.args {
+        for args in &self.inner().arguments {
             argv.push(Box::pin(CString::new(args.as_bytes()).unwrap()));
         }
 

@@ -1,5 +1,5 @@
 #[cfg(test)]
-#[cfg(all(feature = "hooks"))]
+#[cfg(feature = "hooks")]
 mod tests {
     use core::{
         ffi::c_void,

@@ -1,19 +1,18 @@
 //! `LibAFL` functionality for filesystem interaction
 
-#[cfg(feature = "std")]
-use alloc::{borrow::ToOwned, vec::Vec};
-use alloc::{rc::Rc, string::String};
-use core::cell::RefCell;
-#[cfg(feature = "std")]
-use core::time::Duration;
+use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
+use core::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 #[cfg(unix)]
 use std::os::unix::prelude::{AsRawFd, RawFd};
-#[cfg(feature = "std")]
-use std::time::SystemTime;
 use std::{
     fs::{self, File, OpenOptions, remove_file},
     io::{Seek, Write},
     path::{Path, PathBuf},
+    sync::OnceLock,
+    time::SystemTime,
 };
 
 use crate::Error;
@@ -25,7 +24,11 @@ pub const INPUTFILE_STD: &str = ".cur_input";
 /// Derives a filename from [`INPUTFILE_STD`] that may be used to deliver testcases to the target.
 /// It ensures the filename is unique to the fuzzer process.
 pub fn get_unique_std_input_file() -> String {
-    format!("{}_{}", INPUTFILE_STD, std::process::id())
+    static STD_COUNT: OnceLock<AtomicU64> = OnceLock::new();
+    let next = STD_COUNT
+        .get_or_init(|| AtomicU64::new(0))
+        .fetch_add(1, Ordering::SeqCst);
+    format!("{}_{}_{}", INPUTFILE_STD, std::process::id(), next)
 }
 
 /// Write a file atomically
@@ -62,7 +65,6 @@ where
 
 /// An [`InputFile`] to write fuzzer input to.
 /// The target/forkserver will read from this file.
-#[cfg(feature = "std")]
 #[derive(Debug)]
 pub struct InputFile {
     /// The filename/path too this [`InputFile`]
@@ -71,7 +73,7 @@ pub struct InputFile {
     pub file: File,
     /// The ref count for this [`InputFile`].
     /// Once it reaches 0, the underlying [`File`] will be removed.
-    pub rc: Rc<RefCell<usize>>,
+    pub rc: Arc<()>,
 }
 
 impl Eq for InputFile {}
@@ -84,11 +86,6 @@ impl PartialEq for InputFile {
 
 impl Clone for InputFile {
     fn clone(&self) -> Self {
-        {
-            let mut rc = self.rc.borrow_mut();
-            assert_ne!(*rc, usize::MAX, "InputFile rc overflow");
-            *rc += 1;
-        }
         Self {
             path: self.path.clone(),
             file: self.file.try_clone().unwrap(),
@@ -113,7 +110,7 @@ impl InputFile {
         Ok(Self {
             path: filename.as_ref().to_owned(),
             file: f,
-            rc: Rc::new(RefCell::new(1)),
+            rc: Arc::new(()),
         })
     }
 
@@ -147,7 +144,6 @@ impl InputFile {
 /// Finds new files in the given directory, taking the last time we looked at this path as parameter.
 /// This method works recursively.
 /// If `last` is `None`, it'll load all file.
-#[cfg(feature = "std")]
 pub fn find_new_files_rec<P: AsRef<Path>>(
     dir: P,
     last_check: &Option<Duration>,
@@ -182,13 +178,9 @@ pub fn find_new_files_rec<P: AsRef<Path>>(
     Ok(new_files)
 }
 
-#[cfg(feature = "std")]
 impl Drop for InputFile {
     fn drop(&mut self) {
-        let mut rc = self.rc.borrow_mut();
-        assert_ne!(*rc, 0, "InputFile rc should never be 0");
-        *rc -= 1;
-        if *rc == 0 {
+        if Arc::into_inner(core::mem::take(&mut self.rc)).is_some() {
             // try to remove the file, but ignore errors
             drop(remove_file(&self.path));
         }

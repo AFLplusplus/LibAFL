@@ -12,9 +12,7 @@ use crate::{
     GuestAddr,
     host::{Host, HostAction},
     shadow::PoisonType,
-    symbols::{
-        AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols, SymbolsLookupStr,
-    },
+    symbols::{AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols},
 };
 
 #[derive(Debug)]
@@ -139,7 +137,7 @@ impl<S: Symbols> LibcHost<S> {
 
     fn get_syscall() -> Result<<FunctionSyscall as Function>::Func, LibcHostError<S>> {
         let addr = SYSCALL_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionSyscall::NAME).map_err(|e| LibcHostError::FailedToFindSymbol(e))
+            S::lookup(FunctionSyscall::NAME).map_err(|e| LibcHostError::FailedToFindSymbol(e))
         })?;
         let f = FunctionSyscall::as_ptr(addr).map_err(|e| LibcHostError::InvalidPointerType(e))?;
         Ok(f)

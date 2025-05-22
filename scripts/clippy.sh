@@ -3,8 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 cd "$SCRIPT_DIR/.." || exit 1
 
-CLIPPY_CMD="RUST_BACKTRACE=full cargo +nightly clippy --no-deps --tests --examples --benches"
-RUSTC_FLAGS="-Z macro-backtrace"
+CLIPPY_CMD="RUST_BACKTRACE=full cargo clippy --no-deps --tests --examples --benches"
 
 set -e
 # Function to run Clippy on a single directory
@@ -69,10 +68,7 @@ for project in "${PROJECTS[@]}"; do
       echo "Warning: Directory $project does not exist. Skipping."
    fi
 done
-
+# Last run it on all
 eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"
 
 echo "Clippy run completed for all specified projects."
-
-# Last run it on all
-eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"

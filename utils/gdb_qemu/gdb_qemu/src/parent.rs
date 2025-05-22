@@ -7,7 +7,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use nix::unistd::read;
 
 use crate::{args::ParentArgs, exit::Exit};

@@ -117,8 +117,11 @@ pub fn main() {
     }
 
     let timeout = Duration::from_secs(5);
-    let mut executor =
-        MyExecutor { shmem_id, timeout }.into_executor(tuple_list!(observer, bt_observer));
+    let mut executor = MyExecutor { shmem_id, timeout }.into_executor(
+        tuple_list!(observer, bt_observer),
+        None,
+        None,
+    );
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(nonzero!(32));

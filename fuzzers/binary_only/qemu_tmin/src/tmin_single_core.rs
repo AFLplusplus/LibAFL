@@ -1,6 +1,7 @@
 //! A binary-only testcase minimizer using qemu, similar to AFL++ afl-tmin
 #[cfg(feature = "i386")]
 use core::mem::size_of;
+use core::str::from_utf8;
 #[cfg(feature = "snapshot")]
 use core::time::Duration;
 use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
@@ -29,8 +30,10 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, Emulator, GuestAddr,
-    GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuShutdownCause, Regs,
+    elf::EasyElf,
+    modules::{edges::StdEdgeCoverageChildModule, RedirectStdoutModule},
+    ArchExtras, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason,
+    QemuShutdownCause, Regs,
 };
 #[cfg(feature = "snapshot")]
 use libafl_qemu::{modules::SnapshotModule, QemuExecutor};
@@ -146,12 +149,30 @@ pub fn fuzz() -> Result<(), Error> {
         ))
     };
 
+    let stdout_callback = |buf: &[u8]| {
+        if let Ok(s) = from_utf8(buf) {
+            let msg = s.trim_end();
+            if msg.len() != 0 {
+                log::info!("{msg}");
+            }
+        }
+    };
+
+    let redirect_stdout_module = if options.verbose {
+        RedirectStdoutModule::new()
+            .with_stderr(stdout_callback)
+            .with_stdout(stdout_callback)
+    } else {
+        RedirectStdoutModule::new()
+    };
+
     #[cfg(feature = "snapshot")]
     let modules = tuple_list!(
         StdEdgeCoverageChildModule::builder()
             .const_map_observer(edges_observer.as_mut())
             .build()?,
-        SnapshotModule::new()
+        SnapshotModule::new(),
+        redirect_stdout_module
     );
 
     // Create our QEMU emulator
@@ -223,9 +244,7 @@ pub fn fuzz() -> Result<(), Error> {
         };
 
     // Set up the most basic monitor possible.
-    let monitor = SimpleMonitor::new(|s| {
-        println!("{s}");
-    });
+    let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
         Ok(res) => res,

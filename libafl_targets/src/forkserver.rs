@@ -6,22 +6,31 @@ use std::{
     sync::OnceLock,
 };
 
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
+use libafl::executors::forkserver::FS_NEW_OPT_AUTODTCT;
+#[cfg(feature = "cmplog")]
+use libafl::executors::forkserver::SHM_CMPLOG_ENV_VAR;
 use libafl::{
     Error,
     executors::forkserver::{
-        FORKSRV_FD, FS_ERROR_SHM_OPEN, FS_NEW_OPT_AUTODTCT, FS_NEW_OPT_MAPSIZE,
-        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, SHM_CMPLOG_ENV_VAR, SHM_ENV_VAR,
-        SHM_FUZZ_ENV_VAR,
+        AFL_MAP_SIZE_ENV_VAR, FORKSRV_FD, FS_ERROR_SHM_OPEN, FS_NEW_OPT_MAPSIZE,
+        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, MAX_INPUT_SIZE_DEFAULT,
+        SHM_ENV_VAR, SHM_FUZZ_ENV_VAR, SHM_FUZZ_MAP_SIZE_ENV_VAR, SHMEM_FUZZ_HDR_SIZE,
     },
 };
-use libafl_bolts::os::{ChildHandle, ForkResult};
+use libafl_bolts::{
+    os::{ChildHandle, ForkResult},
+    shmem::{ShMem, ShMemId, ShMemProvider},
+};
 use nix::{
     sys::signal::{SigHandler, Signal},
     unistd::Pid,
 };
 
+#[cfg(feature = "cmplog_extended_instrumentation")]
+use crate::cmps::EXTENDED_CMPLOG_MAP_PTR;
 #[cfg(feature = "cmplog")]
-use crate::cmps::CMPLOG_MAP_PTR;
+use crate::cmps::{AflppCmpLogMap, CMPLOG_MAP_PTR};
 use crate::coverage::{__afl_map_size, EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use crate::coverage::{__token_start, __token_stop};
@@ -51,6 +60,7 @@ fn write_to_forkserver(message: &[u8]) -> Result<(), Error> {
     }
     Ok(())
 }
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 fn write_all_to_forkserver(message: &[u8]) -> Result<(), Error> {
     let mut remain_len = message.len();
     while remain_len > 0 {
@@ -86,6 +96,39 @@ fn read_u32_from_forkserver() -> Result<u32, Error> {
     Ok(u32::from_ne_bytes(buf))
 }
 
+/// Consume current shared memory structure, and get the raw pointer to
+/// this shared memory.
+///
+/// Note that calling this method will result in a memory leak.
+fn shmem_into_raw<T: Sized>(shmem: impl ShMem) -> *mut T {
+    let mut manually_dropped = core::mem::ManuallyDrop::new(shmem);
+    manually_dropped.as_mut_ptr().cast()
+}
+
+fn map_shared_memory_common<SHM: ShMemProvider>(
+    shmem_provider: &mut SHM,
+    map_env_var: &str,
+    map_size_env_var: &str,
+    map_size_default_fallback: usize,
+) -> Result<*mut u8, Error> {
+    let Ok(id_str) = std::env::var(map_env_var) else {
+        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
+        return Err(Error::illegal_argument(format!(
+            "Error: shared memory variable {map_env_var} is not set"
+        )));
+    };
+    let map_size = if let Ok(map_size_str) = std::env::var(map_size_env_var) {
+        map_size_str
+            .parse()
+            .map_err(|_| Error::illegal_argument(format!("Invalid {map_size_env_var} value")))?
+    } else {
+        map_size_default_fallback
+    };
+    let shmem = shmem_provider.shmem_from_id_and_size(ShMemId::from_string(&id_str), map_size)?;
+
+    Ok(shmem_into_raw(shmem))
+}
+
 /// Guard [`map_shared_memory`] is invoked only once
 static SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
 
@@ -94,31 +137,18 @@ static SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
 ///
 /// If anything failed, the forkserver will be notified with
 /// [`FS_ERROR_SHM_OPEN`].
-pub fn map_shared_memory() -> Result<(), Error> {
+pub fn map_shared_memory<SHM: ShMemProvider>(shmem_provider: &mut SHM) -> Result<(), Error> {
     if SHM_MAP_GUARD.set(()).is_err() {
         return Err(Error::illegal_state("shared memory has been mapped before"));
     }
-    map_shared_memory_internal()
+    map_shared_memory_internal(shmem_provider)
 }
 
-fn map_shared_memory_internal() -> Result<(), Error> {
-    let Ok(id_str) = std::env::var(SHM_ENV_VAR) else {
-        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
-        return Err(Error::illegal_argument(
-            "Error: variable for edge coverage shared memory is not set",
-        ));
-    };
-    let Ok(shm_id) = id_str.parse() else {
-        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
-        return Err(Error::illegal_argument("Invalid __AFL_SHM_ID value"));
-    };
-    let map = unsafe { libc::shmat(shm_id, core::ptr::null(), 0) };
-    if map.is_null() || core::ptr::eq(map, libc::MAP_FAILED) {
-        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
-        return Err(Error::illegal_state("shmat for map"));
-    }
+fn map_shared_memory_internal<SHM: ShMemProvider>(shmem_provider: &mut SHM) -> Result<(), Error> {
+    let target_ptr =
+        map_shared_memory_common(shmem_provider, SHM_ENV_VAR, AFL_MAP_SIZE_ENV_VAR, 65536)?;
     unsafe {
-        EDGES_MAP_PTR = map.cast();
+        EDGES_MAP_PTR = target_ptr;
     }
     Ok(())
 }
@@ -131,32 +161,23 @@ static INPUT_SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
 ///
 /// If anything failed, the forkserver will be notified with
 /// [`FS_ERROR_SHM_OPEN`].
-pub fn map_input_shared_memory() -> Result<(), Error> {
+pub fn map_input_shared_memory<SHM: ShMemProvider>(shmem_provider: &mut SHM) -> Result<(), Error> {
     if INPUT_SHM_MAP_GUARD.set(()).is_err() {
         return Err(Error::illegal_state("shared memory has been mapped before"));
     }
-    map_input_shared_memory_internal()
+    map_input_shared_memory_internal(shmem_provider)
 }
 
-fn map_input_shared_memory_internal() -> Result<(), Error> {
-    let Ok(id_str) = std::env::var(SHM_FUZZ_ENV_VAR) else {
-        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
-        return Err(Error::illegal_argument(
-            "Error: variable for fuzzing shared memory is not set",
-        ));
-    };
-    let Ok(shm_id) = id_str.parse() else {
-        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
-        return Err(Error::illegal_argument("Invalid __AFL_SHM_FUZZ_ID value"));
-    };
-    let map = unsafe { libc::shmat(shm_id, core::ptr::null(), 0) };
-    if map.is_null() || core::ptr::eq(map, libc::MAP_FAILED) {
-        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
-        return Err(Error::illegal_state(
-            "Could not access fuzzing shared memory",
-        ));
-    }
-    let map: *mut u32 = map.cast();
+fn map_input_shared_memory_internal<SHM: ShMemProvider>(
+    shmem_provider: &mut SHM,
+) -> Result<(), Error> {
+    let target_ptr = map_shared_memory_common(
+        shmem_provider,
+        SHM_FUZZ_ENV_VAR,
+        SHM_FUZZ_MAP_SIZE_ENV_VAR,
+        MAX_INPUT_SIZE_DEFAULT + SHMEM_FUZZ_HDR_SIZE,
+    )?;
+    let map: *mut u32 = target_ptr.cast();
     unsafe {
         INPUT_LENGTH_PTR = map;
         INPUT_PTR = map.add(1).cast();
@@ -174,32 +195,33 @@ static CMPLOG_SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
 /// If anything failed, the forkserver will be notified with
 /// [`FS_ERROR_SHM_OPEN`].
 #[cfg(feature = "cmplog")]
-pub fn map_cmplog_shared_memory() -> Result<(), Error> {
+pub fn map_cmplog_shared_memory<SHM: ShMemProvider>(shmem_provider: &mut SHM) -> Result<(), Error> {
     if CMPLOG_SHM_MAP_GUARD.set(()).is_err() {
         return Err(Error::illegal_state("shared memory has been mapped before"));
     }
-    map_cmplog_shared_memory_internal()
+    map_cmplog_shared_memory_internal(shmem_provider)
 }
 
 #[cfg(feature = "cmplog")]
-fn map_cmplog_shared_memory_internal() -> Result<(), Error> {
+fn map_cmplog_shared_memory_internal<SHM: ShMemProvider>(
+    shmem_provider: &mut SHM,
+) -> Result<(), Error> {
     let Ok(id_str) = std::env::var(SHM_CMPLOG_ENV_VAR) else {
         write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
-        return Err(Error::illegal_argument(
-            "Error: variable for cmplog shared memory is not set",
-        ));
+        return Err(Error::illegal_argument(format!(
+            "Error: shared memory variable {SHM_CMPLOG_ENV_VAR} is not set"
+        )));
     };
-    let Ok(shm_id) = id_str.parse() else {
-        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
-        return Err(Error::illegal_argument("Invalid __AFL_CMPLOG_SHM_ID value"));
-    };
-    let map = unsafe { libc::shmat(shm_id, core::ptr::null(), 0) };
-    if map.is_null() || core::ptr::eq(map, libc::MAP_FAILED) {
-        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
-        return Err(Error::illegal_state("shmat for map"));
-    }
+    let map_size = size_of::<AflppCmpLogMap>();
+    let shmem = shmem_provider.shmem_from_id_and_size(ShMemId::from_string(&id_str), map_size)?;
+
+    let target_ptr = shmem_into_raw(shmem);
     unsafe {
-        CMPLOG_MAP_PTR = map.cast();
+        CMPLOG_MAP_PTR = target_ptr;
+    }
+    #[cfg(feature = "cmplog_extended_instrumentation")]
+    unsafe {
+        EXTENDED_CMPLOG_MAP_PTR = target_ptr;
     }
     Ok(())
 }

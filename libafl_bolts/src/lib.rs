@@ -5,10 +5,6 @@
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]
-// For `type_eq`
-#![cfg_attr(nightly, feature(specialization))]
-// For `std::simd`
-#![cfg_attr(nightly, feature(portable_simd))]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
@@ -341,6 +337,8 @@ pub enum Error {
     InvalidCorpus(String, ErrorBacktrace),
     /// Error specific to a runtime like QEMU or Frida
     Runtime(String, ErrorBacktrace),
+    /// The `Input` was invalid.
+    InvalidInput(String, ErrorBacktrace),
 }
 
 impl Error {
@@ -367,6 +365,15 @@ impl Error {
         S: Into<String>,
     {
         Error::EmptyOptional(arg.into(), ErrorBacktrace::new())
+    }
+
+    /// The `Input` was invalid
+    #[must_use]
+    pub fn invalid_input<S>(reason: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::InvalidInput(reason.into(), ErrorBacktrace::new())
     }
 
     /// Key not in Map
@@ -578,6 +585,10 @@ impl Display for Error {
             }
             Self::Runtime(s, b) => {
                 write!(f, "Runtime error: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::InvalidInput(s, b) => {
+                write!(f, "Encountered an invalid input: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
         }

@@ -12,7 +12,7 @@ readme = "../../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -25,6 +25,9 @@ categories = [
 features = ["document-features"]
 all-features = true
 rustc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
 
 [features]
 default = [
@@ -187,10 +190,14 @@ llmp_small_maps = [
   "libafl_bolts/llmp_small_maps",
 ] # reduces initial map size for llmp
 
-## Grammar mutator. Requires nightly.
+## Grammar mutator.
 nautilus = ["std", "serde_json/std", "rand_trait", "regex-syntax", "regex"]
 
+## Python grammar support for nautilus
 nautilus_py = ["nautilus", "dep:pyo3"]
+
+## Lua Mutator support (mutators implemented in Lua)
+lua_mutator = ["mlua"]
 
 ## Use the best SIMD implementation by our benchmark
 simd = ["libafl_bolts/simd"]
@@ -296,9 +303,13 @@ document-features = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
 fastbloom = { workspace = true, optional = true }
-
-[lints]
-workspace = true
+# For Lua Mutators
+# TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>
+mlua = { version = "0.10.3", features = [
+  "lua54",
+  "vendored",
+  "macros",
+], optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }                # For (*nix) libc

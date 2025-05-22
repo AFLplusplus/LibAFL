@@ -17,7 +17,7 @@ function Run-Clippy {
     
     try {
         $env:RUST_BACKTRACE = "full"
-        cargo +nightly clippy --all-features --no-deps --tests --examples --benches -- -Z macro-backtrace
+        cargo clippy --all-features --no-deps --tests --examples --benches
 
         # Exit unsuccessfully on clippy error
         if (!$?) {
@@ -55,7 +55,7 @@ else {
 
 # First run it on all default members
 $env:RUST_BACKTRACE = "full"
-cargo +nightly clippy --all-features --no-deps --tests --examples --benches -- -Z macro-backtrace
+cargo clippy --all-features --no-deps --tests --examples --benches
 
 # Exit unsuccessfully on clippy error
 if (!$?) {

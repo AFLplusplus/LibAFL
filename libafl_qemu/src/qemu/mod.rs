@@ -916,7 +916,7 @@ impl Qemu {
 
     #[cfg(feature = "systemmode")]
     pub fn set_hw_breakpoint(&self, addr: GuestAddr) -> Result<(), Error> {
-        let ret = unsafe { libafl_qemu_set_hw_breakpoint(addr.into()) };
+        let ret = unsafe { libafl_qemu_set_hw_breakpoint(addr as GuestVirtAddr) };
         match ret {
             0 => Ok(()),
             errno => Err(Error::unsupported(format!(
@@ -927,7 +927,7 @@ impl Qemu {
 
     #[cfg(feature = "systemmode")]
     pub fn remove_hw_breakpoint(&self, addr: GuestAddr) -> Result<(), Error> {
-        let ret = unsafe { libafl_qemu_remove_hw_breakpoint(addr.into()) };
+        let ret = unsafe { libafl_qemu_remove_hw_breakpoint(addr as GuestVirtAddr) };
         match ret {
             0 => Ok(()),
             errno => Err(Error::unsupported(format!(

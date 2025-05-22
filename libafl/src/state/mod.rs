@@ -701,7 +701,7 @@ where
 
     fn load_file<E, EM, Z>(
         &mut self,
-        path: &PathBuf,
+        path: &Path,
         manager: &mut EM,
         fuzzer: &mut Z,
         executor: &mut E,
@@ -711,11 +711,14 @@ where
         EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
-        log::info!("Loading file {path:?} ...");
+        log::info!("Loading file {} ...", path.display());
         let input = match (config.loader)(fuzzer, self, path) {
             Ok(input) => input,
             Err(err) => {
-                log::error!("Skipping input that we could not load from {path:?}: {err:?}");
+                log::error!(
+                    "Skipping input that we could not load from {}: {err:?}",
+                    path.display()
+                );
                 return Ok(ExecuteInputResult::default());
             }
         };
@@ -726,7 +729,10 @@ where
             let (res, _) = fuzzer.evaluate_input(self, executor, manager, &input)?;
             if !(res.is_corpus() || res.is_solution()) {
                 fuzzer.add_disabled_input(self, input)?;
-                log::warn!("input {:?} was not interesting, adding as disabled.", &path);
+                log::warn!(
+                    "Input {} was not interesting, adding as disabled.",
+                    path.display()
+                );
             }
             Ok(res)
         }

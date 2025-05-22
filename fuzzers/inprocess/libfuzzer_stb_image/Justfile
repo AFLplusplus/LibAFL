@@ -1,14 +1,15 @@
 FUZZER_NAME := 'libfuzzer_stb_image'
 PROJECT_DIR := absolute_path(".")
 CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
-PROFILE := env("PROFILE", "release")
+PROFILE := env("PROFILE", "dev")
 PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
 
 EXTENSION := if os() == "windows" {".exe"} else { "" }
 LIBAFL_CC := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc" + EXTENSION
 LIBAFL_CXX := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx" + EXTENSION
- 
 FUZZER := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME + EXTENSION
+set windows-shell := ['cmd.exe', '/c']
+set unstable
 
 alias cc := cxx
 
@@ -18,7 +19,7 @@ cxx:
 fuzzer: cxx
     #!/bin/bash
     cargo build --profile {{PROFILE}}
-    cp {{FUZZER}} .
+    {{LIBAFL_CC}} -o ./{{FUZZER_NAME}} harness.cc
 
 [linux]
 [macos]
@@ -46,6 +47,11 @@ test: fuzzer
         echo "Fuzzer does not generate any testcases or any crashes"
         exit 1
     fi
+
+[windows]
+[script("cmd.exe", "/c")]
+test:
+    cargo build --release
 
 clean:
     #!/bin/bash

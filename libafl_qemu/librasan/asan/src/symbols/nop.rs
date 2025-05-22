@@ -10,7 +10,7 @@ pub struct NopSymbols;
 impl Symbols for NopSymbols {
     type Error = NopSymbolsError;
 
-    fn lookup(name: *const c_char) -> Result<GuestAddr, Self::Error> {
+    unsafe fn lookup_raw(name: *const c_char) -> Result<GuestAddr, Self::Error> {
         Err(NopSymbolsError::SymbolNotFound(name))
     }
 }

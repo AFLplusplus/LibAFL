@@ -283,6 +283,8 @@ PreservedAnalyses AFLCoverage::run(Module &M, ModuleAnalysisManager &MAM) {
             }
             break;
           }
+          default:
+            break;
         }
       }
       /* Make up cur_loc */

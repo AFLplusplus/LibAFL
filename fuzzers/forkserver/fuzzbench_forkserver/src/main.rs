@@ -11,7 +11,10 @@ use clap::{Arg, ArgAction, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::forkserver::{ForkserverExecutor, SHM_CMPLOG_ENV_VAR},
+    executors::{
+        forkserver::{ForkserverExecutor, AFL_MAP_SIZE_ENV_VAR, SHM_CMPLOG_ENV_VAR},
+        StdChildArgs,
+    },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -38,9 +41,9 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSliceMut, TargetArgs,
+    AsSliceMut, StdTargetArgs,
 };
-use libafl_targets::cmps::AFLppCmpLogMap;
+use libafl_targets::cmps::AflppCmpLogMap;
 use nix::sys::signal::Signal;
 
 pub fn main() {
@@ -247,7 +250,7 @@ fn fuzz(
     }
     let shmem_buf = shmem.as_slice_mut();
     // To let know the AFL++ binary that we have a big map
-    std::env::set_var("AFL_MAP_SIZE", format!("{}", MAP_SIZE));
+    std::env::set_var(AFL_MAP_SIZE_ENV_VAR, format!("{}", MAP_SIZE));
 
     // Create an observation channel using the hitcounts map of AFL++
     let edges_observer = unsafe {
@@ -348,12 +351,12 @@ fn fuzz(
 
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
-        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
+        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AflppCmpLogMap>().unwrap();
         // let the forkserver know the shmid
         unsafe {
             cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
         }
-        let cmpmap = unsafe { OwnedRefMut::<AFLppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
+        let cmpmap = unsafe { OwnedRefMut::<AflppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
 

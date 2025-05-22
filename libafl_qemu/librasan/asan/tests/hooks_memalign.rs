@@ -21,7 +21,7 @@ mod tests {
     #[test]
     fn memalign_power_of_two() {
         let addr = unsafe { memalign(8, 8) };
-        assert_ne!(addr, 0 as *mut _);
+        assert_ne!(addr, std::ptr::null_mut());
         assert_eq!(addr as usize & 7, 0);
     }
 
