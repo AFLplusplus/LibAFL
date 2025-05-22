@@ -368,7 +368,7 @@ jobs:
           # they would all share the same key (combining the `shared-key` and 
           # `key`) our build would generate a load of warnings. Why this 
           # particular fuzzer? No real reason, but we had to choose one.
-          save-if: ${{ matrix.fuzzer = 'binary_only/frida_libpng' }}
+          save-if: ${{ matrix.fuzzer == 'binary_only/frida_libpng' }}
           cache-all-crates: true
           # The code is built in the fuzzers own directory, not in the target
           # directory in the root of the workspace
