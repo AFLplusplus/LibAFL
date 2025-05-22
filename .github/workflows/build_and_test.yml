@@ -208,7 +208,7 @@ jobs:
       - name: Run a maturin build
         run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
       - name: Run python test
-        run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/binary_only/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
+        run: . ./bindings/pylibafl/.env/bin/activate # && cd fuzzers/binary_only/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
 
   cargo-fmt:
     runs-on: ubuntu-24.04
@@ -262,81 +262,81 @@ jobs:
       matrix:
         fuzzer:
           # Baby
-          - ./fuzzers/baby/baby_fuzzer_swap_differential
-          - ./fuzzers/baby/tutorial
-          - ./fuzzers/baby/baby_fuzzer
-          # - ./fuzzers/baby/backtrace_baby_fuzzers
-          - ./fuzzers/baby/baby_fuzzer_unicode
-          - ./fuzzers/baby/baby_fuzzer_minimizing
-          - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_fork_executor
-          - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor
-          - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_fork_executor
-          - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
-          - ./fuzzers/baby/backtrace_baby_fuzzers/command_executor
-          - ./fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor
-          - ./fuzzers/baby/baby_fuzzer_custom_executor
+          - fuzzers/baby/baby_fuzzer_swap_differential
+          - fuzzers/baby/tutorial
+          - fuzzers/baby/baby_fuzzer
+          # - fuzzers/baby/backtrace_baby_fuzzers
+          - fuzzers/baby/baby_fuzzer_unicode
+          - fuzzers/baby/baby_fuzzer_minimizing
+          - fuzzers/baby/backtrace_baby_fuzzers/c_code_with_fork_executor
+          - fuzzers/baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor
+          - fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_fork_executor
+          - fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
+          - fuzzers/baby/backtrace_baby_fuzzers/command_executor
+          - fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor
+          - fuzzers/baby/baby_fuzzer_custom_executor
 
           # Binary-only
-          - ./fuzzers/binary_only/fuzzbench_fork_qemu
-          - ./fuzzers/binary_only/frida_executable_libpng
-          # - ./fuzzers/binary_only/frida_windows_gdiplus
-          - ./fuzzers/binary_only/frida_libpng
-          - ./fuzzers/binary_only/fuzzbench_qemu
-          - ./fuzzers/binary_only/intel_pt_baby_fuzzer
-          - ./fuzzers/binary_only/intel_pt_command_executor
-          # - ./fuzzers/binary_only/tinyinst_simple
+          - fuzzers/binary_only/fuzzbench_fork_qemu
+          - fuzzers/binary_only/frida_executable_libpng
+          # - fuzzers/binary_only/frida_windows_gdiplus
+          - fuzzers/binary_only/frida_libpng
+          - fuzzers/binary_only/fuzzbench_qemu
+          - fuzzers/binary_only/intel_pt_baby_fuzzer
+          - fuzzers/binary_only/intel_pt_command_executor
+          # - fuzzers/binary_only/tinyinst_simple
 
           # Forkserver
-          - ./fuzzers/forkserver/forkserver_simple
-          - ./fuzzers/forkserver/forkserver_capture_stdout
-          - ./fuzzers/forkserver/forkserver_libafl_cc
-          - ./fuzzers/forkserver/fuzzbench_forkserver
-          - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
-          - ./fuzzers/forkserver/fuzzbench_forkserver_sand
-          - ./fuzzers/forkserver/libafl-fuzz
-          - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
+          - fuzzers/forkserver/forkserver_simple
+          - fuzzers/forkserver/forkserver_capture_stdout
+          - fuzzers/forkserver/forkserver_libafl_cc
+          - fuzzers/forkserver/fuzzbench_forkserver
+          - fuzzers/forkserver/fuzzbench_forkserver_cmplog
+          - fuzzers/forkserver/fuzzbench_forkserver_sand
+          - fuzzers/forkserver/libafl-fuzz
+          - fuzzers/forkserver/baby_fuzzer_with_forkexecutor
 
           # Full-system
-          - ./fuzzers/full_system/nyx_launcher
-          - ./fuzzers/full_system/nyx_libxml2_standalone
-          - ./fuzzers/full_system/nyx_libxml2_parallel
+          - fuzzers/full_system/nyx_launcher
+          - fuzzers/full_system/nyx_libxml2_standalone
+          - fuzzers/full_system/nyx_libxml2_parallel
 
           # Structure-aware
-          - ./fuzzers/structure_aware/nautilus_sync
-          - ./fuzzers/structure_aware/baby_fuzzer_grimoire
-          - ./fuzzers/structure_aware/baby_fuzzer_gramatron
-          - ./fuzzers/structure_aware/baby_fuzzer_tokens
-          - ./fuzzers/structure_aware/baby_fuzzer_multi
-          - ./fuzzers/structure_aware/baby_fuzzer_custom_input
-          - ./fuzzers/structure_aware/baby_fuzzer_nautilus
-          - ./fuzzers/structure_aware/forkserver_simple_nautilus
+          - fuzzers/structure_aware/nautilus_sync
+          - fuzzers/structure_aware/baby_fuzzer_grimoire
+          - fuzzers/structure_aware/baby_fuzzer_gramatron
+          - fuzzers/structure_aware/baby_fuzzer_tokens
+          - fuzzers/structure_aware/baby_fuzzer_multi
+          - fuzzers/structure_aware/baby_fuzzer_custom_input
+          - fuzzers/structure_aware/baby_fuzzer_nautilus
+          - fuzzers/structure_aware/forkserver_simple_nautilus
 
           # In-process
-          - ./fuzzers/fuzz_anything/cargo_fuzz
-          - ./fuzzers/inprocess/fuzzbench
-          - ./fuzzers/inprocess/fuzzbench_text
-          - ./fuzzers/inprocess/fuzzbench_ctx
-          - ./fuzzers/inprocess/libfuzzer_libmozjpeg
-          - ./fuzzers/inprocess/libfuzzer_libpng
-          - ./fuzzers/inprocess/libfuzzer_libpng_launcher
-          - ./fuzzers/inprocess/libfuzzer_libpng_accounting
-          - ./fuzzers/inprocess/libfuzzer_libpng_centralized
-          - ./fuzzers/inprocess/libfuzzer_libpng_cmin
-          - ./fuzzers/inprocess/libfuzzer_libpng_norestart
-          # - ./fuzzers/inprocess/libfuzzer_libpng_tcp_manager
-          # - ./fuzzers/inprocess/libfuzzer_windows_asan
-          - ./fuzzers/inprocess/libfuzzer_stb_image_sugar
-          - ./fuzzers/inprocess/libfuzzer_stb_image
-          # - ./fuzzers/structure_aware/libfuzzer_stb_image_concolic
-          # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
-          # - ./fuzzers/inprocess/libafl_libfuzzer_windows
+          - fuzzers/fuzz_anything/cargo_fuzz
+          - fuzzers/inprocess/fuzzbench
+          - fuzzers/inprocess/fuzzbench_text
+          - fuzzers/inprocess/fuzzbench_ctx
+          - fuzzers/inprocess/libfuzzer_libmozjpeg
+          - fuzzers/inprocess/libfuzzer_libpng
+          - fuzzers/inprocess/libfuzzer_libpng_launcher
+          - fuzzers/inprocess/libfuzzer_libpng_accounting
+          - fuzzers/inprocess/libfuzzer_libpng_centralized
+          - fuzzers/inprocess/libfuzzer_libpng_cmin
+          - fuzzers/inprocess/libfuzzer_libpng_norestart
+          # - fuzzers/inprocess/libfuzzer_libpng_tcp_manager
+          # - fuzzers/inprocess/libfuzzer_windows_asan
+          - fuzzers/inprocess/libfuzzer_stb_image_sugar
+          - fuzzers/inprocess/libfuzzer_stb_image
+          # - fuzzers/structure_aware/libfuzzer_stb_image_concolic
+          # - fuzzers/inprocess/sqlite_centralized_multi_machine
+          # - fuzzers/inprocess/libafl_libfuzzer_windows
 
           # Fuzz Anything
-          - ./fuzzers/fuzz_anything/push_harness
-          - ./fuzzers/fuzz_anything/push_stage_harness
-          - ./fuzzers/fuzz_anything/libafl_atheris
-          - ./fuzzers/fuzz_anything/baby_no_std
-          - ./fuzzers/fuzz_anything/baby_fuzzer_wasm
+          - fuzzers/fuzz_anything/push_harness
+          - fuzzers/fuzz_anything/push_stage_harness
+          - fuzzers/fuzz_anything/libafl_atheris
+          - fuzzers/fuzz_anything/baby_no_std
+          - fuzzers/fuzz_anything/baby_fuzzer_wasm
 
     runs-on: ubuntu-24.04
     steps:
@@ -360,6 +360,15 @@ jobs:
           # and awful lot of their dependencies). That way we won't use up
           # as much space.
           shared-key: fuzzers-x86_64
+          # We want to include the commit hash to ensure the cache is replaced
+          # on each new commit.
+          key: ${{ github.sha }}
+          # We will only save the cache for one of the builds. Though we could 
+          # just omit this filter and the jobs race to push to the cache, since
+          # they would all share the same key (combining the `shared-key` and 
+          # `key`) our build would generate a load of warnings. Why this 
+          # particular fuzzer? No real reason, but we had to choose one.
+          save-if: ${{ matrix.fuzzer = 'fuzzers/binary_only/frida_libpng' }}
           cache-all-crates: true
           # The code is built in the fuzzers own directory, not in the target
           # directory in the root of the workspace
@@ -411,7 +420,7 @@ jobs:
       matrix:
         os: [ ubuntu-24.04 ]
         fuzzer:
-          - ./fuzzers/full_system/unicorn
+          - fuzzers/full_system/unicorn
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/fuzzer-tester-prepare
@@ -461,6 +470,9 @@ jobs:
           # We will have each of these fuzzers have it's own cache since these
           # are some of the heaviest fuzzers to build.
           shared-key: qemu-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
+          # We want to include the commit hash to ensure the cache is replaced
+          # on each new commit.
+          key: ${{ github.sha }}
           cache-all-crates: true
           # The code is built in the fuzzers own directory, not in the target
           # directory in the root of the workspace
@@ -532,6 +544,9 @@ jobs:
           # cache for each since they are both expensive to build and one builds
           # for many different architectures.
           shared-key: librasan-${{ matrix.task }}
+          # We want to include the commit hash to ensure the cache is replaced
+          # on each new commit.
+          key: ${{ github.sha }}
           cache-all-crates: true
           # Again the artefacts aren't built in the target root directory.
           workspaces: |
@@ -573,9 +588,9 @@ jobs:
         with:
           shared-key: no-std
       - name: Build aarch64-unknown-none
-        run: cd ./fuzzers/fuzz_anything/baby_no_std && cargo build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+        run: cd fuzzers/fuzz_anything/baby_no_std && cargo build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
       - name: run x86_64 until panic!
-        run: cd ./fuzzers/fuzz_anything/baby_no_std && cargo run || test $? -ne 0 || exit 1
+        run: cd fuzzers/fuzz_anything/baby_no_std && cargo run || test $? -ne 0 || exit 1
       - name: no_std tests
         run: cd ./libafl && cargo test --no-default-features
 
@@ -720,6 +735,9 @@ jobs:
           # There aren't too many of these fuzzers, so lets just give them a 
           # separate cache each for now.
           shared-key: fuzzers-windows-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
+          # We want to include the commit hash to ensure the cache is replaced
+          # on each new commit.
+          key: ${{ github.sha }}
           cache-all-crates: true
           # The code is built in the fuzzers own directory, not in the target
           # directory in the root of the workspace
