@@ -426,7 +426,7 @@ jobs:
 
   # Job to build and test the QEMU fuzzers
   qemu:
-    name: 🚀 ${{ matrix.fuzzer }}
+    name: 🤖 ${{ matrix.fuzzer }}
     needs:
       - fuzzers-preflight # Check that all the fuzzers listed for testing or explicitly ignored
       - qemu-changes # Only build if the QEMU code has changed
@@ -680,7 +680,7 @@ jobs:
 
   # The windows fuzzers require the same setup, so we will use a matrix build
   windows:
-    name: 🚀 ${{ matrix.fuzzer }}
+    name: 🚙 ${{ matrix.fuzzer }}
     strategy:
       matrix:
         fuzzer:
