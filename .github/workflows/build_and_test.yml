@@ -365,7 +365,7 @@ jobs:
       - name: Test
         if: runner.os == 'Linux'
         shell: bash
-        run: \
+        run: |
           RUN_ON_CI=1 \
           LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
           cargo \
@@ -464,7 +464,8 @@ jobs:
             ${{ matrix.fuzzer }}
       - name: Test
         shell: bash
-        run: unset RUSTC && \
+        run: |
+          unset RUSTC && \
           ARCH=x86_64 \
           RUN_ON_CI=1 \
           LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
@@ -649,7 +650,7 @@ jobs:
           push: ${{ github.ref == 'refs/heads/main' }}
           load: ${{ github.ref != 'refs/heads/main' }}
           tags: 
-            ghcr.io/aflplusplus/libafl:latest'
+            ghcr.io/aflplusplus/libafl:latest
           cache-from: |
             type=registry,ref=ghcr.io/aflplusplus/libafl:cache
             type=local,src=/tmp/.buildx-cache
