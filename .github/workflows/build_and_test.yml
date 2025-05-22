@@ -497,7 +497,7 @@ jobs:
     strategy:
       matrix:
         util:
-          - utils/gdb_qemu
+          - gdb_qemu
 
     runs-on: ubuntu-24.04
     steps:
@@ -511,7 +511,7 @@ jobs:
       - name: Build and run utils (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: just -d ${{ matrix.util }} --justfile ${{ matrix.util }}/Justfile test
+        run: just -d utils/${{ matrix.util }} --justfile utils/${{ matrix.util }}/Justfile test
 
   # Build and test librasan. The setup is common, so we use a matrix build and
   # use the task name at the end to select which target to build
