@@ -1,6 +1,6 @@
 [package]
 name = "libafl-fuzz"
-version = "0.15.2"
+version = "0.15.3"
 publish = false
 edition = "2021"
 
