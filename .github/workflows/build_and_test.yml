@@ -356,7 +356,10 @@ jobs:
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: fuzzers-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
+          # We will have these guys all share a cache (since they should share
+          # and awful lot of their dependencies). That way we won't use up
+          # as much space.
+          shared-key: fuzzers-x86_64
           cache-all-crates: true
           # The code is built in the fuzzers own directory, not in the target
           # directory in the root of the workspace
@@ -456,6 +459,8 @@ jobs:
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
+          # We will have each of these fuzzers have it's own cache since these
+          # are some of the heaviest fuzzers to build.
           shared-key: qemu-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
           cache-all-crates: true
           # The code is built in the fuzzers own directory, not in the target
@@ -524,7 +529,9 @@ jobs:
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
-          # Use the task name to build the cache key
+          # Use the task name to build the cache key. We will have a separate 
+          # cache for each since they are both expensive to build and one builds
+          # for many different architectures.
           shared-key: librasan-${{ matrix.task }}
           cache-all-crates: true
           # Again the artefacts aren't built in the target root directory.
@@ -623,6 +630,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
+          # We want to be able to update the cache if the Dockerfile is changed,
+          # but still be able to use previous versions if available.
           key: ${{ runner.os }}-buildx-${{ github.ref }}-${{ hashFiles('Dockerfile') }}
           restore-keys: |
             ${{ runner.os }}-buildx-${{ github.ref }}-
@@ -663,6 +672,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
+          # We want to be able to update the cache if the Dockerfile is changed,
+          # but still be able to use previous versions if available.
           key: ${{ runner.os }}-buildx-${{ github.ref }}-${{ hashFiles('Dockerfile') }}
           restore-keys: |
             ${{ runner.os }}-buildx-${{ github.ref }}-
@@ -703,6 +714,8 @@ jobs:
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
+          # There aren't too many of these fuzzers, so lets just give them a 
+          # separate cache each for now.
           shared-key: fuzzers-windows-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
           cache-all-crates: true
           # The code is built in the fuzzers own directory, not in the target
