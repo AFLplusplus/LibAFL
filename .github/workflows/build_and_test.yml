@@ -104,12 +104,12 @@ jobs:
     runs-on: ubuntu-24.04
     if: contains( github.event.pull_request.labels.*.name, 'pre-release')
     steps:
-      - name: Add miri
-        run: rustup toolchain install --component miri --allow-downgrade
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
         with:
           use_nightly: 'true'
+      - name: Add miri
+        run: rustup toolchain install --component miri --allow-downgrade
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: ubuntu-miri
