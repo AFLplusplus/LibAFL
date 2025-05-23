@@ -90,10 +90,7 @@ pub trait StdTargetArgs: Sized {
     /// If use stdin
     #[must_use]
     fn use_stdin(&self) -> bool {
-        match &self.inner().input_location {
-            InputLocation::StdIn { out_file: _ } => true,
-            _ => false,
-        }
+        matches!(&self.inner().input_location, InputLocation::StdIn { out_file: _ })
     }
 
     /// Set input
@@ -127,8 +124,7 @@ pub trait StdTargetArgs: Sized {
                 InputLocation::File { out_file } => out_file.path.as_path() == path.as_ref(),
                 InputLocation::StdIn { out_file } => out_file
                     .as_ref()
-                    .map(|of| of.path.as_path() == path.as_ref())
-                    .unwrap_or(true),
+                    .is_none_or(|of| of.path.as_path() == path.as_ref()),
                 InputLocation::Arg { argnum: _ } => false,
             },
             "Already specified an input file under a different name. This is not supported"

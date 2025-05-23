@@ -262,7 +262,7 @@ where
                             self.args[*argnum] = cstring_input;
                         }
                     }
-                    InputLocation::StdIn => {
+                    InputLocation::StdIn { out_file: _ } => {
                         let (pipe_read, pipe_write) = pipe().unwrap();
                         write(pipe_write, &input.target_bytes()).unwrap();
                         dup2(pipe_read.as_raw_fd(), STDIN_FILENO).unwrap();
