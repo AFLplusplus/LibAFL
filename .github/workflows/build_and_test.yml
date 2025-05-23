@@ -149,7 +149,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
+        with:
+          shared-key: "ubuntu-clippy"
       - name: Run clippy
         run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/clippy.sh
     # --- test embedding the libafl_libfuzzer_runtime library
