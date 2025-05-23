@@ -125,7 +125,7 @@ pub trait StdTargetArgs: Sized {
         assert!(
             match &moved.inner().input_location {
                 InputLocation::File { out_file } => out_file.path.as_path() == path.as_ref(),
-                InputLocation::StdIn { input_file } => out_file
+                InputLocation::StdIn { input_file } => input_file
                     .as_ref()
                     .is_none_or(|of| of.path.as_path() == path.as_ref()),
                 InputLocation::Arg { argnum: _ } => false,
