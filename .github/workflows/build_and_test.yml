@@ -108,7 +108,11 @@ jobs:
         run: rustup toolchain install --component miri --allow-downgrade
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
+        with:
+          use_nightly: 'true'
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-miri
       # --- miri undefined behavior test --
       - name: Run miri tests
         run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo miri test
