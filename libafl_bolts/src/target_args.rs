@@ -90,7 +90,10 @@ pub trait StdTargetArgs: Sized {
     /// If use stdin
     #[must_use]
     fn use_stdin(&self) -> bool {
-        matches!(&self.inner().input_location, InputLocation::StdIn { out_file: _ })
+        matches!(
+            &self.inner().input_location,
+            InputLocation::StdIn { out_file: _ }
+        )
     }
 
     /// Set input
