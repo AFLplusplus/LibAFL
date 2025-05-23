@@ -109,7 +109,7 @@ jobs:
         with:
           use_nightly: 'true'
       - name: Add miri
-        run: rustup toolchain install --component miri --allow-downgrade
+        run: rustup +nightly component add miri
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: ubuntu-miri
