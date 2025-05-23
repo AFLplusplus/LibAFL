@@ -41,6 +41,11 @@ def harness(b):
     emu.run()
 
 
-fuzz = sugar.QemuBytesCoverageSugar(["./in"], "./out", 3456, [0])
-#fuzz.run_with_qemu(emu, harness)
-fuzz.run(["qemu-x86_64", BINARY_PATH], harness)
+# Create a fuzzer using the launcher
+# with 4 instances bounds to cores 0-3
+# LLMP uses port 3456 to synchronize
+# stdout from the target is NOT redirected to /dev/null
+fuzz = sugar.QemuBytesCoverageSugar(
+    ["./in"], "./out", 3456, [0, 1, 2, 3], enable_stdout=True
+)
+fuzz.run(emu, harness)

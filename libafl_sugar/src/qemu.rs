@@ -85,6 +85,9 @@ where
     /// Fuzz `iterations` number of times, instead of indefinitely; implies use of `fuzz_loop_for`
     #[builder(default = None)]
     iterations: Option<u64>,
+    /// Disable redirection of stdout to /dev/null on unix build targets
+    #[builder(default = None)]
+    enable_stdout: Option<bool>,
 }
 
 impl<H> Debug for QemuBytesCoverageSugar<'_, H>
@@ -111,6 +114,7 @@ where
                 },
             )
             .field("iterations", &self.iterations)
+            .field("enable_stdout", &self.enable_stdout)
             .finish()
     }
 }
@@ -155,7 +159,7 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let monitor = MultiMonitor::new(|s| log::info!("{s}"));
+        let monitor = MultiMonitor::new(|s| println!("{s}"));
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -509,8 +513,14 @@ where
             .remote_broker_addr(self.remote_broker_addr);
 
         #[cfg(unix)]
-        let launcher = launcher.stdout_file(Some("/dev/null"));
+        if self.enable_stdout.unwrap_or(false) {
+            launcher.build().launch().expect("Launcher failed");
+        } else {
+            let launcher = launcher.stdout_file(Some("/dev/null"));
+            launcher.build().launch().expect("Launcher failed");
+        }
 
+        #[cfg(not(unix))]
         launcher.build().launch().expect("Launcher failed");
     }
 }
@@ -538,6 +548,7 @@ pub mod pybind {
         iterations: Option<u64>,
         tokens_file: Option<PathBuf>,
         timeout: Option<u64>,
+        enable_stdout: Option<bool>,
     }
 
     #[pymethods]
@@ -553,7 +564,8 @@ pub mod pybind {
             use_cmplog=None,
             iterations=None,
             tokens_file=None,
-            timeout=None
+            timeout=None,
+            enable_stdout=None,
         ))]
         fn new(
             input_dirs: Vec<PathBuf>,
@@ -564,6 +576,7 @@ pub mod pybind {
             iterations: Option<u64>,
             tokens_file: Option<PathBuf>,
             timeout: Option<u64>,
+            enable_stdout: Option<bool>,
         ) -> Self {
             Self {
                 input_dirs,
@@ -574,12 +587,13 @@ pub mod pybind {
                 iterations,
                 tokens_file,
                 timeout,
+                enable_stdout,
             }
         }
 
         /// Run the fuzzer
         #[expect(clippy::needless_pass_by_value)]
-        pub fn run(&self, qemu_cli: Vec<String>, harness: PyObject) {
+        pub fn run(&self, qemu: &Qemu, harness: PyObject) {
             qemu::QemuBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
@@ -597,30 +611,7 @@ pub mod pybind {
                 .timeout(self.timeout)
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
-                .build()
-                .run(QemuSugarParameter::QemuCli(&qemu_cli));
-        }
-
-        /// Run the fuzzer using the Qemu objects passed as argument
-        #[expect(clippy::needless_pass_by_value)]
-        pub fn run_with_qemu(&self, qemu: &Qemu, harness: PyObject) {
-            qemu::QemuBytesCoverageSugar::builder()
-                .input_dirs(&self.input_dirs)
-                .output_dir(self.output_dir.clone())
-                .broker_port(self.broker_port)
-                .cores(&self.cores)
-                .harness(|buf| {
-                    Python::with_gil(|py| -> PyResult<()> {
-                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
-                        harness.call1(py, args)?;
-                        Ok(())
-                    })
-                    .unwrap();
-                })
-                .use_cmplog(self.use_cmplog)
-                .timeout(self.timeout)
-                .tokens_file(self.tokens_file.clone())
-                .iterations(self.iterations)
+                .enable_stdout(self.enable_stdout)
                 .build()
                 .run(QemuSugarParameter::Qemu(&qemu.qemu));
         }
