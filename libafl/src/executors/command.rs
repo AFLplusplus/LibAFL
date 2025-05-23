@@ -164,7 +164,7 @@ where
                 }
                 Ok(cmd.spawn()?)
             }
-            InputLocation::StdIn => {
+            InputLocation::StdIn { out_file: _ } => {
                 let mut handle = self.command.stdin(Stdio::piped()).spawn()?;
                 let mut stdin = handle.stdin.take().unwrap();
                 match stdin.write_all(input.target_bytes().as_slice()) {
@@ -590,7 +590,12 @@ impl CommandExecutorBuilder {
 
         let mut command = Command::new(program);
         match &self.target_inner.input_location {
-            InputLocation::StdIn => {
+            InputLocation::StdIn { out_file } => {
+                if out_file.is_some() {
+                    return Err(Error::illegal_argument(
+                        "Setting filename for CommandExecutor is not supported!",
+                    ));
+                }
                 command.stdin(Stdio::piped());
             }
             InputLocation::File { .. } | InputLocation::Arg { .. } => {

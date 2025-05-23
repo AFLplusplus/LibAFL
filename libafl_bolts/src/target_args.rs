@@ -11,7 +11,7 @@ use crate::fs::{InputFile, get_unique_std_input_file};
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin
 /// `File`: The target reads from the specified [`InputFile`]
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputLocation {
     /// Mutate a commandline argument to deliver an input
     Arg {
@@ -19,14 +19,22 @@ pub enum InputLocation {
         argnum: usize,
     },
     /// Deliver input via `StdIn`
-    #[default]
-    StdIn,
+    StdIn {
+        /// The alternative input file
+        out_file: Option<InputFile>,
+    },
     /// Deliver the input via the specified [`InputFile`]
     /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
     File {
         /// The file to write input to. The target should read input from this location.
         out_file: InputFile,
     },
+}
+
+impl Default for InputLocation {
+    fn default() -> Self {
+        Self::StdIn { out_file: None }
+    }
 }
 
 /// The shared inner structs of trait [`StdTargetArgs`]
@@ -82,7 +90,10 @@ pub trait StdTargetArgs: Sized {
     /// If use stdin
     #[must_use]
     fn use_stdin(&self) -> bool {
-        matches!(self.inner().input_location, InputLocation::StdIn)
+        match &self.inner().input_location {
+            InputLocation::StdIn { out_file: _ } => true,
+            _ => false,
+        }
     }
 
     /// Set input
@@ -114,7 +125,10 @@ pub trait StdTargetArgs: Sized {
         assert!(
             match &moved.inner().input_location {
                 InputLocation::File { out_file } => out_file.path.as_path() == path.as_ref(),
-                InputLocation::StdIn => true,
+                InputLocation::StdIn { out_file } => out_file
+                    .as_ref()
+                    .map(|of| of.path.as_path() == path.as_ref())
+                    .unwrap_or(true),
                 InputLocation::Arg { argnum: _ } => false,
             },
             "Already specified an input file under a different name. This is not supported"

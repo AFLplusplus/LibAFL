@@ -1031,7 +1031,10 @@ where
         OT: ObserversTuple<I, S>,
     {
         let input_file = match &self.target_inner.input_location {
-            InputLocation::StdIn => InputFile::create(OsString::from(get_unique_std_input_file()))?,
+            InputLocation::StdIn { out_file } => match out_file {
+                Some(out_file) => out_file.clone(),
+                None => InputFile::create(OsString::from(get_unique_std_input_file()))?,
+            },
             InputLocation::Arg { argnum: _ } => {
                 return Err(Error::illegal_argument(
                     "forkserver doesn't support argument mutation",
