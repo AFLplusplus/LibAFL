@@ -30,20 +30,18 @@ harness: libpng
         -lm -static
 
 [unix]
-run_single: harness build
+run_single: build harness
     {{ FUZZER_SINGLE }} \
         --output ./output \
         --input ./corpus \
-        --verbose \
         -- {{ HARNESS }}
 
 [unix]
-run_multi: harness build
+run_multi: build harness
     {{ FUZZER_MULTI }} \
         --output ./output \
         --input ./corpus \
         --cores 0 \
-        --verbose \
         -- {{ HARNESS }}
 
 [unix]

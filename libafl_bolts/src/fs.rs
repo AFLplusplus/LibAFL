@@ -1,20 +1,21 @@
 //! `LibAFL` functionality for filesystem interaction
 
+use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
+use core::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 #[cfg(unix)]
 use std::os::unix::prelude::{AsRawFd, RawFd};
-
-use alloc::string::String;
-use alloc::sync::Arc;
-use alloc::{borrow::ToOwned, vec::Vec};
-use core::time::Duration;
-
-use crate::Error;
-use std::time::SystemTime;
 use std::{
     fs::{self, File, OpenOptions, remove_file},
     io::{Seek, Write},
     path::{Path, PathBuf},
+    sync::OnceLock,
+    time::SystemTime,
 };
+
+use crate::Error;
 
 /// The default filename to use to deliver testcases to the target
 pub const INPUTFILE_STD: &str = ".cur_input";
@@ -23,7 +24,11 @@ pub const INPUTFILE_STD: &str = ".cur_input";
 /// Derives a filename from [`INPUTFILE_STD`] that may be used to deliver testcases to the target.
 /// It ensures the filename is unique to the fuzzer process.
 pub fn get_unique_std_input_file() -> String {
-    format!("{}_{}", INPUTFILE_STD, std::process::id())
+    static STD_COUNT: OnceLock<AtomicU64> = OnceLock::new();
+    let next = STD_COUNT
+        .get_or_init(|| AtomicU64::new(0))
+        .fetch_add(1, Ordering::SeqCst);
+    format!("{}_{}_{}", INPUTFILE_STD, std::process::id(), next)
 }
 
 /// Write a file atomically

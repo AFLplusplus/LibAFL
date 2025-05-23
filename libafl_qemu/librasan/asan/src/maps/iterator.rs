@@ -3,7 +3,8 @@ use core::fmt::Debug;
 
 use crate::{
     GuestAddr,
-    maps::{MapReader, decode::MapDecode, entry::MapEntry},
+    file::FileReader,
+    maps::{decode::MapDecode, entry::MapEntry},
 };
 
 const BUFFER_SIZE: usize = 4096;
@@ -21,25 +22,26 @@ enum MapState {
 }
 
 #[derive(Debug)]
-pub struct MapIterator<R: MapReader> {
+pub struct MapIterator<R: FileReader> {
     source: R,
     buffer: [u8; BUFFER_SIZE],
     buff_len: usize,
     state: MapState,
 }
 
-impl<R: MapReader> MapIterator<R> {
-    pub fn new(source: R) -> MapIterator<R> {
-        MapIterator {
+impl<R: FileReader> MapIterator<R> {
+    pub fn new() -> Result<MapIterator<R>, R::Error> {
+        let source = R::new(c"/proc/self/maps")?;
+        Ok(MapIterator {
             source,
             buffer: [0; BUFFER_SIZE],
             buff_len: 0,
             state: MapState::Base,
-        }
+        })
     }
 }
 
-impl<R: MapReader> Iterator for MapIterator<R> {
+impl<R: FileReader> Iterator for MapIterator<R> {
     type Item = MapEntry;
 
     fn next(&mut self) -> Option<MapEntry> {

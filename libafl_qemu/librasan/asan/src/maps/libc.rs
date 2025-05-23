@@ -62,7 +62,7 @@ pub struct LibcMapReader<S: Symbols> {
 impl<S: Symbols> LibcMapReader<S> {
     fn get_open() -> Result<<FunctionOpen as Function>::Func, LibcMapReaderError<S>> {
         let addr = OPEN_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionOpen::NAME).map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
+            S::lookup(FunctionOpen::NAME).map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
         })?;
         let f =
             FunctionOpen::as_ptr(addr).map_err(|e| LibcMapReaderError::InvalidPointerType(e))?;
@@ -71,7 +71,7 @@ impl<S: Symbols> LibcMapReader<S> {
 
     fn get_close() -> Result<<FunctionClose as Function>::Func, LibcMapReaderError<S>> {
         let addr = CLOSE_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionClose::NAME)
+            S::lookup(FunctionClose::NAME)
                 .map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
         })?;
         let f =
@@ -81,7 +81,7 @@ impl<S: Symbols> LibcMapReader<S> {
 
     fn get_read() -> Result<<FunctionRead as Function>::Func, LibcMapReaderError<S>> {
         let addr = READ_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionRead::NAME).map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
+            S::lookup(FunctionRead::NAME).map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
         })?;
         let f =
             FunctionRead::as_ptr(addr).map_err(|e| LibcMapReaderError::InvalidPointerType(e))?;
@@ -91,7 +91,7 @@ impl<S: Symbols> LibcMapReader<S> {
     fn get_errno_location()
     -> Result<<FunctionErrnoLocation as Function>::Func, LibcMapReaderError<S>> {
         let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionErrnoLocation::NAME)
+            S::lookup(FunctionErrnoLocation::NAME)
                 .map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
         })?;
         let f = FunctionErrnoLocation::as_ptr(addr)

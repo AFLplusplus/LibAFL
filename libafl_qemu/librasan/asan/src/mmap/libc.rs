@@ -20,9 +20,7 @@ use thiserror::Error;
 use crate::{
     GuestAddr, asan_swap,
     mmap::{Mmap, MmapProt},
-    symbols::{
-        AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols, SymbolsLookupStr,
-    },
+    symbols::{AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols},
 };
 
 #[derive(Debug)]
@@ -102,7 +100,7 @@ static MADVISE_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 impl<S: Symbols> LibcMmap<S> {
     fn get_mmap() -> Result<<FunctionMmap as Function>::Func, LibcMapError<S>> {
         let addr = MMAP_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionMmap::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
+            S::lookup(FunctionMmap::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
         })?;
         let f = FunctionMmap::as_ptr(addr).map_err(|e| LibcMapError::InvalidPointerType(e))?;
         Ok(f)
@@ -110,7 +108,7 @@ impl<S: Symbols> LibcMmap<S> {
 
     fn get_munmap() -> Result<<FunctionMunmap as Function>::Func, LibcMapError<S>> {
         let addr = MUNMAP_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionMunmap::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
+            S::lookup(FunctionMunmap::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
         })?;
         let f = FunctionMunmap::as_ptr(addr).map_err(|e| LibcMapError::InvalidPointerType(e))?;
         Ok(f)
@@ -118,7 +116,7 @@ impl<S: Symbols> LibcMmap<S> {
 
     fn get_mprotect() -> Result<<FunctionMprotect as Function>::Func, LibcMapError<S>> {
         let addr = MPROTECT_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionMprotect::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
+            S::lookup(FunctionMprotect::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
         })?;
         let f = FunctionMprotect::as_ptr(addr).map_err(|e| LibcMapError::InvalidPointerType(e))?;
         Ok(f)
@@ -126,8 +124,7 @@ impl<S: Symbols> LibcMmap<S> {
 
     fn get_errno_location() -> Result<<FunctionErrnoLocation as Function>::Func, LibcMapError<S>> {
         let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionErrnoLocation::NAME)
-                .map_err(|e| LibcMapError::FailedToFindSymbol(e))
+            S::lookup(FunctionErrnoLocation::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
         })?;
         let f =
             FunctionErrnoLocation::as_ptr(addr).map_err(|e| LibcMapError::InvalidPointerType(e))?;
@@ -136,7 +133,7 @@ impl<S: Symbols> LibcMmap<S> {
 
     fn get_madvise() -> Result<<FunctionMadvise as Function>::Func, LibcMapError<S>> {
         let addr = MADVISE_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionMadvise::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
+            S::lookup(FunctionMadvise::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
         })?;
         let f = FunctionMadvise::as_ptr(addr).map_err(|e| LibcMapError::InvalidPointerType(e))?;
         Ok(f)

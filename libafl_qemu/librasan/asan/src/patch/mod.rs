@@ -59,9 +59,7 @@ impl Patches {
     }
 
     pub fn is_patched(addr: GuestAddr) -> bool {
-        PATCHED
-            .get()
-            .map_or(false, |p| p.lock().contains_key(&addr))
+        PATCHED.get().is_some_and(|p| p.lock().contains_key(&addr))
     }
 }
 

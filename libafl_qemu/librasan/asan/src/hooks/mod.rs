@@ -89,7 +89,7 @@ impl PatchedHook {
     }
 
     pub fn lookup<S: Symbols>(&self) -> Result<GuestAddr, S::Error> {
-        S::lookup(self.name.as_ptr() as *const c_char)
+        unsafe { S::lookup_raw(self.name.as_ptr() as *const c_char) }
     }
 }
 

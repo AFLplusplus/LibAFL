@@ -6,8 +6,8 @@ use libafl_bolts::tuples::{Append, Prepend, tuple_list};
 #[cfg(feature = "systemmode")]
 use crate::FastSnapshotManager;
 use crate::{
-    Emulator, NopEmulatorDriver, NopSnapshotManager, QemuInitError, QemuParams, StdEmulatorDriver,
-    StdSnapshotManager,
+    Emulator, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError, QemuParams,
+    StdEmulatorDriver, StdSnapshotManager,
     command::{NopCommandManager, StdCommandManager},
     config::QemuConfigBuilder,
     modules::{EmulatorModule, EmulatorModuleTuple},
@@ -159,6 +159,31 @@ where
             self.snapshot_manager,
             self.command_manager,
         )
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn build_with_qemu(
+        self,
+        qemu: Qemu,
+    ) -> Result<Emulator<C, CM, ED, ET, I, S, SM>, QemuInitError>
+    where
+        ET: EmulatorModuleTuple<I, S>,
+    {
+        // The logic from Emulator::new needs to be duplicated here because of type mismatch on modules
+        //  between Emulator::new and Emulator::new_wit_qemu
+        let emulator_hooks =
+            unsafe { super::EmulatorHooks::new(crate::QemuHooks::get_unchecked()) };
+        let emulator_modules = unsafe { super::EmulatorModules::new(emulator_hooks, self.modules) };
+
+        unsafe {
+            Ok(Emulator::new_with_qemu(
+                qemu,
+                emulator_modules,
+                self.driver,
+                self.snapshot_manager,
+                self.command_manager,
+            ))
+        }
     }
 }
 

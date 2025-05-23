@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.2
-FROM rust:1.85.0 AS libafl
+FROM rust:1.87.0 AS libafl
 LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
 LABEL "about"="LibAFL Docker image"
 
@@ -64,6 +64,7 @@ RUN apt-get update && \
     python3-pip \
     python3-venv \
     software-properties-common \
+    ca-certificates \
     wget
 RUN set -ex &&\
   wget https://apt.llvm.org/llvm.sh &&\
@@ -86,11 +87,13 @@ RUN wget https://download.qemu.org/qemu-${QEMU_VER}.tar.xz && \
       i386-linux-user,\
       ppc-linux-user,\
       mips-linux-user,\
+      x86_64-linux-user,\
       arm-softmmu,\
       aarch64-softmmu,\
       i386-softmmu,\
       ppc-softmmu,\
-      mips-softmmu" && \
+      mips-softmmu,\
+      x86_64-softmmu" && \
     make -j && \
     make install && \
     cd /root && \

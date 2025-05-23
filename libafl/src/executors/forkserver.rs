@@ -143,9 +143,11 @@ fn report_error_and_exit(status: i32) -> Result<(), Error> {
 }
 
 /// The length of header bytes which tells shmem size
-const SHMEM_FUZZ_HDR_SIZE: usize = 4;
-const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
-const MIN_INPUT_SIZE_DEFAULT: usize = 1;
+pub const SHMEM_FUZZ_HDR_SIZE: usize = 4;
+/// Maximum default length for input
+pub const MAX_INPUT_SIZE_DEFAULT: usize = 1024 * 1024;
+/// Minimum default length for input
+pub const MIN_INPUT_SIZE_DEFAULT: usize = 1;
 /// Environment variable key for shared memory id for input and its len
 pub const SHM_FUZZ_ENV_VAR: &str = "__AFL_SHM_FUZZ_ID";
 /// Environment variable key for the page size (at least/usually `testcase_size_max + sizeof::<u32>()`)
@@ -395,12 +397,6 @@ impl Forkserver {
                 "Coverage map size unknown. Use coverage_map_size() to tell the forkserver about the map size.",
             ));
         };
-
-        if env::var(AFL_MAP_SIZE_ENV_VAR).is_err() {
-            log::warn!(
-                "{AFL_MAP_SIZE_ENV_VAR} not set. If it is unset, the forkserver may fail to start up"
-            );
-        }
 
         if env::var(SHM_ENV_VAR).is_err() {
             return Err(Error::unknown("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer".to_string()));
@@ -671,7 +667,7 @@ pub struct ForkserverExecutor<I, OT, S, SHM> {
     forkserver: Forkserver,
     observers: OT,
     map: Option<SHM>,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<fn() -> (I, S)>, // For Send/Sync
     map_size: Option<usize>,
     min_input_size: usize,
     max_input_size: usize,
@@ -1035,7 +1031,12 @@ where
         OT: ObserversTuple<I, S>,
     {
         let input_file = match &self.target_inner.input_location {
-            InputLocation::StdIn => InputFile::create(OsString::from(get_unique_std_input_file()))?,
+            InputLocation::StdIn {
+                input_file: out_file,
+            } => match out_file {
+                Some(out_file) => out_file.clone(),
+                None => InputFile::create(OsString::from(get_unique_std_input_file()))?,
+            },
             InputLocation::Arg { argnum: _ } => {
                 return Err(Error::illegal_argument(
                     "forkserver doesn't support argument mutation",
