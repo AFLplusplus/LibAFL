@@ -21,7 +21,7 @@ pub enum InputLocation {
     /// Deliver input via `StdIn`
     StdIn {
         /// The alternative input file
-        out_file: Option<InputFile>,
+        input_file: Option<InputFile>,
     },
     /// Deliver the input via the specified [`InputFile`]
     /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
@@ -33,7 +33,7 @@ pub enum InputLocation {
 
 impl Default for InputLocation {
     fn default() -> Self {
-        Self::StdIn { out_file: None }
+        Self::StdIn { input_file: None }
     }
 }
 
@@ -92,7 +92,7 @@ pub trait StdTargetArgs: Sized {
     fn use_stdin(&self) -> bool {
         matches!(
             &self.inner().input_location,
-            InputLocation::StdIn { out_file: _ }
+            InputLocation::StdIn { input_file: _ }
         )
     }
 
@@ -125,7 +125,7 @@ pub trait StdTargetArgs: Sized {
         assert!(
             match &moved.inner().input_location {
                 InputLocation::File { out_file } => out_file.path.as_path() == path.as_ref(),
-                InputLocation::StdIn { out_file } => out_file
+                InputLocation::StdIn { input_file } => out_file
                     .as_ref()
                     .is_none_or(|of| of.path.as_path() == path.as_ref()),
                 InputLocation::Arg { argnum: _ } => false,
