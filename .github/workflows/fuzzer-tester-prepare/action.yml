@@ -16,15 +16,15 @@ runs:
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - name: Add nightly toolchain
-      if: ${{ inputs.fuzzer-name == './fuzzers/inprocess/fuzzbench_ctx' || inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_no_std' || inputs.fuzzer-name == './fuzzers/baby/tutorial'}}
+      if: ${{ inputs.fuzzer-name == 'inprocess/fuzzbench_ctx' || inputs.fuzzer-name == 'fuzz_anything/baby_no_std' || inputs.fuzzer-name == 'baby/tutorial'}}
       shell: bash
       run: rustup toolchain install nightly-x86_64-unknown-linux-gnu; rustup component add clippy rustfmt --toolchain nightly-x86_64-unknown-linux-gnu; rustup default nightly
     - name: Add no_std toolchain
-      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_no_std' }}
+      if: ${{ inputs.fuzzer-name == 'fuzz_anything/baby_no_std' }}
       shell: bash
       run: rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
     - name: Add nyx deps
-      if: ${{ inputs.fuzzer-name == './fuzzers/full_system/nyx_launcher' || inputs.fuzzer-name == './fuzzers/full_system/nyx_libxml2_standalone' || inputs.fuzzer-name == './fuzzers/full_system/nyx_libxml2_parallel' }}
+      if: ${{ inputs.fuzzer-name == 'full_system/nyx_launcher' || inputs.fuzzer-name == 'full_system/nyx_libxml2_standalone' || inputs.fuzzer-name == 'full_system/nyx_libxml2_parallel' }}
       shell: bash
       run: sudo apt update && sudo apt install -y libgtk-3-dev pax-utils python3-msgpack python3-jinja2 libcapstone-dev
     - name: install just
@@ -32,16 +32,16 @@ runs:
       with:
         just-version: '1.40.0'
     - name: Add wasm target
-      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
+      if: ${{ inputs.fuzzer-name == 'fuzz_anything/baby_fuzzer_wasm' }}
       shell: bash
       run: rustup target add wasm32-unknown-unknown
     - name: install wasm-pack
-      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
+      if: ${{ inputs.fuzzer-name == 'fuzz_anything/baby_fuzzer_wasm' }}
       uses: baptiste0928/cargo-install@v3
       with:
         crate: wasm-pack
     - name: install chrome
-      if: ${{ inputs.fuzzer-name == './fuzzers/fuzz_anything/baby_fuzzer_wasm' }}
+      if: ${{ inputs.fuzzer-name == 'fuzz_anything/baby_fuzzer_wasm' }}
       uses: browser-actions/setup-chrome@v1
       with:
         chrome-version: stable

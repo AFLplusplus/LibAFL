@@ -14,7 +14,7 @@ done < <(
   {
     find ./fuzzers -mindepth 2 -maxdepth 2 -type d
     find ./fuzzers/baby/backtrace_baby_fuzzers -mindepth 1 -maxdepth 1 -type d
-  } | sed 's|^\./||'
+  } | sed 's|^\./fuzzers/||'
 )
 
 exit $ret

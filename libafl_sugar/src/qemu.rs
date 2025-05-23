@@ -85,6 +85,9 @@ where
     /// Fuzz `iterations` number of times, instead of indefinitely; implies use of `fuzz_loop_for`
     #[builder(default = None)]
     iterations: Option<u64>,
+    /// Disable redirection of stdout to /dev/null on unix build targets
+    #[builder(default = None)]
+    enable_stdout: Option<bool>,
 }
 
 impl<H> Debug for QemuBytesCoverageSugar<'_, H>
@@ -111,8 +114,18 @@ where
                 },
             )
             .field("iterations", &self.iterations)
+            .field("enable_stdout", &self.enable_stdout)
             .finish()
     }
+}
+
+/// Enum to allow passing either qemu cli parameters or a running qemu instance
+#[derive(Debug, Copy, Clone)]
+pub enum QemuSugarParameter<'a> {
+    /// Argument list to pass to initialize Qemu
+    QemuCli(&'a [String]),
+    /// Already existing Qemu instance
+    Qemu(&'a Qemu),
 }
 
 impl<H> QemuBytesCoverageSugar<'_, H>
@@ -121,7 +134,7 @@ where
 {
     /// Run the fuzzer
     #[expect(clippy::too_many_lines)]
-    pub fn run(&mut self, qemu_cli: &[String]) {
+    pub fn run(&mut self, qemu: QemuSugarParameter) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -146,7 +159,7 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let monitor = MultiMonitor::new(|s| log::info!("{s}"));
+        let monitor = MultiMonitor::new(|s| println!("{s}"));
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -254,11 +267,17 @@ where
                     ExitKind::Ok
                 };
 
-                let emulator = Emulator::empty()
-                    .qemu_parameters(qemu_cli.to_owned())
-                    .modules(modules)
-                    .build()
-                    .expect("Could not initialize Emulator");
+                let emulator = match qemu {
+                    QemuSugarParameter::QemuCli(qemu_cli) => Emulator::empty()
+                        .qemu_parameters(qemu_cli.to_owned())
+                        .modules(modules)
+                        .build()
+                        .expect("Could not initialize Emulator"),
+                    QemuSugarParameter::Qemu(qemu) => Emulator::empty()
+                        .modules(modules)
+                        .build_with_qemu(*qemu)
+                        .expect("Could not initialize Emulator"),
+                };
 
                 let executor = QemuExecutor::new(
                     emulator,
@@ -377,11 +396,17 @@ where
                     ExitKind::Ok
                 };
 
-                let emulator = Emulator::empty()
-                    .qemu_parameters(qemu_cli.to_owned())
-                    .modules(modules)
-                    .build()
-                    .expect("Could not initialize Emulator");
+                let emulator = match qemu {
+                    QemuSugarParameter::QemuCli(qemu_cli) => Emulator::empty()
+                        .qemu_parameters(qemu_cli.to_owned())
+                        .modules(modules)
+                        .build()
+                        .expect("Could not initialize Emulator"),
+                    QemuSugarParameter::Qemu(qemu) => Emulator::empty()
+                        .modules(modules)
+                        .build_with_qemu(*qemu)
+                        .expect("Could not initialize Emulator"),
+                };
 
                 let mut executor = QemuExecutor::new(
                     emulator,
@@ -488,8 +513,14 @@ where
             .remote_broker_addr(self.remote_broker_addr);
 
         #[cfg(unix)]
-        let launcher = launcher.stdout_file(Some("/dev/null"));
+        if self.enable_stdout.unwrap_or(false) {
+            launcher.build().launch().expect("Launcher failed");
+        } else {
+            let launcher = launcher.stdout_file(Some("/dev/null"));
+            launcher.build().launch().expect("Launcher failed");
+        }
 
+        #[cfg(not(unix))]
         launcher.build().launch().expect("Launcher failed");
     }
 }
@@ -500,8 +531,10 @@ pub mod pybind {
     use std::path::PathBuf;
 
     use libafl_bolts::core_affinity::Cores;
+    use libafl_qemu::pybind::Qemu;
     use pyo3::{prelude::*, types::PyBytes};
 
+    use super::QemuSugarParameter;
     use crate::qemu;
 
     #[pyclass(unsendable)]
@@ -515,6 +548,7 @@ pub mod pybind {
         iterations: Option<u64>,
         tokens_file: Option<PathBuf>,
         timeout: Option<u64>,
+        enable_stdout: Option<bool>,
     }
 
     #[pymethods]
@@ -530,7 +564,8 @@ pub mod pybind {
             use_cmplog=None,
             iterations=None,
             tokens_file=None,
-            timeout=None
+            timeout=None,
+            enable_stdout=None,
         ))]
         fn new(
             input_dirs: Vec<PathBuf>,
@@ -541,6 +576,7 @@ pub mod pybind {
             iterations: Option<u64>,
             tokens_file: Option<PathBuf>,
             timeout: Option<u64>,
+            enable_stdout: Option<bool>,
         ) -> Self {
             Self {
                 input_dirs,
@@ -551,12 +587,13 @@ pub mod pybind {
                 iterations,
                 tokens_file,
                 timeout,
+                enable_stdout,
             }
         }
 
         /// Run the fuzzer
         #[expect(clippy::needless_pass_by_value)]
-        pub fn run(&self, qemu_cli: Vec<String>, harness: PyObject) {
+        pub fn run(&self, qemu: &Qemu, harness: PyObject) {
             qemu::QemuBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
@@ -574,8 +611,9 @@ pub mod pybind {
                 .timeout(self.timeout)
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
+                .enable_stdout(self.enable_stdout)
                 .build()
-                .run(&qemu_cli);
+                .run(QemuSugarParameter::Qemu(&qemu.qemu));
         }
     }
 
