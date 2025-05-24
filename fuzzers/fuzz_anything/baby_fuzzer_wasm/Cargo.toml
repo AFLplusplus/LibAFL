@@ -1,6 +1,6 @@
 [package]
 name = "baby_fuzzer_wasm"
-version = "0.15.2"
+version = "0.15.3"
 authors = ["Addison Crump <research@addisoncrump.info>"]
 edition = "2018"
 

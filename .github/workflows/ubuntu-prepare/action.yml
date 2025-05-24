@@ -1,32 +1,59 @@
 name: Setup Rust Environment
-description: Sets up the Rust environment for the CI workflow
+description: Sets up the Rust environment for the CI workflow and optionally installs nightly
+
+# ---------- new section ----------
+inputs:
+  use_nightly:
+    description: "If true, install the Rust nightly toolchain instead of stable"
+    required: false
+    default: "false"
+# ---------------------------------
+
 runs:
   using: composite
   steps:
-    - name: Uninstall all currently installed rust
+    - name: Uninstall all currently installed Rust
       shell: bash
       run: |
         sudo apt purge -y 'cargo*' 'rust*'
+
     - name: Install and cache deps
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y curl lsb-release wget software-properties-common gnupg shellcheck pax-utils libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev
-    - uses: dtolnay/rust-toolchain@stable
+        sudo apt-get install -y \
+          curl lsb-release wget software-properties-common gnupg shellcheck pax-utils \
+          libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev
+
+    # ---------- toolchain selection ----------
+    - name: Install Rust (stable)
+      if: ${{ inputs.use_nightly == 'false' }}
+      uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy, rustfmt
-    - name: install just
+
+    - name: Install Rust (nightly)
+      if: ${{ inputs.use_nightly == 'true' }}
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: clippy, rustfmt
+    # -----------------------------------------
+
+    - name: Install just
       uses: extractions/setup-just@v2
       with:
         just-version: '1.40.0'
+
     - uses: taiki-e/install-action@cargo-hack
+
     - name: Install LLVM
       shell: bash
       run: |
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
-        sudo ./llvm.sh ${{env.MAIN_LLVM_VERSION}} all
-        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{env.MAIN_LLVM_VERSION}} 200
-    - name: Symlink Headers
+        sudo ./llvm.sh ${{ env.MAIN_LLVM_VERSION }} all
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ env.MAIN_LLVM_VERSION }} 200
+
+    - name: Symlink headers
       shell: bash
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
