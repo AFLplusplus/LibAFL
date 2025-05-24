@@ -603,7 +603,7 @@ jobs:
   nostd-clippy:
     runs-on: ubuntu-24.04
     steps:
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rust-src
       - name: Add targets
@@ -611,11 +611,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: no-std
+          shared-key: no-std-clippy
       - name: libafl armv6m-none-eabi (32 bit no_std) clippy
         run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
-      - name: Build no_std no_alloc bolts
-        run: cd ./libafl_bolts && cargo build -Zbuild-std=core --target aarch64-unknown-none --no-default-features -v --release && cd ../
 
   format-toml:
     runs-on: ubuntu-24.04
