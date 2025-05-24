@@ -365,6 +365,7 @@ fn fuzz(
             .debug_child(debug_child)
             .shmem_provider(&mut shmem_provider)
             .parse_afl_cmdline(arguments)
+            .coverage_map_size(MAP_SIZE)
             .is_persistent(true)
             .timeout(timeout * 10)
             .kill_signal(signal)
