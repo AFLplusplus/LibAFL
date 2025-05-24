@@ -1301,9 +1301,11 @@ impl AflppRedQueen {
         if copy_len > 0 {
             unsafe {
                 for l in 1..=copy_len {
-                    let mut cloned = buf.to_vec();
-                    buffer_copy(&mut cloned, repl, 0, buf_idx, l);
-                    vec.push(cloned);
+                    if l <= repl.len() {
+                        let mut cloned = buf.to_vec();
+                        buffer_copy(&mut cloned, repl, 0, buf_idx, l);
+                        vec.push(cloned);
+                    }
                 }
                 // vec.push(cloned);
             }
