@@ -12,11 +12,14 @@ use core::{
     time::Duration,
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use std::os::fd::AsRawFd;
+use std::os::fd::{FromRawFd, OwnedFd};
 use std::{
     ffi::OsStr,
     io::{Read, Write},
-    os::{fd::RawFd, unix::ffi::OsStrExt},
+    os::{
+        fd::{IntoRawFd, RawFd},
+        unix::ffi::OsStrExt,
+    },
     process::{Child, Command, Stdio},
 };
 
@@ -265,7 +268,12 @@ where
                     InputLocation::StdIn { input_file: _ } => {
                         let (pipe_read, pipe_write) = pipe().unwrap();
                         write(pipe_write, &input.target_bytes()).unwrap();
-                        dup2(BorrowedFd::from_raw(pipe_read), STDIN_FILENO).unwrap();
+                        // # Safety
+                        // We replace the Stdin fileno. Typical Unix stuff.
+                        let mut stdin_fd = unsafe { OwnedFd::from_raw_fd(STDIN_FILENO) };
+                        dup2(pipe_read, &mut stdin_fd).unwrap();
+                        // We never want to close this fd. Process will execve below.
+                        let _ = stdin_fd.into_raw_fd();
                     }
                     InputLocation::File { out_file } => {
                         out_file.write_buf(input.target_bytes().as_slice()).unwrap();
