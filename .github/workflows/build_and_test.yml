@@ -614,6 +614,8 @@ jobs:
           shared-key: no-std-clippy
       - name: libafl armv6m-none-eabi (32 bit no_std) clippy
         run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
+      - name: libafl_bolts armv6m-none-eabi (32 bit no_std) clippy
+        run: cd ./libafl_bolts && cargo clippy --target thumbv6m-none-eabi --no-default-features
 
   format-toml:
     runs-on: ubuntu-24.04
