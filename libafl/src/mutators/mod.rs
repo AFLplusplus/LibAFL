@@ -1,7 +1,7 @@
 //! [`Mutator`]`s` mutate input during fuzzing.
 //!
 //! These can be used standalone or in combination with other mutators to explore the input space more effectively.
-//! You can read more about mutators in the [libAFL book](https://aflplus.plus/libafl-book/core_concepts/mutator.html)
+//! You can read more about mutators in the [LibAFL book](https://aflplus.plus/libafl-book/core_concepts/mutator.html)
 pub mod scheduled;
 use core::fmt;
 

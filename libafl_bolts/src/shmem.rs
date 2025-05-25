@@ -1399,7 +1399,7 @@ pub mod unix_shmem {
         use std::{fs::File, os::fd::IntoRawFd};
 
         use libc::{MAP_SHARED, PROT_READ, PROT_WRITE, close, fstat, ftruncate, mmap, munmap};
-        use nix::sys::memfd::{MemFdCreateFlag, memfd_create};
+        use nix::sys::memfd::{MFdFlags, memfd_create};
 
         use crate::{
             Error,
@@ -1421,8 +1421,8 @@ pub mod unix_shmem {
             /// Create a new shared memory mapping, using shmget/shmat
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 unsafe {
-                    let c_str = CString::new("libAFL").unwrap();
-                    let Ok(fd) = memfd_create(&c_str, MemFdCreateFlag::empty()) else {
+                    let c_str = CString::new("LibAFL").unwrap();
+                    let Ok(fd) = memfd_create(c_str.as_c_str(), MFdFlags::empty()) else {
                         return Err(Error::last_os_error("Failed to create memfd".to_string()));
                     };
                     let fd = fd.into_raw_fd();
@@ -1549,10 +1549,7 @@ pub mod unix_shmem {
             /// enough to hold all output and avoid spurious read/write errors from children. However, you are free
             /// to set the size via [`std::fs::File::set_len`]
             pub fn new_file() -> Result<File, Error> {
-                Ok(File::from(memfd_create(
-                    c"libafl_file",
-                    MemFdCreateFlag::empty(),
-                )?))
+                Ok(File::from(memfd_create(c"libafl_file", MFdFlags::empty())?))
             }
         }
 
