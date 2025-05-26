@@ -24,7 +24,7 @@ use libafl_bolts::{
     AsSlice, AsSliceMut, InputLocation, StdTargetArgs, StdTargetArgsInner, Truncate,
     core_affinity::CoreId,
     fs::{InputFile, get_unique_std_input_file},
-    os::{dup2, pipes::Pipe},
+    os::{dup2, last_error_str, pipes::Pipe},
     shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
     tuples::{MatchNameRef, Prepend, RefIndexable},
 };
@@ -174,20 +174,31 @@ const KILL_SIGNAL_DEFAULT: Signal = Signal::SIGTERM;
 pub trait ConfigTarget {
     /// Sets the sid
     fn setsid(&mut self) -> &mut Self;
+
     /// Sets a mem limit
     fn setlimit(&mut self, memlimit: u64) -> &mut Self;
+
     /// enables core dumps (rlimit = infinity)
     fn set_coredump(&mut self, enable: bool) -> &mut Self;
+
     /// Sets the AFL forkserver pipes
-    fn setpipe(
+    ///
+    /// # Safety
+    /// All pipes must be valid file descriptors. They will be dup2-ed internally.
+    unsafe fn setpipe(
         &mut self,
         st_read: RawFd,
         st_write: RawFd,
         ctl_read: RawFd,
         ctl_write: RawFd,
     ) -> &mut Self;
-    /// dup2 the specific fd, used for stdio
-    fn setdup2(&mut self, old_fd: RawFd, new_fd: RawFd) -> &mut Self;
+
+    /// [`dup2`] the specific `fd`, used for `stdio`
+    ///
+    /// # Safety
+    /// The file descriptors must be valid. They will be `dup2-ed`.
+    unsafe fn setdup2(&mut self, old_fd: RawFd, new_fd: RawFd) -> &mut Self;
+
     /// Bind children to a single core
     fn bind(&mut self, core: CoreId) -> &mut Self;
 }
@@ -195,44 +206,52 @@ pub trait ConfigTarget {
 impl ConfigTarget for Command {
     fn setsid(&mut self) -> &mut Self {
         let func = move || {
+            // # Safety
+            // raw libc call without any parameters
             unsafe {
-                libc::setsid();
+                if libc::setsid() == -1 {
+                    log::warn!("Failed to set sid. Error: {:?}", last_error_str());
+                }
             };
             Ok(())
         };
         unsafe { self.pre_exec(func) }
     }
 
-    fn setpipe(
+    /// # Safety
+    /// All pipes must be valid file descriptors. They will be dup2-ed internally.
+    unsafe fn setpipe(
         &mut self,
         st_read: RawFd,
         st_write: RawFd,
         ctl_read: RawFd,
         ctl_write: RawFd,
     ) -> &mut Self {
-        let func = move || {
-            match dup2(ctl_read, FORKSRV_FD) {
-                Ok(()) => (),
-                Err(_) => {
-                    return Err(io::Error::last_os_error());
+        // # Safety
+        // If this was called with correct parameters, we're good.
+        unsafe {
+            let func = move || {
+                match dup2(ctl_read, FORKSRV_FD) {
+                    Ok(()) => (),
+                    Err(_) => {
+                        return Err(io::Error::last_os_error());
+                    }
                 }
-            }
 
-            match dup2(st_write, FORKSRV_FD + 1) {
-                Ok(()) => (),
-                Err(_) => {
-                    return Err(io::Error::last_os_error());
+                match dup2(st_write, FORKSRV_FD + 1) {
+                    Ok(()) => (),
+                    Err(_) => {
+                        return Err(io::Error::last_os_error());
+                    }
                 }
-            }
-            unsafe {
                 libc::close(st_read);
                 libc::close(st_write);
                 libc::close(ctl_read);
                 libc::close(ctl_write);
-            }
-            Ok(())
-        };
-        unsafe { self.pre_exec(func) }
+                Ok(())
+            };
+            self.pre_exec(func)
+        }
     }
 
     #[expect(trivial_numeric_casts)]
@@ -280,8 +299,10 @@ impl ConfigTarget for Command {
         unsafe { self.pre_exec(func) }
     }
 
-    fn setdup2(&mut self, old_fd: RawFd, new_fd: RawFd) -> &mut Self {
+    unsafe fn setdup2(&mut self, old_fd: RawFd, new_fd: RawFd) -> &mut Self {
         let func = move || {
+            // # Safety
+            // The fd should be valid at this point - depending on parameters.
             let ret = unsafe { libc::dup2(old_fd, new_fd) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
@@ -418,7 +439,11 @@ impl Forkserver {
         // Setup args, stdio
         command.args(args);
         if use_stdin {
-            command.setdup2(input_filefd, libc::STDIN_FILENO);
+            // # Safety
+            // We assume the file descriptors will be valid and not closed.
+            unsafe {
+                command.setdup2(input_filefd, libc::STDIN_FILENO);
+            }
         } else {
             command.stdin(Stdio::null());
         }
@@ -426,7 +451,11 @@ impl Forkserver {
         if debug_output {
             command.stdout(Stdio::inherit());
         } else if let Some(fd) = &stdout_memfd {
-            command.setdup2(*fd, libc::STDOUT_FILENO);
+            // # Safety
+            // We assume the file descriptors will be valid and not closed.
+            unsafe {
+                command.setdup2(*fd, libc::STDOUT_FILENO);
+            }
             command.stdout(Stdio::null());
         } else {
             command.stdout(Stdio::null());
@@ -435,7 +464,11 @@ impl Forkserver {
         if debug_output {
             command.stderr(Stdio::inherit());
         } else if let Some(fd) = &stderr_memfd {
-            command.setdup2(*fd, libc::STDERR_FILENO);
+            // # Safety
+            // We assume the file descriptors will be valid and not closed.
+            unsafe {
+                command.setdup2(*fd, libc::STDERR_FILENO);
+            }
             command.stderr(Stdio::null());
         } else {
             command.stderr(Stdio::null());
@@ -477,25 +510,29 @@ impl Forkserver {
             command.current_dir(cwd);
         }
 
-        let fsrv_handle = match command
-            .env("LD_BIND_NOW", "1")
-            .envs(envs)
-            .setlimit(memlimit)
-            .set_coredump(afl_debug)
-            .setsid()
-            .setpipe(
-                st_pipe.read_end().unwrap(),
-                st_pipe.write_end().unwrap(),
-                ctl_pipe.read_end().unwrap(),
-                ctl_pipe.write_end().unwrap(),
-            )
-            .spawn()
-        {
-            Ok(fsrv_handle) => fsrv_handle,
-            Err(err) => {
-                return Err(Error::illegal_state(format!(
-                    "Could not spawn the forkserver: {err:#?}"
-                )));
+        // # Saftey
+        // The pipe file descriptors used for `setpipe` are valid at this point.
+        let fsrv_handle = unsafe {
+            match command
+                .env("LD_BIND_NOW", "1")
+                .envs(envs)
+                .setlimit(memlimit)
+                .set_coredump(afl_debug)
+                .setsid()
+                .setpipe(
+                    st_pipe.read_end().unwrap(),
+                    st_pipe.write_end().unwrap(),
+                    ctl_pipe.read_end().unwrap(),
+                    ctl_pipe.write_end().unwrap(),
+                )
+                .spawn()
+            {
+                Ok(fsrv_handle) => fsrv_handle,
+                Err(err) => {
+                    return Err(Error::illegal_state(format!(
+                        "Could not spawn the forkserver: {err:#?}"
+                    )));
+                }
             }
         };
 

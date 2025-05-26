@@ -148,12 +148,10 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
     if !res.status.success() {
         let stdout = from_utf8(&res.stdout).unwrap();
         let stderr = from_utf8(&res.stderr).unwrap();
-        return Err(io::Error::new(
-            ErrorKind::Other,
-            format!(
-                "Cargo generate-lockfile failed. Run cargo generate-lockfile for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {gen_lockfile_cmd:?}"
-            ),
-        ));
+        return Err(io::Error::other(format!(
+            "Cargo generate-lockfile failed. Run cargo generate-lockfile for {}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {gen_lockfile_cmd:?}",
+            cargo_file_path.display()
+        )));
     }
 
     Ok(())
@@ -197,12 +195,10 @@ async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) 
     if !res.status.success() {
         let stdout = from_utf8(&res.stdout).unwrap();
         let stderr = from_utf8(&res.stderr).unwrap();
-        return Err(io::Error::new(
-            ErrorKind::Other,
-            format!(
-                "Cargo fmt failed. Run cargo fmt for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}"
-            ),
-        ));
+        return Err(io::Error::other(format!(
+            "Cargo fmt failed. Run cargo fmt for \"{}\".\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}",
+            cargo_file_path.display()
+        )));
     }
 
     Ok(())
@@ -242,14 +238,14 @@ async fn run_clang_fmt(
         let stdout = from_utf8(&res.stdout).unwrap();
         let stderr = from_utf8(&res.stderr).unwrap();
         println!("{stderr}");
-        Err(io::Error::new(
-            ErrorKind::Other,
-            format!("{clang} failed.\nstdout:{stdout}\nstderr:{stderr}"),
-        ))
+        Err(io::Error::other(format!(
+            "{clang} failed.\nstdout:{stdout}\nstderr:{stderr}"
+        )))
     }
 }
 
 /// extracts (major, minor, patch) version from `clang-format --version` output.
+#[must_use]
 pub fn parse_llvm_fmt_version(fmt_str: &str) -> Option<(u32, u32, u32)> {
     let re =
         Regex::new(r"clang-format version (?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)").unwrap();
@@ -280,7 +276,10 @@ async fn main() -> io::Result<()> {
         Err(_) => std::env::current_dir().expect("Failed to get LibAFL root directory."),
     };
 
-    println!("Using {libafl_root_dir:#?} as the project root");
+    println!(
+        "Using \"{}\" as the project root",
+        libafl_root_dir.display()
+    );
     let rust_excluded_directories = RegexSet::new([
         r".*target.*",
         r".*utils/noaslr.*",
@@ -357,6 +356,7 @@ async fn main() -> io::Result<()> {
             )
         } else if which(unspecified_clang_format).is_ok() {
             let version_str = get_version_string(unspecified_clang_format, &[]).await?;
+            println!("{version_str}");
             let (major, _, _) = parse_llvm_fmt_version(&version_str).unwrap();
 
             if major == REF_LLVM_VERSION {
@@ -437,13 +437,16 @@ async fn main() -> io::Result<()> {
 }
 
 async fn get_version_string(path: &str, args: &[&str]) -> Result<String, io::Error> {
-    let version = Command::new(path)
+    let res = Command::new(path)
         .args(args)
         .arg("--version")
         .output()
-        .await?
-        .stdout;
-    Ok(from_utf8(&version).unwrap().replace('\n', ""))
+        .await?;
+    assert!(
+        res.status.success(),
+        "Failed to run {path} {args:?}: {res:?}"
+    );
+    Ok(from_utf8(&res.stdout).unwrap().replace('\n', ""))
 }
 
 #[expect(clippy::needless_pass_by_value)]

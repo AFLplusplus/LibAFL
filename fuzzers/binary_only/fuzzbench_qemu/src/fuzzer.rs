@@ -2,11 +2,11 @@
 
 use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::FromRawFd;
 use std::{
     env,
     fs::{self, File, OpenOptions},
-    io::{self, Write},
+    io::Write,
     path::PathBuf,
     process,
 };
@@ -36,9 +36,10 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
+#[cfg(unix)]
+use libafl_bolts::os::dup_and_mute_outputs;
 use libafl_bolts::{
     current_time,
-    os::dup2,
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -52,12 +53,10 @@ use libafl_qemu::{
         cmplog::{CmpLogModule, CmpLogObserver},
         edges::StdEdgeCoverageModule,
     },
-    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
-    Regs, TargetSignalHandling,
+    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, Regs,
+    TargetSignalHandling,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
-#[cfg(unix)]
-use nix::unistd::dup;
 
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
@@ -244,13 +243,16 @@ fn fuzz(
             .open(&logfile)?,
     );
 
+    // We forward all outputs to dev/null, but keep a copy around for the fuzzer output.
+    //
+    // # Safety
+    // stdout and stderr should still be open at this point in time.
     #[cfg(unix)]
-    let mut stdout_cpy = unsafe {
-        let new_fd = dup(io::stdout().as_raw_fd())?;
-        File::from_raw_fd(new_fd)
-    };
+    let (new_stdout, _new_stderr) = unsafe { dup_and_mute_outputs()? };
+    // # Safety
+    // The new stdout is open at this point, and we will don't use it anywhere else.
     #[cfg(unix)]
-    let file_null = File::open("/dev/null")?;
+    let mut stdout_cpy = unsafe { File::from_raw_fd(new_stdout) };
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
@@ -416,13 +418,6 @@ fn fuzz(
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
-    // Remove target output (logs still survive)
-    #[cfg(unix)]
-    {
-        let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        dup2(null_fd, io::stderr().as_raw_fd())?;
-    }
     // reopen file to make sure we're at the end
     log.replace(
         OpenOptions::new()

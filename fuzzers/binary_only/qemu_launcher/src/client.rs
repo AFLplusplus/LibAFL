@@ -17,7 +17,6 @@ use libafl_qemu::modules::{
 
 use crate::{harness::Harness, instance::Instance, options::FuzzerOptions};
 
-#[expect(clippy::module_name_repetitions)]
 pub type ClientState =
     StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 

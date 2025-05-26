@@ -21,4 +21,4 @@ env_logger = "0.11.5"
 libafl = { path = "../../../libafl", features = ["std", "derive"] }
 libafl_bolts = { path = "../../../libafl_bolts" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
-nix = { version = "0.29.0", features = ["signal"] }
+nix = { version = "0.30.1", features = ["signal"] }

@@ -35,6 +35,8 @@ use crate::{feedbacks::LibfuzzerCrashCauseMetadata, fuzz_with, options::Libfuzze
 
 #[cfg(unix)]
 fn destroy_output_fds(options: &LibfuzzerOptions) {
+    // TODO: this could probably use libafl_bolts::os::dup_and_mute_outputsputs instead.
+
     use libafl_bolts::os::{dup2, null_fd};
 
     let null_fd = null_fd().unwrap();
@@ -43,17 +45,29 @@ fn destroy_output_fds(options: &LibfuzzerOptions) {
 
     #[cfg(feature = "tui_monitor")]
     if options.tui() {
-        dup2(null_fd, stdout_fd).unwrap();
-        dup2(null_fd, stderr_fd).unwrap();
+        // # Safety
+        // The file descriptors schould still be valid at this point.
+        unsafe {
+            dup2(null_fd, stdout_fd).unwrap();
+            dup2(null_fd, stderr_fd).unwrap();
+        }
         return;
     }
 
     if options.close_fd_mask() != 0 {
         if options.close_fd_mask() & u8::try_from(stderr_fd).unwrap() != 0 {
-            dup2(null_fd, stdout_fd).unwrap();
+            // # Safety
+            // The file descriptors schould still be valid at this point.
+            unsafe {
+                dup2(null_fd, stdout_fd).unwrap();
+            }
         }
         if options.close_fd_mask() & u8::try_from(stderr_fd).unwrap() != 0 {
-            dup2(null_fd, stderr_fd).unwrap();
+            // # Safety
+            // The file descriptors schould still be valid at this point.
+            unsafe {
+                dup2(null_fd, stderr_fd).unwrap();
+            }
         }
     }
 }

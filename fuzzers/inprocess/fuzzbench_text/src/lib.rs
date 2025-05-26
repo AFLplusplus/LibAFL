@@ -47,7 +47,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_time,
-    os::dup2,
+    os::{dup2, dup_and_mute_outputs},
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -58,8 +58,6 @@ use libafl_targets::autotokens;
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
-#[cfg(unix)]
-use nix::unistd::dup;
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -270,12 +268,29 @@ fn fuzz_binary(
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]
-    let mut stdout_cpy = unsafe {
-        let new_fd = dup(io::stdout().as_raw_fd())?;
-        File::from_raw_fd(new_fd)
+    let mut stdout_cpy = {
+        // We forward all outputs to dev/null, but keep a copy around for the fuzzer output.
+        //
+        // # Safety
+        // stdout and stderr should still be open at this point in time.
+        let (new_stdout, new_stderr) = unsafe { dup_and_mute_outputs()? };
+
+        // If we are debugging, re-enable target stderror.
+        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
+            // # Safety
+            // Nobody else uses the new stderror here.
+            unsafe {
+                dup2(new_stderr, io::stderr().as_raw_fd())?;
+            }
+        }
+
+        // # Safety
+        // The new stdout is open at this point, and we will don't use it anywhere else.
+        #[cfg(unix)]
+        unsafe {
+            File::from_raw_fd(new_stdout)
+        }
     };
-    #[cfg(unix)]
-    let file_null = File::open("/dev/null")?;
 
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
@@ -403,7 +418,7 @@ fn fuzz_binary(
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::with_timeout(
+    let executor = InProcessExecutor::with_timeout(
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
@@ -447,13 +462,6 @@ fn fuzz_binary(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Remove target output (logs still survive)
-    #[cfg(unix)]
-    {
-        let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        dup2(null_fd, io::stderr().as_raw_fd())?;
-    }
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
 
@@ -476,12 +484,29 @@ fn fuzz_text(
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]
-    let mut stdout_cpy = unsafe {
-        let new_fd = dup(io::stdout().as_raw_fd())?;
-        File::from_raw_fd(new_fd)
+    let mut stdout_cpy = {
+        // We forward all outputs to dev/null, but keep a copy around for the fuzzer output.
+        //
+        // # Safety
+        // stdout and stderr should still be open at this point in time.
+        let (new_stdout, new_stderr) = unsafe { dup_and_mute_outputs()? };
+
+        // If we are debugging, re-enable target stderror.
+        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
+            // # Safety
+            // Nobody else uses the new stderror here.
+            unsafe {
+                dup2(new_stderr, io::stderr().as_raw_fd())?;
+            }
+        }
+
+        // # Safety
+        // The new stdout is open at this point, and we will don't use it anywhere else.
+        #[cfg(unix)]
+        unsafe {
+            File::from_raw_fd(new_stdout)
+        }
     };
-    #[cfg(unix)]
-    let file_null = File::open("/dev/null")?;
 
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
@@ -632,7 +657,7 @@ fn fuzz_text(
     let generalization = GeneralizationStage::new(&edges_observer);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::with_timeout(
+    let executor = InProcessExecutor::with_timeout(
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
@@ -674,13 +699,6 @@ fn fuzz_text(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Remove target output (logs still survive)
-    #[cfg(unix)]
-    {
-        let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        dup2(null_fd, io::stderr().as_raw_fd())?;
-    }
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
 

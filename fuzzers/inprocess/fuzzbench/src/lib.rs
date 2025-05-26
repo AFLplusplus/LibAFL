@@ -21,7 +21,7 @@ use libafl::{
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
     feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -39,6 +39,8 @@ use libafl::{
     },
     state::{HasCorpus, StdState},
 };
+#[cfg(unix)]
+use libafl_bolts::os::dup_and_mute_outputs;
 use libafl_bolts::{
     AsSlice, current_time,
     os::dup2,
@@ -51,8 +53,6 @@ use libafl_targets::autotokens;
 use libafl_targets::{
     CmpLogObserver, libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer,
 };
-#[cfg(unix)]
-use nix::unistd::dup;
 
 /// The fuzzer main (as `no_mangle` C function)
 #[unsafe(no_mangle)]
@@ -207,12 +207,29 @@ fn fuzz(
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]
-    let mut stdout_cpy = unsafe {
-        let new_fd = dup(io::stdout().as_raw_fd())?;
-        File::from_raw_fd(new_fd)
+    let mut stdout_cpy = {
+        // We forward all outputs to dev/null, but keep a copy around for the fuzzer output.
+        //
+        // # Safety
+        // stdout and stderr should still be open at this point in time.
+        let (new_stdout, new_stderr) = unsafe { dup_and_mute_outputs()? };
+
+        // If we are debugging, re-enable target stderror.
+        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
+            // # Safety
+            // Nobody else uses the new stderror here.
+            unsafe {
+                dup2(new_stderr, io::stderr().as_raw_fd())?;
+            }
+        }
+
+        // # Safety
+        // The new stdout is open at this point, and we will don't use it anywhere else.
+        #[cfg(unix)]
+        unsafe {
+            File::from_raw_fd(new_stdout)
+        }
     };
-    #[cfg(unix)]
-    let file_null = File::open("/dev/null")?;
 
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
@@ -334,7 +351,7 @@ fn fuzz(
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::with_timeout(
+    let executor = InProcessExecutor::with_timeout(
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
@@ -378,15 +395,6 @@ fn fuzz(
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Remove target output (logs still survive)
-    #[cfg(unix)]
-    {
-        let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
-            dup2(null_fd, io::stderr().as_raw_fd())?;
-        }
-    }
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
 

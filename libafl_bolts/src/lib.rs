@@ -160,8 +160,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
 use std::{
     fs::File,
-    io::{Write, stderr, stdout},
-    os::fd::{AsRawFd, FromRawFd, RawFd},
+    io::Write,
+    os::fd::{FromRawFd, RawFd},
     panic,
 };
 
@@ -1323,27 +1323,6 @@ impl log::Log for SimpleFdLogger {
     }
 
     fn flush(&self) {}
-}
-
-/// Closes `stdout` and `stderr` and returns a new `stdout` and `stderr`
-/// to be used in the fuzzer for further logging.
-///
-/// # Safety
-/// The function is arguably safe, but it might have undesirable side effects since it closes `stdout` and `stderr`.
-#[cfg(all(unix, feature = "std"))]
-#[expect(unused_qualifications)]
-pub unsafe fn dup_and_mute_outputs() -> Result<(RawFd, RawFd), Error> {
-    let old_stdout = stdout().as_raw_fd();
-    let old_stderr = stderr().as_raw_fd();
-    let null_fd = crate::os::null_fd()?;
-
-    let new_stdout = crate::os::dup(old_stdout)?;
-    let new_stderr = crate::os::dup(old_stderr)?;
-
-    crate::os::dup2(null_fd, old_stdout)?;
-    crate::os::dup2(null_fd, old_stderr)?;
-
-    Ok((new_stdout, new_stderr))
 }
 
 /// Set up an error print hook that will

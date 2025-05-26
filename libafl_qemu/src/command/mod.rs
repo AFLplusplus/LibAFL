@@ -44,6 +44,7 @@ mod bindings {
     #![expect(clippy::all)]
     #![expect(clippy::pedantic)]
     #![allow(unsafe_op_in_unsafe_fn)]
+    #![allow(warnings)]
 
     include!(concat!(env!("OUT_DIR"), "/libafl_qemu_bindings.rs"));
 }

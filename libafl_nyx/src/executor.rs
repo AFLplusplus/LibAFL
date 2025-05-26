@@ -1,8 +1,7 @@
-use core::marker::PhantomData;
+use core::{marker::PhantomData, ops::IndexMut};
 use std::{
     io::{Read, Seek},
-    ops::IndexMut,
-    os::fd::AsRawFd,
+    os::fd::{AsFd, AsRawFd},
 };
 
 use libafl::{
@@ -78,11 +77,15 @@ where
             .map_err(|_| Error::unsupported("Inputs larger than 4GB are not supported"))?;
         // Duplicate the file descriptor since QEMU(?) closes it and we
         // want to keep |self.helper.nyx_stdout| open.
-        let hprintf_fd = nix::unistd::dup(self.helper.nyx_stdout.as_raw_fd())
+        // # Safety
+        //
+        let hprintf_fd = nix::unistd::dup(self.helper.nyx_stdout.as_fd())
             .map_err(|e| Error::illegal_state(format!("Failed to duplicate Nyx stdout fd: {e}")))?;
 
         self.helper.nyx_process.set_input(buffer, size);
-        self.helper.nyx_process.set_hprintf_fd(hprintf_fd);
+        self.helper
+            .nyx_process
+            .set_hprintf_fd(hprintf_fd.as_raw_fd());
 
         unsafe {
             if CMPLOG_ENABLED == 1 {
