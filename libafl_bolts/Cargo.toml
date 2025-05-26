@@ -121,7 +121,7 @@ llmp_small_maps = ["alloc"]
 #! ### Stable SIMD features
 
 ## Use the best SIMD implementation by our benchmark.
-simd = ["alloc", "libafl_wide"]
+simd = ["alloc", "wide"]
 
 [build-dependencies]
 rustversion = { workspace = true }
@@ -178,7 +178,7 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
 ] }
 
 # optional stable simd, pin to a commit due to `u8x32` not released yet. Switch to `wide` as long as next release is out!
-libafl_wide = { version = "0.7.33", optional = true, package = "wide" }
+wide = { version = "0.7.33", optional = true, package = "libafl_wide" }
 rustversion = { workspace = true }
 
 # Document all features of this crate (for `cargo doc`)
