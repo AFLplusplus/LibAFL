@@ -551,7 +551,7 @@ version = "3.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46f93780a459b7d656ef7f071fe699c4d3d2cb201c4b24d085b6ddc505276e73"
 dependencies = [
- "nix 0.30.1",
+ "nix",
  "windows-sys",
 ]
 
@@ -725,9 +725,9 @@ checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
 
 [[package]]
 name = "fastbloom"
-version = "0.9.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27cea6e7f512d43b098939ff4d5a5d6fe3db07971e1d05176fe26c642d33f5b8"
+checksum = "dee0191af12b622a9263467105cda1a21f8e6cbc535b2fd49de829ca92794e32"
 dependencies = [
  "getrandom 0.3.3",
  "siphasher",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "fuzzbench_fork_qemu"
-version = "0.15.2"
+version = "0.15.3"
 dependencies = [
  "clap",
  "env_logger",
@@ -771,7 +771,6 @@ dependencies = [
  "libafl_qemu",
  "libafl_targets",
  "log",
- "nix 0.29.0",
 ]
 
 [[package]]
@@ -1051,7 +1050,7 @@ checksum = "441225017b106b9f902e97947a6d31e44ebcf274b91bdbfb51e5c477fcd468e5"
 
 [[package]]
 name = "libafl"
-version = "0.15.2"
+version = "0.15.3"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1069,7 +1068,7 @@ dependencies = [
  "libm",
  "log",
  "meminterval",
- "nix 0.29.0",
+ "nix",
  "num-traits",
  "postcard",
  "regex",
@@ -1087,7 +1086,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_bolts"
-version = "0.15.2"
+version = "0.15.3"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1100,7 +1099,7 @@ dependencies = [
  "log",
  "mach2",
  "miniz_oxide",
- "nix 0.29.0",
+ "nix",
  "num_enum",
  "once_cell",
  "postcard",
@@ -1122,7 +1121,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_derive"
-version = "0.15.2"
+version = "0.15.3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1131,7 +1130,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu"
-version = "0.15.2"
+version = "0.15.3"
 dependencies = [
  "addr2line",
  "bindgen",
@@ -1152,8 +1151,6 @@ dependencies = [
  "libc",
  "log",
  "meminterval",
- "memmap2",
- "num-derive",
  "num-traits",
  "num_enum",
  "object",
@@ -1167,13 +1164,12 @@ dependencies = [
  "syscall-numbers",
  "thread_local",
  "toml",
- "typed-arena",
  "typed-builder",
 ]
 
 [[package]]
 name = "libafl_qemu_build"
-version = "0.15.2"
+version = "0.15.3"
 dependencies = [
  "bindgen",
  "cc",
@@ -1188,7 +1184,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu_sys"
-version = "0.15.2"
+version = "0.15.3"
 dependencies = [
  "libafl_qemu_build",
  "libc",
@@ -1201,7 +1197,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_targets"
-version = "0.15.2"
+version = "0.15.3"
 dependencies = [
  "bindgen",
  "cc",
@@ -1210,7 +1206,7 @@ dependencies = [
  "libafl_bolts",
  "libc",
  "log",
- "nix 0.29.0",
+ "nix",
  "once_cell",
  "rangemap",
  "rustversion",
@@ -1331,19 +1327,6 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.29.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
-dependencies = [
- "bitflags",
- "cfg-if",
- "cfg_aliases",
- "libc",
- "memoffset",
-]
-
-[[package]]
-name = "nix"
 version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
@@ -1352,6 +1335,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -1362,17 +1346,6 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
-]
-
-[[package]]
-name = "num-derive"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

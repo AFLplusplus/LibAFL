@@ -6,8 +6,10 @@
 #![expect(improper_ctypes)]
 #![expect(unsafe_op_in_unsafe_fn)]
 #![allow(unused_imports)]
+#![allow(warnings)]
 
 #[cfg(all(not(feature = "clippy"), target_os = "linux"))]
+#[allow(warning)]
 #[rustfmt::skip]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 

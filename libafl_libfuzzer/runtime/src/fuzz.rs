@@ -35,6 +35,8 @@ use crate::{feedbacks::LibfuzzerCrashCauseMetadata, fuzz_with, options::Libfuzze
 
 #[cfg(unix)]
 fn destroy_output_fds(options: &LibfuzzerOptions) {
+    // TODO: this could probably use libafl_bolts::dup_and_mute_outputs instead.
+
     use libafl_bolts::os::{dup2, null_fd};
 
     let null_fd = null_fd().unwrap();
