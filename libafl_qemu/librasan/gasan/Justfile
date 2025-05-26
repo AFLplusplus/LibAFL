@@ -9,7 +9,6 @@ compile_gasan:
 	#!/bin/sh
 	. {{ DOTENV }}
 	cargo \
-		+nightly \
 		build \
 		--package gasan \
 		--target ${CROSS_TARGET} \
@@ -21,7 +20,6 @@ fix_gasan:
 	#!/bin/sh
 	. {{ DOTENV }}
 	cargo \
-		+nightly \
 		fix \
 		--package gasan \
 		--target ${CROSS_TARGET} \

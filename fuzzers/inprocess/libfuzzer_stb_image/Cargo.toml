@@ -1,12 +1,11 @@
 [package]
 name = "libfuzzer_stb_image"
-version = "0.15.2"
+version = "0.15.3"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
 ]
 edition = "2021"
-build = "build.rs"
 
 [features]
 default = ["std"]
@@ -22,13 +21,17 @@ debug = true
 libafl = { path = "../../../libafl" }
 libafl_bolts = { path = "../../../libafl_bolts" }
 libafl_targets = { path = "../../../libafl_targets", features = [
-  "sancov_pcguard_edges",
+  "sancov_pcguard_hitcounts",
   "sancov_cmplog",
   "libfuzzer",
-  "libfuzzer_no_link_main",
 ] }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 mimalloc = { version = "0.1.43", default-features = false }
+libafl_cc = { path = "../../../libafl_cc" }
 
 [build-dependencies]
 cc = { version = "1.1.21", features = ["parallel"] }
+
+[lib]
+name = "libfuzzer_stb_image"
+crate-type = ["staticlib"]

@@ -30,6 +30,8 @@ pub mod centralized_multi_machine;
 #[cfg(all(unix, feature = "multi_machine"))]
 pub use centralized_multi_machine::*;
 
+use super::EventWithStats;
+
 /// An LLMP-backed event hook for scalable multi-processed fuzzing
 #[derive(Debug)]
 pub struct StdLlmpEventHook<I, MT> {
@@ -71,7 +73,7 @@ where
             } else {
                 &*msg
             };
-            let event: Event<I> = postcard::from_bytes(event_bytes)?;
+            let event: EventWithStats<I> = postcard::from_bytes(event_bytes)?;
             match Self::handle_in_broker(
                 monitor,
                 &mut self.client_stats_manager,
@@ -91,7 +93,7 @@ where
             &mut self.client_stats_manager,
             "Broker Heartbeat",
             ClientId(0),
-        );
+        )?;
         Ok(())
     }
 }
@@ -112,13 +114,20 @@ where
     }
 
     /// Handle arriving events in the broker
-    #[expect(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         monitor: &mut MT,
         client_stats_manager: &mut ClientStatsManager,
         client_id: ClientId,
-        event: &Event<I>,
+        event: &EventWithStats<I>,
     ) -> Result<BrokerEventResult, Error> {
+        let stats = event.stats();
+
+        client_stats_manager.client_stats_insert(client_id)?;
+        client_stats_manager.update_client_stats_for(client_id, |client_stat| {
+            client_stat.update_executions(stats.executions, stats.time);
+        })?;
+
+        let event = event.event();
         match &event {
             Event::NewTestcase {
                 corpus_size,
@@ -131,65 +140,52 @@ where
                     client_id
                 };
 
-                client_stats_manager.client_stats_insert(id);
+                client_stats_manager.client_stats_insert(id)?;
                 client_stats_manager.update_client_stats_for(id, |client_stat| {
                     client_stat.update_corpus_size(*corpus_size as u64);
-                });
-                monitor.display(client_stats_manager, event.name(), id);
+                })?;
+                monitor.display(client_stats_manager, event.name(), id)?;
                 Ok(BrokerEventResult::Forward)
             }
-            Event::UpdateExecStats {
-                time,
-                executions,
-                phantom: _,
-            } => {
-                // TODO: The monitor buffer should be added on client add.
-                client_stats_manager.client_stats_insert(client_id);
-                client_stats_manager.update_client_stats_for(client_id, |client_stat| {
-                    client_stat.update_executions(*executions, *time);
-                });
-                monitor.display(client_stats_manager, event.name(), client_id);
+            Event::Heartbeat => {
+                monitor.display(client_stats_manager, event.name(), client_id)?;
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats { name, value, .. } => {
-                client_stats_manager.client_stats_insert(client_id);
+                client_stats_manager.client_stats_insert(client_id)?;
                 client_stats_manager.update_client_stats_for(client_id, |client_stat| {
                     client_stat.update_user_stats(name.clone(), value.clone());
-                });
+                })?;
                 client_stats_manager.aggregate(name);
-                monitor.display(client_stats_manager, event.name(), client_id);
+                monitor.display(client_stats_manager, event.name(), client_id)?;
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor {
-                time,
-                executions,
                 introspection_stats,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
 
                 // Get the client for the staterestorer ID
-                client_stats_manager.client_stats_insert(client_id);
+                client_stats_manager.client_stats_insert(client_id)?;
                 client_stats_manager.update_client_stats_for(client_id, |client_stat| {
-                    // Update the normal monitor for this client
-                    client_stat.update_executions(*executions, *time);
                     // Update the performance monitor for this client
                     client_stat.update_introspection_stats((**introspection_stats).clone());
-                });
+                })?;
 
                 // Display the monitor via `.display` only on core #1
-                monitor.display(client_stats_manager, event.name(), client_id);
+                monitor.display(client_stats_manager, event.name(), client_id)?;
 
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size, .. } => {
-                client_stats_manager.client_stats_insert(client_id);
+                client_stats_manager.client_stats_insert(client_id)?;
                 client_stats_manager.update_client_stats_for(client_id, |client_stat| {
                     client_stat.update_objective_size(*objective_size as u64);
-                });
-                monitor.display(client_stats_manager, event.name(), client_id);
+                })?;
+                monitor.display(client_stats_manager, event.name(), client_id)?;
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {

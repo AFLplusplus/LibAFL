@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error,
-    corpus::{CachedOnDiskCorpus, Corpus, CorpusId, HasTestcase, Testcase},
+    corpus::{CachedOnDiskCorpus, Corpus, CorpusId, EnableDisableCorpus, HasTestcase, Testcase},
     inputs::Input,
 };
 
@@ -43,6 +43,8 @@ pub struct OnDiskMetadata<'a> {
     pub metadata: &'a SerdeAnyMap,
     /// The exec time for this [`Testcase`]
     pub exec_time: &'a Option<Duration>,
+    /// The executions of this [`Testcase`]
+    pub executions: &'a u64,
 }
 
 /// A corpus able to store [`Testcase`]s to disk, and load them from disk, when they are being used.
@@ -183,6 +185,21 @@ where
 
     fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
+    }
+}
+
+impl<I> EnableDisableCorpus for OnDiskCorpus<I>
+where
+    I: Input,
+{
+    #[inline]
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.inner.disable(id)
+    }
+
+    #[inline]
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.inner.enable(id)
     }
 }
 

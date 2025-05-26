@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use clap::{builder::Str, Parser};
+use clap::{Parser, builder::Str};
 
 #[derive(Default)]
 pub struct Version;

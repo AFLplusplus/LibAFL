@@ -14,7 +14,7 @@ use libafl::{
     generators::RandPrintablesGenerator,
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
@@ -136,6 +136,8 @@ pub fn main() {
             command_configurator,
             tuple_list!(observer),
             tuple_list!(hook),
+            None,
+            None,
         );
 
     // Generator of printable bytearrays of max size 32
@@ -147,7 +149,7 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer

@@ -5,31 +5,31 @@ use clap::Parser;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{forkserver::ForkserverExecutor, HasObservers},
+    executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
     feedback_and_fast, feedback_or,
     feedbacks::{
         CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback, TimeFeedback,
     },
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::Fuzzer,
     generators::{NautilusContext, NautilusGenerator},
-    inputs::{NautilusInput, NautilusTargetBytesConverter},
+    inputs::{NautilusBytesConverter, NautilusInput},
     monitors::SimpleMonitor,
     mutators::{
-        NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator,
-        StdScheduledMutator, Tokens,
+        HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
+        NautilusSpliceMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::StdState,
-    HasMetadata,
+    BloomInputFilter, HasMetadata, StdFuzzerBuilder,
 };
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled},
-    AsSliceMut, Truncate,
+    AsSliceMut, StdTargetArgs, Truncate,
 };
 use nix::sys::signal::Signal;
 
@@ -166,7 +166,12 @@ pub fn main() {
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let converter = NautilusBytesConverter::new(&context);
+    let mut fuzzer = StdFuzzerBuilder::new()
+        .input_filter(BloomInputFilter::default())
+        .bytes_converter(converter)
+        .build(scheduler, feedback, objective)
+        .unwrap();
 
     // If we should debug the child
     let debug_child = opt.debug_child;
@@ -186,7 +191,6 @@ pub fn main() {
         .coverage_map_size(MAP_SIZE)
         .timeout(Duration::from_millis(opt.timeout))
         .kill_signal(opt.signal)
-        .target_bytes_converter(NautilusTargetBytesConverter::new(&context))
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
@@ -207,7 +211,7 @@ pub fn main() {
     state.add_metadata(tokens);
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_stack_pow(
+    let mutator = HavocScheduledMutator::with_max_stack_pow(
         tuple_list!(
             NautilusRandomMutator::new(&context),
             NautilusRandomMutator::new(&context),

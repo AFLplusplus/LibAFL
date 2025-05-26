@@ -264,11 +264,17 @@ impl Qemu {
         unsafe { (addr as usize - guest_base) as GuestAddr }
     }
 
+    /// Tells whether access to target address @addr of size @size is valid or not.
+    /// The access is checked relatively to `current_cpu` if available, or the CPU at index 0
+    /// otherwise.
+    /// The function returns None if no CPU could be found.
     #[must_use]
-    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
-        self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index(0))
-            .access_ok(kind, addr, size)
+    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> Option<bool> {
+        Some(
+            self.current_cpu()
+                .or_else(|| self.cpu_from_index(0))?
+                .access_ok(kind, addr, size),
+        )
     }
 
     pub fn force_dfl(&self) {
@@ -467,47 +473,60 @@ impl Qemu {
 pub mod pybind {
     use libafl_qemu_sys::{GuestAddr, MmapPerms};
     use pyo3::{
-        Bound, PyObject, PyResult, Python,
-        conversion::FromPyObject,
+        Bound, FromPyObject, PyObject, PyResult, Python,
         exceptions::PyValueError,
-        pymethods,
+        pyclass, pymethods,
         types::{PyAnyMethods, PyInt},
     };
 
-    use crate::{pybind::Qemu, qemu::hooks::SyscallHookResult};
+    use crate::{pybind::Qemu, qemu::hooks};
 
     static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
+
+    #[pyclass]
+    #[derive(FromPyObject)]
+    pub struct SyscallHookResult {
+        /// if None: run.
+        /// else: skip with given value.
+        skip: Option<GuestAddr>,
+    }
 
     extern "C" fn py_syscall_hook_wrapper(
         _data: u64,
         sys_num: i32,
-        a0: u64,
-        a1: u64,
-        a2: u64,
-        a3: u64,
-        a4: u64,
-        a5: u64,
-        a6: u64,
-        a7: u64,
-    ) -> SyscallHookResult {
+        a0: GuestAddr,
+        a1: GuestAddr,
+        a2: GuestAddr,
+        a3: GuestAddr,
+        a4: GuestAddr,
+        a5: GuestAddr,
+        a6: GuestAddr,
+        a7: GuestAddr,
+    ) -> hooks::SyscallHookResult {
         unsafe { (&raw const PY_SYSCALL_HOOK).read() }.map_or_else(
-            || SyscallHookResult::new(None),
+            || hooks::SyscallHookResult::Run,
             |obj| {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
                 Python::with_gil(|py| {
                     let ret = obj.call1(py, args).expect("Error in the syscall hook");
                     let any = ret.bind(py);
                     if any.is_none() {
-                        SyscallHookResult::new(None)
+                        hooks::SyscallHookResult::Run
                     } else {
                         let a: Result<&Bound<'_, PyInt>, _> = any.downcast_exact();
                         if let Ok(i) = a {
-                            SyscallHookResult::new(Some(
+                            hooks::SyscallHookResult::Skip(
                                 i.extract().expect("Invalid syscall hook return value"),
-                            ))
+                            )
                         } else {
-                            SyscallHookResult::extract_bound(ret.bind(py))
-                                .expect("The syscall hook must return a SyscallHookResult")
+                            let syscall = SyscallHookResult::extract_bound(ret.bind(py))
+                                .expect("The syscall hook must return a SyscallHookResult");
+
+                            if let Some(ret) = syscall.skip {
+                                hooks::SyscallHookResult::Skip(ret)
+                            } else {
+                                hooks::SyscallHookResult::Run
+                            }
                         }
                     }
                 })

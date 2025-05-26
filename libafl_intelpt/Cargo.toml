@@ -38,7 +38,7 @@ raw-cpuid = { version = "11.1.0" }
 
 [target.'cfg(target_os = "linux" )'.dependencies]
 caps = { version = "0.5.5" }
-perf-event-open-sys = { version = "4.0.0" }
+perf-event-open-sys = { version = "5.0.0" }
 
 [lints]
 workspace = true

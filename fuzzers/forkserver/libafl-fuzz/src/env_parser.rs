@@ -1,6 +1,9 @@
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
-use libafl::{stages::afl_stats::AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS, Error};
+use libafl::{
+    executors::forkserver::AFL_MAP_SIZE_ENV_VAR,
+    stages::afl_stats::AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS, Error,
+};
 use libafl_bolts::core_affinity::Cores;
 
 use crate::Opt;
@@ -37,7 +40,7 @@ pub fn parse_envs(opt: &mut Opt) -> Result<(), Error> {
     if let Ok(res) = std::env::var("AFL_NO_AUTODICT") {
         opt.no_autodict = parse_bool(&res)?;
     }
-    if let Ok(res) = std::env::var("AFL_MAP_SIZE") {
+    if let Ok(res) = std::env::var(AFL_MAP_SIZE_ENV_VAR) {
         let map_size = validate_map_size(res.parse()?)?;
         opt.map_size = Some(map_size);
     }

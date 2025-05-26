@@ -5,10 +5,6 @@
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]
-// For `type_eq`
-#![cfg_attr(nightly, feature(specialization))]
-// For `std::simd`
-#![cfg_attr(nightly, feature(portable_simd))]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
@@ -113,9 +109,16 @@ pub mod subrange;
 pub mod tuples;
 
 #[cfg(all(feature = "std", unix))]
-pub mod cargs;
+pub mod argparse;
 #[cfg(all(feature = "std", unix))]
-pub use cargs::*;
+pub use argparse::*;
+
+#[cfg(all(feature = "std", unix))]
+pub mod target_args;
+#[cfg(all(feature = "std", unix))]
+pub use target_args::*;
+
+pub mod simd;
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
@@ -334,6 +337,8 @@ pub enum Error {
     InvalidCorpus(String, ErrorBacktrace),
     /// Error specific to a runtime like QEMU or Frida
     Runtime(String, ErrorBacktrace),
+    /// The `Input` was invalid.
+    InvalidInput(String, ErrorBacktrace),
 }
 
 impl Error {
@@ -360,6 +365,15 @@ impl Error {
         S: Into<String>,
     {
         Error::EmptyOptional(arg.into(), ErrorBacktrace::new())
+    }
+
+    /// The `Input` was invalid
+    #[must_use]
+    pub fn invalid_input<S>(reason: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::InvalidInput(reason.into(), ErrorBacktrace::new())
     }
 
     /// Key not in Map
@@ -571,6 +585,10 @@ impl Display for Error {
             }
             Self::Runtime(s, b) => {
                 write!(f, "Runtime error: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::InvalidInput(s, b) => {
+                write!(f, "Encountered an invalid input: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
         }
@@ -945,9 +963,33 @@ pub fn current_milliseconds() -> u64 {
 /// Format a `Duration` into a HMS string
 #[cfg(feature = "alloc")]
 #[must_use]
-pub fn format_duration_hms(duration: &time::Duration) -> String {
-    let secs = duration.as_secs();
-    format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
+pub fn format_duration(duration: &time::Duration) -> String {
+    const MINS_PER_HOUR: u64 = 60;
+    const HOURS_PER_DAY: u64 = 24;
+
+    const SECS_PER_MINUTE: u64 = 60;
+    const SECS_PER_HOUR: u64 = SECS_PER_MINUTE * MINS_PER_HOUR;
+    const SECS_PER_DAY: u64 = SECS_PER_HOUR * HOURS_PER_DAY;
+
+    let total_secs = duration.as_secs();
+    let secs = total_secs % SECS_PER_MINUTE;
+
+    if total_secs < SECS_PER_MINUTE {
+        format!("{secs}s")
+    } else {
+        let mins = (total_secs / SECS_PER_MINUTE) % MINS_PER_HOUR;
+        if total_secs < SECS_PER_HOUR {
+            format!("{mins}m-{secs}s")
+        } else {
+            let hours = (total_secs / SECS_PER_HOUR) % HOURS_PER_DAY;
+            if total_secs < SECS_PER_DAY {
+                format!("{hours}h-{mins}m-{secs}s")
+            } else {
+                let days = total_secs / SECS_PER_DAY;
+                format!("{days}days {hours}h-{mins}m-{secs}s")
+            }
+        }
+    }
 }
 
 /// Format a number with thousands separators
@@ -1120,7 +1162,7 @@ mod windows_logging {
                 h_stdout,
                 bytes.as_ptr() as *const _,
                 bytes.len() as u32,
-                &mut bytes_written,
+                &raw mut bytes_written,
                 ptr::null_mut(),
             )
         };

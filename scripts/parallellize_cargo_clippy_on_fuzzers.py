@@ -58,8 +58,7 @@ def main():
         options = "-D clippy::pedantic" if args.pedantic else ""
 
         cmd_default = f"cargo clippy -- -D warnings {options}"
-        cmd_nightly = f"cargo +nightly clippy -- -D warnings {options}"
-        for cmd in [cmd_default, cmd_nightly]:
+        for cmd in [cmd_default]:
             logging.info(f"[{fuzzer}] Running: {cmd}")
             if args.dry_run:
                 continue

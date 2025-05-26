@@ -26,7 +26,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use hashbrown::HashMap;
-use libafl_bolts::{ClientId, current_time, format_big_number, format_duration_hms};
+use libafl_bolts::{ClientId, Error, current_time, format_big_number, format_duration};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use typed_builder::TypedBuilder;
 
@@ -281,7 +281,6 @@ pub struct TuiContext {
 
     pub total_map_density: String,
     pub total_solutions: u64,
-    pub total_cycles_done: u64,
     pub total_corpus_count: u64,
 
     pub total_process_timing: ProcessTiming,
@@ -310,7 +309,6 @@ impl TuiContext {
 
             total_map_density: "0%".to_string(),
             total_solutions: 0,
-            total_cycles_done: 0,
             total_corpus_count: 0,
             total_item_geometry: ItemGeometry::new(),
             total_process_timing: ProcessTiming::new(),
@@ -341,7 +339,7 @@ impl Monitor for TuiMonitor {
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         let cur_time = current_time();
 
         {
@@ -374,14 +372,13 @@ impl Monitor for TuiMonitor {
                      edges_total,
                  }| format!("{}%", edges_hit * 100 / edges_total),
             );
-            ctx.total_cycles_done = 0;
             ctx.total_item_geometry = client_stats_manager.item_geometry();
         }
 
-        client_stats_manager.client_stats_insert(sender_id);
+        client_stats_manager.client_stats_insert(sender_id)?;
         let exec_sec = client_stats_manager
-            .update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time));
-        let client = client_stats_manager.client_stats_for(sender_id);
+            .update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time))?;
+        let client = client_stats_manager.client_stats_for(sender_id)?;
 
         let sender = format!("#{}", sender_id.0);
         let pad = if event_msg.len() + sender.len() < 13 {
@@ -412,7 +409,7 @@ impl Monitor for TuiMonitor {
                     .entry(sender_id.0 as usize)
                     .or_default()
                     .grab_data(client);
-            });
+            })?;
             while ctx.client_logs.len() >= DEFAULT_LOGS_NUMBER {
                 ctx.client_logs.pop_front();
             }
@@ -422,10 +419,10 @@ impl Monitor for TuiMonitor {
         #[cfg(feature = "introspection")]
         {
             // Print the client performance monitor. Skip the Client IDs that have never sent anything.
-            for (i, client) in client_stats_manager
+            for (i, (_, client)) in client_stats_manager
                 .client_stats()
                 .iter()
-                .filter(|x| x.enabled())
+                .filter(|(_, x)| x.enabled())
                 .enumerate()
             {
                 self.context
@@ -437,6 +434,8 @@ impl Monitor for TuiMonitor {
                     .grab_data(&client.introspection_stats);
             }
         }
+
+        Ok(())
     }
 }
 

@@ -1,8 +1,8 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdio.h>
 #include "hooks.h"
-#include "printf.h"
 #include "trace.h"
 
 int vasprintf(char **restrict strp, const char *restrict fmt, va_list va) {
@@ -11,7 +11,7 @@ int vasprintf(char **restrict strp, const char *restrict fmt, va_list va) {
 
   if (fmt == NULL) { return -1; }
 
-  int len = vsnprintf_(NULL, 0, fmt, va);
+  int len = vsnprintf(NULL, 0, fmt, va);
 
   if (len < 0) { return -1; }
 
@@ -19,5 +19,5 @@ int vasprintf(char **restrict strp, const char *restrict fmt, va_list va) {
   if (buffer == NULL) { return -1; }
 
   *strp = buffer;
-  return vsnprintf_(buffer, len, fmt, va);
+  return vsnprintf(buffer, len, fmt, va);
 }

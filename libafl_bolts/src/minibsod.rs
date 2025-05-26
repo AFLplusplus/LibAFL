@@ -12,7 +12,7 @@ use std::process::Command;
 #[cfg(unix)]
 use libc::siginfo_t;
 #[cfg(target_vendor = "apple")]
-use mach::{
+use mach2::{
     message::mach_msg_type_number_t,
     port::mach_port_t,
     traps::mach_task_self,
@@ -1022,11 +1022,11 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
         r = unsafe {
             mach_vm_region_recurse(
                 task,
-                &mut addr,
-                &mut sz,
-                &mut reg,
+                &raw mut addr,
+                &raw mut sz,
+                &raw mut reg,
                 pvminfo.as_mut_ptr() as vm_region_recurse_info_t,
-                &mut _cnt,
+                &raw mut _cnt,
             )
         };
         if r != libc::KERN_SUCCESS {

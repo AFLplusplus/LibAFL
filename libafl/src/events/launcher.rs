@@ -366,7 +366,7 @@ where
                     "Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit..."
                 );
                 unsafe {
-                    libc::waitpid(*handle, &mut status, 0);
+                    libc::waitpid(*handle, &raw mut status, 0);
                     if status != 0 {
                         log::info!("Client with pid {handle} exited with status {status}");
                     }

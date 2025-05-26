@@ -24,7 +24,7 @@ mod build;
 pub use build::build;
 
 #[rustversion::nightly]
-use crate::build::QEMU_REVISION;
+use crate::build::LIBAFL_QEMU_GIT_REV;
 
 const LLVM_VERSION_MAX: i32 = 33;
 
@@ -421,7 +421,7 @@ pub fn maybe_generate_stub_bindings(
             None,
             vec![
                 header.as_str(),
-                format!("/* qemu git hash: {QEMU_REVISION} */").as_str(),
+                format!("/* qemu git hash: {LIBAFL_QEMU_GIT_REV} */").as_str(),
             ],
             false,
         );

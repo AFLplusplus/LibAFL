@@ -14,7 +14,7 @@ use alloc::{borrow::Cow, string::String, vec::Vec};
 use std::net::UdpSocket;
 
 use cadence::{BufferedUdpMetricSink, Gauged, QueuingMetricSink, StatsdClient};
-use libafl_bolts::ClientId;
+use libafl_bolts::{ClientId, Error};
 
 use super::{
     Monitor,
@@ -194,7 +194,7 @@ impl Monitor for StatsdMonitor {
         client_stats_manager: &mut ClientStatsManager,
         _event_msg: &str,
         _sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         if self.try_display(client_stats_manager).is_none() {
             // The client failed to send metrics, which means the server is down
             // or something else happened. We then de-initialize the client, and
@@ -202,5 +202,6 @@ impl Monitor for StatsdMonitor {
             // and try to connect the server then.
             self.statsd_client = None;
         }
+        Ok(())
     }
 }

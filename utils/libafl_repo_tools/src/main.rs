@@ -84,7 +84,7 @@ use tokio::{process::Command, task::JoinSet};
 use walkdir::{DirEntry, WalkDir};
 use which::which;
 
-const REF_LLVM_VERSION: u32 = 19;
+const REF_LLVM_VERSION: u32 = 20;
 
 fn is_workspace_toml(path: &Path) -> bool {
     for line in read_to_string(path).unwrap().lines() {
@@ -132,7 +132,6 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
     let mut gen_lockfile_cmd = Command::new("cargo");
 
     gen_lockfile_cmd
-        .arg("+nightly")
         .arg("generate-lockfile")
         .arg("--manifest-path")
         .arg(cargo_file_path.as_path());
@@ -177,7 +176,6 @@ async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) 
     let mut fmt_command = Command::new("cargo");
 
     fmt_command
-        .arg("+nightly")
         .arg("fmt")
         .arg("--manifest-path")
         .arg(cargo_file_path.as_path());
@@ -286,7 +284,6 @@ async fn main() -> io::Result<()> {
     let rust_excluded_directories = RegexSet::new([
         r".*target.*",
         r".*utils/noaslr.*",
-        r".*utils/gdb_qemu.*",
         r".*docs/listings/baby_fuzzer/listing-.*",
         r".*LibAFL/Cargo.toml.*",
         r".*AFLplusplus.*",
@@ -326,16 +323,10 @@ async fn main() -> io::Result<()> {
         .collect();
 
     // cargo version
-    println!(
-        "Using {}",
-        get_version_string("cargo", &["+nightly"]).await?
-    );
+    println!("Using {}", get_version_string("cargo", &[]).await?);
 
     // rustfmt version
-    println!(
-        "Using {}",
-        get_version_string("cargo", &["+nightly", "fmt"]).await?
-    );
+    println!("Using {}", get_version_string("cargo", &["fmt"]).await?);
 
     let mut tokio_joinset = JoinSet::new();
 

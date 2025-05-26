@@ -11,9 +11,9 @@ extern crate simplelog;
 
 use std::os::fd::AsRawFd;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Parser;
-use nix::unistd::{fork, pipe, ForkResult};
+use nix::unistd::{ForkResult, fork, pipe};
 
 use crate::{args::Args, child::Child, exit::Exit, logger::Logger, parent::Parent};
 

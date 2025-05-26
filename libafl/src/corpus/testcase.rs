@@ -50,6 +50,8 @@ pub struct Testcase<I> {
     cached_len: Option<usize>,
     /// Number of fuzzing iterations of this particular input updated in `perform_mutational`
     scheduled_count: usize,
+    /// Number of executions done at discovery time
+    executions: u64,
     /// Parent [`CorpusId`], if known
     parent_id: Option<CorpusId>,
     /// If the testcase is "disabled"
@@ -145,6 +147,24 @@ impl<I> Testcase<I> {
         &mut self.metadata_path
     }
 
+    /// Get the executions
+    #[inline]
+    pub fn executions(&self) -> &u64 {
+        &self.executions
+    }
+
+    /// Get the executions (mutable)
+    #[inline]
+    pub fn executions_mut(&mut self) -> &mut u64 {
+        &mut self.executions
+    }
+
+    /// Set the executions
+    #[inline]
+    pub fn set_executions(&mut self, executions: u64) {
+        self.executions = executions;
+    }
+
     /// Get the execution time of the testcase
     #[inline]
     pub fn exec_time(&self) -> &Option<Duration> {
@@ -228,6 +248,7 @@ impl<I> Testcase<I> {
             metadata_path: None,
             exec_time: None,
             cached_len: None,
+            executions: 0,
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
@@ -252,6 +273,7 @@ impl<I> Testcase<I> {
             metadata_path: None,
             exec_time: None,
             cached_len: None,
+            executions: 0,
             scheduled_count: 0,
             parent_id: Some(parent_id),
             disabled: false,
@@ -278,6 +300,7 @@ impl<I> Testcase<I> {
             metadata_path: None,
             exec_time: None,
             cached_len: None,
+            executions: 0,
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
@@ -333,6 +356,7 @@ impl<I> Default for Testcase<I> {
             #[cfg(feature = "std")]
             metadata_path: None,
             disabled: false,
+            executions: 0,
             objectives_found: 0,
             #[cfg(feature = "track_hit_feedbacks")]
             hit_feedbacks: Vec::new(),

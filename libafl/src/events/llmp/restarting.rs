@@ -55,9 +55,9 @@ use crate::{
     common::HasMetadata,
     events::{
         _LLMP_TAG_EVENT_TO_BROKER, AwaitRestartSafe, Event, EventConfig, EventFirer,
-        EventManagerHooksTuple, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
-        LLMP_TAG_EVENT_TO_BOTH, LlmpShouldSaveState, ProgressReporter, SendExiting,
-        StdLlmpEventHook, launcher::ClientDescription, std_maybe_report_progress,
+        EventManagerHooksTuple, EventManagerId, EventReceiver, EventRestarter, EventWithStats,
+        HasEventManagerId, LLMP_TAG_EVENT_TO_BOTH, LlmpShouldSaveState, ProgressReporter,
+        SendExiting, StdLlmpEventHook, launcher::ClientDescription, std_maybe_report_progress,
         std_report_progress,
     },
     inputs::Input,
@@ -121,7 +121,7 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         #[cfg(feature = "llmp_compression")]
         let flags = LLMP_FLAG_INITIALIZED;
@@ -255,7 +255,7 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
         while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
@@ -280,24 +280,31 @@ where
                 msg
             };
 
-            let event: Event<I> = postcard::from_bytes(event_bytes)?;
-            log::debug!("Received event in normal llmp {}", event.name_detailed());
+            let event: EventWithStats<I> = postcard::from_bytes(event_bytes)?;
+            log::debug!(
+                "Received event in normal llmp {}",
+                event.event().name_detailed()
+            );
 
             // If the message comes from another machine, do not
             // consider other events than new testcase.
-            if !event.is_new_testcase() && (flags & LLMP_FLAG_FROM_MM == LLMP_FLAG_FROM_MM) {
+            if !event.event().is_new_testcase() && (flags & LLMP_FLAG_FROM_MM == LLMP_FLAG_FROM_MM)
+            {
                 continue;
             }
 
-            log::trace!("Got event in client: {} from {client_id:?}", event.name());
+            log::trace!(
+                "Got event in client: {} from {client_id:?}",
+                event.event().name()
+            );
             if !self.hooks.pre_receive_all(state, client_id, &event)? {
                 continue;
             }
-            let evt_name = event.name_detailed();
-            match event {
+            let evt_name = event.event().name_detailed();
+            match event.event() {
                 Event::NewTestcase {
                     client_config,
-                    ref observers_buf,
+                    observers_buf,
                     #[cfg(feature = "std")]
                     forward_id,
                     ..
@@ -326,7 +333,7 @@ where
                 _ => {
                     return Err(Error::unknown(format!(
                         "Received illegal message that message should not have arrived: {:?}.",
-                        event.name()
+                        event.event().name()
                     )));
                 }
             }
@@ -334,7 +341,11 @@ where
         Ok(None)
     }
 
-    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+    fn on_interesting(
+        &mut self,
+        _state: &mut S,
+        _event_vec: EventWithStats<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -563,7 +574,7 @@ where
             Ok(()) => (),
             Err(e) => log::error!("Failed to send tcp message {e:#?}"),
         }
-        log::debug!("Asking he broker to be disconnected");
+        log::debug!("Asking the broker to be disconnected");
         Ok(())
     }
 }

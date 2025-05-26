@@ -38,7 +38,11 @@ pub mod allocator;
 #[cfg(not(feature = "test"))]
 pub mod arch;
 
+pub mod env;
+
 pub mod exit;
+
+pub mod file;
 
 #[cfg(feature = "hooks")]
 pub mod hooks;
@@ -108,8 +112,11 @@ pub type off_t = isize;
 #[allow(non_camel_case_types)]
 pub type off_t = libc::off_t;
 
+use core::mem::transmute;
+
 #[cfg(not(feature = "test"))]
 use ::core::ffi::{c_char, c_void};
+use nostd_printf::vsnprintf;
 
 #[cfg(not(feature = "test"))]
 unsafe extern "C" {
@@ -126,3 +133,10 @@ unsafe extern "C" {
     pub fn asan_panic(msg: *const c_char) -> !;
     pub fn asan_swap(enabled: bool);
 }
+
+/*
+ * vsnprintf is only called from our C code, but we need to tell Rust that we
+ * still need it even though it isn't referenced from rust.
+ */
+#[used]
+static LINK_VSNPRINTF: unsafe extern "C" fn() = unsafe { transmute(vsnprintf as *const ()) };

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
-    events::{Event, EventFirer, LogSeverity},
+    events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{HasObserverHandle, map::MapFeedbackMetadata},
     fuzzer::Evaluator,
@@ -254,7 +254,7 @@ where
                 metadata.unstable_entries.insert(item); // Insert newly found items
             }
             metadata.filled_entries_count = map_first_filled_count;
-        } else if !state.has_metadata::<UnstableEntriesMetadata>() {
+        } else if !state.has_metadata::<UnstableEntriesMetadata>() && map_first_filled_count > 0 {
             send_default_stability = true;
             state.add_metadata(UnstableEntriesMetadata::new());
         }
@@ -335,30 +335,36 @@ where
                     map_first_filled_count.saturating_sub(unstable_entries) as u64;
                 mgr.fire(
                     state,
-                    Event::UpdateUserStats {
-                        name: Cow::from("stability"),
-                        value: UserStats::new(
-                            UserStatsValue::Ratio(stable_count, map_first_filled_count as u64),
-                            AggregatorOps::Avg,
-                        ),
-                        phantom: PhantomData,
-                    },
+                    EventWithStats::with_current_time(
+                        Event::UpdateUserStats {
+                            name: Cow::from("stability"),
+                            value: UserStats::new(
+                                UserStatsValue::Ratio(stable_count, map_first_filled_count as u64),
+                                AggregatorOps::Avg,
+                            ),
+                            phantom: PhantomData,
+                        },
+                        *state.executions(),
+                    ),
                 )?;
             }
         } else if send_default_stability {
             mgr.fire(
                 state,
-                Event::UpdateUserStats {
-                    name: Cow::from("stability"),
-                    value: UserStats::new(
-                        UserStatsValue::Ratio(
-                            map_first_filled_count as u64,
-                            map_first_filled_count as u64,
+                EventWithStats::with_current_time(
+                    Event::UpdateUserStats {
+                        name: Cow::from("stability"),
+                        value: UserStats::new(
+                            UserStatsValue::Ratio(
+                                map_first_filled_count as u64,
+                                map_first_filled_count as u64,
+                            ),
+                            AggregatorOps::Avg,
                         ),
-                        AggregatorOps::Avg,
-                    ),
-                    phantom: PhantomData,
-                },
+                        phantom: PhantomData,
+                    },
+                    *state.executions(),
+                ),
             )?;
         }
 

@@ -6,7 +6,6 @@ compile_runner:
   #!/bin/sh
   . {{ DOTENV }}
   cargo \
-    +nightly \
     build \
     --package runner \
     --target x86_64-unknown-linux-gnu \
@@ -19,7 +18,6 @@ fix_runner:
   #!/bin/sh
   . {{ DOTENV }}
   cargo \
-    +nightly \
     fix \
     --package runner \
     --target x86_64-unknown-linux-gnu \

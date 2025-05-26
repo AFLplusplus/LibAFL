@@ -3,28 +3,32 @@ use std::{
     fs::{read, write},
 };
 
+#[cfg(windows)]
+use libafl::executors::inprocess::InProcessExecutor;
+#[cfg(unix)]
+use libafl::executors::inprocess_fork::InProcessForkExecutor;
 use libafl::{
     Error, ExecutesInput, Fuzzer, StdFuzzer,
     corpus::{Corpus, HasTestcase, InMemoryCorpus, Testcase},
     events::SimpleEventManager,
-    executors::{ExitKind, inprocess_fork::InProcessForkExecutor},
+    executors::ExitKind,
     feedbacks::{CrashFeedback, TimeoutFeedback},
     inputs::{BytesInput, HasMutatorBytes, HasTargetBytes},
-    mutators::{Mutator, StdScheduledMutator, havoc_mutations_no_crossover},
+    mutators::{HavocScheduledMutator, Mutator, havoc_mutations_no_crossover},
     schedulers::QueueScheduler,
     stages::StdTMinMutationalStage,
     state::{HasCorpus, StdState},
 };
+#[cfg(unix)]
+use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{
     AsSlice, HasLen,
     rands::{RomuDuoJrRand, StdRand},
-    shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
 use libafl_targets::LLVMCustomMutator;
 
 use crate::{CustomMutationStatus, options::LibfuzzerOptions};
-
 type TMinState =
     StdState<InMemoryCorpus<BytesInput>, BytesInput, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;
 
@@ -61,15 +65,28 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
 
     let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), (), ());
 
-    let shmem_provider = StdShMemProvider::new()?;
-    let mut executor = InProcessForkExecutor::new(
+    #[cfg(unix)]
+    let mut executor = {
+        let shmem_provider = StdShMemProvider::new()?;
+        InProcessForkExecutor::new(
+            &mut harness,
+            (),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+            options.timeout(),
+            shmem_provider,
+        )?
+    };
+
+    #[cfg(windows)]
+    let mut executor = InProcessExecutor::with_timeout(
         &mut harness,
         (),
         &mut fuzzer,
         &mut state,
         &mut mgr,
         options.timeout(),
-        shmem_provider,
     )?;
 
     let exit_kind = fuzzer.execute_input(&mut state, &mut executor, &mut mgr, &input)?;
@@ -165,13 +182,13 @@ pub fn minimize_crash(
     // TODO configure with mutation stacking options from libfuzzer
     if mutator_status.custom_mutation {
         let custom_mutator = unsafe {
-            LLVMCustomMutator::mutate_unchecked(StdScheduledMutator::new(
+            LLVMCustomMutator::mutate_unchecked(HavocScheduledMutator::new(
                 havoc_mutations_no_crossover(),
             ))
         };
         minimize_crash_with_mutator(options, harness, custom_mutator, state)
     } else {
-        let std_mutator = StdScheduledMutator::new(havoc_mutations_no_crossover());
+        let std_mutator = HavocScheduledMutator::new(havoc_mutations_no_crossover());
         minimize_crash_with_mutator(options, harness, std_mutator, state)
     }
 }

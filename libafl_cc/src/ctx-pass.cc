@@ -34,32 +34,6 @@
 #include <fstream>
 #include <set>
 
-#include "llvm/Config/llvm-config.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/IR/IRBuilder.h"
-
-#if USE_NEW_PM
-  #include "llvm/Passes/PassPlugin.h"
-  #include "llvm/Passes/PassBuilder.h"
-  #include "llvm/IR/PassManager.h"
-#else
-  #include "llvm/IR/LegacyPassManager.h"
-  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#endif
-
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/CFG.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/ValueTracking.h"
-#include "llvm/Pass.h"
-#include "llvm/IR/Constants.h"
-
 #include <iostream>
 
 using namespace llvm;
@@ -68,24 +42,12 @@ using namespace llvm;
 
 namespace {
 
-#if USE_NEW_PM
 class CtxPass : public PassInfoMixin<CtxPass> {
  public:
   CtxPass() {
-#else
-class CtxPass : public ModulePass {
- public:
-  static char ID;
-
-  CtxPass() : ModulePass(ID) {
-#endif
   }
 
-#if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-#else
-  bool runOnModule(Module &M) override;
-#endif
 
  protected:
   uint32_t map_size = MAP_SIZE;
@@ -107,7 +69,6 @@ class CtxPass : public ModulePass {
 
 }  // namespace
 
-#if USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "CtxPass", "v0.1",
@@ -115,23 +76,15 @@ llvmGetPassPluginInfo() {
           [](PassBuilder &PB) {
             PB.registerOptimizerLastEPCallback([](ModulePassManager &MPM,
                                                   OptimizationLevel  OL
-  #if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 20
                                                   ,
                                                   ThinOrFullLTOPhase Phase
-  #endif
+#endif
                                                ) { MPM.addPass(CtxPass()); });
           }};
 }
-#else
-char CtxPass::ID = 0;
-#endif
 
-#if USE_NEW_PM
 PreservedAnalyses CtxPass::run(Module &M, ModuleAnalysisManager &MAM) {
-#else
-bool CtxPass::runOnModule(Module &M) {
-
-#endif
   LLVMContext &C = M.getContext();
   auto         moduleName = M.getName();
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
@@ -201,27 +154,6 @@ bool CtxPass::runOnModule(Module &M) {
     }
   }
 
-#if USE_NEW_PM
   auto PA = PreservedAnalyses::all();
   return PA;
-#else
-  return true;
-#endif
 }
-
-#if USE_NEW_PM
-
-#else
-static void registerCtxPass(const PassManagerBuilder &,
-                            legacy::PassManagerBase &PM) {
-  PM.add(new CtxPass());
-}
-
-static RegisterPass<CtxPass> X("ctx", "ctx instrumentation pass", false, false);
-
-static RegisterStandardPasses RegisterCtxPass(
-    PassManagerBuilder::EP_OptimizerLast, registerCtxPass);
-
-static RegisterStandardPasses RegisterCtxPass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerCtxPass);
-#endif

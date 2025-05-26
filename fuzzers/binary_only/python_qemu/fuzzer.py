@@ -6,7 +6,7 @@ import lief
 MAX_SIZE = 0x100
 BINARY_PATH = "./a.out"
 
-emu = qemu.Qemu(["qemu-x86_64", BINARY_PATH], [])
+emu = qemu.Qemu(["qemu-x86_64", BINARY_PATH])
 
 elf = lief.parse(BINARY_PATH)
 test_one_input = elf.get_function_address("LLVMFuzzerTestOneInput")
@@ -41,5 +41,11 @@ def harness(b):
     emu.run()
 
 
-fuzz = sugar.QemuBytesCoverageSugar(["./in"], "./out", 3456, [0, 1, 2, 3])
+# Create a fuzzer using the launcher
+# with 4 instances bounds to cores 0-3
+# LLMP uses port 3456 to synchronize
+# stdout from the target is NOT redirected to /dev/null
+fuzz = sugar.QemuBytesCoverageSugar(
+    ["./in"], "./out", 3456, [0, 1, 2, 3], enable_stdout=True
+)
 fuzz.run(emu, harness)

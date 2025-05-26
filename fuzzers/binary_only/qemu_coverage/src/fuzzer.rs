@@ -1,4 +1,4 @@
-//! A libfuzzer-like fuzzer using qemu for binary-only coverage
+//! A qemu test case runner to generate drcov coverage outputs
 #[cfg(feature = "i386")]
 use core::mem::size_of;
 use core::time::Duration;
@@ -156,7 +156,7 @@ pub fn fuzz() {
         qemu.entry_break(test_one_input_ptr);
 
         let mappings = QemuMappingsViewer::new(&qemu);
-        println!("{:#?}", mappings);
+        log::info!("{:#?}", mappings);
 
         let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
         log::info!("Break at {pc:#x}");

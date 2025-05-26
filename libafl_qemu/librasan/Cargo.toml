@@ -3,10 +3,10 @@ members = ["asan", "gasan", "qasan", "zasan", "fuzz", "dummy_libc", "runner"]
 resolver = "2"
 
 [workspace.package]
-version = "0.15.2"
+version = "0.15.3"
 license = "MIT OR Apache-2.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 
 [profile.dev]
 panic = "abort"

@@ -1,19 +1,22 @@
 [package]
 name = "libafl_libfuzzer_runtime"
-version = "0.15.2"
+version = "0.15.3"
 edition = "2024"
 publish = false
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
-default = ["fork"]
+default = []
 ## Enables forking mode for the LibAFL launcher (instead of starting new processes)
 fork = ["libafl/fork"]
 track_hit_feedbacks = [
   "libafl/track_hit_feedbacks",
   "libafl_targets/track_hit_feedbacks",
 ]
+tui_monitor = ["libafl/tui_monitor"]
+
+[target.'cfg(not(windows))'.features]
+## Enable the `fork` feature on non-windows platforms
+default = ["fork", "tui_monitor"]
 
 [profile.release]
 lto = true
@@ -40,7 +43,6 @@ libafl = { path = "../libafl", default-features = false, features = [
   "regex",
   "errors_backtrace",
   "serdeany_autoreg",
-  "tui_monitor",
   "unicode",
 ] }
 libafl_bolts = { path = "../libafl_bolts", default-features = false, features = [

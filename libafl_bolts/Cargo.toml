@@ -12,7 +12,7 @@ readme = "./README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -52,6 +52,7 @@ std = [
   "uds",
   "serial_test",
   "alloc",
+  "simd",
 ]
 
 ## Enables all features that allocate in `no_std`
@@ -117,8 +118,19 @@ llmp_debug = ["alloc", "std"]
 ## Reduces the initial map size for llmp
 llmp_small_maps = ["alloc"]
 
+#! ### Stable SIMD features
+
+## Use the best SIMD implementation by our benchmark.
+simd = ["alloc", "wide"]
+
 [build-dependencies]
 rustversion = { workspace = true }
+
+[dev-dependencies]
+clap = { version = "4.5", features = ["derive", "env"] }
+rand = "0.9.0"
+chrono = "0.4.40"
+itertools = "0.14.0"
 
 [dependencies]
 libafl_derive = { workspace = true, default-features = true, optional = true }
@@ -165,6 +177,10 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
   "logging",
 ] }
 
+# optional stable simd, pin to a commit due to `u8x32` not released yet. Switch to `wide` as long as next release is out!
+wide = { version = "0.7.33", optional = true, package = "libafl_wide" }
+rustversion = { workspace = true }
+
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
 
@@ -201,7 +217,7 @@ windows-result = "0.3.0"
 windows = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
-mach = "0.3.2"
+mach2 = "0.4.2"
 
 #[profile.release]
 #lto = true
@@ -212,3 +228,11 @@ mach = "0.3.2"
 name = "llmp_test"
 path = "./examples/llmp_test/main.rs"
 required-features = ["std"]
+
+
+[[example]]
+name = "simd"
+path = "./examples/simd/simd.rs"
+bench = true
+harness = false
+required-features = ["std", "simd"]

@@ -97,9 +97,12 @@ impl<T> Truncate for &[T] {
 
 impl<T> Truncate for &mut [T] {
     fn truncate(&mut self, len: usize) {
-        let mut value = core::mem::take(self);
-        value = unsafe { value.get_unchecked_mut(..len) };
-        let _: &mut [T] = core::mem::replace(self, value);
+        let value = core::mem::take(self);
+        let len = value.len().min(len);
+        let truncated = value
+            .get_mut(..len)
+            .expect("Truncate with len <= len() should always work");
+        let _: &mut [T] = core::mem::replace(self, truncated);
     }
 }
 
@@ -1159,7 +1162,7 @@ impl<T: Sized> OwnedMutPtr<T> {
     pub fn as_ptr(&self) -> *const T {
         match self {
             OwnedMutPtr::Ptr(ptr) => *ptr,
-            OwnedMutPtr::Owned(owned) => &**owned,
+            OwnedMutPtr::Owned(owned) => &raw const **owned,
         }
     }
 
@@ -1168,7 +1171,7 @@ impl<T: Sized> OwnedMutPtr<T> {
     pub fn as_mut_ptr(&mut self) -> *mut T {
         match self {
             OwnedMutPtr::Ptr(ptr) => *ptr,
-            OwnedMutPtr::Owned(owned) => &mut **owned,
+            OwnedMutPtr::Owned(owned) => &raw mut **owned,
         }
     }
 }
@@ -1230,5 +1233,28 @@ where
             },
             OwnedMutPtr::Owned(v) => OwnedMutPtr::Owned(v),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::Truncate;
+
+    #[test]
+    fn test_truncate() {
+        let mut data = [0; 1024];
+        let mut slice = &mut data as &mut [_];
+
+        slice.truncate(1);
+        assert_eq!(0, slice[0]);
+        assert_eq!(1, slice.len());
+
+        slice.truncate(100);
+        assert_eq!(0, slice[0]);
+        assert_eq!(1, slice.len());
+
+        slice.truncate(0);
+        slice.truncate(100);
+        assert_eq!(0, slice.len());
     }
 }

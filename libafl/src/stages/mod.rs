@@ -71,9 +71,11 @@ pub mod colorization;
 pub mod concolic;
 #[cfg(feature = "std")]
 pub mod dump;
+pub mod dynamic;
 pub mod generalization;
 pub mod generation;
 pub mod logics;
+pub mod nop;
 pub mod power;
 #[cfg(feature = "std")]
 pub mod sync;

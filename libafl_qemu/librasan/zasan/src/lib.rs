@@ -9,6 +9,8 @@ use asan::{
         backend::dlmalloc::DlmallocBackend,
         frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
+    env::Env,
+    file::linux::LinuxFileReader,
     logger::linux::LinuxLogger,
     mmap::linux::LinuxMmap,
     shadow::{
@@ -16,26 +18,33 @@ use asan::{
         guest::{DefaultShadowLayout, GuestShadow},
     },
     symbols::{Symbols, nop::NopSymbols},
-    tracking::{Tracking, guest::GuestTracking},
+    tracking::{Tracking, guest_fast::GuestFastTracking},
 };
-use log::{Level, trace};
+use log::{Level, info, trace};
 use spin::{Lazy, Mutex};
 
 pub type ZasanFrontend = DefaultFrontend<
     DlmallocBackend<LinuxMmap>,
     GuestShadow<LinuxMmap, DefaultShadowLayout>,
-    GuestTracking,
+    GuestFastTracking,
 >;
 
 pub type ZasanSyms = NopSymbols;
 
+pub type ZasanEnv = Env<LinuxFileReader>;
+
 const PAGE_SIZE: usize = 4096;
 
 static FRONTEND: Lazy<Mutex<ZasanFrontend>> = Lazy::new(|| {
-    LinuxLogger::initialize(Level::Info);
+    let level = ZasanEnv::initialize()
+        .ok()
+        .and_then(|e| e.log_level())
+        .unwrap_or(Level::Warn);
+    LinuxLogger::initialize(level);
+    info!("Zasan initializing...");
     let backend = DlmallocBackend::<LinuxMmap>::new(PAGE_SIZE);
     let shadow = GuestShadow::<LinuxMmap, DefaultShadowLayout>::new().unwrap();
-    let tracking = GuestTracking::new().unwrap();
+    let tracking = GuestFastTracking::new().unwrap();
     let frontend = ZasanFrontend::new(
         backend,
         shadow,
@@ -44,6 +53,7 @@ static FRONTEND: Lazy<Mutex<ZasanFrontend>> = Lazy::new(|| {
         ZasanFrontend::DEFAULT_QUARANTINE_SIZE,
     )
     .unwrap();
+    info!("Zasan initialized.");
     Mutex::new(frontend)
 });
 
@@ -104,7 +114,7 @@ pub unsafe extern "C" fn asan_get_size(addr: *const c_void) -> usize {
 #[unsafe(no_mangle)]
 /// # Safety
 pub unsafe extern "C" fn asan_sym(name: *const c_char) -> *const c_void {
-    ZasanSyms::lookup(name).unwrap() as *const c_void
+    unsafe { ZasanSyms::lookup_raw(name).unwrap() as *const c_void }
 }
 
 #[unsafe(no_mangle)]

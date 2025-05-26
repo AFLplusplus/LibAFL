@@ -724,8 +724,7 @@ impl IntelPTBuilder {
 
     /// Set the size of the perf aux buffer (actual PT traces buffer)
     pub fn perf_aux_buffer_size(mut self, perf_aux_buffer_size: usize) -> Result<Self, Error> {
-        // todo:replace with is_multiple_of once stable
-        if perf_aux_buffer_size % PAGE_SIZE != 0 {
+        if !perf_aux_buffer_size.is_multiple_of(PAGE_SIZE) {
             return Err(Error::illegal_argument(
                 "IntelPT perf_aux_buffer must be page aligned",
             ));
@@ -903,7 +902,7 @@ fn linux_version() -> Result<(usize, usize, usize), ()> {
         domainname: [0; 65],
     };
 
-    if unsafe { libc::uname(&mut uname_data) } != 0 {
+    if unsafe { libc::uname(&raw mut uname_data) } != 0 {
         return Err(());
     }
 

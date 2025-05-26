@@ -20,7 +20,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     monitors::MultiMonitor,
     mutators::{
-        havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator,
+        havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator,
         token_mutations::I2SRandReplace,
     },
     observers::{
@@ -193,10 +193,12 @@ fn fuzz(
     let tracing = ShadowTracingStage::new();
 
     // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+        I2SRandReplace::new()
+    )));
 
     // Setup a basic mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mutational = StdMutationalStage::new(mutator);
 
     if concolic {
@@ -215,9 +217,11 @@ fn fuzz(
         let mut stages = tuple_list!(
             // Create a concolic trace
             ConcolicTracingStage::new(
-                TracingStage::new(
-                    MyCommandConfigurator.into_executor(tuple_list!(concolic_observer)),
-                ),
+                TracingStage::new(MyCommandConfigurator.into_executor(
+                    tuple_list!(concolic_observer),
+                    None,
+                    None
+                ),),
                 concolic_ref,
             ),
             // Use the concolic trace for z3-based solving

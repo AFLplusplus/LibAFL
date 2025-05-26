@@ -60,6 +60,14 @@ where
         input.append_part(generated);
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<G> Named for GenerateToAppendMutator<G> {
@@ -87,6 +95,14 @@ where
             Some(_) => Ok(MutationResult::Mutated),
             None => Ok(MutationResult::Skipped),
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -122,6 +138,14 @@ where
                 Ok(MutationResult::Mutated)
             }
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -168,6 +192,14 @@ where
         input.insert_part(current_idx, (key, part));
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for CrossoverInsertMutator {
@@ -213,6 +245,14 @@ where
         input.remove_part_at_index(current_idx);
         input.insert_part(current_idx, (key, part));
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 

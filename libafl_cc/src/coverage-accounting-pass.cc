@@ -22,27 +22,6 @@
 #include <string>
 #include <fstream>
 
-#include "llvm/Support/CommandLine.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/MathExtras.h"
-
-// Without this, Can't build with llvm-14 & old PM
-#if LLVM_VERSION_MAJOR >= 14 && !defined(USE_NEW_PM)
-  #include "llvm/Pass.h"
-#endif
-
-#if LLVM_VERSION_MAJOR > 3 || \
-    (LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR > 4)
-  #include "llvm/IR/DebugInfo.h"
-  #include "llvm/IR/CFG.h"
-#else
-  #include "llvm/DebugInfo.h"
-  #include "llvm/Support/CFG.h"
-#endif
-
 typedef uint32_t prev_loc_t;
 
 #define MAP_SIZE ACCOUNTING_MAP_SIZE
@@ -180,16 +159,9 @@ bool isSecuritySensitiveFunction(Function *F) {
   return 0;
 }
 
-#ifdef USE_NEW_PM
 class AFLCoverage : public PassInfoMixin<AFLCoverage> {
  public:
   AFLCoverage() {
-#else
-class AFLCoverage : public ModulePass {
- public:
-  static char ID;
-  AFLCoverage() : ModulePass(ID) {
-#endif
     granularity = StringSwitch<AccountingGranularity>(GranularityStr)
                       .Case("BB", BB_GRAN)
                       .Case("FUNC", FUNC_GRAN)
@@ -197,11 +169,7 @@ class AFLCoverage : public ModulePass {
     // initInstrumentList();
   }
 
-#ifdef USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-#else
-  bool runOnModule(Module &M) override;
-#endif
 
  protected:
   uint32_t              map_size = MAP_SIZE;
@@ -211,23 +179,22 @@ class AFLCoverage : public ModulePass {
 
 }  // namespace
 
-#ifdef USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "AFLCoverageAccounting", "v0.1",
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
-  #if 1
+#if 1
             PB.registerOptimizerLastEPCallback(
                 [](ModulePassManager &MPM, OptimizationLevel OL
-    #if LLVM_VERSION_MAJOR >= 20
+  #if LLVM_VERSION_MAJOR >= 20
                    ,
                    ThinOrFullLTOPhase Phase
-    #endif
+  #endif
 
                 ) { MPM.addPass(AFLCoverage()); });
-  /* TODO LTO registration */
-  #else
+/* TODO LTO registration */
+#else
             using PipelineElement = typename PassBuilder::PipelineElement;
             PB.registerPipelineParsingCallback([](StringRef          Name,
                                                   ModulePassManager &MPM,
@@ -239,29 +206,18 @@ llvmGetPassPluginInfo() {
                 return false;
               }
             });
-  #endif
+#endif
           }};
 }
-#else
 
-char AFLCoverage::ID = 0;
-#endif
-
-#ifdef USE_NEW_PM
 PreservedAnalyses AFLCoverage::run(Module &M, ModuleAnalysisManager &MAM) {
-#else
-bool AFLCoverage::runOnModule(Module &M) {
-#endif
-
   LLVMContext &C = M.getContext();
 
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
   uint32_t     rand_seed;
   unsigned int cur_loc = 0;
 
-#ifdef USE_NEW_PM
   auto PA = PreservedAnalyses::all();
-#endif
 
   /* Setup random() so we get Actually Random(TM) */
   rand_seed = time(NULL);
@@ -327,6 +283,8 @@ bool AFLCoverage::runOnModule(Module &M) {
             }
             break;
           }
+          default:
+            break;
         }
       }
       /* Make up cur_loc */
@@ -337,35 +295,21 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       /* Load prev_loc */
 
-      LoadInst *PrevLoc = IRB.CreateLoad(
-#if LLVM_VERSION_MAJOR >= 14
-          Int32Ty,
-#endif
-          AFLPrevLoc);
+      LoadInst *PrevLoc = IRB.CreateLoad(Int32Ty, AFLPrevLoc);
       PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
       /* Load SHM pointer */
 
-      LoadInst *MemReadPtr = IRB.CreateLoad(
-#if LLVM_VERSION_MAJOR >= 14
-          PointerType::get(Int32Ty, 0),
-#endif
-          AFLMemOpPtr);
+      LoadInst *MemReadPtr =
+          IRB.CreateLoad(PointerType::get(Int32Ty, 0), AFLMemOpPtr);
       MemReadPtr->setMetadata(M.getMDKindID("nosanitize"),
                               MDNode::get(C, None));
-      Value *MemReadPtrIdx = IRB.CreateGEP(
-#if LLVM_VERSION_MAJOR >= 14
-          Int32Ty,
-#endif
-          MemReadPtr, IRB.CreateXor(PrevLoc, CurLoc));
+      Value *MemReadPtrIdx =
+          IRB.CreateGEP(Int32Ty, MemReadPtr, IRB.CreateXor(PrevLoc, CurLoc));
 
       /* Update bitmap */
 
-      LoadInst *MemReadCount = IRB.CreateLoad(
-#if LLVM_VERSION_MAJOR >= 14
-          Int32Ty,
-#endif
-          MemReadPtrIdx);
+      LoadInst *MemReadCount = IRB.CreateLoad(Int32Ty, MemReadPtrIdx);
       MemReadCount->setMetadata(M.getMDKindID("nosanitize"),
                                 MDNode::get(C, None));
       Value *MemReadIncr =
@@ -391,22 +335,5 @@ bool AFLCoverage::runOnModule(Module &M) {
               (unsigned)InstRatio);
   }
 
-#ifdef USE_NEW_PM
   return PA;
-#else
-  return true;
-#endif
 }
-
-#ifndef USE_NEW_PM
-static void registerAFLPass(const PassManagerBuilder &,
-                            legacy::PassManagerBase &PM) {
-  PM.add(new AFLCoverage());
-}
-
-static RegisterStandardPasses RegisterAFLPass(
-    PassManagerBuilder::EP_OptimizerLast, registerAFLPass);
-
-static RegisterStandardPasses RegisterAFLPass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerAFLPass);
-#endif

@@ -28,6 +28,9 @@ pub use mapping::*;
 pub mod tuneable;
 pub use tuneable::*;
 
+#[cfg(feature = "lua_mutator")]
+pub mod lua;
+
 #[cfg(feature = "std")]
 pub mod hash;
 #[cfg(feature = "std")]
@@ -93,7 +96,7 @@ impl From<i32> for MutationId {
 ///
 /// [`MutationResult::Skipped`] does not necessarily mean that the input changed,
 /// just that the mutator did something. For slow targets, consider using
-/// a filtered fuzzer (see [`crate::fuzzer::StdFuzzer::with_input_filter`])
+/// a fuzzer with a input filter
 /// or wrapping your mutator in a [`hash::MutationChecker`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MutationResult {
@@ -111,10 +114,7 @@ pub trait Mutator<I, S>: Named {
 
     /// Post-process given the outcome of the execution
     /// `new_corpus_id` will be `Some` if a new [`crate::corpus::Testcase`] was created this execution.
-    #[inline]
-    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
-        Ok(())
-    }
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error>;
 }
 
 /// A mutator that takes input, and returns a vector of mutated inputs.
@@ -400,6 +400,10 @@ impl<I, S> Mutator<I, S> for NopMutator {
     fn mutate(&mut self, _state: &mut S, _input: &mut I) -> Result<MutationResult, Error> {
         Ok(self.result)
     }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for NopMutator {
@@ -418,6 +422,10 @@ impl<S> Mutator<bool, S> for BoolInvertMutator {
     fn mutate(&mut self, _state: &mut S, input: &mut bool) -> Result<MutationResult, Error> {
         *input = !*input;
         Ok(MutationResult::Mutated)
+    }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
     }
 }
 

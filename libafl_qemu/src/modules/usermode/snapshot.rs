@@ -302,13 +302,12 @@ impl SnapshotModule {
     }
 
     pub fn access(&mut self, addr: GuestAddr, size: usize) {
-        // ASSUMPTION: the access can only cross 2 pages
-        debug_assert!(size <= SNAPSHOT_PAGE_SIZE);
-        let page = addr & SNAPSHOT_PAGE_MASK;
-        self.page_access(page);
-        let second_page = (addr + size as GuestAddr - 1) & SNAPSHOT_PAGE_MASK;
-        if page != second_page {
-            self.page_access(second_page);
+        let start = addr & SNAPSHOT_PAGE_MASK;
+        let end = (addr + size as GuestAddr - 1) & SNAPSHOT_PAGE_MASK;
+        /* Apparently there is a performance hit to using an inclusive range */
+        #[allow(clippy::range_plus_one)]
+        for page in (start..end + 1).step_by(SNAPSHOT_PAGE_SIZE) {
+            self.page_access(page);
         }
     }
 
@@ -888,11 +887,11 @@ where
     if i64::from(sys_num) == SYS_munmap {
         let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
         if !h.is_unmap_allowed(a0 as GuestAddr, a1 as usize) {
-            return SyscallHookResult::new(Some(0));
+            return SyscallHookResult::Skip(0);
         }
     }
 
-    SyscallHookResult::new(None)
+    SyscallHookResult::Run
 }
 
 #[expect(non_upper_case_globals, clippy::too_many_arguments)]
@@ -920,7 +919,13 @@ where
     match i64::from(sys_num) {
         SYS_read | SYS_pread64 => {
             let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-            h.access(a1, a2 as usize);
+            /*
+             * Only note the access if the call is successful. And only mark the
+             * portion of the buffer which has actually been modified.
+             */
+            if result != GuestAddr::MAX {
+                h.access(a1, result as usize);
+            }
         }
         SYS_readlinkat => {
             let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();

@@ -1,5 +1,6 @@
 arm64 := "aarch64-linux-gnu"
 arm := "arm-linux-gnueabihf"
+riscv64 := "riscv64-linux-gnu"
 x64 := "x86_64-linux-gnu"
 
 assembly_arm64:
@@ -16,6 +17,13 @@ binary_arm:
 	{{arm}}-as foo_arm.s -o foo_arm.elf
 	{{arm}}-objcopy -O binary foo_arm.elf foo_arm.bin
 
+assembly_riscv64:
+	{{riscv64}}-gcc -O2 -S -c foo.c -o foo_riscv64.s
+
+binary_riscv64:
+	{{riscv64}}-as foo_riscv64.s -o foo_riscv64.elf
+	{{riscv64}}-objcopy -O binary -j .text.startup foo_riscv64.elf foo_riscv64.bin
+
 assembly_x86:
 	{{x64}}-gcc -O2 -S -c foo.c -o foo_x86.s
 
@@ -26,11 +34,12 @@ binary_x86:
 
 build_arm: assembly_arm binary_arm
 build_arm64: assembly_arm64 binary_arm64
+build_riscv64: assembly_riscv64 binary_riscv64
 build_x86: assembly_x86 binary_x86
 
 clean:
 	rm foo_*
 
 
-all: build_arm build_arm64 build_x86
-# sudo apt install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+all: build_arm build_arm64 build_riscv64 build_x86
+# sudo apt install gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu gcc-riscv64-linux-gnu

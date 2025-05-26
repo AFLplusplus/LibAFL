@@ -97,8 +97,8 @@ pub fn main() -> Result<(), Error> {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
-    let minimizer = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let minimizer = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(
         StdMutationalStage::new(mutator),
         StdTMinMutationalStage::new(minimizer, factory, 128)
@@ -124,7 +124,7 @@ pub fn main() -> Result<(), Error> {
 
     let mut mgr = SimpleEventManager::new(mon);
 
-    let minimizer = StdScheduledMutator::new(havoc_mutations());
+    let minimizer = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdTMinMutationalStage::new(
         minimizer,
         CrashFeedback::new(),
