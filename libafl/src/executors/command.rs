@@ -12,23 +12,20 @@ use core::{
     time::Duration,
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use std::os::fd::{FromRawFd, OwnedFd};
+use std::os::fd::AsRawFd;
 use std::{
     ffi::OsStr,
     io::{Read, Write},
-    os::{
-        fd::{IntoRawFd, RawFd},
-        unix::ffi::OsStrExt,
-    },
+    os::{fd::RawFd, unix::ffi::OsStrExt},
     process::{Child, Command, Stdio},
 };
 
-#[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
     AsSlice, InputLocation, StdTargetArgs, StdTargetArgsInner,
     tuples::{Handle, MatchName, MatchNameRef, RefIndexable},
 };
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use libafl_bolts::{core_affinity::CoreId, os::dup2};
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libc::STDIN_FILENO;
 #[cfg(target_os = "linux")]
@@ -84,12 +81,16 @@ impl StdCommandCaptureMethod {
         #[cfg(feature = "fork")]
         {
             if let Self::Fd(old) = self {
-                if stdout {
-                    cmd.setdup2(*old, libc::STDOUT_FILENO);
-                    cmd.stdout(Stdio::null());
-                } else {
-                    cmd.setdup2(*old, libc::STDERR_FILENO);
-                    cmd.stderr(Stdio::null());
+                // Safety
+                // We set up the file desciptors we assume to be valid and not closed (yet)
+                unsafe {
+                    if stdout {
+                        cmd.setdup2(*old, libc::STDOUT_FILENO);
+                        cmd.stdout(Stdio::null());
+                    } else {
+                        cmd.setdup2(*old, libc::STDERR_FILENO);
+                        cmd.stderr(Stdio::null());
+                    }
                 }
             } else {
                 Self::pipe_capture(cmd, stdout);
@@ -234,7 +235,7 @@ where
                 personality, ptrace,
                 signal::{Signal, raise},
             },
-            unistd::{ForkResult, alarm, dup2, execve, fork, pipe, write},
+            unistd::{ForkResult, alarm, execve, fork, pipe, write},
         };
 
         match unsafe { fork() } {
@@ -270,10 +271,7 @@ where
                         write(pipe_write, &input.target_bytes()).unwrap();
                         // # Safety
                         // We replace the Stdin fileno. Typical Unix stuff.
-                        let mut stdin_fd = unsafe { OwnedFd::from_raw_fd(STDIN_FILENO) };
-                        dup2(pipe_read, &mut stdin_fd).unwrap();
-                        // We never want to close this fd. Process will execve below.
-                        let _ = stdin_fd.into_raw_fd();
+                        unsafe { dup2(pipe_read.as_raw_fd(), STDIN_FILENO)? };
                     }
                     InputLocation::File { out_file } => {
                         out_file.write_buf(input.target_bytes().as_slice()).unwrap();

@@ -114,7 +114,7 @@ pub fn startable_self() -> Result<Command, Error> {
 /// # Safety
 /// The fd need to be a legal fd.
 #[cfg(all(unix, feature = "std"))]
-pub fn dup(fd: RawFd) -> Result<RawFd, Error> {
+pub unsafe fn dup(fd: RawFd) -> Result<RawFd, Error> {
     match unsafe { libc::dup(fd) } {
         -1 => Err(Error::last_os_error(format!("Error calling dup({fd})"))),
         new_fd => Ok(new_fd),
@@ -148,7 +148,7 @@ pub fn peak_rss_mb_child_processes() -> Result<i64, Error> {
 /// # Safety
 /// The fds need to be legal fds.
 #[cfg(all(unix, feature = "std"))]
-pub fn dup2(fd: RawFd, device: RawFd) -> Result<(), Error> {
+pub unsafe fn dup2(fd: RawFd, device: RawFd) -> Result<(), Error> {
     match unsafe { libc::dup2(fd, device) } {
         -1 => Err(Error::last_os_error(format!(
             "Error calling dup2({fd}, {device})"
