@@ -960,7 +960,7 @@ checksum = "dee0191af12b622a9263467105cda1a21f8e6cbc535b2fd49de829ca92794e32"
 dependencies = [
  "getrandom 0.3.3",
  "siphasher",
- "wide 0.7.32 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wide",
 ]
 
 [[package]]
@@ -1484,6 +1484,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "hostname",
  "libafl_derive",
+ "libafl_wide",
  "libc",
  "log",
  "mach2",
@@ -1501,7 +1502,6 @@ dependencies = [
  "typeid",
  "uds",
  "uuid",
- "wide 0.7.32 (git+https://github.com/Lokathor/wide?rev=71b5df0b2620da753836fafce5f99076181a49fe)",
  "winapi",
  "windows 0.59.0",
  "windows-result 0.3.4",
@@ -1600,6 +1600,16 @@ dependencies = [
  "rangemap",
  "rustversion",
  "serde",
+]
+
+[[package]]
+name = "libafl_wide"
+version = "0.7.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2f28d525f6e361b6cd55c0da5347027860a902d638d15194c16dc2f39a5ba9f"
+dependencies = [
+ "bytemuck",
+ "safe_arch",
 ]
 
 [[package]]
@@ -3090,15 +3100,6 @@ name = "wide"
 version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41b5576b9a81633f3e8df296ce0063042a73507636cbe956c61133dd7034ab22"
-dependencies = [
- "bytemuck",
- "safe_arch",
-]
-
-[[package]]
-name = "wide"
-version = "0.7.32"
-source = "git+https://github.com/Lokathor/wide?rev=71b5df0b2620da753836fafce5f99076181a49fe#71b5df0b2620da753836fafce5f99076181a49fe"
 dependencies = [
  "bytemuck",
  "safe_arch",

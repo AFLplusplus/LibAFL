@@ -160,8 +160,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
 use std::{
     fs::File,
-    io::{Write, stderr, stdout},
-    os::fd::{AsRawFd, FromRawFd, RawFd},
+    io::Write,
+    os::fd::{FromRawFd, RawFd},
     panic,
 };
 
