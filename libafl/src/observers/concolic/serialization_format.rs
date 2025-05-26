@@ -82,7 +82,7 @@ impl<R: Read> MessageFileReader<R> {
 
     /// Parse the next message out of the stream.
     /// [`Option::None`] is returned once the stream is depleted.
-    /// IO and serialization errors are passed to the caller using [`bincode::Result`].
+    /// IO and serialization errors are passed to the caller as [`DecodeError`].
     /// Finally, the returned tuple contains the message itself as a [`SymExpr`] and the [`SymExprRef`] associated
     /// with this message.
     /// The `SymExprRef` may be used by following messages to refer back to this message.
