@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
     cell::RefCell,
     fs::{File, OpenOptions},
@@ -16,8 +18,6 @@ use libafl_bolts::{
     os::dup,
     shmem::{ShMemProvider, StdShMemProvider},
 };
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
 
 use crate::{client::Client, options::FuzzerOptions};
 
