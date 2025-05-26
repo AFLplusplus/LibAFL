@@ -1,12 +1,9 @@
-use core::marker::PhantomData;
-
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
         ClientDescription, EventFirer, EventReceiver, EventRestarter, ProgressReporter, SendExiting,
     },
     inputs::BytesInput,
-    monitors::Monitor,
     state::StdState,
     Error,
 };

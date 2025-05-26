@@ -1,10 +1,10 @@
-use std::{marker::PhantomData, process};
+use std::process;
 
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
-        ClientDescription, EventFirer, EventReceiver, EventRestarter, LlmpRestartingEventManager,
-        NopEventManager, ProgressReporter, SendExiting,
+        ClientDescription, EventFirer, EventReceiver, EventRestarter, NopEventManager,
+        ProgressReporter, SendExiting,
     },
     executors::{Executor, ShadowExecutor},
     feedback_and_fast, feedback_or, feedback_or_fast,
@@ -29,7 +29,6 @@ use libafl::{
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    shmem::{StdShMem, StdShMemProvider},
     tuples::{tuple_list, Merge},
 };
 use libafl_nyx::{
