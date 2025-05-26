@@ -18,6 +18,8 @@ pub mod pipes;
 use alloc::{borrow::Cow, ffi::CString};
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::CStr;
+#[cfg(all(unix, feature = "std"))]
+use std::io::{stderr, stdout};
 #[cfg(feature = "std")]
 use std::{env, process::Command};
 #[cfg(all(unix, feature = "std"))]
@@ -154,6 +156,31 @@ pub unsafe fn dup2(fd: RawFd, device: RawFd) -> Result<(), Error> {
             "Error calling dup2({fd}, {device})"
         ))),
         _ => Ok(()),
+    }
+}
+
+/// Closes `stdout` and `stderr` and returns a new `stdout` and `stderr`
+/// to be used in the fuzzer for further logging.
+///
+/// # Safety
+/// The function in itiself is safe, but it might have undesirable side effects since it closes `stdout` and `stderr`.
+#[cfg(all(unix, feature = "std"))]
+#[expect(unused_qualifications)]
+pub unsafe fn dup_and_mute_outputs() -> Result<(RawFd, RawFd), Error> {
+    let old_stdout = stdout().as_raw_fd();
+    let old_stderr = stderr().as_raw_fd();
+    let null_fd = crate::os::null_fd()?;
+
+    // # Safety
+    // Duplicates the corect file descriptors.
+    unsafe {
+        let new_stdout = crate::os::dup(old_stdout)?;
+        let new_stderr = crate::os::dup(old_stderr)?;
+
+        crate::os::dup2(null_fd, old_stdout)?;
+        crate::os::dup2(null_fd, old_stderr)?;
+
+        Ok((new_stdout, new_stderr))
     }
 }
 

@@ -46,8 +46,8 @@ use libafl::{
     Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_time, dup_and_mute_outputs,
-    os::dup2,
+    current_time,
+    os::{dup2, dup_and_mute_outputs},
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},

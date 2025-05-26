@@ -37,7 +37,7 @@ use libafl::{
     Error, HasMetadata,
 };
 #[cfg(unix)]
-use libafl_bolts::dup_and_mute_outputs;
+use libafl_bolts::os::dup_and_mute_outputs;
 use libafl_bolts::{
     current_time,
     ownedref::OwnedMutSlice,

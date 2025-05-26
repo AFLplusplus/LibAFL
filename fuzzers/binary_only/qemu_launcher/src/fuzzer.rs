@@ -18,7 +18,7 @@ use libafl::{
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{core_affinity::CoreId, current_time};
 #[cfg(unix)]
-use libafl_bolts::{dup_and_mute_outputs, os::dup2};
+use libafl_bolts::{os::dup2, os::dup_and_mute_outputs};
 
 use crate::{client::Client, options::FuzzerOptions};
 
