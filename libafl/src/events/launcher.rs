@@ -439,11 +439,15 @@ where
                             .stderr_file
                             .map(|filename| File::create(filename).unwrap());
                         if let Some(file) = opened_stdout_file {
-                            dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                            if let Some(stderr) = opened_stderr_file {
-                                dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                            } else {
-                                dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                            // # Safety
+                            // We assume the file descriptors are valid here
+                            unsafe {
+                                dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                if let Some(stderr) = opened_stderr_file {
+                                    dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                } else {
+                                    dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                }
                             }
                         }
                     }
