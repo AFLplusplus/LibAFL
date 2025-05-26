@@ -217,14 +217,12 @@ fn fuzz(
         // stdout and stderr should still be open at this point in time.
         let (new_stdout, new_stderr) = unsafe { dup_and_mute_outputs()? };
 
-        {
-            // If we are debugging, re-enable target stderror.
-            if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
-                // # Safety
-                // Nobody else uses the new stderror here.
-                unsafe {
-                    dup2(new_stderr, io::stderr().as_raw_fd())?;
-                }
+        // If we are debugging, re-enable target stderror.
+        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
+            // # Safety
+            // Nobody else uses the new stderror here.
+            unsafe {
+                dup2(new_stderr, io::stderr().as_raw_fd())?;
             }
         }
 

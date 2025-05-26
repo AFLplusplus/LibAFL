@@ -16,42 +16,43 @@ use std::{
 
 use clap::{Arg, Command};
 use libafl::{
-    Error, HasMetadata,
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        HavocScheduledMutator, StdMOptMutator, Tokens, havoc_mutations,
-        token_mutations::I2SRandReplace, tokens_mutations,
+        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, HavocScheduledMutator,
+        StdMOptMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{
-        IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        ShadowTracingStage, StdMutationalStage, calibrate::CalibrationStage,
-        power::StdPowerMutationalStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
+        StdMutationalStage,
     },
     state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 #[cfg(unix)]
 use libafl_bolts::dup_and_mute_outputs;
 use libafl_bolts::{
-    AsSlice, current_time,
+    current_time,
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{Merge, tuple_list},
+    tuples::{tuple_list, Merge},
+    AsSlice,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    CmpLogObserver, libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
 
 /// The fuzzer main (as `no_mangle` C function)
@@ -214,15 +215,12 @@ fn fuzz(
         // stdout and stderr should still be open at this point in time.
         let (new_stdout, new_stderr) = unsafe { dup_and_mute_outputs()? };
 
-        #[cfg(unix)]
-        {
-            // If we are debugging, re-enable target stderror.
-            if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
-                // # Safety
-                // Nobody else uses the new stderror here.
-                unsafe {
-                    dup2(new_stderr, io::stderr().as_raw_fd())?;
-                }
+        // If we are debugging, re-enable target stderror.
+        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
+            // # Safety
+            // Nobody else uses the new stderror here.
+            unsafe {
+                dup2(new_stderr, io::stderr().as_raw_fd())?;
             }
         }
 

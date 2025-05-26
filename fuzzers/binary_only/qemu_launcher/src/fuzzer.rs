@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
     cell::RefCell,
     fs::{File, OpenOptions},
@@ -16,10 +18,7 @@ use libafl::{
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{core_affinity::CoreId, current_time};
 #[cfg(unix)]
-use {
-    nix::unistd::dup,
-    std::os::unix::io::{AsRawFd, FromRawFd},
-};
+use libafl_bolts::{dup_and_mute_outputs, os::dup2};
 
 use crate::{client::Client, options::FuzzerOptions};
 
@@ -54,10 +53,31 @@ impl Fuzzer {
             });
 
             #[cfg(unix)]
-            let stdout_cpy = RefCell::new(unsafe {
-                let new_fd = dup(io::stdout().as_raw_fd())?;
-                File::from_raw_fd(new_fd)
-            });
+            let wrapped_stdout = {
+                // We forward all outputs to dev/null, but keep a copy around for the fuzzer output.
+                //
+                // # Safety
+                // stdout and stderr should still be open at this point in time.
+                let (new_stdout, new_stderr) = unsafe { dup_and_mute_outputs()? };
+
+                // If we are debugging, re-enable target stderror.
+                if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
+                    // # Safety
+                    // Nobody else uses the new stderror here.
+                    unsafe {
+                        dup2(new_stderr, io::stderr().as_raw_fd())?;
+                    }
+                }
+
+                // # Safety
+                // The new stdout is open at this point, and we will don't use it anywhere else.
+                #[cfg(unix)]
+                unsafe {
+                    File::from_raw_fd(new_stdout)
+                }
+            };
+
+            let stdout_cpy = RefCell::new(wrapped_stdout);
 
             // The stats reporter for the broker
             let monitor = MultiMonitor::new(|s| {
