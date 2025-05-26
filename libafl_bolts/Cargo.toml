@@ -177,8 +177,8 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
   "logging",
 ] }
 
-# optional stable simd, pin to a commit due to `u8x32` not released yet. Switch as long as next release is out!
-wide = { git = "https://github.com/Lokathor/wide", rev = "71b5df0b2620da753836fafce5f99076181a49fe", optional = true }
+# optional stable simd, pin to a commit due to `u8x32` not released yet. Switch to `wide` as long as next release is out!
+wide = { version = "0.7.33", optional = true, package = "libafl_wide" }
 rustversion = { workspace = true }
 
 # Document all features of this crate (for `cargo doc`)
