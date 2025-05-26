@@ -6,6 +6,7 @@ use core::{
     num::NonZeroUsize,
 };
 
+#[cfg(feature = "std")]
 use bincode::{Decode, Encode};
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
