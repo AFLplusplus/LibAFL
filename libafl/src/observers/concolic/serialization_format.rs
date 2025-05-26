@@ -45,19 +45,22 @@
 use core::fmt::{self, Debug, Formatter};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
-use bincode::{DefaultOptions, Options};
-pub use bincode::{ErrorKind, Result};
+use bincode::{
+    config::{self, Configuration},
+    decode_from_std_read, encode_into_std_write,
+    error::{DecodeError, EncodeError},
+};
 
 use super::{SymExpr, SymExprRef};
 
-fn serialization_options() -> DefaultOptions {
-    DefaultOptions::new()
+fn serialization_options() -> Configuration {
+    config::standard()
 }
 
 /// A `MessageFileReader` reads a stream of [`SymExpr`] and their corresponding [`SymExprRef`]s from any [`Read`].
 pub struct MessageFileReader<R: Read> {
     reader: R,
-    deserializer_config: DefaultOptions,
+    deserializer_config: Configuration,
     current_id: usize,
 }
 
@@ -79,18 +82,20 @@ impl<R: Read> MessageFileReader<R> {
 
     /// Parse the next message out of the stream.
     /// [`Option::None`] is returned once the stream is depleted.
-    /// IO and serialization errors are passed to the caller using [`bincode::Result`].
+    /// IO and serialization errors are passed to the caller as [`DecodeError`].
     /// Finally, the returned tuple contains the message itself as a [`SymExpr`] and the [`SymExprRef`] associated
     /// with this message.
     /// The `SymExprRef` may be used by following messages to refer back to this message.
-    pub fn next_message(&mut self) -> Option<Result<(SymExprRef, SymExpr)>> {
-        match self.deserializer_config.deserialize_from(&mut self.reader) {
+    pub fn next_message(&mut self) -> Option<Result<(SymExprRef, SymExpr), DecodeError>> {
+        match decode_from_std_read(&mut self.reader, self.deserializer_config) {
             Ok(mut message) => {
                 let message_id = self.transform_message(&mut message);
                 Some(Ok((message_id, message)))
             }
-            Err(e) => match *e {
-                ErrorKind::Io(ref io_err) => match io_err.kind() {
+            Err(e) => match e {
+                DecodeError::Io {
+                    inner: ref io_err, ..
+                } => match io_err.kind() {
                     io::ErrorKind::UnexpectedEof => None,
                     _ => Some(Err(e)),
                 },
@@ -221,7 +226,7 @@ pub struct MessageFileWriter<W> {
     id_counter: usize,
     writer: W,
     writer_start_position: u64,
-    serialization_options: DefaultOptions,
+    serialization_options: Configuration,
 }
 
 impl<W> Debug for MessageFileWriter<W>
@@ -282,7 +287,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
     /// Writes a message to the stream and returns the [`SymExprRef`] that should be used to refer back to this message.
     /// May error when the underlying `Write` errors or when there is a serialization error.
     #[expect(clippy::too_many_lines)]
-    pub fn write_message(&mut self, mut message: SymExpr) -> Result<SymExprRef> {
+    pub fn write_message(&mut self, mut message: SymExpr) -> Result<SymExprRef, EncodeError> {
         let current_id = self.id_counter;
         match &mut message {
             SymExpr::InputByte { .. }
@@ -384,11 +389,14 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                 *b = self.make_relative(*b);
             }
         }
-        self.serialization_options
-            .serialize_into(&mut self.writer, &message)?;
+        encode_into_std_write(&message, &mut self.writer, self.serialization_options)?;
+
         // for every path constraint, make sure we can later decode it in case we crash by updating the trace header
         if let SymExpr::PathConstraint { .. } = &message {
-            self.write_trace_size()?;
+            self.write_trace_size().map_err(|err| EncodeError::Io {
+                inner: err,
+                index: 0,
+            })?;
         }
         Ok(SymExprRef::new(current_id).unwrap())
     }
