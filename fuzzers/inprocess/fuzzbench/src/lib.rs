@@ -16,43 +16,42 @@ use std::{
 
 use clap::{Arg, Command};
 use libafl::{
+    Error, HasMetadata,
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
+    executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, HavocScheduledMutator,
-        StdMOptMutator, Tokens,
+        HavocScheduledMutator, StdMOptMutator, Tokens, havoc_mutations,
+        token_mutations::I2SRandReplace, tokens_mutations,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
+        IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
-        StdMutationalStage,
+        ShadowTracingStage, StdMutationalStage, calibrate::CalibrationStage,
+        power::StdPowerMutationalStage,
     },
     state::{HasCorpus, StdState},
-    Error, HasMetadata,
 };
 #[cfg(unix)]
 use libafl_bolts::os::dup_and_mute_outputs;
 use libafl_bolts::{
-    current_time,
+    AsSlice, current_time,
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
-    AsSlice,
+    tuples::{Merge, tuple_list},
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
+    CmpLogObserver, libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer,
 };
 
 /// The fuzzer main (as `no_mangle` C function)
