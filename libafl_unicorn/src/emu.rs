@@ -4,7 +4,7 @@ use capstone::{
 };
 pub use libafl_targets::{EDGES_MAP, EDGES_MAP_PTR};
 use unicorn_engine::{
-    RegisterARM, RegisterARM64, RegisterX86, Unicorn,
+    RegisterARM, RegisterARM64, RegisterRISCV, RegisterX86, Unicorn,
     unicorn_const::{Arch, Permission},
 };
 
@@ -40,7 +40,7 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
 
     let pc = emu.pc_read().unwrap();
 
-    log::debug!("PC: {:X}", pc);
+    log::debug!("PC: {pc:X}");
     let arch = emu.get_arch();
     match arch {
         Arch::ARM => {
@@ -56,6 +56,14 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
             log::debug!("X1: {:X}", emu.reg_read(RegisterARM64::X1).unwrap());
             log::debug!("X2: {:X}", emu.reg_read(RegisterARM64::X2).unwrap());
             log::debug!("X3: {:X}", emu.reg_read(RegisterARM64::X3).unwrap());
+        }
+        Arch::RISCV => {
+            log::debug!("SP: {:X}", emu.reg_read(RegisterRISCV::SP).unwrap());
+            log::debug!("RA: {:X}", emu.reg_read(RegisterRISCV::RA).unwrap());
+            log::debug!("GP: {:X}", emu.reg_read(RegisterRISCV::GP).unwrap());
+            log::debug!("TP: {:X}", emu.reg_read(RegisterRISCV::TP).unwrap());
+            log::debug!("A0: {:X}", emu.reg_read(RegisterRISCV::A0).unwrap());
+            log::debug!("A1: {:X}", emu.reg_read(RegisterRISCV::A1).unwrap());
         }
         Arch::X86 => {
             log::debug!("ESP: {:X}", emu.reg_read(RegisterX86::ESP).unwrap());
@@ -100,6 +108,12 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
                     .detail(true)
                     .build()
                     .expect("Failed to create Capstone object"),
+                Arch::RISCV => Capstone::new()
+                    .riscv()
+                    .mode(arch::riscv::ArchMode::RiscV64)
+                    .detail(true)
+                    .build()
+                    .expect("Failed to create Capstone object"),
 
                 _ => Capstone::new()
                     .x86()
@@ -118,7 +132,7 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
             }
 
             for i in insns.as_ref() {
-                log::debug!("{}", i);
+                log::debug!("{i}");
             }
         }
     }

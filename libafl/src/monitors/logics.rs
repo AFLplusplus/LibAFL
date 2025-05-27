@@ -1,6 +1,6 @@
 //! Monitor wrappers that add logics to monitor
 
-use libafl_bolts::ClientId;
+use libafl_bolts::{ClientId, Error};
 
 use crate::monitors::{Monitor, stats::ClientStatsManager};
 
@@ -21,11 +21,12 @@ where
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         while (self.closure)(client_stats_manager, event_msg, sender_id) {
             self.monitor
-                .display(client_stats_manager, event_msg, sender_id);
+                .display(client_stats_manager, event_msg, sender_id)?;
         }
+        Ok(())
     }
 }
 
@@ -60,11 +61,12 @@ where
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         if (self.closure)(client_stats_manager, event_msg, sender_id) {
             self.monitor
-                .display(client_stats_manager, event_msg, sender_id);
+                .display(client_stats_manager, event_msg, sender_id)?;
         }
+        Ok(())
     }
 }
 
@@ -101,14 +103,15 @@ where
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         if (self.closure)(client_stats_manager, event_msg, sender_id) {
             self.if_monitor
-                .display(client_stats_manager, event_msg, sender_id);
+                .display(client_stats_manager, event_msg, sender_id)?;
         } else {
             self.else_monitor
-                .display(client_stats_manager, event_msg, sender_id);
+                .display(client_stats_manager, event_msg, sender_id)?;
         }
+        Ok(())
     }
 }
 
@@ -146,10 +149,11 @@ where
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         if let Some(monitor) = self.monitor.as_mut() {
-            monitor.display(client_stats_manager, event_msg, sender_id);
+            monitor.display(client_stats_manager, event_msg, sender_id)?;
         }
+        Ok(())
     }
 }
 

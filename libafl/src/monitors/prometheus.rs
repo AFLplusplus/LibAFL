@@ -42,7 +42,7 @@ use std::thread;
 
 // using thread in order to start the HTTP server in a separate thread
 use futures::executor::block_on;
-use libafl_bolts::{ClientId, current_time};
+use libafl_bolts::{ClientId, Error, current_time};
 // using the official rust client library for Prometheus: https://github.com/prometheus/client_rust
 use prometheus_client::{
     encoding::{EncodeLabelSet, text::encode},
@@ -98,7 +98,7 @@ where
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         // Update the prometheus metrics
         // The gauges must take signed i64's, with max value of 2^63-1 so it is
         // probably fair to error out at a count of nine quintillion across any
@@ -216,8 +216,8 @@ where
 
         // Client-specific metrics
 
-        client_stats_manager.client_stats_insert(sender_id);
-        let client = client_stats_manager.client_stats_for(sender_id);
+        client_stats_manager.client_stats_insert(sender_id)?;
+        let client = client_stats_manager.client_stats_for(sender_id)?;
         let mut cur_client_clone = client.clone();
 
         self.prometheus_client_stats
@@ -319,6 +319,7 @@ where
                 .set(value);
         }
         (self.print_fn)(&fmt);
+        Ok(())
     }
 }
 

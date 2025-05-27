@@ -1,6 +1,6 @@
 [package]
 name = "libafl_repo_tools"
-version = "0.15.1"
+version = "0.15.3"
 edition = "2024"
 description = "A set of useful tools to manage the LibAFL repository"
 authors = ["Romain Malmain <romain.malmain@pm.me>"]
@@ -11,7 +11,7 @@ repository = "https://github.com/AFLplusplus/LibAFL.git"
 project-root = "0.2"
 walkdir = "2.5"
 regex = "1.10"
-tokio = { version = "1.38", features = [
+tokio = { version = "1.44", features = [
   "process",
   "rt",
   "rt-multi-thread",

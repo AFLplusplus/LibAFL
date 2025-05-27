@@ -9,10 +9,13 @@ use asan::{
         backend::{dlmalloc::DlmallocBackend, mimalloc::MimallocBackend},
         frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
+    env::Env,
+    file::libc::LibcFileReader,
+    hooks::PatchedHooks,
     logger::libc::LibcLogger,
-    maps::libc::LibcMapReader,
+    maps::{Maps, iterator::MapIterator},
     mmap::libc::LibcMmap,
-    patch::{hooks::PatchedHooks, raw::RawPatch},
+    patch::{Patches, raw::RawPatch},
     shadow::{
         Shadow,
         guest::{DefaultShadowLayout, GuestShadow},
@@ -21,9 +24,9 @@ use asan::{
         Symbols,
         dlsym::{DlSymSymbols, LookupTypeNext},
     },
-    tracking::{Tracking, guest::GuestTracking},
+    tracking::{Tracking, guest_fast::GuestFastTracking},
 };
-use log::{Level, debug, trace};
+use log::{Level, info, trace};
 use spin::{Lazy, mutex::Mutex};
 
 type Syms = DlSymSymbols<LookupTypeNext>;
@@ -33,18 +36,24 @@ type GasanMmap = LibcMmap<Syms>;
 type GasanBackend = MimallocBackend<DlmallocBackend<GasanMmap>>;
 
 pub type GasanFrontend =
-    DefaultFrontend<GasanBackend, GuestShadow<GasanMmap, DefaultShadowLayout>, GuestTracking>;
+    DefaultFrontend<GasanBackend, GuestShadow<GasanMmap, DefaultShadowLayout>, GuestFastTracking>;
 
 pub type GasanSyms = DlSymSymbols<LookupTypeNext>;
+
+pub type GasanEnv = Env<LibcFileReader<GasanSyms>>;
 
 const PAGE_SIZE: usize = 4096;
 
 static FRONTEND: Lazy<Mutex<GasanFrontend>> = Lazy::new(|| {
-    LibcLogger::initialize::<GasanSyms>(Level::Info);
-    debug!("init");
+    let level = GasanEnv::initialize()
+        .ok()
+        .and_then(|e| e.log_level())
+        .unwrap_or(Level::Warn);
+    LibcLogger::initialize::<GasanSyms>(level);
+    info!("Gasan initializing...");
     let backend = GasanBackend::new(DlmallocBackend::new(PAGE_SIZE));
     let shadow = GuestShadow::<GasanMmap, DefaultShadowLayout>::new().unwrap();
-    let tracking = GuestTracking::new().unwrap();
+    let tracking = GuestFastTracking::new().unwrap();
     let frontend = GasanFrontend::new(
         backend,
         shadow,
@@ -53,7 +62,17 @@ static FRONTEND: Lazy<Mutex<GasanFrontend>> = Lazy::new(|| {
         GasanFrontend::DEFAULT_QUARANTINE_SIZE,
     )
     .unwrap();
-    PatchedHooks::init::<GasanSyms, RawPatch, LibcMapReader<GasanSyms>, GasanMmap>().unwrap();
+    let mappings = Maps::new(
+        MapIterator::<LibcFileReader<Syms>>::new()
+            .unwrap()
+            .collect(),
+    );
+    Patches::init(mappings);
+    for hook in PatchedHooks::default() {
+        let target = hook.lookup::<GasanSyms>().unwrap();
+        Patches::apply::<RawPatch, GasanMmap>(target, hook.destination).unwrap();
+    }
+    info!("Gasan initialized.");
     Mutex::new(frontend)
 });
 
@@ -113,8 +132,8 @@ pub unsafe extern "C" fn asan_get_size(addr: *const c_void) -> usize {
 
 #[unsafe(no_mangle)]
 /// # Safety
-pub unsafe extern "C" fn asan_sym(name: *const c_char) -> GuestAddr {
-    GasanSyms::lookup(name).unwrap()
+pub unsafe extern "C" fn asan_sym(name: *const c_char) -> *const c_void {
+    unsafe { GasanSyms::lookup_raw(name).unwrap() as *const c_void }
 }
 
 #[unsafe(no_mangle)]
@@ -141,7 +160,7 @@ pub unsafe extern "C" fn asan_track(addr: *const c_void, len: usize) {
     FRONTEND
         .lock()
         .tracking_mut()
-        .alloc(addr as GuestAddr, len)
+        .track(addr as GuestAddr, len)
         .unwrap();
 }
 
@@ -152,7 +171,7 @@ pub unsafe extern "C" fn asan_untrack(addr: *const c_void) {
     FRONTEND
         .lock()
         .tracking_mut()
-        .dealloc(addr as GuestAddr)
+        .untrack(addr as GuestAddr)
         .unwrap();
 }
 

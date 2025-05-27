@@ -19,7 +19,7 @@ use crate::{
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
-    state::{HasCorpus, HasRand},
+    state::HasRand,
 };
 
 /// The randomic mutator for `Nautilus` grammar.
@@ -61,6 +61,14 @@ impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
             input.tree = Tree::from_rule_vec(tmp, self.ctx);
             Ok(MutationResult::Mutated)
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -127,6 +135,14 @@ impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
         }
         Ok(MutationResult::Skipped)
     }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl Named for NautilusRecursionMutator<'_> {
@@ -162,7 +178,7 @@ impl Debug for NautilusSpliceMutator<'_> {
 
 impl<S> Mutator<NautilusInput, S> for NautilusSpliceMutator<'_>
 where
-    S: HasCorpus<NautilusInput> + HasMetadata + HasRand,
+    S: HasMetadata + HasRand,
 {
     fn mutate(
         &mut self,
@@ -197,6 +213,14 @@ where
             input.tree = Tree::from_rule_vec(tmp, self.ctx);
             Ok(MutationResult::Mutated)
         }
+    }
+    #[inline]
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _new_corpus_id: Option<crate::corpus::CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
     }
 }
 

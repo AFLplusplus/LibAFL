@@ -341,7 +341,7 @@ mod tests {
         feedback_and_fast, feedback_or_fast,
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasTargetBytes},
-        mutators::{StdScheduledMutator, mutations::BitFlipMutator},
+        mutators::{HavocScheduledMutator, mutations::BitFlipMutator},
         schedulers::StdScheduler,
         stages::StdMutationalStage,
         state::{HasSolutions, StdState},
@@ -443,7 +443,7 @@ mod tests {
             // Run the tests for each function
             for test in tests {
                 let (function_name, expected_error) = test;
-                log::info!("Testing with harness function {}", function_name);
+                log::info!("Testing with harness function {function_name}");
 
                 let mut corpus = InMemoryCorpus::<BytesInput>::new();
 
@@ -517,7 +517,7 @@ mod tests {
                         Rc::clone(&frida_helper),
                     );
 
-                    let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
+                    let mutator = HavocScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
                     let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
                         mutator,
                         NonZero::new(1).unwrap()

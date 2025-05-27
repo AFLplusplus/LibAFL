@@ -35,7 +35,6 @@ libafl_bolts = { path = "../../../libafl_bolts", features = [
 ] }
 libafl_nyx = { path = "../../../libafl_nyx/" }
 log = { version = "0.4.20" }
-nix = { version = "0.29.0", features = ["fs"] }
 rangemap = { version = "1.5.1" }
 readonly = { version = "0.2.12" }
 typed-builder = { version = "0.20.0" }

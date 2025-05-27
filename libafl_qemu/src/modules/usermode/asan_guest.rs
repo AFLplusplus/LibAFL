@@ -203,7 +203,8 @@ where
 
             assert!(
                 asan_lib.as_path().exists(),
-                "The ASAN library doesn't exist: {asan_lib:#?}"
+                "The ASAN library doesn't exist: {}",
+                asan_lib.display()
             );
 
             let asan_lib = asan_lib

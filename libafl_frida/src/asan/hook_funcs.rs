@@ -837,6 +837,7 @@ impl AsanRuntime {
 
     #[expect(non_snake_case)]
     #[allow(unknown_lints)] // the compiler is contradicting itself
+    #[allow(clippy::used_underscore_items)]
     #[inline]
     pub fn hook__Znwm(
         &mut self,
@@ -873,6 +874,7 @@ impl AsanRuntime {
 
     #[expect(non_snake_case)]
     #[allow(unknown_lints)] // the compiler is contradicting itself
+    #[allow(clippy::used_underscore_items)]
     #[inline]
     pub fn hook__ZnwmSt11align_val_t(
         &mut self,
@@ -1608,7 +1610,7 @@ impl AsanRuntime {
     ) -> *mut c_void {
         log::trace!("hook_mmap");
         let res = original(addr, length, prot, flags, fd, offset);
-        if res != (-1_isize as *mut c_void) {
+        if !ptr::addr_eq(res, ptr::null_mut::<c_void>().wrapping_sub(1)) {
             self.allocator_mut()
                 .map_shadow_for_region(res as usize, res as usize + length, true);
         }

@@ -23,7 +23,7 @@ categories = [
 [dev-dependencies]
 libafl_bolts = { workspace = true, features = ["xxh3", "alloc"] } # libafl_bolts
 
-criterion = "0.5.1" # Benchmarking
+criterion = "0.6.0" # Benchmarking
 ahash = { workspace = true, default-features = false } # The hash function already used in hashbrown
 rustc-hash = { version = "2.0.0", default-features = false } # yet another hash
 xxhash-rust = { version = "0.8.12", features = [

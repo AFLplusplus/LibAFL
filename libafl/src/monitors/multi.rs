@@ -6,7 +6,7 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::{ClientId, current_time};
+use libafl_bolts::{ClientId, Error, current_time};
 
 use crate::monitors::{Monitor, stats::ClientStatsManager};
 
@@ -37,7 +37,7 @@ where
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
-    ) {
+    ) -> Result<(), Error> {
         let sender = format!("#{}", sender_id.0);
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
@@ -62,11 +62,11 @@ where
 
         (self.print_fn)(&global_fmt);
 
-        client_stats_manager.client_stats_insert(sender_id);
+        client_stats_manager.client_stats_insert(sender_id)?;
         let cur_time = current_time();
         let exec_sec = client_stats_manager
-            .update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time));
-        let client = client_stats_manager.client_stats_for(sender_id);
+            .update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time))?;
+        let client = client_stats_manager.client_stats_for(sender_id)?;
 
         let pad = " ".repeat(head.len());
         let mut fmt = format!(
@@ -86,10 +86,10 @@ where
         #[cfg(feature = "introspection")]
         {
             // Print the client performance monitor. Skip the Client 0 which is the broker
-            for (i, client) in client_stats_manager
+            for (i, (_, client)) in client_stats_manager
                 .client_stats()
                 .iter()
-                .filter(|x| x.enabled())
+                .filter(|(_, x)| x.enabled())
                 .enumerate()
             {
                 let fmt = format!("Client {:03}:\n{}", i + 1, client.introspection_stats);
@@ -99,6 +99,7 @@ where
             // Separate the spacing just a bit
             (self.print_fn)("\n");
         }
+        Ok(())
     }
 }
 

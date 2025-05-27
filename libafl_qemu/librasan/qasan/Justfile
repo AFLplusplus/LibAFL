@@ -9,7 +9,6 @@ compile_qasan:
 	#!/bin/sh
 	. {{ DOTENV }}
 	cargo \
-		+nightly \
 		build \
 		--package qasan \
 		--target ${CROSS_TARGET} \
@@ -21,7 +20,6 @@ fix_qasan:
 	#!/bin/sh
 	. {{ DOTENV }}
 	cargo \
-		+nightly \
 		fix \
 		--package qasan \
 		--target ${CROSS_TARGET} \

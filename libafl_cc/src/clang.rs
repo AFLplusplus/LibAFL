@@ -39,10 +39,6 @@ pub enum LLVMPasses {
     Ctx,
     /// Function logging
     FunctionLogging,
-    /// Profiling
-    Profiling,
-    /// Data dependency instrumentation
-    DDG,
 }
 
 impl LLVMPasses {
@@ -69,12 +65,6 @@ impl LLVMPasses {
             LLVMPasses::FunctionLogging => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("function-logging.{}", dll_extension()))
             }
-            LLVMPasses::Profiling => {
-                PathBuf::from(env!("OUT_DIR")).join(format!("profiling.{}", dll_extension()))
-            }
-            LLVMPasses::DDG => {
-                PathBuf::from(env!("OUT_DIR")).join(format!("ddg-instr.{}", dll_extension()))
-            }
         }
     }
 }
@@ -97,7 +87,6 @@ pub struct ClangWrapper {
     bit_mode: u32,
     need_libafl_arg: bool,
     has_libafl_arg: bool,
-    use_new_pm: bool,
 
     output: Option<PathBuf>,
     configurations: Vec<crate::Configuration>,
@@ -413,38 +402,20 @@ impl ToolWrapper for ClangWrapper {
             return Ok(args);
         }
 
-        if !self.passes.is_empty() {
-            if self.use_new_pm {
-                if let Some(ver) = LIBAFL_CC_LLVM_VERSION {
-                    if ver < 16 {
-                        args.push("-fexperimental-new-pass-manager".into());
-                    }
-                }
-            } else {
-                args.push("-flegacy-pass-manager".into());
-            }
-        }
         for pass in &self.passes {
             use_pass = true;
-            if self.use_new_pm {
-                // https://github.com/llvm/llvm-project/issues/56137
-                // Need this -Xclang -load -Xclang -<pass>.so thing even with the new PM
-                // to pass the arguments to LLVM Passes
-                args.push("-Xclang".into());
-                args.push("-load".into());
-                args.push("-Xclang".into());
-                args.push(pass.path().into_os_string().into_string().unwrap());
-                args.push("-Xclang".into());
-                args.push(format!(
-                    "-fpass-plugin={}",
-                    pass.path().into_os_string().into_string().unwrap()
-                ));
-            } else {
-                args.push("-Xclang".into());
-                args.push("-load".into());
-                args.push("-Xclang".into());
-                args.push(pass.path().into_os_string().into_string().unwrap());
-            }
+            // https://github.com/llvm/llvm-project/issues/56137
+            // Need this -Xclang -load -Xclang -<pass>.so thing even with the new PM
+            // to pass the arguments to LLVM Passes
+            args.push("-Xclang".into());
+            args.push("-load".into());
+            args.push("-Xclang".into());
+            args.push(pass.path().into_os_string().into_string().unwrap());
+            args.push("-Xclang".into());
+            args.push(format!(
+                "-fpass-plugin={}",
+                pass.path().into_os_string().into_string().unwrap()
+            ));
         }
         if !self.is_asm && !self.passes.is_empty() {
             for passes_arg in &self.passes_args {
@@ -551,14 +522,6 @@ impl ClangWrapper {
     /// Create a new Clang Wrapper
     #[must_use]
     pub fn new() -> Self {
-        #[cfg(unix)]
-        let use_new_pm = match LIBAFL_CC_LLVM_VERSION {
-            Some(ver) => ver >= 14,
-            None => false,
-        };
-        #[cfg(not(unix))]
-        let use_new_pm = false;
-
         Self {
             optimize: true,
             wrapped_cc: CLANG_PATH.into(),
@@ -572,7 +535,6 @@ impl ClangWrapper {
             bit_mode: 0,
             need_libafl_arg: false,
             has_libafl_arg: false,
-            use_new_pm,
             output: None,
             configurations: vec![crate::Configuration::Default],
             ignoring_configurations: false,
@@ -644,12 +606,6 @@ impl ClangWrapper {
     /// Set if it needs the --libafl arg to add the custom arguments to clang
     pub fn need_libafl_arg(&mut self, value: bool) -> &'_ mut Self {
         self.need_libafl_arg = value;
-        self
-    }
-
-    /// Set if use new llvm pass manager.
-    pub fn use_new_pm(&mut self, value: bool) -> &'_ mut Self {
-        self.use_new_pm = value;
         self
     }
 }

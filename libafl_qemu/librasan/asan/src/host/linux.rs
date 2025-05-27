@@ -66,14 +66,14 @@ impl Host for LinuxHost {
         Ok(())
     }
 
-    fn alloc(start: GuestAddr, len: usize) -> LinuxHostResult<()> {
+    fn track(start: GuestAddr, len: usize) -> LinuxHostResult<()> {
         unsafe {
             syscall3(Self::sysno(), HostAction::Alloc as usize, start, len)?;
         };
         Ok(())
     }
 
-    fn dealloc(start: GuestAddr) -> LinuxHostResult<()> {
+    fn untrack(start: GuestAddr) -> LinuxHostResult<()> {
         unsafe { syscall2(Self::sysno(), HostAction::Dealloc as usize, start)? };
         Ok(())
     }

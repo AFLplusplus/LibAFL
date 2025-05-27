@@ -1,0 +1,30 @@
+import "../../../just/libafl.just"
+
+FUZZER_NAME     := "libafl_libfuzzer_windows"
+FUZZER_NAME_WIN := "libafl_libfuzzer_windows.exe"
+
+set windows-shell := ['cmd.exe', '/c']
+set unstable
+
+[windows]
+libafl_libfuzzer:
+    powershell -File ..\..\..\libafl_libfuzzer_runtime\build.ps1
+
+[windows]
+harness: libafl_libfuzzer
+    copy ..\..\..\libafl_libfuzzer_runtime\libFuzzer.lib  .
+    cl /c /O2 /EHsc /std:c++17 /MDd /fsanitize-coverage=inline-8bit-counters /fsanitize-coverage=edge /fsanitize-coverage=trace-cmp /fsanitize-coverage=trace-div /Fo:harness.obj harness.cc
+    link harness.obj libFuzzer.lib sancov.lib /OUT:libafl_libfuzzer_windows.exe
+
+[windows]
+run: harness
+    if not exist corpus mkdir corpus
+    {{FUZZER_NAME_WIN}} -use_value_profile=1 corpus
+
+[windows]
+[script("cmd.exe", "/c")]
+test: harness
+    if exist corpus rd /s /q corpus
+    mkdir corpus
+    {{FUZZER_NAME_WIN}} -use_value_profile=1 -runs=30000 corpus
+    dir /a-d corpus && (echo Files exist) || (exit /b 1337)

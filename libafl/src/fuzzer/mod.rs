@@ -15,10 +15,13 @@ use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    events::{Event, EventConfig, EventFirer, EventReceiver, ProgressReporter, SendExiting},
+    events::{
+        Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter,
+        SendExiting,
+    },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
-    inputs::Input,
+    inputs::{Input, NopBytesConverter},
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
@@ -73,6 +76,16 @@ pub trait HasObjective {
 
     /// Sets whether to share objectives among nodes
     fn set_share_objectives(&mut self, share_objectives: bool);
+}
+
+/// Can convert input to another type
+pub trait HasBytesConverter {
+    /// The converter itself
+    type Converter;
+    /// the input converter
+    fn converter(&self) -> &Self::Converter;
+    /// the input converter(mut)
+    fn converter_mut(&mut self) -> &mut Self::Converter;
 }
 
 /// Evaluates if an input is interesting using the feedback
@@ -291,16 +304,17 @@ impl ExecuteInputResult {
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
-pub struct StdFuzzer<CS, F, IF, OF> {
+pub struct StdFuzzer<CS, F, IC, IF, OF> {
     scheduler: CS,
     feedback: F,
     objective: OF,
+    bytes_converter: IC,
     input_filter: IF,
     // Handles whether to share objective testcases among nodes
     share_objectives: bool,
 }
 
-impl<CS, F, I, IF, OF, S> HasScheduler<I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, F, I, IC, IF, OF, S> HasScheduler<I, S> for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
 {
@@ -315,7 +329,7 @@ where
     }
 }
 
-impl<CS, F, IF, OF> HasFeedback for StdFuzzer<CS, F, IF, OF> {
+impl<CS, F, IC, IF, OF> HasFeedback for StdFuzzer<CS, F, IC, IF, OF> {
     type Feedback = F;
 
     fn feedback(&self) -> &Self::Feedback {
@@ -327,7 +341,7 @@ impl<CS, F, IF, OF> HasFeedback for StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
+impl<CS, F, IC, IF, OF> HasObjective for StdFuzzer<CS, F, IC, IF, OF> {
     type Objective = OF;
 
     fn objective(&self) -> &OF {
@@ -347,7 +361,8 @@ impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, EM, F, I, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, EM, F, I, IC, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S>
+    for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     EM: EventFirer<I, S>,
@@ -357,9 +372,11 @@ where
     OT: ObserversTuple<I, S> + Serialize,
     S: HasCorpus<I>
         + MaybeHasClientPerfMonitor
+        + HasExecutions
         + HasCurrentTestcase<I>
         + HasSolutions<I>
-        + HasLastFoundTime,
+        + HasLastFoundTime
+        + HasExecutions,
 {
     fn check_results(
         &mut self,
@@ -416,6 +433,7 @@ where
         let corpus = if exec_res.is_corpus() {
             // Add the input to the main corpus
             let mut testcase = Testcase::from(input.clone());
+            testcase.set_executions(*state.executions());
             #[cfg(feature = "track_hit_feedbacks")]
             self.feedback_mut()
                 .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
@@ -431,6 +449,7 @@ where
         if exec_res.is_solution() {
             // The input is a solution, add it to the respective corpus
             let mut testcase = Testcase::from(input.clone());
+            testcase.set_executions(*state.executions());
             testcase.add_metadata(*exit_kind);
             testcase.set_parent_id_optional(*state.corpus().current());
             if let Ok(mut tc) = state.current_testcase_mut() {
@@ -484,27 +503,32 @@ where
             if exec_res.is_corpus() {
                 manager.fire(
                     state,
-                    Event::NewTestcase {
-                        input: input.clone(),
-                        observers_buf,
-                        exit_kind: *exit_kind,
-                        corpus_size: state.corpus().count(),
-                        client_config: manager.configuration(),
-                        time: current_time(),
-                        forward_id: None,
-                        #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                        node_id: None,
-                    },
+                    EventWithStats::with_current_time(
+                        Event::NewTestcase {
+                            input: input.clone(),
+                            observers_buf,
+                            exit_kind: *exit_kind,
+                            corpus_size: state.corpus().count(),
+                            client_config: manager.configuration(),
+                            forward_id: None,
+                            #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                            node_id: None,
+                        },
+                        *state.executions(),
+                    ),
                 )?;
             }
+
             if exec_res.is_solution() {
                 manager.fire(
                     state,
-                    Event::Objective {
-                        input: self.share_objectives.then_some(input.clone()),
-                        objective_size: state.solutions().count(),
-                        time: current_time(),
-                    },
+                    EventWithStats::with_current_time(
+                        Event::Objective {
+                            input: self.share_objectives.then_some(input.clone()),
+                            objective_size: state.solutions().count(),
+                        },
+                        *state.executions(),
+                    ),
                 )?;
             }
         }
@@ -534,7 +558,8 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> EvaluatorObservers<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IC, IF, OF, S> EvaluatorObservers<E, EM, I, S>
+    for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -569,7 +594,9 @@ where
     }
 }
 
-trait InputFilter<I> {
+/// A trait to determine if a input should be run or not
+pub trait InputFilter<I> {
+    /// should run execution for this input or no
     fn should_execute(&mut self, input: &I) -> bool;
 }
 
@@ -591,9 +618,18 @@ pub struct BloomInputFilter {
 }
 
 #[cfg(feature = "std")]
+impl Default for BloomInputFilter {
+    fn default() -> Self {
+        let bloom = BloomFilter::with_false_pos(1e-4).expected_items(10_000_000);
+        Self { bloom }
+    }
+}
+
+#[cfg(feature = "std")]
 impl BloomInputFilter {
     #[must_use]
-    fn new(items_count: usize, fp_p: f64) -> Self {
+    /// Constructor
+    pub fn new(items_count: usize, fp_p: f64) -> Self {
         let bloom = BloomFilter::with_false_pos(fp_p).expected_items(items_count);
         Self { bloom }
     }
@@ -607,7 +643,7 @@ impl<I: Hash> InputFilter<I> for BloomInputFilter {
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IC, IF, OF, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -666,6 +702,7 @@ where
         let observers = executor.observers();
         // Always consider this to be "interesting"
         let mut testcase = Testcase::from(input.clone());
+        testcase.set_executions(*state.executions());
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
@@ -693,11 +730,13 @@ where
 
             manager.fire(
                 state,
-                Event::Objective {
-                    input: self.share_objectives.then_some(input.clone()),
-                    objective_size: state.solutions().count(),
-                    time: current_time(),
-                },
+                EventWithStats::with_current_time(
+                    Event::Objective {
+                        input: self.share_objectives.then_some(input.clone()),
+                        objective_size: state.solutions().count(),
+                    },
+                    *state.executions(),
+                ),
             )?;
         }
 
@@ -733,23 +772,26 @@ where
         };
         manager.fire(
             state,
-            Event::NewTestcase {
-                input,
-                observers_buf,
-                exit_kind,
-                corpus_size: state.corpus().count(),
-                client_config: manager.configuration(),
-                time: current_time(),
-                forward_id: None,
-                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                node_id: None,
-            },
+            EventWithStats::with_current_time(
+                Event::NewTestcase {
+                    input,
+                    observers_buf,
+                    exit_kind,
+                    corpus_size: state.corpus().count(),
+                    client_config: manager.configuration(),
+                    forward_id: None,
+                    #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                    node_id: None,
+                },
+                *state.executions(),
+            ),
         )?;
         Ok((id, ExecuteInputResult::new(corpus_worthy, is_solution)))
     }
 
     fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {
         let mut testcase = Testcase::from(input.clone());
+        testcase.set_executions(*state.executions());
         testcase.set_disabled(true);
         // Add the disabled input to the main corpus
         let id = state.corpus_mut().add_disabled(testcase)?;
@@ -757,7 +799,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> EventProcessor<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IC, IF, OF, S> EventProcessor<E, EM, I, S> for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -785,32 +827,32 @@ where
         while let Some((event, with_observers)) = manager.try_receive(state)? {
             // at this point event is either newtestcase or objectives
             let res = if with_observers {
-                match event {
+                match event.event() {
                     Event::NewTestcase {
-                        ref input,
-                        ref observers_buf,
+                        input,
+                        observers_buf,
                         exit_kind,
                         ..
                     } => {
                         let observers: E::Observers =
                             postcard::from_bytes(observers_buf.as_ref().unwrap())?;
                         let res = self.evaluate_execution(
-                            state, manager, input, &observers, &exit_kind, false,
+                            state, manager, input, &observers, exit_kind, false,
                         )?;
                         res.1
                     }
                     _ => None,
                 }
             } else {
-                match event {
-                    Event::NewTestcase { ref input, .. } => {
+                match event.event() {
+                    Event::NewTestcase { input, .. } => {
                         let res = self.evaluate_input_with_observers(
                             state, executor, manager, input, false,
                         )?;
                         res.1
                     }
                     Event::Objective {
-                        input: Some(ref unwrapped_input),
+                        input: Some(unwrapped_input),
                         ..
                     } => {
                         let res = self.evaluate_input_with_observers(
@@ -839,7 +881,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IC, IF, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -971,42 +1013,93 @@ where
     }
 }
 
-impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
-    /// Create a new [`StdFuzzer`] with standard behavior and the provided duplicate input execution filter.
-    pub fn with_input_filter(scheduler: CS, feedback: F, objective: OF, input_filter: IF) -> Self {
+/// The builder for std fuzzer
+#[derive(Debug, Default)]
+pub struct StdFuzzerBuilder<IC, IF> {
+    bytes_converter: Option<IC>,
+    input_filter: Option<IF>,
+}
+
+impl StdFuzzerBuilder<(), ()> {
+    /// Contstuctor
+    #[must_use]
+    pub fn new() -> Self {
         Self {
-            scheduler,
-            feedback,
-            objective,
-            input_filter,
-            share_objectives: false,
+            input_filter: None,
+            bytes_converter: None,
         }
     }
 }
 
-impl<CS, F, OF> StdFuzzer<CS, F, NopInputFilter, OF> {
-    /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
-    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
-        Self::with_input_filter(scheduler, feedback, objective, NopInputFilter)
+impl<IF> StdFuzzerBuilder<(), IF> {
+    /// set input converter
+    pub fn bytes_converter<IC>(self, bytes_converter: IC) -> StdFuzzerBuilder<IC, IF> {
+        StdFuzzerBuilder {
+            bytes_converter: Some(bytes_converter),
+            input_filter: self.input_filter,
+        }
     }
 }
 
-#[cfg(feature = "std")] // hashing requires std
-impl<CS, F, OF> StdFuzzer<CS, F, BloomInputFilter, OF> {
-    /// Create a new [`StdFuzzer`], which, with a certain certainty, executes each input only once.
-    ///
-    /// This is achieved by hashing each input and using a bloom filter to differentiate inputs.
-    ///
-    /// Use this implementation if hashing each input is very fast compared to executing potential duplicate inputs.
-    pub fn with_bloom_input_filter(
+impl<IC> StdFuzzerBuilder<IC, ()> {
+    /// set input filter
+    pub fn input_filter<IF>(self, input_filter: IF) -> StdFuzzerBuilder<IC, IF> {
+        StdFuzzerBuilder {
+            bytes_converter: self.bytes_converter,
+            input_filter: Some(input_filter),
+        }
+    }
+}
+
+impl<IC, IF> StdFuzzerBuilder<IC, IF> {
+    /// build it
+    pub fn build<CS, F, OF>(
+        self,
         scheduler: CS,
         feedback: F,
         objective: OF,
-        items_count: usize,
-        fp_p: f64,
-    ) -> Self {
-        let input_filter = BloomInputFilter::new(items_count, fp_p);
-        Self::with_input_filter(scheduler, feedback, objective, input_filter)
+    ) -> Result<StdFuzzer<CS, F, IC, IF, OF>, Error> {
+        let Some(bytes_converter) = self.bytes_converter else {
+            return Err(Error::illegal_argument("input converter not set"));
+        };
+        let Some(input_filter) = self.input_filter else {
+            return Err(Error::illegal_argument("input filter not set"));
+        };
+
+        Ok(StdFuzzer {
+            bytes_converter,
+            input_filter,
+            scheduler,
+            feedback,
+            objective,
+            share_objectives: false,
+        })
+    }
+}
+
+impl<CS, F, IC, IF, OF> HasBytesConverter for StdFuzzer<CS, F, IC, IF, OF> {
+    type Converter = IC;
+
+    fn converter(&self) -> &Self::Converter {
+        &self.bytes_converter
+    }
+
+    fn converter_mut(&mut self) -> &mut Self::Converter {
+        &mut self.bytes_converter
+    }
+}
+
+impl<CS, F, OF> StdFuzzer<CS, F, NopBytesConverter, NopInputFilter, OF> {
+    /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
+    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
+        Self {
+            scheduler,
+            feedback,
+            objective,
+            bytes_converter: NopBytesConverter::default(),
+            input_filter: NopInputFilter,
+            share_objectives: false,
+        }
     }
 }
 
@@ -1022,7 +1115,7 @@ pub trait ExecutesInput<E, EM, I, S> {
     ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> ExecutesInput<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IC, IF, OF, S> ExecutesInput<E, EM, I, S> for StdFuzzer<CS, F, IC, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers,
@@ -1057,19 +1150,34 @@ where
 
 /// A [`NopFuzzer`] that does nothing
 #[derive(Clone, Debug)]
-pub struct NopFuzzer {}
+pub struct NopFuzzer {
+    converter: NopBytesConverter,
+}
 
 impl NopFuzzer {
     /// Creates a new [`NopFuzzer`]
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self {
+            converter: NopBytesConverter::default(),
+        }
     }
 }
 
 impl Default for NopFuzzer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl HasBytesConverter for NopFuzzer {
+    type Converter = NopBytesConverter;
+    fn converter(&self) -> &Self::Converter {
+        &self.converter
+    }
+
+    fn converter_mut(&mut self) -> &mut Self::Converter {
+        &mut self.converter
     }
 }
 
@@ -1117,12 +1225,12 @@ mod tests {
 
     use libafl_bolts::rands::StdRand;
 
-    use super::{Evaluator, StdFuzzer};
     use crate::{
         corpus::InMemoryCorpus,
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
-        inputs::BytesInput,
+        fuzzer::{BloomInputFilter, Evaluator, StdFuzzerBuilder},
+        inputs::{BytesInput, NopBytesConverter},
         schedulers::StdScheduler,
         state::StdState,
     };
@@ -1131,7 +1239,12 @@ mod tests {
     fn filtered_execution() {
         let execution_count = RefCell::new(0);
         let scheduler = StdScheduler::new();
-        let mut fuzzer = StdFuzzer::with_bloom_input_filter(scheduler, (), (), 100, 1e-4);
+        let bloom_filter = BloomInputFilter::default();
+        let mut fuzzer = StdFuzzerBuilder::new()
+            .input_filter(bloom_filter)
+            .bytes_converter(NopBytesConverter::default())
+            .build(scheduler, (), ())
+            .unwrap();
         let mut state = StdState::new(
             StdRand::new(),
             InMemoryCorpus::new(),

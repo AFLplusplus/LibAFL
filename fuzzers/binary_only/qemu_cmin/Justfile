@@ -28,7 +28,7 @@ harness: libpng
         -lm -static
 
 [unix]
-run: harness build
+run: build harness
     {{ FUZZER }} \
         --output ./output \
         --input ./corpus \

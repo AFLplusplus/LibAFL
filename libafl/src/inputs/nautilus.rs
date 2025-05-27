@@ -8,16 +8,15 @@ use core::{
 use libafl_bolts::{HasLen, ownedref::OwnedSlice};
 use serde::{Deserialize, Serialize};
 
-use super::TargetBytesConverter;
+use super::BytesInput;
 use crate::{
-    Error,
     common::nautilus::grammartec::{
         newtypes::NodeId,
         rule::RuleIdOrCustom,
         tree::{Tree, TreeLike},
     },
     generators::nautilus::NautilusContext,
-    inputs::{BytesInput, Input, InputConverter},
+    inputs::{Input, InputConverter, InputToBytes},
 };
 
 /// An [`Input`] implementation for `Nautilus` grammar.
@@ -97,49 +96,34 @@ impl Hash for NautilusInput {
     }
 }
 
-/// `InputConverter` to convert from `NautilusInput` to `BytesInput`
+/// Convert from `NautilusInput` to `BytesInput`
 #[derive(Debug)]
-pub struct NautilusToBytesInputConverter<'a> {
+pub struct NautilusBytesConverter<'a> {
     ctx: &'a NautilusContext,
 }
 
-impl<'a> NautilusToBytesInputConverter<'a> {
+impl<'a> NautilusBytesConverter<'a> {
     #[must_use]
-    /// Create a new `NautilusToBytesInputConverter` from a context
+    /// Create a new `NautilusBytesConverter` from a context
     pub fn new(ctx: &'a NautilusContext) -> Self {
         Self { ctx }
     }
 }
 
-impl InputConverter for NautilusToBytesInputConverter<'_> {
+impl InputConverter for NautilusBytesConverter<'_> {
     type From = NautilusInput;
     type To = BytesInput;
 
-    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, libafl_bolts::Error> {
         let mut bytes = vec![];
         input.unparse(self.ctx, &mut bytes);
         Ok(BytesInput::new(bytes))
     }
 }
 
-/// A converter to convert a nautilus context to target bytes
-#[derive(Debug)]
-pub struct NautilusTargetBytesConverter<'a> {
-    /// The Nautilus Context
-    ctx: &'a NautilusContext,
-}
-
-impl<'a> NautilusTargetBytesConverter<'a> {
-    /// Create a new [`NautilusTargetBytesConverter`]
-    #[must_use]
-    pub fn new(ctx: &'a NautilusContext) -> NautilusTargetBytesConverter<'a> {
-        NautilusTargetBytesConverter { ctx }
-    }
-}
-
-impl TargetBytesConverter<NautilusInput> for NautilusTargetBytesConverter<'_> {
-    fn to_target_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
-        let mut bytes = Vec::new();
+impl InputToBytes<NautilusInput> for NautilusBytesConverter<'_> {
+    fn to_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
+        let mut bytes = vec![];
         input.unparse(self.ctx, &mut bytes);
         OwnedSlice::from(bytes)
     }

@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
     cell::RefCell,
     fs::{File, OpenOptions},
@@ -5,25 +7,18 @@ use std::{
 };
 
 use clap::Parser;
-#[cfg(feature = "simplemgr")]
-use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
-use libafl::events::{EventConfig, Launcher, LlmpEventManagerBuilder, MonitorTypedEventManager};
+use libafl::events::{EventConfig, Launcher};
 use libafl::{
-    events::ClientDescription,
+    events::{ClientDescription, SimpleEventManager},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{core_affinity::CoreId, current_time};
-#[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::{llmp::LlmpBroker, staterestore::StateRestorer, tuples::tuple_list};
 #[cfg(unix)]
-use {
-    nix::unistd::dup,
-    std::os::unix::io::{AsRawFd, FromRawFd},
-};
+use libafl_bolts::{os::dup2, os::dup_and_mute_outputs};
 
 use crate::{client::Client, options::FuzzerOptions};
 
@@ -58,10 +53,31 @@ impl Fuzzer {
             });
 
             #[cfg(unix)]
-            let stdout_cpy = RefCell::new(unsafe {
-                let new_fd = dup(io::stdout().as_raw_fd())?;
-                File::from_raw_fd(new_fd)
-            });
+            let wrapped_stdout = {
+                // We forward all outputs to dev/null, but keep a copy around for the fuzzer output.
+                //
+                // # Safety
+                // stdout and stderr should still be open at this point in time.
+                let (new_stdout, new_stderr) = unsafe { dup_and_mute_outputs()? };
+
+                // If we are debugging, re-enable target stderror.
+                if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
+                    // # Safety
+                    // Nobody else uses the new stderror here.
+                    unsafe {
+                        dup2(new_stderr, io::stderr().as_raw_fd())?;
+                    }
+                }
+
+                // # Safety
+                // The new stdout is open at this point, and we will don't use it anywhere else.
+                #[cfg(unix)]
+                unsafe {
+                    File::from_raw_fd(new_stdout)
+                }
+            };
+
+            let stdout_cpy = RefCell::new(wrapped_stdout);
 
             // The stats reporter for the broker
             let monitor = MultiMonitor::new(|s| {
@@ -84,7 +100,8 @@ impl Fuzzer {
     {
         // The shared memory allocator
         #[cfg(not(feature = "simplemgr"))]
-        let mut shmem_provider = StdShMemProvider::new()?;
+        let shmem_provider = StdShMemProvider::new()?;
+
         /* If we are running in verbose, don't provide a replacement stdout, otherwise, use /dev/null */
         #[cfg(not(feature = "simplemgr"))]
         let stdout = if self.options.verbose {
@@ -95,45 +112,10 @@ impl Fuzzer {
 
         let client = Client::new(&self.options);
 
-        #[cfg(not(feature = "simplemgr"))]
-        if self.options.rerun_input.is_some() {
-            // If we want to rerun a single input but we use a restarting mgr, we'll have to create a fake restarting mgr that doesn't actually restart.
-            // It's not pretty but better than recompiling with simplemgr.
-
-            // Just a random number, let's hope it's free :)
-            let broker_port = 13120;
-            let _fake_broker = LlmpBroker::create_attach_to_tcp(
-                shmem_provider.clone(),
-                tuple_list!(),
-                broker_port,
-            )
-            .unwrap();
-
-            // To rerun an input, instead of using a launcher, we create dummy parameters and run the client directly.
-            // NOTE: This is a hack for debugging that that will only work for non-crashing inputs.
-            return client.run(
-                None,
-                MonitorTypedEventManager::<_, M>::new(
-                    LlmpEventManagerBuilder::builder()
-                        .build_on_port(
-                            shmem_provider.clone(),
-                            broker_port,
-                            EventConfig::AlwaysUnique,
-                            Some(StateRestorer::new(
-                                shmem_provider.new_shmem(0x1000).unwrap(),
-                            )),
-                        )
-                        .unwrap(),
-                ),
-                ClientDescription::new(0, 0, CoreId(0)),
-            );
-        }
-
-        #[cfg(feature = "simplemgr")]
         if self.options.rerun_input.is_some() {
             return client.run(
                 None,
-                SimpleEventManager::new(monitor),
+                SimpleEventManager::new(monitor.clone()),
                 ClientDescription::new(0, 0, CoreId(0)),
             );
         }
@@ -141,7 +123,7 @@ impl Fuzzer {
         #[cfg(feature = "simplemgr")]
         return client.run(
             None,
-            SimpleEventManager::new(monitor),
+            SimpleEventManager::new(monitor.clone()),
             ClientDescription::new(0, 0, CoreId(0)),
         );
 
@@ -152,7 +134,7 @@ impl Fuzzer {
             .broker_port(self.options.port)
             .configuration(EventConfig::from_build_id())
             .monitor(monitor)
-            .run_client(|s, m, c| client.run(s, MonitorTypedEventManager::<_, M>::new(m), c))
+            .run_client(|s, m, c| client.run(s, m, c))
             .cores(&self.options.cores)
             .stdout_file(stdout)
             .stderr_file(stdout)

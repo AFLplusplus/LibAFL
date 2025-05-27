@@ -7,9 +7,7 @@ ZASAN_SOURCE_DIR := source_directory()
 compile_zasan:
 	#!/bin/sh
 	. {{ DOTENV }}
-	RUSTFLAGS="--cfg rustix_use_experimental_asm" \
 	cargo \
-		+nightly \
 		build \
 		--package zasan \
 		--target ${CROSS_TARGET} \
@@ -21,7 +19,6 @@ fix_zasan:
 	#!/bin/sh
 	. {{ DOTENV }}
 	cargo \
-		+nightly \
 		fix \
 		--package zasan \
 		--target ${CROSS_TARGET} \

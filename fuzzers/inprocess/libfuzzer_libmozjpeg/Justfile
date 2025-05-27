@@ -47,7 +47,6 @@ lib:
 [linux]
 [macos]
 fuzzer: lib cxx
-    pwd
     {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/mozjpeg-4.0.3/libjpeg.a {{PROJECT_DIR}}/mozjpeg-4.0.3/libturbojpeg.a -I {{PROJECT_DIR}}/mozjpeg-4.0.3/ -o {{FUZZER_NAME}} -lm -lz
 
 [windows]

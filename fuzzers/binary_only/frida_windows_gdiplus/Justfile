@@ -38,10 +38,13 @@ test_cmplog: build harness_cmplog_test
 
 [windows]
 [script("cmd.exe", "/c")]
-test: build harness
+test_default: build harness
     start "" "{{FUZZER_NAME}}" -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
     ping -n 10 127.0.0.1>NUL && taskkill /im frida_windows_gdiplus.exe /F
     dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
+
+[windows]
+test: test_default test_cmplog
 
 [windows]
 clean:

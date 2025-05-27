@@ -1,22 +1,19 @@
 use core::fmt::Debug;
-use std::{fs, marker::PhantomData, ops::Range, process};
+use std::{fs, ops::Range, process};
 
-#[cfg(feature = "simplemgr")]
-use libafl::events::SimpleEventManager;
-#[cfg(not(feature = "simplemgr"))]
-use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, HasCurrentCorpusId, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{ClientDescription, EventRestarter},
+    events::{
+        ClientDescription, EventFirer, EventReceiver, EventRestarter, ProgressReporter, SendExiting,
+    },
     executors::{Executor, ExitKind, ShadowExecutor},
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     inputs::{BytesInput, Input},
-    monitors::Monitor,
     mutators::{
-        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
-        StdScheduledMutator, Tokens,
+        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, HavocScheduledMutator,
+        StdMOptMutator, Tokens,
     },
     observers::{
         CanTrack, HitcountsMapObserver, ObserversTuple, TimeObserver, VariableMapObserver,
@@ -31,8 +28,6 @@ use libafl::{
     state::{HasCorpus, HasExecutions, HasSolutions, StdState},
     Error, HasMetadata,
 };
-#[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::shmem::{StdShMem, StdShMemProvider};
 use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
@@ -57,14 +52,6 @@ use crate::{harness::Harness, options::FuzzerOptions};
 pub type ClientState =
     StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
-#[cfg(feature = "simplemgr")]
-pub type ClientMgr<M> = SimpleEventManager<BytesInput, M, ClientState>;
-#[cfg(not(feature = "simplemgr"))]
-pub type ClientMgr<M> = MonitorTypedEventManager<
-    LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMem, StdShMemProvider>,
-    M,
->;
-
 /*
  * The snapshot and iterations options interact as follows:
  *
@@ -87,17 +74,22 @@ pub type ClientMgr<M> = MonitorTypedEventManager<
  */
 
 #[derive(TypedBuilder)]
-pub struct Instance<'a, M: Monitor> {
+pub struct Instance<'a, EM> {
     options: &'a FuzzerOptions,
-    mgr: ClientMgr<M>,
+    mgr: EM,
     client_description: ClientDescription,
     #[builder(default)]
     extra_tokens: Vec<String>,
-    #[builder(default=PhantomData)]
-    phantom: PhantomData<M>,
 }
 
-impl<M: Monitor> Instance<'_, M> {
+impl<MTEM> Instance<'_, MTEM>
+where
+    MTEM: EventFirer<BytesInput, ClientState>
+        + EventRestarter<ClientState>
+        + ProgressReporter<ClientState>
+        + SendExiting
+        + EventReceiver<BytesInput, ClientState>,
+{
     fn coverage_filter(&self, qemu: Qemu) -> Result<StdAddressFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
         if let Some(includes) = &self.options.include {
@@ -319,7 +311,7 @@ impl<M: Monitor> Instance<'_, M> {
             let tracing = ShadowTracingStage::new();
 
             // Setup a randomic Input2State stage
-            let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+            let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
                 I2SRandReplace::new()
             )));
 
@@ -359,7 +351,7 @@ impl<M: Monitor> Instance<'_, M> {
             )?;
 
             // Setup an havoc mutator with a mutational stage
-            let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+            let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
             let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
                 StdPowerMutationalStage::new(mutator);
             let mut stages = tuple_list!(calibration, power, stats_stage);
@@ -375,6 +367,7 @@ impl<M: Monitor> Instance<'_, M> {
         }
     }
 
+    #[allow(clippy::type_complexity)] // TODO: make less complex
     fn reset_executor_snapshot_module<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>(
         executor: &mut QemuExecutor<'a, C, CM, ED, EM, (SnapshotModule, ET), H, I, OT, S, SM, Z>,
         qemu: Qemu,
@@ -398,6 +391,7 @@ impl<M: Monitor> Instance<'_, M> {
             .reset(qemu);
     }
 
+    #[allow(clippy::type_complexity)]
     fn reset_shadow_executor_snapshot_module<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SOT, Z>(
         executor: &mut ShadowExecutor<
             QemuExecutor<'a, C, CM, ED, EM, (SnapshotModule, ET), H, I, OT, S, SM, Z>,
@@ -438,10 +432,10 @@ impl<M: Monitor> Instance<'_, M> {
         stages: &mut ST,
     ) -> Result<(), Error>
     where
-        ST: StagesTuple<E, ClientMgr<M>, ClientState, Z>,
+        ST: StagesTuple<E, MTEM, ClientState, Z>,
         RSM: Fn(&mut E, Qemu),
-        Z: Fuzzer<E, ClientMgr<M>, BytesInput, ClientState, ST>
-            + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
+        Z: Fuzzer<E, MTEM, BytesInput, ClientState, ST>
+            + Evaluator<E, MTEM, BytesInput, ClientState>,
     {
         if state.must_load_initial_inputs() {
             let corpus_dirs = [self.options.input_dir()];

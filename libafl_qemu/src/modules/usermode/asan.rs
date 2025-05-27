@@ -14,7 +14,7 @@ use std::{
 use hashbrown::{HashMap, HashSet};
 use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::os::unix_signals::Signal;
-use libafl_qemu_sys::GuestAddr;
+use libafl_qemu_sys::{GuestAddr, MapInfo};
 use libc::{
     MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE, c_void,
 };
@@ -61,6 +61,8 @@ pub struct AsanModule {
     empty: bool,
     rt: Pin<Box<AsanGiovese>>,
     filter: StdAddressFilter,
+    asan_lib: Option<String>,
+    asan_mappings: Option<Vec<MapInfo>>,
 }
 
 pub struct AsanGiovese {
@@ -408,6 +410,8 @@ impl AsanModule {
             empty: true,
             rt,
             filter,
+            asan_lib: None,
+            asan_mappings: None,
         }
     }
 
@@ -578,9 +582,9 @@ impl AsanGiovese {
                 }
                 _ => (),
             }
-            SyscallHookResult::new(Some(r))
+            SyscallHookResult::Skip(r)
         } else {
-            SyscallHookResult::new(None)
+            SyscallHookResult::Run
         }
     }
 
@@ -981,7 +985,7 @@ where
 
         // Let the use skip preloading the ASAN DSO. Maybe they want to use
         // their own implementation.
-        if env::var_os("SKIP_ASAN_LD_PRELOAD").is_none() {
+        let asan_lib = if env::var_os("SKIP_ASAN_LD_PRELOAD").is_none() {
             let current = env::current_exe().unwrap();
             let asan_lib = fs::canonicalize(current)
                 .unwrap()
@@ -994,7 +998,8 @@ where
 
             assert!(
                 asan_lib.as_path().exists(),
-                "The ASAN library doesn't exist: {asan_lib:#?}"
+                "The ASAN library doesn't exist: {}",
+                asan_lib.display()
             );
 
             let asan_lib = asan_lib
@@ -1034,13 +1039,18 @@ where
                 args.insert(1, "LD_PRELOAD=".to_string() + &asan_lib);
                 args.insert(1, "-E".into());
             }
-        }
+            Some(asan_lib)
+        } else {
+            None
+        };
 
         unsafe {
             AsanGiovese::init(&mut self.rt, emulator_modules.hooks().qemu_hooks());
         }
 
         *qemu_params = QemuParams::Cli(args);
+
+        self.asan_lib = asan_lib;
     }
 
     fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
@@ -1056,12 +1066,23 @@ where
 
     fn first_exec<ET>(
         &mut self,
-        _qemu: Qemu,
+        qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
+        if let Some(asan_lib) = &self.asan_lib {
+            let asan_mappings = qemu
+                .mappings()
+                .filter(|m| match m.path() {
+                    Some(p) => p == asan_lib,
+                    None => false,
+                })
+                .collect::<Vec<MapInfo>>();
+            self.asan_mappings = Some(asan_mappings);
+        }
+
         emulator_modules.reads(
             Hook::Function(gen_readwrite_asan::<ET, I, S>),
             Hook::Function(trace_read_asan::<ET, I, S, 1>),
@@ -1173,11 +1194,21 @@ where
     S: Unpin,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-    if h.must_instrument(pc) {
-        Some(pc.into())
-    } else {
-        None
+    if !h.must_instrument(pc) {
+        return None;
     }
+
+    // Don't sanitize the sanitizer!
+    if let Some(asan_mappings) = &h.asan_mappings {
+        if asan_mappings
+            .iter()
+            .any(|m| m.start() <= pc && pc < m.end())
+        {
+            return None;
+        }
+    }
+
+    Some(pc.into())
 }
 
 pub fn trace_read_asan<ET, I, S, const N: usize>(
@@ -1260,11 +1291,21 @@ where
     S: Unpin,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-    if h.must_instrument(pc) {
-        Some(pc.into())
-    } else {
-        Some(0)
+    if !h.must_instrument(pc) {
+        return Some(0);
     }
+
+    // Don't sanitize the sanitizer!
+    if let Some(asan_mappings) = &h.asan_mappings {
+        if asan_mappings
+            .iter()
+            .any(|m| m.start() <= pc && pc < m.end())
+        {
+            return Some(0);
+        }
+    }
+
+    Some(pc.into())
 }
 
 pub fn trace_write_asan_snapshot<ET, I, S, const N: usize>(
@@ -1350,9 +1391,9 @@ where
             }
             _ => (),
         }
-        SyscallHookResult::new(Some(0))
+        SyscallHookResult::Skip(0)
     } else {
-        SyscallHookResult::new(None)
+        SyscallHookResult::Run
     }
 }
 

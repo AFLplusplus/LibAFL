@@ -527,10 +527,7 @@ impl AsanRuntime {
         });
 
         if start == 0 {
-            log::error!(
-                "range_for_address: no range found for address {:#x}",
-                address
-            );
+            log::error!("range_for_address: no range found for address {address:#x}");
         }
         (start, end)
     }
@@ -547,7 +544,7 @@ impl AsanRuntime {
         // Write something to (hopefully) make sure the val isn't optimized out
 
         unsafe {
-            write_volatile(&mut stack_var, 0xfadbeef);
+            write_volatile(&raw mut stack_var, 0xfadbeef);
         }
 
         let range = Self::range_for_address(stack_address);
@@ -1529,7 +1526,7 @@ impl AsanRuntime {
         let insn = instructions[0]; // This is the very instruction that has triggered fault
         log::info!(
             "Fault Instruction: {}",
-            insn.display_with(DisplayStyle::Intel).to_string()
+            insn.display_with(DisplayStyle::Intel)
         );
         let operand_count = insn.operand_count();
 
@@ -2478,7 +2475,7 @@ impl AsanRuntime {
         let result = frida_to_cs(decoder, instr);
 
         if let Err(e) = result {
-            log::error!("{}", e);
+            log::error!("{e}");
             return None;
         }
 
@@ -2520,7 +2517,7 @@ impl AsanRuntime {
 
                         // println!("{:#?} {:#?} {:#?}", cs_instr, cs_instr.to_string(), operand);
                         // println!("{:#?}", (memsz, basereg, indexreg, scale, disp));
-                        log::trace!("ASAN Interesting operand {:#?}", operand);
+                        log::trace!("ASAN Interesting operand {operand:#?}");
                         log::trace!("{:#?}", (memsz, basereg, indexreg, scale, disp));
                         return Some((memsz, basereg, indexreg, scale, disp));
                     }
@@ -2699,7 +2696,7 @@ impl AsanRuntime {
                 writer.put_nop();
             }
         } else {
-            log::trace!("Cannot check instructions for {:?} bytes.", width);
+            log::trace!("Cannot check instructions for {width:?} bytes.");
         }
 
         writer.put_pop_reg(X86Register::Rdi);

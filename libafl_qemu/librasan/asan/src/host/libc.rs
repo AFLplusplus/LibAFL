@@ -12,9 +12,7 @@ use crate::{
     GuestAddr,
     host::{Host, HostAction},
     shadow::PoisonType,
-    symbols::{
-        AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols, SymbolsLookupStr,
-    },
+    symbols::{AtomicGuestAddr, Function, FunctionPointer, FunctionPointerError, Symbols},
 };
 
 #[derive(Debug)]
@@ -111,7 +109,7 @@ impl<S: Symbols> Host for LibcHost<S> {
         Ok(())
     }
 
-    fn alloc(start: GuestAddr, len: usize) -> Result<(), LibcHostError<S>> {
+    fn track(start: GuestAddr, len: usize) -> Result<(), LibcHostError<S>> {
         unsafe {
             let syscall = Self::get_syscall()?;
             let ret = syscall(Self::SYSCALL_NO, HostAction::Alloc as usize, start, len);
@@ -122,7 +120,7 @@ impl<S: Symbols> Host for LibcHost<S> {
         Ok(())
     }
 
-    fn dealloc(start: GuestAddr) -> Result<(), LibcHostError<S>> {
+    fn untrack(start: GuestAddr) -> Result<(), LibcHostError<S>> {
         let syscall = Self::get_syscall()?;
         let ret = unsafe { syscall(Self::SYSCALL_NO, HostAction::Dealloc as usize, start) };
         if ret != 0 {
@@ -139,7 +137,7 @@ impl<S: Symbols> LibcHost<S> {
 
     fn get_syscall() -> Result<<FunctionSyscall as Function>::Func, LibcHostError<S>> {
         let addr = SYSCALL_ADDR.try_get_or_insert_with(|| {
-            S::lookup_str(FunctionSyscall::NAME).map_err(|e| LibcHostError::FailedToFindSymbol(e))
+            S::lookup(FunctionSyscall::NAME).map_err(|e| LibcHostError::FailedToFindSymbol(e))
         })?;
         let f = FunctionSyscall::as_ptr(addr).map_err(|e| LibcHostError::InvalidPointerType(e))?;
         Ok(f)

@@ -1,6 +1,6 @@
 [package]
 name = "forkserver_simple"
-version = "0.15.1"
+version = "0.15.3"
 authors = ["tokatoka <tokazerkje@outlook.com>"]
 edition = "2021"
 
@@ -21,4 +21,4 @@ env_logger = "0.11.5"
 libafl = { path = "../../../libafl", features = ["std", "derive", "nautilus"] }
 libafl_bolts = { path = "../../../libafl_bolts" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
-nix = { version = "0.29.0", features = ["signal"] }
+nix = { version = "0.30.1", features = ["signal"] }

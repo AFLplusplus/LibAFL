@@ -1,19 +1,18 @@
-use std::{marker::PhantomData, process};
+use std::process;
 
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
-        ClientDescription, EventRestarter, LlmpRestartingEventManager, MonitorTypedEventManager,
-        NopEventManager,
+        ClientDescription, EventFirer, EventReceiver, EventRestarter, NopEventManager,
+        ProgressReporter, SendExiting,
     },
     executors::{Executor, ShadowExecutor},
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     inputs::BytesInput,
-    monitors::Monitor,
     mutators::{
-        havoc_mutations, tokens_mutations, I2SRandReplace, StdMOptMutator, StdScheduledMutator,
+        havoc_mutations, tokens_mutations, HavocScheduledMutator, I2SRandReplace, StdMOptMutator,
         Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -30,7 +29,6 @@ use libafl::{
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    shmem::{StdShMem, StdShMemProvider},
     tuples::{tuple_list, Merge},
 };
 use libafl_nyx::{
@@ -43,22 +41,22 @@ use crate::options::FuzzerOptions;
 pub type ClientState =
     StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
-pub type ClientMgr<M> = MonitorTypedEventManager<
-    LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMem, StdShMemProvider>,
-    M,
->;
-
 #[derive(TypedBuilder)]
-pub struct Instance<'a, M: Monitor> {
+pub struct Instance<'a, EM> {
     options: &'a FuzzerOptions,
     /// The harness. We create it before forking, then `take()` it inside the client.
-    mgr: ClientMgr<M>,
+    mgr: EM,
     client_description: ClientDescription,
-    #[builder(default=PhantomData)]
-    phantom: PhantomData<M>,
 }
 
-impl<M: Monitor> Instance<'_, M> {
+impl<EM> Instance<'_, EM>
+where
+    EM: EventFirer<BytesInput, ClientState>
+        + EventRestarter<ClientState>
+        + ProgressReporter<ClientState>
+        + SendExiting
+        + EventReceiver<BytesInput, ClientState>,
+{
     pub fn run(mut self, state: Option<ClientState>) -> Result<(), Error> {
         let parent_cpu_id = self
             .options
@@ -188,7 +186,7 @@ impl<M: Monitor> Instance<'_, M> {
             let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
             // Setup a randomic Input2State stage
-            let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+            let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
                 I2SRandReplace::new()
             )));
 
@@ -214,7 +212,7 @@ impl<M: Monitor> Instance<'_, M> {
         let mut executor = NyxExecutor::builder().build(helper, observers);
 
         // Setup an havoc mutator with a mutational stage
-        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+        let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
@@ -229,9 +227,8 @@ impl<M: Monitor> Instance<'_, M> {
         stages: &mut ST,
     ) -> Result<(), Error>
     where
-        Z: Fuzzer<E, ClientMgr<M>, BytesInput, ClientState, ST>
-            + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
-        ST: StagesTuple<E, ClientMgr<M>, ClientState, Z>,
+        Z: Fuzzer<E, EM, BytesInput, ClientState, ST> + Evaluator<E, EM, BytesInput, ClientState>,
+        ST: StagesTuple<E, EM, ClientState, Z>,
     {
         let corpus_dirs = [self.options.input_dir()];
 

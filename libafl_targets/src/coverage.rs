@@ -12,19 +12,13 @@ use alloc::borrow::Cow;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{Error, mutators::Tokens};
 
-use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_ALLOCATED_SIZE, EDGES_MAP_DEFAULT_SIZE};
+use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_ALLOCATED_SIZE, EDGES_MAP_DEFAULT_SIZE};
 
 /// The map for edges.
 #[unsafe(no_mangle)]
 #[allow(non_upper_case_globals)] // expect breaks here for some reason
 pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_ALLOCATED_SIZE] = [0; EDGES_MAP_ALLOCATED_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
-
-/// The map for data dependency
-#[unsafe(no_mangle)]
-#[allow(non_upper_case_globals)] // expect breaks here for some reason
-pub static mut __ddg_area_ptr_local: [u8; DDG_MAP_SIZE] = [0; DDG_MAP_SIZE];
-pub use __ddg_area_ptr_local as DDG_MAP;
 
 /// The map for accounting mem writes.
 #[unsafe(no_mangle)]
@@ -39,11 +33,11 @@ pub use __afl_acc_memop_ptr_local as ACCOUNTING_MEMOP_MAP;
 pub static mut MAX_EDGES_FOUND: usize = 0;
 
 unsafe extern "C" {
+    /// The sharedmemort fuzzing flag
+    pub static mut __afl_sharedmem_fuzzing: core::ffi::c_uint;
+
     /// The area pointer points to the edges map.
     pub static mut __afl_area_ptr: *mut u8;
-
-    /// The area pointer points to the data flow map
-    pub static mut __ddg_area_ptr: *mut u8;
 
     /// The area pointer points to the accounting mem operations map.
     pub static mut __afl_acc_memop_ptr: *mut u32;
@@ -58,7 +52,9 @@ unsafe extern "C" {
 }
 pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
 pub use __afl_area_ptr as EDGES_MAP_PTR;
-pub use __ddg_area_ptr as DDG_MAP_PTR;
+pub use __afl_fuzz_len as INPUT_LENGTH_PTR;
+pub use __afl_fuzz_ptr as INPUT_PTR;
+pub use __afl_sharedmem_fuzzing as SHM_FUZZING;
 
 /// Return Tokens from the compile-time token section
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
@@ -81,6 +77,16 @@ pub fn autotokens() -> Result<Tokens, Error> {
 #[allow(non_upper_case_globals)] // expect breaks here for some reason
 #[unsafe(no_mangle)]
 pub static mut __afl_map_size: usize = EDGES_MAP_DEFAULT_SIZE;
+/// The pointer points to the AFL++ inputs
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
+#[unsafe(no_mangle)]
+pub static mut __afl_fuzz_ptr: *mut u8 = core::ptr::null_mut();
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
+static mut __afl_fuzz_len_local: u32 = 0;
+/// The pointer points to the length of AFL++ inputs
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
+#[unsafe(no_mangle)]
+pub static mut __afl_fuzz_len: *mut u32 = &raw mut __afl_fuzz_len_local;
 
 #[cfg(any(
     feature = "sancov_pcguard_edges",

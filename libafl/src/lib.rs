@@ -5,10 +5,6 @@ Welcome to `LibAFL`
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]
-// For `type_eq`
-#![cfg_attr(nightly, feature(specialization))]
-// For `std::simd`
-#![cfg_attr(nightly, feature(portable_simd))]
 #![cfg_attr(
     not(test),
     warn(
@@ -124,7 +120,7 @@ mod tests {
         fuzzer::Fuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
-        mutators::{StdScheduledMutator, mutations::BitFlipMutator},
+        mutators::{HavocScheduledMutator, mutations::BitFlipMutator},
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
@@ -178,7 +174,7 @@ mod tests {
         )
         .unwrap();
 
-        let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
+        let mutator = HavocScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         for i in 0..1000 {

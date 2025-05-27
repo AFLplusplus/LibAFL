@@ -9,11 +9,14 @@ use asan::{
         backend::{dlmalloc::DlmallocBackend, mimalloc::MimallocBackend},
         frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
+    env::Env,
+    file::libc::LibcFileReader,
+    hooks::PatchedHooks,
     host::{Host, libc::LibcHost},
     logger::libc::LibcLogger,
-    maps::libc::LibcMapReader,
+    maps::{Maps, iterator::MapIterator},
     mmap::libc::LibcMmap,
-    patch::{hooks::PatchedHooks, raw::RawPatch},
+    patch::{Patches, raw::RawPatch},
     shadow::{Shadow, host::HostShadow},
     symbols::{
         Symbols,
@@ -21,7 +24,7 @@ use asan::{
     },
     tracking::{Tracking, host::HostTracking},
 };
-use log::{Level, trace};
+use log::{Level, info, trace};
 use spin::{Lazy, Mutex};
 
 type Syms = DlSymSymbols<LookupTypeNext>;
@@ -37,10 +40,17 @@ pub type QasanFrontend =
 
 pub type QasanSyms = DlSymSymbols<LookupTypeNext>;
 
+pub type QasanEnv = Env<LibcFileReader<QasanSyms>>;
+
 const PAGE_SIZE: usize = 4096;
 
 static FRONTEND: Lazy<Mutex<QasanFrontend>> = Lazy::new(|| {
-    LibcLogger::initialize::<QasanSyms>(Level::Info);
+    let level = QasanEnv::initialize()
+        .ok()
+        .and_then(|e| e.log_level())
+        .unwrap_or(Level::Warn);
+    LibcLogger::initialize::<QasanSyms>(level);
+    info!("Qasan initializing...");
     let backend = QasanBackend::new(DlmallocBackend::new(PAGE_SIZE));
     let shadow = HostShadow::<QasanHost>::new().unwrap();
     let tracking = HostTracking::<QasanHost>::new().unwrap();
@@ -52,7 +62,17 @@ static FRONTEND: Lazy<Mutex<QasanFrontend>> = Lazy::new(|| {
         QasanFrontend::DEFAULT_QUARANTINE_SIZE,
     )
     .unwrap();
-    PatchedHooks::init::<QasanSyms, RawPatch, LibcMapReader<QasanSyms>, QasanMmap>().unwrap();
+    let mappings = Maps::new(
+        MapIterator::<LibcFileReader<Syms>>::new()
+            .unwrap()
+            .collect(),
+    );
+    Patches::init(mappings);
+    for hook in PatchedHooks::default() {
+        let target = hook.lookup::<QasanSyms>().unwrap();
+        Patches::apply::<RawPatch, QasanMmap>(target, hook.destination).unwrap();
+    }
+    info!("Qasan initialized.");
     Mutex::new(frontend)
 });
 
@@ -112,8 +132,8 @@ pub unsafe extern "C" fn asan_get_size(addr: *const c_void) -> usize {
 
 #[unsafe(no_mangle)]
 /// # Safety
-pub unsafe extern "C" fn asan_sym(name: *const c_char) -> GuestAddr {
-    QasanSyms::lookup(name).unwrap()
+pub unsafe extern "C" fn asan_sym(name: *const c_char) -> *const c_void {
+    unsafe { QasanSyms::lookup_raw(name).unwrap() as *const c_void }
 }
 
 #[unsafe(no_mangle)]
@@ -140,7 +160,7 @@ pub unsafe extern "C" fn asan_track(addr: *const c_void, len: usize) {
     FRONTEND
         .lock()
         .tracking_mut()
-        .alloc(addr as GuestAddr, len)
+        .track(addr as GuestAddr, len)
         .unwrap();
 }
 
@@ -151,7 +171,7 @@ pub unsafe extern "C" fn asan_untrack(addr: *const c_void) {
     FRONTEND
         .lock()
         .tracking_mut()
-        .dealloc(addr as GuestAddr)
+        .untrack(addr as GuestAddr)
         .unwrap();
 }
 

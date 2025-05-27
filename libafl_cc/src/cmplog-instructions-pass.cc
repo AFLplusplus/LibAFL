@@ -37,15 +37,8 @@
 #include "llvm/Pass.h"
 #include "llvm/Analysis/ValueTracking.h"
 
-#if LLVM_VERSION_MAJOR > 3 || \
-    (LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR > 4)
-  #include "llvm/IR/Verifier.h"
-  #include "llvm/IR/DebugInfo.h"
-#else
-  #include "llvm/Analysis/Verifier.h"
-  #include "llvm/DebugInfo.h"
-  #define nullptr 0
-#endif
+#include "llvm/IR/Verifier.h"
+#include "llvm/IR/DebugInfo.h"
 
 #include <set>
 
@@ -55,33 +48,12 @@ static cl::opt<bool> CmplogExtended("cmplog_instructions_extended",
                                     cl::init(false), cl::NotHidden);
 namespace {
 
-#if USE_NEW_PM
 class CmpLogInstructions : public PassInfoMixin<CmpLogInstructions> {
  public:
   CmpLogInstructions() {
   }
-#else
 
-class CmpLogInstructions : public ModulePass {
- public:
-  static char ID;
-  CmpLogInstructions() : ModulePass(ID) {
-  }
-#endif
-
-#if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-#else
-  bool runOnModule(Module &M) override;
-
-  #if LLVM_VERSION_MAJOR < 4
-  const char *getPassName() const override {
-  #else
-  StringRef getPassName() const override {
-  #endif
-    return "cmplog instructions";
-  }
-#endif
 
  private:
   bool hookInstrs(Module &M);
@@ -90,28 +62,20 @@ class CmpLogInstructions : public ModulePass {
 
 }  // namespace
 
-#if USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "CmpLogInstructions", "v0.1",
           [](PassBuilder &PB) {
-  #if LLVM_VERSION_MAJOR >= 16
-    #if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 20
             PB.registerPipelineStartEPCallback(
-    #else
+#else
             PB.registerOptimizerEarlyEPCallback(
-    #endif
-  #else
-            PB.registerOptimizerLastEPCallback(
-  #endif
+#endif
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
                   MPM.addPass(CmpLogInstructions());
                 });
           }};
 }
-#else
-char CmpLogInstructions::ID = 0;
-#endif
 
 template <class Iterator>
 Iterator Unique(Iterator first, Iterator last) {
@@ -286,17 +250,11 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
             continue;
           }
 
-#if (LLVM_VERSION_MAJOR >= 12)
           vector_cnt = tt->getElementCount().getKnownMinValue();
           ty0 = tt->getElementType();
-#endif
         }
 
-        if (ty0->isHalfTy()
-#if LLVM_VERSION_MAJOR >= 11
-            || ty0->isBFloatTy()
-#endif
-        )
+        if (ty0->isHalfTy() || ty0->isBFloatTy())
           max_size = 16;
         else if (ty0->isFloatTy())
           max_size = 32;
@@ -306,11 +264,9 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
           max_size = 80;
         else if (ty0->isFP128Ty() || ty0->isPPC_FP128Ty())
           max_size = 128;
-#if (LLVM_VERSION_MAJOR >= 12)
         else if (ty0->getTypeID() != llvm::Type::PointerTyID && !be_quiet)
           fprintf(stderr, "Warning: unsupported cmp type for cmplog: %u!\n",
                   ty0->getTypeID());
-#endif
 
         attr += 8;
         is_fp = 1;
@@ -318,7 +274,6 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 
       } else {
         if (ty0->isVectorTy()) {
-#if (LLVM_VERSION_MAJOR >= 12)
           VectorType *tt = dyn_cast<VectorType>(ty0);
           if (!tt) {
             fprintf(stderr, "Warning: cmplog cmp vector is not a vector!\n");
@@ -327,7 +282,6 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
 
           vector_cnt = tt->getElementCount().getKnownMinValue();
           ty1 = ty0 = tt->getElementType();
-#endif
         }
 
         intTyOp0 = dyn_cast<IntegerType>(ty0);
@@ -339,13 +293,10 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
                          : intTyOp1->getBitWidth();
 
         } else {
-#if (LLVM_VERSION_MAJOR >= 12)
           if (ty0->getTypeID() != llvm::Type::PointerTyID && !be_quiet) {
             fprintf(stderr, "Warning: unsupported cmp type for cmplog: %u\n",
                     ty0->getTypeID());
           }
-
-#endif
         }
       }
 
@@ -624,42 +575,12 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
   return true;
 }
 
-#if USE_NEW_PM
 PreservedAnalyses CmpLogInstructions::run(Module                &M,
                                           ModuleAnalysisManager &MAM) {
-#else
-bool CmpLogInstructions::runOnModule(Module &M) {
-#endif
   hookInstrs(M);
 
-#if USE_NEW_PM
   auto PA = PreservedAnalyses::all();
-#endif
   verifyModule(M);
 
-#if USE_NEW_PM
   return PA;
-#else
-  return true;
-#endif
 }
-
-#if USE_NEW_PM
-#else
-static void registerCmpLogInstructionsPass(const PassManagerBuilder &,
-                                           legacy::PassManagerBase &PM) {
-  auto p = new CmpLogInstructions();
-  PM.add(p);
-}
-
-static RegisterStandardPasses RegisterCmpLogInstructionsPass(
-    PassManagerBuilder::EP_OptimizerLast, registerCmpLogInstructionsPass);
-
-static RegisterStandardPasses RegisterCmpLogInstructionsPass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerCmpLogInstructionsPass);
-
-static RegisterStandardPasses RegisterCmpLogInstructionsPassLTO(
-    PassManagerBuilder::EP_FullLinkTimeOptimizationLast,
-    registerCmpLogInstructionsPass);
-
-#endif

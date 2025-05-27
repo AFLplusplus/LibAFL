@@ -34,6 +34,8 @@ guest = []
 hooks = []
 ## Enable support for shadow memory and tracking in the host
 host = ["dep:syscalls"]
+## Intialize all allocations with 0xff
+initialize = []
 ## Enable use of the `libc` library to support creation of mappings, read/write, logging etc (more OS agnostic)
 libc = ["dep:libc"]
 ## Enable the use of direct syscalls (supported by `rustix`) to interact with the operating system (Linux specific).
@@ -57,6 +59,11 @@ log = { version = "0.4.22", default-features = false, features = [
   "release_max_level_info",
 ] }
 libc = { version = "0.2.169", default-features = false, optional = true }
+nostd-musl = { version = "0.1.5", default-features = false, features = [
+  "optimized-assembly",
+] }
+nostd-printf = { version = "0.1.4", default-features = false }
+
 readonly = { version = "0.2.12", default-features = false }
 rustix = { version = "1.0.0", default-features = false, features = [
   "fs",
@@ -71,6 +78,8 @@ spin = { version = "0.9.8", default-features = false, features = [
 ] }
 syscalls = { version = "0.6.18", default-features = false, optional = true }
 thiserror = { version = "2.0.11", default-features = false }
+ahash = { version = "0.8.12", default-features = false }
+hashbrown = { version = "0.15.3", default-features = false }
 
 [build-dependencies]
 cc = { version = "1.2.13" }

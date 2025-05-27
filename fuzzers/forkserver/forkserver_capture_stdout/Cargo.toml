@@ -1,0 +1,24 @@
+[package]
+name = "forkserver_capture_stdout"
+version = "0.14.1"
+authors = ["tokatoka <tokazerkje@outlook.com>", "Ziqiao Kong <mio@lazym.io>"]
+edition = "2024"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[dependencies]
+clap = { version = "4.5.18", features = ["derive"] }
+env_logger = "0.11.5"
+libafl = { path = "../../../libafl", features = ["std", "derive"] }
+libafl_bolts = { path = "../../../libafl_bolts" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+nix = { version = "0.30.1", features = ["signal"] }
+serde = "1.0.219"
+serde_json = "1.0.140"

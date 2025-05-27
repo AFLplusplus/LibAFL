@@ -2,9 +2,10 @@ use std::env;
 
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::ClientDescription,
+    events::{
+        ClientDescription, EventFirer, EventReceiver, EventRestarter, ProgressReporter, SendExiting,
+    },
     inputs::BytesInput,
-    monitors::Monitor,
     state::StdState,
     Error,
 };
@@ -14,13 +15,8 @@ use libafl_qemu::modules::{
     utils::filters::StdAddressFilter, DrCovModule, InjectionModule,
 };
 
-use crate::{
-    harness::Harness,
-    instance::{ClientMgr, Instance},
-    options::FuzzerOptions,
-};
+use crate::{harness::Harness, instance::Instance, options::FuzzerOptions};
 
-#[expect(clippy::module_name_repetitions)]
 pub type ClientState =
     StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
@@ -51,12 +47,19 @@ impl Client<'_> {
     }
 
     #[expect(clippy::too_many_lines)]
-    pub fn run<M: Monitor>(
+    pub fn run<EM>(
         &self,
         state: Option<ClientState>,
-        mgr: ClientMgr<M>,
+        mgr: EM,
         client_description: ClientDescription,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        EM: EventFirer<BytesInput, ClientState>
+            + EventRestarter<ClientState>
+            + ProgressReporter<ClientState>
+            + SendExiting
+            + EventReceiver<BytesInput, ClientState>,
+    {
         let core_id = client_description.core_id();
         let mut args = self.args()?;
         Harness::edit_args(&mut args);

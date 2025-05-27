@@ -18,11 +18,6 @@ categories = [
 ]
 
 [dependencies]
-libafl = { path = "../libafl", default-features = false, features = [
-  "std",
-  "derive",
-  "llmp_compression",
-] }
 libafl_targets = { path = "../libafl_targets" }
 
 # External dependencies

@@ -12,9 +12,7 @@ use core::{
 
 use thiserror::Error;
 
-use crate::GuestAddr;
-#[cfg(feature = "hooks")]
-use crate::patch::hooks::{PatchedHooks, PatchesCheckError};
+use crate::{GuestAddr, patch::Patches};
 
 #[cfg(feature = "libc")]
 pub mod dlsym;
@@ -80,22 +78,16 @@ impl Default for AtomicGuestAddr {
 
 pub trait Symbols: Debug + Sized + Send {
     type Error: Debug;
-    fn lookup(name: *const c_char) -> Result<GuestAddr, Self::Error>;
+    unsafe fn lookup_raw(name: *const c_char) -> Result<GuestAddr, Self::Error>;
+
+    fn lookup(name: &CStr) -> Result<GuestAddr, Self::Error> {
+        unsafe { Self::lookup_raw(name.as_ptr() as *const c_char) }
+    }
 }
 
 pub trait Function {
     const NAME: &'static CStr;
     type Func: Copy;
-}
-
-pub trait SymbolsLookupStr: Symbols {
-    fn lookup_str(name: &CStr) -> Result<GuestAddr, Self::Error>;
-}
-
-impl<S: Symbols> SymbolsLookupStr for S {
-    fn lookup_str(name: &CStr) -> Result<GuestAddr, Self::Error> {
-        S::lookup(name.as_ptr() as *const c_char)
-    }
 }
 
 pub trait FunctionPointer: Function {
@@ -108,8 +100,9 @@ impl<T: Function> FunctionPointer for T {
             Err(FunctionPointerError::BadAddress(addr))?;
         }
 
-        #[cfg(feature = "hooks")]
-        PatchedHooks::check_patched(addr).map_err(FunctionPointerError::PatchedAddress)?;
+        if Patches::is_patched(addr) {
+            Err(FunctionPointerError::PatchedAddress(addr))?;
+        }
 
         let pp_sym = (&addr) as *const GuestAddr as *const *mut c_void;
         let p_f = pp_sym as *const Self::Func;
@@ -122,7 +115,6 @@ impl<T: Function> FunctionPointer for T {
 pub enum FunctionPointerError {
     #[error("Bad address: {0}")]
     BadAddress(GuestAddr),
-    #[cfg(feature = "hooks")]
     #[error("Patched address: {0}")]
-    PatchedAddress(PatchesCheckError),
+    PatchedAddress(GuestAddr),
 }

@@ -9,7 +9,7 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing"]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -53,15 +53,21 @@ sancov_cmplog = [
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
 sanitizer_interfaces = []
 clippy = [] # Ignore compiler warnings during clippy
-observers = ["meminterval", "ahash"]
+observers = ["meminterval"]
 common = [
 ] # Compile common C code defining sanitizer options and cross-platform intrinsics
 coverage = ["common"] # Compile C code definining coverage maps
 cmplog = ["common"] # Compile C code defining cmp log maps
-forkserver = ["common"] # Compile C code for forkserver support
+forkserver = [
+  "common",
+  "nix",
+  "libafl/std",
+  "libafl/fork",
+] # Compile C code for forkserver support
 windows_asan = ["common"] # Compile C code for ASAN on Windows
 whole_archive = [] # use +whole-archive to ensure the presence of weak symbols
 cmplog_extended_instrumentation = [
+  "cmplog", # without `cmplog`, extended instrumentation won't compile
 ] # support for aflpp cmplog map, we will remove this once aflpp and libafl cmplog shares the same LLVM passes.
 function-logging = ["common"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
@@ -74,6 +80,7 @@ rustversion = "1.0.17"
 libafl = { workspace = true, features = [], default-features = false }
 libafl_bolts = { workspace = true, features = [] }
 libc = { workspace = true }
+nix = { workspace = true, optional = true }
 hashbrown = { workspace = true, default-features = true }
 once_cell = "1.19.0"
 log = { workspace = true }
@@ -84,7 +91,6 @@ serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] } # serialization lib
 meminterval = { workspace = true, features = ["serde"], optional = true }
-ahash = { workspace = true, default-features = false, optional = true }
 
 [lints]
 workspace = true

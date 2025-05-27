@@ -19,20 +19,18 @@ build:
 run: build harness
     cargo run \
       --profile {{ PROFILE }} \
-      ./{{ FUZZER_NAME }} \
+      {{ BUILD_DIR }}/harness \
       -- \
-      --libafl-in ../../inprocess/libfuzzer_libpng/corpus \
-      --libafl-out ./out \
-      ./{{ FUZZER_NAME }}
-
+      --libafl-in ./corpus \
+      --libafl-out ./out
 
 [unix]
 test: build harness
     #!/bin/bash
 
     rm -rf out/
-    timeout 15s {{ FUZZER }} {{ BUILD_DIR }}/harness -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out out ./harness | tee fuzz_stdout.log
-    if grep -qa "corpus: 5" fuzz_stdout.log; then
+    timeout 15s {{ FUZZER }} {{ BUILD_DIR }}/harness -- --libafl-in ./corpus --libafl-out out ./harness | tee fuzz_stdout.log
+    if grep -qa "objectives: 1" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
         echo "Fuzzer does not generate any testcases or any crashes"

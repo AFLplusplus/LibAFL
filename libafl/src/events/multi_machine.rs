@@ -22,7 +22,7 @@ use tokio::{
 use typed_builder::TypedBuilder;
 
 use crate::{
-    events::{Event, TcpMultiMachineLlmpReceiverHook, TcpMultiMachineLlmpSenderHook},
+    events::{EventWithStats, TcpMultiMachineLlmpReceiverHook, TcpMultiMachineLlmpSenderHook},
     inputs::{Input, NopInput},
 };
 
@@ -50,7 +50,7 @@ pub enum MultiMachineMsg<'a, I> {
     LlmpMsg(OwnedRef<'a, [u8]>),
 
     /// A `LibAFL` Event (already deserialized)
-    Event(OwnedRef<'a, Event<I>>),
+    Event(OwnedRef<'a, EventWithStats<I>>),
 }
 
 /// We do not use raw pointers, so no problem with thead-safety
@@ -65,7 +65,7 @@ impl<'a, I> MultiMachineMsg<'a, I> {
     /// `OwnedRef` should **never** be a raw pointer for thread-safety reasons.
     /// We check this for debug builds, but not for release.
     #[must_use]
-    pub unsafe fn event(event: OwnedRef<'a, Event<I>>) -> Self {
+    pub unsafe fn event(event: OwnedRef<'a, EventWithStats<I>>) -> Self {
         debug_assert!(!event.is_raw());
 
         MultiMachineMsg::Event(event)
@@ -268,10 +268,10 @@ where
                 let timeout = current_time() + parent_lock.node_descriptor.timeout;
 
                 parent_lock.parent = loop {
-                    log::debug!("Trying to connect to parent @ {}..", parent_addr);
+                    log::debug!("Trying to connect to parent @ {parent_addr}..");
                     match TcpStream::connect(parent_addr).await {
                         Ok(stream) => {
-                            log::debug!("Connected to parent @ {}", parent_addr);
+                            log::debug!("Connected to parent @ {parent_addr}");
 
                             break Some(stream);
                         }
@@ -302,10 +302,10 @@ where
 
                 // The main listening loop. Should never fail.
                 'listening: loop {
-                    log::debug!("listening for children on {:?}...", listener);
+                    log::debug!("listening for children on {listener:?}...");
                     match listener.accept().await {
                         Ok((mut stream, addr)) => {
-                            log::debug!("{} joined the children.", addr);
+                            log::debug!("{addr} joined the children.");
                             let mut state_guard = state.write().await;
 
                             if let Err(e) = state_guard
@@ -487,7 +487,7 @@ where
 
             // Garbage collect disconnected children
             for id_to_remove in &ids_to_remove {
-                log::debug!("Child {:?} has been garbage collected.", id_to_remove);
+                log::debug!("Child {id_to_remove:?} has been garbage collected.");
                 self.children.remove(id_to_remove);
             }
         }
@@ -596,7 +596,7 @@ where
 
         // Garbage collect disconnected children
         for id_to_remove in &ids_to_remove {
-            log::debug!("Child {:?} has been garbage collected.", id_to_remove);
+            log::debug!("Child {id_to_remove:?} has been garbage collected.");
             self.children.remove(id_to_remove);
         }
 

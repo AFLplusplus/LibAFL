@@ -8,11 +8,11 @@ authors = [
 description = "Slot your own fuzzers together and extend their features using Rust"
 documentation = "https://docs.rs/libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"
-readme = "../README.md"
+readme = "../../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -25,6 +25,9 @@ categories = [
 features = ["document-features"]
 all-features = true
 rustc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
 
 [features]
 default = [
@@ -39,7 +42,8 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
-  "tui_monitor",
+  "simd",
+  "errors_backtrace",
 ]
 document-features = ["dep:document-features"]
 
@@ -186,15 +190,17 @@ llmp_small_maps = [
   "libafl_bolts/llmp_small_maps",
 ] # reduces initial map size for llmp
 
-## Grammar mutator. Requires nightly.
-nautilus = [
-  "std",
-  "serde_json/std",
-  "dep:pyo3",
-  "rand_trait",
-  "regex-syntax",
-  "regex",
-]
+## Grammar mutator.
+nautilus = ["std", "serde_json/std", "rand_trait", "regex-syntax", "regex"]
+
+## Python grammar support for nautilus
+nautilus_py = ["nautilus", "dep:pyo3"]
+
+## Lua Mutator support (mutators implemented in Lua)
+lua_mutator = ["mlua"]
+
+## Use the best SIMD implementation by our benchmark
+simd = ["libafl_bolts/simd"]
 
 [[example]]
 name = "tui_mock"
@@ -226,7 +232,7 @@ hashbrown = { workspace = true, features = [
 num-traits = { workspace = true, default-features = false }
 serde = { workspace = true, features = ["alloc"] } # serialization lib
 postcard = { workspace = true } # no_std compatible serde serialization format
-bincode = { version = "1.3.3", optional = true }
+bincode = { version = "2.0.1", optional = true, features = ["serde"] }
 bitbybit = { workspace = true }
 arbitrary-int = { workspace = true }
 ahash = { workspace = true } # The hash function already used in hashbrown
@@ -249,7 +255,7 @@ libm = "0.2.8"
 ratatui = { version = "0.29.0", default-features = false, features = [
   'crossterm',
 ], optional = true } # Commandline rendering, for TUI Monitor
-crossterm = { version = "0.28.1", optional = true }
+crossterm = { version = "0.29.0", optional = true }
 
 cadence = { version = "1.5.0", optional = true } # For the statsd monitor
 prometheus-client = { version = "0.23.0", optional = true } # For the prometheus monitor
@@ -269,8 +275,6 @@ tokio = { version = "1.40.0", optional = true, features = [
 enumflags2 = { version = "0.7.10", optional = true }
 
 wait-timeout = { version = "0.2.0", optional = true } # used by CommandExecutor to wait for child process
-
-concat-idents = { version = "1.1.5", optional = true }
 
 libcasr = { version = "2.12.1", optional = true }
 
@@ -299,9 +303,13 @@ document-features = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
 fastbloom = { workspace = true, optional = true }
-
-[lints]
-workspace = true
+# For Lua Mutators
+# TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>
+mlua = { version = "0.10.3", features = [
+  "lua54",
+  "vendored",
+  "macros",
+], optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }                # For (*nix) libc

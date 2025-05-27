@@ -1,4 +1,4 @@
-//! In-memory fuzzer with `QEMU`-based binary-only instrumentation
+//! In-Process fuzzer with `QEMU`-based binary-only instrumentation
 use core::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
@@ -11,7 +11,7 @@ use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager, launcher::Launcher},
     executors::{ExitKind, ShadowExecutor},
-    feedback_or, feedback_or_fast,
+    feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
@@ -20,12 +20,12 @@ use libafl::{
     mutators::{
         I2SRandReplace,
         havoc_mutations::havoc_mutations,
-        scheduled::{StdScheduledMutator, tokens_mutations},
+        scheduled::{HavocScheduledMutator, tokens_mutations},
         token_mutations::Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{ShadowTracingStage, StdMutationalStage},
+    stages::{CalibrationStage, ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
@@ -85,6 +85,9 @@ where
     /// Fuzz `iterations` number of times, instead of indefinitely; implies use of `fuzz_loop_for`
     #[builder(default = None)]
     iterations: Option<u64>,
+    /// Disable redirection of stdout to /dev/null on unix build targets
+    #[builder(default = None)]
+    enable_stdout: Option<bool>,
 }
 
 impl<H> Debug for QemuBytesCoverageSugar<'_, H>
@@ -111,8 +114,18 @@ where
                 },
             )
             .field("iterations", &self.iterations)
+            .field("enable_stdout", &self.enable_stdout)
             .finish()
     }
+}
+
+/// Enum to allow passing either qemu cli parameters or a running qemu instance
+#[derive(Debug, Copy, Clone)]
+pub enum QemuSugarParameter<'a> {
+    /// Argument list to pass to initialize Qemu
+    QemuCli(&'a [String]),
+    /// Already existing Qemu instance
+    Qemu(&'a Qemu),
 }
 
 impl<H> QemuBytesCoverageSugar<'_, H>
@@ -121,7 +134,7 @@ where
 {
     /// Run the fuzzer
     #[expect(clippy::too_many_lines)]
-    pub fn run(&mut self, qemu_cli: &[String]) {
+    pub fn run(&mut self, qemu: QemuSugarParameter) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -131,11 +144,11 @@ where
 
         let mut out_dir = self.output_dir.clone();
         if fs::create_dir(&out_dir).is_err() {
-            log::info!("Out dir at {:?} already exists.", &out_dir);
+            log::info!("Out dir at {} already exists.", &out_dir.display());
             assert!(
                 out_dir.is_dir(),
-                "Out dir at {:?} is not a valid directory!",
-                &out_dir
+                "Out dir at {} is not a valid directory!",
+                &out_dir.display()
             );
         }
         let mut crashes = out_dir.clone();
@@ -146,7 +159,7 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let monitor = MultiMonitor::new(|s| log::info!("{s}"));
+        let monitor = MultiMonitor::new(|s| println!("{s}"));
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -169,17 +182,27 @@ where
             // Keep tracks of CMPs
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
+            // New maximization map feedback linked to the edges observer and the feedback state
+            let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);
+            // Extra MapFeedback to deduplicate finds according to the cov map
+            let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
+
+            let calibration = CalibrationStage::new(&map_feedback);
+            let calibration_cmplog = CalibrationStage::new(&map_feedback);
+
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
-                // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::new(&edges_observer),
+                map_feedback,
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::new(&time_observer)
             );
 
             // A feedback to choose if an input is a solution or not
-            let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+            let mut objective = feedback_and_fast!(
+                feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new()),
+                map_objective
+            );
 
             // If not restarting, create a State from scratch
             let mut state = state.unwrap_or_else(|| {
@@ -244,11 +267,17 @@ where
                     ExitKind::Ok
                 };
 
-                let emulator = Emulator::empty()
-                    .qemu_parameters(qemu_cli.to_owned())
-                    .modules(modules)
-                    .build()
-                    .expect("Could not initialize Emulator");
+                let emulator = match qemu {
+                    QemuSugarParameter::QemuCli(qemu_cli) => Emulator::empty()
+                        .qemu_parameters(qemu_cli.to_owned())
+                        .modules(modules)
+                        .build()
+                        .expect("Could not initialize Emulator"),
+                    QemuSugarParameter::Qemu(qemu) => Emulator::empty()
+                        .modules(modules)
+                        .build_with_qemu(*qemu)
+                        .expect("Could not initialize Emulator"),
+                };
 
                 let executor = QemuExecutor::new(
                     emulator,
@@ -302,18 +331,18 @@ where
                 let tracing = ShadowTracingStage::new();
 
                 // Setup a randomic Input2State stage
-                let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+                let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
                     I2SRandReplace::new()
                 )));
 
                 if self.tokens_file.is_some() {
                     // Setup a basic mutator
                     let mutator =
-                        StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                        HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages = tuple_list!(tracing, i2s, mutational);
+                    let mut stages = tuple_list!(calibration_cmplog, tracing, i2s, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
@@ -330,11 +359,11 @@ where
                     }
                 } else {
                     // Setup a basic mutator
-                    let mutator = StdScheduledMutator::new(havoc_mutations());
+                    let mutator = HavocScheduledMutator::new(havoc_mutations());
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages = tuple_list!(tracing, i2s, mutational);
+                    let mut stages = tuple_list!(calibration_cmplog, tracing, i2s, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
@@ -367,11 +396,17 @@ where
                     ExitKind::Ok
                 };
 
-                let emulator = Emulator::empty()
-                    .qemu_parameters(qemu_cli.to_owned())
-                    .modules(modules)
-                    .build()
-                    .expect("Could not initialize Emulator");
+                let emulator = match qemu {
+                    QemuSugarParameter::QemuCli(qemu_cli) => Emulator::empty()
+                        .qemu_parameters(qemu_cli.to_owned())
+                        .modules(modules)
+                        .build()
+                        .expect("Could not initialize Emulator"),
+                    QemuSugarParameter::Qemu(qemu) => Emulator::empty()
+                        .modules(modules)
+                        .build_with_qemu(*qemu)
+                        .expect("Could not initialize Emulator"),
+                };
 
                 let mut executor = QemuExecutor::new(
                     emulator,
@@ -423,11 +458,11 @@ where
                 if self.tokens_file.is_some() {
                     // Setup a basic mutator
                     let mutator =
-                        StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                        HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages = tuple_list!(mutational);
+                    let mut stages = tuple_list!(calibration, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
@@ -444,11 +479,11 @@ where
                     }
                 } else {
                     // Setup a basic mutator
-                    let mutator = StdScheduledMutator::new(havoc_mutations());
+                    let mutator = HavocScheduledMutator::new(havoc_mutations());
                     let mutational = StdMutationalStage::new(mutator);
 
                     // The order of the stages matter!
-                    let mut stages = tuple_list!(mutational);
+                    let mut stages = tuple_list!(calibration, mutational);
 
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
@@ -478,8 +513,14 @@ where
             .remote_broker_addr(self.remote_broker_addr);
 
         #[cfg(unix)]
-        let launcher = launcher.stdout_file(Some("/dev/null"));
+        if self.enable_stdout.unwrap_or(false) {
+            launcher.build().launch().expect("Launcher failed");
+        } else {
+            let launcher = launcher.stdout_file(Some("/dev/null"));
+            launcher.build().launch().expect("Launcher failed");
+        }
 
+        #[cfg(not(unix))]
         launcher.build().launch().expect("Launcher failed");
     }
 }
@@ -490,8 +531,10 @@ pub mod pybind {
     use std::path::PathBuf;
 
     use libafl_bolts::core_affinity::Cores;
+    use libafl_qemu::pybind::Qemu;
     use pyo3::{prelude::*, types::PyBytes};
 
+    use super::QemuSugarParameter;
     use crate::qemu;
 
     #[pyclass(unsendable)]
@@ -505,6 +548,7 @@ pub mod pybind {
         iterations: Option<u64>,
         tokens_file: Option<PathBuf>,
         timeout: Option<u64>,
+        enable_stdout: Option<bool>,
     }
 
     #[pymethods]
@@ -520,7 +564,8 @@ pub mod pybind {
             use_cmplog=None,
             iterations=None,
             tokens_file=None,
-            timeout=None
+            timeout=None,
+            enable_stdout=None,
         ))]
         fn new(
             input_dirs: Vec<PathBuf>,
@@ -531,6 +576,7 @@ pub mod pybind {
             iterations: Option<u64>,
             tokens_file: Option<PathBuf>,
             timeout: Option<u64>,
+            enable_stdout: Option<bool>,
         ) -> Self {
             Self {
                 input_dirs,
@@ -541,12 +587,13 @@ pub mod pybind {
                 iterations,
                 tokens_file,
                 timeout,
+                enable_stdout,
             }
         }
 
         /// Run the fuzzer
         #[expect(clippy::needless_pass_by_value)]
-        pub fn run(&self, qemu_cli: Vec<String>, harness: PyObject) {
+        pub fn run(&self, qemu: &Qemu, harness: PyObject) {
             qemu::QemuBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
@@ -564,8 +611,9 @@ pub mod pybind {
                 .timeout(self.timeout)
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
+                .enable_stdout(self.enable_stdout)
                 .build()
-                .run(&qemu_cli);
+                .run(QemuSugarParameter::Qemu(&qemu.qemu));
         }
     }
 

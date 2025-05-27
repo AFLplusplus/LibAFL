@@ -1,7 +1,7 @@
-use core::marker::PhantomData;
+use core::{marker::PhantomData, ops::IndexMut};
 use std::{
     io::{Read, Seek},
-    os::fd::AsRawFd,
+    os::fd::{AsFd, AsRawFd},
 };
 
 use libafl::{
@@ -11,7 +11,10 @@ use libafl::{
     observers::{ObserversTuple, StdOutObserver},
     state::HasExecutions,
 };
-use libafl_bolts::{AsSlice, tuples::RefIndexable};
+use libafl_bolts::{
+    AsSlice,
+    tuples::{Handle, RefIndexable},
+};
 use libnyx::NyxReturnValue;
 
 use crate::{cmplog::CMPLOG_ENABLED, helper::NyxHelper};
@@ -21,7 +24,7 @@ pub struct NyxExecutor<S, OT> {
     /// implement nyx function
     pub helper: NyxHelper,
     /// stdout
-    stdout: Option<StdOutObserver>,
+    stdout: Option<Handle<StdOutObserver>>,
     /// stderr
     // stderr: Option<StdErrObserver>,
     /// observers
@@ -74,11 +77,15 @@ where
             .map_err(|_| Error::unsupported("Inputs larger than 4GB are not supported"))?;
         // Duplicate the file descriptor since QEMU(?) closes it and we
         // want to keep |self.helper.nyx_stdout| open.
-        let hprintf_fd = nix::unistd::dup(self.helper.nyx_stdout.as_raw_fd())
+        // # Safety
+        //
+        let hprintf_fd = nix::unistd::dup(self.helper.nyx_stdout.as_fd())
             .map_err(|e| Error::illegal_state(format!("Failed to duplicate Nyx stdout fd: {e}")))?;
 
         self.helper.nyx_process.set_input(buffer, size);
-        self.helper.nyx_process.set_hprintf_fd(hprintf_fd);
+        self.helper
+            .nyx_process
+            .set_hprintf_fd(hprintf_fd.as_raw_fd());
 
         unsafe {
             if CMPLOG_ENABLED == 1 {
@@ -112,7 +119,7 @@ where
             }
         };
 
-        if let Some(ob) = self.stdout.as_mut() {
+        if let Some(ob) = self.stdout.clone() {
             let mut stdout = Vec::new();
             self.helper.nyx_stdout.rewind()?;
             self.helper
@@ -120,7 +127,7 @@ where
                 .read_to_end(&mut stdout)
                 .map_err(|e| Error::illegal_state(format!("Failed to read Nyx stdout: {e}")))?;
 
-            ob.observe(&stdout);
+            self.observers_mut().index_mut(&ob).observe(stdout);
         }
 
         unsafe {
@@ -169,7 +176,7 @@ impl<S, OT> NyxExecutor<S, OT> {
 }
 
 pub struct NyxExecutorBuilder {
-    stdout: Option<StdOutObserver>,
+    stdout: Option<Handle<StdOutObserver>>,
     // stderr: Option<StdErrObserver>,
 }
 
@@ -188,7 +195,7 @@ impl NyxExecutorBuilder {
         }
     }
 
-    pub fn stdout(&mut self, stdout: StdOutObserver) -> &mut Self {
+    pub fn stdout(&mut self, stdout: Handle<StdOutObserver>) -> &mut Self {
         self.stdout = Some(stdout);
         self
     }

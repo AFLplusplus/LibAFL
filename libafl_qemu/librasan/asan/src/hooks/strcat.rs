@@ -5,7 +5,7 @@ use core::{
 
 use log::trace;
 
-use crate::{asan_load, asan_panic};
+use crate::{asan_load, asan_panic, asan_store};
 
 /// # Safety
 /// See man pages
@@ -30,7 +30,7 @@ pub unsafe extern "C" fn strcat(s: *mut c_char, ct: *const c_char) -> *mut c_cha
         while *ct.add(ct_len) != 0 {
             ct_len += 1;
         }
-        asan_load(s as *const c_void, s_len + 1);
+        asan_store(s.add(s_len) as *const c_void, ct_len + 1);
         asan_load(ct as *const c_void, ct_len + 1);
         copy(ct, s.add(s_len), ct_len + 1);
         s

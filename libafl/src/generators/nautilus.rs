@@ -9,9 +9,11 @@ use std::{fs, io::BufReader, path::Path};
 use libafl_bolts::rands::Rand;
 
 pub use crate::common::nautilus::grammartec::newtypes::NTermId;
+#[cfg(feature = "nautilus_py")]
+use crate::nautilus::grammartec::python_grammar_loader;
 use crate::{
     Error, common::nautilus::grammartec::context::Context, generators::Generator,
-    inputs::nautilus::NautilusInput, nautilus::grammartec::python_grammar_loader, state::HasRand,
+    inputs::nautilus::NautilusInput, state::HasRand,
 };
 
 /// The nautilus context for a generator
@@ -87,19 +89,29 @@ impl NautilusContext {
     pub fn from_file<P: AsRef<Path>>(tree_depth: usize, grammar_file: P) -> Result<Self, Error> {
         let grammar_file = grammar_file.as_ref();
         if grammar_file.extension().unwrap_or_default() == "py" {
-            log::debug!("Creating NautilusContext from python grammar");
-            let mut ctx = python_grammar_loader::load_python_grammar(
-                fs::read_to_string(grammar_file)?.as_str(),
-            );
-            ctx.initialize(tree_depth);
-            return Ok(Self { ctx });
+            #[cfg(feature = "nautilus_py")]
+            {
+                log::debug!("Creating NautilusContext from python grammar");
+                let mut ctx = python_grammar_loader::load_python_grammar(
+                    fs::read_to_string(grammar_file)?.as_str(),
+                );
+                ctx.initialize(tree_depth);
+                return Ok(Self { ctx });
+            }
+            #[cfg(not(feature = "nautilus_py"))]
+            {
+                return Err(Error::illegal_argument(format!(
+                    "Feature `nautilus_py` is required to load grammar from {grammar_file:?}"
+                )));
+            }
         }
         log::debug!("Creating NautilusContext from json grammar");
         let file = fs::File::open(grammar_file)?;
         let reader = BufReader::new(file);
         let rules: Vec<Vec<String>> = serde_json::from_reader(reader).map_err(|err| {
             Error::illegal_argument(format!(
-                "Error loading context from json grammar file {grammar_file:?}: {err:?}"
+                "Error loading context from json grammar file {}: {err:?}",
+                grammar_file.display()
             ))
         })?;
         Ok(Self::new(tree_depth, &rules))

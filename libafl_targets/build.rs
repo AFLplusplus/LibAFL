@@ -52,10 +52,6 @@ fn main() {
         .map_or(Ok(SIXTY_FIVE_KB), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
 
-    let ddg_map_size: usize = option_env!("LIBAFL_DDG_MAP_SIZE")
-        .map_or(Ok(SIXTY_FIVE_KB), str::parse)
-        .expect("Could not parse LIBAFL_DDG_MAP_SIZE");
-
     assert!(edges_map_default_size <= edges_map_allocated_size);
     assert!(edges_map_default_size.is_power_of_two());
 
@@ -75,8 +71,6 @@ fn main() {
         pub const CMPLOG_MAP_H: usize = {cmplog_map_h};
         /// The size of the accounting maps
         pub const ACCOUNTING_MAP_SIZE: usize = {acc_map_size};
-        /// The size of the accounting maps
-        pub const DDG_MAP_SIZE: usize = {ddg_map_size};        
 "
     )
     .expect("Could not write file");
@@ -89,7 +83,6 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
-    println!("cargo:rerun-if-env-changed=LIBAFL_DDG_MAP_SIZE");
 
     #[cfg(feature = "common")]
     {
@@ -200,7 +193,6 @@ fn main() {
                 Some(&*format!("{edges_map_allocated_size}")),
             )
             .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
-            .define("DDG_MAP_SIZE", Some(&*format!("{ddg_map_size}")))
             .compile("coverage");
     }
 
@@ -249,41 +241,23 @@ fn main() {
         }
     }
 
-    #[cfg(any(feature = "forkserver", feature = "windows_asan"))]
-    let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
-
-    #[cfg(feature = "forkserver")]
+    #[cfg(feature = "windows_asan")]
     {
-        if target_family == "unix" {
-            println!("cargo:rerun-if-changed=src/forkserver.c");
+        let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+        if target_family == "windows" {
+            println!("cargo:rerun-if-changed=src/windows_asan.c");
 
-            let mut forkserver = cc::Build::new();
+            let mut windows_asan = cc::Build::new();
 
             #[cfg(feature = "whole_archive")]
             {
-                forkserver.link_lib_modifier("+whole-archive");
+                windows_asan.link_lib_modifier("+whole-archive");
             }
 
-            forkserver
-                .file(src_dir.join("forkserver.c"))
-                .compile("forkserver");
+            windows_asan
+                .file(src_dir.join("windows_asan.c"))
+                .compile("windows_asan");
         }
-    }
-
-    #[cfg(feature = "windows_asan")]
-    if target_family == "windows" {
-        println!("cargo:rerun-if-changed=src/windows_asan.c");
-
-        let mut windows_asan = cc::Build::new();
-
-        #[cfg(feature = "whole_archive")]
-        {
-            windows_asan.link_lib_modifier("+whole-archive");
-        }
-
-        windows_asan
-            .file(src_dir.join("windows_asan.c"))
-            .compile("windows_asan");
     }
 
     // NOTE: Sanitizer interfaces doesn't require common

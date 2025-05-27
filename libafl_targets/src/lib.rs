@@ -127,7 +127,7 @@ pub mod windows_asan;
 #[cfg(all(windows, feature = "std", feature = "windows_asan"))]
 pub use windows_asan::*;
 
-#[cfg(all(unix, feature = "forkserver"))]
+#[cfg(all(unix, feature = "std", feature = "forkserver"))]
 pub mod forkserver;
-#[cfg(all(unix, feature = "forkserver"))]
+#[cfg(all(unix, feature = "std", feature = "forkserver"))]
 pub use forkserver::*;

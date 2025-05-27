@@ -1,6 +1,7 @@
 //! The command executor executes a sub program for each run
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::ffi::CString;
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::vec::Vec;
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use core::ffi::CStr;
@@ -13,20 +14,18 @@ use core::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use std::os::fd::AsRawFd;
 use std::{
-    ffi::{OsStr, OsString},
+    ffi::OsStr,
     io::{Read, Write},
-    os::unix::ffi::OsStrExt,
-    path::{Path, PathBuf},
+    os::{fd::RawFd, unix::ffi::OsStrExt},
     process::{Child, Command, Stdio},
 };
 
-#[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
-    AsSlice,
-    fs::{InputFile, get_unique_std_input_file},
-    tuples::{Handle, MatchName, RefIndexable},
+    AsSlice, InputLocation, StdTargetArgs, StdTargetArgsInner,
+    tuples::{Handle, MatchName, MatchNameRef, RefIndexable},
 };
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use libafl_bolts::{core_affinity::CoreId, os::dup2};
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libc::STDIN_FILENO;
 #[cfg(target_os = "linux")]
@@ -47,7 +46,9 @@ use nix::{
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use typed_builder::TypedBuilder;
 
-use super::HasTimeout;
+#[cfg(all(target_family = "unix", feature = "fork"))]
+use super::forkserver::ConfigTarget;
+use super::{HasTimeout, StdChildArgs, StdChildArgsInner};
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
@@ -56,28 +57,49 @@ use crate::{
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::HasExecutions,
-    std::borrow::ToOwned,
 };
 
-/// How to deliver input to an external program
-/// `StdIn`: The target reads from stdin
-/// `File`: The target reads from the specified [`InputFile`]
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum InputLocation {
-    /// Mutate a commandline argument to deliver an input
-    Arg {
-        /// The offset of the argument to mutate
-        argnum: usize,
-    },
-    /// Deliver input via `StdIn`
+/// How do we capture stdout/stderr. Not intended for public use.
+#[derive(Debug, Default)]
+#[allow(dead_code)]
+enum StdCommandCaptureMethod {
+    Fd(RawFd),
     #[default]
-    StdIn,
-    /// Deliver the input via the specified [`InputFile`]
-    /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
-    File {
-        /// The file to write input to. The target should read input from this location.
-        out_file: InputFile,
-    },
+    Pipe,
+}
+
+impl StdCommandCaptureMethod {
+    fn pipe_capture(cmd: &mut Command, stdout: bool) {
+        if stdout {
+            cmd.stdout(Stdio::piped());
+        } else {
+            cmd.stderr(Stdio::piped());
+        }
+    }
+
+    fn pre_capture(&self, cmd: &mut Command, stdout: bool) {
+        #[cfg(feature = "fork")]
+        {
+            if let Self::Fd(old) = self {
+                // Safety
+                // We set up the file desciptors we assume to be valid and not closed (yet)
+                unsafe {
+                    if stdout {
+                        cmd.setdup2(*old, libc::STDOUT_FILENO);
+                        cmd.stdout(Stdio::null());
+                    } else {
+                        cmd.setdup2(*old, libc::STDERR_FILENO);
+                        cmd.stderr(Stdio::null());
+                    }
+                }
+            } else {
+                Self::pipe_capture(cmd, stdout);
+            }
+        }
+
+        #[cfg(not(feature = "fork"))]
+        Self::pipe_capture(cmd, stdout);
+    }
 }
 
 /// A simple Configurator that takes the most common parameters
@@ -88,8 +110,8 @@ pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
     /// By default, the child output is hidden to increase execution speed
     debug_child: bool,
-    stdout_observer: Option<Handle<StdOutObserver>>,
-    stderr_observer: Option<Handle<StdErrObserver>>,
+    stdout_cap: Option<StdCommandCaptureMethod>,
+    stderr_cap: Option<StdCommandCaptureMethod>,
     timeout: Duration,
     /// true: input gets delivered via stdink
     input_location: InputLocation,
@@ -101,30 +123,26 @@ impl<I> CommandConfigurator<I> for StdCommandConfigurator
 where
     I: HasTargetBytes,
 {
-    fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
-        self.stdout_observer.clone()
-    }
-
-    fn stderr_observer(&self) -> Option<Handle<StdErrObserver>> {
-        self.stderr_observer.clone()
-    }
-
     fn spawn_child(&mut self, input: &I) -> Result<Child, Error> {
+        let mut cmd = Command::new(self.command.get_program());
         match &mut self.input_location {
             InputLocation::Arg { argnum } => {
                 let args = self.command.get_args();
-                let mut cmd = Command::new(self.command.get_program());
 
-                if !self.debug_child {
+                if self.debug_child {
+                    cmd.stdout(Stdio::inherit());
+                } else if let Some(cap) = &self.stdout_cap {
+                    cap.pre_capture(&mut cmd, true);
+                } else {
                     cmd.stdout(Stdio::null());
-                    cmd.stderr(Stdio::null());
                 }
 
-                if self.stdout_observer.is_some() {
-                    cmd.stdout(Stdio::piped());
-                }
-                if self.stderr_observer.is_some() {
-                    cmd.stderr(Stdio::piped());
+                if self.debug_child {
+                    cmd.stderr(Stdio::inherit());
+                } else if let Some(cap) = &self.stderr_cap {
+                    cap.pre_capture(&mut cmd, false);
+                } else {
+                    cmd.stderr(Stdio::null());
                 }
 
                 for (i, arg) in args.enumerate() {
@@ -150,7 +168,7 @@ where
                 }
                 Ok(cmd.spawn()?)
             }
-            InputLocation::StdIn => {
+            InputLocation::StdIn { input_file: _ } => {
                 let mut handle = self.command.stdin(Stdio::piped()).spawn()?;
                 let mut stdin = handle.stdin.take().unwrap();
                 match stdin.write_all(input.target_bytes().as_slice()) {
@@ -217,7 +235,7 @@ where
                 personality, ptrace,
                 signal::{Signal, raise},
             },
-            unistd::{ForkResult, alarm, dup2, execve, fork, pipe, write},
+            unistd::{ForkResult, alarm, execve, fork, pipe, write},
         };
 
         match unsafe { fork() } {
@@ -248,10 +266,12 @@ where
                             self.args[*argnum] = cstring_input;
                         }
                     }
-                    InputLocation::StdIn => {
+                    InputLocation::StdIn { input_file: _ } => {
                         let (pipe_read, pipe_write) = pipe().unwrap();
                         write(pipe_write, &input.target_bytes()).unwrap();
-                        dup2(pipe_read.as_raw_fd(), STDIN_FILENO).unwrap();
+                        // # Safety
+                        // We replace the Stdin fileno. Typical Unix stuff.
+                        unsafe { dup2(pipe_read.as_raw_fd(), STDIN_FILENO)? };
                     }
                     InputLocation::File { out_file } => {
                         out_file.write_buf(input.target_bytes().as_slice()).unwrap();
@@ -291,6 +311,8 @@ pub struct CommandExecutor<I, OT, S, T, HT = (), C = Child> {
     configurer: T,
     /// The observers used by this executor
     observers: OT,
+    stdout_observer: Option<Handle<StdOutObserver>>,
+    stderr_observer: Option<Handle<StdErrObserver>>,
     hooks: HT,
     phantom: PhantomData<(C, I, S)>,
 }
@@ -324,6 +346,8 @@ where
             .field("inner", &self.configurer)
             .field("observers", &self.observers)
             .field("hooks", &self.hooks)
+            .field("stdout_observer", &self.stdout_observer)
+            .field("stderr_observer", &self.stderr_observer)
             .finish()
     }
 }
@@ -345,9 +369,8 @@ where
     fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
         use wait_timeout::ChildExt;
 
+        self.observers_mut().pre_exec_all(state, input)?;
         *state.executions_mut() += 1;
-        self.observers.pre_exec_child_all(state, input)?;
-
         let mut child = self.configurer.spawn_child(input)?;
 
         let exit_kind = child
@@ -363,31 +386,28 @@ where
                 ExitKind::Timeout
             });
 
-        self.observers
-            .post_exec_child_all(state, input, &exit_kind)?;
+        // Manualy update stdout/stderr here if we use piped implementation.
+        // Reason of not putting into state and pass by post_exec_all is that
+        // - Save extra at least two hashmap lookups since we already know the handle
+        // - Doesn't pose HasNamedMetadata bound on S (note we might have many stdout/stderr observers)
+        if let Some(mut stderr) = child.stderr {
+            if let Some(stderr_handle) = self.stderr_observer.clone() {
+                let mut buf = vec![];
+                stderr.read_to_end(&mut buf)?;
+                self.observers_mut().index_mut(&stderr_handle).observe(buf);
+            }
+        }
 
-        if let Some(h) = &mut self.configurer.stdout_observer() {
-            let mut stdout = Vec::new();
-            child.stdout.as_mut().ok_or_else(|| {
-                 Error::illegal_state(
-                     "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
-                 )
-             })?.read_to_end(&mut stdout)?;
-            let mut observers = self.observers_mut();
-            let obs = observers.index_mut(h);
-            obs.observe(&stdout);
+        if let Some(mut stdout) = child.stdout {
+            if let Some(stdout_handle) = self.stdout_observer.clone() {
+                let mut buf = vec![];
+                stdout.read_to_end(&mut buf)?;
+                self.observers_mut().index_mut(&stdout_handle).observe(buf);
+            }
         }
-        if let Some(h) = &mut self.configurer.stderr_observer() {
-            let mut stderr = Vec::new();
-            child.stderr.as_mut().ok_or_else(|| {
-                 Error::illegal_state(
-                     "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
-                 )
-             })?.read_to_end(&mut stderr)?;
-            let mut observers = self.observers_mut();
-            let obs = observers.index_mut(h);
-            obs.observe(&stderr);
-        }
+
+        self.observers_mut()
+            .post_exec_child_all(state, input, &exit_kind)?;
         Ok(exit_kind)
     }
 }
@@ -519,15 +539,28 @@ where
 /// The builder for a default [`CommandExecutor`] that should fit most use-cases.
 #[derive(Debug, Clone)]
 pub struct CommandExecutorBuilder {
-    stdout: Option<Handle<StdOutObserver>>,
-    stderr: Option<Handle<StdErrObserver>>,
-    debug_child: bool,
-    program: Option<OsString>,
-    args: Vec<OsString>,
-    input_location: InputLocation,
-    cwd: Option<PathBuf>,
-    envs: Vec<(OsString, OsString)>,
-    timeout: Duration,
+    target_inner: StdTargetArgsInner,
+    child_env_inner: StdChildArgsInner,
+}
+
+impl StdTargetArgs for CommandExecutorBuilder {
+    fn inner(&self) -> &StdTargetArgsInner {
+        &self.target_inner
+    }
+
+    fn inner_mut(&mut self) -> &mut StdTargetArgsInner {
+        &mut self.target_inner
+    }
+}
+
+impl StdChildArgs for CommandExecutorBuilder {
+    fn inner(&self) -> &StdChildArgsInner {
+        &self.child_env_inner
+    }
+
+    fn inner_mut(&mut self) -> &mut StdChildArgsInner {
+        &mut self.child_env_inner
+    }
 }
 
 impl Default for CommandExecutorBuilder {
@@ -541,143 +574,9 @@ impl CommandExecutorBuilder {
     #[must_use]
     fn new() -> CommandExecutorBuilder {
         CommandExecutorBuilder {
-            stdout: None,
-            stderr: None,
-            program: None,
-            args: vec![],
-            input_location: InputLocation::StdIn,
-            cwd: None,
-            envs: vec![],
-            timeout: Duration::from_secs(5),
-            debug_child: false,
+            target_inner: StdTargetArgsInner::default(),
+            child_env_inner: StdChildArgsInner::default(),
         }
-    }
-
-    /// Set the binary to execute
-    /// This option is required.
-    pub fn program<O>(&mut self, program: O) -> &mut Self
-    where
-        O: AsRef<OsStr>,
-    {
-        self.program = Some(program.as_ref().to_owned());
-        self
-    }
-
-    /// Set the input mode and location.
-    /// This option is mandatory, if not set, the `build` method will error.
-    fn input(&mut self, input: InputLocation) -> &mut Self {
-        // This is a fatal error in the user code, no point in returning Err.
-        assert_eq!(
-            self.input_location,
-            InputLocation::StdIn,
-            "input location already set to non-stdin, cannot set it again"
-        );
-        self.input_location = input;
-        self
-    }
-
-    /// Sets the input mode to [`InputLocation::Arg`] and uses the current arg offset as `argnum`.
-    /// During execution, at input will be provided _as argument_ at this position.
-    /// Use [`Self::arg_input_file_std`] if you want to provide the input as a file instead.
-    pub fn arg_input_arg(&mut self) -> &mut Self {
-        let argnum = self.args.len();
-        self.input(InputLocation::Arg { argnum });
-        // Placeholder arg that gets replaced with the input name later.
-        self.arg("PLACEHOLDER");
-        self
-    }
-
-    /// Sets the stdout observer
-    pub fn stdout_observer(&mut self, stdout: Handle<StdOutObserver>) -> &mut Self {
-        self.stdout = Some(stdout);
-        self
-    }
-
-    /// Sets the stderr observer
-    pub fn stderr_observer(&mut self, stderr: Handle<StdErrObserver>) -> &mut Self {
-        self.stderr = Some(stderr);
-        self
-    }
-
-    /// Sets the input mode to [`InputLocation::File`]
-    /// and adds the filename as arg to at the current position.
-    /// Uses a default filename.
-    /// Use [`Self::arg_input_file`] to specify a custom filename.
-    pub fn arg_input_file_std(&mut self) -> &mut Self {
-        self.arg_input_file(get_unique_std_input_file());
-        self
-    }
-
-    /// Sets the input mode to [`InputLocation::File`]
-    /// and adds the filename as arg to at the current position.
-    pub fn arg_input_file<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
-        self.arg(path.as_ref());
-        let out_file_std = InputFile::create(path.as_ref()).unwrap();
-        self.input(InputLocation::File {
-            out_file: out_file_std,
-        });
-        self
-    }
-
-    /// Adds an argument to the program's commandline.
-    pub fn arg<O: AsRef<OsStr>>(&mut self, arg: O) -> &mut CommandExecutorBuilder {
-        self.args.push(arg.as_ref().to_owned());
-        self
-    }
-
-    /// Adds a range of arguments to the program's commandline.
-    pub fn args<IT, O>(&mut self, args: IT) -> &mut CommandExecutorBuilder
-    where
-        IT: IntoIterator<Item = O>,
-        O: AsRef<OsStr>,
-    {
-        for arg in args {
-            self.arg(arg.as_ref());
-        }
-        self
-    }
-
-    /// Adds a range of environment variables to the executed command.
-    pub fn envs<IT, K, V>(&mut self, vars: IT) -> &mut CommandExecutorBuilder
-    where
-        IT: IntoIterator<Item = (K, V)>,
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        for (ref key, ref val) in vars {
-            self.env(key.as_ref(), val.as_ref());
-        }
-        self
-    }
-
-    /// Adds an environment variable to the executed command.
-    pub fn env<K, V>(&mut self, key: K, val: V) -> &mut CommandExecutorBuilder
-    where
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        self.envs
-            .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
-        self
-    }
-
-    /// Sets the working directory for the child process.
-    pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut CommandExecutorBuilder {
-        self.cwd = Some(dir.as_ref().to_owned());
-        self
-    }
-
-    /// If set to true, the child's output won't be redirecited to `/dev/null`.
-    /// Defaults to `false`.
-    pub fn debug_child(&mut self, debug_child: bool) -> &mut CommandExecutorBuilder {
-        self.debug_child = debug_child;
-        self
-    }
-
-    /// Sets the execution timeout duration.
-    pub fn timeout(&mut self, timeout: Duration) -> &mut CommandExecutorBuilder {
-        self.timeout = timeout;
-        self
     }
 
     /// Builds the `CommandExecutor`
@@ -689,55 +588,110 @@ impl CommandExecutorBuilder {
         I: HasTargetBytes,
         OT: MatchName + ObserversTuple<I, S>,
     {
-        let Some(program) = &self.program else {
+        let Some(program) = &self.target_inner.program else {
             return Err(Error::illegal_argument(
                 "CommandExecutor::builder: no program set!",
             ));
         };
 
         let mut command = Command::new(program);
-        match &self.input_location {
-            InputLocation::StdIn => {
+        match &self.target_inner.input_location {
+            InputLocation::StdIn {
+                input_file: out_file,
+            } => {
+                if out_file.is_some() {
+                    return Err(Error::illegal_argument(
+                        "Setting filename for CommandExecutor is not supported!",
+                    ));
+                }
                 command.stdin(Stdio::piped());
             }
             InputLocation::File { .. } | InputLocation::Arg { .. } => {
                 command.stdin(Stdio::null());
             }
         }
-        command.args(&self.args);
+        command.args(&self.target_inner.arguments);
         command.envs(
-            self.envs
+            self.target_inner
+                .envs
                 .iter()
                 .map(|(k, v)| (k.as_os_str(), v.as_os_str())),
         );
-        if let Some(cwd) = &self.cwd {
+        if let Some(cwd) = &self.child_env_inner.current_directory {
             command.current_dir(cwd);
         }
-        if !self.debug_child {
-            command.stdout(Stdio::null());
-            command.stderr(Stdio::null());
+
+        let stdout_cap = self.child_env_inner.stdout_observer.as_ref().map(|hdl| {
+            observers
+                .get(hdl)
+                .as_ref()
+                .expect("stdout observer not in observers tuple")
+                .as_raw_fd()
+                .map(StdCommandCaptureMethod::Fd)
+                .unwrap_or_default()
+        });
+
+        let stderr_cap = self.child_env_inner.stderr_observer.as_ref().map(|hdl| {
+            observers
+                .get(hdl)
+                .as_ref()
+                .expect("stderr observer not in observers tuple")
+                .as_raw_fd()
+                .map(StdCommandCaptureMethod::Fd)
+                .unwrap_or_default()
+        });
+
+        if self.child_env_inner.debug_child {
+            command.stdout(Stdio::piped());
+            command.stderr(Stdio::piped());
+        } else {
+            if let Some(cap) = &stdout_cap {
+                cap.pre_capture(&mut command, true);
+            } else {
+                command.stdout(Stdio::null());
+            }
+
+            if let Some(cap) = &stderr_cap {
+                cap.pre_capture(&mut command, false);
+            } else {
+                command.stderr(Stdio::null());
+            }
         }
 
-        if self.stdout.is_some() {
+        if self.child_env_inner.stdout_observer.is_some() {
             command.stdout(Stdio::piped());
         }
 
-        if self.stderr.is_some() {
+        if self.child_env_inner.stderr_observer.is_some() {
             command.stderr(Stdio::piped());
         }
 
+        if let Some(core) = self.child_env_inner.core {
+            #[cfg(feature = "fork")]
+            command.bind(core);
+
+            #[cfg(not(feature = "fork"))]
+            return Err(Error::illegal_argument(format!(
+                "Your host doesn't support fork and thus libafl can not bind to core {:?} right after children get spawned",
+                core
+            )));
+        }
+
         let configurator = StdCommandConfigurator {
-            debug_child: self.debug_child,
-            stdout_observer: self.stdout.clone(),
-            stderr_observer: self.stderr.clone(),
-            input_location: self.input_location.clone(),
-            timeout: self.timeout,
+            debug_child: self.child_env_inner.debug_child,
+            stdout_cap,
+            stderr_cap,
+            input_location: self.target_inner.input_location.clone(),
+            timeout: self.child_env_inner.timeout,
             command,
         };
+
         Ok(
             <StdCommandConfigurator as CommandConfigurator<I>>::into_executor::<OT, S>(
                 configurator,
                 observers,
+                self.child_env_inner.stdout_observer.clone(),
+                self.child_env_inner.stderr_observer.clone(),
             ),
         )
     }
@@ -789,7 +743,7 @@ impl CommandExecutorBuilder {
 /// where
 ///     S: HasExecutions,
 /// {
-///     MyExecutor.into_executor(())
+///     MyExecutor.into_executor((), None, None)
 /// }
 /// ```
 pub trait CommandConfigurator<I, C = Child>: Sized {
@@ -823,11 +777,18 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     }
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<I, OT, S, Self, (), C> {
+    fn into_executor<OT, S>(
+        self,
+        observers: OT,
+        stdout_observer: Option<Handle<StdOutObserver>>,
+        stderr_observer: Option<Handle<StdErrObserver>>,
+    ) -> CommandExecutor<I, OT, S, Self, (), C> {
         CommandExecutor {
             configurer: self,
             observers,
             hooks: (),
+            stderr_observer,
+            stdout_observer,
             phantom: PhantomData,
         }
     }
@@ -837,11 +798,15 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
         self,
         observers: OT,
         hooks: HT,
+        stdout_observer: Option<Handle<StdOutObserver>>,
+        stderr_observer: Option<Handle<StdErrObserver>>,
     ) -> CommandExecutor<I, OT, S, Self, HT, C> {
         CommandExecutor {
             configurer: self,
             observers,
             hooks,
+            stderr_observer,
+            stdout_observer,
             phantom: PhantomData,
         }
     }
@@ -865,15 +830,19 @@ fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus
 
 #[cfg(test)]
 mod tests {
+    use libafl_bolts::{StdTargetArgs, tuples::Handled};
+    use tuple_list::tuple_list;
+
     use crate::{
         events::SimpleEventManager,
         executors::{
-            Executor,
+            Executor, StdChildArgs,
             command::{CommandExecutor, InputLocation},
         },
         fuzzer::NopFuzzer,
         inputs::{BytesInput, NopInput},
         monitors::SimpleMonitor,
+        observers::StdOutObserver,
         state::NopState,
     };
 
@@ -885,8 +854,7 @@ mod tests {
                 log::info!("{status}");
             }));
 
-        let mut executor = CommandExecutor::builder();
-        executor
+        let executor = CommandExecutor::builder()
             .program("ls")
             .input(InputLocation::Arg { argnum: 0 });
         let executor = executor.build(());
@@ -900,5 +868,34 @@ mod tests {
                 &BytesInput::new(b"test".to_vec()),
             )
             .unwrap();
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_capture() {
+        let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
+            SimpleEventManager::new(SimpleMonitor::new(|status| {
+                log::info!("{status}");
+            }));
+
+        let stdout = StdOutObserver::new("stdout".into()).unwrap();
+        let handle = stdout.handle();
+        let executor = CommandExecutor::builder()
+            .program("ls")
+            .stdout_observer(handle.clone())
+            .input(InputLocation::Arg { argnum: 0 });
+        let executor = executor.build(tuple_list!(stdout));
+        let mut executor = executor.unwrap();
+
+        executor
+            .run_target(
+                &mut NopFuzzer::new(),
+                &mut NopState::<NopInput>::new(),
+                &mut mgr,
+                &BytesInput::new(b".".to_vec()),
+            )
+            .unwrap();
+
+        assert!(executor.observers.0.output.is_some());
     }
 }
