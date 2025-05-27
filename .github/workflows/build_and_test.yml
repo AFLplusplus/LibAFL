@@ -24,6 +24,7 @@ jobs:
         os: [ ubuntu-24.04, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
     steps:
+      - uses: extractions/setup-just@v3
       - name: Install mimetype
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libfile-mimeinfo-perl
@@ -81,6 +82,7 @@ jobs:
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
@@ -91,6 +93,7 @@ jobs:
   ubuntu-doc-test:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
@@ -102,6 +105,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: contains( github.event.pull_request.labels.*.name, 'pre-release')
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
         with:
@@ -118,6 +122,7 @@ jobs:
   ubuntu:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - uses: actions/checkout@v4
@@ -142,6 +147,7 @@ jobs:
   ubuntu-clippy:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - uses: actions/checkout@v4
@@ -163,6 +169,7 @@ jobs:
       matrix:
         instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17" ]
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
@@ -188,6 +195,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
+      - uses: extractions/setup-just@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -200,6 +208,7 @@ jobs:
   python-bindings:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y lsb-release wget software-properties-common gnupg libz3-dev
       - name: Install maturin
@@ -218,6 +227,7 @@ jobs:
     env:
       MAIN_LLVM_VERSION: 20
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
@@ -235,6 +245,7 @@ jobs:
     # fixme: use ubuntu-latest once this gets fixed https://github.com/UmbrellaDocs/action-linkspector/issues/32
     runs-on: ubuntu-22.04
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - name: Run linkspector
         uses: umbrelladocs/action-linkspector@v1
@@ -245,6 +256,7 @@ jobs:
   msrv:
     runs-on: ubuntu-latest
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-hack
@@ -254,6 +266,7 @@ jobs:
   fuzzers-preflight:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - name: Fuzzer in CI Check
         run: just fuzzers-preflight
@@ -345,6 +358,7 @@ jobs:
 
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
         # Get the name of the fuzzer so that we can use it as the key for a cache
         # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
@@ -401,6 +415,7 @@ jobs:
     outputs:
       qemu: ${{ steps.filter.outputs.qemu }}
     steps:
+      - uses: extractions/setup-just@v3
       - name: Checkout
         uses: actions/checkout@v4
       - name: Filter
@@ -428,6 +443,7 @@ jobs:
         fuzzer:
           - fuzzers/full_system/unicorn
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/fuzzer-tester-prepare
       - name: "Install dependencies"
@@ -459,6 +475,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
+      - uses: extractions/setup-just@v3
         # Get the name of the fuzzer so that we can use it as the key for a cache
         # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
@@ -506,6 +523,7 @@ jobs:
 
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - name: Install deps
@@ -536,6 +554,7 @@ jobs:
     if: ${{ needs.qemu-changes.outputs.qemu == 'true' }}
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -587,6 +606,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
+      - uses: extractions/setup-just@v3
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add aarch64-unknown-none
       - uses: actions/checkout@v4
@@ -604,6 +624,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rust-src
+      - uses: extractions/setup-just@v3
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
       - uses: actions/checkout@v4
@@ -618,6 +639,7 @@ jobs:
   format-toml:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - name: Install taplo
         run: curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
       - uses: actions/checkout@v4
@@ -635,6 +657,7 @@ jobs:
       image: ghcr.io/aflplusplus/libafl:latest
 
     steps:
+      - uses: extractions/setup-just@v3
       - name: Checkout repo
         uses: actions/checkout@v3
 
@@ -719,6 +742,7 @@ jobs:
       - fuzzers-preflight
       - common
     steps:
+      - uses: extractions/setup-just@v3
         # Get the name of the fuzzer so that we can use it as the key for a cache
         # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
@@ -762,6 +786,7 @@ jobs:
       - common
     steps:
       - uses: dtolnay/rust-toolchain@stable
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - name: Install just, ws
         run: cargo install just cargo-workspaces
@@ -778,6 +803,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - uses: extractions/setup-just@v3
       - name: Install deps
         run: brew install z3 gtk+3 python llvm@${{env.MAIN_LLVM_VERSION}}
       - name: Install cxxbridge
@@ -794,6 +820,7 @@ jobs:
   ios:
     runs-on: macOS-latest
     steps:
+      - uses: extractions/setup-just@v3
       - uses: dtolnay/rust-toolchain@stable
       - name: install ios
         run: rustup target add aarch64-apple-ios
@@ -806,6 +833,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: dtolnay/rust-toolchain@stable
+      - uses: extractions/setup-just@v3
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25b
@@ -824,6 +852,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v3
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
