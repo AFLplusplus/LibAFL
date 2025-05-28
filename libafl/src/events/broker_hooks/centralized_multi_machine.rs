@@ -12,6 +12,7 @@ use libafl_bolts::{
     llmp::{Flags, LLMP_FLAG_FROM_MM, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
     ownedref::OwnedRef,
 };
+use send_wrapper::SendWrapper;
 use serde::Serialize;
 use tokio::{
     net::ToSocketAddrs,
@@ -28,42 +29,6 @@ use crate::{
     },
     inputs::Input,
 };
-
-/// Makes a raw pointer send + sync.
-/// Extremely unsafe to use in general, only use this if you know what you're doing.
-#[derive(Debug, Clone, Copy)]
-pub struct NullLock<T> {
-    value: T,
-}
-
-unsafe impl<T> Send for NullLock<T> {}
-unsafe impl<T> Sync for NullLock<T> {}
-
-impl<T> NullLock<T> {
-    /// Instantiate a [`NullLock`]
-    ///
-    /// # Safety
-    ///
-    /// The null lock makes anything Send + Sync, which is usually very dangerous.
-    pub unsafe fn new(value: T) -> Self {
-        Self { value }
-    }
-
-    /// Get a reference to value
-    pub fn get(&self) -> &T {
-        &self.value
-    }
-
-    /// Get a mutable reference to value
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.value
-    }
-
-    /// Get back the value
-    pub fn into_innter(self) -> T {
-        self.value
-    }
-}
 
 /// The Receiving side of the multi-machine architecture
 /// It is responsible for receiving messages from other neighbours.
@@ -164,15 +129,12 @@ where
     ) -> Result<LlmpMsgHookResult, Error> {
         let shared_state = self.shared_state.clone();
 
-        // # Safety
-        // Here, we suppose msg will *never* be written again and will always be available.
-        // Thus, it is safe to handle this in a separate thread.
-        let msg_lock = unsafe { NullLock::new((msg.as_ptr(), msg.len())) };
+        let msg_lock = SendWrapper::new((msg.as_ptr(), msg.len()));
         // let flags = msg_flags.clone();
 
         let _handle: JoinHandle<Result<(), Error>> = self.rt.spawn(async move {
             let mut state_wr_lock = shared_state.write().await;
-            let (msg_ptr, msg_len) = msg_lock.into_innter();
+            let (msg_ptr, msg_len) = *msg_lock;
             let msg: &[u8] = unsafe { slice::from_raw_parts(msg_ptr, msg_len) }; // most likely crash here
 
             // #[cfg(not(feature = "llmp_compression"))]
