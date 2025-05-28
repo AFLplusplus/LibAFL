@@ -42,6 +42,9 @@ tests_not_expected=(
 # We don't want any core dumps. They can potentially be quite large
 ulimit -c 0
 
+# Set debug variable to let the target print stderr.
+export LIBAFL_FUZZBENCH_DEBUG=1
+
 for i in "${!tests[@]}"
 do
   test="${tests[i]}"
