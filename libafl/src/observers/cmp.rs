@@ -421,7 +421,7 @@ impl AflppCmpValuesMetadata {
 pub struct AflppCmpLogHeader {
     /// The number of hits of a particular comparison
     ///
-    /// 6 bits up to 63 entries, we have CMP_MAP_H = 32 (so using half of it)
+    /// 6 bits up to 63 entries, we have `CMP_MAP_H = 32` (so using half of it)
     #[bits(0..=5, r)]
     hits: u6,
     /// Whether a comparison is u8/u8, u16/u16, etc.

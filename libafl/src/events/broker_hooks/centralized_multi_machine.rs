@@ -12,6 +12,7 @@ use libafl_bolts::{
     llmp::{Flags, LLMP_FLAG_FROM_MM, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
     ownedref::OwnedRef,
 };
+use send_wrapper::SendWrapper;
 use serde::Serialize;
 use tokio::{
     net::ToSocketAddrs,
@@ -133,7 +134,7 @@ where
 
         let _handle: JoinHandle<Result<(), Error>> = self.rt.spawn(async move {
             let mut state_wr_lock = shared_state.write().await;
-            let (msg_ptr, msg_len) = msg_lock.into_innter();
+            let (msg_ptr, msg_len) = *msg_lock;
             let msg: &[u8] = unsafe { slice::from_raw_parts(msg_ptr, msg_len) }; // most likely crash here
 
             // #[cfg(not(feature = "llmp_compression"))]

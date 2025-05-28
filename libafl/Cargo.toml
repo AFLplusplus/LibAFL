@@ -65,7 +65,6 @@ std = [
   "typed-builder",
   "fastbloom",
   "fs2",
-  "send_wrapper",
 ]
 
 ## Tracks the Feedbacks and the Objectives that were interesting for a Testcase
@@ -107,7 +106,7 @@ tcp_manager = ["tokio", "std"]
 tcp_compression = ["tcp_manager", "libafl_bolts/gzip"]
 
 ## Enable multi-machine support
-multi_machine = ["tokio", "std", "enumflags2", "ahash/std"]
+multi_machine = ["tokio", "std", "enumflags2", "ahash/std", "send_wrapper"]
 
 ## Enables the `NaiveTokenizer` and `StacktraceObserver`
 regex = ["std", "dep:regex"]
