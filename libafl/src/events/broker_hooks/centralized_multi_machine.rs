@@ -29,42 +29,6 @@ use crate::{
     inputs::Input,
 };
 
-/// Makes a raw pointer send + sync.
-/// Extremely unsafe to use in general, only use this if you know what you're doing.
-#[derive(Debug, Clone, Copy)]
-pub struct NullLock<T> {
-    value: T,
-}
-
-unsafe impl<T> Send for NullLock<T> {}
-unsafe impl<T> Sync for NullLock<T> {}
-
-impl<T> NullLock<T> {
-    /// Instantiate a [`NullLock`]
-    ///
-    /// # Safety
-    ///
-    /// The null lock makes anything Send + Sync, which is usually very dangerous.
-    pub unsafe fn new(value: T) -> Self {
-        Self { value }
-    }
-
-    /// Get a reference to value
-    pub fn get(&self) -> &T {
-        &self.value
-    }
-
-    /// Get a mutable reference to value
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.value
-    }
-
-    /// Get back the value
-    pub fn into_innter(self) -> T {
-        self.value
-    }
-}
-
 /// The Receiving side of the multi-machine architecture
 /// It is responsible for receiving messages from other neighbours.
 /// Please check [`crate::events::multi_machine`] for more information.
@@ -164,10 +128,7 @@ where
     ) -> Result<LlmpMsgHookResult, Error> {
         let shared_state = self.shared_state.clone();
 
-        // # Safety
-        // Here, we suppose msg will *never* be written again and will always be available.
-        // Thus, it is safe to handle this in a separate thread.
-        let msg_lock = unsafe { NullLock::new((msg.as_ptr(), msg.len())) };
+        let msg_lock = SendWrapper::new((msg.as_ptr(), msg.len()));
         // let flags = msg_flags.clone();
 
         let _handle: JoinHandle<Result<(), Error>> = self.rt.spawn(async move {
