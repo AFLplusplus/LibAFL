@@ -3,6 +3,9 @@ set -e
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
+# Set debug variable to let the target print stderr.
+export LIBAFL_FUZZBENCH_DEBUG=1
+
 if [[ ! -x "$QEMU_LAUNCHER" ]]; then
   echo "env variable QEMU_LAUNCHER does not point to a valid executable"
   echo "QEMU_LAUNCHER should point to qemu_launcher"
