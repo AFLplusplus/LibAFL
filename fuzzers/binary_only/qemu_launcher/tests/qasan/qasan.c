@@ -13,7 +13,7 @@
 #define LOG(x)                              \
   do {                                      \
     char buf[] = x;                         \
-    write(STDOUT_FILENO, buf, sizeof(buf)); \
+    write(STDERR_FILENO, buf, sizeof(buf)); \
                                             \
   } while (false);
 
