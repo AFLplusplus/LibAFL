@@ -24,6 +24,7 @@ jobs:
         os: [ ubuntu-24.04, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
     steps:
+      - uses: extractions/setup-just@v3
       - name: Install mimetype
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libfile-mimeinfo-perl
@@ -72,38 +73,39 @@ jobs:
         run: cargo test -- --test-threads 1
       - name: Run tests (Linux)
         if: runner.os != 'Windows'
-        run: cargo test -- --test-threads 1
+        run: just test-docs
+      - name: Run tests
+        run: just test
       - name: Test libafl no_std
-        run: cd libafl && cargo test --no-default-features
-      - name: Test libafl_bolts no_std no_alloc
-        run: cd libafl_bolts && cargo test --no-default-features
-      - name: Test libafl_targets no_std
-        run: cd libafl_targets && cargo test --no-default-features
+        run: just test-no-std
 
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Build Docs
-        run: cargo doc --all-features --no-deps
+        run: just doc
 
   ubuntu-doc-test:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Test Docs
-        run: cargo test --doc --all-features
+        run: test-docs
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
     if: contains( github.event.pull_request.labels.*.name, 'pre-release')
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
         with:
@@ -115,11 +117,12 @@ jobs:
           shared-key: ubuntu-miri
       # --- miri undefined behavior test --
       - name: Run miri tests
-        run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo miri test
+        run: just test-miri
 
   ubuntu:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - uses: actions/checkout@v4
@@ -130,20 +133,21 @@ jobs:
       - name: Check pcguard edges
         run: cargo check --features=sancov_pcguard_edges
       - name: run shellcheck
-        run: shellcheck ./scripts/*.sh
+        run: just shellcheck
       # ---- build normal and examples ----
       - name: Run a normal build
-        run: cargo build --verbose
+        run: just default
       # - name: Run libafl_qemu usermode tests
       #   run: cd libafl_qemu && cargo test
       # - name: Run libafl_qemu systemmode tests
       #   run: cd libafl_qemu && cargo test --no-default-features --features x86_64,systemmode
       - name: Build examples
-        run: cargo build --examples --verbose
+        run: just examples cargo build --examples --verbose
 
   ubuntu-clippy:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - uses: actions/checkout@v4
@@ -152,7 +156,7 @@ jobs:
         with:
           shared-key: "ubuntu-clippy"
       - name: Run clippy
-        run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/clippy.sh
+        run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} just clippy
     # --- test embedding the libafl_libfuzzer_runtime library
     # Fix me plz
     # - name: Test Build libafl_libfuzzer with embed
@@ -165,6 +169,7 @@ jobs:
       matrix:
         instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17" ]
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
@@ -190,6 +195,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
+      - uses: extractions/setup-just@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -197,11 +203,12 @@ jobs:
       - name: Install smoke test deps
         run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh
       - name: Run smoke test
-        run: ./libafl_concolic/test/smoke_test.sh
+        run: just concolic-smoke-test
 
   python-bindings:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y lsb-release wget software-properties-common gnupg libz3-dev
       - name: Install maturin
@@ -211,15 +218,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Run a maturin build
-        run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
+        run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && just build-python
       - name: Run python test
-        run: . ./bindings/pylibafl/.env/bin/activate # && cd fuzzers/binary_only/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
+        run: just test-python-fuzzer
 
   cargo-fmt:
     runs-on: ubuntu-24.04
     env:
       MAIN_LLVM_VERSION: 20
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
@@ -228,13 +236,16 @@ jobs:
         with: { shared-key: "ubuntu" }
       - name: Installing black
         run: python3 -m pip install black
+      - name: Install taplo
+        run: curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
       - name: Format Check
-        run: ./scripts/fmt_all.sh check
+        run: just check-fmt
 
   check-md-links:
     # fixme: use ubuntu-latest once this gets fixed https://github.com/UmbrellaDocs/action-linkspector/issues/32
     runs-on: ubuntu-22.04
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - name: Run linkspector
         uses: umbrelladocs/action-linkspector@v1
@@ -245,18 +256,20 @@ jobs:
   msrv:
     runs-on: ubuntu-latest
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-hack
       # Note: We currently only specify minimum rust versions for the default workspace members
-      - run: cargo hack check --rust-version -p libafl -p libafl_bolts -p libafl_derive -p libafl_cc -p libafl_targets
+      - run: just msrv
 
   fuzzers-preflight:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - name: Fuzzer in CI Check
-        run: ./scripts/check_tested_fuzzers.sh
+        run: just fuzzers-preflight
 
   fuzzers:
     name: 🚀 ${{ matrix.fuzzer }}
@@ -345,6 +358,7 @@ jobs:
 
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
         # Get the name of the fuzzer so that we can use it as the key for a cache
         # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
@@ -401,6 +415,7 @@ jobs:
     outputs:
       qemu: ${{ steps.filter.outputs.qemu }}
     steps:
+      - uses: extractions/setup-just@v3
       - name: Checkout
         uses: actions/checkout@v4
       - name: Filter
@@ -428,6 +443,7 @@ jobs:
         fuzzer:
           - fuzzers/full_system/unicorn
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/fuzzer-tester-prepare
       - name: "Install dependencies"
@@ -459,6 +475,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
+      - uses: extractions/setup-just@v3
         # Get the name of the fuzzer so that we can use it as the key for a cache
         # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
@@ -506,6 +523,7 @@ jobs:
 
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - name: Install deps
@@ -536,6 +554,7 @@ jobs:
     if: ${{ needs.qemu-changes.outputs.qemu == 'true' }}
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -587,18 +606,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
+      - uses: extractions/setup-just@v3
       - name: Add targets
-        run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
+        run: rustup target add arm-linux-androideabi && rustup target add aarch64-unknown-none
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: no-std
       - name: Build aarch64-unknown-none
-        run: cd fuzzers/fuzz_anything/baby_no_std && cargo build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+        run: just build-aarch64-unknown-none
       - name: run x86_64 until panic!
-        run: cd fuzzers/fuzz_anything/baby_no_std && cargo run || test $? -ne 0 || exit 1
-      - name: no_std tests
-        run: cd ./libafl && cargo test --no-default-features
+        run: just test-no-std
 
   nostd-clippy:
     runs-on: ubuntu-24.04
@@ -606,6 +624,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rust-src
+      - uses: extractions/setup-just@v3
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
       - uses: actions/checkout@v4
@@ -620,6 +639,7 @@ jobs:
   format-toml:
     runs-on: ubuntu-24.04
     steps:
+      - uses: extractions/setup-just@v3
       - name: Install taplo
         run: curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
       - uses: actions/checkout@v4
@@ -637,6 +657,7 @@ jobs:
       image: ghcr.io/aflplusplus/libafl:latest
 
     steps:
+      - uses: extractions/setup-just@v3
       - name: Checkout repo
         uses: actions/checkout@v3
 
@@ -721,6 +742,7 @@ jobs:
       - fuzzers-preflight
       - common
     steps:
+      - uses: extractions/setup-just@v3
         # Get the name of the fuzzer so that we can use it as the key for a cache
         # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
@@ -735,6 +757,12 @@ jobs:
         uses: ./.github/workflows/windows-tester-prepare
       - name: install cxx bridge
         run: cargo install cxxbridge-cmd
+      - name: Install just, ws
+        run: cargo install just cargo-workspaces
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
+      - name: Build fuzzers/binary_only/tinyinst_simple
+        run: just test-fuzzer ./fuzzers/binary_only/tinyinst_simple/
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -758,14 +786,16 @@ jobs:
       - common
     steps:
       - uses: dtolnay/rust-toolchain@stable
+      - uses: extractions/setup-just@v3
       - uses: actions/checkout@v4
+      - name: Install just, ws
+        run: cargo install just cargo-workspaces
       - uses: ./.github/workflows/windows-tester-prepare
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: windows-clippy
       - name: Run real clippy, not the fake one
-        shell: pwsh
-        run: .\scripts\clippy.ps1
+        run: just clippy
 
   macos:
     runs-on: macOS-latest
@@ -773,6 +803,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - uses: extractions/setup-just@v3
       - name: Install deps
         run: brew install z3 gtk+3 python llvm@${{env.MAIN_LLVM_VERSION}}
       - name: Install cxxbridge
@@ -780,16 +811,29 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: MacOS Build
-        run: cargo build --verbose
+        run: just build
       - name: Increase map sizes
-        run: ./scripts/shmem_limits_macos.sh
+        run: just increase-mem-limits
       - name: Clippy
-        run: cargo clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
+        run: just clippy
+
+  ios:
+    runs-on: macOS-latest
+    steps:
+      - uses: extractions/setup-just@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - name: install ios
+        run: rustup target add aarch64-apple-ios
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Build iOS
+        run: just build-ios
 
   ubuntu-cross-android-arm64:
     runs-on: ubuntu-24.04
     steps:
       - uses: dtolnay/rust-toolchain@stable
+      - uses: extractions/setup-just@v3
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25b
@@ -800,7 +844,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build Android
-        run: cd libafl && PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo ndk -t arm64-v8a build --release
+        run: just build-android
 
   ubuntu-cross-android-x86_64:
     runs-on: ubuntu-24.04
@@ -808,6 +852,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
+      - uses: extractions/setup-just@v3
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
