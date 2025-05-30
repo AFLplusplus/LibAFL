@@ -5,6 +5,8 @@ use libafl_bolts::tuples::{Append, Prepend, tuple_list};
 
 #[cfg(feature = "systemmode")]
 use crate::FastSnapshotManager;
+#[cfg(doc)]
+use crate::config::QemuConfig;
 use crate::{
     Emulator, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError, QemuParams,
     StdEmulatorDriver, StdSnapshotManager,
@@ -12,8 +14,6 @@ use crate::{
     config::QemuConfigBuilder,
     modules::{EmulatorModule, EmulatorModuleTuple},
 };
-#[cfg(doc)]
-use crate::{Qemu, config::QemuConfig};
 
 /// An [`Emulator`] Builder.
 ///
