@@ -89,9 +89,7 @@ ahash = { version = "0.8.12", default-features = false }     # The hash function
 arbitrary-int = "1.2.7"                                      # arbitrary sized integers, useful in combination with bitfields (bitbybit crate)
 backtrace = { version = "0.3.74", default-features = false } # Used to get the stacktrace in StacktraceObserver
 bindgen = "0.71.1"
-# 2024-12-16: bitbybit 1.3.3 is leading CI to fail due to missing docs.
-# fixme: Change this to 1.3.3 when the issue https://github.com/danlehmann/bitfield/issues/66 is resolved.
-bitbybit = "=1.3.2" # bitfields, use this for bit fields and bit enums
+bitbybit = "1.3.3" # bitfields, use this for bit fields and bit enums
 capstone = "0.13.0" # Disassembler used in libafl_unicorn to provide disassembly on crash
 clap = "4.5.18"
 cc = "1.1.21"
@@ -131,7 +129,7 @@ unicorn-engine = "2.0.1" # Used in libafl_unicorn
 uuid = { version = "1.10.0", features = ["serde", "v4"] }
 which = "7.0.2"
 windows = "0.59.0"
-z3 = "0.12.1"
+z3 = {version="0.12.1", features = ["static-link-z3"]}
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
 
 [workspace.lints.rust]
