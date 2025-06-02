@@ -118,7 +118,7 @@ rangemap = "1.5.1"
 regex = "1.10.6"
 rustversion = "1.0.17"
 serde = { version = "1.0.210", default-features = false } # serialization lib
-serial_test = { version = "3.2", default-features = false }
+serial_test = { version = "3.2.0", default-features = false }
 serde_json = { version = "1.0.128", default-features = false }
 serde_yaml = { version = "0.9.34" } # For parsing the injections yaml file
 static_assertions = "1.1.0"
