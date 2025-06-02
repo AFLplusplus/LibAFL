@@ -109,7 +109,7 @@ type to implement this with. Thankfully, Rust will let you know when you need to
 As an example, `InMemoryCorpus` before 0.9 looked like this:
 
 ```rust,ignore
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct InMemoryCorpus<I>
 where
@@ -131,7 +131,7 @@ After 0.9, all `Corpus` implementations are required to implement `UsesInput`. A
 the input type (as it is now provided by the UsesInput impl). The migrated implementation is shown below:
 
 ```rust,ignore
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct InMemoryCorpus<I>
 where

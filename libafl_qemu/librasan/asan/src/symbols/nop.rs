@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{GuestAddr, symbols::Symbols};
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct NopSymbols;
 
 impl Symbols for NopSymbols {

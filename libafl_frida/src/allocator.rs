@@ -92,7 +92,7 @@ macro_rules! map_to_shadow {
 }
 
 /// Metadata for an allocation
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AllocationMetadata {
     /// The address of the allocation
     pub address: usize,

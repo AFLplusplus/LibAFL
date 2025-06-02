@@ -442,7 +442,7 @@ impl RetryCountRestartHelper {
 }
 
 /// The index of a stage
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct StageId(pub(crate) usize);
 

@@ -21,7 +21,7 @@ fn dll_extension<'a>() -> &'a str {
 include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 
 /// The supported LLVM passes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LLVMPasses {
     //CmpLogIns,
     /// The `CmpLog` pass

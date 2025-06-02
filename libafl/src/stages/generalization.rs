@@ -49,7 +49,7 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 pub static GENERALIZATION_STAGE_NAME: &str = "generalization";
 
 /// A stage that runs a tracer executor
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct GeneralizationStage<C, EM, I, O, OT, S, Z> {
     name: Cow<'static, str>,
     map_observer_handle: Handle<C>,

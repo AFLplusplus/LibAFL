@@ -18,7 +18,7 @@ pub struct NyxHelper {
     pub bitmap_buffer: *mut u8,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum NyxProcessType {
     /// stand alone mode
     ALONE,

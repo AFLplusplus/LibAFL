@@ -51,7 +51,7 @@ pub enum SnapshotManagerCheckError {
     SnapshotCheckError(QemuSnapshotCheckResult),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Copy, Clone)]
 pub struct NopSnapshotManager;
 
 impl Default for NopSnapshotManager {
@@ -84,7 +84,7 @@ impl IsSnapshotManager for NopSnapshotManager {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub struct SnapshotId {
     id: u64,
 }

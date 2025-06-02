@@ -643,7 +643,7 @@ impl AsanErrorsObserver {
 }
 
 /// A feedback reporting potential [`struct@AsanErrors`] from an `AsanErrorsObserver`
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AsanErrorsFeedback<S> {
     errors: Option<AsanErrors>,
     observer_handle: Handle<AsanErrorsObserver>,

@@ -17,7 +17,7 @@ use rangemap::RangeMap;
 
 /// A basic block struct
 /// This can be used to keep track of new addresses.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DrCovBasicBlock {
     /// Start of this basic block
     pub start: u64,
@@ -27,7 +27,7 @@ pub struct DrCovBasicBlock {
 
 /// A (Raw) Basic Block List Entry.
 /// This is only relevant in combination with a [`DrCovReader`] or a [`DrCovWriter`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct DrCovBasicBlockEntry {
     /// Start of this basic block

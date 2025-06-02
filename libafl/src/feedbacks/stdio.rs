@@ -25,7 +25,7 @@ impl_serdeany!(StdOutMetadata);
 
 /// Nop feedback that annotates stdout in the new testcase. The testcase
 /// is never interesting (use with an OR).
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StdOutToMetadataFeedback {
     o_ref: Handle<StdOutObserver>,
 }
@@ -109,7 +109,7 @@ impl_serdeany!(StdErrMetadata);
 
 /// Nop feedback that annotates stderr in the new testcase. The testcase
 /// is never interesting (use with an OR).
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StdErrToMetadataFeedback {
     o_ref: Handle<StdErrObserver>,
 }

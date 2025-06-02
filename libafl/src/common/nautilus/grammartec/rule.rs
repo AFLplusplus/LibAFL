@@ -67,7 +67,7 @@ impl RuleChild {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RuleIdOrCustom {
     Rule(RuleId),
     Custom(RuleId, Vec<u8>),
@@ -89,7 +89,7 @@ impl RuleIdOrCustom {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum Rule {
     Plain(PlainRule),
     #[cfg(feature = "nautilus_py")]
@@ -132,7 +132,7 @@ impl ScriptRule {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlainRule {
     pub nonterm: NTermId,
     pub children: Vec<RuleChild>,

@@ -16,7 +16,7 @@ pub enum ExitArgs {
     Arg6,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct CustomInsn<C> {
     command: C,
 }

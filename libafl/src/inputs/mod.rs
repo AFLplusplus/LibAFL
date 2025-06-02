@@ -298,7 +298,7 @@ impl ResizableMutator<u8> for &mut Vec<u8> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Copy, Clone, Default)]
 /// Basic `NopBytesConverter` with just one type that is not converting
 pub struct NopBytesConverter {}
 

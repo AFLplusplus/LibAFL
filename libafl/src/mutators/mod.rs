@@ -62,7 +62,7 @@ use crate::{Error, corpus::CorpusId};
 // We can use it to report which mutations generated the testcase in the broker logs
 
 /// The index of a mutation in the mutations tuple
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct MutationId(pub(crate) usize);
 
@@ -98,7 +98,7 @@ impl From<i32> for MutationId {
 /// just that the mutator did something. For slow targets, consider using
 /// a fuzzer with a input filter
 /// or wrapping your mutator in a [`hash::MutationChecker`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MutationResult {
     /// The [`Mutator`] executed on this `Input`. It may not guarantee that the input has actually been changed.
     Mutated,
@@ -383,7 +383,7 @@ impl<I, S> IntoVec<Box<dyn Mutator<I, S>>> for Vec<Box<dyn Mutator<I, S>>> {
 /// ```rust,ignore
 /// let mut stages = tuple_list!(StdMutationalStage::new(NopMutator(MutationResult::Mutated)));
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct NopMutator {
     result: MutationResult,
 }

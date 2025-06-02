@@ -24,7 +24,7 @@ use crate::{
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
-#[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Default, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 struct TuneableMutationalStageMetadata {
     iters: Option<u64>,
     fuzz_time: Option<Duration>,
@@ -147,7 +147,7 @@ where
 }
 
 /// A [`MutationalStage`] where the mutator iteration can be tuned at runtime
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct TuneableMutationalStage<E, EM, I, M, S, Z> {
     /// The mutator we use
     mutator: M,

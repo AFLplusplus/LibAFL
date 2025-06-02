@@ -42,7 +42,7 @@ pub(crate) const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
 pub const COMPRESS_THRESHOLD: usize = 1024;
 
 /// Specify if the State must be persistent over restarts
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum LlmpShouldSaveState {
     /// Always save and restore the state on restart (not OOM resistant)
     OnRestart,

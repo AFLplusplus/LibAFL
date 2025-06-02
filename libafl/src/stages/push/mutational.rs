@@ -42,7 +42,7 @@ pub const DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 /// It may randomly continue earlier.
 ///
 /// The default mutational push stage
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct StdMutationalPushStage<EM, M, I, OT, S, Z>
 where
     S: HasCorpus<I>,

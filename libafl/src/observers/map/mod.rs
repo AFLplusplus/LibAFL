@@ -108,7 +108,7 @@ pub trait CanTrack {
 /// This is a bit of a magic structure. We pass it to the observer tuple as itself, but when its
 /// referred to with `match_name`, there is a cast from this type to its inner type. This is
 /// *guaranteed to be safe* by `#[repr(transparent)]`.
-#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct ExplicitTracking<T, const ITH: bool, const NTH: bool>(T);
 
 impl<T, const ITH: bool, const NTH: bool> CanTrack for ExplicitTracking<T, ITH, NTH> {

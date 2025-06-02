@@ -24,7 +24,7 @@ use crate::{
 
 /// A stage that runs a tracer executor
 /// This should *NOT* be used with inprocess executor
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct TracingStage<EM, I, TE, S, Z> {
     name: Cow<'static, str>,
     tracer_executor: TE,

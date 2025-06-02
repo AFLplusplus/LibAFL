@@ -613,7 +613,7 @@ unsafe fn llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
 
 /// Description of a shared map.
 /// May be used to restore the map by id.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct LlmpDescription {
     /// Info about the [`ShMem`] in use
     shmem: ShMemDescription,
@@ -621,7 +621,7 @@ pub struct LlmpDescription {
     last_message_offset: Option<u64>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 /// Result of an LLMP Message hook
 pub enum LlmpMsgHookResult {
     /// This has been handled in the broker. No need to forward.
@@ -631,7 +631,7 @@ pub enum LlmpMsgHookResult {
 }
 
 /// Message sent over the "wire"
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 #[repr(C)]
 pub struct LlmpMsg {
     /// A tag
@@ -885,7 +885,7 @@ impl LlmpPage {
 /// Message payload when a client got added */
 /// This is an internal message!
 /// [`LLMP_TAG_END_OF_PAGE_V1`]
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 #[repr(C)]
 struct LlmpPayloadSharedMapInfo {
     /// The map size
@@ -897,7 +897,7 @@ struct LlmpPayloadSharedMapInfo {
 /// Message payload when a client got removed
 /// This is an internal message!
 /// [`LLMP_TAG_END_OF_PAGE_V1`]
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 #[repr(C, align(8))]
 struct LlmpClientExitInfo {
     /// The restarter process id of the client
@@ -1972,7 +1972,7 @@ where
 }
 
 /// A page wrapper
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct LlmpSharedMap<SHM> {
     /// Shmem containg the actual (unsafe) page,
     /// shared between one `LlmpSender` and one `LlmpReceiver`
@@ -3518,7 +3518,7 @@ where
 }
 
 /// A restorable client description
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct LlmpClientDescription {
     /// Description of the sender
     sender: LlmpDescription,

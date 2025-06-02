@@ -349,7 +349,7 @@ const V_MAX: f64 = 1.0;
 const V_MIN: f64 = 0.05;
 
 /// The `MOpt` mode to use
-#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum MOptMode {
     /// Pilot fuzzing mode
     Pilotfuzzing,

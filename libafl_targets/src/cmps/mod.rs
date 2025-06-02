@@ -80,7 +80,7 @@ pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 
 /// The header for `CmpLog` hits.
 #[repr(C)]
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct CmpLogHeader {
     hits: u16,
     shape: u8,
@@ -95,7 +95,7 @@ pub struct CmpLogHeader {
 /// two (left and right of comparison) u128 values, split into two u64 values. If the left and
 /// right values are smaller than u64, they can be sign or zero extended to 64 bits, as the actual
 /// comparison size is determined by the `hits` field of the associated `AflppCmpLogHeader`.
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Copy, Clone)]
 #[repr(C, packed)]
 pub struct AflppCmpLogOperands {
     v0: u64,
@@ -197,7 +197,7 @@ impl AflppCmpLogOperands {
 }
 
 /// The AFL++ `cmpfn_operands` struct
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Copy, Clone)]
 #[repr(C, packed)]
 /// Comparison function operands, like for strcmp/memcmp, represented as two byte arrays.
 pub struct AflppCmpLogFnOperands {
@@ -269,17 +269,17 @@ impl AflppCmpLogFnOperands {
 
 /// The operands logged during `CmpLog`.
 #[repr(C)]
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct CmpLogInstruction(u64, u64, u8);
 
 /// The routine arguments logged during `CmpLog`.
 #[repr(C)]
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct CmpLogRoutine([u8; CMPLOG_RTN_LEN], [u8; CMPLOG_RTN_LEN]);
 
 /// Union of cmplog operands and routines
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone)]
 pub union CmpLogVals {
     operands: [[CmpLogInstruction; CMPLOG_MAP_H]; CMPLOG_MAP_W],
     routines: [[CmpLogRoutine; CMPLOG_MAP_RTN_H]; CMPLOG_MAP_W],
@@ -291,7 +291,7 @@ impl Debug for CmpLogVals {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone)]
 #[repr(C, packed)]
 /// Comparison values
 pub union AflppCmpLogVals {
@@ -339,7 +339,7 @@ impl AflppCmpLogVals {
 
 /// A struct containing the `CmpLog` metadata for a `LibAFL` run.
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Copy, Clone)]
 pub struct CmpLogMap {
     headers: [CmpLogHeader; CMPLOG_MAP_W],
     vals: CmpLogVals,

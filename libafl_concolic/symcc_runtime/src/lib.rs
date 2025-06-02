@@ -201,6 +201,7 @@ macro_rules! impl_nop_runtime_fn {
 }
 
 /// This runtime does nothing and concretizes all expressions. Intended for testing purposes.
+#[derive(Debug, Copy, Clone)]
 pub struct NopRuntime;
 
 impl Runtime for NopRuntime {

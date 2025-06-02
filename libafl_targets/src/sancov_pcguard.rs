@@ -81,7 +81,7 @@ use core::marker::PhantomData;
 /// The hook to initialize ngram everytime we run the harness
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Copy, Clone)]
 pub struct NgramHook<I, S> {
     phantom: PhantomData<(I, S)>,
 }
@@ -89,7 +89,7 @@ pub struct NgramHook<I, S> {
 /// The hook to initialize ctx everytime we run the harness
 #[cfg(feature = "sancov_ctx")]
 #[rustversion::nightly]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Copy, Clone)]
 pub struct CtxHook<I, S> {
     phantom: PhantomData<(I, S)>,
 }

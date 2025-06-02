@@ -40,7 +40,7 @@ pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1)
 
 pub type StopExecutionCallback = Box<dyn FnMut(&mut SnapshotModule, Qemu)>;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct SnapshotPageInfo {
     pub addr: GuestAddr,
     pub perms: MmapPerms,
@@ -80,7 +80,7 @@ pub struct MappingInfo {
 /// It is supposed to be used primarily for debugging, its usage is discouraged.
 /// If you end up needing it, you most likely have an issue with the snapshot system.
 /// If this is the case, please [fill in an issue on the main repository](https://github.com/AFLplusplus/LibAFL/issues).
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum IntervalSnapshotFilter {
     All,
     AllowList(Vec<Range<GuestAddr>>),

@@ -30,7 +30,7 @@ use crate::{
 
 #[bitflags(default = SendToParent | SendToChildren)]
 #[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 /// The node policy. It represents flags that can be applied to the node to change how it behaves.
 pub enum NodePolicy {
     /// Send current node's interesting inputs to parent.
@@ -43,7 +43,7 @@ const DUMMY_BYTE: u8 = 0x14;
 
 /// Use `OwnedRef` as much as possible here to avoid useless copies.
 /// An owned TCP message for multi machine
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 // #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub enum MultiMachineMsg<'a, I> {
     /// A raw llmp message (not deserialized)
@@ -95,7 +95,7 @@ impl<'a, I> MultiMachineMsg<'a, I> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 /// A `NodeId` (unused for now)
 pub struct NodeId(pub u64);
 

@@ -20,7 +20,7 @@ use crate::{
 };
 
 /// An [`Input`] implementation for `Nautilus` grammar.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NautilusInput {
     /// The input representation as Tree
     pub tree: Tree,

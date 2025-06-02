@@ -5,7 +5,7 @@ const DEFAULT_TIMEOUT_SECS: u8 = 2;
 const DEFAULT_TIMEOUT_MICRO_SECS: u32 = 0;
 const DEFAULT_SNAP_MODE: bool = true;
 
-#[derive(Debug, Clone, Copy, TypedBuilder)]
+#[derive(Debug, Copy, Clone, TypedBuilder)]
 pub struct NyxSettings {
     /// The CPU core for the Nyx process.
     ///

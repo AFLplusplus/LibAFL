@@ -572,7 +572,7 @@ where
 
 /// A wrapper type to enable the indexing of [`MatchName`] implementors with `[]`.
 #[cfg(feature = "alloc")]
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 #[repr(transparent)]
 pub struct RefIndexable<RM, M>(RM, PhantomData<M>);
 

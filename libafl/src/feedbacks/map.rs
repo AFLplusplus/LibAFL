@@ -78,7 +78,7 @@ pub trait IsNovel<T> {
 }
 
 /// [`AllIsNovel`] consider everything a novelty. Here mostly just for debugging.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct AllIsNovel {}
 
 impl<T> IsNovel<T> for AllIsNovel
@@ -106,7 +106,7 @@ fn saturating_next_power_of_two<T: PrimInt>(n: T) -> T {
 }
 
 /// Consider as novelty if the reduced value is different from the old value.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct DifferentIsNovel {}
 
 impl<T> IsNovel<T> for DifferentIsNovel
@@ -120,7 +120,7 @@ where
 }
 
 /// Only consider as novel the values which are at least the next pow2 class of the old value
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct NextPow2IsNovel {}
 
 impl<T> IsNovel<T> for NextPow2IsNovel
@@ -141,7 +141,7 @@ where
 }
 
 /// Only consider `T::one()` or `T::max_value()`, if they are bigger than the old value, as novel
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct OneOrFilledIsNovel {}
 
 impl<T> IsNovel<T> for OneOrFilledIsNovel
@@ -233,7 +233,7 @@ impl MapNoveltiesMetadata {
 }
 
 /// The state of [`MapFeedback`]
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 #[expect(clippy::unsafe_derive_deserialize)] // for SerdeAny
 pub struct MapFeedbackMetadata<T> {
     /// Contains information about untouched entries
@@ -298,7 +298,7 @@ where
 }
 
 /// The most common AFL-like feedback type
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct MapFeedback<C, N, O, R> {
     /// New indexes observed in the last observation
     pub(crate) novelties: Option<Vec<usize>>,

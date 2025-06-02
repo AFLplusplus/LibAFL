@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// An item of the generalized input
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GeneralizedItem {
     /// Real bytes
     Bytes(Vec<u8>),
@@ -22,7 +22,7 @@ pub enum GeneralizedItem {
 }
 
 /// Metadata regarding the generalised content of an input
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)

@@ -947,7 +947,7 @@ where
 }
 
 /// The kind of manager we're creating right now
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Copy, Clone)]
 pub enum TcpManagerKind {
     /// Any kind will do
     Any,

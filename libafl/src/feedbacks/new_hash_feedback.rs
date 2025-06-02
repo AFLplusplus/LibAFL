@@ -31,7 +31,7 @@ pub trait HashSetState<T> {
 }
 
 /// The state of [`NewHashFeedback`]
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 #[expect(clippy::unsafe_derive_deserialize)]
 pub struct NewHashFeedbackMetadata {
     /// Contains information about untouched entries
@@ -88,7 +88,7 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 }
 
 /// A [`NewHashFeedback`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NewHashFeedback<O> {
     name: Cow<'static, str>,
     o_ref: Handle<O>,

@@ -58,7 +58,7 @@ use crate::monitors::{
 };
 
 /// Prometheus metrics for global and each client.
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct PrometheusStats {
     corpus_count: Family<Labels, Gauge>,
     objective_count: Family<Labels, Gauge>,

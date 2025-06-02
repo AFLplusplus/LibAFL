@@ -18,7 +18,7 @@ use crate::{
 };
 
 /// The result of a differential test between two observers.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DiffResult {
     /// The two observers report the same outcome.
     Equal,

@@ -15,7 +15,7 @@ use crate::{
     state::HasCorpus,
 };
 
-#[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Default, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)

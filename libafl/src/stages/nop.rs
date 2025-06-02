@@ -3,7 +3,7 @@
 use super::{Restartable, Stage};
 
 /// A stage that does nothing
-#[derive(Debug, Default)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct NopStage {}
 
 impl NopStage {

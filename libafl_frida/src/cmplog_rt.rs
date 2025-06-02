@@ -72,7 +72,7 @@ fn gum_red_zone_size_i32() -> i32 {
 }
 
 /// The type of an operand loggged during `CmpLog`
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Copy, Clone)]
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 pub enum CmplogOperandType {
     /// A Register
@@ -85,7 +85,7 @@ pub enum CmplogOperandType {
 }
 
 /// The type of an operand loggged during `CmpLog`
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Copy, Clone)]
 #[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
 pub enum CmplogOperandType {
     /// A Register

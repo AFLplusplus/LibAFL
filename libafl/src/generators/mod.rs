@@ -71,7 +71,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 /// Generates random bytes
 pub struct RandBytesGenerator {
     min_size: NonZeroUsize,
@@ -111,7 +111,7 @@ impl RandBytesGenerator {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 /// Generates random printable characters
 pub struct RandPrintablesGenerator {
     min_size: NonZeroUsize,

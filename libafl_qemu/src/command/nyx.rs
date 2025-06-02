@@ -125,7 +125,7 @@ macro_rules! define_nyx_command_manager {
                 }
             }
 
-            #[derive(Clone, Debug)]
+            #[derive(Debug, Clone)]
             pub enum [<$name Commands>]
             {
                 // StartPhysCommand(StartPhysCommand)

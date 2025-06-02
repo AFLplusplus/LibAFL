@@ -128,7 +128,7 @@ struct YamlInjectionEntry {
     tests: Vec<Test>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 struct FunctionDescription {
     param: u8,
 }
@@ -140,14 +140,14 @@ pub struct InjectionDefinition {
     functions: HashMap<String, FunctionDescription>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct Matches {
     id: usize,
     lib_name: String,
     matches: Vec<Match>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct Match {
     bytes_lower: Vec<u8>,
     original_value: String,

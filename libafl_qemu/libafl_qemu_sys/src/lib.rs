@@ -103,10 +103,10 @@ pub type GuestVirtAddr = vaddr;
 pub type GuestHwAddrInfo = qemu_plugin_hwaddr;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FatPtr(pub *const c_void, pub *const c_void);
 
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Copy, Clone, EnumIter, PartialEq, Eq)]
 #[repr(i32)]
 pub enum MmapPerms {
     None = 0,

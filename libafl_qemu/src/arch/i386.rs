@@ -15,7 +15,7 @@ impl CallingConvention {
     pub const Default: CallingConvention = CallingConvention::Cdecl;
 }
 
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Copy, Clone, EnumIter)]
 #[repr(i32)]
 pub enum Regs {
     Eax = 0,

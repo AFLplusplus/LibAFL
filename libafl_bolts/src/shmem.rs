@@ -108,7 +108,7 @@ pub type StdServedShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemP
 
 /// Description of a shared map.
 /// May be used to restore the map by id.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct ShMemDescription {
     /// Size of this map
     pub size: usize,
@@ -135,7 +135,7 @@ impl ShMemDescription {
 /// That means you have to use shmem server to access to the shmem segment from other processes in these cases.
 /// On the other hand, id is a unique identifier if you use `CommonUnixShMem` or `Win32ShMem`.
 /// In these two cases, you can use shmat(id) or `OpenFileMappingA`(id) to gain access to the shmem
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct ShMemId {
     id: [u8; 20],
 }
@@ -359,7 +359,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
 /// # Note
 /// If you just want a simple shared memory implementation, use [`StdShMemProvider`] instead.
 #[cfg(feature = "alloc")]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct NopShMemProvider;
 
 #[cfg(feature = "alloc")]
@@ -700,7 +700,7 @@ pub mod unix_shmem {
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
         /// Default on `MacOS` and `iOS`, where we need a central point to unmap
         /// shared mem segments for dubious Mach kernel reasons.
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone)]
         pub struct MmapShMem {
             /// The path of this shared memory segment.
             /// None in case we didn't [`shm_open`] this ourselves, but someone sent us the FD.
@@ -967,7 +967,7 @@ pub mod unix_shmem {
 
         /// A [`ShMemProvider`] which uses [`shm_open`] and [`mmap`] to provide shared memory mappings.
         #[cfg(unix)]
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone)]
         pub struct MmapShMemProvider {}
 
         impl MmapShMemProvider {
@@ -1031,7 +1031,7 @@ pub mod unix_shmem {
         }
 
         /// The default sharedmap impl for unix using shmctl & shmget
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone)]
         pub struct CommonUnixShMem {
             id: ShMemId,
             map: *mut u8,
@@ -1132,7 +1132,7 @@ pub mod unix_shmem {
 
         /// A [`ShMemProvider`] which uses `shmget`/`shmat`/`shmctl` to provide shared memory mappings.
         #[cfg(unix)]
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone)]
         pub struct CommonUnixShMemProvider {}
 
         unsafe impl Send for CommonUnixShMemProvider {}
@@ -1186,7 +1186,7 @@ pub mod unix_shmem {
         };
 
         /// An ashmem based impl for linux/android
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone)]
         pub struct AshmemShMem {
             id: ShMemId,
             map: *mut u8,
@@ -1350,7 +1350,7 @@ pub mod unix_shmem {
         }
 
         /// A [`ShMemProvider`] which uses ashmem to provide shared memory mappings.
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone)]
         pub struct AshmemShMemProvider {}
 
         unsafe impl Send for AshmemShMemProvider {}
@@ -1408,7 +1408,7 @@ pub mod unix_shmem {
 
         /// An memfd based impl for linux/android
         #[cfg(unix)]
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone)]
         pub struct MemfdShMem {
             id: ShMemId,
             map: *mut u8,
@@ -1529,7 +1529,7 @@ pub mod unix_shmem {
 
         /// A [`ShMemProvider`] which uses memfd to provide shared memory mappings.
         #[cfg(unix)]
-        #[derive(Clone, Debug)]
+        #[derive(Debug, Clone)]
         pub struct MemfdShMemProvider {}
 
         unsafe impl Send for MemfdShMemProvider {}
@@ -1731,7 +1731,7 @@ pub mod win32_shmem {
     }
 
     /// A [`ShMemProvider`] which uses `win32` functions to provide shared memory mappings.
-    #[derive(Clone, Debug)]
+    #[derive(Debug, Clone)]
     pub struct Win32ShMemProvider {}
 
     impl Default for Win32ShMemProvider {

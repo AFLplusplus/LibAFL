@@ -31,7 +31,7 @@ use crate::{
 };
 
 /// Wraps a [`TracingStage`] to add concolic observing.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct ConcolicTracingStage<'a, EM, I, TE, S, Z> {
     name: Cow<'static, str>,
     inner: TracingStage<EM, I, TE, S, Z>,
@@ -357,7 +357,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
 /// A mutational stage that uses Z3 to solve concolic constraints attached to the [`crate::corpus::Testcase`] by the [`ConcolicTracingStage`].
 #[cfg(feature = "concolic_mutation")]
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SimpleConcolicMutationalStage<I, Z> {
     name: Cow<'static, str>,
     phantom: PhantomData<(I, Z)>,

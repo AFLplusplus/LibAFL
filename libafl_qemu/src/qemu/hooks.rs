@@ -388,7 +388,7 @@ macro_rules! create_exec_wrapper {
 macro_rules! create_hook_id {
     ($name:ident, $sys:ident,true) => {
         paste::paste! {
-            #[derive(Clone, Copy, PartialEq, Debug)]
+            #[derive(Copy, Clone, PartialEq, Debug)]
             pub struct [<$name HookId>](pub(crate) usize);
             impl [<$name HookId>] {
                 #[must_use]
@@ -405,7 +405,7 @@ macro_rules! create_hook_id {
     };
     ($name:ident, $sys:ident,false) => {
         paste::paste! {
-            #[derive(Clone, Copy, PartialEq, Debug)]
+            #[derive(Copy, Clone, PartialEq, Debug)]
             pub struct [<$name HookId>](pub(crate) usize);
             impl [<$name HookId>] {
                 #[must_use]
@@ -967,7 +967,7 @@ pub type CrashHookClosure<ET, I, S> = Box<dyn FnMut(Qemu, &mut EmulatorModules<E
 ///
 /// • **Crash** hooks: to hook crashes in the virtual CPU in user
 ///   mode;
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct QemuHooks {
     _private: (),
 }

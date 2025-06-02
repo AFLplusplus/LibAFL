@@ -289,7 +289,7 @@ impl_rng_core!(RomuDuoJrRand);
 impl_rng_core!(Sfc64Rand);
 
 /// xoshiro256++ PRNG: <https://prng.di.unimi.it/>
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Xoshiro256PlusPlusRand {
     s: [u64; 4],
 }
@@ -334,7 +334,7 @@ impl Xoshiro256PlusPlusRand {
 }
 
 /// Xorshift64 PRNG
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct XorShift64Rand {
     s: u64,
 }
@@ -366,7 +366,7 @@ impl XorShift64Rand {
 }
 
 /// Lehmer64 PRNG
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Lehmer64Rand {
     s: u128,
 }
@@ -398,7 +398,7 @@ impl Lehmer64Rand {
 
 /// Extremely quick rand implementation
 /// see <https://arxiv.org/pdf/2002.11331.pdf>
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct RomuTrioRand {
     x_state: u64,
     y_state: u64,
@@ -440,7 +440,7 @@ impl Rand for RomuTrioRand {
 }
 
 /// see <https://arxiv.org/pdf/2002.11331.pdf>
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct RomuDuoJrRand {
     x_state: u64,
     y_state: u64,
@@ -478,7 +478,7 @@ impl Rand for RomuDuoJrRand {
 /// [SFC64][1] algorithm by Chris Doty-Humphrey.
 ///
 /// [1]: https://numpy.org/doc/stable/reference/random/bit_generators/sfc64.html
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Sfc64Rand {
     a: u64,
     b: u64,
@@ -524,7 +524,7 @@ impl Rand for Sfc64Rand {
 }
 
 /// fake rand, for testing purposes
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct XkcdRand {
     val: u64,
 }

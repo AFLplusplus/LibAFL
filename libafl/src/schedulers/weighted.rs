@@ -31,7 +31,7 @@ use crate::{
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WeightedScheduleMetadata {
     /// The fuzzer execution spent in the current cycles
     runs_in_current_cycle: usize,
@@ -95,7 +95,7 @@ impl WeightedScheduleMetadata {
 libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct WeightedScheduler<C, F, O> {
     table_invalidated: bool,
     strat: Option<PowerSchedule>,

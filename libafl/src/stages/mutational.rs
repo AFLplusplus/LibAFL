@@ -95,7 +95,7 @@ pub trait MutationalStage<S> {
 pub const DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 
 /// The default mutational stage
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct StdMutationalStage<E, EM, I1, I2, M, S, Z> {
     /// The name
     name: Cow<'static, str>,
@@ -291,7 +291,7 @@ where
     }
 }
 /// A mutational stage that operates on multiple inputs, as returned by [`MultiMutator::multi_mutate`].
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct MultiMutationalStage<E, EM, I, M, S, Z> {
     name: Cow<'static, str>,
     mutator: M,

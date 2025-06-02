@@ -76,7 +76,7 @@ pub struct ServedShMemProvider<SP> {
 
 /// [`ShMem`] that got served from a [`ShMemService`] via domain sockets and can now be used in this program.
 /// It works around Android's lack of "proper" shared maps.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct ServedShMem<SHM> {
     inner: ManuallyDrop<SHM>,
     server_fd: i32,
@@ -266,7 +266,7 @@ where
 }
 
 /// A request sent to the [`ShMem`] server to receive a fd to a shared map
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum ServedShMemRequest {
     /// Register a new map with a given size.
     NewMap(usize),
@@ -310,7 +310,7 @@ enum ServedShMemResponse<SHM> {
 }
 
 /// Report the status of the [`ShMem`] background thread start status
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum ShMemServiceStatus {
     Starting,
     Started,

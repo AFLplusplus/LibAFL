@@ -28,7 +28,7 @@ use super::Rand;
 use crate::Error;
 
 /// Helper struct for [`LoadedDiceSampler`]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct AliasEntry {
     val: usize,
     alias: usize,
@@ -47,7 +47,7 @@ impl AliasEntry {
 }
 
 /// A simple [`LoadedDiceSampler`]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LoadedDiceSampler {
     entries: Vec<AliasEntry>,
 }

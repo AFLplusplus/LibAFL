@@ -44,7 +44,7 @@ impl fmt::Display for UserStats {
 }
 
 /// Definition of how we aggregate this across multiple clients
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum AggregatorOps {
     /// Do nothing
     None,
