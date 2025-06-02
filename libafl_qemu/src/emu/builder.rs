@@ -11,7 +11,7 @@ use crate::{
     Emulator, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError, QemuParams,
     StdEmulatorDriver, StdSnapshotManager,
     command::{NopCommandManager, StdCommandManager},
-    config::QemuConfigBuilder,
+    parameters::config::QemuConfigBuilder,
     modules::{EmulatorModule, EmulatorModuleTuple},
 };
 

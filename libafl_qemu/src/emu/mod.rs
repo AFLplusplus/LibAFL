@@ -44,7 +44,7 @@ mod systemmode;
 #[cfg(feature = "systemmode")]
 pub use systemmode::*;
 
-use crate::config::QemuConfigBuilder;
+use crate::parameters::config::QemuConfigBuilder;
 
 #[derive(Clone, Copy)]
 pub enum GuestAddrKind {
