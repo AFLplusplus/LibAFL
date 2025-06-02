@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{corpus::CorpusId, inputs::Input};
 
 /// A terminal for gramatron grammar fuzzing
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Terminal {
     /// The state
     pub state: usize,
@@ -35,7 +35,7 @@ impl Terminal {
 }
 
 /// An input for gramatron grammar fuzzing
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct GramatronInput {
     /// The input representation as list of terminals
     terms: Vec<Terminal>,

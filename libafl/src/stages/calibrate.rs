@@ -41,7 +41,7 @@ pub const CALIBRATION_STAGE_NAME: &str = "calibration";
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UnstableEntriesMetadata {
     unstable_entries: HashSet<usize>,
     filled_entries_count: usize,
@@ -78,7 +78,7 @@ impl Default for UnstableEntriesMetadata {
 }
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct CalibrationStage<C, E, I, O, OT, S> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,

@@ -12,7 +12,7 @@ use crate::{
     modules::EmulatorModuleTuple,
 };
 
-#[derive(Clone, Debug, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder)]
 #[allow(clippy::struct_excessive_bools)] // cfg dependent
 pub struct NyxEmulatorDriver {
     #[builder(default = OnceCell::new())]

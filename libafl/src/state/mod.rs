@@ -199,7 +199,7 @@ impl<I, S, Z> Debug for LoadConfig<'_, I, S, Z> {
 }
 
 /// The state a fuzz run.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(bound = "
         C: serde::Serialize + for<'a> serde::Deserialize<'a>,
         R: serde::Serialize + for<'a> serde::Deserialize<'a>,
@@ -1198,7 +1198,7 @@ impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC> {
 }
 
 /// A very simple state without any bells or whistles, for testing.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
     named_metadata: NamedSerdeAnyMap,

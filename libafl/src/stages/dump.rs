@@ -27,7 +27,7 @@ use crate::{
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub struct DumpToDiskMetadata {
     last_corpus: Option<CorpusId>,
     last_solution: Option<CorpusId>,

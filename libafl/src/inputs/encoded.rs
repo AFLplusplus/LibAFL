@@ -44,7 +44,7 @@ pub trait Tokenizer {
 }
 
 /// A token input encoder/decoder
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct TokenInputEncoderDecoder {
     /// The table of tokens
     token_table: HashMap<String, u32>,
@@ -109,7 +109,7 @@ impl Default for TokenInputEncoderDecoder {
 
 /// A naive tokenizer struct
 #[cfg(feature = "regex")]
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct NaiveTokenizer {
     /// Ident regex
     ident_re: Regex,
@@ -193,7 +193,7 @@ impl Tokenizer for NaiveTokenizer {
 }
 
 /// A codes input is the basic input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct EncodedInput {
     /// The input representation as list of codes
     codes: Vec<u32>,

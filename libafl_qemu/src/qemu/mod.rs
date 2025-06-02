@@ -111,12 +111,12 @@ pub enum QemuExitReason {
 /// The thin wrapper around QEMU.
 /// It is considered unsafe to use it directly.
 /// Prefer using `Emulator` instead in case of doubt.
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Qemu {
     _private: (),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum QemuParams {
     // QemuConfig is quite big, at least 240 bytes so we use a Box
     Config(Box<QemuConfig>),
@@ -151,7 +151,7 @@ pub struct MemAccessInfo {
     oi: libafl_qemu_sys::MemOpIdx,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Copy, Clone)]
 #[repr(transparent)]
 pub struct CPU {
     cpu_ptr: CPUStatePtr,

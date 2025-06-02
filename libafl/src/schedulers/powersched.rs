@@ -25,7 +25,7 @@ pub const N_FUZZ_SIZE: usize = 1 << 21;
 libafl_bolts::impl_serdeany!(SchedulerMetadata);
 
 /// The metadata used for power schedules
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)
@@ -251,7 +251,7 @@ impl PowerSchedule {
 }
 
 /// The power schedule to use
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum BaseSchedule {
     /// The `explore` power schedule
@@ -271,7 +271,7 @@ pub enum BaseSchedule {
 /// A corpus scheduler using power schedules
 /// Note that this corpus is merely holding the metadata necessary for the power calculation
 /// and here we DON'T actually calculate the power (we do it in the stage)
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct PowerQueueScheduler<C, O> {
     queue_cycles: u64,
     strat: PowerSchedule,

@@ -59,7 +59,7 @@ impl<T> HasRefCnt for ListFeedbackMetadata<T> {
 }
 
 /// Consider interesting a testcase if the list in `ListObserver` is not empty.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct ListFeedback<T> {
     observer_handle: Handle<ListObserver<T>>,
     novelty: HashSet<T>,

@@ -28,7 +28,7 @@ use crate::{
 
 /// An input composed of multiple parts. Use in situations where subcomponents are not necessarily
 /// related, or represent distinct parts of the input.
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub struct ListInput<I> {
     parts: Vec<I>,
 }

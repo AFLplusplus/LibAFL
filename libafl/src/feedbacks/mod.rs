@@ -610,7 +610,7 @@ pub type EagerOrFeedback<A, B> = CombinedFeedback<A, B, LogicEagerOr>;
 pub type FastOrFeedback<A, B> = CombinedFeedback<A, B, LogicFastOr>;
 
 /// Compose feedbacks with an `NOT` operation
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct NotFeedback<A> {
     /// The feedback to invert
     pub inner: A,
@@ -810,7 +810,7 @@ impl ExitKindLogic for GenericDiffLogic {
 
 /// A generic exit type checking feedback. Use [`CrashFeedback`], [`TimeoutFeedback`], or
 /// [`DiffExitKindFeedback`] directly instead.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExitKindFeedback<L> {
     #[cfg(feature = "track_hit_feedbacks")]
     /// The previous run's result of [`Self::is_interesting`]
@@ -900,7 +900,7 @@ pub type DiffExitKindFeedback = ExitKindFeedback<GenericDiffLogic>;
 /// Nop feedback that annotates execution time in the new testcase, if any
 /// for this Feedback, the testcase is never interesting (use with an OR).
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeFeedback {
     observer_handle: Handle<TimeObserver>,
 }
@@ -954,7 +954,7 @@ impl TimeFeedback {
 
 /// The [`ConstFeedback`] reports the same value, always.
 /// It can be used to enable or disable feedback results through composition.
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ConstFeedback {
     /// Always returns `true`
     True,

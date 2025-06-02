@@ -46,7 +46,7 @@ pub use systemmode::*;
 
 use crate::config::QemuConfigBuilder;
 
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone)]
 pub enum GuestAddrKind {
     Physical(GuestPhysAddr),
     Virtual(GuestVirtAddr),

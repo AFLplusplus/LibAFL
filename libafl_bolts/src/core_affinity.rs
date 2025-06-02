@@ -49,7 +49,7 @@ pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
 }
 
 /// This represents a CPU core.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[repr(transparent)]
 pub struct CoreId(
     /// The numerical `id` of a core

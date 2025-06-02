@@ -402,7 +402,7 @@ where
 }
 
 /// Wrap a slice and convert to a Vec on serialize
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 enum OwnedSliceInner<'a, T: 'a + Sized> {
     /// A ref to a raw slice and length
     RefRaw(*const T, usize, UnsafeMarker),
@@ -1070,7 +1070,7 @@ impl<'a, T, const N: usize> From<&'a mut &'a mut [T; N]> for OwnedMutSizedSlice<
 }
 
 /// Wrap a C-style pointer and convert to a Box on serialize
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum OwnedPtr<T: Sized> {
     /// Ptr to the content
     Ptr(*const T),
@@ -1139,7 +1139,7 @@ where
 }
 
 /// Wrap a C-style mutable pointer and convert to a Box on serialize
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum OwnedMutPtr<T: Sized> {
     /// A mut ptr to the content
     Ptr(*mut T),

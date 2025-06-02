@@ -15,7 +15,7 @@ pub mod libc;
 pub mod linux;
 
 #[repr(usize)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 #[allow(dead_code)]
 enum HostAction {
     CheckLoad,

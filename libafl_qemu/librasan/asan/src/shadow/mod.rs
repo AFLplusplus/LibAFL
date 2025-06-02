@@ -22,7 +22,7 @@ pub mod guest;
 pub mod host;
 
 #[repr(u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum PoisonType {
     AsanValid = 0x00,
     AsanPartial1 = 0x01,

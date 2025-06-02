@@ -112,7 +112,9 @@ where
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct NopEmulatorDriver;
+
 impl<C, CM, ET, I, S, SM> EmulatorDriver<C, CM, ET, I, S, SM> for NopEmulatorDriver
 where
     C: Clone,
@@ -122,7 +124,7 @@ where
 {
 }
 
-#[derive(Clone, Debug, Default, TypedBuilder)]
+#[derive(Debug, Clone, Default, TypedBuilder)]
 #[allow(clippy::struct_excessive_bools)] // cfg dependent
 pub struct StdEmulatorDriver {
     #[builder(default = OnceCell::new())]

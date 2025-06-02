@@ -202,13 +202,13 @@ where
 ///
 /// It will allow anything in the registered ranges, and deny anything else.
 /// If there is no range registered, it will allow anything.
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct AddressFilterVec {
     // ideally, we should use a tree
     registered_addresses: Vec<Range<GuestAddr>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct StdAddressFilter(FilterList<AddressFilterVec>);
 
 impl Default for StdAddressFilter {
@@ -280,13 +280,13 @@ impl AddressFilter for StdAddressFilter {
 ///
 /// It will allow anything in the registered pages, and deny anything else.
 /// If there is no page registered, it will allow anything.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct PageFilterVec {
     registered_pages: HashSet<GuestPhysAddr>,
 }
 
 #[cfg(feature = "systemmode")]
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct StdPageFilter(FilterList<PageFilterVec>);
 
 #[cfg(feature = "usermode")]
@@ -355,8 +355,9 @@ pub trait AddressFilter: 'static + Debug {
     fn allowed(&self, address: &GuestAddr) -> bool;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct NopAddressFilter;
+
 impl AddressFilter for NopAddressFilter {
     fn register(&mut self, _address: &Range<GuestAddr>) {}
 
@@ -371,8 +372,9 @@ pub trait PageFilter: 'static + Debug {
     fn allowed(&self, page_id: &GuestPhysAddr) -> bool;
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct NopPageFilter;
+
 impl PageFilter for NopPageFilter {
     fn register(&mut self, _page_id: GuestPhysAddr) {}
 
@@ -398,7 +400,7 @@ mod tests {
         StdPageFilter,
     };
 
-    #[derive(Clone, Debug)]
+    #[derive(Debug, Clone)]
     struct DummyModule<AF, PF> {
         address_filter: AF,
         page_filter: PF,

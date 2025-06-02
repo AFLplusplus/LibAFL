@@ -31,7 +31,7 @@ static mut POWER_MUTATIONAL_STAGE_ID: usize = 0;
 /// Default name for `PowerMutationalStage`; derived from AFL++
 pub const POWER_MUTATIONAL_STAGE_NAME: &str = "power";
 /// The mutational stage using power schedules
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct PowerMutationalStage<E, F, EM, I, M, S, Z> {
     name: Cow<'static, str>,
     /// The mutators we use

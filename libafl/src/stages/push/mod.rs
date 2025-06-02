@@ -34,7 +34,7 @@ use crate::{
 
 // The shared state for all [`PushStage`]s
 /// Should be stored inside a `[Rc<RefCell<_>>`]
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct PushStageSharedState<EM, I, OT, S, Z> {
     /// The state
     pub state: S,
@@ -62,7 +62,7 @@ impl<EM, I, OT, S, Z> PushStageSharedState<EM, I, OT, S, Z> {
 }
 
 /// Helper class for the [`PushStage`] trait, taking care of borrowing the shared state
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct PushStageHelper<EM, I, OT, S, Z> {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.

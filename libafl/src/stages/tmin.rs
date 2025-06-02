@@ -41,7 +41,7 @@ use crate::{
 };
 
 /// The default corpus entry minimising mutational stage
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z> {
     /// The name
     name: Cow<'static, str>,
@@ -334,7 +334,7 @@ impl<E, EM, F, FF, I, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z> 
 
 /// A feedback which checks if the hash of the current observed value is equal to the original hash
 /// provided
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct ObserverEqualityFeedback<C, M, S> {
     name: Cow<'static, str>,
     observer_handle: Handle<C>,

@@ -200,7 +200,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tree {
     pub rules: Vec<RuleIdOrCustom>,
     pub sizes: Vec<usize>,

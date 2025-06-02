@@ -18,7 +18,7 @@ pub unsafe extern "C" fn __libafl_target_call_hook(id: usize) {
 }
 
 /// The empty struct to clear the `FUNCTION_LIST` before the execution
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct CallHook<I, S> {
     phantom: PhantomData<(I, S)>,
 }

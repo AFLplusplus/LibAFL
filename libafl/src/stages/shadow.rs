@@ -23,7 +23,7 @@ use crate::{
 };
 
 /// A stage that runs the shadow executor using also the shadow observers
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct ShadowTracingStage<E, EM, I, SOT, S, Z> {
     name: Cow<'static, str>,
     phantom: PhantomData<(E, EM, I, SOT, S, Z)>,

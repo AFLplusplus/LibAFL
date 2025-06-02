@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// A trigger
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Trigger {
     /// the destination
     pub dest: usize,
@@ -22,7 +22,7 @@ pub struct Trigger {
 }
 
 /// The [`Automaton`]
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Automaton {
     /// final state
     pub final_state: usize,
@@ -32,7 +32,7 @@ pub struct Automaton {
     pub pda: Vec<Vec<Trigger>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 /// Generates random inputs from a grammar automaton
 pub struct GramatronGenerator<'a, S> {
     automaton: &'a Automaton,

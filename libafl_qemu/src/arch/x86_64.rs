@@ -13,7 +13,7 @@ impl CallingConvention {
     pub const Default: CallingConvention = CallingConvention::SystemV;
 }
 
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Copy, Clone, EnumIter)]
 #[repr(i32)]
 pub enum Regs {
     Rax = 0,

@@ -58,7 +58,7 @@ pub trait Monitor {
 
 /// Monitor that print exactly nothing.
 /// Not good for debugging, very good for speed.
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct NopMonitor {}
 
 impl Monitor for NopMonitor {

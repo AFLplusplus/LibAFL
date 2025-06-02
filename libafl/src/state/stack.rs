@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// A stack to keep track of which stage is executing
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct StageStack {
     /// The stage indexes for each nesting of stages
     stage_idx_stack: Vec<StageId>,

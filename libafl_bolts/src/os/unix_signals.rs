@@ -274,7 +274,7 @@ unsafe extern "C" {
 }
 
 /// All signals on this system, as `enum`.
-#[derive(Debug, IntoPrimitive, TryFromPrimitive, Clone, Copy)]
+#[derive(Debug, IntoPrimitive, TryFromPrimitive, Copy, Clone)]
 #[repr(i32)]
 pub enum Signal {
     /// `SIGABRT` signal id

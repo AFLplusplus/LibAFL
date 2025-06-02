@@ -34,7 +34,7 @@ where
 pub type PacketLenMinimizerScheduler<CS, I, S> =
     MinimizerScheduler<CS, PacketLenTestcaseScore, I, MapIndexesMetadata, S>;
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct PacketLenFeedback {
     len: u64,
 }

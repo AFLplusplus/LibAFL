@@ -5,14 +5,14 @@ use libafl_qemu_sys::{CPUStatePtr, GuestAddr};
 
 use crate::CallingConvention;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum QemuError {
     Init(QemuInitError),
     Exit(QemuExitError),
     RW(QemuRWError),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum QemuInitError {
     MultipleInstances,
     NoParametersProvided,
@@ -21,19 +21,19 @@ pub enum QemuInitError {
     TooManyArgs(usize),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum QemuExitError {
     UnknownKind, // Exit reason was not NULL, but exit kind is unknown. Should never happen.
     UnexpectedExit, // Qemu exited without going through an expected exit point. Can be caused by a crash for example.
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum QemuRWErrorKind {
     Read,
     Write,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum QemuRWErrorCause {
     WrongCallingConvention(CallingConvention, CallingConvention), // expected, given
     WrongArgument(u8),
@@ -42,7 +42,7 @@ pub enum QemuRWErrorCause {
     WrongMemoryLocation(GuestAddr, usize), // addr, size
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 #[expect(dead_code)]
 pub struct QemuRWError {
     kind: QemuRWErrorKind,

@@ -24,7 +24,7 @@ pub const TRANSFERRED_FEEDBACK_NAME: Cow<'static, str> =
 /// [`crate::EvaluatorObservers::evaluate_input_with_observers`] or
 /// [`crate::ExecutionProcessor::process_execution`] calls with setting this metadata to true/false
 /// before and after.
-#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct TransferringMetadata {
     transferring: bool,
 }
@@ -40,7 +40,7 @@ impl TransferringMetadata {
 
 /// Simple feedback which may be used to test whether the testcase was transferred from another node
 /// in a multi-node fuzzing arrangement.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct TransferredFeedback {
     #[cfg(feature = "track_hit_feedbacks")]
     // The previous run's result of `Self::is_interesting`

@@ -42,7 +42,7 @@ impl<E, I, S> VerifyTimeoutsStage<E, I, S> {
 }
 
 /// Timeouts that `VerifyTimeoutsStage` will read from
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 #[serde(bound = "I: for<'a> Deserialize<'a> + Serialize")]
 pub struct TimeoutsToVerify<I> {
     inputs: VecDeque<I>,

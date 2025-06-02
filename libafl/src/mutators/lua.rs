@@ -259,49 +259,17 @@ mod tests {
     #[cfg(feature = "std")]
     use std::println;
 
-    use libafl_bolts::{Error, rands::StdRand, serdeany::SerdeAnyMap};
+    use libafl_bolts::Error;
 
     use crate::{
-        HasMetadata,
         inputs::BytesInput,
         mutators::{MutationResult, Mutator, lua::LuaMutator},
-        state::{HasMaxSize, HasRand},
+        state::NopState,
     };
-
-    struct NopState(StdRand);
-    impl HasRand for NopState {
-        type Rand = StdRand;
-
-        fn rand(&self) -> &Self::Rand {
-            &self.0
-        }
-
-        fn rand_mut(&mut self) -> &mut Self::Rand {
-            &mut self.0
-        }
-    }
-    impl HasMaxSize for NopState {
-        fn max_size(&self) -> usize {
-            1337
-        }
-
-        fn set_max_size(&mut self, _max_size: usize) {
-            unimplemented!()
-        }
-    }
-    impl HasMetadata for NopState {
-        fn metadata_map(&self) -> &SerdeAnyMap {
-            unimplemented!()
-        }
-
-        fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
-            unimplemented!()
-        }
-    }
 
     #[test]
     fn simple_test() {
-        let mut state = NopState(StdRand::with_seed(1337));
+        let mut state: NopState<BytesInput> = NopState::new();
 
         let mut lua_mutator = LuaMutator::new(
             &mut state,
@@ -319,16 +287,20 @@ mod tests {
 
         let bytes = vec![0, 1, 2, 3, 4];
         let mut bytesinput = BytesInput::new(bytes);
-        let mutation_result = lua_mutator.mutate(&mut state, &mut bytesinput).unwrap();
-        assert!(matches!(mutation_result, MutationResult::Mutated));
-
-        #[cfg(feature = "std")]
-        println!("MutationResult: {mutation_result:?}");
+        for _i in 0..10 {
+            let mutation_result = lua_mutator.mutate(&mut state, &mut bytesinput).unwrap();
+            if matches!(mutation_result, MutationResult::Mutated) {
+                #[cfg(feature = "std")]
+                println!("MutationResult: {mutation_result:?} after {_i} iterations");
+                return;
+            }
+        }
+        panic!("LuaMutator did not mutate once in 10 tries!");
     }
 
     #[test]
     fn test_timeout() {
-        let mut state = NopState(StdRand::with_seed(1337));
+        let mut state: NopState<BytesInput> = NopState::new();
 
         assert!(
             matches!(

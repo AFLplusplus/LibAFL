@@ -95,7 +95,7 @@ impl SignalHandler for ShutdownSignalData {
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManagers`, such as [`LlmpRestartingEventManager`].
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct EventManagerId(
     /// The id
@@ -109,7 +109,7 @@ use crate::monitors::stats::ClientPerfStats;
 use crate::state::HasCurrentStageId;
 
 /// The log event severity
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum LogSeverity {
     /// Debug severity
     Debug,
@@ -153,7 +153,7 @@ pub enum BrokerEventResult {
 }
 
 /// Distinguish a fuzzer by its config
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EventConfig {
     /// Always assume unique setups for fuzzer configs
     AlwaysUnique,
@@ -239,7 +239,7 @@ where
 */
 
 /// Basic statistics
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExecStats {
     /// The time of generation of the [`Event`]
     time: Duration,
@@ -256,7 +256,7 @@ impl ExecStats {
 }
 
 /// Event with associated stats
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventWithStats<I> {
     /// The event
     event: Event<I>,
@@ -298,7 +298,7 @@ impl<I> EventWithStats<I> {
 
 // TODO remove forward_id as not anymore needed for centralized
 /// Events sent around in the library
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Event<I> {
     // TODO use an ID to keep track of the original index in the sender Corpus
     // The sender can then use it to send Testcase metadata with CustomEvent
@@ -616,7 +616,7 @@ pub trait HasEventManagerId {
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct NopEventManager {}
 
 impl NopEventManager {

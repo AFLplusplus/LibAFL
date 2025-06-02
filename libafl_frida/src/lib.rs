@@ -81,7 +81,7 @@ pub mod frida_helper_shutdown_observer;
 
 use libafl_bolts::core_affinity::{CoreId, Cores, get_core_ids};
 /// A representation of the various Frida options
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct FridaOptions {
     enable_asan: bool,

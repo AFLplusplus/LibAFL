@@ -16,7 +16,7 @@ use crate::MmapPerms;
 #[cfg(target_os = "linux")]
 use crate::{GuestAddr, libafl_mapinfo};
 
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Copy, Clone, EnumIter, PartialEq, Eq)]
 #[repr(i32)]
 pub enum VerifyAccess {
     Read = libc::PROT_READ,

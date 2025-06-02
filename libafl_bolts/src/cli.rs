@@ -107,7 +107,7 @@ fn parse_instrumentation_location(
 
 /// The scripting engine to use for JavaScript scripting support
 #[cfg(feature = "frida_cli")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, ValueEnum, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, ValueEnum, Default)]
 pub enum FridaScriptBackend {
     /// The Google V8 engine
     V8,
@@ -117,7 +117,7 @@ pub enum FridaScriptBackend {
 }
 
 /// Top-level container for cli options/arguments/subcommands
-#[derive(Parser, Clone, Debug, Serialize, Deserialize)]
+#[derive(Parser, Debug, Clone, Serialize, Deserialize)]
 #[command(
     arg_required_else_help(true),
     subcommand_precedence_over_arg(true),

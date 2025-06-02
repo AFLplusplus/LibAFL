@@ -129,7 +129,7 @@ pub const VCPP_EXCEPTION_ERROR_INVALID_PARAMETER: i32 = 0xC06D0057;
 pub const VCPP_EXCEPTION_ERROR_MOD_NOT_FOUND: i32 = 0xC06D007E;
 pub const VCPP_EXCEPTION_ERROR_PROC_NOT_FOUND: i32 = 0xC06D007F;
 
-#[derive(Debug, FromPrimitive, Clone, Copy)]
+#[derive(Debug, FromPrimitive, Copy, Clone)]
 #[repr(i32)]
 pub enum ExceptionCode {
     // From https://github.com/wine-mirror/wine/blob/master/include/winnt.h#L611

@@ -18,7 +18,7 @@ use libafl_bolts::{
 use crate::cmps::observers::AflppCmpLogObserver;
 
 /// Trace with tainted input
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct AflppCmplogTracingStage<'a, EM, TE, S, Z> {
     name: Cow<'static, str>,
     tracer_executor: TE,

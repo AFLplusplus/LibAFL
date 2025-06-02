@@ -601,7 +601,7 @@ pub trait InputFilter<I> {
 }
 
 /// A pseudo-filter that will execute each input.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct NopInputFilter;
 impl<I> InputFilter<I> for NopInputFilter {
     #[inline]
@@ -1149,7 +1149,7 @@ where
 }
 
 /// A [`NopFuzzer`] that does nothing
-#[derive(Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct NopFuzzer {
     converter: NopBytesConverter,
 }

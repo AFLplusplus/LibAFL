@@ -110,7 +110,7 @@ pub(crate) fn classify_counts(map: &mut [u8]) {
 ///
 /// [`MapObserver`]s that are not slice-backed, such as `MultiMapObserver`, can use
 /// [`HitcountsIterableMapObserver`] instead.
-#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash)]
 pub struct HitcountsMapObserver<M> {
     base: M,
 }
@@ -324,7 +324,7 @@ where
 /// Map observer with hitcounts postprocessing
 /// Less optimized version for non-slice iterators.
 /// Slice-backed observers should use a [`HitcountsMapObserver`].
-#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash)]
 pub struct HitcountsIterableMapObserver<M> {
     base: M,
 }

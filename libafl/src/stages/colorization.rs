@@ -61,7 +61,7 @@ impl Ord for Earlier {
 /// Default name for `ColorizationStage`; derived from ALF++
 pub const COLORIZATION_STAGE_NAME: &str = "colorization";
 /// The mutational stage using power schedules
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct ColorizationStage<C, E, EM, I, O, S, Z> {
     map_observer_handle: Handle<C>,
     name: Cow<'static, str>,

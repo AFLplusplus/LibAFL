@@ -10,7 +10,7 @@ use libafl::{
     state::HasCorpus,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct MergeScheduler<I, S> {
     mapping: HashMap<usize, CorpusId>,
     all: BTreeSet<CorpusId>,

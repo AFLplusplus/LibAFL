@@ -65,7 +65,7 @@ impl HasMin for wide::u8x32 {
 }
 
 /// A [`MaxReducer`] reduces int values and returns their maximum.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct MaxReducer {}
 
 impl<T> Reducer<T> for MaxReducer
@@ -102,7 +102,7 @@ where
 }
 
 /// A [`NopReducer`] does nothing, and just "reduces" to the second/`new` value.
-#[derive(Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct NopReducer {}
 
 impl<T> Reducer<T> for NopReducer {
@@ -118,7 +118,7 @@ impl<T> SimdReducer<T> for NopReducer {
 }
 
 /// A [`MinReducer`] reduces int values and returns their minimum.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct MinReducer {}
 
 impl<T> Reducer<T> for MinReducer
@@ -155,7 +155,7 @@ where
 }
 
 /// A [`OrReducer`] reduces the values returning the bitwise OR with the old value
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct OrReducer {}
 
 impl<T> Reducer<T> for OrReducer
@@ -181,7 +181,7 @@ where
 pub type SimdOrReducer = OrReducer;
 
 /// A [`AndReducer`] reduces the values returning the bitwise AND with the old value
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct AndReducer {}
 
 impl<T> Reducer<T> for AndReducer
