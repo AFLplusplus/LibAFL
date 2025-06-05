@@ -129,7 +129,7 @@ typed-builder = "0.21.0" # Implement the builder pattern at compiletime
 typeid = "1.0.0" # Safe type_eq that doesn't rely on std specialization
 unicorn-engine = "2.0.1" # Used in libafl_unicorn
 uuid = { version = "1.10.0", features = ["serde", "v4"] }
-which = "7.0.2"
+which = "8.0.0"
 windows = "0.59.0"
 z3 = "0.12.1"
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
