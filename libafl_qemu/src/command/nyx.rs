@@ -109,8 +109,8 @@ macro_rules! define_nyx_command_manager {
                 #[deny(unreachable_patterns)]
                 fn parse(&self, qemu: Qemu) -> Result<Self::Commands, CommandError> {
                     let arch_regs_map: &'static EnumMap<ExitArgs, Regs> = get_exit_arch_regs();
-                    let nyx_backdoor = qemu.read_reg(Regs::Rax)? as c_uint;
-                    let cmd_id = qemu.read_reg(Regs::Rbx)? as c_uint;
+                    let nyx_backdoor = qemu.read_reg(arch_regs_map[ExitArgs::Ret])? as c_uint;
+                    let cmd_id = qemu.read_reg(arch_regs_map[ExitArgs::Cmd])? as c_uint;
 
                     // Check nyx backdoor correctness
                     debug_assert_eq!(nyx_backdoor, 0x1f);
