@@ -542,11 +542,11 @@ impl<I> EnableDisableCorpus for InMemoryCorpus<I> {
 }
 
 impl<I> HasTestcase<I> for InMemoryCorpus<I> {
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }
