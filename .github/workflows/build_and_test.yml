@@ -544,16 +544,8 @@ jobs:
       - name: Test
         shell: bash
         run: |
-          unset RUSTC && \
-          ARCH=i386 \
-          RUN_ON_CI=1 \
-          LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
-          cargo \
-            run \
-            --manifest-path ./utils/ci_runner/Cargo.toml \
-            --  \
-            fuzzers/${{ matrix.fuzzer }}            
-
+          unset RUSTC && cd fuzzers/${{ matrix.fuzzer }} && ARCH=i386 just build-multiarch
+          
   utils:
     name: 🔧 ${{ matrix.util }}
     strategy:
