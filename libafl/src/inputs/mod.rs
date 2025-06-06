@@ -161,7 +161,7 @@ impl HasLen for NopInput {
 /// Instead, it can be used as bytes input for a target
 pub trait HasTargetBytes {
     /// Target bytes, that can be written to a target
-    fn target_bytes(&self) -> OwnedSlice<u8>;
+    fn target_bytes(&self) -> OwnedSlice<'_, u8>;
 }
 
 /// Contains mutable bytes
