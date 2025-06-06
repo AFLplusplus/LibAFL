@@ -49,7 +49,7 @@ impl Input for PacketData {}
 
 impl HasTargetBytes for PacketData {
     #[inline]
-    fn target_bytes(&self) -> OwnedSlice<u8> {
+    fn target_bytes(&self) -> OwnedSlice<'_, u8> {
         let mut serialized_data = Vec::with_capacity(self.serialized_size());
         self.binary_serialize::<_, LittleEndian>(&mut serialized_data);
         OwnedSlice::from(serialized_data)

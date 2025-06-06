@@ -143,7 +143,7 @@ impl NopInput {
 
 impl Input for NopInput {}
 impl HasTargetBytes for NopInput {
-    fn target_bytes(&self) -> OwnedSlice<u8> {
+    fn target_bytes(&self) -> OwnedSlice<'_, u8> {
         OwnedSlice::from(vec![0])
     }
 }
@@ -173,7 +173,7 @@ pub trait HasMutatorBytes: HasLen {
     fn mutator_bytes_mut(&mut self) -> &mut [u8];
 
     /// Creates a [`SubRangeSlice`] from this input, that can be used to slice a byte array.
-    fn sub_bytes<R>(&self, range: R) -> SubRangeSlice<u8>
+    fn sub_bytes<R>(&self, range: R) -> SubRangeSlice<'_, u8>
     where
         R: RangeBounds<usize>,
     {
@@ -181,7 +181,7 @@ pub trait HasMutatorBytes: HasLen {
     }
 
     /// Creates a [`SubRangeMutSlice`] from this input, that can be used to slice a byte array.
-    fn sub_bytes_mut<R>(&mut self, range: R) -> SubRangeMutSlice<u8>
+    fn sub_bytes_mut<R>(&mut self, range: R) -> SubRangeMutSlice<'_, u8>
     where
         R: RangeBounds<usize>,
     {
@@ -189,7 +189,7 @@ pub trait HasMutatorBytes: HasLen {
     }
 
     /// Creates a [`BytesSubInput`] from this input, that can be used for local mutations.
-    fn sub_input<R>(&mut self, range: R) -> BytesSubInput<Self>
+    fn sub_input<R>(&mut self, range: R) -> BytesSubInput<'_, Self>
     where
         R: RangeBounds<usize>,
     {
