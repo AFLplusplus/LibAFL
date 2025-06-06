@@ -441,7 +441,7 @@ jobs:
 
   # Job to build and test the QEMU fuzzers
   qemu:
-    name: 🤖 ${{ matrix.fuzzer }} (i386)
+    name: 🤖 ${{ matrix.fuzzer }}
     needs:
       - fuzzers-preflight # Check that all the fuzzers listed for testing or explicitly ignored
       - qemu-changes # Only build if the QEMU code has changed
@@ -500,7 +500,7 @@ jobs:
 
   # Job to build and test the QEMU fuzzers
   qemu-i386:
-    name: 🤖 ${{ matrix.fuzzer }}
+    name: 🤖 ${{ matrix.fuzzer }} (i386)
     needs:
       - fuzzers-preflight # Check that all the fuzzers listed for testing or explicitly ignored
       - qemu-changes # Only build if the QEMU code has changed
@@ -539,6 +539,10 @@ jobs:
           # directory in the root of the workspace
           workspaces: |
             fuzzers/${{ matrix.fuzzer }}
+      - name: "Install dependencies"
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt update && sudo apt install gcc-i686-linux-gnu
       - name: Test
         shell: bash
         run: |
