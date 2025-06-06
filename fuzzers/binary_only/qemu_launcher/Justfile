@@ -69,7 +69,7 @@ test_inner: harness build
 
 [unix]
 test:
-    just test_inner
+    ARCH=x86_64 just test_inner
 
 single: harness build
     {{ FUZZER }} \

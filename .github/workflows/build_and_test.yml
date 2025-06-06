@@ -508,9 +508,7 @@ jobs:
     strategy:
       matrix:
         fuzzer:
-            - binary_only/qemu_launcher
-            # - full_system/qemu_linux_kernel
-            # - full_system/qemu_linux_process
+            - full_system/qemu_baremetal
     runs-on: ubuntu-24.04
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
