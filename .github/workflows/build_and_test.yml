@@ -542,7 +542,7 @@ jobs:
       - name: "Install dependencies"
         if: runner.os == 'Linux'
         shell: bash
-        run: sudo apt update && sudo apt install gcc-i686-linux-gnu
+        run: sudo apt update && sudo apt -y install gcc-i686-linux-gnu
       - name: Test
         shell: bash
         run: |
