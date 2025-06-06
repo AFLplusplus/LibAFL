@@ -440,7 +440,7 @@ jobs:
         run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} cargo run --manifest-path ./utils/ci_runner/Cargo.toml -- ${{ matrix.fuzzer }}
 
   # Job to build and test the QEMU fuzzers
-  qemu:
+  qemu-user:
     name: 🤖 ${{ matrix.fuzzer }}
     needs:
       - fuzzers-preflight # Check that all the fuzzers listed for testing or explicitly ignored
@@ -453,7 +453,6 @@ jobs:
             - binary_only/qemu_tmin
             - binary_only/qemu_coverage
             - binary_only/qemu_launcher
-            - full_system/qemu_baremetal
             # - full_system/qemu_linux_kernel
             # - full_system/qemu_linux_process
     runs-on: ubuntu-24.04
@@ -499,7 +498,61 @@ jobs:
 
 
   # Job to build and test the QEMU fuzzers
-  qemu-i386:
+  qemu-system:
+    name: 🤖 ${{ matrix.fuzzer }}
+    needs:
+      - fuzzers-preflight # Check that all the fuzzers listed for testing or explicitly ignored
+      - qemu-changes # Only build if the QEMU code has changed
+    if: ${{ needs.qemu-changes.outputs.qemu == 'true' }}
+    strategy:
+      matrix:
+        fuzzer:
+            - full_system/qemu_baremetal
+            # - full_system/qemu_linux_kernel
+            # - full_system/qemu_linux_process
+    runs-on: ubuntu-24.04
+    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    steps:
+        # Get the name of the fuzzer so that we can use it as the key for a cache
+        # of the built artefacts. The key cannot have any special characters.
+      - name: Get fuzzer name
+        id: fuzzer_name
+        run: |
+          fname=$(basename "${{ matrix.fuzzer }}")
+          echo "fuzzer_name=$fname" >> $GITHUB_OUTPUT
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare
+        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # We will have each of these fuzzers have it's own cache since these
+          # are some of the heaviest fuzzers to build.
+          shared-key: qemu-${{ steps.fuzzer_name.outputs.fuzzer_name }}-arm
+          # We want to include the commit hash to ensure the cache is replaced
+          # on each new commit.
+          key: ${{ github.sha }}
+          cache-all-crates: true
+          # The code is built in the fuzzers own directory, not in the target
+          # directory in the root of the workspace
+          workspaces: |
+            fuzzers/${{ matrix.fuzzer }}
+      - name: Test
+        shell: bash
+        run: |
+          unset RUSTC && \
+          ARCH=arm \
+          RUN_ON_CI=1 \
+          LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+          cargo \
+            run \
+            --manifest-path ./utils/ci_runner/Cargo.toml \
+            --  \
+            fuzzers/${{ matrix.fuzzer }}
+
+  # Job to build and test the QEMU fuzzers
+  qemu-system-i386:
     name: 🤖 ${{ matrix.fuzzer }} (i386)
     needs:
       - fuzzers-preflight # Check that all the fuzzers listed for testing or explicitly ignored
