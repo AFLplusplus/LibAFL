@@ -182,11 +182,11 @@ impl<I> HasTestcase<I> for CachedOnDiskCorpus<I>
 where
     I: Input,
 {
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }

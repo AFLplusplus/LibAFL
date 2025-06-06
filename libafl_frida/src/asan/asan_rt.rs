@@ -378,12 +378,12 @@ impl AsanRuntime {
     }
 
     /// Gets the allocator
-    pub fn allocator(&self) -> MutexGuard<Allocator> {
+    pub fn allocator(&self) -> MutexGuard<'_, Allocator> {
         self.allocator.lock().unwrap()
     }
 
     /// Gets the allocator (mutable)
-    pub fn allocator_mut(&mut self) -> MutexGuard<Allocator> {
+    pub fn allocator_mut(&mut self) -> MutexGuard<'_, Allocator> {
         self.allocator.lock().unwrap()
     }
 

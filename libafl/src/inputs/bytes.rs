@@ -60,7 +60,7 @@ impl ResizableMutator<u8> for BytesInput {
 
 impl HasTargetBytes for BytesInput {
     #[inline]
-    fn target_bytes(&self) -> OwnedSlice<u8> {
+    fn target_bytes(&self) -> OwnedSlice<'_, u8> {
         OwnedSlice::from(self.as_ref())
     }
 }

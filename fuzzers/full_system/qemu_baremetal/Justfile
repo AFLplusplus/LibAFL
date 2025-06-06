@@ -27,6 +27,13 @@ build flavor="breakpoint": target_dir
         --features std,{{flavor}} \
         --target-dir {{TARGET_DIR}}
 
+build-multiarch flavor="breakpoint": target_dir
+    cargo build \
+        --profile {{PROFILE}} \
+        --no-default-features \
+        --features std,{{flavor}},{{ ARCH }} \
+        --target-dir {{TARGET_DIR}}
+
 run flavor="breakpoint": (target flavor) (build flavor)
     {{BUILD_DIR / "qemu_baremetal"}} \
         -icount shift=auto,align=off,sleep=off \
