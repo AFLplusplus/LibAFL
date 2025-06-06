@@ -13,12 +13,7 @@ default = ["std", "low_level", "arm"]
 std = []
 
 arm = ["libafl_qemu/arm"]
-x86_64 = ["libafl_qemu/x86_64"]
 i386 = ["libafl_qemu/i386"]
-aarch64 = ["libafl_qemu/aarch64"]
-mips = ["libafl_qemu/mips"]
-ppc = ["libafl_qemu/ppc", "be"]
-hexagon = ["libafl_qemu/hexagon"]
 
 low_level = [
 ] # The low-level way to interact with LibAFL QEMU, with direct calls to QEMU's functions
