@@ -22,11 +22,11 @@ use crate::{Error, HasMetadata, corpus::CorpusId};
 pub trait HasTestcase<I> {
     /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error>;
+    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<I>>, Error>;
 
     /// Shorthand to receive a [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error>;
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<I>>, Error>;
 }
 
 /// An entry in the [`Testcase`] Corpus
