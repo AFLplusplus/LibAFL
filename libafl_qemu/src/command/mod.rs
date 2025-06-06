@@ -30,7 +30,7 @@ use crate::{
 };
 
 #[cfg(all(
-    any(cpu_target = "i386", cpu_target = "x86_64"),
+    cpu_target = "x86_64",
     feature = "systemmode"
 ))]
 pub mod nyx;
