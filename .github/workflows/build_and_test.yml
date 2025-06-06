@@ -542,7 +542,7 @@ jobs:
       - name: "Install dependencies"
         if: runner.os == 'Linux'
         shell: bash
-        run: sudo apt update && sudo apt -y install gcc-i686-linux-gnu g++-i686-linux-gnu
+        run: sudo apt update && sudo apt -y install gcc-i686-linux-gnu g++-i686-linux-gnu && rustup target add i686-unknown-linux-gnu
       - name: Test
         shell: bash
         run: |
