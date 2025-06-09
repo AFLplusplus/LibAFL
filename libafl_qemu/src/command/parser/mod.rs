@@ -16,10 +16,7 @@ use crate::{
     sync_exit::ExitArgs,
 };
 
-#[cfg(all(
-    any(cpu_target = "i386", cpu_target = "x86_64"),
-    feature = "systemmode"
-))]
+#[cfg(all(cpu_target = "x86_64", feature = "systemmode"))]
 pub mod nyx;
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
