@@ -72,7 +72,7 @@ cmplog_extended_instrumentation = [
 function-logging = ["common"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 [build-dependencies]
-bindgen = "0.71.1"
+bindgen = "0.72.0"
 cc = { version = "1.1.21", features = ["parallel"] }
 rustversion = "1.0.17"
 
