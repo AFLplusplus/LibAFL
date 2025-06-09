@@ -24,7 +24,7 @@ build flavor="breakpoint": target_dir
     cargo build \
         --profile {{PROFILE}} \
         --no-default-features \
-        --features std,{{flavor}} \
+        --features std,{{flavor}},{{ ARCH }}  \
         --target-dir {{TARGET_DIR}}
 
 build-multiarch flavor="breakpoint": target_dir
