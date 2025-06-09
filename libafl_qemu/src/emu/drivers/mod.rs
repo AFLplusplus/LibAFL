@@ -14,15 +14,9 @@ use crate::{
     modules::EmulatorModuleTuple,
 };
 
-#[cfg(all(
-    any(cpu_target = "i386", cpu_target = "x86_64"),
-    feature = "systemmode"
-))]
+#[cfg(all(cpu_target = "x86_64", feature = "systemmode"))]
 pub mod nyx;
-#[cfg(all(
-    any(cpu_target = "i386", cpu_target = "x86_64"),
-    feature = "systemmode"
-))]
+#[cfg(all(cpu_target = "x86_64", feature = "systemmode"))]
 pub use nyx::{NyxEmulatorDriver, NyxEmulatorDriverBuilder};
 
 #[derive(Debug, Clone)]

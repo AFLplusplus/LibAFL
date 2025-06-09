@@ -877,12 +877,12 @@ where
 
     /// Ranges
     #[must_use]
-    pub fn ranges(&self) -> Ref<RangeMap<u64, (u16, String)>> {
+    pub fn ranges(&self) -> Ref<'_, RangeMap<u64, (u16, String)>> {
         self.ranges.borrow()
     }
 
     /// Mutable ranges
-    pub fn ranges_mut(&mut self) -> RefMut<RangeMap<u64, (u16, String)>> {
+    pub fn ranges_mut(&mut self) -> RefMut<'_, RangeMap<u64, (u16, String)>> {
         (*self.ranges).borrow_mut()
     }
 }

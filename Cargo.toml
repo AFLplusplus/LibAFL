@@ -46,7 +46,6 @@ exclude = [
   "utils/noaslr",
   "utils/gdb_qemu",
   "utils/libafl_repo_tools",
-  "utils/desyscall",
   "utils/multi_machine_generator",
   "scripts",
   # additional crates

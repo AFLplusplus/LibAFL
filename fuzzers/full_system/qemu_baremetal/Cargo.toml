@@ -9,8 +9,11 @@ authors = [
 edition = "2021"
 
 [features]
-default = ["std", "low_level"]
+default = ["std", "low_level", "arm"]
 std = []
+
+arm = ["libafl_qemu/arm"]
+i386 = ["libafl_qemu/i386"]
 
 low_level = [
 ] # The low-level way to interact with LibAFL QEMU, with direct calls to QEMU's functions
@@ -30,7 +33,6 @@ libafl = { path = "../../../libafl" }
 libafl_bolts = { path = "../../../libafl_bolts" }
 libafl_targets = { path = "../../../libafl_targets" }
 libafl_qemu = { path = "../../../libafl_qemu", features = [
-  "arm",
   "systemmode",
 ], default-features = false }
 env_logger = "0.11.5"
