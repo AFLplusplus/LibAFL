@@ -45,7 +45,7 @@ pub const CMPLOG_KIND_RTN: u8 = 1;
 
 // EXTERNS, GLOBALS
 
-#[cfg(any(feature = "cmplog", feature = "sancov_cmplog"))]
+#[cfg(any(feature = "cmplog", feature = "sancov_cmplog", feature = "sancov_value_profile"))]
 // void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2)
 unsafe extern "C" {
     /// Logs an instruction for feedback during fuzzing
