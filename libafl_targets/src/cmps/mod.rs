@@ -57,11 +57,22 @@ unsafe extern "C" {
     /// Logs a routine for feedback during fuzzing
     pub fn __libafl_targets_cmplog_routines(k: usize, ptr1: *const u8, ptr2: *const u8);
 
+    /// Cmplog routines but with len specified.
+    pub fn __libafl_targets_cmplog_routines_len(k: usize, ptr1: *const u8, ptr2: *const u8, len: usize);
+
     /// Pointer to the `CmpLog` map
     pub static mut libafl_cmplog_map_ptr: *mut CmpLogMap;
 
     /// Pointer to the extended `CmpLog` map
     pub static mut libafl_cmplog_map_extended_ptr: *mut CmpLogMap;
+}
+
+#[cfg(feature = "cmplog_extended_instrumentation")]
+unsafe extern "C" {
+    /// Logs an AFL++ style routine for feedback during fuzzing
+    pub fn __libafl_targets_cmplog_routines_extended(k: usize, ptr1: *const u8, ptr2: *const u8);
+    /// Extended cmplog routines but with len specified.
+    pub fn __libafl_targets_cmplog_routines_extended_len(k: usize, ptr1: *const u8, ptr2: *const u8, len: usize);
 }
 
 #[cfg(feature = "cmplog_extended_instrumentation")]
