@@ -176,13 +176,12 @@ static inline void cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
   if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_RTN) {
     libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_RTN;
     libafl_cmplog_map_ptr->headers[k].hits = 1;
-    libafl_cmplog_map_ptr->headers[k].shape = len;
+    libafl_cmplog_map_ptr->headers[k].shape = len - 1;
     hits = 0;
   } else {
     hits = libafl_cmplog_map_ptr->headers[k].hits++;
     if (libafl_cmplog_map_ptr->headers[k].shape < len) {
-      libafl_cmplog_map_ptr->headers[k].shape =
-          len;  // TODO; adjust len for AFL++'s cmplog protocol
+      libafl_cmplog_map_ptr->headers[k].shape = len - 1;
     }
   }
 
@@ -204,19 +203,18 @@ static inline void cmplog_routines_checked_extended(uintptr_t      k,
   if (libafl_cmplog_map_extended_ptr->headers[k].type != CMPLOG_KIND_RTN) {
     libafl_cmplog_map_extended_ptr->headers[k].type = CMPLOG_KIND_RTN;
     libafl_cmplog_map_extended_ptr->headers[k].hits = 1;
-    libafl_cmplog_map_extended_ptr->headers[k].shape = len;
+    libafl_cmplog_map_extended_ptr->headers[k].shape = len - 1;
     hits = 0;
   } else {
     hits = libafl_cmplog_map_extended_ptr->headers[k].hits++;
     if (libafl_cmplog_map_extended_ptr->headers[k].shape < len) {
-      libafl_cmplog_map_extended_ptr->headers[k].shape =
-          len;  // TODO; adjust len for AFL++'s cmplog protocol
+      libafl_cmplog_map_extended_ptr->headers[k].shape = len - 1;
     }
   }
 
   hits &= CMPLOG_MAP_RTN_H - 1;
-  libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0_len = len;
-  libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v1_len = len;
+  libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0_len = 0x80 + len;
+  libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v1_len = 0x80 + len;
   MEMCPY(libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0, ptr1, len);
   MEMCPY(libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v1, ptr2, len);
   libafl_cmplog_enabled = true;
