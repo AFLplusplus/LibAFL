@@ -723,7 +723,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Install taplo
-        run: curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
+        run: curl -fsSL https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
       - uses: actions/checkout@v4
       - name: Run taplo
         run: taplo format --check
