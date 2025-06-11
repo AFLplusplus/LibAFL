@@ -30,9 +30,6 @@ unsafe extern "C" {
 
     /// Trace a switch statement
     pub fn __sanitizer_cov_trace_switch(val: u64, cases: *const u64);
-
-    /// cmplog internal api
-    pub fn __libafl_targets_cmplog_routines_len(k: usize, s1: *const u8, s2: *const u8, len: usize);
 }
 
 /// overriding `__sanitizer_weak_hook_memcmp`
@@ -51,7 +48,7 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_memcmp(
             let k: usize = called_pc as usize;
             let k = (k >> 4) ^ (k << 8);
             let k = k & (CMPLOG_MAP_W - 1);
-            __libafl_targets_cmplog_routines_len(
+            crate::__libafl_targets_cmplog_routines_len(
                 k,
                 s1 as *const u8,
                 s2 as *const u8,
@@ -89,7 +86,7 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strncmp(
                 }
                 actual_len += 1;
             }
-            __libafl_targets_cmplog_routines_len(k, s1 as *const u8, s2 as *const u8, actual_len);
+            crate::__libafl_targets_cmplog_routines_len(k, s1 as *const u8, s2 as *const u8, actual_len);
         }
     }
 }
@@ -135,7 +132,7 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strcmp(
                 }
                 actual_len += 1;
             }
-            __libafl_targets_cmplog_routines_len(k, s1 as *const u8, s2 as *const u8, actual_len);
+            crate::__libafl_targets_cmplog_routines_len(k, s1 as *const u8, s2 as *const u8, actual_len);
         }
     }
 }

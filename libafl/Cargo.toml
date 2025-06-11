@@ -239,7 +239,7 @@ ahash = { workspace = true } # The hash function already used in hashbrown
 meminterval = { workspace = true, features = ["serde"] }
 backtrace = { workspace = true, optional = true } # Used to get the stacktrace in StacktraceObserver
 typed-builder = { workspace = true, optional = true } # Implement the builder pattern at compiletime
-send_wrapper = { version="0.6.0", optional = true } # To move data between threads
+send_wrapper = { version = "0.6.0", optional = true } # To move data between threads
 
 serde_json = { workspace = true, optional = true, default-features = false, features = [
   "alloc",

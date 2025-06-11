@@ -102,7 +102,7 @@ extern uint8_t libafl_cmplog_enabled;
 
 // 5 of CMPLOG inner APIs, we static inline everything
 // area_is_valid, cmplog_instructions_checked,
-// cmplog_instructions_extended_checked,
+// cmplog_instructions_checked_extended,
 // cmplog_routines_checked,
 // cmplog_routines_checked_extended
 
@@ -132,7 +132,7 @@ static inline void cmplog_instructions_checked(uintptr_t k, uint8_t shape,
   libafl_cmplog_enabled = true;
 }
 
-static inline void cmplog_instructions_extended_checked(
+static inline void cmplog_instructions_checked_extended(
     uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2, uint8_t attr) {
 #ifdef CMPLOG_EXTENDED
   if (!libafl_cmplog_enabled) { return; }
