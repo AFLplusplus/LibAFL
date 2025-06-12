@@ -13,7 +13,11 @@ use core::{mem::align_of, slice};
 #[rustversion::nightly]
 use libafl::executors::hooks::ExecutorHook;
 
-#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[cfg(any(
+    feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
+    feature = "pointer_maps"
+))]
 #[allow(unused_imports)] // only used in an unused function
 use crate::EDGES_MAP_DEFAULT_SIZE;
 #[cfg(any(
@@ -283,6 +287,10 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
             #[cfg(feature = "pointer_maps")]
             {
                 MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1) % EDGES_MAP_ALLOCATED_SIZE;
+                assert!(
+                    (MAX_EDGES_FOUND <= EDGES_MAP_DEFAULT_SIZE),
+                    "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({EDGES_MAP_DEFAULT_SIZE}). Use the LIBAFL_EDGES_MAP_DEFAULT_SIZE env to increase it at compile time."
+                );
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
