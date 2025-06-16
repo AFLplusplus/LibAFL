@@ -116,9 +116,9 @@ pub trait InputConverter: Debug {
 }
 
 /// This trait can transfor any input to bytes
-pub trait InputToBytes<I>: Debug {
+pub trait TargetBytesConverter<I>: Debug {
     /// Transform to bytes
-    fn to_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
+    fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
 }
 
 /// `None` type to satisfy the type infearence in an `Option`
@@ -300,13 +300,20 @@ impl ResizableMutator<u8> for &mut Vec<u8> {
 
 #[derive(Debug, Copy, Clone, Default)]
 /// Basic `NopBytesConverter` with just one type that is not converting
-pub struct NopBytesConverter {}
+pub struct NopTargetBytesConverter;
 
-impl<I> InputToBytes<I> for NopBytesConverter
+impl NopTargetBytesConverter {
+    /// Creates a new [`NopTargetBytesConverter`]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl<I> TargetBytesConverter<I> for NopTargetBytesConverter
 where
     I: HasTargetBytes + Debug,
 {
-    fn to_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8> {
+    fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8> {
         input.target_bytes()
     }
 }

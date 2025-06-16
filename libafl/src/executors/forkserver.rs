@@ -47,7 +47,7 @@ use crate::observers::{
 use crate::{
     Error, HasBytesConverter,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{Input, InputToBytes},
+    inputs::{Input, TargetBytesConverter},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
     state::HasExecutions,
@@ -1517,7 +1517,7 @@ where
     S: HasExecutions,
     SHM: ShMem,
     Z: HasBytesConverter,
-    Z::Converter: InputToBytes<I>,
+    Z::Converter: TargetBytesConverter<I>,
 {
     #[inline]
     fn run_target(
@@ -1528,7 +1528,7 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let converter = fuzzer.converter_mut();
-        let bytes = converter.to_bytes(input);
+        let bytes = converter.to_target_bytes(input);
         self.observers_mut().pre_exec_child_all(state, input)?;
         let exit = self.execute_input(state, bytes.as_slice())?;
         self.observers_mut()

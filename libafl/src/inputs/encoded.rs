@@ -15,12 +15,15 @@ use core::{
 
 use ahash::RandomState;
 use hashbrown::HashMap;
-use libafl_bolts::{Error, HasLen};
+use libafl_bolts::{Error, HasLen, ownedref::OwnedSlice};
 #[cfg(feature = "regex")]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{corpus::CorpusId, inputs::Input};
+use crate::{
+    corpus::CorpusId,
+    inputs::{Input, TargetBytesConverter},
+};
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
 pub trait InputEncoder<T>
@@ -104,6 +107,15 @@ impl TokenInputEncoderDecoder {
 impl Default for TokenInputEncoderDecoder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl TargetBytesConverter<EncodedInput> for TokenInputEncoderDecoder {
+    /// Transform to bytes
+    fn to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
+        let mut bytes = vec![];
+        self.decode(input, &mut bytes).unwrap();
+        bytes.into()
     }
 }
 
