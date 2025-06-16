@@ -79,13 +79,13 @@ pub trait HasObjective {
 }
 
 /// Can convert input to another type
-pub trait HasBytesConverter {
+pub trait HasTargetBytesConverter {
     /// The converter itself
     type Converter;
     /// the input converter
-    fn converter(&self) -> &Self::Converter;
+    fn target_bytes_converter(&self) -> &Self::Converter;
     /// the input converter(mut)
-    fn converter_mut(&mut self) -> &mut Self::Converter;
+    fn target_bytes_converter_mut(&mut self) -> &mut Self::Converter;
 }
 
 /// Evaluates if an input is interesting using the feedback
@@ -308,7 +308,7 @@ pub struct StdFuzzer<CS, F, IC, IF, OF> {
     scheduler: CS,
     feedback: F,
     objective: OF,
-    bytes_converter: IC,
+    target_bytes_converter: IC,
     input_filter: IF,
     // Handles whether to share objective testcases among nodes
     share_objectives: bool,
@@ -1016,7 +1016,7 @@ where
 /// The builder for std fuzzer
 #[derive(Debug, Default)]
 pub struct StdFuzzerBuilder<IC, IF> {
-    bytes_converter: IC,
+    target_bytes_converter: IC,
     input_filter: IF,
 }
 
@@ -1025,7 +1025,7 @@ impl StdFuzzerBuilder<NopTargetBytesConverter, NopInputFilter> {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            bytes_converter: NopTargetBytesConverter,
+            target_bytes_converter: NopTargetBytesConverter,
             input_filter: NopInputFilter,
         }
     }
@@ -1033,9 +1033,9 @@ impl StdFuzzerBuilder<NopTargetBytesConverter, NopInputFilter> {
 
 impl<IC, IF> StdFuzzerBuilder<IC, IF> {
     /// set input converter
-    pub fn bytes_converter<IC2>(self, bytes_converter: IC2) -> StdFuzzerBuilder<IC2, IF> {
+    pub fn target_bytes_converter<IC2>(self, bytes_converter: IC2) -> StdFuzzerBuilder<IC2, IF> {
         StdFuzzerBuilder {
-            bytes_converter: bytes_converter,
+            target_bytes_converter: bytes_converter,
             input_filter: self.input_filter,
         }
     }
@@ -1045,7 +1045,7 @@ impl<IC, IF> StdFuzzerBuilder<IC, IF> {
     /// set input filter
     pub fn input_filter<IF2>(self, input_filter: IF2) -> StdFuzzerBuilder<IC, IF2> {
         StdFuzzerBuilder {
-            bytes_converter: self.bytes_converter,
+            target_bytes_converter: self.target_bytes_converter,
             input_filter: input_filter,
         }
     }
@@ -1060,7 +1060,7 @@ impl<IC, IF> StdFuzzerBuilder<IC, IF> {
         objective: OF,
     ) -> StdFuzzer<CS, F, IC, IF, OF> {
         StdFuzzer {
-            bytes_converter: self.bytes_converter,
+            target_bytes_converter: self.target_bytes_converter,
             input_filter: self.input_filter,
             scheduler,
             feedback,
@@ -1070,24 +1070,26 @@ impl<IC, IF> StdFuzzerBuilder<IC, IF> {
     }
 }
 
-impl<CS, F, IC, IF, OF> HasBytesConverter for StdFuzzer<CS, F, IC, IF, OF> {
+impl<CS, F, IC, IF, OF> HasTargetBytesConverter for StdFuzzer<CS, F, IC, IF, OF> {
     type Converter = IC;
 
-    fn converter(&self) -> &Self::Converter {
-        &self.bytes_converter
+    fn target_bytes_converter(&self) -> &Self::Converter {
+        &self.target_bytes_converter
     }
 
-    fn converter_mut(&mut self) -> &mut Self::Converter {
-        &mut self.bytes_converter
+    fn target_bytes_converter_mut(&mut self) -> &mut Self::Converter {
+        &mut self.target_bytes_converter
     }
 }
 
 impl<CS, F, OF> StdFuzzer<CS, F, NopTargetBytesConverter, NopInputFilter, OF> {
     /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
-        Self::builder().build(scheduler, feedback, objective)
+        StdFuzzer::builder().build(scheduler, feedback, objective)
     }
+}
 
+impl StdFuzzer<(), (), NopTargetBytesConverter, NopInputFilter, ()> {
     /// Creates a [`StdFuzzerBuiler`] that allows us to specify additional [`TargetBytesConverter`](crate::inputs::TargetBytesConverter) and [`InputFilter`] fields.
     pub fn builder() -> StdFuzzerBuilder<NopTargetBytesConverter, NopInputFilter> {
         StdFuzzerBuilder::new()
@@ -1161,13 +1163,13 @@ impl Default for NopFuzzer {
     }
 }
 
-impl HasBytesConverter for NopFuzzer {
+impl HasTargetBytesConverter for NopFuzzer {
     type Converter = NopTargetBytesConverter;
-    fn converter(&self) -> &Self::Converter {
+    fn target_bytes_converter(&self) -> &Self::Converter {
         &self.converter
     }
 
-    fn converter_mut(&mut self) -> &mut Self::Converter {
+    fn target_bytes_converter_mut(&mut self) -> &mut Self::Converter {
         &mut self.converter
     }
 }
@@ -1233,9 +1235,8 @@ mod tests {
         let bloom_filter = BloomInputFilter::default();
         let mut fuzzer = StdFuzzerBuilder::new()
             .input_filter(bloom_filter)
-            .bytes_converter(NopTargetBytesConverter::default())
-            .build(scheduler, (), ())
-            .unwrap();
+            .target_bytes_converter(NopTargetBytesConverter::default())
+            .build(scheduler, (), ());
         let mut state = StdState::new(
             StdRand::new(),
             InMemoryCorpus::new(),

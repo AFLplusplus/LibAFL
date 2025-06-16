@@ -15,7 +15,7 @@ use frida_gum::{
 #[cfg(windows)]
 use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks};
 use libafl::{
-    Error, HasBytesConverter,
+    Error, HasTargetBytesConverter,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{Input, InputToBytes},
     observers::ObserversTuple,
@@ -63,7 +63,7 @@ where
     S: HasExecutions + HasCurrentTestcase<I> + HasSolutions<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
-    Z: HasBytesConverter,
+    Z: HasTargetBytesConverter,
     Z::Converter: InputToBytes<I>,
 {
     /// Instruct the target about the input and run
@@ -75,7 +75,7 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        let converter = fuzzer.converter_mut();
+        let converter = fuzzer.target_bytes_converter_mut();
         let target_bytes = converter.to_bytes(input);
         self.helper.borrow_mut().pre_exec(target_bytes.as_slice())?;
         if self.helper.borrow_mut().stalker_enabled() {

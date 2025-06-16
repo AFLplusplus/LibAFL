@@ -268,29 +268,117 @@ impl EncodedInput {
     }
 }
 
-#[cfg(feature = "regex")]
 #[cfg(test)]
+#[cfg(feature = "regex")]
+#[cfg_attr(all(miri, target_arch = "aarch64", target_vendor = "apple"), ignore)] // Regex miri fails on M1
 mod tests {
     use alloc::borrow::ToOwned;
     use core::str::from_utf8;
 
-    use crate::inputs::encoded::{
-        InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder,
+    use libafl_bolts::{ownedref::OwnedRef, rands::StdRand, tuples::Handled};
+    use serial_test::serial;
+    use tuple_list::tuple_list;
+
+    use crate::{
+        Evaluator, Fuzzer, HasTargetBytesConverter, StdFuzzer,
+        corpus::InMemoryCorpus,
+        events::NopEventManager,
+        executors::{
+            ExitKind, InProcessExecutor, hooks::inprocess::inprocess_get_fuzzer, nop::NopExecutor,
+        },
+        feedbacks::BoolValueFeedback,
+        inputs::{
+            EncodedInput, TargetBytesConverter,
+            encoded::{InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
+        },
+        observers::ValueObserver,
+        schedulers::QueueScheduler,
+        stages::nop::NopStage,
+        state::StdState,
     };
 
-    #[test]
-    #[cfg_attr(all(miri, target_arch = "aarch64", target_vendor = "apple"), ignore)] // Regex miri fails on M1
-    fn test_input() {
+    fn setup_encoder_decoder() -> (TokenInputEncoderDecoder, EncodedInput) {
         let mut t = NaiveTokenizer::default();
         let mut ed = TokenInputEncoderDecoder::new();
         let input = ed
             .encode("/* test */a = 'pippo baudo'; b=c+a\n".as_bytes(), &mut t)
             .unwrap();
+        (ed, input)
+    }
+
+    #[test]
+    fn test_input() {
+        let (ed, input) = setup_encoder_decoder();
         let mut bytes = vec![];
         ed.decode(&input, &mut bytes).unwrap();
         assert_eq!(
             from_utf8(&bytes).unwrap(),
             "a = 'pippo baudo' ; b = c + a ".to_owned()
         );
+    }
+
+    #[test]
+    #[serial]
+    fn test_targetbytes_fuzzer_builds() {
+        const TRUE_VAL: bool = true;
+
+        let observer = ValueObserver::new("test_value", OwnedRef::Ref(&TRUE_VAL));
+        let mut true_feedback = BoolValueFeedback::new(&observer.handle());
+        let mut true_objective = BoolValueFeedback::new(&observer.handle());
+
+        let (bytes_converter, input) = setup_encoder_decoder();
+        let mut event_mgr = NopEventManager::new();
+
+        let mut state = StdState::new(
+            StdRand::new(),
+            InMemoryCorpus::new(),
+            InMemoryCorpus::new(),
+            &mut true_feedback,
+            &mut true_objective,
+        )
+        .unwrap();
+
+        let mut harness_fn = |bytes: &EncodedInput| {
+            // Get access to the global state struct
+            // # Safety
+            // This only runs once as part of this test, we basically pass the fuzzer borrow into the harness.
+            let fuzzer: &mut StdFuzzer<
+                QueueScheduler,
+                BoolValueFeedback<'_>,
+                TokenInputEncoderDecoder,
+                crate::NopInputFilter,
+                BoolValueFeedback<'_>,
+            > = unsafe { inprocess_get_fuzzer().unwrap() };
+            let target_bytes = fuzzer.target_bytes_converter_mut().to_target_bytes(&bytes);
+            println!("Executed: {:?}", target_bytes);
+            ExitKind::Ok
+        };
+
+        let mut fuzzer = StdFuzzer::builder()
+            .target_bytes_converter(bytes_converter)
+            .build(QueueScheduler::new(), true_feedback, true_objective);
+
+        let mut executor = InProcessExecutor::new(
+            &mut harness_fn,
+            tuple_list!(observer),
+            &mut fuzzer,
+            &mut state,
+            &mut event_mgr,
+        )
+        .unwrap();
+
+        fuzzer
+            .add_input(&mut state, &mut executor, &mut event_mgr, input)
+            .unwrap();
+
+        fuzzer
+            .fuzz_loop_for(
+                &mut tuple_list!(NopStage::new()),
+                &mut NopExecutor::nop(),
+                &mut state,
+                &mut NopEventManager::new(),
+                1,
+            )
+            .unwrap();
     }
 }
