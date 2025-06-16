@@ -2,6 +2,9 @@
 resolver = "2"
 members = [
   "libafl",
+  "libafl_asan",
+  "libafl_asan/libafl_asan_fuzz",
+  "libafl_asan/libafl_asan_libc",
   "libafl_bolts",
   "libafl_cc",
   "libafl_concolic/symcc_runtime",
@@ -16,6 +19,7 @@ members = [
   "libafl_tinyinst",
   "libafl_qemu",
   "libafl_qemu/libafl_qemu_build",
+  "libafl_qemu/libafl_qemu_runner",
   "libafl_qemu/libafl_qemu_sys",
   "libafl_sugar",
   "libafl_concolic/test/dump_constraints",
@@ -55,6 +59,8 @@ exclude = [
 [workspace.package]
 version = "0.15.3"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "./README.md"
 
 [workspace.dependencies]
 # Internal deps

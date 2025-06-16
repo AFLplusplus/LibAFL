@@ -43,8 +43,8 @@ pub fn build() {
     target_dir.pop();
     let include_dir = target_dir.join("include");
 
-    let qemu_asan_guest = cfg!(all(feature = "build_libgasan", not(feature = "hexagon")));
-    let qemu_asan = cfg!(all(feature = "build_libqasan", not(feature = "hexagon")));
+    let qemu_asan_guest = cfg!(all(feature = "asan_guest", not(feature = "hexagon")));
+    let qemu_asan_host = cfg!(all(feature = "asan_host", not(feature = "hexagon")));
 
     let libafl_qemu_hdr_name = "libafl_qemu.h";
     let libafl_qemu_arch_hdr_name = "libafl_qemu_arch.h";
@@ -114,7 +114,7 @@ pub fn build() {
         "cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))"
     );
 
-    let cross_cc = if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
+    let cross_cc = if cfg!(feature = "usermode") && (qemu_asan_guest || qemu_asan_host) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
         let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
             if cpu_target != env::consts::ARCH {
@@ -212,9 +212,9 @@ pub fn build() {
         nyx_bindings_file.as_path(),
     );
 
-    let rasan = cfg!(feature = "rasan");
+    let asan_rust = cfg!(feature = "asan_rust");
 
-    if cfg!(feature = "usermode") && !rasan && (qemu_asan || qemu_asan_guest) {
+    if cfg!(feature = "usermode") && !asan_rust && (qemu_asan_guest || qemu_asan_host) {
         let qasan_dir = Path::new("libqasan");
         let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
         println!("cargo:rerun-if-changed={}", qasan_dir.display());
@@ -235,14 +235,14 @@ pub fn build() {
         );
     }
 
-    if cfg!(feature = "usermode") && rasan {
-        let rasan_dir = Path::new("librasan");
-        let rasan_dir = fs::canonicalize(rasan_dir).unwrap();
-        let just_file = rasan_dir.join("Justfile");
-        println!("cargo:rerun-if-changed={}", rasan_dir.display());
+    if cfg!(feature = "usermode") && asan_rust {
+        let asan_dir = Path::new("libafl_qemu_asan");
+        let asan_dir = fs::canonicalize(asan_dir).unwrap();
+        let just_file = asan_dir.join("Justfile");
+        println!("cargo:rerun-if-changed={}", asan_dir.display());
         println!("cargo:rerun-if-changed={}", just_file.display());
 
-        let rasan_dir_str = rasan_dir.to_str().unwrap();
+        let asan_dir_str = asan_dir.to_str().unwrap();
         let just_file_str = just_file.to_str().unwrap();
         let target_dir_str = target_dir.to_str().unwrap();
 
@@ -252,24 +252,24 @@ pub fn build() {
             "release"
         };
 
-        let gasan_args = [
+        let guest_args = [
             "just",
-            "-d", rasan_dir_str,
+            "-d", asan_dir_str,
             "-f", just_file_str,
             "--set", "ARCH", &cpu_target,
             "--set", "PROFILE", profile,
             "--set", "TARGET_DIR", target_dir_str,
-            "build_gasan"];
-        just::run(gasan_args.iter()).expect("Failed to build rust guest address sanitizer library");
+            "build_guest"];
+        just::run(guest_args.iter()).expect("Failed to build rust guest address sanitizer library");
 
-        let qasan_args = [
+        let host_args = [
             "just",
-            "-d", rasan_dir_str,
+            "-d", asan_dir_str,
             "-f", just_file_str,
             "--set", "ARCH", &cpu_target,
             "--set", "PROFILE", profile,
             "--set", "TARGET_DIR", target_dir_str,
-            "build_qasan"];
-        just::run(qasan_args.iter()).expect("Failed to build rust address sanitizer library");
+            "build_host"];
+        just::run(host_args.iter()).expect("Failed to build rust address sanitizer library");
     }
 }
