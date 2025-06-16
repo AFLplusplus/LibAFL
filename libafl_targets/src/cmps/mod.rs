@@ -46,13 +46,13 @@ pub const CMPLOG_KIND_RTN: u8 = 1;
 // EXTERNS, GLOBALS
 
 #[cfg(any(feature = "cmplog", feature = "sancov_cmplog", feature = "sancov_value_profile"))]
-// void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2)
+// void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t size, uint64_t arg1, uint64_t arg2)
 unsafe extern "C" {
     /// Logs an instruction for feedback during fuzzing
-    pub fn __libafl_targets_cmplog_instructions(k: usize, shape: u8, arg1: u64, arg2: u64);
+    pub fn __libafl_targets_cmplog_instructions(k: usize, size: u8, arg1: u64, arg2: u64);
 
     /// Logs an AFL++ style instruction for feedback during fuzzing
-    pub fn __libafl_targets_cmplog_instructions_extended(k: usize, shape: u8, arg1: u64, arg2: u64);
+    pub fn __libafl_targets_cmplog_instructions_extended(k: usize, size: u8, arg1: u64, arg2: u64);
 
     /// Logs a routine for feedback during fuzzing
     pub fn __libafl_targets_cmplog_routines(k: usize, ptr1: *const u8, ptr2: *const u8);
@@ -387,30 +387,32 @@ impl CmpMap for CmpLogMap {
 
     fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues> {
         if self.headers[idx].kind == CMPLOG_KIND_INS {
+            let shape = self.headers[idx].shape;
             unsafe {
-                match self.headers[idx].shape {
-                    1 => Some(CmpValues::U8((
+                match shape {
+                    0 => Some(CmpValues::U8((
                         self.vals.operands[idx][execution].0 as u8,
                         self.vals.operands[idx][execution].1 as u8,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
-                    2 => Some(CmpValues::U16((
+                    1 => Some(CmpValues::U16((
                         self.vals.operands[idx][execution].0 as u16,
                         self.vals.operands[idx][execution].1 as u16,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
-                    4 => Some(CmpValues::U32((
+                    3 => Some(CmpValues::U32((
                         self.vals.operands[idx][execution].0 as u32,
                         self.vals.operands[idx][execution].1 as u32,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
-                    8 => Some(CmpValues::U64((
+                    7 => Some(CmpValues::U64((
                         self.vals.operands[idx][execution].0,
                         self.vals.operands[idx][execution].1,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
-                    // other => panic!("Invalid CmpLog shape {}", other),
-                    _ => None,
+                    // TODO handle 128 bits & 256 bits & 512 bits cmps
+                    15 | 31 | 63 => None,
+                    _ => panic!("Invalid CmpLog shape {shape}"),
                 }
             }
         } else {
@@ -579,8 +581,9 @@ impl CmpMap for AflppCmpLogMap {
     fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues> {
         let header = self.headers[idx];
         if header.type_().value() == CMPLOG_KIND_INS {
+            let shape = self.headers[idx].shape().value();
             unsafe {
-                match self.headers[idx].shape().value() {
+                match shape {
                     0 => Some(CmpValues::U8((
                         self.vals.operands[idx][execution].v0 as u8,
                         self.vals.operands[idx][execution].v1 as u8,
@@ -601,9 +604,9 @@ impl CmpMap for AflppCmpLogMap {
                         self.vals.operands[idx][execution].v1,
                         false,
                     ))),
-                    // TODO handle 128 bits & 256 bits cmps
-                    // other => panic!("Invalid CmpLog shape {}", other),
-                    _ => None,
+                    // TODO handle 128 bits & 256 bits & 512 bits cmps
+                    15 | 31 | 63 => None,
+                    _ => panic!("Invalid CmpLog shape {shape}"),
                 }
             }
         } else {

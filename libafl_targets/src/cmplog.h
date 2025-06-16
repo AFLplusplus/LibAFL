@@ -106,12 +106,15 @@ extern uint8_t libafl_cmplog_enabled;
 // cmplog_routines_checked,
 // cmplog_routines_checked_extended
 
-static inline void cmplog_instructions_checked(uintptr_t k, uint8_t shape,
+// size is the operand size of instruction, which should be greater than 0
+static inline void cmplog_instructions_checked(uintptr_t k, uint8_t size,
                                                uint64_t arg1, uint64_t arg2,
                                                uint8_t arg1_is_const) {
   if (!libafl_cmplog_enabled) { return; }
   libafl_cmplog_enabled = false;
 
+  if (size == 0) { return; }
+  uint8_t shape = size - 1;
   uint16_t hits;
   if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
     libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_INS;
@@ -132,11 +135,15 @@ static inline void cmplog_instructions_checked(uintptr_t k, uint8_t shape,
   libafl_cmplog_enabled = true;
 }
 
+// size is the operand size of instruction, which should be greater than 0
 static inline void cmplog_instructions_checked_extended(
-    uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2, uint8_t attr) {
+    uintptr_t k, uint8_t size, uint64_t arg1, uint64_t arg2, uint8_t attr) {
 #ifdef CMPLOG_EXTENDED
   if (!libafl_cmplog_enabled) { return; }
   libafl_cmplog_enabled = false;
+
+  if (size == 0) { return; }
+  uint8_t shape = size - 1;
 
   // printf("%ld %ld %ld\n", k, arg1, arg2);
   uint16_t hits;
@@ -160,7 +167,7 @@ static inline void cmplog_instructions_checked_extended(
 #else
   // just do nothing
   (void)k;
-  (void)shape;
+  (void)size;
   (void)arg1;
   (void)arg2;
   (void)attr;
@@ -176,13 +183,12 @@ static inline void cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
   if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_RTN) {
     libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_RTN;
     libafl_cmplog_map_ptr->headers[k].hits = 1;
-    libafl_cmplog_map_ptr->headers[k].shape = len;
+    libafl_cmplog_map_ptr->headers[k].shape = len - 1;
     hits = 0;
   } else {
     hits = libafl_cmplog_map_ptr->headers[k].hits++;
     if (libafl_cmplog_map_ptr->headers[k].shape < len) {
-      libafl_cmplog_map_ptr->headers[k].shape =
-          len;  // TODO; adjust len for AFL++'s cmplog protocol
+      libafl_cmplog_map_ptr->headers[k].shape = len - 1;
     }
   }
 
@@ -204,19 +210,18 @@ static inline void cmplog_routines_checked_extended(uintptr_t      k,
   if (libafl_cmplog_map_extended_ptr->headers[k].type != CMPLOG_KIND_RTN) {
     libafl_cmplog_map_extended_ptr->headers[k].type = CMPLOG_KIND_RTN;
     libafl_cmplog_map_extended_ptr->headers[k].hits = 1;
-    libafl_cmplog_map_extended_ptr->headers[k].shape = len;
+    libafl_cmplog_map_extended_ptr->headers[k].shape = len - 1;
     hits = 0;
   } else {
     hits = libafl_cmplog_map_extended_ptr->headers[k].hits++;
     if (libafl_cmplog_map_extended_ptr->headers[k].shape < len) {
-      libafl_cmplog_map_extended_ptr->headers[k].shape =
-          len;  // TODO; adjust len for AFL++'s cmplog protocol
+      libafl_cmplog_map_extended_ptr->headers[k].shape = len - 1;
     }
   }
 
   hits &= CMPLOG_MAP_RTN_H - 1;
-  libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0_len = len;
-  libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v1_len = len;
+  libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0_len = 0x80 + len;
+  libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v1_len = 0x80 + len;
   MEMCPY(libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0, ptr1, len);
   MEMCPY(libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v1, ptr2, len);
   libafl_cmplog_enabled = true;
