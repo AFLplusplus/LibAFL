@@ -195,9 +195,9 @@ where
                 .unwrap()
                 .parent()
                 .unwrap()
-                .join("libgasan.so");
+                .join("libafl_qemu_asan_guest.so");
 
-            let asan_lib = env::var_os("CUSTOM_GASAN_PATH").map_or(asan_lib, |x| {
+            let asan_lib = env::var_os("CUSTOM_LIBAFL_QEMU_ASAN_PATH").map_or(asan_lib, |x| {
                 fs::canonicalize(PathBuf::from(x.to_string_lossy().to_string())).unwrap()
             });
 
@@ -248,14 +248,14 @@ where
             None
         };
 
-        if env::var("QASAN_DEBUG").is_ok() {
+        if env::var("LIBAFL_QEMU_ASAN_DEBUG").is_ok() {
             args.push("-E".into());
-            args.push("QASAN_DEBUG=1".into());
+            args.push("LIBAFL_QEMU_ASAN_DEBUG=1".into());
         }
 
-        if env::var("QASAN_LOG").is_ok() {
+        if env::var("LIBAFL_QEMU_ASAN_LOG").is_ok() {
             args.push("-E".into());
-            args.push("QASAN_LOG=1".into());
+            args.push("LIBAFL_QEMU_ASAN_LOG=1".into());
         }
 
         *qemu_params = QemuParams::Cli(args);

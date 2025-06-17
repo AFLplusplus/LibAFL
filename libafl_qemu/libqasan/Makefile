@@ -21,17 +21,17 @@ override LDFLAGS     += -ldl -pthread
 SRC := libqasan.c hooks.c malloc.c mmap.c string.c uninstrument.c patch.c dlmalloc.c printf/printf.c
 HDR := libqasan.h qasan.h map_macro.h printf/printf.h
 
-all: $(OUT_DIR)/libgasan.so $(OUT_DIR)/libqasan.so
+all: $(OUT_DIR)/libafl_qemu_asan_guest.so $(OUT_DIR)/libafl_qemu_asan_host.so
 
-$(OUT_DIR)/libgasan.so: $(HDR) $(SRC)
+$(OUT_DIR)/libafl_qemu_asan_guest.so: $(HDR) $(SRC)
 	$(CC) $(CFLAGS) -DASAN_GUEST=1 -fPIC -shared $(SRC) -o $@ $(LDFLAGS)
 
-$(OUT_DIR)/libqasan.so: $(HDR) $(SRC)
+$(OUT_DIR)/libafl_qemu_asan_host.so: $(HDR) $(SRC)
 	$(CC) $(CFLAGS) -fPIC -shared $(SRC) -o $@ $(LDFLAGS)
 
 .NOTPARALLEL: clean
 
 clean:
 	rm -f *.o *.so *~ a.out core core.[1-9][0-9]*
-	rm -f $(OUT_DIR)/libgasan.so
-	rm -f $(OUT_DIR)/libqasan.so
+	rm -f $(OUT_DIR)/libafl_qemu_asan_guest.so
+	rm -f $(OUT_DIR)/libafl_qemu_asan_host.so

@@ -34,13 +34,13 @@ run: harness build
     #!/bin/bash
 
     source {{ DOTENV }}
-    CUSTOM_QASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so \
+    CUSTOM_LIBAFL_QEMU_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.so \
     {{ FUZZER }} \
         --input ./corpus \
         --output {{ TARGET_DIR }}/output/ \
         --log {{TARGET_DIR}}/output/log.txt \
         --cores 0-7 \
-        --asan-cores 0-3 \
+        --asan-host-cores 0-3 \
         --cmplog-cores 2-5 \
         --iterations 1000000 \
         --tui \
@@ -61,11 +61,11 @@ test_inner: harness build
     # complie again with simple mgr
     cargo build --profile={{PROFILE}} --features="simplemgr,{{ARCH}}" --target-dir={{ TARGET_DIR }} || exit 1
 
-    export CUSTOM_QASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so
-    ./tests/qasan/qasan_test.sh || exit 1
+    export CUSTOM_LIBAFL_QEMU_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.so
+    ./tests/asan/host_test.sh || exit 1
 
-    export CUSTOM_GASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libgasan.so
-    ./tests/qasan/gasan_test.sh || exit 1
+    export CUSTOM_LIBAFL_QEMU_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_guest.so
+    ./tests/asan/guest_test.sh || exit 1
 
 [unix]
 test:
@@ -80,17 +80,17 @@ single: harness build
         -- \
         {{ HARNESS }}
 
-asan: harness build
+asan_host: harness build
     #!/bin/bash
 
     source {{ DOTENV }}
-    CUSTOM_QASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libqasan.so \
+    CUSTOM_LIBAFL_QEMU_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.so \
     {{ FUZZER }} \
         --input ./corpus \
         --output {{ TARGET_DIR }}/output/ \
         --log {{ TARGET_DIR }}/output/log.txt \
         --cores 0 \
-        --asan-cores 0 \
+        --asan-host-cores 0 \
         -- \
         {{ HARNESS }}
 
@@ -98,7 +98,7 @@ asan_guest: harness build
     #!/bin/bash
 
     source {{ DOTENV }}
-    CUSTOM_GASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libgasan.so \
+    CUSTOM_LIBAFL_QEMU_ASAN_PATH={{ BUILD_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_guest.so \
     {{ FUZZER }} \
         --input ./corpus \
         --output {{ TARGET_DIR }}/output/ \

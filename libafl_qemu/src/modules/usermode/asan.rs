@@ -991,9 +991,9 @@ where
                 .unwrap()
                 .parent()
                 .unwrap()
-                .join("libqasan.so");
+                .join("libafl_qemu_asan_host.so");
 
-            let asan_lib = env::var_os("CUSTOM_QASAN_PATH")
+            let asan_lib = env::var_os("CUSTOM_LIBAFL_QEMU_ASAN_PATH")
                 .map_or(asan_lib, |x| PathBuf::from(x.to_string_lossy().to_string()));
 
             assert!(

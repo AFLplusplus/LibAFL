@@ -1,0 +1,32 @@
+[package]
+name = "libafl_qemu_asan_nolibc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "afl_qemu_asan_nolibc"
+crate-type = ["staticlib"]
+
+[features]
+default = []
+test = ["libafl_asan/test"]
+
+[dependencies]
+libafl_asan = { path = "../../../libafl_asan", default-features = false, features = [
+  "dlmalloc",
+  "global_allocator",
+  "guest",
+  "hooks",
+  "host",
+  "linux",
+  "tracking",
+] }
+log = { version = "0.4.22", default-features = false, features = [
+  "release_max_level_info",
+] }
+spin = { version = "0.9.8", default-features = false, features = [
+  "lazy",
+  "mutex",
+  "spin_mutex",
+] }

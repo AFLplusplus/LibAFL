@@ -1,0 +1,27 @@
+[package]
+name = "libafl_asan_libc"
+description = "Dummy libc library for use with LibAFL Asan library"
+edition = "2024"
+rust-version = "1.87"
+keywords = ["fuzzing", "address", "sanitizer", "asan", "libc"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[lib]
+name = "afl_asan_libc"
+crate-type = ["staticlib"]
+
+[features]
+default = []
+test = []
+
+[dependencies]
