@@ -86,6 +86,8 @@ where
         input: &I,
         executor_ptr: *const c_void,
     ) {
+        // # Safety
+        // This writes pointers to global state. Only unsafe if the state is they are accessed incorrectly.
         unsafe {
             let data = &raw mut GLOBAL_STATE;
             write_volatile(
@@ -114,6 +116,8 @@ where
     /// This function marks the boundary between the fuzzer and the target
     #[inline]
     pub fn leave_target(&mut self, _fuzzer: &mut Z, _state: &mut S, _mgr: &mut EM, _input: &I) {
+        // # Safety
+        // We set the global pointer to null, no direct safety concerns arise.
         unsafe {
             let data = &raw mut GLOBAL_STATE;
 

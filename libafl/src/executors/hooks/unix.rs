@@ -51,6 +51,8 @@ pub mod unix_signal_handler {
             info: &mut siginfo_t,
             context: Option<&mut ucontext_t>,
         ) {
+            // # Safety
+            // This runs in a signal handler, no other threads access these variables/borrows anymore.
             unsafe {
                 let data = &raw mut GLOBAL_STATE;
                 let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
@@ -97,6 +99,9 @@ pub mod unix_signal_handler {
         I: Input + Clone,
     {
         let old_hook = panic::take_hook();
+        // # Safety
+        // The panic handler should only run when all other execution stopped.
+        // At this point, accessing the global state should be sound.
         panic::set_hook(Box::new(move |panic_info| unsafe {
             old_hook(panic_info);
             let data = &raw mut GLOBAL_STATE;

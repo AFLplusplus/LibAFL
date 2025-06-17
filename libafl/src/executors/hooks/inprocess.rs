@@ -527,8 +527,8 @@ impl InProcessExecutorHandlerData {
     }
 }
 
-/// Exception handling needs some nasty unsafe.
-pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+/// Exception handling needs some nasty globals.
+pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
     // The state ptr for signal handling
     state_ptr: null_mut(),
     // The event manager ptr for signal handling
@@ -560,44 +560,12 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
 /// Get the inprocess State
 ///
 /// # Safety
+/// This is a *very* dangerous and mainly for internal use (unless you _really_ know what you're doing.
+/// The type is not checked and needs to be specified correctly.
 /// Only safe if not called twice and if the state is not accessed from another borrow while this one is alive.
 #[must_use]
 pub unsafe fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
+    // # Safety
+    // As unsafe as it gets, but the function is documented accordingly.
     unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
-}
-
-/// Get the `EventManager`
-///
-/// # Safety
-/// Only safe if not called twice and if the event manager is not accessed from another borrow while this one is alive.
-#[must_use]
-pub unsafe fn inprocess_get_event_manager<'a, EM>() -> Option<&'a mut EM> {
-    unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
-}
-
-/// Gets the inprocess [`crate::fuzzer::Fuzzer`]
-///
-/// # Safety
-/// Only safe if not called twice and if the fuzzer is not accessed from another borrow while this one is alive.
-#[must_use]
-pub unsafe fn inprocess_get_fuzzer<'a, F>() -> Option<&'a mut F> {
-    unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }
-}
-
-/// Gets the inprocess [`Executor`]
-///
-/// # Safety
-/// Only safe if not called twice and if the executor is not accessed from another borrow while this one is alive.
-#[must_use]
-pub unsafe fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
-    unsafe { (GLOBAL_STATE.executor_ptr as *mut E).as_mut() }
-}
-
-/// Gets the inprocess input
-///
-/// # Safety
-/// Only safe if not called concurrently and if the input is not used mutably while this reference is alive.
-#[must_use]
-pub unsafe fn inprocess_get_input<'a, I>() -> Option<&'a I> {
-    unsafe { (GLOBAL_STATE.current_input_ptr as *const I).as_ref() }
 }
