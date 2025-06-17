@@ -527,8 +527,8 @@ impl InProcessExecutorHandlerData {
     }
 }
 
-/// Exception handling needs some nasty unsafe.
-static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+/// Exception handling needs some nasty globals.
+pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
     // The state ptr for signal handling
     state_ptr: null_mut(),
     // The event manager ptr for signal handling
@@ -565,5 +565,7 @@ static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandler
 /// Only safe if not called twice and if the state is not accessed from another borrow while this one is alive.
 #[must_use]
 pub unsafe fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
+    // # Safety
+    // As unsafe as it gets, but the function is documented accordingly.
     unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
 }
