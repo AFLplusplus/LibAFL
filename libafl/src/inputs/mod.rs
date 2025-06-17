@@ -31,7 +31,6 @@ pub use list::*;
 pub mod nautilus;
 
 use alloc::{
-    boxed::Box,
     string::String,
     vec::{Drain, Splice, Vec},
 };
@@ -104,24 +103,35 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash 
     }
 }
 
-/// Convert between two input types with a state
-pub trait InputConverter: Debug {
-    /// Source type
-    type From;
+/// Convert between two input types using the given state
+pub trait InputConverter<I>: Debug {
     /// Destination type
     type To;
 
     /// Convert the src type to the dest
-    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error>;
+    fn convert(&mut self, input: I) -> Result<Self::To, Error>;
 }
 
-/// This trait can transfor any input to bytes
+/// This trait can transform any input to bytes, which can be sent to the target from a harness.
+/// Converters that implement this trait auto-implement [`InputConverter`] for this `I` to [`BytesInput`].
 pub trait ToTargetBytes<I>: Debug {
     /// Transform to bytes
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
 }
 
-/// `None` type to satisfy the type infearence in an `Option`
+impl<I, T> InputConverter<I> for T
+where
+    T: ToTargetBytes<I>,
+{
+    type To = BytesInput;
+
+    fn convert(&mut self, input: I) -> Result<BytesInput, Error> {
+        Ok(BytesInput::new(self.to_target_bytes(&input).to_vec()))
+    }
+}
+
+
+/// `None` type to satisfy the type inference in an `Option`
 #[macro_export]
 macro_rules! none_input_converter {
     () => {
@@ -299,11 +309,12 @@ impl ResizableMutator<u8> for &mut Vec<u8> {
 }
 
 #[derive(Debug, Copy, Clone, Default)]
-/// Basic `NopBytesConverter` with just one type that is not converting
+/// Basic `NopToTargetBytes` with just one type that is not converting
 pub struct NopToTargetBytes;
 
 impl NopToTargetBytes {
     /// Creates a new [`NopToTargetBytes`]
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -315,50 +326,5 @@ where
 {
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8> {
         input.target_bytes()
-    }
-}
-
-/// `InputConverter` that uses a closure to convert
-pub struct ClosureInputConverter<F, T>
-where
-    F: Input,
-    T: Input,
-{
-    convert_cb: Box<dyn FnMut(F) -> Result<T, Error>>,
-}
-
-impl<F, T> Debug for ClosureInputConverter<F, T>
-where
-    F: Input,
-    T: Input,
-{
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ClosureInputConverter")
-            .finish_non_exhaustive()
-    }
-}
-
-impl<F, T> ClosureInputConverter<F, T>
-where
-    F: Input,
-    T: Input,
-{
-    /// Create a new converter using two closures, use None to forbid the conversion or the conversion back
-    #[must_use]
-    pub fn new(convert_cb: Box<dyn FnMut(F) -> Result<T, Error>>) -> Self {
-        Self { convert_cb }
-    }
-}
-
-impl<F, T> InputConverter for ClosureInputConverter<F, T>
-where
-    F: Input,
-    T: Input,
-{
-    type From = F;
-    type To = T;
-
-    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
-        (self.convert_cb)(input)
     }
 }

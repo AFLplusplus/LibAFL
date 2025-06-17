@@ -13,13 +13,24 @@ use serde::{Serialize, de::DeserializeOwned};
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase}, events::{
+    Error, HasMetadata,
+    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
+    events::{
         Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter,
         SendExiting,
-    }, executors::{Executor, ExitKind, HasObservers}, feedbacks::Feedback, inputs::{Input, NopToTargetBytes, ToTargetBytes}, mark_feature_time, observers::ObserversTuple, schedulers::Scheduler, stages::StagesTuple, start_timer, state::{
+    },
+    executors::{Executor, ExitKind, HasObservers},
+    feedbacks::Feedback,
+    inputs::{Input, NopToTargetBytes, ToTargetBytes},
+    mark_feature_time,
+    observers::ObserversTuple,
+    schedulers::Scheduler,
+    stages::StagesTuple,
+    start_timer,
+    state::{
         HasCorpus, HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported,
         HasLastFoundTime, HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
-    }, Error, HasMetadata
+    },
 };
 
 /// Send a monitor update all 15 (or more) seconds
@@ -82,7 +93,7 @@ pub trait HasToTargetBytes {
 impl<I, T> ToTargetBytes<I> for T
 where
     T: HasToTargetBytes + Debug,
-    T::Converter: ToTargetBytes<I>
+    T::Converter: ToTargetBytes<I>,
 {
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> libafl_bolts::ownedref::OwnedSlice<'a, u8> {
         self.target_bytes_converter_mut().to_target_bytes(input)
@@ -1034,9 +1045,12 @@ impl StdFuzzerBuilder<NopToTargetBytes, NopInputFilter> {
 
 impl<IC, IF> StdFuzzerBuilder<IC, IF> {
     /// set input converter
-    pub fn target_bytes_converter<IC2>(self, bytes_converter: IC2) -> StdFuzzerBuilder<IC2, IF> {
+    pub fn target_bytes_converter<IC2>(
+        self,
+        target_bytes_converter: IC2,
+    ) -> StdFuzzerBuilder<IC2, IF> {
         StdFuzzerBuilder {
-            target_bytes_converter: bytes_converter,
+            target_bytes_converter,
             input_filter: self.input_filter,
         }
     }
@@ -1047,7 +1061,7 @@ impl<IC, IF> StdFuzzerBuilder<IC, IF> {
     pub fn input_filter<IF2>(self, input_filter: IF2) -> StdFuzzerBuilder<IC, IF2> {
         StdFuzzerBuilder {
             target_bytes_converter: self.target_bytes_converter,
-            input_filter: input_filter,
+            input_filter,
         }
     }
 }
@@ -1092,6 +1106,7 @@ impl<CS, F, OF> StdFuzzer<CS, F, NopToTargetBytes, NopInputFilter, OF> {
 
 impl StdFuzzer<(), (), NopToTargetBytes, NopInputFilter, ()> {
     /// Creates a [`StdFuzzerBuiler`] that allows us to specify additional [`ToTargetBytes`](crate::inputs::ToTargetBytes) and [`InputFilter`] fields.
+    #[must_use]
     pub fn builder() -> StdFuzzerBuilder<NopToTargetBytes, NopInputFilter> {
         StdFuzzerBuilder::new()
     }
@@ -1153,7 +1168,7 @@ impl NopFuzzer {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            converter: NopToTargetBytes::default(),
+            converter: NopToTargetBytes,
         }
     }
 }

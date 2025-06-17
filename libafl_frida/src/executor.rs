@@ -15,7 +15,7 @@ use frida_gum::{
 #[cfg(windows)]
 use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks};
 use libafl::{
-    Error, HasToTargetBytes,
+    Error,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{Input, ToTargetBytes},
     observers::ObserversTuple,

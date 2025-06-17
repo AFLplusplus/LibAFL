@@ -110,17 +110,6 @@ impl<'a> NautilusBytesConverter<'a> {
     }
 }
 
-impl InputConverter for NautilusBytesConverter<'_> {
-    type From = NautilusInput;
-    type To = BytesInput;
-
-    fn convert(&mut self, input: Self::From) -> Result<Self::To, libafl_bolts::Error> {
-        let mut bytes = vec![];
-        input.unparse(self.ctx, &mut bytes);
-        Ok(BytesInput::new(bytes))
-    }
-}
-
 impl ToTargetBytes<NautilusInput> for NautilusBytesConverter<'_> {
     fn to_target_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
         let mut bytes = vec![];

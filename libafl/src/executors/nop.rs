@@ -28,6 +28,7 @@ impl<OT> ConstantExecutor<OT> {
 
 impl ConstantExecutor<()> {
     /// Create a new `nop` executor that does nothing.
+    #[must_use]
     pub fn nop() -> Self {
         Self::new(ExitKind::Ok, Duration::default(), ())
     }
