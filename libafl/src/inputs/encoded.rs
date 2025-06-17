@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::CorpusId,
-    inputs::{Input, TargetBytesConverter},
+    inputs::{Input, ToTargetBytes},
 };
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
@@ -110,7 +110,7 @@ impl Default for TokenInputEncoderDecoder {
     }
 }
 
-impl TargetBytesConverter<EncodedInput> for TokenInputEncoderDecoder {
+impl ToTargetBytes<EncodedInput> for TokenInputEncoderDecoder {
     /// Transform to bytes
     fn to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
         let mut bytes = vec![];
@@ -280,7 +280,7 @@ mod tests {
     use tuple_list::tuple_list;
 
     use crate::{
-        Evaluator, Fuzzer, HasTargetBytesConverter, StdFuzzer,
+        Evaluator, Fuzzer, HasToTargetBytes, StdFuzzer,
         corpus::InMemoryCorpus,
         events::NopEventManager,
         executors::{
@@ -288,7 +288,7 @@ mod tests {
         },
         feedbacks::BoolValueFeedback,
         inputs::{
-            EncodedInput, TargetBytesConverter,
+            EncodedInput, ToTargetBytes,
             encoded::{InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
         },
         observers::ValueObserver,
@@ -339,9 +339,9 @@ mod tests {
         .unwrap();
 
         let mut harness_fn = |bytes: &EncodedInput| {
-            // Get access to the global state struct
             // # Safety
             // This only runs once as part of this test, we basically pass the fuzzer borrow into the harness.
+            // Don't try this at home.
             let fuzzer: &mut StdFuzzer<
                 QueueScheduler,
                 BoolValueFeedback<'_>,

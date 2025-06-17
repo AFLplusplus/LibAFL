@@ -16,7 +16,7 @@ use crate::{
         tree::{Tree, TreeLike},
     },
     generators::nautilus::NautilusContext,
-    inputs::{Input, InputConverter, InputToBytes},
+    inputs::{Input, InputConverter, ToTargetBytes},
 };
 
 /// An [`Input`] implementation for `Nautilus` grammar.
@@ -121,8 +121,8 @@ impl InputConverter for NautilusBytesConverter<'_> {
     }
 }
 
-impl InputToBytes<NautilusInput> for NautilusBytesConverter<'_> {
-    fn to_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
+impl ToTargetBytes<NautilusInput> for NautilusBytesConverter<'_> {
+    fn to_target_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
         let mut bytes = vec![];
         input.unparse(self.ctx, &mut bytes);
         OwnedSlice::from(bytes)
