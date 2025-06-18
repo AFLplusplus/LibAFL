@@ -280,12 +280,10 @@ mod tests {
     use tuple_list::tuple_list;
 
     use crate::{
-        Evaluator, Fuzzer, HasToTargetBytes, StdFuzzer,
+        Evaluator, Fuzzer, StdFuzzer,
         corpus::InMemoryCorpus,
         events::NopEventManager,
-        executors::{
-            ExitKind, InProcessExecutor, hooks::inprocess::inprocess_get_fuzzer, nop::NopExecutor,
-        },
+        executors::{ExitKind, InProcessExecutor, nop::NopExecutor},
         feedbacks::BoolValueFeedback,
         inputs::{
             EncodedInput, ToTargetBytes,
@@ -327,6 +325,7 @@ mod tests {
         let mut true_objective = BoolValueFeedback::new(&observer.handle());
 
         let (bytes_converter, input) = setup_encoder_decoder();
+        let input_clone = input.clone();
         let mut event_mgr = NopEventManager::new();
 
         let mut state = StdState::new(
@@ -338,25 +337,17 @@ mod tests {
         )
         .unwrap();
 
-        let mut harness_fn = |bytes: &EncodedInput| {
-            // # Safety
-            // This only runs once as part of this test, we basically pass the fuzzer borrow into the harness.
-            // Don't try this at home.
-            let fuzzer: &mut StdFuzzer<
-                QueueScheduler,
-                BoolValueFeedback<'_>,
-                TokenInputEncoderDecoder,
-                crate::NopInputFilter,
-                BoolValueFeedback<'_>,
-            > = unsafe { inprocess_get_fuzzer().unwrap() };
-            let target_bytes = fuzzer.target_bytes_converter_mut().to_target_bytes(&bytes);
-            println!("Executed: {:?}", target_bytes);
+        let mut harness_fn = |input: &EncodedInput| {
+            println!("Executed: {:?}", input);
             ExitKind::Ok
         };
 
         let mut fuzzer = StdFuzzer::builder()
             .target_bytes_converter(bytes_converter)
-            .build(QueueScheduler::new(), true_feedback, true_objective);
+            .scheduler(QueueScheduler::new())
+            .feedback(true_feedback)
+            .objective(true_objective)
+            .build();
 
         let mut executor = InProcessExecutor::new(
             &mut harness_fn,
@@ -370,6 +361,9 @@ mod tests {
         fuzzer
             .add_input(&mut state, &mut executor, &mut event_mgr, input)
             .unwrap();
+
+        let input_bytes = fuzzer.to_target_bytes(&input_clone);
+        assert!(!input_bytes.is_empty());
 
         fuzzer
             .fuzz_loop_for(

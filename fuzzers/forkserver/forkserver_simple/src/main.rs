@@ -99,9 +99,12 @@ pub fn main() {
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzerBuilder::new()
-        .bytes_converter(encoder_decoder)
+        .target_bytes_converter(encoder_decoder)
         .input_filter(NopInputFilter)
-        .build(scheduler, feedback, objective);
+        .scheduler(scheduler)
+        .feedback(feedback)
+        .objective(objective)
+        .build();
 
     // Create the executor for an in-process function with just one observer
     let mut executor = ForkserverExecutor::builder()

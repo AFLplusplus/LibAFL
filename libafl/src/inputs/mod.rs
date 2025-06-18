@@ -130,7 +130,6 @@ where
     }
 }
 
-
 /// `None` type to satisfy the type inference in an `Option`
 #[macro_export]
 macro_rules! none_input_converter {
