@@ -8,7 +8,6 @@ use core::{
 use libafl_bolts::{HasLen, ownedref::OwnedSlice};
 use serde::{Deserialize, Serialize};
 
-use super::BytesInput;
 use crate::{
     common::nautilus::grammartec::{
         newtypes::NodeId,
@@ -16,7 +15,7 @@ use crate::{
         tree::{Tree, TreeLike},
     },
     generators::nautilus::NautilusContext,
-    inputs::{Input, InputConverter, ToTargetBytes},
+    inputs::{Input, ToTargetBytes},
 };
 
 /// An [`Input`] implementation for `Nautilus` grammar.
