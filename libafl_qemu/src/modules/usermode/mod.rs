@@ -9,9 +9,9 @@ pub mod snapshot;
 pub use snapshot::{IntervalSnapshotFilter, SnapshotModule};
 
 #[cfg(not(cpu_target = "hexagon"))]
-pub mod asan;
+pub mod asan_host;
 #[cfg(not(cpu_target = "hexagon"))]
-pub use asan::AsanModule;
+pub use asan_host::AsanHostModule;
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod asan_guest;

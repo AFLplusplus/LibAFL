@@ -25,7 +25,7 @@ use crate::{
     emu::EmulatorModules,
     modules::{
         EmulatorModule, EmulatorModuleTuple,
-        asan::AsanModule,
+        asan_host::AsanHostModule,
         utils::filters::{HasAddressFilter, NOP_ADDRESS_FILTER, NopAddressFilter},
     },
     qemu::{Hook, SyscallHookResult},
@@ -785,7 +785,7 @@ where
     where
         ET: EmulatorModuleTuple<I, S>,
     {
-        if emulator_modules.get::<AsanModule>().is_none() {
+        if emulator_modules.get::<AsanHostModule>().is_none() {
             // The ASan module, if present, will call the tracer hook for the snapshot helper as opt
             emulator_modules.writes(
                 Hook::Empty,

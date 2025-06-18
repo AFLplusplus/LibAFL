@@ -54,7 +54,7 @@ pub const SHADOW_PAGE_MASK: GuestAddr = !(SHADOW_PAGE_SIZE as GuestAddr - 1);
 pub const DEFAULT_REDZONE_SIZE: usize = 128;
 
 #[derive(Debug)]
-pub struct AsanModule {
+pub struct AsanHostModule {
     env: Vec<(String, String)>,
     enabled: bool,
     detect_leaks: bool,
@@ -76,7 +76,7 @@ pub struct AsanGiovese {
     pub error_found: bool,
 }
 
-pub struct AsanModuleBuilder {
+pub struct AsanHostModuleBuilder {
     env: Vec<(String, String)>,
     detect_leaks: bool,
     snapshot: bool,
@@ -240,7 +240,7 @@ impl Debug for AsanGiovese {
     }
 }
 
-impl AsanModuleBuilder {
+impl AsanHostModuleBuilder {
     #[must_use]
     pub fn new(
         env: Vec<(String, String)>,
@@ -351,8 +351,8 @@ impl AsanModuleBuilder {
     }
 
     #[must_use]
-    pub fn build(self) -> AsanModule {
-        AsanModule::new(
+    pub fn build(self) -> AsanHostModule {
+        AsanHostModule::new(
             self.env.as_ref(),
             self.detect_leaks,
             self.snapshot,
@@ -363,7 +363,7 @@ impl AsanModuleBuilder {
     }
 }
 
-impl Default for AsanModuleBuilder {
+impl Default for AsanHostModuleBuilder {
     fn default() -> Self {
         let env = env::vars()
             .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
@@ -379,10 +379,10 @@ impl Default for AsanModuleBuilder {
     }
 }
 
-impl AsanModule {
+impl AsanHostModule {
     #[must_use]
-    pub fn builder() -> AsanModuleBuilder {
-        AsanModuleBuilder::default()
+    pub fn builder() -> AsanHostModuleBuilder {
+        AsanHostModuleBuilder::default()
     }
 
     #[must_use]
@@ -967,7 +967,7 @@ impl AsanGiovese {
     }
 }
 
-impl<I, S> EmulatorModule<I, S> for AsanModule
+impl<I, S> EmulatorModule<I, S> for AsanHostModule
 where
     I: Unpin,
     S: Unpin,
@@ -1155,7 +1155,7 @@ where
     }
 }
 
-impl HasAddressFilter for AsanModule {
+impl HasAddressFilter for AsanHostModule {
     type AddressFilter = StdAddressFilter;
     fn address_filter(&self) -> &Self::AddressFilter {
         &self.filter
@@ -1175,7 +1175,7 @@ pub fn oncrash_asan<ET, I, S>(
     I: Unpin,
     S: Unpin,
 {
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+    let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
     let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
     h.rt.report(qemu, pc, AsanError::Signal(target_sig));
 }
@@ -1193,7 +1193,7 @@ where
     I: Unpin,
     S: Unpin,
 {
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+    let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
     if !h.must_instrument(pc) {
         return None;
     }
@@ -1223,7 +1223,7 @@ pub fn trace_read_asan<ET, I, S, const N: usize>(
     I: Unpin,
     S: Unpin,
 {
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+    let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
     h.read::<N>(qemu, id as GuestAddr, addr);
 }
 
@@ -1240,7 +1240,7 @@ pub fn trace_read_n_asan<ET, I, S>(
     I: Unpin,
     S: Unpin,
 {
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+    let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
     h.read_n(qemu, id as GuestAddr, addr, size);
 }
 
@@ -1256,7 +1256,7 @@ pub fn trace_write_asan<ET, I, S, const N: usize>(
     I: Unpin,
     S: Unpin,
 {
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+    let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
     h.write::<N>(qemu, id as GuestAddr, addr);
 }
 
@@ -1273,7 +1273,7 @@ pub fn trace_write_n_asan<ET, I, S>(
     I: Unpin,
     S: Unpin,
 {
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+    let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
     h.read_n(qemu, id as GuestAddr, addr, size);
 }
 
@@ -1290,7 +1290,7 @@ where
     I: Unpin,
     S: Unpin,
 {
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+    let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
     if !h.must_instrument(pc) {
         return Some(0);
     }
@@ -1321,7 +1321,7 @@ pub fn trace_write_asan_snapshot<ET, I, S, const N: usize>(
     S: Unpin,
 {
     if id != 0 {
-        let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+        let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
         h.write::<N>(qemu, id as GuestAddr, addr);
     }
     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
@@ -1342,7 +1342,7 @@ pub fn trace_write_n_asan_snapshot<ET, I, S>(
     S: Unpin,
 {
     if id != 0 {
-        let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+        let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
         h.read_n(qemu, id as GuestAddr, addr, size);
     }
     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
@@ -1370,7 +1370,7 @@ where
     S: Unpin,
 {
     if sys_num == QASAN_FAKESYS_NR {
-        let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+        let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
         match QasanAction::try_from(a0).expect("Invalid QASan action number") {
             QasanAction::CheckLoad => {
                 let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();

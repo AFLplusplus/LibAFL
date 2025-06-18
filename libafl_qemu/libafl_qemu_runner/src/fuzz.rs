@@ -6,7 +6,9 @@ use libafl_qemu::{
     Emulator, GuestAddr, NopEmulatorDriver, NopSnapshotManager, QemuExitError, QemuInitError,
     command::NopCommandManager,
     elf::EasyElf,
-    modules::{AsanGuestModule, AsanModule, EmulatorModuleTuple, utils::filters::StdAddressFilter},
+    modules::{
+        AsanGuestModule, AsanHostModule, EmulatorModuleTuple, utils::filters::StdAddressFilter,
+    },
 };
 use log::{error, info};
 use thiserror::Error;
@@ -123,7 +125,12 @@ pub fn fuzz() {
 
     let ret = if options.asan_host {
         info!("Enabling ASAN");
-        let modules = tuple_list!(AsanModule::builder().env(&env).filter(asan_filter).build());
+        let modules = tuple_list!(
+            AsanHostModule::builder()
+                .env(&env)
+                .filter(asan_filter)
+                .build()
+        );
         info!("Modules: {:#?}", modules);
         run(options, modules)
     } else if options.asan_guest {
