@@ -1062,9 +1062,16 @@ impl StdFuzzerBuilder<(), (), NopToTargetBytes, NopInputFilter, ()> {
     }
 }
 
+impl Default for StdFuzzerBuilder<(), (), NopToTargetBytes, NopInputFilter, ()> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
     /// Sets the converter to target bytes.
     /// The converter converts the input to bytes that can be sent to the target (for example, to a [`ForkserverExecutor`](crate::executors::ForkserverExecutor).
+    #[must_use]
     pub fn target_bytes_converter<IC2>(
         self,
         target_bytes_converter: IC2,
@@ -1083,6 +1090,7 @@ impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
 impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
     /// Set the input filter.
     /// The input filter will filter out (i.e., not execute) certain inputs.
+    #[must_use]
     pub fn input_filter<IF2>(self, input_filter: IF2) -> StdFuzzerBuilder<CS, F, IC, IF2, OF> {
         StdFuzzerBuilder {
             target_bytes_converter: self.target_bytes_converter,
@@ -1097,11 +1105,12 @@ impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
 
 impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
     /// Sets the scheduler used to schedule new testcases
+    #[must_use]
     pub fn scheduler<CS2>(self, scheduler: CS2) -> StdFuzzerBuilder<CS2, F, IC, IF, OF> {
         StdFuzzerBuilder {
             target_bytes_converter: self.target_bytes_converter,
             input_filter: self.input_filter,
-            scheduler: scheduler,
+            scheduler,
             feedback: self.feedback,
             objective: self.objective,
             share_objectives: self.share_objectives,
@@ -1111,12 +1120,13 @@ impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
 
 impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
     /// Sets the feedback that will store new testcases on if a run returns `is_interesting`.
+    #[must_use]
     pub fn feedback<F2>(self, feedback: F2) -> StdFuzzerBuilder<CS, F2, IC, IF, OF> {
         StdFuzzerBuilder {
             target_bytes_converter: self.target_bytes_converter,
             input_filter: self.input_filter,
             scheduler: self.scheduler,
-            feedback: feedback,
+            feedback,
             objective: self.objective,
             share_objectives: self.share_objectives,
         }
@@ -1125,13 +1135,14 @@ impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
 
 impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
     /// Sets the feedback that will store new testcases as solution (for example, a crash) if a run returns `is_interesting`.
+    #[must_use]
     pub fn objective<OF2>(self, objective: OF2) -> StdFuzzerBuilder<CS, F, IC, IF, OF2> {
         StdFuzzerBuilder {
             target_bytes_converter: self.target_bytes_converter,
             input_filter: self.input_filter,
             scheduler: self.scheduler,
             feedback: self.feedback,
-            objective: objective,
+            objective,
             share_objectives: self.share_objectives,
         }
     }
@@ -1139,7 +1150,8 @@ impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
 
 impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
     /// Sets whether to share objective testcases among nodes
-    pub fn share_objectives(self, share_objectives: bool) -> Self {
+    #[must_use]
+    pub fn share_objectives(self, share_objectives: bool) -> StdFuzzerBuilder<CS, F, IC, IF, OF> {
         StdFuzzerBuilder {
             target_bytes_converter: self.target_bytes_converter,
             input_filter: self.input_filter,

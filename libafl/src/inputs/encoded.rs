@@ -338,7 +338,7 @@ mod tests {
         .unwrap();
 
         let mut harness_fn = |input: &EncodedInput| {
-            println!("Executed: {:?}", input);
+            println!("Executed: {input:?}");
             ExitKind::Ok
         };
 
