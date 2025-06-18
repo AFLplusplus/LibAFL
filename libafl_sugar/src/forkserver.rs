@@ -147,7 +147,7 @@ impl ForkserverBytesCoverageSugar<'_> {
             };
 
             // New maximization map feedback linked to the edges observer and the feedback state
-            let map_feedback = MaxMapFeedback::new(&edges_observer);
+            let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);
             // Extra MapFeedback to deduplicate finds according to the cov map
             let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
@@ -157,7 +157,7 @@ impl ForkserverBytesCoverageSugar<'_> {
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::new(&edges_observer),
+                map_feedback,
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::new(&time_observer)
             );

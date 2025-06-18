@@ -337,7 +337,7 @@ where
                         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
                 } else {
-                    let mut stages = tuple_list!(mutational);
+                    let mut stages = tuple_list!(calibration, mutational);
                     if let Some(iters) = self.iterations {
                         fuzzer.fuzz_loop_for(
                             &mut stages,
