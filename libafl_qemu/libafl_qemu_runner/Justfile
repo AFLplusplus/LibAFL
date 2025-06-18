@@ -7,7 +7,7 @@ build:
   . {{ DOTENV }}
   cargo \
     build \
-    --package runner \
+    --package libafl_qemu_runner \
     --target x86_64-unknown-linux-gnu \
     --profile {{ PROFILE }} \
     --target-dir {{ TARGET_DIR }} \
@@ -19,7 +19,7 @@ fix:
   . {{ DOTENV }}
   cargo \
     fix \
-    --package runner \
+    --package libafl_qemu_runner \
     --target x86_64-unknown-linux-gnu \
     --profile {{ PROFILE }} \
     --target-dir {{ TARGET_DIR }} \
