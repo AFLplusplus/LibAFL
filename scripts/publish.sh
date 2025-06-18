@@ -86,3 +86,39 @@ cd ../.. || exit 1
 cd libafl_libfuzzer
 cargo publish "$@"
 cd .. || exit 1
+
+sleep 20
+
+cd libafl_asan
+cargo publish "$@"
+cd .. || exit 1
+
+sleep 20
+
+cd libafl_asan/libafl_asan_libc
+cargo publish "$@"
+cd ../.. || exit 1
+
+sleep 20
+
+cd libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_guest
+cargo publish "$@"
+cd ../../.. || exit 1
+
+sleep 20
+
+cd libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_host
+cargo publish "$@"
+cd ../../.. || exit 1
+
+sleep 20
+
+cd libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_nolibc
+cargo publish "$@"
+cd ../../.. || exit 1
+
+sleep 20
+
+cd libafl_qemu/libafl_qemu_runner
+cargo publish "$@"
+cd ../.. || exit 1
