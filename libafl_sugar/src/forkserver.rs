@@ -115,7 +115,7 @@ impl ForkserverBytesCoverageSugar<'_> {
         let shmem_provider = UnixShMemProvider::new().expect("Failed to init shared memory");
         let mut shmem_provider_client = shmem_provider.clone();
 
-        let monitor = MultiMonitor::new(|s| log::info!("{s}"));
+        let monitor = MultiMonitor::new(|s| println!("{s}"));
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -157,7 +157,7 @@ impl ForkserverBytesCoverageSugar<'_> {
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::new(&edges_observer),
+                map_feedback,
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::new(&time_observer)
             );
