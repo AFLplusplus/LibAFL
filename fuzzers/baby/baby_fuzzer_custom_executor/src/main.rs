@@ -142,7 +142,10 @@ pub fn main() {
     #[cfg(feature = "bloom_input_filter")]
     let mut fuzzer = StdFuzzer::builder()
         .input_filter(filter)
-        .build(scheduler, feedback, objective);
+        .scheduler(scheduler)
+        .feedback(feedback)
+        .objective(objective)
+        .build();
 
     // Create the executor for an in-process function with just one observer
     let executor = CustomExecutor::new(&state);
