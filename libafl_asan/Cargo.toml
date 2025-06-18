@@ -83,7 +83,7 @@ rustix = { version = "1.0.0", default-features = false, features = [
   "process",
   "stdio",
 ], optional = true }
-spin = { version = "0.9.8", default-features = false, features = [
+spin = { version = "0.10.0", default-features = false, features = [
   "lazy",
   "mutex",
   "spin_mutex",
