@@ -115,7 +115,7 @@ impl ForkserverBytesCoverageSugar<'_> {
         let shmem_provider = UnixShMemProvider::new().expect("Failed to init shared memory");
         let mut shmem_provider_client = shmem_provider.clone();
 
-        let monitor = MultiMonitor::new(|s| log::info!("{s}"));
+        let monitor = MultiMonitor::new(|s| println!("{s}"));
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -147,7 +147,7 @@ impl ForkserverBytesCoverageSugar<'_> {
             };
 
             // New maximization map feedback linked to the edges observer and the feedback state
-            let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);
+            let map_feedback = MaxMapFeedback::new(&edges_observer);
             // Extra MapFeedback to deduplicate finds according to the cov map
             let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
