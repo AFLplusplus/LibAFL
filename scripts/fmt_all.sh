@@ -38,6 +38,8 @@ if [ "$1" != "check" ]; then
     echo "[*] Formatting TOML files"
     taplo format
   fi
+else
+  run: taplo format --check || exit 1
 fi
 
 echo "[*] Done :)"
