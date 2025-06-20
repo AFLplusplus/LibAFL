@@ -254,7 +254,7 @@ where
         event: Event<DI>,
     ) -> Result<(), Error>
     where
-        ICB: InputConverter<To = I, From = DI>,
+        ICB: InputConverter<From = DI, To = I>,
         Z: EvaluatorObservers<E, EM, I, S>,
     {
         match event {
@@ -322,7 +322,7 @@ where
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
-        ICB: InputConverter<To = I, From = DI>,
+        ICB: InputConverter<From = DI, To = I>,
         DI: DeserializeOwned + Input,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
         Z: EvaluatorObservers<E, EM, I, S>,

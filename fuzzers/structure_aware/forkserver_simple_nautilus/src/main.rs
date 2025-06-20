@@ -169,9 +169,11 @@ pub fn main() {
     let converter = NautilusBytesConverter::new(&context);
     let mut fuzzer = StdFuzzerBuilder::new()
         .input_filter(BloomInputFilter::default())
-        .bytes_converter(converter)
-        .build(scheduler, feedback, objective)
-        .unwrap();
+        .target_bytes_converter(converter)
+        .scheduler(scheduler)
+        .feedback(feedback)
+        .objective(objective)
+        .build();
 
     // If we should debug the child
     let debug_child = opt.debug_child;

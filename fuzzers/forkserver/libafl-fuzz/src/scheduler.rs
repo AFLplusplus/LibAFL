@@ -8,6 +8,7 @@ use libafl::{
 };
 use libafl_bolts::tuples::MatchName;
 
+#[derive(Debug)]
 pub enum SupportedSchedulers<Q, W> {
     Queue(Q, PhantomData<W>),
     Weighted(W, PhantomData<Q>),

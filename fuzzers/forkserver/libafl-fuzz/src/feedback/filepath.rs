@@ -23,6 +23,17 @@ pub struct CustomFilepathToTestcaseFeedback<F> {
     out_dir: PathBuf,
 }
 
+impl<F> std::fmt::Debug for CustomFilepathToTestcaseFeedback<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    where
+        Self: Sized,
+    {
+        f.debug_struct("CustomFilepathToTestcaseFeedback")
+            .field("out_dir", &self.out_dir)
+            .finish_non_exhaustive()
+    }
+}
+
 impl<F> CustomFilepathToTestcaseFeedback<F> {
     /// Create a new [`CustomFilepathToTestcaseFeedback`].
     pub fn new(func: F, out_dir: PathBuf) -> Self {

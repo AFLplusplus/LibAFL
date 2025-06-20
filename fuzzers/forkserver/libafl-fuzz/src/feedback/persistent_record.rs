@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// A [`PersitentRecordFeedback`] tracks the last N inputs that the fuzzer has run.
 /// TODO: Kept in memory for now but should write to disk.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct PersitentRecordFeedback<I> {
     /// Vec that tracks the last `record_size` [`Input`]
     record: VecDeque<I>,

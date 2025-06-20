@@ -15,12 +15,15 @@ use core::{
 
 use ahash::RandomState;
 use hashbrown::HashMap;
-use libafl_bolts::{Error, HasLen};
+use libafl_bolts::{Error, HasLen, ownedref::OwnedSlice};
 #[cfg(feature = "regex")]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{corpus::CorpusId, inputs::Input};
+use crate::{
+    corpus::CorpusId,
+    inputs::{Input, ToTargetBytes},
+};
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
 pub trait InputEncoder<T>
@@ -104,6 +107,15 @@ impl TokenInputEncoderDecoder {
 impl Default for TokenInputEncoderDecoder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl ToTargetBytes<EncodedInput> for TokenInputEncoderDecoder {
+    /// Transform to bytes
+    fn to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
+        let mut bytes = vec![];
+        self.decode(input, &mut bytes).unwrap();
+        bytes.into()
     }
 }
 
@@ -256,29 +268,111 @@ impl EncodedInput {
     }
 }
 
-#[cfg(feature = "regex")]
 #[cfg(test)]
+#[cfg(feature = "regex")]
+#[cfg_attr(all(miri, target_arch = "aarch64", target_vendor = "apple"), ignore)] // Regex miri fails on M1
 mod tests {
     use alloc::borrow::ToOwned;
     use core::str::from_utf8;
 
-    use crate::inputs::encoded::{
-        InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder,
+    use libafl_bolts::{ownedref::OwnedRef, rands::StdRand, tuples::Handled};
+    use serial_test::serial;
+    use tuple_list::tuple_list;
+
+    use crate::{
+        Evaluator, Fuzzer, StdFuzzer,
+        corpus::InMemoryCorpus,
+        events::NopEventManager,
+        executors::{ExitKind, InProcessExecutor, nop::NopExecutor},
+        feedbacks::BoolValueFeedback,
+        inputs::{
+            EncodedInput, ToTargetBytes,
+            encoded::{InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
+        },
+        observers::ValueObserver,
+        schedulers::QueueScheduler,
+        stages::nop::NopStage,
+        state::StdState,
     };
 
-    #[test]
-    #[cfg_attr(all(miri, target_arch = "aarch64", target_vendor = "apple"), ignore)] // Regex miri fails on M1
-    fn test_input() {
+    fn setup_encoder_decoder() -> (TokenInputEncoderDecoder, EncodedInput) {
         let mut t = NaiveTokenizer::default();
         let mut ed = TokenInputEncoderDecoder::new();
         let input = ed
             .encode("/* test */a = 'pippo baudo'; b=c+a\n".as_bytes(), &mut t)
             .unwrap();
+        (ed, input)
+    }
+
+    #[test]
+    fn test_input() {
+        let (ed, input) = setup_encoder_decoder();
         let mut bytes = vec![];
         ed.decode(&input, &mut bytes).unwrap();
         assert_eq!(
             from_utf8(&bytes).unwrap(),
             "a = 'pippo baudo' ; b = c + a ".to_owned()
         );
+    }
+
+    #[test]
+    #[serial]
+    fn test_targetbytes_fuzzer_builds() {
+        const TRUE_VAL: bool = true;
+
+        let observer = ValueObserver::new("test_value", OwnedRef::Ref(&TRUE_VAL));
+        let mut true_feedback = BoolValueFeedback::new(&observer.handle());
+        let mut true_objective = BoolValueFeedback::new(&observer.handle());
+
+        let (bytes_converter, input) = setup_encoder_decoder();
+        let input_clone = input.clone();
+        let mut event_mgr = NopEventManager::new();
+
+        let mut state = StdState::new(
+            StdRand::new(),
+            InMemoryCorpus::new(),
+            InMemoryCorpus::new(),
+            &mut true_feedback,
+            &mut true_objective,
+        )
+        .unwrap();
+
+        let mut harness_fn = |input: &EncodedInput| {
+            println!("Executed: {input:?}");
+            ExitKind::Ok
+        };
+
+        let mut fuzzer = StdFuzzer::builder()
+            .target_bytes_converter(bytes_converter)
+            .scheduler(QueueScheduler::new())
+            .feedback(true_feedback)
+            .objective(true_objective)
+            .build();
+
+        let mut executor = InProcessExecutor::new(
+            &mut harness_fn,
+            tuple_list!(observer),
+            &mut fuzzer,
+            &mut state,
+            &mut event_mgr,
+        )
+        .unwrap();
+
+        fuzzer
+            .add_input(&mut state, &mut executor, &mut event_mgr, input)
+            .unwrap();
+
+        let input_bytes = fuzzer.to_target_bytes(&input_clone);
+        assert!(!input_bytes.is_empty());
+
+        fuzzer
+            .fuzz_loop_for(
+                &mut tuple_list!(NopStage::new()),
+                &mut NopExecutor::nop(),
+                &mut state,
+                &mut NopEventManager::new(),
+                1,
+            )
+            .unwrap();
     }
 }
