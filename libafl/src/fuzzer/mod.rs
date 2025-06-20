@@ -89,7 +89,7 @@ pub trait HasToTargetBytes {
     fn target_bytes_converter_mut(&mut self) -> &mut Self::Converter;
 }
 
-/// Blanket implementation to shorthand-call [`Self::to_target_bytes`] on the fuzzer directly.
+/// Blanket implementation to shorthand-call [`ToTargetBytes::to_target_bytes`] on the fuzzer directly.
 impl<I, T> ToTargetBytes<I> for T
 where
     T: HasToTargetBytes + Debug,
@@ -1201,7 +1201,7 @@ impl<CS, F, OF> StdFuzzer<CS, F, NopToTargetBytes, NopInputFilter, OF> {
 }
 
 impl StdFuzzer<(), (), NopToTargetBytes, NopInputFilter, ()> {
-    /// Creates a [`StdFuzzerBuiler`] that allows us to specify additional [`ToTargetBytes`](crate::inputs::ToTargetBytes) and [`InputFilter`] fields.
+    /// Creates a [`StdFuzzerBuilder`] that allows us to specify additional [`ToTargetBytes`] and [`InputFilter`] fields.
     #[must_use]
     pub fn builder() -> StdFuzzerBuilder<(), (), NopToTargetBytes, NopInputFilter, ()> {
         StdFuzzerBuilder::new()
