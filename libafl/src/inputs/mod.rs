@@ -38,6 +38,7 @@ use core::{
     clone::Clone,
     fmt::Debug,
     hash::Hash,
+    marker::PhantomData,
     ops::{DerefMut, RangeBounds},
 };
 #[cfg(feature = "std")]
@@ -104,12 +105,14 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash 
 }
 
 /// Convert between two input types using the given state
-pub trait InputConverter<I>: Debug {
+pub trait InputConverter {
+    /// What to convert from
+    type From;
     /// Destination type
     type To;
 
     /// Convert the src type to the dest
-    fn convert(&mut self, input: I) -> Result<Self::To, Error>;
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error>;
 }
 
 /// This trait can transform any input to bytes, which can be sent to the target from a harness.
@@ -119,23 +122,23 @@ pub trait ToTargetBytes<I>: Debug {
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
 }
 
-impl<I, T> InputConverter<I> for T
+struct TargetBytesInputConverter<I, T> {
+    to_bytes_converter: T,
+    _phantom: PhantomData<I>,
+}
+
+impl<I, T> InputConverter for TargetBytesInputConverter<I, T>
 where
     T: ToTargetBytes<I>,
 {
+    type From = I;
     type To = BytesInput;
 
-    fn convert(&mut self, input: I) -> Result<BytesInput, Error> {
-        Ok(BytesInput::new(self.to_target_bytes(&input).to_vec()))
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
+        Ok(BytesInput::new(
+            self.to_bytes_converter.to_target_bytes(&input).to_vec(),
+        ))
     }
-}
-
-/// `None` type to satisfy the type inference in an `Option`
-#[macro_export]
-macro_rules! none_input_converter {
-    () => {
-        None::<$crate::inputs::ClosureInputConverter<_, _>>
-    };
 }
 
 /// An input for tests, mainly. There is no real use much else.

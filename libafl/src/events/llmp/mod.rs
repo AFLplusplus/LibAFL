@@ -254,7 +254,7 @@ where
         event: Event<DI>,
     ) -> Result<(), Error>
     where
-        ICB: InputConverter<DI, To = I>,
+        ICB: InputConverter<From = DI, To = I>,
         Z: EvaluatorObservers<E, EM, I, S>,
     {
         match event {
@@ -322,7 +322,7 @@ where
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
-        ICB: InputConverter<DI, To = I>,
+        ICB: InputConverter<From = DI, To = I>,
         DI: DeserializeOwned + Input,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
         Z: EvaluatorObservers<E, EM, I, S>,
@@ -362,7 +362,7 @@ where
 
 impl<I, IC, ICB, S, SHM, SP> EventFirer<I, S> for LlmpEventConverter<I, IC, ICB, S, SHM, SP>
 where
-    IC: InputConverter<I>,
+    IC: InputConverter<From = I>,
     IC::To: Serialize,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
