@@ -1,0 +1,111 @@
+# Justfile for LibAFL cmplog demo
+# Usage: just <command>
+
+# Default recipe - show available commands
+default:
+    @just --list
+
+# Compile the test targets
+compile:
+    @if ! command -v afl-clang-fast >/dev/null 2>&1; then \
+        echo "Error: afl-clang-fast not found in PATH. Please install AFL++ and ensure afl-clang-fast is available."; \
+        exit 1; \
+    fi
+    @echo "Compiling test targets..."
+    cd test && afl-clang-fast -O0 test-cmplog.c -o test-cmplog.afl
+    cd test && AFL_LLVM_CMPLOG=1 afl-clang-fast -O0 test-cmplog.c -o test-cmplog.cmplog
+    cp -f ./test/test-cmplog.afl .
+    cp -f ./test/test-cmplog.cmplog .
+    @echo "Test targets compiled successfully!"
+
+# Build the Rust fuzzer
+build:
+    @echo "Building Rust fuzzer..."
+    cargo build
+    @echo "Rust fuzzer built successfully!"
+
+# Create necessary directories
+setup:
+    @echo "Setting up directories..."
+    mkdir -p ./corpus
+    mkdir -p ./output
+    @echo "Created corpus and output directories"
+
+# Initialize corpus with test input
+init-corpus:
+    @echo "Initializing corpus..."
+    echo "test" > ./corpus/test.txt
+    @echo "Corpus initialized with test input"
+
+# Compile everything and set up environment
+prepare: compile build setup init-corpus
+    @echo "Environment prepared successfully!"
+
+# Run the fuzzer
+run: prepare
+    @echo "Starting fuzzer..."
+    ./target/debug/fuzzbench_forkserver_cmplog -i ./corpus/ -o ./output/ ./test-cmplog.afl --cmplog ./test-cmplog.cmplog
+
+# Run in release mode (faster)
+run-release: compile setup init-corpus
+    @echo "Building in release mode..."
+    cargo build --release
+    @echo "Starting fuzzer in release mode..."
+    ./target/release/fuzzbench_forkserver_cmplog -i ./corpus/ -o ./output/ ./test-cmplog.afl --cmplog ./test-cmplog.cmplog
+
+# Clean compiled binaries
+clean-binaries:
+    @echo "Cleaning compiled binaries..."
+    rm -f ./test-cmplog.afl
+    rm -f ./test-cmplog.cmplog
+    rm -f ./test/test-cmplog.afl
+    rm -f ./test/test-cmplog.cmplog
+    @echo "Binaries cleaned"
+
+# Clean Rust build artifacts
+clean-rust:
+    @echo "Cleaning Rust build artifacts..."
+    cargo clean
+    @echo "Rust artifacts cleaned"
+
+# Clean corpus and output directories
+clean-data:
+    @echo "Cleaning corpus and output directories..."
+    rm -rf ./corpus
+    rm -rf ./output
+    @echo "Data directories cleaned"
+
+# Clean log files
+clean-logs:
+    @echo "Cleaning log files..."
+    rm -f ./libafl.log
+    rm -f ./.cur_input_*
+    @echo "Log files cleaned"
+
+# Clean everything
+clean: clean-binaries clean-rust clean-data clean-logs
+    @echo "All cleaned up!"
+
+# Kill any running fuzzer processes
+kill:
+    @echo "Killing fuzzer processes..."
+    @pkill -f fuzzbench_forkserver_cmplog || echo "No fuzzer processes found"
+
+# Test compilation without running
+test-compile: compile
+    @echo "Testing compiled binaries..."
+    @if [ -x "./test-cmplog.afl" ]; then \
+        echo "✓ test-cmplog.afl compiled successfully"; \
+    else \
+        echo "✗ test-cmplog.afl compilation failed"; \
+    fi
+    @if [ -x "./test-cmplog.cmplog" ]; then \
+        echo "✓ test-cmplog.cmplog compiled successfully"; \
+    else \
+        echo "✗ test-cmplog.cmplog compilation failed"; \
+    fi
+
+# Quick test run (limited time)
+quick-test: prepare
+    @echo "Running quick test (10 seconds)..."
+    timeout 10s ./target/debug/fuzzbench_forkserver_cmplog -i ./corpus/ -o ./output/ ./test-cmplog.afl --cmplog ./test-cmplog.cmplog || echo "Quick test completed"
