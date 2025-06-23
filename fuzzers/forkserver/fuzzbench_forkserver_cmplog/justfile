@@ -106,6 +106,6 @@ test-compile: compile
     fi
 
 # Quick test run (limited time)
-quick-test: prepare
+test: prepare
     @echo "Running quick test (10 seconds)..."
     timeout 10s ./target/debug/fuzzbench_forkserver_cmplog -i ./corpus/ -o ./output/ ./test-cmplog.afl --cmplog ./test-cmplog.cmplog || echo "Quick test completed"
