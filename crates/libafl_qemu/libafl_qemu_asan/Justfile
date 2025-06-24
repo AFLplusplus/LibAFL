@@ -1,4 +1,4 @@
-import "../../just/libafl-qemu.just"
+import "../../../just/libafl-qemu.just"
 import "libafl_qemu_asan_guest/Justfile"
 import "libafl_qemu_asan_host/Justfile"
 import "libafl_qemu_asan_nolibc/Justfile"

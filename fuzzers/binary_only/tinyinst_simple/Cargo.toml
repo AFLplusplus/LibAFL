@@ -4,9 +4,9 @@ version = "0.15.3"
 edition = "2021"
 
 [dependencies]
-libafl = { path = "../../../libafl", features = ["introspection"] }
-libafl_bolts = { path = "../../../libafl_bolts" }
-libafl_tinyinst = { path = "../../../libafl_tinyinst" }
+libafl = { path = "../../../crates/libafl", features = ["introspection"] }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_tinyinst = { path = "../../../crates/libafl_tinyinst" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 
 [profile.release]

@@ -25,17 +25,17 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl" }
-libafl_bolts = { path = "../../../libafl_bolts" }
-libafl_targets = { path = "../../../libafl_targets", features = [
+libafl = { path = "../../../crates/libafl" }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_pcguard_edges",
   "sancov_cmplog",
   "libfuzzer",
 ] }
-libafl_sugar = { path = "../../../libafl_sugar" }
+libafl_sugar = { path = "../../../crates/libafl_sugar" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 mimalloc = { version = "0.1.43", default-features = false }
-libafl_cc = { path = "../../../libafl_cc" }
+libafl_cc = { path = "../../../crates/libafl_cc" }
 
 [build-dependencies]
 cc = { version = "1.1.21", features = ["parallel"] }

@@ -226,7 +226,7 @@ test_nyx_mode: build_afl build_libafl_fuzz
     export LIBAFL_DEBUG_OUTPUT=1
     AFL_PATH={{AFL_DIR}} {{AFL_CC_PATH}} ./test/test-instr.c -o ./test/out-instr
     rm -rf ./test/nyx-test
-    cd ../../../libafl_nyx
+    cd ../../../crates/libafl_nyx
     rm -rf packer
     git clone https://github.com/nyx-fuzz/packer.git
     python3 packer/packer/nyx_packer.py \

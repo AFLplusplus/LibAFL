@@ -1,4 +1,4 @@
-import "../../just/libafl-qemu.just"
+import "../../../just/libafl-qemu.just"
 import "../../libafl_asan/fuzzer_name.just"
 
 [unix]

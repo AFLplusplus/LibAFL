@@ -15,11 +15,11 @@ feel free to add an AST-based input for structured fuzzing, and more.
 
 ## Core concepts
 
-LibAFL is fast, multi-platform, no_std compatible, and scales over cores and machines. It offers a main crate that provide building blocks for custom fuzzers, [libafl](./libafl), a library containing common code that can be used for targets instrumentation, [libafl_targets](./libafl_targets), and a library providing facilities to wrap compilers, [libafl_cc](./libafl_cc). It offers integrations with popular instrumentation frameworks. At the moment, the supported backends are:
-+ `SanitizerCoverage`, in [libafl_targets](./libafl_targets)
-+ `Frida`, in [libafl_frida](./libafl_frida)
-+ `QEMU` user-mode and system mode, including hooks for emulation, in [libafl_qemu](./libafl_qemu)
-+ `TinyInst`, in [libafl_tinyinst](./libafl_tinyinst) by [elbiazo](https://github.com/elbiazo)
+LibAFL is fast, multi-platform, no_std compatible, and scales over cores and machines. It offers a main crate that provide building blocks for custom fuzzers, [libafl](./crates/libafl), a library containing common code that can be used for targets instrumentation, [libafl_targets](./crates/libafl_targets), and a library providing facilities to wrap compilers, [libafl_cc](./crates/libafl_cc). It offers integrations with popular instrumentation frameworks. At the moment, the supported backends are:
++ `SanitizerCoverage`, in [libafl_targets](./crates/libafl_targets)
++ `Frida`, in [libafl_frida](./crates/libafl_frida)
++ `QEMU` user-mode and system mode, including hooks for emulation, in [libafl_qemu](./crates/libafl_qemu)
++ `TinyInst`, in [libafl_tinyinst](./crates/libafl_tinyinst) by [elbiazo](https://github.com/elbiazo)
 
 ## Building and installing
 

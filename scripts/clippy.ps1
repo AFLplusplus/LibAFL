@@ -31,12 +31,12 @@ function Run-Clippy {
 
 # Define projects for Windows
 $AllProjects = @(
-    "libafl_concolic/test/dump_constraints",
-    "libafl_concolic/test/runtime_test",
-    "libafl_libfuzzer",
-    "libafl_nyx",
-    "libafl_sugar",
-    "libafl_tinyinst"
+    "crates/libafl_concolic/test/dump_constraints",
+    "crates/libafl_concolic/test/runtime_test",
+    "crates/libafl_libfuzzer",
+    "crates/libafl_nyx",
+    "crates/libafl_sugar",
+    "crates/libafl_tinyinst"
     "utils/build_and_test_fuzzers",
     "utils/deexit",
     "utils/libafl_benches",

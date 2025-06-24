@@ -18,6 +18,6 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../../libafl" }
-libafl_bolts = { path = "../../../../libafl_bolts" }
+libafl = { path = "../../../../crates/libafl" }
+libafl_bolts = { path = "../../../../crates/libafl_bolts" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }

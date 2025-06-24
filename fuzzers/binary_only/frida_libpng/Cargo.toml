@@ -19,22 +19,22 @@ debug = true
 panic = 'abort'
 
 [dependencies]
-libafl = { path = "../../../libafl", features = [
+libafl = { path = "../../../crates/libafl", features = [
   "std",
   "llmp_compression",
   "llmp_bind_public",
   "frida_cli",
   "errors_backtrace",
 ] } #,  "llmp_small_maps", "llmp_debug"]}
-libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
 frida-gum = { version = "0.16.7", features = [
   "auto-download",
   "event-sink",
   "invocation-listener",
   "script",
 ] }
-libafl_frida = { path = "../../../libafl_frida", features = ["cmplog"] }
-libafl_targets = { path = "../../../libafl_targets", features = [
+libafl_frida = { path = "../../../crates/libafl_frida", features = ["cmplog"] }
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_cmplog",
 ] }
 libloading = "0.8.5"

@@ -196,9 +196,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Install smoke test deps
-        run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh
+        run: sudo ./crates/libafl_concolic/test/smoke_test_ubuntu_deps.sh
       - name: Run smoke test
-        run: ./libafl_concolic/test/smoke_test.sh
+        run: ./crates/libafl_concolic/test/smoke_test.sh
 
   python-bindings:
     runs-on: ubuntu-24.04
@@ -653,7 +653,7 @@ jobs:
           RUSTC_BOOTSTRAP=1 \
           LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
           just \
-            -f ./libafl_asan/Justfile \
+            -f ./crates/libafl_asan/Justfile \
             test_everything
 
   libafl_qemu_asan:
@@ -691,7 +691,7 @@ jobs:
           RUSTC_BOOTSTRAP=1 \
           LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
           just \
-            -f ./libafl_qemu/libafl_qemu_asan/Justfile \
+            -f ./crates/libafl_qemu/libafl_qemu_asan/Justfile \
             build_everything_dev \
             build_x86_64_release
 
@@ -712,7 +712,7 @@ jobs:
       - name: run x86_64 until panic!
         run: cd fuzzers/fuzz_anything/baby_no_std && cargo run || test $? -ne 0 || exit 1
       - name: no_std tests
-        run: cd ./libafl && cargo test --no-default-features
+        run: cd ./crates/libafl && cargo test --no-default-features
 
   nostd-clippy:
     runs-on: ubuntu-24.04
@@ -727,9 +727,9 @@ jobs:
         with:
           shared-key: no-std-clippy
       - name: libafl armv6m-none-eabi (32 bit no_std) clippy
-        run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
+        run: cd ./crates/libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
       - name: libafl_bolts armv6m-none-eabi (32 bit no_std) clippy
-        run: cd ./libafl_bolts && cargo clippy --target thumbv6m-none-eabi --no-default-features
+        run: cd ./crates/libafl_bolts && cargo clippy --target thumbv6m-none-eabi --no-default-features
 
   format-toml:
     runs-on: ubuntu-24.04

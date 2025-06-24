@@ -1,4 +1,4 @@
-import "../../just/libafl-qemu.just"
+import "../../../just/libafl-qemu.just"
 import "../fuzzer_name.just"
 
 libc_SOURCE_DIR := source_directory()

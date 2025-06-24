@@ -23,16 +23,16 @@ which = "6.0.3"
 
 [dependencies]
 env_logger = "0.11.5"
-libafl = { path = "../../../libafl" }
-libafl_bolts = { path = "../../../libafl_bolts", features = [
+libafl = { path = "../../../crates/libafl" }
+libafl_bolts = { path = "../../../crates/libafl_bolts", features = [
   "errors_backtrace",
 ] }
-libafl_targets = { path = "../../../libafl_targets", features = [
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_pcguard_hitcounts",
   "libfuzzer",
 ] }
 # TODO Include it only when building cc
-libafl_cc = { path = "../../../libafl_cc" }
+libafl_cc = { path = "../../../crates/libafl_cc" }
 
 clap = { version = "4.5.18", features = ["derive"] }
 log = { version = "0.4.22", features = ["release_max_level_info"] }

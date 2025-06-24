@@ -1,4 +1,4 @@
-import "../../just/libafl.just"
+import "../../../just/libafl.just"
 FUZZER_NAME := ""
 
 clean:

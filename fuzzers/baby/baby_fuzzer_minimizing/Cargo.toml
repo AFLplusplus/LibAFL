@@ -24,6 +24,6 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl", features = ["prelude"] }
-libafl_bolts = { path = "../../../libafl_bolts", features = ["prelude"] }
+libafl = { path = "../../../crates/libafl", features = ["prelude"] }
+libafl_bolts = { path = "../../../crates/libafl_bolts", features = ["prelude"] }
 log = { version = "0.4.22", features = ["release_max_level_info"] }

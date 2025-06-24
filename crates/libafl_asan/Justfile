@@ -1,4 +1,4 @@
-import "../just/libafl-qemu.just"
+import "../../just/libafl-qemu.just"
 import "libafl_asan_fuzz/Justfile"
 import "libafl_asan_libc/Justfile"
 import "fuzzer_name.just"

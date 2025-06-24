@@ -21,4 +21,4 @@ panic = "abort"
 
 [dependencies]
 log = { version = "0.4.22", features = ["release_max_level_info"] }
-symcc_runtime = { path = "../../../../libafl_concolic/symcc_runtime" }
+symcc_runtime = { path = "../../../../crates/libafl_concolic/symcc_runtime" }

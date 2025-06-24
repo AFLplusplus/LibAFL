@@ -22,26 +22,26 @@ run_clippy() {
 # Define projects based on the operating system
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
    ALL_PROJECTS=(
-      "libafl"
-      "libafl_bolts"
-      "libafl_cc"
-      "libafl_concolic/symcc_runtime"
-      "libafl_concolic/symcc_libafl"
-      "libafl_frida"
-      "libafl_libfuzzer"
-      "libafl_libfuzzer_runtime"
-      "libafl_qemu"
-      "libafl_tinyinst"
-      "libafl_qemu/libafl_qemu_build"
-      "libafl_qemu/libafl_qemu_sys"
-      "libafl_nyx"
-      "libafl_intelpt"
+      "crates/libafl"
+      "crates/libafl_bolts"
+      "crates/libafl_cc"
+      "crates/libafl_concolic/symcc_runtime"
+      "crates/libafl_concolic/symcc_libafl"
+      "crates/libafl_frida"
+      "crates/libafl_libfuzzer"
+      "crates/libafl_libfuzzer_runtime"
+      "crates/libafl_qemu"
+      "crates/libafl_tinyinst"
+      "crates/libafl_qemu/libafl_qemu_build"
+      "crates/libafl_qemu/libafl_qemu_sys"
+      "crates/libafl_nyx"
+      "crates/libafl_intelpt"
    )
 fi
 
 # Do not use --all-features for the following projects
 NO_ALL_FEATURES=(
-   "libafl_qemu"
+   "crates/libafl_qemu"
 )
 
 if [ "$#" -eq 0 ]; then
