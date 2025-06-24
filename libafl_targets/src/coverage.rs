@@ -73,11 +73,11 @@ pub fn autotokens() -> Result<Tokens, Error> {
     // All values are checked before dereferencing.
 
     unsafe {
-        if !has_autotokens() {
-            Ok(Tokens::default())
-        } else {
+        if has_autotokens() {
             // we can safely unwrap
             Tokens::from_mut_ptrs(__token_start, __token_stop)
+        } else {
+            Ok(Tokens::default())
         }
     }
 }

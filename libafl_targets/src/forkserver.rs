@@ -127,7 +127,7 @@ fn map_shared_memory_common<SHM: ShMemProvider>(
     } else {
         map_size_default_fallback
     };
-    log::trace!("id_str: {}, size: {}", id_str, map_size);
+
     let shmem = shmem_provider.shmem_from_id_and_size(ShMemId::from_string(&id_str), map_size)?;
 
     Ok(shmem_into_raw(shmem))
