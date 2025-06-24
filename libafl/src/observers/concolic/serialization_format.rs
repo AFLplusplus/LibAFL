@@ -21,11 +21,11 @@
 //!
 //! ## Techniques
 //! The serialization format applies multiple techniques to achieve its goals.
-//! * It uses bincode for efficient binary serialization. Crucially, bincode uses variable length integer encoding,
+//! * It uses postcard for efficient binary serialization. Crucially, postcard uses variable length integer encoding,
 //!   allowing it encode small integers use fewer bytes.
 //! * References to previous expressions are stored relative to the current expressions id. The vast majority of
 //!   expressions refer to other expressions that were defined close to their use. Therefore, encoding relative references
-//!   keeps references small. Therefore, they make optimal use of bincodes variable length integer encoding.
+//!   keeps references small. Therefore, they make optimal use of postcards variable length integer encoding.
 //! * Ids of expressions ([`SymExprRef`]s) are implicitly derived by their position in the message stream. Effectively,
 //!   a counter is used to identify expressions.
 //! * The current length of the trace in bytes in serialized in a fixed format at the beginning of the trace.
@@ -45,22 +45,14 @@
 use core::fmt::{self, Debug, Formatter};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
-use bincode::{
-    config::{self, Configuration},
-    decode_from_std_read, encode_into_std_write,
-    error::{DecodeError, EncodeError},
-};
+use postcard::{Error as DecodeError, Error as EncodeError};
+use postcard::{from_bytes, to_allocvec};
 
 use super::{SymExpr, SymExprRef};
-
-fn serialization_options() -> Configuration {
-    config::standard()
-}
 
 /// A `MessageFileReader` reads a stream of [`SymExpr`] and their corresponding [`SymExprRef`]s from any [`Read`].
 pub struct MessageFileReader<R: Read> {
     reader: R,
-    deserializer_config: Configuration,
     current_id: usize,
 }
 
@@ -75,7 +67,6 @@ impl<R: Read> MessageFileReader<R> {
     pub fn from_reader(reader: R) -> Self {
         Self {
             reader,
-            deserializer_config: serialization_options(),
             current_id: 1,
         }
     }
@@ -87,20 +78,28 @@ impl<R: Read> MessageFileReader<R> {
     /// with this message.
     /// The `SymExprRef` may be used by following messages to refer back to this message.
     pub fn next_message(&mut self) -> Option<Result<(SymExprRef, SymExpr), DecodeError>> {
-        match decode_from_std_read(&mut self.reader, self.deserializer_config) {
+        // Read a reasonable buffer size and try to deserialize
+        let mut buffer = [0u8; 1024];
+        let bytes_read = match self.reader.read(&mut buffer) {
+            Ok(n) if n > 0 => n,
+            _ => return None,
+        };
+
+        match from_bytes::<SymExpr>(&buffer[..bytes_read]) {
             Ok(mut message) => {
                 let message_id = self.transform_message(&mut message);
                 Some(Ok((message_id, message)))
             }
-            Err(e) => match e {
-                DecodeError::Io {
-                    inner: ref io_err, ..
-                } => match io_err.kind() {
-                    io::ErrorKind::UnexpectedEof => None,
-                    _ => Some(Err(e)),
-                },
-                _ => Some(Err(e)),
-            },
+            Err(e) => {
+                if matches!(
+                    e,
+                    DecodeError::DeserializeUnexpectedEnd | DecodeError::DeserializeBadVarint
+                ) {
+                    None
+                } else {
+                    Some(Err(e))
+                }
+            }
         }
     }
 
@@ -226,7 +225,6 @@ pub struct MessageFileWriter<W> {
     id_counter: usize,
     writer: W,
     writer_start_position: u64,
-    serialization_options: Configuration,
 }
 
 impl<W> Debug for MessageFileWriter<W>
@@ -251,45 +249,56 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             id_counter: 1,
             writer,
             writer_start_position,
-            serialization_options: serialization_options(),
         })
     }
 
-    fn write_trace_size(&mut self) -> io::Result<()> {
-        // calculate size of trace
-        let end_pos = self.writer.stream_position()?;
-        let trace_header_len = 0_u64.to_le_bytes().len() as u64;
-        assert!(
-            end_pos >= self.writer_start_position + trace_header_len,
-            "our end position can not be before our start position"
-        );
-        let trace_length = end_pos - self.writer_start_position - trace_header_len;
-
-        // write trace size to beginning of trace
-        self.writer
-            .seek(SeekFrom::Start(self.writer_start_position))?;
-        self.writer.write_all(&trace_length.to_le_bytes())?;
-        // rewind to previous position
-        self.writer.seek(SeekFrom::Start(end_pos))?;
+    /// After the writer has been created, the user may write additional data to the underlying [`Write`].
+    /// This may be necessary, for example, to communicate which version of the serialization format is used.
+    /// This function should be called after this initial data has been written to update the internal state of the `MessageFileWriter`.
+    pub fn update_writer_position(&mut self) -> io::Result<()> {
+        self.writer_start_position = self.writer.stream_position()?;
         Ok(())
     }
 
-    /// Updates the trace header which stores the total length of the trace in bytes.
-    pub fn update_trace_header(&mut self) -> io::Result<()> {
-        self.write_trace_size()?;
+    /// The size of the trace can be read by a consuming process to determine if a trace is complete
+    /// or if it was interrupted by a crash.
+    fn write_trace_size(&mut self) -> io::Result<()> {
+        let current_pos = self.writer.stream_position()?;
+        self.writer
+            .seek(SeekFrom::Start(self.writer_start_position))?;
+        let trace_size = current_pos - self.writer_start_position - 8;
+        self.writer.write_all(&trace_size.to_le_bytes())?;
+        self.writer.seek(SeekFrom::Start(current_pos))?;
         Ok(())
+    }
+
+    /// This function should be called regularly to allow readers to skip incomplete traces.
+    /// For performance reasons, this should not be called after every message.
+    pub fn update_trace_header(&mut self) -> io::Result<()> {
+        self.write_trace_size()
     }
 
     fn make_relative(&self, expr: SymExprRef) -> SymExprRef {
         SymExprRef::new(self.id_counter - expr.get()).unwrap()
     }
 
-    /// Writes a message to the stream and returns the [`SymExprRef`] that should be used to refer back to this message.
-    /// May error when the underlying `Write` errors or when there is a serialization error.
-    #[expect(clippy::too_many_lines)]
+    /// Writes the given [`SymExpr`] to the underlying [`Write`] and returns the [`SymExprRef`] associated with it.
+    /// This [`SymExprRef`] should be used when this [`SymExpr`] is used in other [`SymExpr`].
     pub fn write_message(&mut self, mut message: SymExpr) -> Result<SymExprRef, EncodeError> {
-        let current_id = self.id_counter;
-        match &mut message {
+        let ret = self.transform_message(&mut message);
+        let serialized = to_allocvec(&message)?;
+        self.writer
+            .write_all(&serialized)
+            .map_err(|_| EncodeError::SerializeBufferFull)?;
+        Ok(ret)
+    }
+
+    /// Makes the given `SymExprRef`s in a `SymExpr` relative according to the `current_id` counter.
+    /// This is the inverse function of [`MessageFileReader::make_absolute`].
+    #[expect(clippy::too_many_lines)]
+    fn transform_message(&mut self, message: &mut SymExpr) -> SymExprRef {
+        let ret = SymExprRef::new(self.id_counter).unwrap();
+        match message {
             SymExpr::InputByte { .. }
             | SymExpr::Integer { .. }
             | SymExpr::Integer128 { .. }
@@ -387,18 +396,10 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                 *cond = self.make_relative(*cond);
                 *a = self.make_relative(*a);
                 *b = self.make_relative(*b);
+                self.id_counter += 1;
             }
         }
-        encode_into_std_write(&message, &mut self.writer, self.serialization_options)?;
-
-        // for every path constraint, make sure we can later decode it in case we crash by updating the trace header
-        if let SymExpr::PathConstraint { .. } = &message {
-            self.write_trace_size().map_err(|err| EncodeError::Io {
-                inner: err,
-                index: 0,
-            })?;
-        }
-        Ok(SymExprRef::new(current_id).unwrap())
+        ret
     }
 }
 
