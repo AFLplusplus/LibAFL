@@ -33,7 +33,10 @@ use crate::cmps::EXTENDED_CMPLOG_MAP_PTR;
 use crate::cmps::{AflppCmpLogMap, CMPLOG_MAP_PTR};
 use crate::coverage::{__afl_map_size, EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
-use crate::coverage::{__token_start, __token_stop};
+use crate::{
+    coverage::{__token_start, __token_stop},
+    has_autotokens,
+};
 
 /// SAFETY:
 ///
@@ -124,6 +127,7 @@ fn map_shared_memory_common<SHM: ShMemProvider>(
     } else {
         map_size_default_fallback
     };
+    log::trace!("id_str: {}, size: {}", id_str, map_size);
     let shmem = shmem_provider.shmem_from_id_and_size(ShMemId::from_string(&id_str), map_size)?;
 
     Ok(shmem_into_raw(shmem))
@@ -413,7 +417,7 @@ fn start_forkserver_internal<P: ForkserverParent>(
     forkserver_parent: &mut P,
 ) -> Result<ForkserverState, Error> {
     #[cfg(any(target_os = "linux", target_vendor = "apple"))]
-    let autotokens_on = unsafe { !__token_start.is_null() && !__token_stop.is_null() };
+    let autotokens_on = has_autotokens();
     let sharedmem_fuzzing = unsafe { SHM_FUZZING == 1 };
 
     // Parent supports testcases via shared map - and the user wants to use it. Tell AFL.
