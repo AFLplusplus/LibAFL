@@ -1,24 +1,11 @@
 # GDB-QEMU
+
 `gdb-qemu` is a launcher for running `qemu-user` within `gdb`.
 
-# Test
-```
-rustup target add powerpc-unknown-linux-gnu
-$ just gdb
-```
+## About
 
-# Example
-```
-gdb-multiarch \
-  -ex "set architecture powerpc:MPC8XX" \
-  -ex "set pagination off" \
-  -ex "set confirm off" \
-  -ex "file demo" \
-  -ex "target remote | gdb-qemu -p 1234 qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 demo
-```
-
-# About
 `qemu-gdb` does the following:
+
 * Creates two pipes for the target program to send its `stdout`, `stderr`.
 * Forks a child process and sets the `stdout` and `stderr` using `dup2`.
 * Exec's the target program (passing the provided arguments).
@@ -28,8 +15,27 @@ gdb-multiarch \
 * Optionally logs to the specified log file.
 * Optionally logs trace information of the data transferred by the message pumps.
 
-# Usage
+## Test
+
+```sh
+rustup target add powerpc-unknown-linux-gnu
+$ just gdb
 ```
+
+## Example
+
+```sh
+gdb-multiarch \
+  -ex "set architecture powerpc:MPC8XX" \
+  -ex "set pagination off" \
+  -ex "set confirm off" \
+  -ex "file demo" \
+  -ex "target remote | gdb-qemu -p 1234 qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 demo
+```
+
+## Usage
+
+```sh
 Tool launching qemu-user for debugging
 
 Usage: gdb-qemu [OPTIONS] --port <PORT> <PROGRAM> [-- <ARGS>...]

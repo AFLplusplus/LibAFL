@@ -1,3 +1,5 @@
+# LibAFL Nyx
+
 `libafl_nyx` is the `libafl`'s front-end for the [nyx fuzzing framework](https://github.com/nyx-fuzz), which facilitates fuzzing in virtual machines such as qemu. This crate provides both the standalone mode and parallel mode:
 
 - In standalone mode, no VM snapshot is serialized and stored in the working directory. That might be useful if you really want to run the fuzzer with only one process (meaning one VM).

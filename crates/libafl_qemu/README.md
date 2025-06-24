@@ -20,5 +20,3 @@ If you use LibAFL QEMU for your academic work, consider citing the follwing pape
   keywords     = {fuzzing, emulation},
 }
 ```
-
-

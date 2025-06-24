@@ -137,14 +137,14 @@ to partial support of libfuzzer flags, `libafl_libfuzzer` offers:
 
 - `-dedup=n`, with `n` = 1 enabling deduplication of crashes by stacktrace.
 - `-grimoire=n`, with `n` set to 0 or 1 disabling or enabling [grimoire] mutations, respectively.
-    - if not specified explicitly, `libafl_libfuzzer` will select based on whether existing inputs are UTF-8
-    - you should disable grimoire if your target is not string-like
+  - if not specified explicitly, `libafl_libfuzzer` will select based on whether existing inputs are UTF-8
+  - you should disable grimoire if your target is not string-like
 - `-report=n`, with `n` = 1 causing `libafl_libfuzzer` to emit a report on the corpus content.
 - `-skip_tracing=n`, with `n` = 1 causing `libafl_libfuzzer` to disable cmplog tracing.
-    - you should do this if your target performs many comparisons on memory sequences which are
+  - you should do this if your target performs many comparisons on memory sequences which are
       not contained in the input
 - `-tui=n`, with `n` = 1 enabling a graphical terminal interface.
-    - experimental; some users report inconsistent behaviour with tui enabled
+  - experimental; some users report inconsistent behaviour with tui enabled
 
 ### Supported flags from libfuzzer
 
@@ -152,12 +152,12 @@ to partial support of libfuzzer flags, `libafl_libfuzzer` offers:
 - `-minimize_crash`
 - `-artifact_prefix`
 - `-timeout`
-    - unlike libfuzzer, `libafl_libfuzzer` supports partial second timeouts (e.g. `-timeout=.5`)
+  - unlike libfuzzer, `libafl_libfuzzer` supports partial second timeouts (e.g. `-timeout=.5`)
 - `-dict`
 - `-fork` and `-jobs`
-    - in `libafl_libfuzzer`, these are synonymous
+  - in `libafl_libfuzzer`, these are synonymous
 - `-ignore_crashes`, `-ignore_ooms`, and `-ignore_timeouts`
-    - note that setting `-tui=1` enables these flags by default, so you'll need to explicitly mention `-ignore_...=0` to
+  - note that setting `-tui=1` enables these flags by default, so you'll need to explicitly mention `-ignore_...=0` to
       disable them
 - `-rss_limit_mb` and `-malloc_limit_mb`
 - `-ignore_remaining_args`

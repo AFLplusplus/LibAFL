@@ -1,4 +1,5 @@
 # libafl_qemu_asan
+
 `libafl_qemu_asan` is a library intended to be used by a guest running in QEMU to
 support address sanitizer.
 
@@ -21,6 +22,7 @@ adapt `libafl_qemu_asan` to their needs with minimal modification by selecting
 and combining alternative implementations of the various key components.
 
 ## Features
+
 - `dlmalloc` - Enable support for the dlmalloc allocator backend.
 - `guest` - Enable support for shadow memory and tracking in the guest
 - `host` - Enable support for shadow memory and tracking in the host
@@ -31,9 +33,11 @@ host interaction using `rustix`.
 - `std` - Disable the magic used to support `no_std` environments
 
 ## Testing
+
 This project makes use of a number of unit and integration tests to validate the
 implementation.
 
 ## Fuzzing
+
 The project also includes a couple of fuzzing harnesses supported by
 `cargo-fuzz` in order to supplement unit and integration tests.
