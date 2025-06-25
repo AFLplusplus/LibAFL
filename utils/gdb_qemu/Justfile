@@ -1,4 +1,4 @@
-import "../../../just/libafl.just"
+import "../../just/libafl.just"
 
 DEMO_TARGET := "powerpc-unknown-linux-gnu"
 HOST_TARGET := "x86_64-unknown-linux-gnu"
