@@ -12,8 +12,8 @@ edition = "2021"
 tui = ["libafl/tui_monitor"]
 
 [dependencies]
-libafl = { path = "../../../libafl/", default-features = false, features = [
+libafl = { path = "../../../crates/libafl/", default-features = false, features = [
   "intel_pt",
 ] }
-libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
 proc-maps = "0.4.0"

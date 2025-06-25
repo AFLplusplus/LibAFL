@@ -1,6 +1,6 @@
 import "../../../../just/libafl-qemu.just"
-import "../../../libafl_asan/libafl_asan_libc/Justfile"
-import "../../../libafl_asan/fuzzer_name.just"
+import "../../../crates/libafl_asan/libafl_asan_libc/Justfile"
+import "../../../crates/libafl_asan/fuzzer_name.just"
 
 GUEST_SOURCE_DIR := source_directory()
 

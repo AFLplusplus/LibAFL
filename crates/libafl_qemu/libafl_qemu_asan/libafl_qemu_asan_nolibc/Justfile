@@ -1,5 +1,5 @@
 import "../../../../just/libafl-qemu.just"
-import "../../../libafl_asan/fuzzer_name.just"
+import "../../../crates/libafl_asan/fuzzer_name.just"
 
 NOLIBC_SOURCE_DIR := source_directory()
 
