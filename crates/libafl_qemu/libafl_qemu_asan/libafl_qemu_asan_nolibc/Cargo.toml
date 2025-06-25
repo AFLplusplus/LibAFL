@@ -13,7 +13,7 @@ default = []
 test = ["libafl_asan/test"]
 
 [dependencies]
-libafl_asan = { path = "../../../crates/libafl_asan", default-features = false, features = [
+libafl_asan = { path = "../../../libafl_asan", default-features = false, features = [
   "dlmalloc",
   "global_allocator",
   "guest",
