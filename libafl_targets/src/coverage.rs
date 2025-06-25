@@ -56,6 +56,16 @@ pub use __afl_fuzz_len as INPUT_LENGTH_PTR;
 pub use __afl_fuzz_ptr as INPUT_PTR;
 pub use __afl_sharedmem_fuzzing as SHM_FUZZING;
 
+/// Check if we have enabled autotokens
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
+pub(crate) fn has_autotokens() -> bool {
+    unsafe {
+        !__token_start.is_null()
+            && !__token_stop.is_null()
+            && __token_stop.offset_from(__token_start) != 0
+    }
+}
+
 /// Return Tokens from the compile-time token section
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 pub fn autotokens() -> Result<Tokens, Error> {
@@ -63,11 +73,11 @@ pub fn autotokens() -> Result<Tokens, Error> {
     // All values are checked before dereferencing.
 
     unsafe {
-        if __token_start.is_null() || __token_stop.is_null() {
-            Ok(Tokens::default())
-        } else {
+        if has_autotokens() {
             // we can safely unwrap
             Tokens::from_mut_ptrs(__token_start, __token_stop)
+        } else {
+            Ok(Tokens::default())
         }
     }
 }
