@@ -45,9 +45,9 @@ use crate::observers::{
     AsanBacktraceObserver, get_asan_runtime_flags, get_asan_runtime_flags_with_log_path,
 };
 use crate::{
-    Error, HasBytesConverter,
+    Error,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{Input, InputToBytes},
+    inputs::{Input, ToTargetBytes},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
     state::HasExecutions,
@@ -1516,8 +1516,7 @@ where
     OT: ObserversTuple<I, S>,
     S: HasExecutions,
     SHM: ShMem,
-    Z: HasBytesConverter,
-    Z::Converter: InputToBytes<I>,
+    Z: ToTargetBytes<I>,
 {
     #[inline]
     fn run_target(
@@ -1527,8 +1526,7 @@ where
         _mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        let converter = fuzzer.converter_mut();
-        let bytes = converter.to_bytes(input);
+        let bytes = fuzzer.to_target_bytes(input);
         self.observers_mut().pre_exec_child_all(state, input)?;
         let exit = self.execute_input(state, bytes.as_slice())?;
         self.observers_mut()
