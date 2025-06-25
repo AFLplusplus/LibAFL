@@ -34,7 +34,7 @@ echo "building runtime and dump_constraints"
 cargo build -p runtime_test -p dump_constraints
 
 echo "building target"
-SYMCC_RUNTIME_DIR=../../target/debug symcc_build/symcc symcc/test/if.c -o "if"
+SYMCC_RUNTIME_DIR=../../../target/debug symcc_build/symcc symcc/test/if.c -o "if"
 
 echo "running target with dump_constraints"
 cargo run -p dump_constraints -- --plain-text --output constraints.txt -- ./if < if_test_input
