@@ -20,7 +20,9 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../../crates/libafl", features = ["concolic_mutation"] }
+libafl = { path = "../../../../crates/libafl", features = [
+  "concolic_mutation",
+] }
 libafl_bolts = { path = "../../../../crates/libafl_bolts" }
 libafl_targets = { path = "../../../../crates/libafl_targets", features = [
   "sancov_pcguard_edges",

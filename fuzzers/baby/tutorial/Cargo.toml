@@ -22,7 +22,10 @@ cc = { version = "1.1.21", features = ["parallel"] }
 which = "6.0.3"
 
 [dependencies]
-libafl = { path = "../../../crates/libafl", features = ["default", "rand_trait"] }
+libafl = { path = "../../../crates/libafl", features = [
+  "default",
+  "rand_trait",
+] }
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
 libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_pcguard_hitcounts",
