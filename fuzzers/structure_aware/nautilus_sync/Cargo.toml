@@ -23,14 +23,14 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl", features = ["default", "nautilus"] }
-libafl_bolts = { path = "../../../libafl_bolts" }
-libafl_targets = { path = "../../../libafl_targets", features = [
+libafl = { path = "../../../crates/libafl", features = ["default", "nautilus"] }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_pcguard_hitcounts",
   "libfuzzer",
 ] }
 # TODO Include it only when building cc
-libafl_cc = { path = "../../../libafl_cc" }
+libafl_cc = { path = "../../../crates/libafl_cc" }
 clap = { version = "4.5.18", features = ["derive"] }
 mimalloc = { version = "0.1.43", default-features = false }
 

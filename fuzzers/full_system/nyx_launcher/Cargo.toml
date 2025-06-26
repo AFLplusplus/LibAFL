@@ -29,11 +29,11 @@ vergen = { version = "8.2.1", features = [
 
 [dependencies]
 clap = { version = "4.5.18", features = ["derive", "string"] }
-libafl = { path = "../../../libafl", features = ["tui_monitor"] }
-libafl_bolts = { path = "../../../libafl_bolts", features = [
+libafl = { path = "../../../crates/libafl", features = ["tui_monitor"] }
+libafl_bolts = { path = "../../../crates/libafl_bolts", features = [
   "errors_backtrace",
 ] }
-libafl_nyx = { path = "../../../libafl_nyx/" }
+libafl_nyx = { path = "../../../crates/libafl_nyx/" }
 log = { version = "0.4.20" }
 rangemap = { version = "1.5.1" }
 readonly = { version = "0.2.12" }

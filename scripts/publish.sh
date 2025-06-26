@@ -4,71 +4,71 @@ cd "$SCRIPT_DIR/.." || exit 1
 
 set -e
 
-cd libafl_derive
+pushd crates/libafl_derive
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_cc
+pushd crates/libafl_cc
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_bolts
+pushd crates/libafl_bolts
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_intelpt
+pushd crates/libafl_intelpt
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl
+pushd crates/libafl
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_targets
+pushd crates/libafl_targets
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_frida
+pushd crates/libafl_frida
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_qemu
+pushd crates/libafl_qemu
 
-cd libafl_qemu_build
+pushd libafl_qemu_build
 cargo publish "$@"
-cd ..
-cd libafl_qemu_sys
+popd
+pushd libafl_qemu_sys
 cargo publish "$@"
-cd ..
+popd
 
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_sugar
+pushd crates/libafl_sugar
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_concolic/symcc_libafl
+pushd crates/libafl_concolic/symcc_libafl
 cargo publish "$@"
-cd ../.. || exit 1
+popd || exit 1
 
 sleep 20
 
@@ -79,46 +79,46 @@ if git submodule status | grep "^-">/dev/null ; then \
     git submodule update; \
 fi
 
-cd libafl_concolic/symcc_runtime
+pushd crates/libafl_concolic/symcc_runtime
 cargo publish "$@" --allow-dirty
-cd ../.. || exit 1
+popd || exit 1
 
-cd libafl_libfuzzer
+pushd crates/libafl_libfuzzer
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_asan
+pushd crates/libafl_asan
 cargo publish "$@"
-cd .. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_asan/libafl_asan_libc
+pushd crates/libafl_asan/libafl_asan_libc
 cargo publish "$@"
-cd ../.. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_guest
+pushd crates/libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_guest
 cargo publish "$@"
-cd ../../.. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_host
+pushd crates/libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_host
 cargo publish "$@"
-cd ../../.. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_nolibc
+pushd crates/libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_nolibc
 cargo publish "$@"
-cd ../../.. || exit 1
+popd || exit 1
 
 sleep 20
 
-cd libafl_qemu/libafl_qemu_runner
+pushd crates/libafl_qemu/libafl_qemu_runner
 cargo publish "$@"
-cd ../.. || exit 1
+popd || exit 1

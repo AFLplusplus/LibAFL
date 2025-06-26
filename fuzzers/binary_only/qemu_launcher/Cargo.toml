@@ -43,15 +43,15 @@ vergen-git2 = "1.0.1"
 [dependencies]
 clap = { version = "4.5.18", features = ["derive", "string"] }
 env_logger = { version = "0.11.5" }
-libafl = { path = "../../../libafl", features = ["tui_monitor"] }
-libafl_bolts = { path = "../../../libafl_bolts", features = [
+libafl = { path = "../../../crates/libafl", features = ["tui_monitor"] }
+libafl_bolts = { path = "../../../crates/libafl_bolts", features = [
   "errors_backtrace",
 ] }
-libafl_qemu = { path = "../../../libafl_qemu", features = [
+libafl_qemu = { path = "../../../crates/libafl_qemu", features = [
   "usermode",
   "asan_rust",
 ] }
-libafl_targets = { path = "../../../libafl_targets" }
+libafl_targets = { path = "../../../crates/libafl_targets" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 rangemap = { version = "1.5.1" }
 readonly = { version = "0.2.12" }

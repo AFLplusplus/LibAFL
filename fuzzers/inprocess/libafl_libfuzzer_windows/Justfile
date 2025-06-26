@@ -8,11 +8,11 @@ set unstable
 
 [windows]
 libafl_libfuzzer:
-    powershell -File ..\..\..\libafl_libfuzzer_runtime\build.ps1
+    powershell -File ..\..\..\crates\libafl_libfuzzer_runtime\build.ps1
 
 [windows]
 harness: libafl_libfuzzer
-    copy ..\..\..\libafl_libfuzzer_runtime\libFuzzer.lib  .
+    copy ..\..\..\crates\libafl_libfuzzer_runtime\libFuzzer.lib  .
     cl /c /O2 /EHsc /std:c++17 /MDd /fsanitize-coverage=inline-8bit-counters /fsanitize-coverage=edge /fsanitize-coverage=trace-cmp /fsanitize-coverage=trace-div /Fo:harness.obj harness.cc
     link harness.obj libFuzzer.lib sancov.lib /OUT:libafl_libfuzzer_windows.exe
 

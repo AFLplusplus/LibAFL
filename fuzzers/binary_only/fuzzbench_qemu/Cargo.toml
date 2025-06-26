@@ -23,13 +23,13 @@ debug = false
 strip = true
 
 [dependencies]
-libafl = { path = "../../../libafl" }
-libafl_bolts = { path = "../../../libafl_bolts" }
-libafl_qemu = { path = "../../../libafl_qemu", features = [
+libafl = { path = "../../../crates/libafl" }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_qemu = { path = "../../../crates/libafl_qemu", features = [
   "x86_64",
   "usermode",
 ] }
-libafl_targets = { path = "../../../libafl_targets", version = "0.15.3" }
+libafl_targets = { path = "../../../crates/libafl_targets", version = "0.15.3" }
 
 env_logger = "0.11.5"
 log = { version = "0.4.22", features = ["release_max_level_info"] }

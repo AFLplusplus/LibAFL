@@ -20,9 +20,11 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../../libafl", features = ["concolic_mutation"] }
-libafl_bolts = { path = "../../../../libafl_bolts" }
-libafl_targets = { path = "../../../../libafl_targets", features = [
+libafl = { path = "../../../../crates/libafl", features = [
+  "concolic_mutation",
+] }
+libafl_bolts = { path = "../../../../crates/libafl_bolts" }
+libafl_targets = { path = "../../../../crates/libafl_targets", features = [
   "sancov_pcguard_edges",
   "sancov_cmplog",
   "libfuzzer",
@@ -35,4 +37,4 @@ mimalloc = { version = "0.1.43", default-features = false }
 cc = { version = "1.1.22", features = ["parallel"] }
 cmake = "0.1.51"
 which = "6.0.3"
-symcc_libafl = { path = "../../../../libafl_concolic/symcc_libafl" }
+symcc_libafl = { path = "../../../../crates/libafl_concolic/symcc_libafl" }

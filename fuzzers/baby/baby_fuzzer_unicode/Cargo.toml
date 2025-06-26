@@ -23,6 +23,9 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl", features = ["unicode", "tui_monitor"] }
-libafl_bolts = { path = "../../../libafl_bolts" }
+libafl = { path = "../../../crates/libafl", features = [
+  "unicode",
+  "tui_monitor",
+] }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }

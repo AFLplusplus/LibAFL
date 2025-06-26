@@ -35,6 +35,7 @@ cur_input
 
 crashes
 corpus
+!**/src/corpus
 
 callgrind.out.*
 perf.data
@@ -48,6 +49,7 @@ test.dict
 # Ignore all built fuzzers
 AFLplusplus
 test_*
+!test_harness.cpp
 *_fuzzer
 
 # Ignore common dummy and logfiles

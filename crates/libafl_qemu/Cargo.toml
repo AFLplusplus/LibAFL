@@ -1,0 +1,155 @@
+[package]
+name = "libafl_qemu"
+version.workspace = true
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Romain Malmain <rmalmain@pm.me>",
+]
+description = "QEMU user backend library for LibAFL"
+documentation = "https://docs.rs/libafl_qemu"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "qemu", "instrumentation"]
+edition = "2024"
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
+
+[package.metadata.docs.rs]
+features = ["document-features", "default", "python", "x86_64", "usermode"]
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+default = [
+  "asan_guest",
+  "asan_host",
+  "usermode",
+  "fork",
+  "serdeany_autoreg",
+  "injections",
+]
+## Build asan for address sanitization
+asan_guest = []
+asan_host = []
+## Use Address Sanitizer implementation written in rust (rather than the older C version)
+asan_rust = []
+
+document-features = ["dep:document-features"]
+
+qemu_sanitizers = ["libafl_qemu_sys/qemu_sanitizers"]
+
+paranoid_debug = [
+  "libafl_qemu_sys/paranoid_debug",
+] # Will perform as many checks as possible. The target will be greatly slowed down.
+
+#! # Feature Flags
+#! ### General Features
+## Find injections during fuzzing
+injections = ["serde_yaml", "toml"]
+## Python bindings support
+python = ["pyo3", "pyo3-build-config", "libafl_qemu_sys/python"]
+## Fork support
+fork = ["libafl/fork"]
+
+#! ## The following architecture features are mutually exclusive.
+
+## build qemu for x86_64 (default)
+x86_64 = ["libafl_qemu_sys/x86_64"]
+i386 = ["libafl_qemu_sys/i386"] # build qemu for i386
+arm = ["libafl_qemu_sys/arm"] # build qemu for arm
+aarch64 = ["libafl_qemu_sys/aarch64"] # build qemu for aarch64
+mips = [
+  "libafl_qemu_sys/mips",
+] # build qemu for mips (el, use with the 'be' feature of mips be)
+ppc = ["libafl_qemu_sys/ppc"] # build qemu for powerpc
+hexagon = ["libafl_qemu_sys/hexagon"] # build qemu for hexagon
+riscv32 = ["libafl_qemu_sys/riscv32"] # build qemu for riscv 32bit
+riscv64 = ["libafl_qemu_sys/riscv64"] # build qemu for riscv 64bit
+
+## Big Endian mode
+be = ["libafl_qemu_sys/be"]
+
+## Usermode (mutually exclusive to Systemmode)
+usermode = ["libafl_qemu_sys/usermode"]
+## Systemmode (mutually exclusive to Usermode)
+systemmode = ["libafl_qemu_sys/systemmode"]
+
+#! ## SerdeAny features
+
+## Automatically register all `#[derive(SerdeAny)]` types at startup.
+serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
+
+slirp = [
+  "systemmode",
+  "libafl_qemu_sys/slirp",
+] # build qemu with host libslirp (for user networking)
+
+intel_pt = ["systemmode", "x86_64", "dep:libafl_intelpt"]
+intel_pt_export_raw = ["intel_pt", "libafl_intelpt/export_raw"]
+
+# Requires the binary's build.rs to call `build_libafl_qemu`
+shared = ["libafl_qemu_sys/shared"]
+
+#! ## Internal features, don't use in normal projects
+## clippy workaround
+clippy = ["libafl_qemu_sys/clippy"]
+
+[dependencies]
+libafl = { workspace = true, features = ["std", "derive", "regex"] }
+libafl_bolts = { workspace = true, features = ["std", "derive"] }
+libafl_targets = { workspace = true, default-features = true }
+libafl_qemu_sys = { workspace = true }
+libafl_derive = { workspace = true, default-features = true }
+libafl_intelpt = { workspace = true, default-features = true, optional = true }
+
+serde = { workspace = true, default-features = false, features = [
+  "alloc",
+] } # serialization lib
+hashbrown = { workspace = true, default-features = true, features = [
+  "serde",
+] } # A faster hashmap, nostd compatible
+num-traits = { workspace = true, default-features = true }
+num_enum = { workspace = true, default-features = true }
+goblin = "0.10.0"
+libc = { workspace = true }
+strum = "0.27.0"
+strum_macros = "0.27.0"
+syscall-numbers = "4.0.0"
+meminterval = { workspace = true }
+thread_local = "1.1.8"
+capstone = "0.13.0"
+rangemap = { workspace = true }
+log = { workspace = true }
+object = "0.37.0"
+addr2line = "0.25.0"
+paste = { workspace = true }
+enum-map = "2.7.3"
+serde_yaml = { workspace = true, optional = true } # For parsing the injections yaml file
+toml = { workspace = true, optional = true } # For parsing the injections toml file
+pyo3 = { workspace = true, optional = true, features = ["multiple-pymethods"] }
+bytes-utils = "0.1.4"
+typed-builder = { workspace = true }
+getset = "0.1.3"
+
+# Document all features of this crate (for `cargo doc`)
+document-features = { workspace = true, optional = true }
+
+[build-dependencies]
+libafl_qemu_build = { workspace = true, default-features = true }
+pyo3-build-config = { workspace = true, optional = true }
+rustversion = { workspace = true }
+bindgen = { workspace = true }
+cc = { workspace = true }
+just = { workspace = true }
+
+[lib]
+name = "libafl_qemu"
+crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true

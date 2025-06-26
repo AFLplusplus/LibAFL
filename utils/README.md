@@ -11,7 +11,7 @@ Abort, on the other hand, raises an error LibAFL's inprocess executor will be ab
 
 ## Gramatron: gramatron grammars and preprocessing utils
 
-See https://github.com/HexHive/Gramatron
+See <https://github.com/HexHive/Gramatron>
 
 ## libafl_benches
 

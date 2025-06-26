@@ -1,0 +1,125 @@
+[package]
+name = "libafl_frida"
+version.workspace = true
+authors = ["s1341 <github@shmarya.net>"]
+description = "Frida backend library for LibAFL"
+documentation = "https://docs.rs/libafl_frida"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "frida", "instrumentation"]
+edition = "2024"
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
+
+[package.metadata.docs.rs]
+no-default-features = true # We can't use auto-download inside docs.rs (no internet)
+all-features = false
+features = [
+  "cmplog",
+  "serdeany_autoreg",
+  "track_hit_feedbacks",
+  "document-features",
+]
+
+[features]
+default = ["serdeany_autoreg", "auto-download"]
+document-features = ["dep:document-features"]
+
+#! # Feature Flags
+#! ### General Features
+
+## Enables `cmplog`, a mode that logs comparisons. This increases runtime overhead but also increases the fuzzer's solving capabilities. Should be used on some cores.
+cmplog = ["iced-x86"]
+## Automatically register all types with LibAFL's serializer. There's hardly a reason not to use this.
+serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
+## If hit feedbacks should be tracked as part of LibAFL's feedback.
+track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
+## If Frida should be automatically downloaded (else you'll have to provide a Frida version to use manually)
+auto-download = ["frida-gum-sys/auto-download", "frida-gum/auto-download"]
+
+[build-dependencies]
+cc = { workspace = true, features = ["parallel"] }
+
+[dependencies]
+libafl = { workspace = true, features = [
+  "std",
+  "derive",
+  "frida_cli",
+], default-features = false }
+libafl_bolts = { workspace = true, features = ["std", "derive", "frida_cli"] }
+libafl_targets = { workspace = true, default-features = true, features = [
+  "std",
+  "sancov_cmplog",
+] }
+
+nix = { workspace = true, default-features = true, features = ["mman"] }
+libc = { workspace = true }
+hashbrown = { workspace = true, default-features = true }
+rangemap = { workspace = true }
+frida-gum-sys = { version = "0.16.7", features = [
+  "event-sink",
+  "invocation-listener",
+] }
+frida-gum = { version = "0.16.7", features = [
+  "event-sink",
+  "invocation-listener",
+  "module-names",
+  "script",
+  "backtrace",
+] }
+dynasmrt = "3.0.1"
+
+color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
+termcolor = "1.4.1"
+serde = { workspace = true, default-features = true }
+backtrace = { workspace = true, default-features = false, features = [
+  "std",
+  "serde",
+] }
+num-traits = { workspace = true, default-features = true }
+ahash = { workspace = true, default-features = true }
+paste = { workspace = true }
+log = { workspace = true }
+mmap-rs = "0.6.1"
+yaxpeax-arch = "0.3.2"
+
+document-features = { workspace = true, optional = true } # Document all features of this crate (for `cargo doc`)
+
+[dev-dependencies]
+serial_test = { workspace = true, default-features = false, features = [
+  "logging",
+] }
+clap = { workspace = true, features = ["derive"] }
+libloading = "0.8.5"
+mimalloc = { workspace = true, default-features = false }
+
+[lints]
+workspace = true
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+yaxpeax-arm = "0.3.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+yaxpeax-x86 = "2.0.0"
+iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
+
+[target.'cfg(windows)'.dependencies]
+winsafe = { version = "0.0.24", features = ["kernel"] }
+winapi = { version = "0.3", features = [
+  "processthreadsapi",
+  "winnt",
+  "memoryapi",
+  "errhandlingapi",
+  "debugapi",
+] }
+
+[target.'cfg(unix)'.dependencies]
+errno = "0.3"
+[target.'cfg(target_vendor="apple")'.dependencies]
+mach-sys = { version = "0.5.4" }

@@ -1,0 +1,121 @@
+import "../../../../just/libafl-qemu.just"
+import "../../../libafl_asan/libafl_asan_libc/Justfile"
+import "../../../libafl_asan/fuzzer_name.just"
+
+HOST_SOURCE_DIR := source_directory()
+
+[unix]
+compile_host:
+	#!/bin/sh
+	. {{ DOTENV }}
+	cargo \
+		build \
+		--package libafl_qemu_asan_host \
+		--target ${CROSS_TARGET} \
+		--profile {{ PROFILE }} \
+		--target-dir {{ TARGET_DIR }}
+
+[unix]
+fix_host:
+	#!/bin/sh
+	. {{ DOTENV }}
+	cargo \
+		fix \
+		--package libafl_qemu_asan_host \
+		--target ${CROSS_TARGET} \
+		--profile {{ PROFILE }} \
+		--target-dir {{ TARGET_DIR }} \
+		--features test \
+		--allow-dirty
+
+[unix]
+rel_host: compile_host build_libc
+	#!/bin/sh
+	. {{ DOTENV }}
+	${CROSS_CC} \
+		${LIBAFL_QEMU_ASAN_CFLAGS} \
+		-r \
+		-nodefaultlibs \
+		-nostartfiles \
+		-nostdlib \
+		-g \
+		-u patch_aligned_alloc \
+		-u patch_atoi \
+		-u patch_atol \
+		-u patch_atoll \
+		-u patch_calloc \
+		-u patch_free \
+		-u patch_malloc \
+		-u patch_malloc_usable_size \
+		-u patch_memalign \
+		-u patch_memset \
+		-u patch_mmap \
+		-u patch_munmap \
+		-u patch_posix_memalign \
+		-u patch_pvalloc \
+		-u patch_read \
+		-u patch_realloc \
+		-u patch_reallocarray \
+		-u patch_valloc \
+		-u patch_write \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.rel \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.a
+
+[unix]
+rename_host: rel_host
+	#!/bin/sh
+	. {{ DOTENV }}
+	${CROSS_OBJCOPY} \
+		--redefine-syms={{ HOST_SOURCE_DIR }}/rename_real.syms \
+		--redefine-syms={{ HOST_SOURCE_DIR }}/rename_patch.syms \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.rel \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.renamed
+
+[unix]
+link_host: rename_host
+	#!/bin/sh
+	. {{ DOTENV }}
+	${CROSS_CC} \
+		-shared \
+		-nodefaultlibs \
+		-nostartfiles \
+		-nostdlib \
+		-g \
+		-u aligned_alloc \
+		-u atoi \
+		-u atol \
+		-u atoll \
+		-u calloc \
+		-u free \
+		-u malloc \
+		-u malloc_usable_size \
+		-u memalign \
+		-u memset \
+		-u mmap \
+		-u munmap \
+		-u posix_memalign \
+		-u pvalloc \
+		-u read \
+		-u realloc \
+		-u reallocarray \
+		-u valloc \
+		-u write \
+		-Wl,--version-script={{ HOST_SOURCE_DIR }}/host.map \
+		-Wl,--gc-sections \
+		-Wl,--no-undefined \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libafl_qemu_asan_host.so \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.renamed \
+		-L {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }} \
+		"-lafl_asan_libc"
+
+[unix]
+strip_host: link_host
+	#!/bin/sh
+	. {{ DOTENV }}
+	${CROSS_STRIP} \
+		--strip-unneeded \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.so \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libafl_qemu_asan_host.so
+
+[unix]
+build_host: strip_host
