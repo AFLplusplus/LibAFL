@@ -37,6 +37,13 @@ use crate::{Error, executors::ExitKind};
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
+///
+/// # Important
+/// If your observer has configuration or state that must persist across fuzzer restarts (e.g., when using an EventRestarter),
+/// you **must** store this information in the fuzzer state (typically as metadata), and restore it in `on_state_restore`.
+/// Otherwise, any changes made to the observer's configuration at runtime will be lost after a restart.
+///
+/// The default implementation of `on_state_restore` does nothing. Override it if you need to re-sync observer state from the fuzzer state.
 pub trait Observer<I, S>: Named {
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
@@ -78,6 +85,13 @@ pub trait Observer<I, S>: Named {
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    /// Called after the fuzzer state is restored (e.g., after a restart).
+    /// Override this if your observer needs to re-sync configuration/state from the fuzzer state.
+    #[inline]
+    fn on_state_restore(&mut self, _state: &S) {
+        // Default: do nothing
+    }
 }
 
 /// A haskell-style tuple of observers
@@ -103,6 +117,9 @@ pub trait ObserversTuple<I, S>: MatchName {
         input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
+
+    /// Called after the fuzzer state is restored (e.g., after a restart) for all observers in the tuple.
+    fn on_state_restore_all(&mut self, state: &S);
 }
 
 impl<I, S> ObserversTuple<I, S> for () {
@@ -130,6 +147,10 @@ impl<I, S> ObserversTuple<I, S> for () {
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
+    }
+
+    fn on_state_restore_all(&mut self, _state: &S) {
+        // nothing to do
     }
 }
 
@@ -166,6 +187,11 @@ where
     ) -> Result<(), Error> {
         self.0.post_exec_child(state, input, exit_kind)?;
         self.1.post_exec_child_all(state, input, exit_kind)
+    }
+
+    fn on_state_restore_all(&mut self, state: &S) {
+        self.0.on_state_restore(state);
+        self.1.on_state_restore_all(state);
     }
 }
 
@@ -393,6 +419,14 @@ impl Named for TimeObserver {
 }
 
 impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for TimeObserver {}
+
+/// Utility function to call `on_state_restore_all` on a tuple of observers after state restoration.
+///
+/// Call this after restoring the fuzzer state to ensure all observers re-sync their configuration/state.
+#[inline]
+pub fn notify_observers_on_state_restore<I, S, OT: ObserversTuple<I, S>>(observers: &mut OT, state: &S) {
+    observers.on_state_restore_all(state);
+}
 
 #[cfg(feature = "std")]
 #[cfg(test)]

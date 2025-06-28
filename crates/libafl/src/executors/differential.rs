@@ -176,6 +176,10 @@ where
         self.differential
             .post_exec_child_all(state, input, exit_kind)
     }
+
+    fn on_state_restore_all(&mut self, state: &S) {
+        self.differential.on_state_restore_all(state);
+    }
 }
 
 impl<A, B, DOT> Deref for ProxyObserversTuple<A, B, DOT> {

@@ -23,6 +23,10 @@ feel free to add an AST-based input for structured fuzzing, and more.
 - `QEMU` user-mode and system mode, including hooks for emulation, in [libafl_qemu](./crates/libafl_qemu)
 - `TinyInst`, in [libafl_tinyinst](./crates/libafl_tinyinst) by [elbiazo](https://github.com/elbiazo)
 
+## ⚠️ Note on Observer Configuration and Restarts
+
+If you modify observer configuration/state at runtime (for example, the initial value of a MapObserver), you **must** ensure this state is stored in the fuzzer state (as metadata) and restored after a restart. Otherwise, changes will be lost when using restarting event managers. See the documentation for the [`Observer` trait](./crates/libafl/src/observers/mod.rs) and the [Observer core concept](./docs/src/core_concepts/observer.md#observer-state-restoration-and-restarts) for details and examples.
+
 ## Building and installing
 
 #### Install the Dependencies
