@@ -66,8 +66,8 @@ __pycache__
 **/corpus_discovered
 **/libxml2-*.tar.gz
 
-libafl_nyx/QEMU-Nyx
-libafl_nyx/packer
+**/libafl_nyx/QEMU-Nyx
+**/libafl_nyx/packer
 
 .z3-trace
 
