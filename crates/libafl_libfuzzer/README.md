@@ -15,9 +15,9 @@ fuzzing environment or updating their harnesses.
 
 ## Usage
 
-`libafl_libfuzzer` currently has known support for Rust, C, and C++ targets on Linux and macOS.
-Windows is not currently supported, as we do not currently test or develop for Windows machines, but [we will happily
-hear what issues you face and patch them as possible](https://github.com/AFLplusplus/LibAFL/issues/1563).
+`libafl_libfuzzer` currently has known support for Rust, C, and C++ targets on Linux and
+macOS. Windows is only supported via [usage as a standalone
+library](#usage-as-a-standalone-library-for-ccetc).
 
 For both cases, you should install a recent **nightly** version of Rust via `rustup` and add the `llvm-tools` component
 with `rustup component add llvm-tools`.
@@ -80,6 +80,7 @@ CXXFLAGS='-fsanitize=fuzzer-no-link'
 
 ### Usage as a standalone library (for C/C++/etc.)
 
+
 The runtime for `libafl_libfuzzer` may be used standalone as a direct replacement for libFuzzer with other targets as
 well.
 To do so, [ensure a recent nightly version of Rust is installed](https://rustup.rs/), then enter the
@@ -121,6 +122,14 @@ And then ensure you link with `sancov.lib` when producing your final executable.
 This standalone library is _not_ compatible with Rust targets; you must instead use the crate-based dependency.
 This is due to potential symbol conflict between your harness and the fuzzer runtime, which is resolved by additional
 build steps provided in the `libafl_libfuzzer` crate itself.
+
+#### Troubleshooting
+
+To build the `libafl_libfuzzer` runtime directly, you must have working symbolic links
+in your LibAFL git repository. You can enable this with `git config core.symlinks true`.
+If you see problems related to the `Cargo.toml` file containing only a path, this is
+your problem. Enable symlinks and checkout or re-clone the LibAFL repository.
+
 
 ## Flags
 
