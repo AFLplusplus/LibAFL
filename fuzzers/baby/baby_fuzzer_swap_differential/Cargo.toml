@@ -25,9 +25,9 @@ bindgen = "0.71.1"
 cc = "=1.2.7"      # fix me later
 
 [dependencies]
-libafl = { path = "../../../libafl", features = ["tui_monitor"] }
-libafl_bolts = { path = "../../../libafl_bolts" }
-libafl_targets = { path = "../../../libafl_targets", features = [
+libafl = { path = "../../../crates/libafl", features = ["tui_monitor"] }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_pcguard_hitcounts",
   "libfuzzer",
   "sancov_cmplog",
@@ -36,7 +36,7 @@ libafl_targets = { path = "../../../libafl_targets", features = [
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 mimalloc = { version = "0.1.43", default-features = false }
 
-libafl_cc = { path = "../../../libafl_cc" }
+libafl_cc = { path = "../../../crates/libafl_cc" }
 
 [[bin]]
 name = "fuzzer_sd"

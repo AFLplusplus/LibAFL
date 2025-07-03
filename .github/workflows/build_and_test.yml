@@ -74,11 +74,11 @@ jobs:
         if: runner.os != 'Windows'
         run: cargo test -- --test-threads 1
       - name: Test libafl no_std
-        run: cd libafl && cargo test --no-default-features
+        run: cd crates/libafl && cargo test --no-default-features
       - name: Test libafl_bolts no_std no_alloc
-        run: cd libafl_bolts && cargo test --no-default-features
+        run: cd crates/libafl_bolts && cargo test --no-default-features
       - name: Test libafl_targets no_std
-        run: cd libafl_targets && cargo test --no-default-features
+        run: cd crates/libafl_targets && cargo test --no-default-features
 
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
@@ -135,9 +135,9 @@ jobs:
       - name: Run a normal build
         run: cargo build --verbose
       # - name: Run libafl_qemu usermode tests
-      #   run: cd libafl_qemu && cargo test
+      #   run: cd crates/libafl_qemu && cargo test
       # - name: Run libafl_qemu systemmode tests
-      #   run: cd libafl_qemu && cargo test --no-default-features --features x86_64,systemmode
+      #   run: cd crates/libafl_qemu && cargo test --no-default-features --features x86_64,systemmode
       - name: Build examples
         run: cargo build --examples --verbose
 
@@ -164,6 +164,7 @@ jobs:
     strategy:
       matrix:
         instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17" ]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
@@ -195,9 +196,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Install smoke test deps
-        run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh
+        run: sudo ./crates/libafl_concolic/test/smoke_test_ubuntu_deps.sh
       - name: Run smoke test
-        run: ./libafl_concolic/test/smoke_test.sh
+        run: ./crates/libafl_concolic/test/smoke_test.sh
 
   python-bindings:
     runs-on: ubuntu-24.04
@@ -368,10 +369,10 @@ jobs:
           # We want to include the commit hash to ensure the cache is replaced
           # on each new commit.
           key: ${{ github.sha }}
-          # We will only save the cache for one of the builds. Though we could 
+          # We will only save the cache for one of the builds. Though we could
           # just omit this filter and the jobs race to push to the cache, since
-          # they would all share the same key (combining the `shared-key` and 
-          # `key`) our build would generate a load of warnings. Why this 
+          # they would all share the same key (combining the `shared-key` and
+          # `key`) our build would generate a load of warnings. Why this
           # particular fuzzer? No real reason, but we had to choose one.
           save-if: ${{ matrix.fuzzer == 'binary_only/frida_libpng' }}
           cache-all-crates: true
@@ -392,7 +393,7 @@ jobs:
             fuzzers/${{ matrix.fuzzer }}
 
   # This job checks whether any changes have been made to the QEMU code to avoid
-  # rebuilding and testing the QEMU related fuzzers unnecessarily as they are 
+  # rebuilding and testing the QEMU related fuzzers unnecessarily as they are
   # more expensive to build
   qemu-changes:
     runs-on: ubuntu-24.04
@@ -620,19 +621,43 @@ jobs:
         shell: bash
         run: just -d utils/${{ matrix.util }} --justfile utils/${{ matrix.util }}/Justfile test
 
-  # Build and test librasan. The setup is common, so we use a matrix build and
-  # use the task name at the end to select which target to build
-  librasan:
-    name: 🔧 librasan - ${{ matrix.task }}
-    strategy:
-      matrix:
-        task:
-          - build
-          - test
-      # If one task fails, then don't abandon the other
-      fail-fast: false
-    # Only build this if the QEMU code changes for now. Though agnostic, nobody
-    # else has integrated librasan with other fuzzers for now.
+  libafl_asan:
+    name: 🔧 libafl_asan
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+      - name: Prepare
+        uses: ./.github/workflows/asan-prepare
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Use the task name to build the cache key. We will have a separate
+          # cache for each since they are both expensive to build and one builds
+          # for many different architectures.
+          shared-key: libafl_asan
+          # We want to include the commit hash to ensure the cache is replaced
+          # on each new commit.
+          key: ${{ github.sha }}
+          cache-all-crates: true
+          # Again the artefacts aren't built in the target root directory.
+          workspaces: |
+            libafl_asan
+      - name: Test
+        shell: bash
+        run: |
+          RUN_ON_CI=1 \
+          RUSTC_BOOTSTRAP=1 \
+          LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
+          just \
+            -f ./crates/libafl_asan/Justfile \
+            test_everything
+
+  libafl_qemu_asan:
+    name: 🔧 libafl_qemu_asan
     needs:
         - qemu-changes
     if: ${{ needs.qemu-changes.outputs.qemu == 'true' }}
@@ -644,44 +669,31 @@ jobs:
           submodules: true
           fetch-depth: 0
       - name: Prepare
-        uses: ./.github/workflows/librasan-prepare
+        uses: ./.github/workflows/asan-prepare
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
-          # Use the task name to build the cache key. We will have a separate 
+          # Use the task name to build the cache key. We will have a separate
           # cache for each since they are both expensive to build and one builds
           # for many different architectures.
-          shared-key: librasan-${{ matrix.task }}
+          shared-key: libafl_qemu_asan
           # We want to include the commit hash to ensure the cache is replaced
           # on each new commit.
           key: ${{ github.sha }}
           cache-all-crates: true
           # Again the artefacts aren't built in the target root directory.
           workspaces: |
-            libafl_qemu/librasan
-        # Run only for the build task
+            libafl_qemu/libafl_qemu_asan
       - name: Build
-        if: ${{ matrix.task == 'build' }}
         shell: bash
         run: |
           RUN_ON_CI=1 \
           RUSTC_BOOTSTRAP=1 \
           LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
           just \
-            -f ./libafl_qemu/librasan/Justfile \
+            -f ./crates/libafl_qemu/libafl_qemu_asan/Justfile \
             build_everything_dev \
             build_x86_64_release
-        # Run only for the test task
-      - name: Test
-        if: ${{ matrix.task == 'test' }}
-        shell: bash
-        run: |
-          RUN_ON_CI=1 \
-          RUSTC_BOOTSTRAP=1 \
-          LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
-          just \
-            -f ./libafl_qemu/librasan/Justfile \
-            test_everything
 
   nostd-build:
     runs-on: ubuntu-24.04
@@ -700,7 +712,7 @@ jobs:
       - name: run x86_64 until panic!
         run: cd fuzzers/fuzz_anything/baby_no_std && cargo run || test $? -ne 0 || exit 1
       - name: no_std tests
-        run: cd ./libafl && cargo test --no-default-features
+        run: cd ./crates/libafl && cargo test --no-default-features
 
   nostd-clippy:
     runs-on: ubuntu-24.04
@@ -715,9 +727,9 @@ jobs:
         with:
           shared-key: no-std-clippy
       - name: libafl armv6m-none-eabi (32 bit no_std) clippy
-        run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
+        run: cd ./crates/libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
       - name: libafl_bolts armv6m-none-eabi (32 bit no_std) clippy
-        run: cd ./libafl_bolts && cargo clippy --target thumbv6m-none-eabi --no-default-features
+        run: cd ./crates/libafl_bolts && cargo clippy --target thumbv6m-none-eabi --no-default-features
 
   format-toml:
     runs-on: ubuntu-24.04
@@ -785,7 +797,7 @@ jobs:
           file: ./Dockerfile
           push: ${{ github.ref == 'refs/heads/main' }}
           load: ${{ github.ref != 'refs/heads/main' }}
-          tags: 
+          tags:
             ghcr.io/aflplusplus/libafl:latest
           cache-from: |
             type=registry,ref=ghcr.io/aflplusplus/libafl:cache
@@ -840,7 +852,7 @@ jobs:
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
-          # There aren't too many of these fuzzers, so lets just give them a 
+          # There aren't too many of these fuzzers, so lets just give them a
           # separate cache each for now.
           shared-key: fuzzers-windows-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
           # We want to include the commit hash to ensure the cache is replaced
@@ -902,7 +914,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build Android
-        run: cd libafl && PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo ndk -t arm64-v8a build --release
+        run: cd crates/libafl && PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo ndk -t arm64-v8a build --release
 
   ubuntu-cross-android-x86_64:
     runs-on: ubuntu-24.04
@@ -919,7 +931,7 @@ jobs:
         run: cargo install cargo-ndk
       - name: cargo android targets
         run: |
-          rustup target add x86_64-linux-android 
+          rustup target add x86_64-linux-android
       - name: Build Android
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}

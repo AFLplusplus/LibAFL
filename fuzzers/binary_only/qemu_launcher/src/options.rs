@@ -48,7 +48,7 @@ pub struct FuzzerOptions {
     pub cores: Cores,
 
     #[arg(long, help = "Cpu cores to use for ASan", value_parser = Cores::from_cmdline)]
-    pub asan_cores: Option<Cores>,
+    pub asan_host_cores: Option<Cores>,
 
     #[arg(long, help = "Cpu cores to use for ASan", value_parser = Cores::from_cmdline)]
     pub asan_guest_cores: Option<Cores>,
@@ -120,8 +120,8 @@ impl FuzzerOptions {
         }
     }
 
-    pub fn is_asan_core(&self, core_id: CoreId) -> bool {
-        self.asan_cores
+    pub fn is_asan_host_core(&self, core_id: CoreId) -> bool {
+        self.asan_host_cores
             .as_ref()
             .is_some_and(|c| c.contains(core_id))
     }
@@ -161,15 +161,15 @@ impl FuzzerOptions {
     }
 
     pub fn validate(&self) {
-        if let Some(asan_cores) = &self.asan_cores {
-            for id in &asan_cores.ids {
+        if let Some(asan_host_cores) = &self.asan_host_cores {
+            for id in &asan_host_cores.ids {
                 if !self.cores.contains(*id) {
                     let mut cmd = FuzzerOptions::command();
                     cmd.error(
                         ErrorKind::ValueValidation,
                         format!(
                             "Cmplog cores ({}) must be a subset of total cores ({})",
-                            asan_cores.cmdline, self.cores.cmdline
+                            asan_host_cores.cmdline, self.cores.cmdline
                         ),
                     )
                     .exit();

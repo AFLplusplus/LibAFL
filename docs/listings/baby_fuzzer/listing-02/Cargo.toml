@@ -8,6 +8,6 @@ edition = "2024"
 
 [dependencies]
 #libafl = { version = ".." }
-libafl = { path = "../../../../libafl" }
+libafl = { path = "../../../../crates/libafl" }
 #libafl_bolts = { version = ".." }
-libafl_bolts = { path = "../../../../libafl_bolts" }
+libafl_bolts = { path = "../../../../crates/libafl_bolts" }

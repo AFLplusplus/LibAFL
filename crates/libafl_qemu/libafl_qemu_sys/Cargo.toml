@@ -1,0 +1,81 @@
+[package]
+name = "libafl_qemu_sys"
+version.workspace = true
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Romain Malmain <rmalmain@pm.me>",
+]
+description = "C to Rust bindings for the LibAFL QEMU bridge"
+documentation = "https://docs.rs/libafl_qemu_sys"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../../../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "qemu", "instrumentation"]
+edition = "2024"
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
+links = "qemu"
+
+[package.metadata.docs.rs]
+features = ["x86_64", "usermode"]
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+default = ["usermode", "x86_64"]
+
+# The following architecture features are mutually exclusive.
+x86_64 = []  # build qemu for x86_64
+i386 = []    # build qemu for i386
+arm = []     # build qemu for arm
+aarch64 = [] # build qemu for aarch64
+mips = []    # build qemu for mips (el, use with the 'be' feature of mips be)
+ppc = []     # build qemu for powerpc
+hexagon = [] # build qemu for hexagon
+riscv32 = [] # build qemu for riscv 32bit
+riscv64 = [] # build qemu for riscv 64bit
+
+be = []
+
+usermode = []
+systemmode = []
+
+python = ["pyo3", "pyo3-build-config"]
+
+slirp = [
+  "systemmode",
+  "libafl_qemu_build/slirp",
+] # build qemu with host libslirp (for user networking)
+shared = ["libafl_qemu_build/shared"]
+
+clippy = [
+  "libafl_qemu_build/clippy",
+] # special feature for clippy, don't use in normal projects
+
+qemu_sanitizers = [
+  "libafl_qemu_build/qemu_sanitizers",
+] # Compile QEMU with sanitizers enabled
+
+paranoid_debug = [
+  "libafl_qemu_build/paranoid_debug",
+] # Will perform as many checks as possible. The target will be greatly slowed down.
+
+[dependencies]
+paste = { workspace = true }
+num_enum = { workspace = true, default-features = true }
+libc = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+pyo3 = { workspace = true, optional = true }
+
+[build-dependencies]
+libafl_qemu_build = { workspace = true, default-features = true }
+pyo3-build-config = { workspace = true, optional = true }
+rustversion = { workspace = true }
+
+[lints]
+workspace = true

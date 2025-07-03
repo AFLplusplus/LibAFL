@@ -1,0 +1,41 @@
+import "../../../just/libafl-qemu.just"
+import "../../libafl_asan/fuzzer_name.just"
+
+[unix]
+build:
+  #!/bin/sh
+  . {{ DOTENV }}
+  cargo \
+    build \
+    --package libafl_qemu_runner \
+    --target x86_64-unknown-linux-gnu \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }} \
+    --features {{ ARCH }}
+
+[unix]
+fix:
+  #!/bin/sh
+  . {{ DOTENV }}
+  cargo \
+    fix \
+    --package libafl_qemu_runner \
+    --target x86_64-unknown-linux-gnu \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }} \
+    --features {{ ARCH }} \
+    --allow-dirty
+
+pretty_rust:
+  #!/bin/sh
+  MAIN_LLVM_VERSION=$LLVM_VERSION cargo run --manifest-path ../../utils/libafl_repo_tools/Cargo.toml --release -- -v
+
+pretty_toml:
+  #!/bin/sh
+  taplo fmt
+
+pretty: pretty_rust pretty_toml
+
+clippy:
+  #!/bin/sh
+  cargo clippy

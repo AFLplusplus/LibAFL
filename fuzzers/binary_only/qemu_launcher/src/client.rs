@@ -11,7 +11,7 @@ use libafl::{
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 use libafl_qemu::modules::{
-    asan::AsanModule, asan_guest::AsanGuestModule, cmplog::CmpLogModule,
+    asan_guest::AsanGuestModule, asan_host::AsanHostModule, cmplog::CmpLogModule,
     utils::filters::StdAddressFilter, DrCovModule, InjectionModule,
 };
 
@@ -69,10 +69,10 @@ impl Client<'_> {
         Harness::edit_env(&mut env);
         log::info!("ENV: {:#?}", env);
 
-        let is_asan = self.options.is_asan_core(core_id);
+        let is_asan_host = self.options.is_asan_host_core(core_id);
         let is_asan_guest = self.options.is_asan_guest_core(core_id);
 
-        if is_asan && is_asan_guest {
+        if is_asan_host && is_asan_guest {
             Err(Error::empty_optional("Multiple ASAN modes configured"))?;
         }
 
@@ -131,14 +131,14 @@ impl Client<'_> {
                 // TODO: Add injection support
                 let drcov = self.options.drcov.as_ref().unwrap();
 
-                if is_asan {
+                if is_asan_host {
                     let modules = tuple_list!(
                         DrCovModule::builder()
                             .filename(drcov.clone())
                             .full_trace(true)
                             .build(),
                         unsafe {
-                            AsanModule::builder()
+                            AsanHostModule::builder()
                                 .env(&env)
                                 .filter(asan_filter)
                                 .asan_report()
@@ -165,9 +165,9 @@ impl Client<'_> {
 
                     instance_builder.build().run(args, modules, state)
                 }
-            } else if is_asan {
+            } else if is_asan_host {
                 let modules = tuple_list!(unsafe {
-                    AsanModule::builder()
+                    AsanHostModule::builder()
                         .env(&env)
                         .filter(asan_filter)
                         .asan_report()
@@ -184,13 +184,16 @@ impl Client<'_> {
 
                 instance_builder.build().run(args, modules, state)
             }
-        } else if is_asan && is_cmplog {
+        } else if is_asan_host && is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
                     args,
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanModule::builder().env(&env).filter(asan_filter).build(),
+                        AsanHostModule::builder()
+                            .env(&env)
+                            .filter(asan_filter)
+                            .build(),
                         injection_module,
                     ),
                     state,
@@ -200,7 +203,10 @@ impl Client<'_> {
                     args,
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanModule::builder().env(&env).filter(asan_filter).build()
+                        AsanHostModule::builder()
+                            .env(&env)
+                            .filter(asan_filter)
+                            .build()
                     ),
                     state,
                 )
@@ -226,12 +232,15 @@ impl Client<'_> {
                     state,
                 )
             }
-        } else if is_asan {
+        } else if is_asan_host {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
                     args,
                     tuple_list!(
-                        AsanModule::builder().env(&env).filter(asan_filter).build(),
+                        AsanHostModule::builder()
+                            .env(&env)
+                            .filter(asan_filter)
+                            .build(),
                         injection_module
                     ),
                     state,
@@ -239,7 +248,10 @@ impl Client<'_> {
             } else {
                 instance_builder.build().run(
                     args,
-                    tuple_list!(AsanModule::builder().env(&env).filter(asan_filter).build()),
+                    tuple_list!(AsanHostModule::builder()
+                        .env(&env)
+                        .filter(asan_filter)
+                        .build()),
                     state,
                 )
             }

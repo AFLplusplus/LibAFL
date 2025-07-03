@@ -28,15 +28,15 @@ cc = { version = "1.0.106", features = ["parallel"] }
 which = "6.0.3"
 
 [dependencies]
-libafl = { path = "../../../libafl" }
-libafl_bolts = { path = "../../../libafl_bolts" }
-libafl_targets = { path = "../../../libafl_targets", features = [
+libafl = { path = "../../../crates/libafl" }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_pcguard_hitcounts",
   "sancov_cmplog",
   "libfuzzer",
 ] }
 # TODO Include it only when building cc
-libafl_cc = { path = "../../../libafl_cc" }
+libafl_cc = { path = "../../../crates/libafl_cc" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 clap = { version = "4.5.18", features = ["default"] }
 mimalloc = { version = "0.1.43", default-features = false }

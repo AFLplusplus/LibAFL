@@ -1,0 +1,69 @@
+import "../../../just/libafl-qemu.just"
+import "../fuzzer_name.just"
+
+FUZZ_SOURCE_DIR := source_directory()
+FUZZ_MODE_FLAG := if PROFILE == "dev" { "--dev" } else { "--release" }
+FUZZ_JOBS := if PROFILE == "dev" { "" } else { "-jobs=8" }
+
+[unix]
+build_fuzz:
+  #!/bin/sh
+  . {{ DOTENV }}
+  cargo \
+    build \
+    --package libafl_asan_fuzz \
+    --target x86_64-unknown-linux-gnu \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }}
+
+[unix]
+fix_fuzz:
+  #!/bin/sh
+  . {{ DOTENV }}
+  cargo \
+    fix \
+    --package libafl_asan_fuzz \
+    --target x86_64-unknown-linux-gnu \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }} \
+    --allow-dirty
+
+[unix]
+run_fuzz:
+  #!/bin/sh
+  . {{ DOTENV }}
+  cargo \
+    fuzz \
+    run \
+    --fuzz-dir libafl_asan_fuzz \
+    --target x86_64-unknown-linux-gnu \
+    --sanitizer none \
+    {{ FUZZ_MODE_FLAG }} \
+    ${HARNESS} \
+    -- \
+    -rss_limit_mb=8192 \
+    {{ FUZZ_JOBS }}
+
+[unix]
+fuzz_guest_shadow:
+  #!/bin/sh
+  . {{ DOTENV }}
+  HARNESS=guest_shadow just run_fuzz
+
+[unix]
+fuzz_guest_tracking:
+  #!/bin/sh
+  . {{ DOTENV }}
+  HARNESS=guest_tracking just run_fuzz
+
+[unix]
+fuzz_default_frontend_mock:
+  #!/bin/sh
+  . {{ DOTENV }}
+  HARNESS=default_frontend_mock just run_fuzz
+
+[unix]
+fuzz_default_frontend_dlmalloc:
+  #!/bin/sh
+  . {{ DOTENV }}
+  HARNESS=default_frontend_dlmalloc just run_fuzz

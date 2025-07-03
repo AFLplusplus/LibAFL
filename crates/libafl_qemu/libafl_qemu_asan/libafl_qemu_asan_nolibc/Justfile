@@ -1,0 +1,118 @@
+import "../../../../just/libafl-qemu.just"
+import "../../../libafl_asan/fuzzer_name.just"
+
+NOLIBC_SOURCE_DIR := source_directory()
+
+[unix]
+compile_nolibc:
+	#!/bin/sh
+	. {{ DOTENV }}
+	cargo \
+		build \
+		--package libafl_qemu_asan_nolibc \
+		--target ${CROSS_TARGET} \
+		--profile {{ PROFILE }} \
+		--target-dir {{ TARGET_DIR }}
+
+[unix]
+fix_nolibc:
+	#!/bin/sh
+	. {{ DOTENV }}
+	cargo \
+		fix \
+		--package libafl_qemu_asan_nolibc \
+		--target ${CROSS_TARGET} \
+		--profile {{ PROFILE }} \
+		--target-dir {{ TARGET_DIR }} \
+		--features test \
+		--allow-dirty
+
+[unix]
+rel_nolibc: compile_nolibc
+	#!/bin/sh
+	. {{ DOTENV }}
+	${CROSS_CC} \
+		${LIBAFL_QEMU_ASAN_CFLAGS} \
+		-r \
+		-nodefaultlibs \
+		-nostartfiles \
+		-nostdlib \
+		-g \
+		-u patch_aligned_alloc \
+		-u patch_atoi \
+		-u patch_atol \
+		-u patch_atoll \
+		-u patch_calloc \
+		-u patch_free \
+		-u patch_malloc \
+		-u patch_malloc_usable_size \
+		-u patch_memalign \
+		-u patch_memset \
+		-u patch_mmap \
+		-u patch_munmap \
+		-u patch_posix_memalign \
+		-u patch_pvalloc \
+		-u patch_read \
+		-u patch_realloc \
+		-u patch_reallocarray \
+		-u patch_valloc \
+		-u patch_write \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_nolibc.rel \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_nolibc.a
+
+[unix]
+rename_nolibc: rel_nolibc
+	#!/bin/sh
+	. {{ DOTENV }}
+	${CROSS_OBJCOPY} \
+		--redefine-syms={{ GUEST_SOURCE_DIR }}/rename_real.syms \
+		--redefine-syms={{ GUEST_SOURCE_DIR }}/rename_patch.syms \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_nolibc.rel \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_nolibc.renamed
+
+[unix]
+link_nolibc: rename_nolibc
+	#!/bin/sh
+	. {{ DOTENV }}
+	${CROSS_CC} \
+		-shared \
+		-nodefaultlibs \
+		-nostartfiles \
+		-nostdlib \
+		-g \
+		-u aligned_alloc \
+		-u atoi \
+		-u atol \
+		-u atoll \
+		-u calloc \
+		-u free \
+		-u malloc \
+		-u malloc_usable_size \
+		-u memalign \
+		-u memset \
+		-u mmap \
+		-u munmap \
+		-u posix_memalign \
+		-u pvalloc \
+		-u read \
+		-u realloc \
+		-u reallocarray \
+		-u valloc \
+		-u write \
+		-Wl,--version-script={{ NOLIBC_SOURCE_DIR }}/nolibc.map \
+		-Wl,--gc-sections \
+		-Wl,--no-undefined \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libafl_qemu_asan_nolibc.so \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_nolibc.renamed
+
+[unix]
+strip_nolibc: link_nolibc
+	#!/bin/sh
+	. {{ DOTENV }}
+	${CROSS_STRIP} \
+		--strip-unneeded \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_nolibc.so \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libafl_qemu_asan_nolibc.so
+
+[unix]
+build_nolibc: strip_nolibc
