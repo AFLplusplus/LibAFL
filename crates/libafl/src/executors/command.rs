@@ -53,7 +53,7 @@ use super::{HasTimeout, StdChildArgs, StdChildArgsInner};
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
-    Error, HasTargetBytesConverter,
+    Error,
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, ToTargetBytes},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
@@ -420,8 +420,7 @@ where
     S: HasExecutions,
     T: CommandConfigurator<Child> + Debug,
     OT: MatchName + ObserversTuple<I, S>,
-    Z: HasTargetBytesConverter,
-    Z::Converter: ToTargetBytes<I>,
+    Z: ToTargetBytes<I>,
 {
     fn run_target(
         &mut self,
@@ -430,7 +429,7 @@ where
         _mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.execute_input_with_command(fuzzer.target_bytes_converter_mut(), state, input)
+        self.execute_input_with_command(fuzzer, state, input)
     }
 }
 
@@ -457,8 +456,7 @@ where
     OT: MatchName + ObserversTuple<I, S>,
     S: HasExecutions,
     T: CommandConfigurator<Pid> + Debug,
-    Z: HasTargetBytesConverter,
-    Z::Converter: ToTargetBytes<I>,
+    Z: ToTargetBytes<I>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`
@@ -717,7 +715,7 @@ impl CommandExecutorBuilder {
 ///     Error, HasTargetBytesConverter,
 ///     corpus::Corpus,
 ///     executors::{Executor, command::CommandConfigurator},
-///     inputs::{BytesInput, HasTargetBytes, Input},
+///     inputs::{BytesInput, HasTargetBytes, Input, ToTargetBytes},
 ///     state::HasExecutions,
 /// };
 /// use libafl_bolts::ownedref::OwnedSlice;
@@ -749,7 +747,7 @@ impl CommandExecutorBuilder {
 /// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
 ///     S: HasExecutions,
-///     Z: HasTargetBytesConverter,
+///     Z: ToTargetBytes<BytesInput>,
 /// {
 ///     MyExecutor.into_executor((), None, None)
 /// }
