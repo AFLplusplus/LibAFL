@@ -110,7 +110,7 @@ yaxpeax-x86 = "2.0.0"
 iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-winsafe = { version = "0.0.24", features = ["kernel"] }
+winsafe = { version = "0.0.25", features = ["kernel"] }
 winapi = { version = "0.3", features = [
   "processthreadsapi",
   "winnt",
