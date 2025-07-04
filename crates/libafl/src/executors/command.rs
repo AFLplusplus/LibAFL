@@ -1,8 +1,6 @@
 //! The command executor executes a sub program for each run
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::ffi::CString;
-#[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use alloc::os::fd::AsRawFd;
 #[cfg(not(unix))]
 use alloc::string::{String, ToString};
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
@@ -19,6 +17,8 @@ use core::{
 use std::ffi::OsStr;
 #[cfg(not(unix))]
 use std::ffi::OsString;
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use std::os::fd::AsRawFd;
 #[cfg(unix)]
 use std::os::{fd::RawFd, unix::ffi::OsStrExt};
 use std::{
