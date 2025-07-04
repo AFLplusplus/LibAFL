@@ -2,6 +2,10 @@
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::ffi::CString;
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
+use alloc::os::fd::AsRawFd;
+#[cfg(not(unix))]
+use alloc::string::{String, ToString};
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::vec::Vec;
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use core::ffi::CStr;
@@ -11,18 +15,12 @@ use core::{
     ops::IndexMut,
     time::Duration,
 };
-#[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use std::os::fd::AsRawFd;
 #[cfg(unix)]
-use std::{
-    ffi::OsStr,
-    os::{fd::RawFd, unix::ffi::OsStrExt},
-};
+use std::ffi::OsStr;
 #[cfg(not(unix))]
-use std::{
-    ffi::OsString,
-    string::{String, ToString},
-};
+use std::ffi::OsString;
+#[cfg(unix)]
+use std::os::{fd::RawFd, unix::ffi::OsStrExt};
 use std::{
     io::{Read, Write},
     process::{Child, Command, Stdio},
@@ -89,6 +87,7 @@ impl StdCommandCaptureMethod {
         }
     }
 
+    #[cfg_attr(not(all(unix, feature = "fork")), expect(clippy::unused_self))]
     fn pre_capture(&self, cmd: &mut Command, stdout: bool) {
         #[cfg(all(unix, feature = "fork"))]
         {
@@ -705,14 +704,12 @@ impl CommandExecutorBuilder {
         if let Some(core) = self.child_env_inner.core {
             #[cfg(not(feature = "fork"))]
             return Err(Error::illegal_argument(format!(
-                "You have not compiled libafl with fork support and thus LibAFL cannot bind to core {:?} right after children get spawned",
-                core
+                "You have not compiled libafl with fork support and thus LibAFL cannot bind to core {core:?} right after children get spawned",
             )));
 
             #[cfg(not(unix))]
             return Err(Error::illegal_argument(format!(
-                "No fork support on windows - LibAFL cannot bind to core {:?} right after children get spawned",
-                core
+                "No fork support on windows - LibAFL cannot bind to core {core:?} right after children get spawned",
             )));
 
             #[cfg(all(unix, feature = "fork"))]
