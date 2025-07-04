@@ -31,6 +31,7 @@ pub use list::*;
 pub mod nautilus;
 
 use alloc::{
+    boxed::Box,
     string::String,
     vec::{Drain, Splice, Vec},
 };
@@ -143,6 +144,19 @@ where
     }
 }
 
+impl<I, T> From<T> for TargetBytesInputConverter<I, T>
+where
+    T: ToTargetBytes<I>,
+    I: Clone,
+{
+    fn from(to_bytes_converter: T) -> Self {
+        Self {
+            to_bytes_converter,
+            phantom: PhantomData,
+        }
+    }
+}
+
 /// `None` type to satisfy the type infearence in an `Option`
 #[macro_export]
 macro_rules! none_input_converter {
@@ -173,6 +187,51 @@ impl HasTargetBytes for NopInput {
 impl HasLen for NopInput {
     fn len(&self) -> usize {
         0
+    }
+}
+
+/// `InputConverter` that uses a closure to convert
+pub struct ClosureInputConverter<F, T>
+where
+    F: Input,
+    T: Input,
+{
+    convert_cb: Box<dyn FnMut(F) -> Result<T, Error>>,
+}
+
+impl<F, T> Debug for ClosureInputConverter<F, T>
+where
+    F: Input,
+    T: Input,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ClosureInputConverter")
+            .finish_non_exhaustive()
+    }
+}
+
+impl<F, T> ClosureInputConverter<F, T>
+where
+    F: Input,
+    T: Input,
+{
+    /// Create a new converter using two closures, use None to forbid the conversion or the conversion back
+    #[must_use]
+    pub fn new(convert_cb: Box<dyn FnMut(F) -> Result<T, Error>>) -> Self {
+        Self { convert_cb }
+    }
+}
+
+impl<F, T> InputConverter for ClosureInputConverter<F, T>
+where
+    F: Input,
+    T: Input,
+{
+    type From = F;
+    type To = T;
+
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
+        (self.convert_cb)(input)
     }
 }
 
