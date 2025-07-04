@@ -144,16 +144,23 @@ where
     }
 }
 
+impl<I, T> TargetBytesInputConverter<I, T> {
+    /// Create a new TargetBytesInputConverter from the given [`ToTargetBytes`] fn, that will convert target bytes to a [`BytesInput`].
+    pub fn new(to_target_bytes_converter: T) -> Self {
+        Self {
+            to_bytes_converter: to_target_bytes_converter,
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<I, T> From<T> for TargetBytesInputConverter<I, T>
 where
     T: ToTargetBytes<I>,
     I: Clone,
 {
     fn from(to_bytes_converter: T) -> Self {
-        Self {
-            to_bytes_converter,
-            phantom: PhantomData,
-        }
+        Self::new(to_bytes_converter)
     }
 }
 
