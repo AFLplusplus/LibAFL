@@ -456,6 +456,8 @@ where
     OT: MatchName + ObserversTuple<I, S>,
     S: HasExecutions,
     T: CommandConfigurator<Pid> + Debug,
+    Z: HasTargetBytesConverter,
+    Z::Converter: ToTargetBytes<I>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`
@@ -464,14 +466,16 @@ where
     /// just before the `exec` return (after forking).
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
-        let child = self.configurator.spawn_child(input)?;
+        let child = self
+            .configurator
+            .spawn_child(fuzzer.to_target_bytes(input))?;
 
         let wait_status = waitpid_filtered(child, Some(WaitPidFlag::WUNTRACED))?;
         if !matches!(wait_status, Stopped(c, Signal::SIGSTOP) if c == child) {
