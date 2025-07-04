@@ -122,9 +122,11 @@ pub trait ToTargetBytes<I>: Debug {
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
 }
 
-struct TargetBytesInputConverter<I, T> {
+/// An [`InputConverter`] wrapper that converts anything implementing [`ToTargetBytes`] to a [`BytesInput`].
+#[derive(Debug)]
+pub struct TargetBytesInputConverter<I, T> {
     to_bytes_converter: T,
-    _phantom: PhantomData<I>,
+    phantom: PhantomData<I>,
 }
 
 impl<I, T> InputConverter for TargetBytesInputConverter<I, T>

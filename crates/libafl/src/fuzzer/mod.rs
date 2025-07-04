@@ -79,20 +79,20 @@ pub trait HasObjective {
 }
 
 /// Can convert input to another type
-pub trait HasToTargetBytes {
-    /// The converter itself
+pub trait HasTargetBytesConverter {
+    /// The converter type
     type Converter;
 
-    /// the input converter
+    /// the converter, converting the input to target bytes.
     fn target_bytes_converter(&self) -> &Self::Converter;
-    /// the input converter(mut)
+    /// the converter, converting the input to target bytes (mut).
     fn target_bytes_converter_mut(&mut self) -> &mut Self::Converter;
 }
 
 /// Blanket implementation to shorthand-call [`ToTargetBytes::to_target_bytes`] on the fuzzer directly.
 impl<I, T> ToTargetBytes<I> for T
 where
-    T: HasToTargetBytes + Debug,
+    T: HasTargetBytesConverter + Debug,
     T::Converter: ToTargetBytes<I>,
 {
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> libafl_bolts::ownedref::OwnedSlice<'a, u8> {
@@ -323,7 +323,7 @@ pub struct StdFuzzer<CS, F, IC, IF, OF> {
     feedback: F,
     /// The [`Feedback`] that will store new testcases as solution (for example, a crash) if a run returns `is_interesting`.
     objective: OF,
-    /// A converter that converts the input to bytes that can be sent to the target (for example, to a [`ForkserverExecutor`](crate::executors::ForkserverExecutor).
+    /// A converter that converts the input to bytes that can be sent to the target (for example, to a [`CommandExecutor`](crate::executors::CommandExecutor).
     target_bytes_converter: IC,
     /// The input filter that will filter out (not execute) certain inputs
     input_filter: IF,
@@ -1039,7 +1039,7 @@ pub struct StdFuzzerBuilder<CS, F, IC, IF, OF> {
     feedback: F,
     /// The [`Feedback`] that will store new testcases as solution (for example, a crash) if a run returns `is_interesting`.
     objective: OF,
-    /// A converter that converts the input to bytes that can be sent to the target (for example, to a [`ForkserverExecutor`](crate::executors::ForkserverExecutor).
+    /// A converter that converts the input to bytes that can be sent to the target (for example, to a [`CommandExecutor`](crate::executors::CommandExecutor).
     target_bytes_converter: IC,
     /// The input filter that will filter out (not execute) certain inputs
     input_filter: IF,
@@ -1070,7 +1070,7 @@ impl Default for StdFuzzerBuilder<(), (), NopToTargetBytes, NopInputFilter, ()> 
 
 impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
     /// Sets the converter to target bytes.
-    /// The converter converts the input to bytes that can be sent to the target (for example, to a [`ForkserverExecutor`](crate::executors::ForkserverExecutor).
+    /// The converter converts the input to bytes that can be sent to the target (for example, to a [`CommandExecutor`](crate::executors::CommandExecutor).
     #[must_use]
     pub fn target_bytes_converter<IC2>(
         self,
@@ -1177,7 +1177,7 @@ impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
     }
 }
 
-impl<CS, F, IC, IF, OF> HasToTargetBytes for StdFuzzer<CS, F, IC, IF, OF> {
+impl<CS, F, IC, IF, OF> HasTargetBytesConverter for StdFuzzer<CS, F, IC, IF, OF> {
     type Converter = IC;
 
     fn target_bytes_converter(&self) -> &Self::Converter {
@@ -1275,7 +1275,7 @@ impl Default for NopFuzzer {
     }
 }
 
-impl HasToTargetBytes for NopFuzzer {
+impl HasTargetBytesConverter for NopFuzzer {
     type Converter = NopToTargetBytes;
     fn target_bytes_converter(&self) -> &Self::Converter {
         &self.converter

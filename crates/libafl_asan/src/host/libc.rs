@@ -25,7 +25,7 @@ impl Function for FunctionSyscall {
 
 #[derive(Debug)]
 pub struct LibcHost<S: Symbols> {
-    _phantom: PhantomData<S>,
+    phantom: PhantomData<S>,
 }
 
 impl<S: Symbols> Host for LibcHost<S> {

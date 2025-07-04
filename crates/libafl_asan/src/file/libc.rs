@@ -54,7 +54,7 @@ static GET_ERRNO_LOCATION_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 #[derive(Debug)]
 pub struct LibcFileReader<S: Symbols> {
     fd: c_int,
-    _phantom: PhantomData<S>,
+    phantom: PhantomData<S>,
 }
 
 impl<S: Symbols> LibcFileReader<S> {
@@ -118,7 +118,7 @@ impl<S: Symbols> FileReader for LibcFileReader<S> {
         }
         Ok(LibcFileReader {
             fd,
-            _phantom: PhantomData,
+            phantom: PhantomData,
         })
     }
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {

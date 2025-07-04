@@ -16,7 +16,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct HostShadow<H> {
-    _phantom: PhantomData<H>,
+    phantom: PhantomData<H>,
 }
 
 impl<H: Host> Shadow for HostShadow<H> {
@@ -51,7 +51,7 @@ impl<H: Host> Shadow for HostShadow<H> {
 impl<H: Host> HostShadow<H> {
     pub fn new() -> Result<HostShadow<H>, HostShadowError<H>> {
         Ok(HostShadow::<H> {
-            _phantom: PhantomData,
+            phantom: PhantomData,
         })
     }
 }

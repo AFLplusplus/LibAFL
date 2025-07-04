@@ -13,7 +13,7 @@ use crate::{GuestAddr, host::Host, tracking::Tracking};
 
 #[derive(Debug)]
 pub struct HostTracking<H> {
-    _phantom: PhantomData<H>,
+    phantom: PhantomData<H>,
 }
 
 impl<H: Host> Tracking for HostTracking<H> {
@@ -34,7 +34,7 @@ impl<H: Host> Tracking for HostTracking<H> {
 impl<H: Host> HostTracking<H> {
     pub fn new() -> Result<Self, Errno> {
         Ok(HostTracking::<H> {
-            _phantom: PhantomData,
+            phantom: PhantomData,
         })
     }
 }

@@ -39,7 +39,7 @@ pub struct FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, Z> {
     /// User provided callback for instrumentation
     helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
     followed: bool,
-    _phantom: PhantomData<&'b u8>,
+    phantom: PhantomData<&'b u8>,
 }
 
 impl<EM, H, I, OT, RT, S, Z> Debug for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, Z>
@@ -220,7 +220,7 @@ where
             stalker,
             helper,
             followed: false,
-            _phantom: PhantomData,
+            phantom: PhantomData,
         }
     }
 }

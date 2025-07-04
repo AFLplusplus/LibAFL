@@ -68,7 +68,7 @@ impl Function for FunctionMadvise {
 pub struct LibcMmap<S: Symbols> {
     addr: GuestAddr,
     len: usize,
-    _phantom: PhantomData<S>,
+    phantom: PhantomData<S>,
 }
 
 impl<S: Symbols> Ord for LibcMmap<S> {
@@ -173,7 +173,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
             Ok(LibcMmap {
                 addr,
                 len,
-                _phantom: PhantomData,
+                phantom: PhantomData,
             })
         }
     }
@@ -205,7 +205,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
             Ok(LibcMmap {
                 addr,
                 len,
-                _phantom: PhantomData,
+                phantom: PhantomData,
             })
         }
     }

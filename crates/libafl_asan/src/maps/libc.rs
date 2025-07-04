@@ -56,7 +56,7 @@ static GET_ERRNO_LOCATION_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 #[derive(Debug)]
 pub struct LibcMapReader<S: Symbols> {
     fd: c_int,
-    _phantom: PhantomData<S>,
+    phantom: PhantomData<S>,
 }
 
 impl<S: Symbols> LibcMapReader<S> {
@@ -128,7 +128,7 @@ impl<S: Symbols> MapReader for LibcMapReader<S> {
         }
         Ok(LibcMapReader {
             fd,
-            _phantom: PhantomData,
+            phantom: PhantomData,
         })
     }
 

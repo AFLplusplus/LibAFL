@@ -113,14 +113,14 @@ impl MapEntry {
         }
         Ok(WriteableMapProtection {
             map_entry: self,
-            _phantom: PhantomData,
+            phantom: PhantomData,
         })
     }
 }
 
 pub struct WriteableMapProtection<'a, M: Mmap> {
     map_entry: &'a MapEntry,
-    _phantom: PhantomData<M>,
+    phantom: PhantomData<M>,
 }
 
 impl<M: Mmap> Drop for WriteableMapProtection<'_, M> {
