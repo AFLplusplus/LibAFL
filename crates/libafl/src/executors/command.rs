@@ -702,6 +702,9 @@ impl CommandExecutorBuilder {
         }
 
         if let Some(core) = self.child_env_inner.core {
+            #[cfg(all(unix, feature = "fork"))]
+            command.bind(core);
+
             #[cfg(not(feature = "fork"))]
             return Err(Error::illegal_argument(format!(
                 "You have not compiled libafl with fork support and thus LibAFL cannot bind to core {core:?} right after children get spawned",
@@ -711,9 +714,6 @@ impl CommandExecutorBuilder {
             return Err(Error::illegal_argument(format!(
                 "No fork support on windows - LibAFL cannot bind to core {core:?} right after children get spawned",
             )));
-
-            #[cfg(all(unix, feature = "fork"))]
-            command.bind(core);
         }
 
         let configurator = StdCommandConfigurator {
