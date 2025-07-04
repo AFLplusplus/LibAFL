@@ -6,7 +6,6 @@ use core::{fmt::Debug, time::Duration};
 use std::path::PathBuf;
 
 pub use combined::CombinedExecutor;
-#[cfg(all(feature = "std", unix))]
 pub use command::CommandExecutor;
 pub use differential::DiffExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
@@ -28,7 +27,6 @@ use crate::Error;
 use crate::observers::{StdErrObserver, StdOutObserver};
 
 pub mod combined;
-#[cfg(all(feature = "std", unix))]
 pub mod command;
 pub mod differential;
 #[cfg(all(feature = "std", feature = "fork", unix))]

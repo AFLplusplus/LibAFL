@@ -13,17 +13,27 @@ use core::{
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use std::os::fd::AsRawFd;
+#[cfg(unix)]
 use std::{
     ffi::OsStr,
-    io::{Read, Write},
     os::{fd::RawFd, unix::ffi::OsStrExt},
+};
+#[cfg(not(unix))]
+use std::{
+    ffi::OsString,
+    string::{String, ToString},
+};
+use std::{
+    io::{Read, Write},
     process::{Child, Command, Stdio},
 };
 
+#[cfg(unix)]
+use libafl_bolts::{AsSlice, tuples::MatchNameRef};
 use libafl_bolts::{
-    AsSlice, InputLocation, StdTargetArgs, StdTargetArgsInner,
+    InputLocation, StdTargetArgs, StdTargetArgsInner,
     ownedref::OwnedSlice,
-    tuples::{Handle, MatchName, MatchNameRef, RefIndexable},
+    tuples::{Handle, MatchName, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libafl_bolts::{core_affinity::CoreId, os::dup2};
@@ -64,6 +74,7 @@ use crate::{
 #[derive(Debug, Default)]
 #[allow(dead_code)]
 enum StdCommandCaptureMethod {
+    #[cfg(unix)]
     Fd(RawFd),
     #[default]
     Pipe,
@@ -79,7 +90,7 @@ impl StdCommandCaptureMethod {
     }
 
     fn pre_capture(&self, cmd: &mut Command, stdout: bool) {
-        #[cfg(feature = "fork")]
+        #[cfg(all(unix, feature = "fork"))]
         {
             if let Self::Fd(old) = self {
                 // Safety
@@ -98,7 +109,7 @@ impl StdCommandCaptureMethod {
             }
         }
 
-        #[cfg(not(feature = "fork"))]
+        #[cfg(not(all(unix, feature = "fork")))]
         Self::pipe_capture(cmd, stdout);
     }
 }
@@ -151,7 +162,9 @@ impl CommandConfigurator<Child> for StdCommandConfigurator {
                         // There is an issue here that the chars on Windows are 16 bit wide.
                         // I can't really test it. Please open a PR if this goes wrong.
                         #[cfg(not(unix))]
-                        cmd.arg(OsString::from_vec(target_bytes.to_vec()));
+                        cmd.arg(OsString::from(
+                            String::from_utf8_lossy(&target_bytes).to_string(),
+                        ));
                     } else {
                         cmd.arg(arg);
                     }
@@ -628,6 +641,7 @@ impl CommandExecutorBuilder {
             command.current_dir(cwd);
         }
 
+        #[cfg(unix)]
         let stdout_cap = self.child_env_inner.stdout_observer.as_ref().map(|hdl| {
             observers
                 .get(hdl)
@@ -638,6 +652,7 @@ impl CommandExecutorBuilder {
                 .unwrap_or_default()
         });
 
+        #[cfg(unix)]
         let stderr_cap = self.child_env_inner.stderr_observer.as_ref().map(|hdl| {
             observers
                 .get(hdl)
@@ -647,6 +662,20 @@ impl CommandExecutorBuilder {
                 .map(StdCommandCaptureMethod::Fd)
                 .unwrap_or_default()
         });
+
+        #[cfg(not(unix))]
+        if self.child_env_inner.stdout_observer.is_some()
+            || self.child_env_inner.stderr_observer.is_some()
+        {
+            return Err(Error::illegal_argument(
+                "StdOut and StdError observers not yet supported on Windows.".to_string(),
+            ));
+        }
+        #[cfg(not(unix))]
+        let (stdout_cap, stderr_cap) = (
+            None::<StdCommandCaptureMethod>,
+            None::<StdCommandCaptureMethod>,
+        );
 
         if self.child_env_inner.debug_child {
             command.stdout(Stdio::piped());
@@ -674,14 +703,20 @@ impl CommandExecutorBuilder {
         }
 
         if let Some(core) = self.child_env_inner.core {
-            #[cfg(feature = "fork")]
-            command.bind(core);
-
             #[cfg(not(feature = "fork"))]
             return Err(Error::illegal_argument(format!(
-                "Your host doesn't support fork and thus libafl can not bind to core {:?} right after children get spawned",
+                "You have not compiled libafl with fork support and thus LibAFL cannot bind to core {:?} right after children get spawned",
                 core
             )));
+
+            #[cfg(not(unix))]
+            return Err(Error::illegal_argument(format!(
+                "No fork support on windows - LibAFL cannot bind to core {:?} right after children get spawned",
+                core
+            )));
+
+            #[cfg(all(unix, feature = "fork"))]
+            command.bind(core);
         }
 
         let configurator = StdCommandConfigurator {
@@ -771,6 +806,7 @@ pub trait CommandConfigurator<C>: Sized {
     fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Maps the exit status of the child process to an `ExitKind`.
+    #[cfg(unix)]
     #[inline]
     fn exit_kind_from_status(&self, status: &std::process::ExitStatus) -> ExitKind {
         use crate::std::os::unix::process::ExitStatusExt;
@@ -779,6 +815,17 @@ pub trait CommandConfigurator<C>: Sized {
             Some(9) => ExitKind::Oom,
             Some(_) => ExitKind::Crash,
             None => ExitKind::Ok,
+        }
+    }
+
+    /// Maps the exit status of the child process to an `ExitKind`.
+    #[cfg(windows)]
+    #[inline]
+    fn exit_kind_from_status(&self, status: &std::process::ExitStatus) -> ExitKind {
+        if status.success() {
+            ExitKind::Ok
+        } else {
+            ExitKind::Crash
         }
     }
 

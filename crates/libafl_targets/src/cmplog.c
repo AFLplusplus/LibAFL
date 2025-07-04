@@ -15,7 +15,7 @@ void *__libafl_asan_region_is_poisoned(void *beg, size_t size) {
   return NULL;
 }
 
-  #if defined(__clang__)
+  #if defined(__clang__) || defined(__MINGW32__)
 void *__asan_region_is_poisoned(void *beg, size_t size) {
   (void)beg;
   (void)size;
