@@ -117,7 +117,7 @@ pub trait InputConverter {
 
 /// This trait can transform any input to bytes, which can be sent to the target from a harness.
 /// Converters that implement this trait auto-implement [`InputConverter`] for this `I` to [`BytesInput`].
-pub trait ToTargetBytes<I>: Debug {
+pub trait ToTargetBytes<I> {
     /// Transform to bytes
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
 }

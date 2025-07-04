@@ -167,10 +167,10 @@ impl Allocator {
 
     fn find_smallest_fit(&mut self, size: usize) -> Option<AllocationMetadata> {
         for (current_size, list) in &mut self.allocation_queue {
-            if *current_size >= size {
-                if let Some(metadata) = list.pop() {
-                    return Some(metadata);
-                }
+            if *current_size >= size
+                && let Some(metadata) = list.pop()
+            {
+                return Some(metadata);
             }
         }
         None

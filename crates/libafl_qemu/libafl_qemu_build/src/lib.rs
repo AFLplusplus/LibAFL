@@ -100,15 +100,15 @@ fn find_llvm_config() -> Result<String, String> {
         }
     }
 
-    if which("llvm-config").is_ok() {
-        if let Some(ver) = find_llvm_version("llvm-config".to_owned()) {
-            if ver < rustc_llvm_ver {
-                println!(
-                    "cargo:warning=Version of llvm-config is {ver} but needs to be at least rustc's version ({rustc_llvm_ver})! We will (try to) continue to build. Continue at your own risk, or rebuild with a set LLVM_CONFIG_PATH env variable, pointing to a newer version."
-                );
-            }
-            return Ok("llvm-config".to_owned());
+    if which("llvm-config").is_ok()
+        && let Some(ver) = find_llvm_version("llvm-config".to_owned())
+    {
+        if ver < rustc_llvm_ver {
+            println!(
+                "cargo:warning=Version of llvm-config is {ver} but needs to be at least rustc's version ({rustc_llvm_ver})! We will (try to) continue to build. Continue at your own risk, or rebuild with a set LLVM_CONFIG_PATH env variable, pointing to a newer version."
+            );
         }
+        return Ok("llvm-config".to_owned());
     }
 
     Err("Could not find llvm-config".to_owned())
@@ -126,10 +126,10 @@ fn exec_llvm_config(llvm_config: String, args: &[&str]) -> String {
 
 fn find_llvm_version(llvm_config: String) -> Option<i32> {
     let output = exec_llvm_config(llvm_config, &["--version"]);
-    if let Some(major) = output.split('.').collect::<Vec<&str>>().first() {
-        if let Ok(res) = major.parse::<i32>() {
-            return Some(res);
-        }
+    if let Some(major) = output.split('.').collect::<Vec<&str>>().first()
+        && let Ok(res) = major.parse::<i32>()
+    {
+        return Some(res);
     }
     None
 }
@@ -148,10 +148,10 @@ fn exec_rustc(args: &[&str]) -> String {
 fn find_rustc_llvm_version() -> Option<i32> {
     let output = exec_rustc(&["--verbose", "--version"]);
     let ver = output.split(':').next_back().unwrap().trim();
-    if let Some(major) = ver.split('.').collect::<Vec<&str>>().first() {
-        if let Ok(res) = major.parse::<i32>() {
-            return Some(res);
-        }
+    if let Some(major) = ver.split('.').collect::<Vec<&str>>().first()
+        && let Ok(res) = major.parse::<i32>()
+    {
+        return Some(res);
     }
     None
 }

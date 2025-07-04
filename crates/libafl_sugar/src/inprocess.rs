@@ -203,10 +203,10 @@ where
             });
 
             // Create a dictionary if not existing
-            if let Some(tokens_file) = &self.tokens_file {
-                if state.metadata_map().get::<Tokens>().is_none() {
-                    state.add_metadata(Tokens::from_file(tokens_file)?);
-                }
+            if let Some(tokens_file) = &self.tokens_file
+                && state.metadata_map().get::<Tokens>().is_none()
+            {
+                state.add_metadata(Tokens::from_file(tokens_file)?);
             }
 
             // A minimization+queue policy to get testcasess from the corpus

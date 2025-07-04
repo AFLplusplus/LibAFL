@@ -92,7 +92,7 @@ pub trait HasTargetBytesConverter {
 /// Blanket implementation to shorthand-call [`ToTargetBytes::to_target_bytes`] on the fuzzer directly.
 impl<I, T> ToTargetBytes<I> for T
 where
-    T: HasTargetBytesConverter + Debug,
+    T: HasTargetBytesConverter,
     T::Converter: ToTargetBytes<I>,
 {
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> libafl_bolts::ownedref::OwnedSlice<'a, u8> {

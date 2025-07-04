@@ -471,7 +471,7 @@ where
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
-        let child = self.configurer.spawn_child(input)?;
+        let child = self.configurator.spawn_child(input)?;
 
         let wait_status = waitpid_filtered(child, Some(WaitPidFlag::WUNTRACED))?;
         if !matches!(wait_status, Stopped(c, Signal::SIGSTOP) if c == child) {
@@ -699,7 +699,8 @@ impl CommandExecutorBuilder {
 }
 
 /// A [`CommandConfigurator`] takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
-/// # Example
+///
+/// ## Example
 /// ```
 /// use std::{
 ///     io::Write,
@@ -708,7 +709,7 @@ impl CommandExecutorBuilder {
 /// };
 ///
 /// use libafl::{
-///     Error,
+///     Error, HasTargetBytesConverter,
 ///     corpus::Corpus,
 ///     executors::{Executor, command::CommandConfigurator},
 ///     inputs::{BytesInput, HasTargetBytes, Input},
@@ -743,6 +744,7 @@ impl CommandExecutorBuilder {
 /// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
 ///     S: HasExecutions,
+///     Z: HasTargetBytesConverter,
 /// {
 ///     MyExecutor.into_executor((), None, None)
 /// }

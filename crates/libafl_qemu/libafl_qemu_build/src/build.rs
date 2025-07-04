@@ -576,11 +576,11 @@ pub fn build(
         fs::create_dir_all(target_dir.join("pc-bios")).unwrap();
         for path in fs::read_dir(libafl_qemu_build_dir.join("pc-bios")).unwrap() {
             let path = path.unwrap().path();
-            if path.is_file() {
-                if let Some(name) = path.file_name() {
-                    fs::copy(&path, target_dir.join("pc-bios").join(name))
-                        .expect("Failed to copy a pc-bios folder file");
-                }
+            if path.is_file()
+                && let Some(name) = path.file_name()
+            {
+                fs::copy(&path, target_dir.join("pc-bios").join(name))
+                    .expect("Failed to copy a pc-bios folder file");
             }
         }
     }
