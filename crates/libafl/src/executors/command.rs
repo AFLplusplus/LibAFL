@@ -705,14 +705,9 @@ impl CommandExecutorBuilder {
             #[cfg(all(unix, feature = "fork"))]
             command.bind(core);
 
-            #[cfg(not(feature = "fork"))]
+            #[cfg(not(all(unix, feature = "fork")))]
             return Err(Error::illegal_argument(format!(
-                "You have not compiled libafl with fork support and thus LibAFL cannot bind to core {core:?} right after children get spawned",
-            )));
-
-            #[cfg(not(unix))]
-            return Err(Error::illegal_argument(format!(
-                "No fork support on windows - LibAFL cannot bind to core {core:?} right after children get spawned",
+                "You have not compiled LibAFL with fork support or are running on Windows. LibAFL cannot bind to core {core:?} right after children get spawned. Remove the `core` from StdChildArgs or enable `fork`",
             )));
         }
 
