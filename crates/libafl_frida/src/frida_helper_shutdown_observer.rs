@@ -65,8 +65,7 @@ impl<'de, RT> Deserialize<'de> for FridaHelperObserver<'_, RT> {
         D: Deserializer<'de>,
     {
         struct FridaHelperObserverVisitor<'a, RT> {
-            // marker: std::marker::PhantomData<&'b mut FridaInstrumentationHelper<'a, RT>>,
-            marker: core::marker::PhantomData<&'a RT>,
+            phantom: core::marker::PhantomData<&'a RT>,
         }
 
         impl<'de, 'a, RT> Visitor<'de> for FridaHelperObserverVisitor<'a, RT> {
@@ -91,7 +90,7 @@ impl<'de, RT> Deserialize<'de> for FridaHelperObserver<'_, RT> {
             "FridaHelperObserver",
             &[], // No fields to deserialize
             FridaHelperObserverVisitor {
-                marker: core::marker::PhantomData,
+                phantom: core::marker::PhantomData,
             },
         )
     }
