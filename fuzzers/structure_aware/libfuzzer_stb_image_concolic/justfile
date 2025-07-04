@@ -1,0 +1,46 @@
+# Default recipe, runs when you just type `just`
+default: build
+
+# Build both projects
+build: build-runtime build-fuzzer
+
+# Test both projects
+test: test-runtime test-fuzzer
+
+# Clean both projects
+clean: clean-runtime clean-fuzzer
+
+# --- Runtime Project ---
+
+# Build the runtime project
+build-runtime:
+    @echo "Building the runtime project..."
+    @cargo build --manifest-path runtime/Cargo.toml
+
+# Test the runtime project (depends on it being built first)
+test-runtime: build-runtime
+    @echo "Running runtime tests..."
+    @cargo test --manifest-path runtime/Cargo.toml
+
+# Clean the runtime project
+clean-runtime:
+    @echo "Cleaning runtime project..."
+    @cargo clean --manifest-path runtime/Cargo.toml
+
+
+# --- Fuzzer Project ---
+
+# Build the fuzzer project
+build-fuzzer:
+    @echo "Building the fuzzer project..."
+    @cargo build --manifest-path fuzzer/Cargo.toml
+
+# Test the fuzzer project (depends on it being built first)
+test-fuzzer: build-fuzzer
+    @echo "Running fuzzer tests..."
+    @cargo test --manifest-path fuzzer/Cargo.toml
+
+# Clean the fuzzer project
+clean-fuzzer:
+    @echo "Cleaning fuzzer project..."
+    @cargo clean --manifest-path fuzzer/Cargo.toml
