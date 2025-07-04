@@ -883,21 +883,25 @@ fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::{StdTargetArgs, tuples::Handled};
+    use libafl_bolts::StdTargetArgs;
+    #[cfg(unix)]
+    use libafl_bolts::tuples::Handled;
+    #[cfg(unix)]
     use tuple_list::tuple_list;
 
     use crate::{
         events::SimpleEventManager,
         executors::{
-            Executor, StdChildArgs,
+            Executor,
             command::{CommandExecutor, InputLocation},
         },
         fuzzer::NopFuzzer,
         inputs::{BytesInput, NopInput},
         monitors::SimpleMonitor,
-        observers::StdOutObserver,
         state::NopState,
     };
+    #[cfg(unix)]
+    use crate::{executors::StdChildArgs, observers::StdOutObserver};
 
     #[test]
     #[cfg_attr(miri, ignore)]
