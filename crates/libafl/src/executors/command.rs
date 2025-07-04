@@ -248,11 +248,12 @@ impl CommandConfigurator<Pid> for PTraceCommandConfigurator {
                 match &mut self.input_location {
                     InputLocation::Arg { argnum } => {
                         // self.args[argnum] will be overwritten if already present.
+
                         assert!(
                             *argnum <= self.args.len(),
                             "If you want to fuzz arg {argnum}, you have to specify the other {argnum} (static) args."
                         );
-                        let terminated_input = [input.as_slice() as &[u8], &[0]].concat();
+                        let terminated_input = [target_bytes.as_slice() as &[u8], &[0]].concat();
                         let cstring_input =
                             CString::from(CStr::from_bytes_until_nul(&terminated_input).unwrap());
                         if *argnum == self.args.len() {
