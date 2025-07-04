@@ -47,7 +47,7 @@ EXT_FUNC_IMPL(main, int, (int argc, char **argv), false) {
   #endif
 }
 
-  #if defined(_WIN32)
+  #if defined(_WIN32) && !defined(__MINGW32__)
 // If we do not add the main, the MSVC linker fails with:
 // LINK : fatal error LNK1561: entry point must be defined
 int main(int argc, char **argv) {
@@ -110,10 +110,10 @@ EXPORT_FN size_t libafl_targets_libfuzzer_custom_crossover(
 EXPORT_FN size_t libafl_check_malloc_size(void *ptr) {
 #if defined(__APPLE__)
   return malloc_size(ptr);
-#elif defined(__GNUC__)
-  return malloc_usable_size(ptr);
 #elif defined(_WIN32)
   return _msize(ptr);
+#elif defined(__GNUC__)
+  return malloc_usable_size(ptr);
 #else
   return 0;
 #endif
