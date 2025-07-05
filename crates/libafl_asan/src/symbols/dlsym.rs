@@ -34,7 +34,7 @@ impl LookupType for LookupTypeNext {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct DlSymSymbols<L: LookupType> {
-    _phantom: PhantomData<L>,
+    phantom: PhantomData<L>,
 }
 
 impl<L: LookupType> Symbols for DlSymSymbols<L> {
@@ -68,7 +68,7 @@ impl<L: LookupType> DlSymSymbols<L> {
 
     pub const fn new() -> Self {
         Self {
-            _phantom: PhantomData,
+            phantom: PhantomData,
         }
     }
 

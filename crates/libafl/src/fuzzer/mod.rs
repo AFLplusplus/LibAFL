@@ -21,7 +21,7 @@ use crate::{
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
-    inputs::{Input, NopBytesConverter},
+    inputs::{Input, NopToTargetBytes, ToTargetBytes},
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
@@ -79,13 +79,25 @@ pub trait HasObjective {
 }
 
 /// Can convert input to another type
-pub trait HasBytesConverter {
-    /// The converter itself
+pub trait HasTargetBytesConverter {
+    /// The converter type
     type Converter;
-    /// the input converter
-    fn converter(&self) -> &Self::Converter;
-    /// the input converter(mut)
-    fn converter_mut(&mut self) -> &mut Self::Converter;
+
+    /// the converter, converting the input to target bytes.
+    fn target_bytes_converter(&self) -> &Self::Converter;
+    /// the converter, converting the input to target bytes (mut).
+    fn target_bytes_converter_mut(&mut self) -> &mut Self::Converter;
+}
+
+/// Blanket implementation to shorthand-call [`ToTargetBytes::to_target_bytes`] on the fuzzer directly.
+impl<I, T> ToTargetBytes<I> for T
+where
+    T: HasTargetBytesConverter,
+    T::Converter: ToTargetBytes<I>,
+{
+    fn to_target_bytes<'a>(&mut self, input: &'a I) -> libafl_bolts::ownedref::OwnedSlice<'a, u8> {
+        self.target_bytes_converter_mut().to_target_bytes(input)
+    }
 }
 
 /// Evaluates if an input is interesting using the feedback
@@ -305,12 +317,17 @@ impl ExecuteInputResult {
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
 pub struct StdFuzzer<CS, F, IC, IF, OF> {
+    /// The scheduler used to schedule new testcases
     scheduler: CS,
+    /// The [`Feedback`] that will store new testcases on if a run returns `is_interesting`.
     feedback: F,
+    /// The [`Feedback`] that will store new testcases as solution (for example, a crash) if a run returns `is_interesting`.
     objective: OF,
-    bytes_converter: IC,
+    /// A converter that converts the input to bytes that can be sent to the target (for example, to a [`CommandExecutor`](crate::executors::CommandExecutor).
+    target_bytes_converter: IC,
+    /// The input filter that will filter out (not execute) certain inputs
     input_filter: IF,
-    // Handles whether to share objective testcases among nodes
+    /// Handles whether to share objective testcases among nodes
     share_objectives: bool,
 }
 
@@ -1014,92 +1031,180 @@ where
 }
 
 /// The builder for std fuzzer
-#[derive(Debug, Default)]
-pub struct StdFuzzerBuilder<IC, IF> {
-    bytes_converter: Option<IC>,
-    input_filter: Option<IF>,
+#[derive(Debug)]
+pub struct StdFuzzerBuilder<CS, F, IC, IF, OF> {
+    /// The scheduler used to schedule new testcases
+    scheduler: CS,
+    /// The [`Feedback`] that will store new testcases on if a run returns `is_interesting`.
+    feedback: F,
+    /// The [`Feedback`] that will store new testcases as solution (for example, a crash) if a run returns `is_interesting`.
+    objective: OF,
+    /// A converter that converts the input to bytes that can be sent to the target (for example, to a [`CommandExecutor`](crate::executors::CommandExecutor).
+    target_bytes_converter: IC,
+    /// The input filter that will filter out (not execute) certain inputs
+    input_filter: IF,
+    /// Handles whether to share objective testcases among nodes
+    share_objectives: bool,
 }
 
-impl StdFuzzerBuilder<(), ()> {
-    /// Contstuctor
+impl StdFuzzerBuilder<(), (), NopToTargetBytes, NopInputFilter, ()> {
+    /// Creates a new [`StdFuzzerBuilder`] with default (nop) types.
     #[must_use]
     pub fn new() -> Self {
         Self {
-            input_filter: None,
-            bytes_converter: None,
-        }
-    }
-}
-
-impl<IF> StdFuzzerBuilder<(), IF> {
-    /// set input converter
-    pub fn bytes_converter<IC>(self, bytes_converter: IC) -> StdFuzzerBuilder<IC, IF> {
-        StdFuzzerBuilder {
-            bytes_converter: Some(bytes_converter),
-            input_filter: self.input_filter,
-        }
-    }
-}
-
-impl<IC> StdFuzzerBuilder<IC, ()> {
-    /// set input filter
-    pub fn input_filter<IF>(self, input_filter: IF) -> StdFuzzerBuilder<IC, IF> {
-        StdFuzzerBuilder {
-            bytes_converter: self.bytes_converter,
-            input_filter: Some(input_filter),
-        }
-    }
-}
-
-impl<IC, IF> StdFuzzerBuilder<IC, IF> {
-    /// build it
-    pub fn build<CS, F, OF>(
-        self,
-        scheduler: CS,
-        feedback: F,
-        objective: OF,
-    ) -> Result<StdFuzzer<CS, F, IC, IF, OF>, Error> {
-        let Some(bytes_converter) = self.bytes_converter else {
-            return Err(Error::illegal_argument("input converter not set"));
-        };
-        let Some(input_filter) = self.input_filter else {
-            return Err(Error::illegal_argument("input filter not set"));
-        };
-
-        Ok(StdFuzzer {
-            bytes_converter,
-            input_filter,
-            scheduler,
-            feedback,
-            objective,
+            target_bytes_converter: NopToTargetBytes,
+            input_filter: NopInputFilter,
+            scheduler: (),
+            feedback: (),
+            objective: (),
             share_objectives: false,
-        })
+        }
     }
 }
 
-impl<CS, F, IC, IF, OF> HasBytesConverter for StdFuzzer<CS, F, IC, IF, OF> {
+impl Default for StdFuzzerBuilder<(), (), NopToTargetBytes, NopInputFilter, ()> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
+    /// Sets the converter to target bytes.
+    /// The converter converts the input to bytes that can be sent to the target (for example, to a [`CommandExecutor`](crate::executors::CommandExecutor).
+    #[must_use]
+    pub fn target_bytes_converter<IC2>(
+        self,
+        target_bytes_converter: IC2,
+    ) -> StdFuzzerBuilder<CS, F, IC2, IF, OF> {
+        StdFuzzerBuilder {
+            target_bytes_converter,
+            input_filter: self.input_filter,
+            scheduler: self.scheduler,
+            feedback: self.feedback,
+            objective: self.objective,
+            share_objectives: self.share_objectives,
+        }
+    }
+}
+
+impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
+    /// Set the input filter.
+    /// The input filter will filter out (i.e., not execute) certain inputs.
+    #[must_use]
+    pub fn input_filter<IF2>(self, input_filter: IF2) -> StdFuzzerBuilder<CS, F, IC, IF2, OF> {
+        StdFuzzerBuilder {
+            target_bytes_converter: self.target_bytes_converter,
+            input_filter,
+            scheduler: self.scheduler,
+            feedback: self.feedback,
+            objective: self.objective,
+            share_objectives: self.share_objectives,
+        }
+    }
+}
+
+impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
+    /// Sets the scheduler used to schedule new testcases
+    #[must_use]
+    pub fn scheduler<CS2>(self, scheduler: CS2) -> StdFuzzerBuilder<CS2, F, IC, IF, OF> {
+        StdFuzzerBuilder {
+            target_bytes_converter: self.target_bytes_converter,
+            input_filter: self.input_filter,
+            scheduler,
+            feedback: self.feedback,
+            objective: self.objective,
+            share_objectives: self.share_objectives,
+        }
+    }
+}
+
+impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
+    /// Sets the feedback that will store new testcases on if a run returns `is_interesting`.
+    #[must_use]
+    pub fn feedback<F2>(self, feedback: F2) -> StdFuzzerBuilder<CS, F2, IC, IF, OF> {
+        StdFuzzerBuilder {
+            target_bytes_converter: self.target_bytes_converter,
+            input_filter: self.input_filter,
+            scheduler: self.scheduler,
+            feedback,
+            objective: self.objective,
+            share_objectives: self.share_objectives,
+        }
+    }
+}
+
+impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
+    /// Sets the feedback that will store new testcases as solution (for example, a crash) if a run returns `is_interesting`.
+    #[must_use]
+    pub fn objective<OF2>(self, objective: OF2) -> StdFuzzerBuilder<CS, F, IC, IF, OF2> {
+        StdFuzzerBuilder {
+            target_bytes_converter: self.target_bytes_converter,
+            input_filter: self.input_filter,
+            scheduler: self.scheduler,
+            feedback: self.feedback,
+            objective,
+            share_objectives: self.share_objectives,
+        }
+    }
+}
+
+impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
+    /// Sets whether to share objective testcases among nodes
+    #[must_use]
+    pub fn share_objectives(self, share_objectives: bool) -> StdFuzzerBuilder<CS, F, IC, IF, OF> {
+        StdFuzzerBuilder {
+            target_bytes_converter: self.target_bytes_converter,
+            input_filter: self.input_filter,
+            scheduler: self.scheduler,
+            feedback: self.feedback,
+            objective: self.objective,
+            share_objectives,
+        }
+    }
+}
+
+impl<CS, F, IC, IF, OF> StdFuzzerBuilder<CS, F, IC, IF, OF> {
+    /// Build a [`StdFuzzer`] from this builder.
+    pub fn build(self) -> StdFuzzer<CS, F, IC, IF, OF> {
+        StdFuzzer {
+            target_bytes_converter: self.target_bytes_converter,
+            input_filter: self.input_filter,
+            scheduler: self.scheduler,
+            feedback: self.feedback,
+            objective: self.objective,
+            share_objectives: self.share_objectives,
+        }
+    }
+}
+
+impl<CS, F, IC, IF, OF> HasTargetBytesConverter for StdFuzzer<CS, F, IC, IF, OF> {
     type Converter = IC;
 
-    fn converter(&self) -> &Self::Converter {
-        &self.bytes_converter
+    fn target_bytes_converter(&self) -> &Self::Converter {
+        &self.target_bytes_converter
     }
 
-    fn converter_mut(&mut self) -> &mut Self::Converter {
-        &mut self.bytes_converter
+    fn target_bytes_converter_mut(&mut self) -> &mut Self::Converter {
+        &mut self.target_bytes_converter
     }
 }
 
-impl<CS, F, OF> StdFuzzer<CS, F, NopBytesConverter, NopInputFilter, OF> {
+impl<CS, F, OF> StdFuzzer<CS, F, NopToTargetBytes, NopInputFilter, OF> {
     /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
-        Self {
-            scheduler,
-            feedback,
-            objective,
-            bytes_converter: NopBytesConverter::default(),
-            input_filter: NopInputFilter,
-            share_objectives: false,
-        }
+        StdFuzzer::builder()
+            .scheduler(scheduler)
+            .feedback(feedback)
+            .objective(objective)
+            .build()
+    }
+}
+
+impl StdFuzzer<(), (), NopToTargetBytes, NopInputFilter, ()> {
+    /// Creates a [`StdFuzzerBuilder`] that allows us to specify additional [`ToTargetBytes`] and [`InputFilter`] fields.
+    #[must_use]
+    pub fn builder() -> StdFuzzerBuilder<(), (), NopToTargetBytes, NopInputFilter, ()> {
+        StdFuzzerBuilder::new()
     }
 }
 
@@ -1151,7 +1256,7 @@ where
 /// A [`NopFuzzer`] that does nothing
 #[derive(Debug, Copy, Clone)]
 pub struct NopFuzzer {
-    converter: NopBytesConverter,
+    converter: NopToTargetBytes,
 }
 
 impl NopFuzzer {
@@ -1159,7 +1264,7 @@ impl NopFuzzer {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            converter: NopBytesConverter::default(),
+            converter: NopToTargetBytes,
         }
     }
 }
@@ -1170,13 +1275,13 @@ impl Default for NopFuzzer {
     }
 }
 
-impl HasBytesConverter for NopFuzzer {
-    type Converter = NopBytesConverter;
-    fn converter(&self) -> &Self::Converter {
+impl HasTargetBytesConverter for NopFuzzer {
+    type Converter = NopToTargetBytes;
+    fn target_bytes_converter(&self) -> &Self::Converter {
         &self.converter
     }
 
-    fn converter_mut(&mut self) -> &mut Self::Converter {
+    fn target_bytes_converter_mut(&mut self) -> &mut Self::Converter {
         &mut self.converter
     }
 }
@@ -1226,11 +1331,12 @@ mod tests {
     use libafl_bolts::rands::StdRand;
 
     use crate::{
+        StdFuzzer,
         corpus::InMemoryCorpus,
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
-        fuzzer::{BloomInputFilter, Evaluator, StdFuzzerBuilder},
-        inputs::{BytesInput, NopBytesConverter},
+        fuzzer::{BloomInputFilter, Evaluator},
+        inputs::BytesInput,
         schedulers::StdScheduler,
         state::StdState,
     };
@@ -1240,11 +1346,12 @@ mod tests {
         let execution_count = RefCell::new(0);
         let scheduler = StdScheduler::new();
         let bloom_filter = BloomInputFilter::default();
-        let mut fuzzer = StdFuzzerBuilder::new()
+        let mut fuzzer = StdFuzzer::builder()
             .input_filter(bloom_filter)
-            .bytes_converter(NopBytesConverter::default())
-            .build(scheduler, (), ())
-            .unwrap();
+            .scheduler(scheduler)
+            .feedback(())
+            .objective(())
+            .build();
         let mut state = StdState::new(
             StdRand::new(),
             InMemoryCorpus::new(),

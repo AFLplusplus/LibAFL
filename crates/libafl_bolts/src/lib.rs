@@ -113,9 +113,9 @@ pub mod argparse;
 #[cfg(all(feature = "std", unix))]
 pub use argparse::*;
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(feature = "std")]
 pub mod target_args;
-#[cfg(all(feature = "std", unix))]
+#[cfg(feature = "std")]
 pub use target_args::*;
 
 pub mod simd;

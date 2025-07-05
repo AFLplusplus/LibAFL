@@ -15,9 +15,9 @@ use frida_gum::{
 #[cfg(windows)]
 use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks};
 use libafl::{
-    Error, HasBytesConverter,
+    Error,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{Input, InputToBytes},
+    inputs::{Input, ToTargetBytes},
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
 };
@@ -39,7 +39,7 @@ pub struct FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, Z> {
     /// User provided callback for instrumentation
     helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
     followed: bool,
-    _phantom: PhantomData<&'b u8>,
+    phantom: PhantomData<&'b u8>,
 }
 
 impl<EM, H, I, OT, RT, S, Z> Debug for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, Z>
@@ -63,8 +63,7 @@ where
     S: HasExecutions + HasCurrentTestcase<I> + HasSolutions<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
-    Z: HasBytesConverter,
-    Z::Converter: InputToBytes<I>,
+    Z: ToTargetBytes<I>,
 {
     /// Instruct the target about the input and run
     #[inline]
@@ -75,8 +74,7 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        let converter = fuzzer.converter_mut();
-        let target_bytes = converter.to_bytes(input);
+        let target_bytes = fuzzer.to_target_bytes(input);
         self.helper.borrow_mut().pre_exec(target_bytes.as_slice())?;
         if self.helper.borrow_mut().stalker_enabled() {
             if !(self.followed) {
@@ -222,7 +220,7 @@ where
             stalker,
             helper,
             followed: false,
-            _phantom: PhantomData,
+            phantom: PhantomData,
         }
     }
 }

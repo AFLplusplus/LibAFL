@@ -14,13 +14,13 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
-    inputs::{HasTargetBytes, NopBytesConverter},
+    inputs::HasTargetBytes,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, AflStatsStage, CalibrationStage},
     state::{HasCorpus, HasExecutions, StdState},
-    BloomInputFilter, StdFuzzerBuilder,
+    BloomInputFilter,
 };
 use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -140,11 +140,12 @@ pub fn main() {
     #[cfg(feature = "bloom_input_filter")]
     let filter = BloomInputFilter::new(10_000_000, 0.001);
     #[cfg(feature = "bloom_input_filter")]
-    let mut fuzzer = StdFuzzerBuilder::new()
+    let mut fuzzer = StdFuzzer::builder()
         .input_filter(filter)
-        .bytes_converter(NopBytesConverter::default())
-        .build(scheduler, feedback, objective)
-        .unwrap();
+        .scheduler(scheduler)
+        .feedback(feedback)
+        .objective(objective)
+        .build();
 
     // Create the executor for an in-process function with just one observer
     let executor = CustomExecutor::new(&state);

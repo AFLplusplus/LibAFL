@@ -1,5 +1,5 @@
 use std::{
-    env, ffi::CString, num::NonZero, os::unix::ffi::OsStrExt, path::PathBuf, time::Duration,
+    env, ffi::CString, num::NonZero, os::unix::ffi::OsStrExt, path::PathBuf, slice, time::Duration,
 };
 
 use libafl::{
@@ -12,7 +12,6 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
-    inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::StdMapObserver,
@@ -101,7 +100,7 @@ pub fn main() {
     let intel_pt = IntelPT::builder()
         .cpu(cpu.0)
         .inherit(true)
-        .ip_filters(&[code_memory_addresses.clone()])
+        .ip_filters(slice::from_ref(&code_memory_addresses))
         .build()
         .unwrap();
 
@@ -131,14 +130,12 @@ pub fn main() {
         .cpu(cpu)
         .timeout(Duration::from_secs(2))
         .build();
-    let mut executor =
-        <PTraceCommandConfigurator as CommandConfigurator<BytesInput, _>>::into_executor_with_hooks(
-            command_configurator,
-            tuple_list!(observer),
-            tuple_list!(hook),
-            None,
-            None,
-        );
+    let mut executor = command_configurator.into_executor_with_hooks(
+        tuple_list!(observer),
+        tuple_list!(hook),
+        None,
+        None,
+    );
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());

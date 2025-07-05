@@ -16,7 +16,7 @@ use crate::mmap::Mmap;
 
 pub struct DlmallocBackendMap<M: Mmap> {
     page_size: usize,
-    _phantom: PhantomData<M>,
+    phantom: PhantomData<M>,
 }
 
 unsafe impl<M: Mmap + Send> Allocator for DlmallocBackendMap<M> {
@@ -65,7 +65,7 @@ impl<M: Mmap> DlmallocBackendMap<M> {
     pub const fn new(page_size: usize) -> DlmallocBackendMap<M> {
         DlmallocBackendMap {
             page_size,
-            _phantom: PhantomData,
+            phantom: PhantomData,
         }
     }
 }

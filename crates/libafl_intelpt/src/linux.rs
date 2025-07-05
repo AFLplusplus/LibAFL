@@ -754,10 +754,10 @@ impl IntelPTBuilder {
 /// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
 #[bitfield(u64, default = 0)]
 struct PtConfig {
-    /// Disable call return address compression. AKA DisRETC in Intel SDM.
+    /// Disable call return address compression. AKA `DisRETC` in Intel SDM.
     #[bit(11, rw)]
     noretcomp: bool,
-    /// Indicates the frequency of PSB packets. AKA PSBFreq in Intel SDM.
+    /// Indicates the frequency of `PSB` packets. AKA `PSBFreq` in Intel SDM.
     #[bits(24..=27, rw)]
     psb_period: u4,
 }

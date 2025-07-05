@@ -124,10 +124,10 @@ pub fn find_drcov_files(dir: &PathBuf) -> Vec<PathBuf> {
 
     for entry in WalkDir::new(dir) {
         let entry = entry.unwrap().into_path();
-        if let Some(ext) = entry.extension() {
-            if ext == "drcov" {
-                drcov_files.push(entry);
-            }
+        if let Some(ext) = entry.extension()
+            && ext == "drcov"
+        {
+            drcov_files.push(entry);
         }
     }
 
@@ -138,10 +138,10 @@ fn main() {
     let opts = Opt::parse();
 
     if let Some(out_dir) = &opts.out_dir {
-        if !out_dir.exists() {
-            if let Err(err) = create_dir_all(out_dir) {
-                eprintln!("Failed to create dir {}: {err:?}", out_dir.display());
-            }
+        if !out_dir.exists()
+            && let Err(err) = create_dir_all(out_dir)
+        {
+            eprintln!("Failed to create dir {}: {err:?}", out_dir.display());
         }
 
         assert!(
@@ -156,10 +156,10 @@ fn main() {
             find_drcov_files(input)
         } else {
             let mut files = vec![];
-            if let Some(ext) = input.extension() {
-                if ext == "drcov" {
-                    files.push(input.clone());
-                }
+            if let Some(ext) = input.extension()
+                && ext == "drcov"
+            {
+                files.push(input.clone());
             }
             files
         };

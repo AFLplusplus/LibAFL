@@ -722,18 +722,18 @@ where
                 }
 
                 #[cfg(target_arch = "aarch64")]
-                if let Some((basereg, indexreg, displacement, width, shift)) = res {
-                    if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
-                        rt.emit_shadow_check(
-                            address,
-                            output,
-                            basereg,
-                            indexreg,
-                            displacement,
-                            width,
-                            shift,
-                        );
-                    }
+                if let Some((basereg, indexreg, displacement, width, shift)) = res
+                    && let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>()
+                {
+                    rt.emit_shadow_check(
+                        address,
+                        output,
+                        basereg,
+                        indexreg,
+                        displacement,
+                        width,
+                        shift,
+                    );
                 }
 
                 #[cfg(all(
@@ -770,20 +770,19 @@ where
             }
             instruction.keep();
         }
-        if basic_block_size != 0 {
-            if let Some(rt) = runtimes_unborrowed
+        if basic_block_size != 0
+            && let Some(rt) = runtimes_unborrowed
                 .borrow_mut()
                 .match_first_type_mut::<DrCovRuntime>()
-            {
-                log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
+        {
+            log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
 
-                // We can maybe remove the `basic_block_size as u64`` cast in the future
-                #[allow(trivial_numeric_casts)]
-                rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
-                    basic_block_start,
-                    basic_block_start + (basic_block_size as u64),
-                ));
-            }
+            // We can maybe remove the `basic_block_size as u64`` cast in the future
+            #[allow(trivial_numeric_casts)]
+            rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
+                basic_block_start,
+                basic_block_start + (basic_block_size as u64),
+            ));
         }
     }
 

@@ -24,7 +24,7 @@ pub struct CallStackCoverage<
     pending: bool,
     last_location: usize,
     hasher_builder: THashBuilder,
-    hasher_phantom: PhantomData<THasher>,
+    phantom: PhantomData<THasher>,
 }
 
 impl Default for CallStackCoverage<DefaultHasher, BuildHasherDefault<DefaultHasher>> {
@@ -37,7 +37,7 @@ impl Default for CallStackCoverage<DefaultHasher, BuildHasherDefault<DefaultHash
             pending: false,
             last_location: 0,
             hasher_builder: BuildHasherDefault::default(),
-            hasher_phantom: PhantomData,
+            phantom: PhantomData,
         }
     }
 }

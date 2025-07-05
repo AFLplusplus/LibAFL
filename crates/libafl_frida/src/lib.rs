@@ -194,29 +194,29 @@ impl FridaOptions {
                 }
             } // end of for loop
 
-            if options.enable_asan {
-                if let Some(asan_cores) = asan_cores {
-                    let core_ids = get_core_ids().unwrap();
-                    assert_eq!(
-                        core_ids.len(),
-                        1,
-                        "Client should only be bound to a single core"
-                    );
-                    let core_id: CoreId = core_ids[0];
-                    options.enable_asan = asan_cores.ids.contains(&core_id);
-                }
+            if options.enable_asan
+                && let Some(asan_cores) = asan_cores
+            {
+                let core_ids = get_core_ids().unwrap();
+                assert_eq!(
+                    core_ids.len(),
+                    1,
+                    "Client should only be bound to a single core"
+                );
+                let core_id: CoreId = core_ids[0];
+                options.enable_asan = asan_cores.ids.contains(&core_id);
             }
-            if options.enable_cmplog {
-                if let Some(cmplog_cores) = cmplog_cores {
-                    let core_ids = get_core_ids().unwrap();
-                    assert_eq!(
-                        core_ids.len(),
-                        1,
-                        "Client should only be bound to a single core"
-                    );
-                    let core_id = core_ids[0];
-                    options.enable_cmplog = cmplog_cores.ids.contains(&core_id);
-                }
+            if options.enable_cmplog
+                && let Some(cmplog_cores) = cmplog_cores
+            {
+                let core_ids = get_core_ids().unwrap();
+                assert_eq!(
+                    core_ids.len(),
+                    1,
+                    "Client should only be bound to a single core"
+                );
+                let core_id = core_ids[0];
+                options.enable_cmplog = cmplog_cores.ids.contains(&core_id);
             }
         }
         options

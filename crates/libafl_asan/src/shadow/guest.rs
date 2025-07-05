@@ -19,7 +19,7 @@ use crate::{
 pub struct GuestShadow<M: Mmap, L: ShadowLayout> {
     lo: M,
     hi: M,
-    _phantom: PhantomData<L>,
+    phantom: PhantomData<L>,
 }
 
 impl<M: Mmap, L: ShadowLayout> Shadow for GuestShadow<M, L> {
@@ -283,7 +283,7 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
         Ok(GuestShadow {
             lo,
             hi,
-            _phantom: PhantomData,
+            phantom: PhantomData,
         })
     }
 

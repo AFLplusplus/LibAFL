@@ -1,6 +1,8 @@
 //! The command executor executes a sub program for each run
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::ffi::CString;
+#[cfg(not(unix))]
+use alloc::string::{String, ToString};
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use alloc::vec::Vec;
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
@@ -11,18 +13,25 @@ use core::{
     ops::IndexMut,
     time::Duration,
 };
+#[cfg(unix)]
+use std::ffi::OsStr;
+#[cfg(not(unix))]
+use std::ffi::OsString;
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use std::os::fd::AsRawFd;
+#[cfg(unix)]
+use std::os::{fd::RawFd, unix::ffi::OsStrExt};
 use std::{
-    ffi::OsStr,
     io::{Read, Write},
-    os::{fd::RawFd, unix::ffi::OsStrExt},
     process::{Child, Command, Stdio},
 };
 
+#[cfg(unix)]
+use libafl_bolts::{AsSlice, tuples::MatchNameRef};
 use libafl_bolts::{
-    AsSlice, InputLocation, StdTargetArgs, StdTargetArgsInner,
-    tuples::{Handle, MatchName, MatchNameRef, RefIndexable},
+    InputLocation, StdTargetArgs, StdTargetArgsInner,
+    ownedref::OwnedSlice,
+    tuples::{Handle, MatchName, RefIndexable},
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libafl_bolts::{core_affinity::CoreId, os::dup2};
@@ -54,7 +63,7 @@ use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
     Error,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::HasTargetBytes,
+    inputs::{HasTargetBytes, ToTargetBytes},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::HasExecutions,
 };
@@ -63,6 +72,7 @@ use crate::{
 #[derive(Debug, Default)]
 #[allow(dead_code)]
 enum StdCommandCaptureMethod {
+    #[cfg(unix)]
     Fd(RawFd),
     #[default]
     Pipe,
@@ -77,8 +87,9 @@ impl StdCommandCaptureMethod {
         }
     }
 
+    #[cfg_attr(not(all(unix, feature = "fork")), expect(clippy::unused_self))]
     fn pre_capture(&self, cmd: &mut Command, stdout: bool) {
-        #[cfg(feature = "fork")]
+        #[cfg(all(unix, feature = "fork"))]
         {
             if let Self::Fd(old) = self {
                 // Safety
@@ -97,7 +108,7 @@ impl StdCommandCaptureMethod {
             }
         }
 
-        #[cfg(not(feature = "fork"))]
+        #[cfg(not(all(unix, feature = "fork")))]
         Self::pipe_capture(cmd, stdout);
     }
 }
@@ -113,17 +124,14 @@ pub struct StdCommandConfigurator {
     stdout_cap: Option<StdCommandCaptureMethod>,
     stderr_cap: Option<StdCommandCaptureMethod>,
     timeout: Duration,
-    /// true: input gets delivered via stdink
+    /// true: input gets delivered via stdin
     input_location: InputLocation,
     /// The Command to execute
     command: Command,
 }
 
-impl<I> CommandConfigurator<I> for StdCommandConfigurator
-where
-    I: HasTargetBytes,
-{
-    fn spawn_child(&mut self, input: &I) -> Result<Child, Error> {
+impl CommandConfigurator<Child> for StdCommandConfigurator {
+    fn spawn_child(&mut self, target_bytes: OwnedSlice<'_, u8>) -> Result<Child, Error> {
         let mut cmd = Command::new(self.command.get_program());
         match &mut self.input_location {
             InputLocation::Arg { argnum } => {
@@ -149,11 +157,13 @@ where
                     if i == *argnum {
                         debug_assert_eq!(arg, "PLACEHOLDER");
                         #[cfg(unix)]
-                        cmd.arg(OsStr::from_bytes(input.target_bytes().as_slice()));
+                        cmd.arg(OsStr::from_bytes(target_bytes.as_slice()));
                         // There is an issue here that the chars on Windows are 16 bit wide.
                         // I can't really test it. Please open a PR if this goes wrong.
                         #[cfg(not(unix))]
-                        cmd.arg(OsString::from_vec(input.target_bytes().as_vec()));
+                        cmd.arg(OsString::from(
+                            String::from_utf8_lossy(&target_bytes).to_string(),
+                        ));
                     } else {
                         cmd.arg(arg);
                     }
@@ -171,7 +181,7 @@ where
             InputLocation::StdIn { input_file: _ } => {
                 let mut handle = self.command.stdin(Stdio::piped()).spawn()?;
                 let mut stdin = handle.stdin.take().unwrap();
-                match stdin.write_all(input.target_bytes().as_slice()) {
+                match stdin.write_all(&target_bytes) {
                     Err(err) => {
                         if err.kind() != std::io::ErrorKind::BrokenPipe {
                             return Err(err.into());
@@ -189,7 +199,7 @@ where
                 Ok(handle)
             }
             InputLocation::File { out_file } => {
-                out_file.write_buf(input.target_bytes().as_slice())?;
+                out_file.write_buf(&target_bytes)?;
                 Ok(self.command.spawn()?)
             }
         }
@@ -225,11 +235,8 @@ pub struct PTraceCommandConfigurator {
 }
 
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
-impl<I> CommandConfigurator<I, Pid> for PTraceCommandConfigurator
-where
-    I: HasTargetBytes,
-{
-    fn spawn_child(&mut self, input: &I) -> Result<Pid, Error> {
+impl CommandConfigurator<Pid> for PTraceCommandConfigurator {
+    fn spawn_child(&mut self, target_bytes: OwnedSlice<'_, u8>) -> Result<Pid, Error> {
         use nix::{
             sys::{
                 personality, ptrace,
@@ -253,11 +260,12 @@ where
                 match &mut self.input_location {
                     InputLocation::Arg { argnum } => {
                         // self.args[argnum] will be overwritten if already present.
+
                         assert!(
                             *argnum <= self.args.len(),
                             "If you want to fuzz arg {argnum}, you have to specify the other {argnum} (static) args."
                         );
-                        let terminated_input = [&input.target_bytes() as &[u8], &[0]].concat();
+                        let terminated_input = [target_bytes.as_slice() as &[u8], &[0]].concat();
                         let cstring_input =
                             CString::from(CStr::from_bytes_until_nul(&terminated_input).unwrap());
                         if *argnum == self.args.len() {
@@ -268,13 +276,13 @@ where
                     }
                     InputLocation::StdIn { input_file: _ } => {
                         let (pipe_read, pipe_write) = pipe().unwrap();
-                        write(pipe_write, &input.target_bytes()).unwrap();
+                        write(pipe_write, &target_bytes).unwrap();
                         // # Safety
                         // We replace the Stdin fileno. Typical Unix stuff.
                         unsafe { dup2(pipe_read.as_raw_fd(), STDIN_FILENO)? };
                     }
                     InputLocation::File { out_file } => {
-                        out_file.write_buf(input.target_bytes().as_slice()).unwrap();
+                        out_file.write_buf(&target_bytes).unwrap();
                     }
                 }
 
@@ -306,9 +314,9 @@ where
 ///
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<I, OT, S, T, HT = (), C = Child> {
-    /// The wrapped command configurer
-    configurer: T,
+pub struct CommandExecutor<C, HT, I, OT, S, T> {
+    /// The wrapped command [`StdCommandConfigurator`]
+    configurator: T,
     /// The observers used by this executor
     observers: OT,
     stdout_observer: Option<Handle<StdOutObserver>>,
@@ -317,7 +325,7 @@ pub struct CommandExecutor<I, OT, S, T, HT = (), C = Child> {
     phantom: PhantomData<(C, I, S)>,
 }
 
-impl CommandExecutor<(), (), (), ()> {
+impl CommandExecutor<(), (), (), (), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -335,7 +343,7 @@ impl CommandExecutor<(), (), (), ()> {
     }
 }
 
-impl<I, OT, S, T, HT, C> Debug for CommandExecutor<I, OT, S, T, HT, C>
+impl<C, HT, I, OT, S, T> Debug for CommandExecutor<C, HT, I, OT, S, T>
 where
     T: Debug,
     OT: Debug,
@@ -343,7 +351,7 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
-            .field("inner", &self.configurer)
+            .field("inner", &self.configurator)
             .field("observers", &self.observers)
             .field("hooks", &self.hooks)
             .field("stdout_observer", &self.stdout_observer)
@@ -352,31 +360,38 @@ where
     }
 }
 
-impl<I, OT, S, T, HT, C> CommandExecutor<I, OT, S, T, HT, C> {
+impl<C, HT, I, OT, S, T> CommandExecutor<C, HT, I, OT, S, T> {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
-        &mut self.configurer
+        &mut self.configurator
     }
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-impl<I, OT, S, T> CommandExecutor<I, OT, S, T>
+impl<HT, I, OT, S, T> CommandExecutor<Child, HT, I, OT, S, T>
 where
     S: HasExecutions,
-    T: CommandConfigurator<I> + Debug,
+    T: CommandConfigurator<Child> + Debug,
     OT: ObserversTuple<I, S>,
 {
-    fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
+    fn execute_input_with_command<TB: ToTargetBytes<I>>(
+        &mut self,
+        target_bytes_converter: &mut TB,
+        state: &mut S,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
         use wait_timeout::ChildExt;
 
         self.observers_mut().pre_exec_all(state, input)?;
         *state.executions_mut() += 1;
-        let mut child = self.configurer.spawn_child(input)?;
+        let mut child = self
+            .configurator
+            .spawn_child(target_bytes_converter.to_target_bytes(input))?;
 
         let exit_kind = child
-            .wait_timeout(self.configurer.exec_timeout())
+            .wait_timeout(self.configurator.exec_timeout())
             .expect("waiting on child failed")
-            .map(|status| self.configurer.exit_kind_from_status(&status))
+            .map(|status| self.configurator.exit_kind_from_status(&status))
             .unwrap_or_else(|| {
                 // if this fails, there is not much we can do. let's hope it failed because the process finished
                 // in the meantime.
@@ -386,7 +401,7 @@ where
                 ExitKind::Timeout
             });
 
-        // Manualy update stdout/stderr here if we use piped implementation.
+        // Manually update stdout/stderr here if we use piped implementation.
         // Reason of not putting into state and pass by post_exec_all is that
         // - Save extra at least two hashmap lookups since we already know the handle
         // - Doesn't pose HasNamedMetadata bound on S (note we might have many stdout/stderr observers)
@@ -412,46 +427,48 @@ where
     }
 }
 
-impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S, T>
+impl<EM, HT, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<Child, HT, I, OT, S, T>
 where
     S: HasExecutions,
-    T: CommandConfigurator<I> + Debug,
+    T: CommandConfigurator<Child> + Debug,
     OT: MatchName + ObserversTuple<I, S>,
+    Z: ToTargetBytes<I>,
 {
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.execute_input_with_command(state, input)
+        self.execute_input_with_command(fuzzer, state, input)
     }
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-impl<I, OT, S, T> HasTimeout for CommandExecutor<I, OT, S, T>
+impl<C, HT, I, OT, S, T> HasTimeout for CommandExecutor<C, HT, I, OT, S, T>
 where
-    T: CommandConfigurator<I>,
+    T: CommandConfigurator<C>,
 {
     #[inline]
     fn timeout(&self) -> Duration {
-        self.configurer.exec_timeout()
+        self.configurator.exec_timeout()
     }
 
     #[inline]
     fn set_timeout(&mut self, timeout: Duration) {
-        *self.configurer.exec_timeout_mut() = timeout;
+        *self.configurator.exec_timeout_mut() = timeout;
     }
 }
 
 #[cfg(target_os = "linux")]
-impl<EM, I, OT, S, T, Z, HT> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S, T, HT, Pid>
+impl<EM, HT, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<Pid, HT, I, OT, S, T>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: MatchName + ObserversTuple<I, S>,
     S: HasExecutions,
-    T: CommandConfigurator<I, Pid> + Debug,
+    T: CommandConfigurator<Pid> + Debug,
+    Z: ToTargetBytes<I>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`
@@ -460,14 +477,16 @@ where
     /// just before the `exec` return (after forking).
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
-        let child = self.configurer.spawn_child(input)?;
+        let child = self
+            .configurator
+            .spawn_child(fuzzer.to_target_bytes(input))?;
 
         let wait_status = waitpid_filtered(child, Some(WaitPidFlag::WUNTRACED))?;
         if !matches!(wait_status, Stopped(c, Signal::SIGSTOP) if c == child) {
@@ -521,7 +540,7 @@ where
     }
 }
 
-impl<I, OT, S, T, HT, C> HasObservers for CommandExecutor<I, OT, S, T, HT, C>
+impl<C, HT, I, OT, S, T> HasObservers for CommandExecutor<C, HT, I, OT, S, T>
 where
     OT: ObserversTuple<I, S>,
 {
@@ -583,7 +602,7 @@ impl CommandExecutorBuilder {
     pub fn build<I, OT, S>(
         &self,
         observers: OT,
-    ) -> Result<CommandExecutor<I, OT, S, StdCommandConfigurator>, Error>
+    ) -> Result<CommandExecutor<Child, (), I, OT, S, StdCommandConfigurator>, Error>
     where
         I: HasTargetBytes,
         OT: MatchName + ObserversTuple<I, S>,
@@ -621,6 +640,7 @@ impl CommandExecutorBuilder {
             command.current_dir(cwd);
         }
 
+        #[cfg(unix)]
         let stdout_cap = self.child_env_inner.stdout_observer.as_ref().map(|hdl| {
             observers
                 .get(hdl)
@@ -631,6 +651,7 @@ impl CommandExecutorBuilder {
                 .unwrap_or_default()
         });
 
+        #[cfg(unix)]
         let stderr_cap = self.child_env_inner.stderr_observer.as_ref().map(|hdl| {
             observers
                 .get(hdl)
@@ -640,6 +661,20 @@ impl CommandExecutorBuilder {
                 .map(StdCommandCaptureMethod::Fd)
                 .unwrap_or_default()
         });
+
+        #[cfg(not(unix))]
+        if self.child_env_inner.stdout_observer.is_some()
+            || self.child_env_inner.stderr_observer.is_some()
+        {
+            return Err(Error::illegal_argument(
+                "StdOut and StdError observers not yet supported on Windows.".to_string(),
+            ));
+        }
+        #[cfg(not(unix))]
+        let (stdout_cap, stderr_cap) = (
+            None::<StdCommandCaptureMethod>,
+            None::<StdCommandCaptureMethod>,
+        );
 
         if self.child_env_inner.debug_child {
             command.stdout(Stdio::piped());
@@ -667,13 +702,12 @@ impl CommandExecutorBuilder {
         }
 
         if let Some(core) = self.child_env_inner.core {
-            #[cfg(feature = "fork")]
+            #[cfg(all(unix, feature = "fork"))]
             command.bind(core);
 
-            #[cfg(not(feature = "fork"))]
+            #[cfg(not(all(unix, feature = "fork")))]
             return Err(Error::illegal_argument(format!(
-                "Your host doesn't support fork and thus libafl can not bind to core {:?} right after children get spawned",
-                core
+                "You have not compiled LibAFL with fork support or are running on Windows. LibAFL cannot bind to core {core:?} right after children get spawned. Remove the `core` from StdChildArgs or enable `fork`",
             )));
         }
 
@@ -686,19 +720,17 @@ impl CommandExecutorBuilder {
             command,
         };
 
-        Ok(
-            <StdCommandConfigurator as CommandConfigurator<I>>::into_executor::<OT, S>(
-                configurator,
-                observers,
-                self.child_env_inner.stdout_observer.clone(),
-                self.child_env_inner.stderr_observer.clone(),
-            ),
-        )
+        Ok(configurator.into_executor::<I, OT, S>(
+            observers,
+            self.child_env_inner.stdout_observer.clone(),
+            self.child_env_inner.stderr_observer.clone(),
+        ))
     }
 }
 
-/// A `CommandConfigurator` takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
-/// # Example
+/// A [`CommandConfigurator`] takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
+///
+/// ## Example
 /// ```
 /// use std::{
 ///     io::Write,
@@ -707,18 +739,18 @@ impl CommandExecutorBuilder {
 /// };
 ///
 /// use libafl::{
-///     Error,
+///     Error, HasTargetBytesConverter,
 ///     corpus::Corpus,
 ///     executors::{Executor, command::CommandConfigurator},
-///     inputs::{BytesInput, HasTargetBytes, Input},
+///     inputs::{BytesInput, HasTargetBytes, Input, ToTargetBytes},
 ///     state::HasExecutions,
 /// };
-/// use libafl_bolts::AsSlice;
+/// use libafl_bolts::ownedref::OwnedSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
-/// impl CommandConfigurator<BytesInput> for MyExecutor {
-///     fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
+/// impl CommandConfigurator<Child> for MyExecutor {
+///     fn spawn_child(&mut self, target_bytes: OwnedSlice<'_, u8>) -> Result<Child, Error> {
 ///         let mut command = Command::new("../if");
 ///         command
 ///             .stdin(Stdio::piped())
@@ -727,7 +759,7 @@ impl CommandExecutorBuilder {
 ///
 ///         let child = command.spawn().expect("failed to start process");
 ///         let mut stdin = child.stdin.as_ref().unwrap();
-///         stdin.write_all(input.target_bytes().as_slice())?;
+///         stdin.write_all(&target_bytes)?;
 ///         Ok(child)
 ///     }
 ///
@@ -742,11 +774,12 @@ impl CommandExecutorBuilder {
 /// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
 ///     S: HasExecutions,
+///     Z: ToTargetBytes<BytesInput>,
 /// {
 ///     MyExecutor.into_executor((), None, None)
 /// }
 /// ```
-pub trait CommandConfigurator<I, C = Child>: Sized {
+pub trait CommandConfigurator<C>: Sized {
     /// Get the stdout
     fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
         None
@@ -757,7 +790,7 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     }
 
     /// Spawns a new process with the given configuration.
-    fn spawn_child(&mut self, input: &I) -> Result<C, Error>;
+    fn spawn_child(&mut self, target_bytes: OwnedSlice<'_, u8>) -> Result<C, Error>;
 
     /// Provides timeout duration for execution of the child process.
     fn exec_timeout(&self) -> Duration;
@@ -765,6 +798,7 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Maps the exit status of the child process to an `ExitKind`.
+    #[cfg(unix)]
     #[inline]
     fn exit_kind_from_status(&self, status: &std::process::ExitStatus) -> ExitKind {
         use crate::std::os::unix::process::ExitStatusExt;
@@ -776,15 +810,26 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
         }
     }
 
+    /// Maps the exit status of the child process to an `ExitKind`.
+    #[cfg(windows)]
+    #[inline]
+    fn exit_kind_from_status(&self, status: &std::process::ExitStatus) -> ExitKind {
+        if status.success() {
+            ExitKind::Ok
+        } else {
+            ExitKind::Crash
+        }
+    }
+
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(
+    fn into_executor<I, OT, S>(
         self,
         observers: OT,
         stdout_observer: Option<Handle<StdOutObserver>>,
         stderr_observer: Option<Handle<StdErrObserver>>,
-    ) -> CommandExecutor<I, OT, S, Self, (), C> {
+    ) -> CommandExecutor<C, (), I, OT, S, Self> {
         CommandExecutor {
-            configurer: self,
+            configurator: self,
             observers,
             hooks: (),
             stderr_observer,
@@ -794,15 +839,15 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     }
 
     /// Create an `Executor` with hooks from this `CommandConfigurator`.
-    fn into_executor_with_hooks<OT, S, HT>(
+    fn into_executor_with_hooks<HT, I, OT, S>(
         self,
         observers: OT,
         hooks: HT,
         stdout_observer: Option<Handle<StdOutObserver>>,
         stderr_observer: Option<Handle<StdErrObserver>>,
-    ) -> CommandExecutor<I, OT, S, Self, HT, C> {
+    ) -> CommandExecutor<C, HT, I, OT, S, Self> {
         CommandExecutor {
-            configurer: self,
+            configurator: self,
             observers,
             hooks,
             stderr_observer,
@@ -830,21 +875,25 @@ fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::{StdTargetArgs, tuples::Handled};
+    use libafl_bolts::StdTargetArgs;
+    #[cfg(unix)]
+    use libafl_bolts::tuples::Handled;
+    #[cfg(unix)]
     use tuple_list::tuple_list;
 
     use crate::{
         events::SimpleEventManager,
         executors::{
-            Executor, StdChildArgs,
+            Executor,
             command::{CommandExecutor, InputLocation},
         },
         fuzzer::NopFuzzer,
         inputs::{BytesInput, NopInput},
         monitors::SimpleMonitor,
-        observers::StdOutObserver,
         state::NopState,
     };
+    #[cfg(unix)]
+    use crate::{executors::StdChildArgs, observers::StdOutObserver};
 
     #[test]
     #[cfg_attr(miri, ignore)]
@@ -872,6 +921,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(miri, ignore)]
+    #[cfg(unix)]
     fn test_capture() {
         let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
             SimpleEventManager::new(SimpleMonitor::new(|status| {
