@@ -84,8 +84,10 @@ pub fn availability_in_qemu_kvm() -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     {
-        if let Err(reason) = availability_in_vmx() {
-            reasons.push(reason);
+        match availability_in_vmx() {
+            Err(reason) => reasons.push(reason),
+            Ok(false) => reasons.push("Intel PT is not available for VMX operations.".to_owned()),
+            Ok(true) => {}
         }
 
         let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";

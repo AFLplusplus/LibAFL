@@ -836,7 +836,7 @@ pub(crate) fn availability_in_linux() -> Result<(), String> {
 
 /// Check if the `MSR IA32_VMX_MISC` has bit 14 set, which indicates that Intel PT is
 /// available in VMX operations.
-pub(crate) fn availability_in_vmx() -> Result<(), String> {
+pub(crate) fn availability_in_vmx() -> Result<bool, String> {
     let error_prefix = "Failed to check for PT availability in VM operations: ";
     let mut msrs = fs::OpenOptions::new()
         .read(true)
@@ -852,11 +852,8 @@ pub(crate) fn availability_in_vmx() -> Result<(), String> {
     let mut buf = [0u8; 8];
     msrs.read_exact(&mut buf)
         .map_err(|e| format!("{error_prefix} Failed to read MSR 0x485: {e}"))?;
-    if buf[1] & 0b0100_0000 == 0 {
-        return Err("Intel PT is not available for VMX operations.".to_owned());
-    }
 
-    Ok(())
+    Ok(buf[1] & 0b0100_0000 != 0)
 }
 
 fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
