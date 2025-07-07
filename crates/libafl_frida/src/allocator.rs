@@ -1,6 +1,7 @@
 #[cfg(any(
     windows,
     target_os = "linux",
+    target_os = "freebsd",
     target_vendor = "apple",
     all(
         any(target_arch = "aarch64", target_arch = "x86_64"),
@@ -11,6 +12,7 @@ use alloc::collections::BTreeMap;
 #[cfg(any(
     windows,
     target_os = "linux",
+    target_os = "freebsd",
     target_vendor = "apple",
     all(
         any(target_arch = "aarch64", target_arch = "x86_64"),
@@ -35,6 +37,7 @@ use mach_sys::{
 #[cfg(any(
     windows,
     target_os = "linux",
+    target_os = "freebsd",
     target_vendor = "apple",
     all(
         any(target_arch = "aarch64", target_arch = "x86_64"),
@@ -115,6 +118,7 @@ impl Allocator {
     #[cfg(not(any(
         windows,
         target_os = "linux",
+        target_os = "freebsd",
         target_vendor = "apple",
         all(
             any(target_arch = "aarch64", target_arch = "x86_64"),
@@ -130,6 +134,7 @@ impl Allocator {
     #[cfg(any(
         windows,
         target_os = "linux",
+        target_os = "freebsd",
         target_vendor = "apple",
         all(
             any(target_arch = "aarch64", target_arch = "x86_64"),
@@ -836,6 +841,7 @@ impl Default for Allocator {
     #[cfg(not(any(
         windows,
         target_os = "linux",
+        target_os = "freebsd",
         target_vendor = "apple",
         all(
             any(target_arch = "aarch64", target_arch = "x86_64"),

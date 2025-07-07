@@ -143,7 +143,7 @@ impl Lock {
     }
 }
 
-#[cfg(any(target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple"))]
 use errno::{Errno, errno, set_errno};
 #[cfg(target_os = "windows")]
 use winapi::shared::minwindef::DWORD;
@@ -154,7 +154,7 @@ use winapi::um::errhandlingapi::{GetLastError, SetLastError};
 struct LastErrorGuard {
     #[cfg(target_os = "windows")]
     last_error: DWORD,
-    #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+    #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple"))]
     last_error: Errno,
 }
 
@@ -163,7 +163,7 @@ impl LastErrorGuard {
     fn new() -> Self {
         #[cfg(target_os = "windows")]
         let last_error = unsafe { GetLastError() };
-        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+        #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple"))]
         let last_error = errno();
 
         LastErrorGuard { last_error }
@@ -177,7 +177,7 @@ impl Drop for LastErrorGuard {
         unsafe {
             SetLastError(self.last_error);
         }
-        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+        #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple"))]
         set_errno(self.last_error);
     }
 }
@@ -1126,7 +1126,7 @@ impl AsanRuntime {
         let cpp_libs = ["libc++.1.dylib", "libc++abi.dylib", "libsystem_c.dylib"];
         */
 
-        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+        #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple"))]
         macro_rules! hook_cpp {
            ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking c++ functions in {}", $libname);
@@ -1268,7 +1268,8 @@ impl AsanRuntime {
             }}
            }
         }
-        #[cfg(target_os = "linux")]
+        // FIXME: change or check libraries for FreeBSD
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         {
             hook_cpp!("libc++.so", libcpp);
             hook_cpp!("libc++.so.1", libcpp1);
