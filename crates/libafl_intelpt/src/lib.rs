@@ -84,6 +84,10 @@ pub fn availability_in_qemu_kvm() -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     {
+        if let Err(reason) = availability_in_vmx() {
+            reasons.push(reason);
+        }
+
         let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
         // Ignore the case when the file does not exist since it has been removed.
         // KVM default is `System` mode
@@ -123,7 +127,7 @@ mod test {
 
     /// Quick way to check if your machine is compatible with Intel PT's features used by libafl
     ///
-    /// Simply run `cargo test intel_pt_check_availability -- --show-output`
+    /// Simply run `sudo -E cargo test intel_pt_check_availability -- --show-output`
     #[test]
     fn intel_pt_check_availability() {
         print!("Intel PT availability:\t\t\t");
