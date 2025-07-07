@@ -935,7 +935,7 @@ fn linux_version() -> Result<(usize, usize, usize), ()> {
     let release = unsafe { CStr::from_ptr(uname_data.release.as_ptr()) };
     let mut parts = release
         .to_bytes()
-        .split(|&c| c == b'.' || c == b'-')
+        .split(|&c| matches!(c, b'.' | b'-' | b'+'))
         .take(3)
         .map(|s| String::from_utf8_lossy(s).parse::<usize>());
     if let (Some(Ok(major)), Some(Ok(minor)), Some(Ok(patch))) =
