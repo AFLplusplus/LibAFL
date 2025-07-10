@@ -57,7 +57,7 @@ impl Function for FunctionErrnoLocation {
 }
 
 #[derive(Debug)]
-struct FunctionMadvise;
+pub struct FunctionMadvise;
 
 impl Function for FunctionMadvise {
     type Func = unsafe extern "C" fn(*mut c_void, size_t, c_int) -> c_int;
@@ -131,7 +131,7 @@ impl<S: Symbols> LibcMmap<S> {
         Ok(f)
     }
 
-    fn get_madvise() -> Result<<FunctionMadvise as Function>::Func, LibcMapError<S>> {
+    pub fn get_madvise() -> Result<<FunctionMadvise as Function>::Func, LibcMapError<S>> {
         let addr = MADVISE_ADDR.try_get_or_insert_with(|| {
             S::lookup(FunctionMadvise::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
         })?;

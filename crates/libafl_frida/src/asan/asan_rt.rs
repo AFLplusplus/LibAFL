@@ -2854,7 +2854,7 @@ impl AsanRuntime {
                 0
             };
 
-        #[expect(clippy::comparison_chain)]
+        #[allow(clippy::comparison_chain)]
         if displacement < 0 {
             if displacement > -4096 {
                 let displacement = displacement.unsigned_abs();

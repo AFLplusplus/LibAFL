@@ -107,7 +107,7 @@ impl MapEntry {
         &self.path
     }
 
-    pub fn writeable<M: Mmap>(&self) -> Result<WriteableMapProtection<M>, M::Error> {
+    pub fn writeable<M: Mmap>(&self) -> Result<WriteableMapProtection<'_, M>, M::Error> {
         if !self.write {
             M::protect(self.base(), self.len(), self.prot() | MmapProt::WRITE)?;
         }

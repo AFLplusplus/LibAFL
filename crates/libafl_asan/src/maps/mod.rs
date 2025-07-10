@@ -27,7 +27,7 @@ impl Maps {
     pub fn writeable<M: Mmap>(
         &self,
         addr: GuestAddr,
-    ) -> Result<WriteableMapProtection<M>, MapsError<M>> {
+    ) -> Result<WriteableMapProtection<'_, M>, MapsError<M>> {
         let mapping = self
             .maps
             .iter()
