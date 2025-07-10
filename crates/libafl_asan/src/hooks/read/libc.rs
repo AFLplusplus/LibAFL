@@ -11,6 +11,7 @@ use crate::{
 };
 
 #[cfg(target_os = "macos")]
+#[expect(non_upper_case_globals)]
 const SYS_read: libc::c_long = 0x2000003;
 
 #[derive(Debug)]
