@@ -1,15 +1,58 @@
 //! Based on <https://github.com/alecmocatta/build_id>
 //! (C) Alec Mocatta <alec@mocatta.net> under license MIT or Apache 2
+//!
+//! Maintained by the LibAFL team.
+#![doc = include_str!("../../../README.md")]
+/*! */
+#![cfg_attr(not(test), warn(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    //unused_results
+))]
+#![cfg_attr(test, deny(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    //unused_results
+))]
+#![cfg_attr(
+    test,
+    deny(
+        bad_style,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
 
 use core::{
     any::TypeId,
     hash::{Hash, Hasher},
 };
-use std::{env, fs::File, io, sync::OnceLock};
+use std::{env, fs::File, hash::BuildHasher, io, sync::OnceLock};
 
+use ahash::RandomState;
 use uuid::Uuid;
-
-use crate::hasher_std;
 
 static BUILD_ID: OnceLock<Uuid> = OnceLock::new();
 
@@ -29,8 +72,8 @@ static BUILD_ID: OnceLock<Uuid> = OnceLock::new();
 /// # Examples
 ///
 /// ```
-/// # let remote_build_id = libafl_bolts::build_id::get();
-/// let local_build_id = libafl_bolts::build_id::get();
+/// # let remote_build_id = build_id2::get();
+/// let local_build_id = build_id2::get();
 /// if local_build_id == remote_build_id {
 ///     println!("We're running the same binary as remote!");
 /// } else {
@@ -79,7 +122,7 @@ fn from_type_id<H: Hasher>(mut hasher: H) -> H {
 }
 
 fn calculate() -> Uuid {
-    let hasher = hasher_std();
+    let hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
 
     let hasher = from_exe(hasher.clone()).unwrap_or(hasher);
     let mut hasher = from_type_id(hasher);

@@ -1,5 +1,62 @@
 //! A generic shared memory region to be used by any functions (queues or feedbacks
 //! too.)
+#![doc = include_str!("../../../README.md")]
+/*! */
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
+#![no_std]
+#![cfg_attr(not(test), warn(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    //unused_results
+))]
+#![cfg_attr(test, deny(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    //unused_results
+))]
+#![cfg_attr(
+    test,
+    deny(
+        bad_style,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
+
+#[cfg(feature = "std")]
+#[macro_use]
+extern crate std;
+#[doc(hidden)]
+pub extern crate alloc;
+
+pub use libafl_core::Error;
+
+#[cfg(all(unix, feature = "std"))]
+pub mod pipes;
+#[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
+pub mod unix_shmem_server;
 
 #[cfg(feature = "alloc")]
 use alloc::{rc::Rc, string::ToString, vec::Vec};
@@ -29,11 +86,10 @@ pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 
-use crate::Error;
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
-use crate::os::pipes::Pipe;
+use crate::pipes::Pipe;
 #[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
-pub use crate::os::unix_shmem_server::{ServedShMem, ServedShMemProvider, ShMemService};
+pub use crate::unix_shmem_server::{ServedShMem, ServedShMemProvider, ShMemService};
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -683,16 +739,14 @@ pub mod unix_shmem {
         };
         use std::{io, path::Path, process};
 
+        use fast_rands::{Rand, StdRand};
+        use libafl_core::Error;
         use libc::{
             c_int, c_uchar, close, fcntl, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat,
             shmctl, shmdt, shmget,
         };
 
-        use crate::{
-            Error,
-            rands::{Rand, StdRand},
-            shmem::{ShMem, ShMemId, ShMemProvider},
-        };
+        use crate::{ShMem, ShMemId, ShMemProvider};
 
         /// The max number of bytes used when generating names for [`MmapShMem`]s.
         pub const MAX_MMAP_FILENAME_LEN: usize = 20;
@@ -1003,7 +1057,7 @@ pub mod unix_shmem {
             }
 
             fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
-                let mut rand = StdRand::with_seed(crate::rands::random_seed());
+                let mut rand = StdRand::with_seed(fast_rands::random_seed());
                 let id = rand.next() as u32;
                 let mut full_file_name = format!("libafl_{}_{}", process::id(), id);
                 // leave one byte space for the null byte.
@@ -1798,7 +1852,7 @@ impl<SHM> ShMemCursor<SHM> {
     where
         SHM: DerefMut<Target = [u8]>,
     {
-        use crate::AsSliceMut;
+        use libafl_core::AsSliceMut;
         &mut (self.inner.as_slice_mut()[self.pos..])
     }
 }
@@ -1852,7 +1906,7 @@ where
         let effective_new_pos = match pos {
             std::io::SeekFrom::Start(s) => s,
             std::io::SeekFrom::End(offset) => {
-                use crate::AsSlice;
+                use libafl_core::AsSlice;
                 let map_len = self.inner.as_slice().len();
                 let signed_pos = i64::try_from(map_len).unwrap();
                 let effective = signed_pos.checked_add(offset).unwrap();
@@ -1877,12 +1931,10 @@ where
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 #[cfg(test)]
 mod tests {
+    use libafl_core::{AsSlice, AsSliceMut, Error};
     use serial_test::serial;
 
-    use crate::{
-        AsSlice, AsSliceMut, Error,
-        shmem::{ShMemProvider, StdShMemProvider},
-    };
+    use crate::{ShMemProvider, StdShMemProvider};
 
     #[test]
     #[serial]
@@ -1906,7 +1958,7 @@ mod tests {
             process::{Command, Stdio},
         };
 
-        use crate::shmem::{MmapShMemProvider, ShMem as _, ShMemId};
+        use crate::{MmapShMemProvider, ShMem as _, ShMemId};
 
         // relies on the fact that the ID in a ShMemDescription is always a string for MmapShMem
         match env::var("SHMEM_SIZE") {

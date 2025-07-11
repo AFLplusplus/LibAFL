@@ -29,8 +29,6 @@ all-features = true
 default = [
   "std",
   "derive",
-  "llmp_compression",
-  "llmp_small_maps",
   "rand_trait",
   "gzip",
   "serdeany_autoreg",
@@ -47,6 +45,8 @@ std = [
   "hostname",
   "nix",
   "serde/std",
+  "libafl_core/std",
+  "libafl_core/nix",
   "uuid",
   "backtrace",
   "uds",
@@ -56,7 +56,14 @@ std = [
 ]
 
 ## Enables all features that allocate in `no_std`
-alloc = ["serde/alloc", "hashbrown", "postcard", "erased-serde/alloc", "ahash"]
+alloc = [
+  "serde/alloc",
+  "hashbrown",
+  "postcard",
+  "erased-serde/alloc",
+  "ahash",
+  "libafl_core/alloc",
+]
 
 ## Provide the `#[derive(SerdeAny)]` macro.
 derive = ["libafl_derive"]
@@ -66,7 +73,7 @@ derive = ["libafl_derive"]
 rand_trait = ["rand_core"]
 
 ## Will build the `pyo3` bindings
-python = ["pyo3", "std"]
+python = ["pyo3", "std", "libafl_core/python"]
 
 ## Expose `libafl::prelude` for direct access to all types without additional `use` directives
 prelude = []
@@ -103,21 +110,6 @@ stable_anymap = []
 ## Automatically register all `#[derive(SerdeAny)]` types at startup.
 serdeany_autoreg = ["ctor"]
 
-
-#! ### LLMP features
-
-## If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
-llmp_bind_public = ["alloc"]
-
-## Enables llmp compression using GZip
-llmp_compression = ["alloc", "gzip"]
-
-## Enables debug output for LLMP (also needs a `logger` installed)
-llmp_debug = ["alloc", "std"]
-
-## Reduces the initial map size for llmp
-llmp_small_maps = ["alloc"]
-
 #! ### Stable SIMD features
 
 ## Use the best SIMD implementation by our benchmark.
@@ -133,9 +125,12 @@ chrono = "0.4.40"
 itertools = "0.14.0"
 
 [dependencies]
+libafl_core = { workspace = true, features=["postcard"] }
 libafl_derive = { workspace = true, default-features = true, optional = true }
 static_assertions = { workspace = true }
 typeid = { workspace = true }
+shmem_providers = { workspace = true }
+fast_rands = { workspace = true }
 
 tuple_list = { version = "0.1.3" }
 hashbrown = { workspace = true, features = [
@@ -184,9 +179,6 @@ rustversion = { workspace = true }
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
 
-[lints]
-workspace = true
-
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }                                            # For (*nix) libc
 uds = { version = "0.4.2", optional = true, default-features = false }
@@ -224,11 +216,6 @@ mach2 = "0.4.2"
 #opt-level = 3
 #debug = true
 
-[[example]]
-name = "llmp_test"
-path = "./examples/llmp_test/main.rs"
-required-features = ["std"]
-
 
 [[example]]
 name = "simd"
@@ -236,3 +223,7 @@ path = "./examples/simd/simd.rs"
 bench = true
 harness = false
 required-features = ["std", "simd"]
+
+[lints]
+workspace = true
+

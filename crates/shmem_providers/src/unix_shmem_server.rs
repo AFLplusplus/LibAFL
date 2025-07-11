@@ -47,10 +47,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
 
-use crate::{
-    Error,
-    shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-};
+use crate::{Error, ShMem, ShMemDescription, ShMemId, ShMemProvider};
 
 /// The default server name for our abstract shmem server
 #[cfg(all(unix, not(target_vendor = "apple")))]

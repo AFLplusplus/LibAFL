@@ -1,4 +1,54 @@
-//! The random number generators of `LibAFL`
+//! The fast random number generators of `LibAFL`
+#![doc = include_str!("../../../README.md")]
+/*! */
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
+#![no_std]
+#![cfg_attr(not(test), warn(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    //unused_results
+))]
+#![cfg_attr(test, deny(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    //unused_results
+))]
+#![cfg_attr(
+    test,
+    deny(
+        bad_style,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
+
+#[cfg(feature = "std")]
+#[macro_use]
+extern crate std;
+#[doc(hidden)]
+pub extern crate alloc;
 
 #[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -559,6 +609,41 @@ impl XkcdRand {
 #[cfg(feature = "python")]
 /// `Rand` Python bindings
 pub mod pybind {
+
+    /// Unwrap the mutable body of this wrapper
+    #[macro_export]
+    macro_rules! unwrap_me_mut_body {
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}) => {
+            match &mut $wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let mut borrowed = py_wrapper.borrow_mut(py);
+                            let $name = &mut borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+            }
+        };
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}, { $($wrapper_optional:tt($pw:ident) => $code_block:block)* }) => {
+            match &mut $wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let mut borrowed = py_wrapper.borrow_mut(py);
+                            let $name = &mut borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+                $($wrapper_type::$wrapper_optional($pw) => { $code_block })*
+            }
+        };
+    }
+
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
@@ -567,9 +652,9 @@ pub mod pybind {
     #[pyclass(unsendable, name = "StdRand")]
     #[expect(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
-    /// Python class for StdRand
+    /// Python class for [`StdRand`]
     pub struct PythonStdRand {
-        /// Rust wrapped StdRand object
+        /// Rust wrapped [`StdRand`] object
         pub inner: StdRand,
     }
 
@@ -644,18 +729,17 @@ pub mod pybind {
 
 #[cfg(test)]
 mod tests {
+    use core::num::NonZero;
+
     use crate::{
-        nonzero,
-        rands::{
-            Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
-            Xoshiro256PlusPlusRand,
-        },
+        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
+        Xoshiro256PlusPlusRand,
     };
 
     fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());
-        assert!(rand.below(nonzero!(100)) < 100);
-        assert_eq!(rand.below(nonzero!(1)), 0);
+        assert!(rand.below(NonZero::new(100).unwrap()) < 100);
+        assert_eq!(rand.below(NonZero::new(1).unwrap()), 0);
         assert_eq!(rand.between(10, 10), 10);
         assert!(rand.between(11, 20) > 10);
     }

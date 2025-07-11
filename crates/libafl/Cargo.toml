@@ -177,17 +177,17 @@ serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 llmp_broker_timeouts = ["std"]
 
 ## If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
-llmp_bind_public = ["libafl_bolts/llmp_bind_public"]
+llmp_bind_public = ["ll_mp/llmp_bind_public"]
 
 ## Enables llmp compression using GZip
-llmp_compression = ["libafl_bolts/llmp_compression"]
+llmp_compression = ["ll_mp/llmp_compression"]
 
 ## Enables debug output for LLMP (also needs a `logger` installed)
-llmp_debug = ["std", "libafl_bolts/llmp_debug"]
+llmp_debug = ["std", "ll_mp/llmp_debug"]
 
 ## Reduces the initial map size for llmp
 llmp_small_maps = [
-  "libafl_bolts/llmp_small_maps",
+  "ll_mp/llmp_small_maps",
 ] # reduces initial map size for llmp
 
 ## Grammar mutator.
@@ -222,6 +222,7 @@ static_assertions = { workspace = true }
 libafl_bolts = { workspace = true, features = ["alloc"] }
 libafl_derive = { workspace = true, default-features = true, optional = true }
 libafl_intelpt = { workspace = true, default-features = true, optional = true }
+ll_mp = { workspace = true }
 
 rustversion = { workspace = true }
 tuple_list = { version = "0.1.3" }

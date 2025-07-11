@@ -6,11 +6,11 @@
 //!
 //! ```rust
 //! # use std::thread;
-//! use libafl_bolts::core_affinity;
+//! use core_affinity2;
 //!
 //! // Retrieve the IDs of all active CPU cores.
 //! # #[cfg(not(miri))]
-//! let core_ids = core_affinity::get_core_ids().unwrap();
+//! let core_ids = core_affinity2::get_core_ids().unwrap();
 //!
 //! // Create a thread for each active CPU core.
 //! # #[cfg(not(miri))]
@@ -32,15 +32,64 @@
 //! ```
 //!
 //! *This file is a fork of <https://github.com/Elzair/core_affinity_rs>*
+#![doc = include_str!("../../../README.md")]
+/*! */
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
+#![no_std]
+#![cfg_attr(not(test), warn(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    //unused_results
+))]
+#![cfg_attr(test, deny(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    //unused_results
+))]
+#![cfg_attr(
+    test,
+    deny(
+        bad_style,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
+
+#[cfg(feature = "std")]
+#[macro_use]
+extern crate std;
+#[doc(hidden)]
+pub extern crate alloc;
 
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 
+use libafl_core::Error;
 use serde::{Deserialize, Serialize};
-
-use crate::Error;
 
 /// This function tries to retrieve information
 /// on all the "cores" active on this system.
@@ -249,8 +298,9 @@ mod linux {
     #[cfg(target_os = "dragonfly")]
     const CPU_SETSIZE: libc::c_int = 256;
 
+    use libafl_core::Error;
+
     use super::CoreId;
-    use crate::Error;
 
     #[allow(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
@@ -380,7 +430,7 @@ mod haiku {
     use alloc::vec::Vec;
     use std::thread::available_parallelism;
 
-    use crate::core_affinity::{CoreId, Error};
+    use crate::{CoreId, Error};
 
     #[expect(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
@@ -413,7 +463,7 @@ mod windows {
         Threading::{GetCurrentThread, SetThreadGroupAffinity},
     };
 
-    use crate::core_affinity::{CoreId, Error};
+    use crate::{CoreId, Error};
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         let mut core_ids: Vec<CoreId> = Vec::new();
@@ -594,6 +644,7 @@ mod apple {
     use alloc::vec::Vec;
     use std::thread::available_parallelism;
 
+    use libafl_core::Error;
     #[cfg(target_arch = "x86_64")]
     use libc::{
         KERN_SUCCESS, THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT, integer_t,
@@ -604,7 +655,6 @@ mod apple {
     use libc::{pthread_set_qos_class_self_np, qos_class_t::QOS_CLASS_USER_INITIATED};
 
     use super::CoreId;
-    use crate::Error;
 
     #[cfg(target_arch = "x86_64")]
     #[repr(C)]
@@ -691,13 +741,13 @@ mod netbsd {
     use alloc::vec::Vec;
     use std::thread::available_parallelism;
 
+    use libafl_core::Error;
     use libc::{
         _cpuset, _cpuset_create, _cpuset_destroy, _cpuset_set, _cpuset_size, pthread_self,
         pthread_setaffinity_np,
     };
 
     use super::CoreId;
-    use crate::Error;
 
     #[expect(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
@@ -753,8 +803,9 @@ mod openbsd {
     use alloc::vec::Vec;
     use std::thread::available_parallelism;
 
+    use libafl_core::Error;
+
     use super::CoreId;
-    use crate::Error;
 
     #[expect(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
@@ -781,8 +832,9 @@ mod solaris {
     use alloc::vec::Vec;
     use std::thread::available_parallelism;
 
+    use libafl_core::Error;
+
     use super::CoreId;
-    use crate::Error;
 
     #[expect(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {

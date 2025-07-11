@@ -56,6 +56,56 @@ For broker2broker communication, all messages are forwarded via network sockets.
 Check out the `llmp_test` example in ./examples, or build it with `cargo run --example llmp_test`.
 
 */
+#![doc = include_str!("../../../README.md")]
+/*! */
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
+#![no_std]
+#![cfg_attr(not(test), warn(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    //unused_results
+))]
+#![cfg_attr(test, deny(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    //unused_results
+))]
+#![cfg_attr(
+    test,
+    deny(
+        bad_style,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
+
+#[cfg(feature = "std")]
+#[macro_use]
+extern crate std;
+#[doc(hidden)]
+pub extern crate alloc;
 
 #[cfg(feature = "std")]
 use alloc::boxed::Box;
@@ -90,10 +140,14 @@ use std::{
 
 #[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
+use libafl_bolts::{ClientId, Error};
+#[cfg(feature = "std")]
+use libafl_bolts::{IP_LOCALHOST, current_time};
 #[cfg(all(unix, feature = "std"))]
 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use nix::sys::socket::{self, sockopt::ReusePort};
 use serde::{Deserialize, Serialize};
+use shmem_providers::{ShMem, ShMemDescription, ShMemId, ShMemProvider};
 #[cfg(feature = "std")]
 use tuple_list::tuple_list;
 
@@ -103,12 +157,6 @@ use crate::os::unix_signals::setup_signal_handler;
 use crate::os::unix_signals::{Signal, SignalHandler, siginfo_t, ucontext_t};
 #[cfg(all(windows, feature = "std"))]
 use crate::os::windows_exceptions::{CtrlHandler, setup_ctrl_handler};
-use crate::{
-    ClientId, Error,
-    shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-};
-#[cfg(feature = "std")]
-use crate::{IP_LOCALHOST, current_time};
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.

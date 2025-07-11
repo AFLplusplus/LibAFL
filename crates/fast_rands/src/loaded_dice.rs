@@ -7,8 +7,8 @@ A simple module that implements a random sampler implementing the [alias method]
 Assume we want to sample from the following distribution: `p(0)=0.5, p(1)=0.3, p(2)=0.1, p(3)=0.1`:
 
 ```rust
-# extern crate libafl_bolts;
-use libafl_bolts::rands::{StdRand, loaded_dice::LoadedDiceSampler};
+# extern crate libafl_rand;
+use libafl_rand::{StdRand, loaded_dice::LoadedDiceSampler};
 fn main() {
     let mut rand = StdRand::new();
     let mut sampler = LoadedDiceSampler::new(&[0.5, 0.3, 0.1, 0.1]).unwrap();
@@ -23,9 +23,21 @@ Original code by @eqv, see <https://github.com/eqv/loaded_dice>
 */
 
 use alloc::vec::Vec;
+use core::fmt::{self, Debug, Formatter};
 
 use super::Rand;
-use crate::Error;
+
+/// An illegal argument got passed to a function.
+pub struct IllegalArgumentError;
+
+impl Debug for IllegalArgumentError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "LoadedDiceError(Tried to construct LoadedDiceSampler with empty probs array)"
+        )
+    }
+}
 
 /// Helper struct for [`LoadedDiceSampler`]
 #[derive(Debug, Clone, PartialEq)]
@@ -54,11 +66,9 @@ pub struct LoadedDiceSampler {
 
 impl LoadedDiceSampler {
     /// Create a new [`LoadedDiceSampler`] with the given probabilities
-    pub fn new(probs: &[f64]) -> Result<Self, Error> {
+    pub fn new(probs: &[f64]) -> Result<Self, IllegalArgumentError> {
         if probs.is_empty() {
-            return Err(Error::illegal_argument(
-                "Tried to construct LoadedDiceSampler with empty probs array",
-            ));
+            return Err(IllegalArgumentError);
         }
         let entries = LoadedDiceSampler::construct_table(probs);
         Ok(Self { entries })
@@ -113,7 +123,7 @@ mod tests {
     use alloc::vec::Vec;
 
     use super::LoadedDiceSampler;
-    use crate::rands::{Rand, StdRand};
+    use crate::{Rand, StdRand};
 
     #[test]
     #[expect(clippy::cast_precision_loss)]

@@ -15,9 +15,6 @@ use core::{
 use serde::{Deserialize, Serialize};
 pub use tuple_list::{TupleList, tuple_list, tuple_list_type};
 
-use crate::HasLen;
-#[cfg(feature = "alloc")]
-use crate::Named;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use crate::hash_std;
 
@@ -25,6 +22,74 @@ use crate::hash_std;
 #[must_use]
 pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     typeid::of::<T>() == typeid::of::<U>()
+}
+
+/// We need fixed names for many parts of this lib.
+#[cfg(feature = "alloc")]
+pub trait Named {
+    /// Provide the name of this element.
+    fn name(&self) -> &Cow<'static, str>;
+}
+
+#[cfg(feature = "alloc")]
+impl Named for () {
+    #[inline]
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("()");
+        &NAME
+    }
+}
+
+/// Has a length field
+pub trait HasLen {
+    /// The length
+    fn len(&self) -> usize;
+
+    /// Returns `true` if it has no elements.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T> HasLen for Vec<T> {
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::<T>::len(self)
+    }
+}
+
+impl<T: HasLen> HasLen for &mut T {
+    fn len(&self) -> usize {
+        self.deref().len()
+    }
+}
+
+impl<Head, Tail> HasLen for (Head, Tail)
+where
+    Tail: HasLen,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.1.len() + 1
+    }
+}
+
+impl<Tail> HasLen for (Tail,)
+where
+    Tail: HasLen,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl HasLen for () {
+    #[inline]
+    fn len(&self) -> usize {
+        0
+    }
 }
 
 /// Borrow each member of the tuple
@@ -108,33 +173,6 @@ where
     Tail: HasConstLen,
 {
     const LEN: usize = 1 + Tail::LEN;
-}
-
-impl<Head, Tail> HasLen for (Head, Tail)
-where
-    Tail: HasLen,
-{
-    #[inline]
-    fn len(&self) -> usize {
-        self.1.len() + 1
-    }
-}
-
-impl<Tail> HasLen for (Tail,)
-where
-    Tail: HasLen,
-{
-    #[inline]
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-}
-
-impl HasLen for () {
-    #[inline]
-    fn len(&self) -> usize {
-        0
-    }
 }
 
 /// Finds the `const_name` and `name_id`
@@ -400,15 +438,6 @@ impl NamedTuple for () {
 
     fn names(&self) -> Vec<Cow<'static, str>> {
         Vec::new()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl Named for () {
-    #[inline]
-    fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("Empty");
-        &NAME
     }
 }
 

@@ -1,0 +1,53 @@
+[package]
+name = "core_affinity2"
+version.workspace = true
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
+description = "Core Affinity crate to bind to cores, cross platform"
+documentation = "https://docs.rs/libafl"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "./README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["os", "core-affinity", "no-std"]
+edition = "2024"
+rust-version = "1.87"
+categories = [
+  "embedded",
+  "os",
+  "no-std",
+]
+
+[package.metadata.docs.rs]
+features = ["document-features"]
+all-features = true
+
+[features]
+default = [
+  "std",
+]
+document-features = ["dep:document-features"]
+
+#! # Feature Flags
+#! ### General Features
+
+## Enables features that need rust's `std` lib to work, like print, env, ... support
+std = [
+  "libafl_core/std"
+]
+
+[build-dependencies]
+rustversion = { workspace = true }
+
+[dev-dependencies]
+
+[dependencies]
+# Document all features of this crate (for `cargo doc`)
+document-features = { workspace = true, optional = true }
+serde = { workspace = true, features = ["alloc", "derive"] }
+libafl_core = { workspace = true, features = ["alloc"] }
+libc = { workspace = true }
+
+[lints]
+workspace = true
