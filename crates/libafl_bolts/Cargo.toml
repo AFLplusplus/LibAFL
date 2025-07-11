@@ -125,7 +125,7 @@ chrono = "0.4.40"
 itertools = "0.14.0"
 
 [dependencies]
-libafl_core = { workspace = true, features=["postcard"] }
+libafl_core = { workspace = true, features = ["postcard"] }
 libafl_derive = { workspace = true, default-features = true, optional = true }
 static_assertions = { workspace = true }
 typeid = { workspace = true }
@@ -226,4 +226,3 @@ required-features = ["std", "simd"]
 
 [lints]
 workspace = true
-

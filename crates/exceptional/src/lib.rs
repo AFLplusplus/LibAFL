@@ -50,7 +50,6 @@
 #[macro_use]
 extern crate std;
 #[cfg(feature = "alloc")]
-#[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
 
@@ -62,4 +61,3 @@ pub mod windows_exceptions;
 
 #[cfg(unix)]
 pub use unix_signals::CTRL_C_EXIT;
-

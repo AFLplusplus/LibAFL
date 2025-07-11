@@ -7,8 +7,8 @@ A simple module that implements a random sampler implementing the [alias method]
 Assume we want to sample from the following distribution: `p(0)=0.5, p(1)=0.3, p(2)=0.1, p(3)=0.1`:
 
 ```rust
-# extern crate libafl_rand;
-use libafl_rand::{StdRand, loaded_dice::LoadedDiceSampler};
+# extern crate fast_rands;
+use fast_rands::{StdRand, loaded_dice::LoadedDiceSampler};
 fn main() {
     let mut rand = StdRand::new();
     let mut sampler = LoadedDiceSampler::new(&[0.5, 0.3, 0.1, 0.1]).unwrap();

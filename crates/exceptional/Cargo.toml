@@ -13,32 +13,24 @@ license = "MIT OR Apache-2.0"
 keywords = ["os", "shmem", "no-std"]
 edition = "2024"
 rust-version = "1.87"
-categories = [
-  "embedded",
-  "os",
-  "no-std",
-]
+categories = ["embedded", "os", "no-std"]
 
 [package.metadata.docs.rs]
 features = ["document-features"]
 all-features = true
 
 [features]
-default = [
-  "std",
-  "alloc",
-]
+default = ["std", "alloc"]
 document-features = ["dep:document-features"]
 
 #! # Feature Flags
 #! ### General Features
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = [
-]
+std = ["nix", "libafl_core/std"]
 
 ## Enables all features that allocate in `no_std`
-alloc = []
+alloc = ["libafl_core/alloc"]
 
 [build-dependencies]
 rustversion = { workspace = true }
@@ -48,6 +40,16 @@ rustversion = { workspace = true }
 [dependencies]
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
+libafl_core = { workspace = true }
+nix = { workspace = true, optional = true, default-features = false, features = [
+  "fs",
+  "signal",
+  "socket",
+  "poll",
+] }
+num_enum = { workspace = true, default-features = false }
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
 
 [lints]
 workspace = true

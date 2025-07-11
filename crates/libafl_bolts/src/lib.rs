@@ -70,7 +70,6 @@ pub mod cli;
 pub mod compress;
 #[cfg(feature = "std")]
 pub mod core_affinity;
-pub mod cpu;
 #[cfg(feature = "std")]
 pub mod fs;
 #[cfg(feature = "alloc")]
@@ -156,28 +155,16 @@ use std::{
 // TODO: re-enable once <https://github.com/tkaitchuck/aHash/issues/155> is resolved.
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use ahash::RandomState;
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "xxh3")]
 use xxhash_rust::xxh3::xxh3_64;
 
-/// The client ID == the sender id.
-#[repr(transparent)]
-#[derive(
-    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
-)]
-pub struct ClientId(pub u32);
-
 #[cfg(feature = "alloc")]
 use alloc::string::String;
-use core::time;
 
 #[cfg(feature = "libafl_derive")]
 pub use libafl_derive::SerdeAny;
 #[cfg(feature = "std")]
 use log::{Metadata, Record};
-
-/// Localhost addr, this is used, for example, for LLMP Client, which connects to this address
-pub const IP_LOCALHOST: &str = "127.0.0.1";
 
 /// Returns the standard input [`Hasher`]
 ///

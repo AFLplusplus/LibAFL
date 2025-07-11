@@ -18,6 +18,8 @@ use std::{
     sync::OnceLock,
 };
 
+use libafl_core::format;
+
 // Allow a few extra features we need for the whole module
 #[cfg(unix)]
 use libc::pid_t;

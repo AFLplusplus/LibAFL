@@ -140,23 +140,24 @@ use std::{
 
 #[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
-use libafl_bolts::{ClientId, Error};
+#[cfg(all(unix, not(miri)))]
+use exceptional::unix_signals::setup_signal_handler;
+#[cfg(unix)]
+use exceptional::unix_signals::{Signal, SignalHandler, siginfo_t, ucontext_t};
+#[cfg(all(windows, feature = "std"))]
+use exceptional::windows_exceptions::{CtrlHandler, setup_ctrl_handler};
 #[cfg(feature = "std")]
-use libafl_bolts::{IP_LOCALHOST, current_time};
+use libafl_core::IP_LOCALHOST;
+use libafl_core::{ClientId, Error};
 #[cfg(all(unix, feature = "std"))]
 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use nix::sys::socket::{self, sockopt::ReusePort};
+#[cfg(feature = "std")]
+use no_std_time::current_time;
 use serde::{Deserialize, Serialize};
 use shmem_providers::{ShMem, ShMemDescription, ShMemId, ShMemProvider};
 #[cfg(feature = "std")]
 use tuple_list::tuple_list;
-
-#[cfg(all(unix, not(miri)))]
-use crate::os::unix_signals::setup_signal_handler;
-#[cfg(unix)]
-use crate::os::unix_signals::{Signal, SignalHandler, siginfo_t, ucontext_t};
-#[cfg(all(windows, feature = "std"))]
-use crate::os::windows_exceptions::{CtrlHandler, setup_ctrl_handler};
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
@@ -2485,7 +2486,7 @@ impl Brokers {
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     #[cfg(feature = "std")]
     pub fn loop_with_timeouts(&mut self, timeout: Duration, sleep_time: Option<Duration>) {
-        use super::current_milliseconds;
+        use no_std_time::current_milliseconds;
 
         #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
         Self::setup_handlers();
@@ -2661,7 +2662,7 @@ where
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     #[cfg(feature = "std")]
     pub fn loop_with_timeouts(&mut self, timeout: Duration, sleep_time: Option<Duration>) {
-        use super::current_milliseconds;
+        use no_std_time::current_milliseconds;
 
         #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
         Self::setup_handlers();
@@ -3922,13 +3923,13 @@ mod tests {
     use std::thread::sleep;
 
     use serial_test::serial;
+    use shmem_providers::{ShMemProvider, StdShMemProvider};
 
     use super::{
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
         Tag,
     };
-    use crate::shmem::{ShMemProvider, StdShMemProvider};
 
     #[test]
     #[serial]

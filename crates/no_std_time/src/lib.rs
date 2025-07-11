@@ -52,6 +52,8 @@ extern crate std;
 #[doc(hidden)]
 pub extern crate alloc;
 
+use core::time;
+
 pub mod time_counters;
 
 /// Format a `Duration` into a HMS string

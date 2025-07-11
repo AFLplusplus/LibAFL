@@ -186,9 +186,7 @@ llmp_compression = ["ll_mp/llmp_compression"]
 llmp_debug = ["std", "ll_mp/llmp_debug"]
 
 ## Reduces the initial map size for llmp
-llmp_small_maps = [
-  "ll_mp/llmp_small_maps",
-] # reduces initial map size for llmp
+llmp_small_maps = ["ll_mp/llmp_small_maps"] # reduces initial map size for llmp
 
 ## Grammar mutator.
 nautilus = ["std", "serde_json/std", "rand_trait", "regex-syntax", "regex"]

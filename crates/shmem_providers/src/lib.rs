@@ -51,6 +51,9 @@ extern crate std;
 #[doc(hidden)]
 pub extern crate alloc;
 
+#[cfg(feature = "alloc")]
+use alloc::vec;
+
 pub use libafl_core::Error;
 
 #[cfg(all(unix, feature = "std"))]

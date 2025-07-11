@@ -43,6 +43,9 @@ nix = ["dep:nix"]
 ## Enables postcard error conversion
 postcard = ["dep:postcard"]
 
+## Enables Serde support for some types
+serde = ["dep:serde", "alloc"]
+
 [build-dependencies]
 rustversion = { workspace = true }
 
@@ -54,6 +57,7 @@ backtrace = { workspace = true, default-features = true, optional = true }
 postcard = { workspace = true, optional = true }
 nix = { workspace = true, optional = true }
 pyo3 = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive", "alloc"], optional = true }
 
 [lints]
 workspace = true

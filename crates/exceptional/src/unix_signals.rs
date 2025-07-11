@@ -16,6 +16,8 @@ use core::{
     mem,
 };
 
+use libafl_core::format;
+
 /// armv7 `libc` does not feature a `uncontext_t` implementation
 #[cfg(target_arch = "arm")]
 pub use libc::c_ulong;
@@ -246,6 +248,7 @@ pub struct ucontext_t {
     pub mcontext_data: mcontext64,
 }
 
+use libafl_core::Error;
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 use libc::ssize_t;
 #[cfg(not(any(
@@ -264,8 +267,6 @@ use libc::{
 };
 pub use libc::{c_void, siginfo_t};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-
-use crate::Error;
 
 unsafe extern "C" {
     /// The `libc` `getcontext`

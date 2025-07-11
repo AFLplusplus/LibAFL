@@ -13,17 +13,14 @@ license = "MIT OR Apache-2.0"
 keywords = ["os", "build-id"]
 edition = "2024"
 rust-version = "1.87"
-categories = [
-  "os",
-]
+categories = ["os"]
 
 [package.metadata.docs.rs]
 features = ["document-features"]
 all-features = true
 
 [features]
-default = [
-]
+default = []
 
 [build-dependencies]
 rustversion = { workspace = true }

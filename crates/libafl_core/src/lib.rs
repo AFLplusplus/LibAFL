@@ -56,16 +56,19 @@ type String = &'static str;
 /// Problem is that we really need a non-allocating format...
 /// This one simply returns the `fmt` string.
 /// Good enough for simple errors, for anything else, use the `alloc` feature.
+#[macro_export]
 #[cfg(not(feature = "alloc"))]
 macro_rules! format {
     ($fmt:literal) => {{ $fmt }};
 }
+/// Re-export of the "format" macro
+#[cfg(feature = "alloc")]
+pub use alloc::format;
 
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate std;
 #[cfg(feature = "alloc")]
-#[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
 
@@ -87,7 +90,19 @@ use {
     core::str::Utf8Error,
 };
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
+/// Localhost addr, this is used, for example, for LLMP Client, which connects to this address
+pub const IP_LOCALHOST: &str = "127.0.0.1";
+
+/// The client ID for various use cases across LibAFL
+#[repr(transparent)]
+#[derive(
+    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord
+)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct ClientId(pub u32);
 
 #[cfg(feature = "errors_backtrace")]
 /// Error Backtrace type when `errors_backtrace` feature is enabled (== [`backtrace::Backtrace`])
