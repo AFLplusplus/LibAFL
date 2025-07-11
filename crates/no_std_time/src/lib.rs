@@ -56,6 +56,11 @@ use core::time;
 
 pub mod time_counters;
 
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+#[cfg(feature = "std")]
+use std::time::{SystemTime, UNIX_EPOCH};
+
 /// Format a `Duration` into a HMS string
 #[cfg(feature = "alloc")]
 #[must_use]
@@ -136,4 +141,3 @@ pub fn current_nanos() -> u64 {
 pub fn current_milliseconds() -> u64 {
     current_time().as_millis() as u64
 }
-

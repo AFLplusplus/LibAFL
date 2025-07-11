@@ -42,6 +42,7 @@ rustversion = { workspace = true }
 document-features = { workspace = true, optional = true }
 backtrace = { workspace = true }
 libc = { workspace = true }
+exceptional = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 mach2 = "0.4.2"

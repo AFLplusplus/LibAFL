@@ -17,7 +17,6 @@ use core::{
 };
 
 use libafl_core::format;
-
 /// armv7 `libc` does not feature a `uncontext_t` implementation
 #[cfg(target_arch = "arm")]
 pub use libc::c_ulong;

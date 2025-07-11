@@ -60,6 +60,8 @@ use std::io::{BufWriter, Write};
 use std::process::Command;
 
 #[cfg(unix)]
+use exceptional::unix_signals::{Signal, ucontext_t};
+#[cfg(unix)]
 use libc::siginfo_t;
 #[cfg(target_vendor = "apple")]
 use mach2::{
@@ -72,9 +74,6 @@ use mach2::{
 };
 #[cfg(windows)]
 use windows::Win32::System::Diagnostics::Debug::{CONTEXT, EXCEPTION_POINTERS};
-
-#[cfg(unix)]
-use crate::os::unix_signals::{Signal, ucontext_t};
 
 /// Necessary info to print a mini-BSOD.
 #[derive(Debug)]

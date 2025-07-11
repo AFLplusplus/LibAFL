@@ -50,5 +50,5 @@ extern crate std;
 #[doc(hidden)]
 pub extern crate alloc;
 
-pub mod serdeany;
 pub mod anymap;
+pub mod serdeany;

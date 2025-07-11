@@ -11,13 +11,13 @@ use core::time::Duration;
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use std::{thread, time};
 
-use libafl_bolts::llmp::{LlmpBrokerInner, LlmpMsgHookResult};
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-use libafl_bolts::{
-    ClientId, Error, SimpleStderrLogger,
-    llmp::{self, Flags, LlmpHook, Tag},
-    shmem::{ShMemProvider, StdShMemProvider},
-};
+use libafl_core::{ClientId, Error};
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
+use ll_mp::{self, Flags, LlmpHook, Tag};
+use ll_mp::{LlmpBrokerInner, LlmpMsgHookResult};
+#[cfg(all(feature = "std", not(target_os = "haiku")))]
+use shmem_providers::{ShMemProvider, StdShMemProvider};
 use tuple_list::tuple_list;
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
@@ -36,12 +36,9 @@ const BROKER_TIMEOUT: Duration = Duration::from_secs(10);
 const SLEEP_BETWEEN_FORWARDS: Duration = Duration::from_millis(5);
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-static LOGGER: SimpleStderrLogger = SimpleStderrLogger::new();
-
-#[cfg(all(feature = "std", not(target_os = "haiku")))]
 fn adder_loop(port: u16) -> Result<(), Box<dyn core::error::Error>> {
     let shmem_provider = StdShMemProvider::new()?;
-    let mut client = llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+    let mut client = ll_mp::LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
     let mut last_result: u32 = 0;
     let mut current_result: u32 = 0;
     loop {
@@ -78,7 +75,7 @@ fn adder_loop(port: u16) -> Result<(), Box<dyn core::error::Error>> {
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 fn large_msg_loop(port: u16) -> Result<(), Box<dyn core::error::Error>> {
-    let mut client = llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
+    let mut client = ll_mp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
 
     #[cfg(not(target_vendor = "apple"))]
     let meg_buf = vec![1u8; 1 << 20];
@@ -170,7 +167,7 @@ fn main() {
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     /* The main node has a broker, and a few worker threads */
 
-    use libafl_bolts::llmp::Broker;
+    use ll_mp::Broker;
 
     let mode = std::env::args()
         .nth(1)
@@ -185,13 +182,13 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         .unwrap_or_else(|| "4242".into())
         .parse::<u16>()?;
 
-    log::set_logger(&LOGGER).unwrap();
+    // log::set_logger(..)
     log::set_max_level(log::LevelFilter::Trace);
     println!("Launching in mode {mode} on port {port}");
 
     match mode.as_str() {
         "broker" => {
-            let mut broker = llmp::LlmpBroker::new(
+            let mut broker = ll_mp::LlmpBroker::new(
                 StdShMemProvider::new()?,
                 tuple_list!(LlmpExampleHook::new()),
             )?;
@@ -201,7 +198,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
             broker.loop_with_timeouts(BROKER_TIMEOUT, Some(SLEEP_BETWEEN_FORWARDS));
         }
         "b2b" => {
-            let mut broker = llmp::LlmpBroker::new(
+            let mut broker = ll_mp::LlmpBroker::new(
                 StdShMemProvider::new()?,
                 tuple_list!(LlmpExampleHook::new()),
             )?;
@@ -212,7 +209,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         }
         "ctr" => {
             let mut client =
-                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
+                ll_mp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
             let mut counter: u32 = 0;
             loop {
                 counter = counter.wrapping_add(1);
@@ -229,7 +226,7 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
         }
         "exiting" => {
             let mut client =
-                llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
+                ll_mp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new()?, port)?;
             for i in 0..10_u32 {
                 client.send_buf(_TAG_SIMPLE_U32_V1, &i.to_le_bytes())?;
                 println!("Exiting Client writing {i}");

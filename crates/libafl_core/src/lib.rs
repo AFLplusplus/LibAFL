@@ -83,6 +83,8 @@ use core::{
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "alloc")]
 use {
     alloc::string::{FromUtf8Error, String},
@@ -90,17 +92,12 @@ use {
     core::str::Utf8Error,
 };
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 /// Localhost addr, this is used, for example, for LLMP Client, which connects to this address
 pub const IP_LOCALHOST: &str = "127.0.0.1";
 
 /// The client ID for various use cases across LibAFL
 #[repr(transparent)]
-#[derive(
-    Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord
-)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ClientId(pub u32);
 
@@ -673,7 +670,6 @@ where
         self.as_slice_mut().iter_mut()
     }
 }
-
 
 /// Has a ref count
 pub trait HasRefCnt {
