@@ -1,11 +1,11 @@
 [package]
-name = "ownedref"
+name = "exceptional"
 version.workspace = true
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
 ]
-description = "Library to pass around references that will be owned types on deserialization"
+description = "Everything for your exception and signal handling needs"
 documentation = "https://docs.rs/libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "./README.md"
@@ -39,9 +39,6 @@ std = [
 
 ## Enables all features that allocate in `no_std`
 alloc = []
-
-## Stores the backtraces of all generated `Error`s. Good for debugging, but may come with a slight performance hit.
-errors_backtrace = ["backtrace"]
 
 [build-dependencies]
 rustversion = { workspace = true }

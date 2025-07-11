@@ -40,9 +40,6 @@ std = [
 ## Enables all features that allocate in `no_std`
 alloc = []
 
-## Stores the backtraces of all generated `Error`s. Good for debugging, but may come with a slight performance hit.
-errors_backtrace = ["backtrace"]
-
 [build-dependencies]
 rustversion = { workspace = true }
 

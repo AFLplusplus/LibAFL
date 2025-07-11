@@ -246,56 +246,6 @@ pub mod prelude {
 
     pub use super::{bolts_prelude::*, *};
 }
-
-#[cfg(all(any(doctest, test), not(feature = "std")))]
-/// Provide custom time in `no_std` tests.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn external_current_millis() -> u64 {
-    // TODO: use "real" time here
-    1000
-}
-
-/// Current time
-#[cfg(feature = "std")]
-#[must_use]
-#[inline]
-pub fn current_time() -> time::Duration {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-}
-
-// external defined function in case of `no_std`
-//
-// Define your own `external_current_millis()` function via `extern "C"`
-// which is linked into the binary and called from here.
-#[cfg(all(not(any(doctest, test)), not(feature = "std")))]
-unsafe extern "C" {
-    //#[unsafe(no_mangle)]
-    fn external_current_millis() -> u64;
-}
-
-/// Current time (fixed fallback for `no_std`)
-#[cfg(not(feature = "std"))]
-#[inline]
-#[must_use]
-pub fn current_time() -> time::Duration {
-    let millis = unsafe { external_current_millis() };
-    time::Duration::from_millis(millis)
-}
-
-/// Gets current nanoseconds since [`UNIX_EPOCH`]
-#[must_use]
-#[inline]
-pub fn current_nanos() -> u64 {
-    current_time().as_nanos() as u64
-}
-
-/// Gets current milliseconds since [`UNIX_EPOCH`]
-#[must_use]
-#[inline]
-pub fn current_milliseconds() -> u64 {
-    current_time().as_millis() as u64
-}
-
 /// Trait to truncate slices and maps to a new size
 pub trait Truncate {
     /// Reduce the size of the slice
@@ -316,38 +266,6 @@ impl<T> Truncate for &mut [T] {
             .get_mut(..len)
             .expect("Truncate with len <= len() should always work");
         let _: &mut [T] = core::mem::replace(self, truncated);
-    }
-}
-
-/// Format a `Duration` into a HMS string
-#[cfg(feature = "alloc")]
-#[must_use]
-pub fn format_duration(duration: &time::Duration) -> String {
-    const MINS_PER_HOUR: u64 = 60;
-    const HOURS_PER_DAY: u64 = 24;
-
-    const SECS_PER_MINUTE: u64 = 60;
-    const SECS_PER_HOUR: u64 = SECS_PER_MINUTE * MINS_PER_HOUR;
-    const SECS_PER_DAY: u64 = SECS_PER_HOUR * HOURS_PER_DAY;
-
-    let total_secs = duration.as_secs();
-    let secs = total_secs % SECS_PER_MINUTE;
-
-    if total_secs < SECS_PER_MINUTE {
-        format!("{secs}s")
-    } else {
-        let mins = (total_secs / SECS_PER_MINUTE) % MINS_PER_HOUR;
-        if total_secs < SECS_PER_HOUR {
-            format!("{mins}m-{secs}s")
-        } else {
-            let hours = (total_secs / SECS_PER_HOUR) % HOURS_PER_DAY;
-            if total_secs < SECS_PER_DAY {
-                format!("{hours}h-{mins}m-{secs}s")
-            } else {
-                let days = total_secs / SECS_PER_DAY;
-                format!("{days}days {hours}h-{mins}m-{secs}s")
-            }
-        }
     }
 }
 

@@ -27,16 +27,15 @@ use crate::Error;
 /// The special exit code when the target exited through ctrl-c
 pub const CTRL_C_EXIT: i32 = -1073741510;
 
-// For VEH
+/// For VEH
 const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 
-// For VEH
+/// For VEH
 const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
 
 // For SEH
 // const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
 
-// From https://github.com/Alexpux/mingw-w64/blob/master/mingw-w64-headers/crt/signal.h
 pub const SIGINT: i32 = 2;
 pub const SIGILL: i32 = 4;
 pub const SIGABRT_COMPAT: i32 = 6;
@@ -47,7 +46,6 @@ pub const SIGBREAK: i32 = 21;
 pub const SIGABRT: i32 = 22;
 pub const SIGABRT2: i32 = 22;
 
-// From https://github.com/wine-mirror/wine/blob/master/include/winnt.h#L611
 pub const STATUS_WAIT_0: i32 = 0x00000000;
 pub const STATUS_ABANDONED_WAIT_0: i32 = 0x00000080;
 pub const STATUS_USER_APC: i32 = 0x000000C0;
@@ -96,7 +94,6 @@ pub const STATUS_SXS_EARLY_DEACTIVATION: i32 = 0xC015000F;
 pub const STATUS_SXS_INVALID_DEACTIVATION: i32 = 0xC0150010;
 pub const STATUS_NOT_IMPLEMENTED: i32 = 0xC0000002;
 
-// from https://github.com/x64dbg/x64dbg/blob/4d631707b89d97e199844c08f5b65d8ea5d5d3f3/bin/exceptiondb.txt
 pub const STATUS_WX86_UNSIMULATE: i32 = 0x4000001C;
 pub const STATUS_WX86_CONTINUE: i32 = 0x4000001D;
 pub const STATUS_WX86_SINGLE_STEP: i32 = 0x4000001E;
@@ -132,7 +129,6 @@ pub const VCPP_EXCEPTION_ERROR_PROC_NOT_FOUND: i32 = 0xC06D007F;
 #[derive(Debug, FromPrimitive, Copy, Clone)]
 #[repr(i32)]
 pub enum ExceptionCode {
-    // From https://github.com/wine-mirror/wine/blob/master/include/winnt.h#L611
     WaitZero = STATUS_WAIT_0,
     AbandonedWaitZero = STATUS_ABANDONED_WAIT_0,
     UserApc = STATUS_USER_APC,
@@ -180,7 +176,7 @@ pub enum ExceptionCode {
     SxsEarlyDeactivation = STATUS_SXS_EARLY_DEACTIVATION,
     SxsInvalidDeactivation = STATUS_SXS_INVALID_DEACTIVATION,
     NotImplemented = STATUS_NOT_IMPLEMENTED,
-    // from https://github.com/x64dbg/x64dbg/blob/4d631707b89d97e199844c08f5b65d8ea5d5d3f3/bin/exceptiondb.txt
+
     Wx86Unsimulate = STATUS_WX86_UNSIMULATE,
     Wx86Continue = STATUS_WX86_CONTINUE,
     Wx86SingleStep = STATUS_WX86_SINGLE_STEP,
@@ -534,6 +530,7 @@ unsafe extern "C" fn handle_signal(_signum: i32) {
 }
 
 /// Setup Win32 exception handlers in a somewhat rusty way.
+///
 /// # Safety
 /// Exception handlers are usually ugly, handle with care!
 #[cfg(feature = "alloc")]
@@ -602,6 +599,7 @@ struct CtrlHandlerHolder {
 static mut CTRL_HANDLER: Option<CtrlHandlerHolder> = None;
 
 /// Set `ConsoleCtrlHandler` to catch Ctrl-C
+///
 /// # Safety
 /// Same safety considerations as in `setup_exception_handler`
 pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(

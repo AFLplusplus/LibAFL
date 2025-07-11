@@ -1,4 +1,6 @@
-//! A map that can retrieve values by type - and is SerDe serializable.
+/*!
+ * Everything for your exception and signal handling needs
+ */
 #![doc = include_str!("../../../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
@@ -47,8 +49,17 @@
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate std;
+#[cfg(feature = "alloc")]
+#[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
 
-pub mod serdeany;
-pub mod anymap;
+pub mod unix_signals;
+
+#[cfg(all(windows, feature = "std"))]
+#[expect(missing_docs, overflowing_literals)]
+pub mod windows_exceptions;
+
+#[cfg(unix)]
+pub use unix_signals::CTRL_C_EXIT;
+

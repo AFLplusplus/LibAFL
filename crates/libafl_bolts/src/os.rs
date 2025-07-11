@@ -3,14 +3,6 @@
 #[cfg(any(unix, all(windows, feature = "std")))]
 use crate::Error;
 
-#[cfg(unix)]
-pub mod unix_signals;
-#[cfg(unix)]
-pub use unix_signals::CTRL_C_EXIT;
-
-#[cfg(all(unix, feature = "alloc"))]
-pub mod pipes;
-
 #[cfg(all(unix, feature = "std"))]
 use alloc::{borrow::Cow, ffi::CString};
 #[cfg(all(unix, feature = "std"))]
@@ -27,9 +19,6 @@ use std::{
 };
 
 // Allow a few extra features we need for the whole module
-#[cfg(all(windows, feature = "std"))]
-#[expect(missing_docs, overflowing_literals)]
-pub mod windows_exceptions;
 #[cfg(unix)]
 use libc::pid_t;
 #[cfg(all(windows, feature = "std"))]
