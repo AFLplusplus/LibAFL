@@ -1237,10 +1237,7 @@ pub mod unix_shmem {
             open,
         };
 
-        use crate::{
-            Error,
-            shmem::{ShMem, ShMemId, ShMemProvider},
-        };
+        use crate::{Error, ShMem, ShMemId, ShMemProvider};
 
         /// An ashmem based impl for linux/android
         #[derive(Debug, Clone)]
@@ -1458,10 +1455,7 @@ pub mod unix_shmem {
         use libc::{MAP_SHARED, PROT_READ, PROT_WRITE, close, fstat, ftruncate, mmap, munmap};
         use nix::sys::memfd::{MFdFlags, memfd_create};
 
-        use crate::{
-            Error,
-            shmem::{ShMem, ShMemId, ShMemProvider},
-        };
+        use crate::{Error, ShMem, ShMemId, ShMemProvider};
 
         /// An memfd based impl for linux/android
         #[cfg(unix)]

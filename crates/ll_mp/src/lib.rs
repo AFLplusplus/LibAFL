@@ -111,6 +111,8 @@ pub extern crate alloc;
 use alloc::boxed::Box;
 #[cfg(feature = "std")]
 use alloc::string::ToString;
+#[cfg(feature = "alloc")]
+use alloc::vec;
 use alloc::{string::String, vec::Vec};
 #[cfg(feature = "std")]
 use core::net::SocketAddr;
@@ -148,7 +150,7 @@ use exceptional::unix_signals::{Signal, SignalHandler, siginfo_t, ucontext_t};
 use exceptional::windows_exceptions::{CtrlHandler, setup_ctrl_handler};
 #[cfg(feature = "std")]
 use libafl_core::IP_LOCALHOST;
-use libafl_core::{ClientId, Error};
+use libafl_core::{ClientId, Error, format};
 #[cfg(all(unix, feature = "std"))]
 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use nix::sys::socket::{self, sockopt::ReusePort};

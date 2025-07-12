@@ -57,10 +57,6 @@ pub extern crate alloc;
 #[cfg(feature = "ctor")]
 #[doc(hidden)]
 pub use ctor;
-#[cfg(feature = "alloc")]
-pub mod anymap;
-#[cfg(feature = "std")]
-pub mod build_id;
 #[cfg(all(
     any(feature = "cli", feature = "frida_cli", feature = "qemu_cli"),
     feature = "std"
@@ -69,26 +65,13 @@ pub mod cli;
 #[cfg(feature = "gzip")]
 pub mod compress;
 #[cfg(feature = "std")]
-pub mod core_affinity;
-#[cfg(feature = "std")]
 pub mod fs;
-#[cfg(feature = "alloc")]
-pub mod llmp;
 pub mod math;
-#[cfg(feature = "std")]
-pub mod minibsod;
 pub mod os;
-#[cfg(feature = "alloc")]
-pub mod ownedref;
-#[cfg(feature = "alloc")]
-pub mod serdeany;
 #[cfg(feature = "std")]
 pub mod staterestore;
-#[cfg(feature = "alloc")]
-pub mod subrange;
-// TODO: reenable once ahash works in no-alloc
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
-pub mod tuples;
+
+use no_std_time::current_time;
 
 #[cfg(all(feature = "std", unix))]
 pub mod argparse;
@@ -102,8 +85,8 @@ pub use target_args::*;
 
 pub mod simd;
 
-pub use libafl_core::Error;
 pub use fast_rands as rands;
+pub use libafl_core::Error;
 pub use shmem_providers as shmem;
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
@@ -134,6 +117,8 @@ pub mod bolts_prelude {
 #[cfg(all(unix, feature = "std"))]
 use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
+use alloc::string::String;
+#[cfg(feature = "alloc")]
 use alloc::string::ToString;
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use core::hash::BuildHasher;
@@ -141,8 +126,6 @@ use core::hash::BuildHasher;
 use core::hash::{Hash, Hasher};
 #[cfg(all(unix, feature = "std"))]
 use core::mem;
-#[cfg(feature = "std")]
-use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
 use std::{
     fs::File,
@@ -155,16 +138,12 @@ use std::{
 // TODO: re-enable once <https://github.com/tkaitchuck/aHash/issues/155> is resolved.
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use ahash::RandomState;
-#[cfg(feature = "xxh3")]
-use xxhash_rust::xxh3::xxh3_64;
-
-#[cfg(feature = "alloc")]
-use alloc::string::String;
-
 #[cfg(feature = "libafl_derive")]
 pub use libafl_derive::SerdeAny;
 #[cfg(feature = "std")]
 use log::{Metadata, Record};
+#[cfg(feature = "xxh3")]
+use xxhash_rust::xxh3::xxh3_64;
 
 /// Returns the standard input [`Hasher`]
 ///
@@ -247,12 +226,12 @@ impl<T> Truncate for &[T] {
 
 impl<T> Truncate for &mut [T] {
     fn truncate(&mut self, len: usize) {
-        let value = core::mem::take(self);
+        let value = mem::take(self);
         let len = value.len().min(len);
         let truncated = value
             .get_mut(..len)
             .expect("Truncate with len <= len() should always work");
-        let _: &mut [T] = core::mem::replace(self, truncated);
+        let _: &mut [T] = mem::replace(self, truncated);
     }
 }
 
