@@ -2,7 +2,9 @@
 
 use core::ops::AddAssign;
 
-use crate::Error;
+use libafl_core::Error;
+
+use libafl_core::format;
 
 /// Returns the cumulative distribution function for a discrete distribution.
 pub fn calculate_cumulative_distribution_in_place(probabilities: &mut [f32]) -> Result<(), Error> {
