@@ -233,8 +233,7 @@ jobs:
         run: ./scripts/fmt_all.sh check
 
   check-md-links:
-    # fixme: use ubuntu-latest once this gets fixed https://github.com/UmbrellaDocs/action-linkspector/issues/32
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Run linkspector

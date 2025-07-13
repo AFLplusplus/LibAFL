@@ -3,7 +3,7 @@
 use std::{env, fs::File, io::Write, path::Path};
 
 const TWO_MB: usize = 2_621_440;
-const SIXTY_FIVE_KB: usize = 65_536;
+const SIXTY_FOUR_KIB: usize = 65_536;
 
 #[rustversion::nightly]
 fn enable_nightly() {
@@ -33,15 +33,15 @@ fn main() {
 
     let edges_map_default_size: usize = option_env!("LIBAFL_EDGES_MAP_DEFAULT_SIZE")
         .or(option_env!("LIBAFL_EDGES_MAP_DEFAULT_SIZE")) // keep old env for retrocompatibility
-        .map_or(Ok(SIXTY_FIVE_KB), str::parse)
+        .map_or(Ok(SIXTY_FOUR_KIB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_DEFAULT_SIZE");
 
     let cmp_map_size: usize = option_env!("LIBAFL_CMP_MAP_SIZE")
-        .map_or(Ok(SIXTY_FIVE_KB), str::parse)
+        .map_or(Ok(SIXTY_FOUR_KIB), str::parse)
         .expect("Could not parse LIBAFL_CMP_MAP_SIZE");
 
     let cmplog_map_w: usize = option_env!("LIBAFL_CMPLOG_MAP_W")
-        .map_or(Ok(SIXTY_FIVE_KB), str::parse)
+        .map_or(Ok(SIXTY_FOUR_KIB), str::parse)
         .expect("Could not parse LIBAFL_CMPLOG_MAP_W");
 
     let cmplog_map_h: usize = option_env!("LIBAFL_CMPLOG_MAP_H")
@@ -49,7 +49,7 @@ fn main() {
         .expect("Could not parse LIBAFL_CMPLOG_MAP_H");
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
-        .map_or(Ok(SIXTY_FIVE_KB), str::parse)
+        .map_or(Ok(SIXTY_FOUR_KIB), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
 
     assert!(edges_map_default_size <= edges_map_allocated_size);
