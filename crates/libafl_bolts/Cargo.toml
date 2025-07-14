@@ -50,6 +50,12 @@ std = [
   "nix",
   "no_std_time/std",
   "serde/std",
+  "libafl_core/std",
+  "libafl_core/nix",
+  "shmem_providers/std",
+  "uuid",
+  "backtrace",
+  "uds",
   "serial_test",
   "shmem_providers/std",
   "simd",
@@ -144,6 +150,11 @@ shmem_providers = { workspace = true }
 static_assertions = { workspace = true }
 tuple_list_ex = { workspace = true }
 typeid = { workspace = true }
+shmem_providers = { workspace = true }
+fast_rands = { workspace = true }
+no_std_time = { workspace = true }
+
+tuple_list = { version = "0.1.3" }
 
 ahash = { workspace = true, optional = true } # The hash function already used in hashbrown
 backtrace = { workspace = true, default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
