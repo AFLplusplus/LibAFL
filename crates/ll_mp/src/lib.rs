@@ -104,7 +104,6 @@ Check out the `llmp_test` example in ./examples, or build it with `cargo run --e
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate std;
-#[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
 
