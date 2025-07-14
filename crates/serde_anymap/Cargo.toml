@@ -20,17 +20,21 @@ features = ["document-features"]
 all-features = true
 
 [features]
-default = ["std", "alloc"]
+default = ["std", "alloc", "stable_anymap"]
 document-features = ["dep:document-features"]
 
 #! # Feature Flags
 #! ### General Features
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = []
+std = ["alloc", "libafl_core/std"]
 
 ## Enables all features that allocate in `no_std`
-alloc = []
+alloc = ["erased-serde/alloc", "libafl_core/alloc"]
+
+## Create keys that are more stable between compilations
+stable_anymap = []
+serdeany_autoreg = []
 
 [build-dependencies]
 rustversion = { workspace = true }
@@ -40,6 +44,14 @@ rustversion = { workspace = true }
 [dependencies]
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
+
+libafl_core = { workspace = true }
+static_assertions = { workspace = true }
+serde = { workspace = true }
+erased-serde = { workspace = true, default-features = false }
+hashbrown = { workspace = true }
+ahash = { workspace = true }
+postcard = { workspace = true }
 
 [lints]
 workspace = true

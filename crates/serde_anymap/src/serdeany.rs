@@ -124,14 +124,12 @@ pub mod serdeany_registry {
         HashMap,
         hash_map::{Values, ValuesMut},
     };
+    use libafl_core::{Error, format};
     use serde::{Deserialize, Serialize, de};
 
-    use crate::{
-        Error,
-        serdeany::{
-            DeserializeCallback, DeserializeCallbackSeed, SerdeAny, TypeRepr, type_repr,
-            type_repr_owned,
-        },
+    use crate::serdeany::{
+        DeserializeCallback, DeserializeCallbackSeed, SerdeAny, TypeRepr, type_repr,
+        type_repr_owned,
     };
 
     /// A [`HashMap`] that maps from [`TypeRepr`] to a deserializer and its [`TypeRepr`].

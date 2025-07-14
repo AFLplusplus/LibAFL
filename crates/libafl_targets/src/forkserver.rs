@@ -10,22 +10,18 @@ use std::{
 use libafl::executors::forkserver::FS_NEW_OPT_AUTODTCT;
 #[cfg(feature = "cmplog")]
 use libafl::executors::forkserver::SHM_CMPLOG_ENV_VAR;
-use libafl::{
-    Error,
-    executors::forkserver::{
-        AFL_MAP_SIZE_ENV_VAR, FORKSRV_FD, FS_ERROR_SHM_OPEN, FS_NEW_OPT_MAPSIZE,
-        FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, MAX_INPUT_SIZE_DEFAULT,
-        SHM_ENV_VAR, SHM_FUZZ_ENV_VAR, SHM_FUZZ_MAP_SIZE_ENV_VAR, SHMEM_FUZZ_HDR_SIZE,
-    },
+use libafl::executors::forkserver::{
+    AFL_MAP_SIZE_ENV_VAR, FORKSRV_FD, FS_ERROR_SHM_OPEN, FS_NEW_OPT_MAPSIZE,
+    FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, MAX_INPUT_SIZE_DEFAULT, SHM_ENV_VAR,
+    SHM_FUZZ_ENV_VAR, SHM_FUZZ_MAP_SIZE_ENV_VAR, SHMEM_FUZZ_HDR_SIZE,
 };
-use libafl_bolts::{
-    os::{ChildHandle, ForkResult},
-    shmem::{ShMem, ShMemId, ShMemProvider},
-};
+use libafl_bolts::os::{ChildHandle, ForkResult};
+use libafl_core::Error;
 use nix::{
     sys::signal::{SigHandler, Signal},
     unistd::Pid,
 };
+use shmem_providers::{ShMem, ShMemId, ShMemProvider};
 
 #[cfg(feature = "cmplog_extended_instrumentation")]
 use crate::cmps::EXTENDED_CMPLOG_MAP_PTR;

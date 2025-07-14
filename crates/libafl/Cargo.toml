@@ -223,7 +223,7 @@ libafl_intelpt = { workspace = true, default-features = true, optional = true }
 ll_mp = { workspace = true }
 
 rustversion = { workspace = true }
-tuple_list = { version = "0.1.3" }
+tuple_list = { workspace = true }
 hashbrown = { workspace = true, features = [
   "serde",
   "ahash",

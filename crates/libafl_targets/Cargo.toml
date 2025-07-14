@@ -79,6 +79,9 @@ rustversion = "1.0.17"
 [dependencies]
 libafl = { workspace = true, features = [], default-features = false }
 libafl_bolts = { workspace = true, features = [] }
+fast_rands = { workspace = true }
+ownedref = { workspace = true }
+shmem_providers = { workspace = true }
 libc = { workspace = true }
 nix = { workspace = true, optional = true }
 hashbrown = { workspace = true, default-features = true }

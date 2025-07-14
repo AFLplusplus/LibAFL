@@ -77,7 +77,6 @@
     )
 )]
 
-#[cfg(feature = "std")]
 #[macro_use]
 extern crate std;
 #[doc(hidden)]
@@ -146,7 +145,6 @@ pub struct Cores {
     pub ids: Vec<CoreId>,
 }
 
-#[cfg(feature = "std")]
 impl Cores {
     /// Pick all cores
     pub fn all() -> Result<Self, Error> {
@@ -245,7 +243,6 @@ impl From<Vec<usize>> for Cores {
     }
 }
 
-#[cfg(feature = "std")]
 impl TryFrom<&str> for Cores {
     type Error = Error;
     fn try_from(cores: &str) -> Result<Self, Self::Error> {

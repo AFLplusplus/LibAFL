@@ -63,10 +63,8 @@ use core::{
     slice::{Iter, IterMut, SliceIndex},
 };
 
-use libafl_core::{AsSizedSlice, AsSizedSliceMut, AsSlice, AsSliceMut, IntoOwned};
+use libafl_core::{AsSizedSlice, AsSizedSliceMut, AsSlice, AsSliceMut, IntoOwned, Truncate};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-use crate::{Truncate, shmem::ShMem};
 
 /// Constant size array visitor for serde deserialization.
 /// Mostly taken from <https://github.com/serde-rs/serde/issues/1937#issuecomment-812137971>
@@ -74,6 +72,7 @@ mod arrays {
     use alloc::{boxed::Box, fmt, vec::Vec};
     use core::{convert::TryInto, marker::PhantomData};
 
+    use libafl_core::format;
     use serde::{
         Deserialize, Deserializer,
         de::{SeqAccess, Visitor},
@@ -217,18 +216,6 @@ impl<T> OwnedRef<'_, T>
 where
     T: Sized + 'static,
 {
-    /// Returns a new [`OwnedRef`], pointing to the given [`ShMem`].
-    ///
-    /// # Panics
-    /// Panics if the given shared mem is too small
-    ///
-    /// # Safety
-    /// The shared memory needs to start with a valid object of type `T`.
-    /// Any use of this [`OwnedRef`] will dereference a pointer to the shared memory accordingly.
-    pub unsafe fn from_shmem<SHM: ShMem>(shmem: &mut SHM) -> Self {
-        unsafe { Self::from_ptr(shmem.as_mut_ptr_of().unwrap()) }
-    }
-
     /// Returns a new [`OwnedRef`], owning the given value.
     pub fn owned(val: T) -> Self {
         Self::Owned(Box::new(val))
@@ -350,18 +337,6 @@ impl<T> OwnedRefMut<'_, T>
 where
     T: Sized + 'static,
 {
-    /// Returns a new [`OwnedRefMut`], pointing to the given [`ShMem`].
-    ///
-    /// # Panics
-    /// Panics if the given shared mem is too small
-    ///
-    /// # Safety
-    /// The shared memory needs to start with a valid object of type `T`.
-    /// Any use of this [`OwnedRefMut`] will dereference a pointer to the shared memory accordingly.
-    pub unsafe fn from_shmem<SHM: ShMem>(shmem: &mut SHM) -> Self {
-        unsafe { Self::from_mut_ptr(shmem.as_mut_ptr_of().unwrap()) }
-    }
-
     /// Returns a new [`OwnedRefMut`], owning the given value.
     pub fn owned(val: T) -> Self {
         Self::Owned(Box::new(val))

@@ -1,8 +1,5 @@
 //! Operating System specific abstractions
 
-#[cfg(any(unix, all(windows, feature = "std")))]
-use crate::Error;
-
 #[cfg(all(unix, feature = "std"))]
 use alloc::{borrow::Cow, ffi::CString};
 #[cfg(all(unix, feature = "std"))]
@@ -19,12 +16,14 @@ use std::{
 };
 
 use libafl_core::format;
-
 // Allow a few extra features we need for the whole module
 #[cfg(unix)]
 use libc::pid_t;
 #[cfg(all(windows, feature = "std"))]
 pub use windows_exceptions::CTRL_C_EXIT;
+
+#[cfg(any(unix, all(windows, feature = "std")))]
+use crate::Error;
 
 /// A file that we keep open, pointing to /dev/null
 #[cfg(all(feature = "std", unix))]

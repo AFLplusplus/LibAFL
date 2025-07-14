@@ -10,7 +10,9 @@
 use alloc::borrow::Cow;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
-use libafl::{Error, mutators::Tokens};
+use libafl::mutators::Tokens;
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
+use libafl_core::Error;
 
 use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_ALLOCATED_SIZE, EDGES_MAP_DEFAULT_SIZE};
 

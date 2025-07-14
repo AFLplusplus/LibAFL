@@ -48,7 +48,6 @@
 #[macro_use]
 extern crate std;
 #[cfg(feature = "alloc")]
-#[macro_use]
 #[doc(hidden)]
 pub extern crate alloc;
 
@@ -63,85 +62,15 @@ use core::{
     ops::{Deref, DerefMut, Index, IndexMut},
 };
 
-#[cfg(feature = "alloc")]
+use libafl_core::Named;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 pub use tuple_list::{TupleList, tuple_list, tuple_list_type};
-
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
-use crate::hash_std;
 
 /// Returns if the type `T` is equal to `U`, ignoring lifetimes.
 #[must_use]
 pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     typeid::of::<T>() == typeid::of::<U>()
-}
-
-/// We need fixed names for many parts of this lib.
-#[cfg(feature = "alloc")]
-pub trait Named {
-    /// Provide the name of this element.
-    fn name(&self) -> &Cow<'static, str>;
-}
-
-#[cfg(feature = "alloc")]
-impl Named for () {
-    #[inline]
-    fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("()");
-        &NAME
-    }
-}
-
-/// Has a length field
-pub trait HasLen {
-    /// The length
-    fn len(&self) -> usize;
-
-    /// Returns `true` if it has no elements.
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<T> HasLen for Vec<T> {
-    #[inline]
-    fn len(&self) -> usize {
-        Vec::<T>::len(self)
-    }
-}
-
-impl<T: HasLen> HasLen for &mut T {
-    fn len(&self) -> usize {
-        self.deref().len()
-    }
-}
-
-impl<Head, Tail> HasLen for (Head, Tail)
-where
-    Tail: HasLen,
-{
-    #[inline]
-    fn len(&self) -> usize {
-        self.1.len() + 1
-    }
-}
-
-impl<Tail> HasLen for (Tail,)
-where
-    Tail: HasLen,
-{
-    #[inline]
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-}
-
-impl HasLen for () {
-    #[inline]
-    fn len(&self) -> usize {
-        0
-    }
 }
 
 /// Borrow each member of the tuple
@@ -225,58 +154,6 @@ where
     Tail: HasConstLen,
 {
     const LEN: usize = 1 + Tail::LEN;
-}
-
-/// Finds the `const_name` and `name_id`
-pub trait HasNameId {
-    /// Gets the `const_name` for this entry
-    fn const_name(&self) -> &'static str;
-
-    /// Gets the `name_id` for this entry
-    fn name_id(&self) -> u64 {
-        hash_std(self.const_name().as_bytes())
-    }
-}
-
-/// Gets the id and `const_name` for the given index in a tuple
-pub trait HasNameIdTuple: HasConstLen {
-    /// Gets the `const_name` for the entry at the given index
-    fn const_name_for(&self, index: usize) -> Option<&'static str>;
-
-    /// Gets the `name_id` for the entry at the given index
-    fn name_id_for(&self, index: usize) -> Option<u64>;
-}
-
-impl HasNameIdTuple for () {
-    fn const_name_for(&self, _index: usize) -> Option<&'static str> {
-        None
-    }
-
-    fn name_id_for(&self, _index: usize) -> Option<u64> {
-        None
-    }
-}
-
-impl<Head, Tail> HasNameIdTuple for (Head, Tail)
-where
-    Head: HasNameId,
-    Tail: HasNameIdTuple,
-{
-    fn const_name_for(&self, index: usize) -> Option<&'static str> {
-        if index == 0 {
-            Some(self.0.const_name())
-        } else {
-            self.1.const_name_for(index - 1)
-        }
-    }
-
-    fn name_id_for(&self, index: usize) -> Option<u64> {
-        if index == 0 {
-            Some(self.0.name_id())
-        } else {
-            self.1.name_id_for(index - 1)
-        }
-    }
 }
 
 /// Returns the first element with the given type
@@ -577,11 +454,11 @@ pub trait Handled: Named {
 impl<N> Handled for N where N: Named {}
 
 /// Object with the type T and the name associated with its concrete value
-#[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg(feature = "alloc")]
 pub struct Handle<T: ?Sized> {
     name: Cow<'static, str>,
-    #[serde(skip)]
+    #[cfg_attr(feature = "serde", serde(skip))]
     phantom: PhantomData<T>,
 }
 

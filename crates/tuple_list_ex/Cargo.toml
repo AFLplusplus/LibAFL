@@ -32,6 +32,9 @@ std = []
 ## Enables all features that allocate in `no_std`
 alloc = []
 
+## Enables serde support for tuple lists
+serde = ["alloc", "dep:serde"]
+
 [build-dependencies]
 rustversion = { workspace = true }
 
@@ -40,6 +43,15 @@ rustversion = { workspace = true }
 [dependencies]
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
+
+libafl_core = { workspace = true }
+
+serde = { workspace = true, default-features = false, features = [
+  "derive",
+  "alloc",
+], optional = true }
+tuple_list = { workspace = true }
+typeid = { workspace = true }
 
 [lints]
 workspace = true

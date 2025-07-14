@@ -63,7 +63,7 @@ macro_rules! format {
 }
 /// Re-export of the "format" macro
 #[cfg(feature = "alloc")]
-pub use alloc::format;
+pub use alloc::{borrow::Cow, format};
 
 #[cfg(feature = "std")]
 #[macro_use]
@@ -726,5 +726,96 @@ where
         init_fn(&mut new_vec)?;
 
         Ok(new_vec)
+    }
+}
+
+/// We need fixed names for many parts of this lib.
+#[cfg(feature = "alloc")]
+pub trait Named {
+    /// Provide the name of this element.
+    fn name(&self) -> &Cow<'static, str>;
+}
+
+#[cfg(feature = "alloc")]
+impl Named for () {
+    #[inline]
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("()");
+        &NAME
+    }
+}
+
+/// Has a length field
+pub trait HasLen {
+    /// The length
+    fn len(&self) -> usize;
+
+    /// Returns `true` if it has no elements.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<T> HasLen for Vec<T> {
+    #[inline]
+    fn len(&self) -> usize {
+        Vec::<T>::len(self)
+    }
+}
+
+impl<T: HasLen> HasLen for &mut T {
+    fn len(&self) -> usize {
+        self.deref().len()
+    }
+}
+
+impl<Head, Tail> HasLen for (Head, Tail)
+where
+    Tail: HasLen,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.1.len() + 1
+    }
+}
+
+impl<Tail> HasLen for (Tail,)
+where
+    Tail: HasLen,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl HasLen for () {
+    #[inline]
+    fn len(&self) -> usize {
+        0
+    }
+}
+
+/// Trait to truncate slices and maps to a new size
+pub trait Truncate {
+    /// Reduce the size of the slice
+    fn truncate(&mut self, len: usize);
+}
+
+impl<T> Truncate for &[T] {
+    fn truncate(&mut self, len: usize) {
+        *self = &self[..len];
+    }
+}
+
+impl<T> Truncate for &mut [T] {
+    fn truncate(&mut self, len: usize) {
+        let value = core::mem::take(self);
+        let len = value.len().min(len);
+        let truncated = value
+            .get_mut(..len)
+            .expect("Truncate with len <= len() should always work");
+        let _: &mut [T] = core::mem::replace(self, truncated);
     }
 }

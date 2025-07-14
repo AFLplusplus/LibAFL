@@ -6,10 +6,9 @@ use core::{
     ops::{Bound, Range, RangeBounds},
 };
 
-use crate::{
-    ownedref::{OwnedMutSlice, OwnedSlice},
-    tuples::HasLen,
-};
+use libafl_core::HasLen;
+
+use crate::{OwnedMutSlice, OwnedSlice};
 
 /// An immutable contiguous subslice of a byte slice.
 /// It is mostly useful to cheaply wrap a subslice of a given input.
@@ -33,6 +32,20 @@ pub struct SubRangeMutSlice<'a, T> {
     parent_slice: OwnedMutSlice<'a, T>,
     /// The range inside the parent input we will work on
     range: Range<usize>,
+}
+
+impl<T> HasLen for SubRangeSlice<'_, T> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.range.len()
+    }
+}
+
+impl<T> HasLen for SubRangeMutSlice<'_, T> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.range.len()
+    }
 }
 
 /// Slice wrapper keeping track of the current read position.
@@ -93,20 +106,6 @@ impl<'a, T> SliceReader<'a, T> {
 impl<'a, T> From<&'a [T]> for SliceReader<'a, T> {
     fn from(input: &'a [T]) -> Self {
         Self::new(input)
-    }
-}
-
-impl<T> HasLen for SubRangeSlice<'_, T> {
-    #[inline]
-    fn len(&self) -> usize {
-        self.range.len()
-    }
-}
-
-impl<T> HasLen for SubRangeMutSlice<'_, T> {
-    #[inline]
-    fn len(&self) -> usize {
-        self.range.len()
     }
 }
 

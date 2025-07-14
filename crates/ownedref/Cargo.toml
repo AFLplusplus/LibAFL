@@ -41,5 +41,8 @@ rustversion = { workspace = true }
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
 
+libafl_core = { workspace = true }
+serde = { workspace = true }
+
 [lints]
 workspace = true
