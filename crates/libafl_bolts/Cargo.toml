@@ -74,6 +74,7 @@ alloc = [
   "no_std_time/alloc",
   "postcard",
   "serde/alloc",
+  "serde_anymap",
   "shmem_providers/alloc",
   "tuple_list_ex/alloc",
 ]
@@ -162,7 +163,7 @@ ll_mp = { workspace = true }
 minibsod = { workspace = true }
 no_std_time = { workspace = true }
 ownedref = { workspace = true }
-serde_anymap = { workspace = true }
+serde_anymap = { workspace = true, optional = true }
 shmem_providers = { workspace = true }
 static_assertions = { workspace = true }
 tuple_list_ex = { workspace = true, features = ["serde"] }
