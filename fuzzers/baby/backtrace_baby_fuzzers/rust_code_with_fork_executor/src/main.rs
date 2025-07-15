@@ -69,11 +69,13 @@ pub fn main() {
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", signals_ptr, signals_len) };
     // # Safety
     // We just created the shmem and it's large enough.
-    let bt_observer = unsafe { BacktraceObserver::from_shmem(
-        "BacktraceObserver",
-        &mut bt,
-        libafl::observers::HarnessType::Child,
-    )};
+    let bt_observer = unsafe {
+        BacktraceObserver::from_shmem(
+            "BacktraceObserver",
+            &mut bt,
+            libafl::observers::HarnessType::Child,
+        )
+    };
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let mut feedback = MaxMapFeedback::new(&observer);

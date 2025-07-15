@@ -57,11 +57,13 @@ pub fn main() {
     let mut bt = shmem_provider.new_on_shmem::<Option<u64>>(None).unwrap();
     // # Safety
     // We just created the shmem and it's large enough.
-    let bt_observer = unsafe { BacktraceObserver::from_shmem(
-        "BacktraceObserver",
-        &mut bt,
-        libafl::observers::HarnessType::Child,
-    )};
+    let bt_observer = unsafe {
+        BacktraceObserver::from_shmem(
+            "BacktraceObserver",
+            &mut bt,
+            libafl::observers::HarnessType::Child,
+        )
+    };
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let mut feedback = MaxMapFeedback::new(&observer);
