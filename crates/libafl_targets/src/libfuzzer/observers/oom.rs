@@ -6,12 +6,11 @@ use core::{
 };
 
 use libafl::{
-    Error,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
 };
-use libafl_bolts::Named;
+use libafl_core::{Error, Named};
 use libc::SIGABRT;
 use serde::{Deserialize, Serialize};
 

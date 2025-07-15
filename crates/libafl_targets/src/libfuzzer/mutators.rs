@@ -6,8 +6,8 @@ use alloc::{
 };
 use core::{cell::RefCell, marker::PhantomData, ops::Deref};
 
+use fast_rands::Rand;
 use libafl::{
-    Error,
     corpus::{Corpus, CorpusId},
     inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{
@@ -16,7 +16,7 @@ use libafl::{
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
 };
-use libafl_bolts::{AsSlice, HasLen, Named, rands::Rand};
+use libafl_core::{AsSlice, Error, HasLen, Named};
 
 unsafe extern "C" {
     fn libafl_targets_has_libfuzzer_custom_mutator() -> bool;

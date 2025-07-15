@@ -12,12 +12,10 @@ use core::{
     ptr, slice,
 };
 
-use libafl::{
-    Error,
-    observers::{CmpMap, CmpValues, CmplogBytes, cmp::AflppCmpLogHeader},
-};
-use libafl_bolts::HasLen;
+use libafl::observers::{CmpMap, CmpValues, CmplogBytes, cmp::AflppCmpLogHeader};
+use libafl_bolts::{Error, HasLen, ownedref::OwnedRefMut};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use shmem_providers::ShMem;
 pub use stages::*;
 
 use crate::{CMPLOG_MAP_H, CMPLOG_MAP_W};
@@ -510,6 +508,18 @@ impl HasLen for AflppCmpLogMap {
 }
 
 impl AflppCmpLogMap {
+    /// Returns a new [`OwnedRefMut`] to an [`AflppCmpLogMap`], pointing to the given [`ShMem`].
+    ///
+    /// # Panics
+    /// Panics if the given shared mem is too small
+    ///
+    /// # Safety
+    /// The shared memory needs to start with a valid [`AflppCmpLogMap`] object.
+    /// Any use of this [`OwnedRefMut`] will dereference a pointer to the given shared memory accordingly
+    pub unsafe fn from_shmem<SHM: ShMem>(shmem: &mut SHM) -> OwnedRefMut<'_, Self> {
+        unsafe { OwnedRefMut::from_mut_ptr(shmem.as_mut_ptr_of().unwrap()) }
+    }
+
     #[must_use]
     #[expect(clippy::cast_ptr_alignment)]
     /// Instantiate a new boxed zeroed `AflppCmpLogMap`. This should be used to create a new
