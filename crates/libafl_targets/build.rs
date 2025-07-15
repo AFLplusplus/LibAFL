@@ -2,7 +2,7 @@
 
 use std::{env, fs::File, io::Write, path::Path};
 
-const TWO_MB: usize = 2_621_440;
+const TWO_MIB: usize = 2_097_152;
 const SIXTY_FOUR_KIB: usize = 65_536;
 
 #[rustversion::nightly]
@@ -28,7 +28,7 @@ fn main() {
 
     let edges_map_allocated_size: usize = option_env!("LIBAFL_EDGES_MAP_ALLOCATED_SIZE")
         .or(option_env!("LIBAFL_EDGES_MAP_ALLOCATED_SIZE")) // keep old env for retrocompatibility
-        .map_or(Ok(TWO_MB), str::parse)
+        .map_or(Ok(TWO_MIB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_ALLOCATED_SIZE");
 
     let edges_map_default_size: usize = option_env!("LIBAFL_EDGES_MAP_DEFAULT_SIZE")
