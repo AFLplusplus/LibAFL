@@ -44,7 +44,6 @@ document-features = ["dep:document-features"]
 std = [
   "alloc",
   "backtrace",
-  "backtrace",
   "fast_rands/std",
   "hostname",
   "libafl_core/nix",
@@ -102,7 +101,7 @@ qemu_cli = ["cli"]
 frida_cli = ["cli"]
 
 ## Stores the backtraces of all generated `Error`s. Good for debugging, but may come with a slight performance hit.
-errors_backtrace = ["backtrace"]
+errors_backtrace = ["libafl_core/errors_backtrace"]
 
 ## Enables gzip compression in certain parts of the lib
 gzip = ["miniz_oxide", "alloc", "ll_mp/gzip"]
@@ -123,6 +122,20 @@ stable_anymap = ["serde_anymap/stable_anymap"]
 
 ## Automatically register all `#[derive(SerdeAny)]` types at startup.
 serdeany_autoreg = ["serde_anymap/serdeany_autoreg"]
+
+#! ### LLMP features
+
+## If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
+llmp_bind_public = ["ll_mp/llmp_bind_public"]
+
+## Enables llmp compression using GZip
+llmp_compression = ["ll_mp/llmp_compression"]
+
+## Enables debug output for LLMP (also needs a `logger` installed)
+llmp_debug = ["ll_mp/llmp_debug"]
+
+## Reduces the initial map size for llmp
+llmp_small_maps = ["ll_mp/llmp_small_maps"]
 
 #! ### Stable SIMD features
 
