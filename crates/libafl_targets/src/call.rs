@@ -1,8 +1,8 @@
 use core::marker::PhantomData;
+use std::cell::LazyCell;
 
 use hashbrown::HashMap;
 use libafl::executors::hooks::ExecutorHook;
-use std::cell::LazyCell;
 
 /// The list of functions that this execution has observed
 pub static mut FUNCTION_LIST: LazyCell<HashMap<usize, usize>> = LazyCell::new(HashMap::new);

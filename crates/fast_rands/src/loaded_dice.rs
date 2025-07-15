@@ -22,8 +22,7 @@ fn main() {
 Original code by @eqv, see <https://github.com/eqv/loaded_dice>
 */
 
-use alloc::vec::Vec;
-use alloc::vec;
+use alloc::{vec, vec::Vec};
 use core::fmt::{self, Debug, Formatter};
 
 use super::Rand;

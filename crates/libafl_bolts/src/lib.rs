@@ -355,8 +355,8 @@ pub fn get_thread_id() -> u64 {
 #[cfg(target_os = "windows")]
 mod windows_logging {
     use core::ptr;
-
     use std::cell::OnceCell;
+
     use winapi::um::{
         fileapi::WriteFile, handleapi::INVALID_HANDLE_VALUE, processenv::GetStdHandle,
         winbase::STD_OUTPUT_HANDLE, winnt::HANDLE,
