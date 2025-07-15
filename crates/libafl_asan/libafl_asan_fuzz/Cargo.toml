@@ -15,7 +15,7 @@ libafl_asan = { path = "../", default-features = false, features = [
   "guest",
   "host",
   "libc",
-  "linux",
+  "syscalls",
   "test",
   "tracking",
 ] }

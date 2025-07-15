@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "linux", target_os = "linux", feature = "dlmalloc"))]
+#[cfg(all(test, feature = "syscalls", target_os = "linux", feature = "dlmalloc"))]
 mod tests {
 
     use std::{
@@ -6,7 +6,7 @@ mod tests {
         sync::Mutex,
     };
 
-    use libafl_asan::{allocator::backend::dlmalloc::DlmallocBackend, mmap::linux::LinuxMmap};
+    use libafl_asan::{allocator::backend::dlmalloc::DlmallocBackend, mmap::linux::MmapRegion};
     use spin::Lazy;
 
     static INIT_ONCE: Lazy<Mutex<()>> = Lazy::new(|| {
@@ -18,9 +18,9 @@ mod tests {
 
     const PAGE_SIZE: usize = 4096;
 
-    fn allocator() -> DlmallocBackend<LinuxMmap> {
+    fn allocator() -> DlmallocBackend<MmapRegion> {
         drop(INIT_ONCE.lock().unwrap());
-        DlmallocBackend::<LinuxMmap>::new(PAGE_SIZE)
+        DlmallocBackend::<MmapRegion>::new(PAGE_SIZE)
     }
 
     #[test]

@@ -24,8 +24,8 @@ type TestSyms = crate::symbols::nop::NopSymbols;
 #[cfg(feature = "libc")]
 type TestSyms = crate::symbols::dlsym::DlSymSymbols<crate::symbols::dlsym::LookupTypeNext>;
 
-#[cfg(all(feature = "linux", target_os = "linux", not(feature = "libc")))]
-type TestMap = crate::mmap::linux::LinuxMmap;
+#[cfg(all(feature = "syscalls", target_os = "linux", not(feature = "libc")))]
+type TestMap = crate::mmap::linux::MmapRegion;
 
 #[cfg(feature = "libc")]
 type TestMap = crate::mmap::libc::LibcMmap<TestSyms>;
@@ -34,7 +34,7 @@ type TestMap = crate::mmap::libc::LibcMmap<TestSyms>;
 type TestHost = crate::host::libc::LibcHost<TestSyms>;
 
 #[cfg(all(
-    feature = "linux",
+    feature = "syscalls",
     target_os = "linux",
     not(feature = "libc"),
     not(feature = "guest"),
@@ -57,7 +57,7 @@ type TestShadow = crate::shadow::host::HostShadow<TestHost>;
 
 #[cfg(feature = "libc")]
 use crate::logger::libc::LibcLogger;
-#[cfg(all(feature = "linux", target_os = "linux", not(feature = "libc")))]
+#[cfg(all(feature = "syscalls", target_os = "linux", not(feature = "libc")))]
 use crate::logger::linux::LinuxLogger;
 
 pub type TestFrontend = DefaultFrontend<DlmallocBackend<TestMap>, TestShadow, TestTracking>;
@@ -65,7 +65,7 @@ pub type TestFrontend = DefaultFrontend<DlmallocBackend<TestMap>, TestShadow, Te
 const PAGE_SIZE: usize = 4096;
 
 static FRONTEND: Lazy<Mutex<TestFrontend>> = Lazy::new(|| {
-    #[cfg(all(feature = "linux", target_os = "linux", not(feature = "libc")))]
+    #[cfg(all(feature = "syscalls", target_os = "linux", not(feature = "libc")))]
     LinuxLogger::initialize(Level::Info);
     #[cfg(feature = "libc")]
     LibcLogger::initialize::<TestSyms>(Level::Info);

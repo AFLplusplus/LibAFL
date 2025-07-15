@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "host", feature = "linux", target_os = "linux"))]
+#[cfg(all(test, feature = "host", feature = "syscalls", target_os = "linux"))]
 mod tests {
     use libafl_asan::host::linux::LinuxHost;
 
