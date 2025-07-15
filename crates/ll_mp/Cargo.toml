@@ -27,15 +27,21 @@ document-features = ["dep:document-features"]
 #! ### General Features
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = ["libafl_core/std", "shmem_providers/std", "alloc"]
+std = [
+  "libafl_core/std",
+  "shmem_providers/std",
+  "alloc",
+  "nix",
+  "serial_test",
+  "hostname",
+]
 
 ## Enables all features that allocate in `no_std`
 alloc = [
-  "hostname",
-  "postcard",
+  "exceptional/alloc",
   "libafl_core/alloc",
   "libafl_core/serde",
-  "exceptional/alloc",
+  "postcard",
   "shmem_providers/alloc",
 ]
 
@@ -64,18 +70,17 @@ rustversion = { workspace = true }
 
 [dependencies]
 # Document all features of this crate (for `cargo doc`)
-backtrace = { workspace = true }
 document-features = { workspace = true, optional = true }
 exceptional = { workspace = true }
-hostname = { version = "0.4.0", optional = true }            # Is there really no gethostname in the stdlib?
-libafl_core = { workspace = true, features = ["serde"] }
+hostname = { version = "0.4.0", optional = true }                  # Is there really no gethostname in the stdlib?
+libafl_core = { workspace = true }
 log = { workspace = true }
 miniz_oxide = { version = "0.8.0", optional = true }
-nix = { workspace = true, features = ["socket"] }
+nix = { workspace = true, features = ["socket"], optional = true }
 no_std_time = { workspace = true }
-postcard = { workspace = true, optional = true }             # no_std compatible serde serialization format
+postcard = { workspace = true, optional = true }                   # no_std compatible serde serialization format
 serde = { workspace = true, features = ["alloc", "derive"] }
-serial_test = { workspace = true }
+serial_test = { workspace = true, optional = true }
 shmem_providers = { workspace = true }
 tuple_list = { workspace = true }
 

@@ -44,6 +44,8 @@ document-features = ["dep:document-features"]
 std = [
   "alloc",
   "backtrace",
+  "build_id2",
+  "core_affinity2",
   "fast_rands/std",
   "hostname",
   "libafl_core/nix",
@@ -51,6 +53,7 @@ std = [
   "libafl_core/std",
   "libafl_core/std",
   "ll_mp/std",
+  "minibsod",
   "nix",
   "no_std_time/std",
   "serde/std",
@@ -58,9 +61,6 @@ std = [
   "shmem_providers/std",
   "simd",
   "uds",
-  "uds",
-  "uuid",
-  "uuid",
 ]
 
 ## Enables all features that allocate in `no_std`
@@ -153,14 +153,14 @@ chrono = "0.4.40"
 itertools = "0.14.0"
 
 [dependencies]
-build_id2 = { workspace = true }
-core_affinity2 = { workspace = true }
+build_id2 = { workspace = true, optional = true }
+core_affinity2 = { workspace = true, optional = true }
 exceptional = { workspace = true }
 fast_rands = { workspace = true }
-libafl_core = { workspace = true, features = ["postcard"] }
+libafl_core = { workspace = true }
 libafl_derive = { workspace = true, default-features = true, optional = true }
 ll_mp = { workspace = true }
-minibsod = { workspace = true }
+minibsod = { workspace = true, optional = true }
 no_std_time = { workspace = true }
 ownedref = { workspace = true }
 serde_anymap = { workspace = true, optional = true }
@@ -196,7 +196,6 @@ serde = { workspace = true, default-features = false, features = [
   "derive",
 ] } # serialization lib
 tuple_list = { workspace = true }
-uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
 xxhash-rust = { version = "0.8.12", features = [
   "xxh3",
 ], optional = true } # xxh3 hashing for rust

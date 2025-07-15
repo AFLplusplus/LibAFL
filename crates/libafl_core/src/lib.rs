@@ -102,8 +102,8 @@ pub const IP_LOCALHOST: &str = "127.0.0.1";
 pub struct ClientId(pub u32);
 
 #[cfg(feature = "errors_backtrace")]
-/// Error Backtrace type when `errors_backtrace` feature is enabled (== [`backtrace::Backtrace`])
-pub type ErrorBacktrace = backtrace::Backtrace;
+/// Error Backtrace type when `errors_backtrace` feature is enabled (== [`Backtrace`](std::backtrace::Backtrace`))
+pub type ErrorBacktrace = std::backtrace::Backtrace;
 
 #[cfg(not(feature = "errors_backtrace"))]
 #[derive(Debug, Default)]
@@ -114,7 +114,7 @@ pub struct ErrorBacktrace;
 impl ErrorBacktrace {
     /// Nop
     #[must_use]
-    pub fn new() -> Self {
+    pub fn capture() -> Self {
         Self
     }
 }
@@ -174,7 +174,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::Serialize(arg.into(), ErrorBacktrace::new())
+        Error::Serialize(arg.into(), ErrorBacktrace::capture())
     }
 
     /// Optional val was supposed to be set, but isn't.
@@ -183,7 +183,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::EmptyOptional(arg.into(), ErrorBacktrace::new())
+        Error::EmptyOptional(arg.into(), ErrorBacktrace::capture())
     }
 
     /// The `Input` was invalid
@@ -192,7 +192,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::InvalidInput(reason.into(), ErrorBacktrace::new())
+        Error::InvalidInput(reason.into(), ErrorBacktrace::capture())
     }
 
     /// Key not in Map
@@ -201,7 +201,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::KeyNotFound(arg.into(), ErrorBacktrace::new())
+        Error::KeyNotFound(arg.into(), ErrorBacktrace::capture())
     }
 
     /// Key already exists in Map
@@ -210,7 +210,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::KeyExists(arg.into(), ErrorBacktrace::new())
+        Error::KeyExists(arg.into(), ErrorBacktrace::capture())
     }
 
     /// No elements in the current item
@@ -219,7 +219,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::Empty(arg.into(), ErrorBacktrace::new())
+        Error::Empty(arg.into(), ErrorBacktrace::capture())
     }
 
     /// End of iteration
@@ -228,7 +228,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::IteratorEnd(arg.into(), ErrorBacktrace::new())
+        Error::IteratorEnd(arg.into(), ErrorBacktrace::capture())
     }
 
     /// This is not supported (yet)
@@ -237,7 +237,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::NotImplemented(arg.into(), ErrorBacktrace::new())
+        Error::NotImplemented(arg.into(), ErrorBacktrace::capture())
     }
 
     /// You're holding it wrong
@@ -246,7 +246,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::IllegalState(arg.into(), ErrorBacktrace::new())
+        Error::IllegalState(arg.into(), ErrorBacktrace::capture())
     }
 
     /// The argument passed to this method or function is not valid
@@ -255,7 +255,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::IllegalArgument(arg.into(), ErrorBacktrace::new())
+        Error::IllegalArgument(arg.into(), ErrorBacktrace::capture())
     }
 
     /// Shutting down, not really an error.
@@ -270,7 +270,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::Unsupported(arg.into(), ErrorBacktrace::new())
+        Error::Unsupported(arg.into(), ErrorBacktrace::capture())
     }
 
     /// OS error with additional message
@@ -280,7 +280,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::OsError(err, msg.into(), ErrorBacktrace::new())
+        Error::OsError(err, msg.into(), ErrorBacktrace::capture())
     }
 
     /// OS error from [`io::Error::last_os_error`] with additional message
@@ -293,7 +293,7 @@ impl Error {
         Error::OsError(
             io::Error::last_os_error(),
             msg.into(),
-            ErrorBacktrace::new(),
+            ErrorBacktrace::capture(),
         )
     }
 
@@ -303,7 +303,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::Unknown(arg.into(), ErrorBacktrace::new())
+        Error::Unknown(arg.into(), ErrorBacktrace::capture())
     }
 
     /// Error with corpora
@@ -312,7 +312,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::InvalidCorpus(arg.into(), ErrorBacktrace::new())
+        Error::InvalidCorpus(arg.into(), ErrorBacktrace::capture())
     }
 
     /// Error specific to some runtime, like QEMU or Frida
@@ -321,7 +321,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::Runtime(arg.into(), ErrorBacktrace::new())
+        Error::Runtime(arg.into(), ErrorBacktrace::capture())
     }
 }
 
