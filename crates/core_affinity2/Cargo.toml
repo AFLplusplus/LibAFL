@@ -20,14 +20,7 @@ features = ["document-features"]
 all-features = true
 
 [features]
-default = ["std"]
 document-features = ["dep:document-features"]
-
-#! # Feature Flags
-#! ### General Features
-
-## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = ["libafl_core/std"]
 
 [build-dependencies]
 rustversion = { workspace = true }
@@ -38,7 +31,7 @@ rustversion = { workspace = true }
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
 serde = { workspace = true, features = ["alloc", "derive"] }
-libafl_core = { workspace = true, features = ["alloc"] }
+libafl_core = { workspace = true, features = ["alloc", "std"] }
 libc = { workspace = true }
 
 [lints]

@@ -31,19 +31,19 @@ workspace = true
 
 [features]
 default = [
-  "std",
   "derive",
-  "llmp_compression",
-  "llmp_small_maps",
-  "llmp_broker_timeouts",
-  "rand_trait",
+  "errors_backtrace",
   "fork",
   "gzip",
+  "libafl_bolts/xxh3",
+  "llmp_broker_timeouts",
+  "llmp_compression",
+  "llmp_small_maps",
+  "rand_trait",
   "regex",
   "serdeany_autoreg",
-  "libafl_bolts/xxh3",
   "simd",
-  "errors_backtrace",
+  "std",
 ]
 document-features = ["dep:document-features"]
 
@@ -52,19 +52,20 @@ document-features = ["dep:document-features"]
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
 std = [
-  "serde_json",
-  "serde_json/std",
-  "dep:nix",
-  "serde/std",
-  "bincode",
-  "wait-timeout",
-  "uuid",
   "backtrace",
-  "serial_test",
-  "libafl_bolts/std",
-  "typed-builder",
+  "bincode",
+  "dep:nix",
   "fastbloom",
   "fs2",
+  "libafl_bolts/std",
+  "ll_mp/std",
+  "serde_json",
+  "serde_json/std",
+  "serde/std",
+  "serial_test",
+  "typed-builder",
+  "uuid",
+  "wait-timeout",
 ]
 
 ## Tracks the Feedbacks and the Objectives that were interesting for a Testcase
@@ -218,51 +219,66 @@ static_assertions = { workspace = true }
 
 [dependencies]
 libafl_bolts = { workspace = true, features = ["alloc"] }
+libafl_core = { workspace = true }
 libafl_derive = { workspace = true, default-features = true, optional = true }
 libafl_intelpt = { workspace = true, default-features = true, optional = true }
 ll_mp = { workspace = true }
 
-rustversion = { workspace = true }
-tuple_list = { workspace = true }
+ahash = { workspace = true } # The hash function already used in hashbrown
+arbitrary-int = { workspace = true }
+arrayvec = { version = "0.7.6", optional = true, default-features = false } # used for fixed-len collects
+async-std = { version = "1.13.0", features = ["attributes"], optional = true }
+backtrace = { workspace = true, optional = true } # Used to get the stacktrace in StacktraceObserver
+bincode = { version = "2.0.1", optional = true, features = ["serde"] }
+bitbybit = { workspace = true }
+bitvec = { version = "1.0.1", optional = true, features = [
+  "serde",
+] } # used for string range storage
+cadence = { version = "1.5.0", optional = true } # For the statsd monitor
+clap = { workspace = true, optional = true }
+const_format = "0.2.33" # used for providing helpful compiler output
+const_panic = { version = "0.2.9", default-features = false } # similarly, for formatting const panic output
+crossterm = { version = "0.29.0", optional = true }
+enumflags2 = { version = "0.7.10", optional = true }
+fastbloom = { workspace = true, optional = true }
+fs2 = { workspace = true, optional = true } # used by OnDisk Corpus for file locking
+futures = { version = "0.3.30", optional = true }
 hashbrown = { workspace = true, features = [
   "serde",
   "ahash",
 ], default-features = false } # A faster hashmap, nostd compatible
-num-traits = { workspace = true, default-features = false }
-serde = { workspace = true, features = ["alloc"] } # serialization lib
-postcard = { workspace = true } # no_std compatible serde serialization format
-bincode = { version = "2.0.1", optional = true, features = ["serde"] }
-bitbybit = { workspace = true }
-arbitrary-int = { workspace = true }
-ahash = { workspace = true } # The hash function already used in hashbrown
+libcasr = { version = "2.12.1", optional = true }
+libm = "0.2.8"
+log = { workspace = true }
 meminterval = { workspace = true, features = ["serde"] }
-backtrace = { workspace = true, optional = true } # Used to get the stacktrace in StacktraceObserver
-typed-builder = { workspace = true, optional = true } # Implement the builder pattern at compiletime
-send_wrapper = { version = "0.6.0", optional = true } # To move data between threads
-
-serde_json = { workspace = true, optional = true, default-features = false, features = [
-  "alloc",
-] }
+mlua = { version = "0.10.3", features = [
+  "lua54",
+  "vendored",
+  "macros",
+], optional = true } # For Lua Mutators / TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>
 nix = { workspace = true, optional = true, features = [
   "signal",
   "ptrace",
   "personality",
   "fs",
 ] }
-regex = { workspace = true, optional = true }
-uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
-libm = "0.2.8"
+num_enum = { workspace = true, optional = true }
+num-traits = { workspace = true, default-features = false }
+postcard = { workspace = true } # no_std compatible serde serialization format
+prometheus-client = { version = "0.23.0", optional = true } # For the prometheus monitor
+pyo3 = { workspace = true, optional = true }
 ratatui = { version = "0.29.0", default-features = false, features = [
   'crossterm',
 ], optional = true } # Commandline rendering, for TUI Monitor
-crossterm = { version = "0.29.0", optional = true }
-
-cadence = { version = "1.5.0", optional = true } # For the statsd monitor
-prometheus-client = { version = "0.23.0", optional = true } # For the prometheus monitor
+regex = { workspace = true, optional = true }
+regex-syntax = { version = "0.8.4", optional = true } # For nautilus
+rustversion = { workspace = true }
+send_wrapper = { version = "0.6.0", optional = true } # To move data between threads
+serde = { workspace = true, features = ["alloc"] } # serialization lib
+serde_json = { workspace = true, optional = true, default-features = false, features = [
+  "alloc",
+] }
 tide = { version = "0.16.0", optional = true }
-async-std = { version = "1.13.0", features = ["attributes"], optional = true }
-futures = { version = "0.3.30", optional = true }
-log = { workspace = true }
 tokio = { version = "1.40.0", optional = true, features = [
   "sync",
   "net",
@@ -272,25 +288,10 @@ tokio = { version = "1.40.0", optional = true, features = [
   "rt-multi-thread",
   "time",
 ] } # used for TCP Event Manager and multi-machine
-enumflags2 = { version = "0.7.10", optional = true }
-
+tuple_list = { workspace = true }
+typed-builder = { workspace = true, optional = true } # Implement the builder pattern at compiletime
+uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
 wait-timeout = { version = "0.2.0", optional = true } # used by CommandExecutor to wait for child process
-
-libcasr = { version = "2.12.1", optional = true }
-
-bitvec = { version = "1.0.1", optional = true, features = [
-  "serde",
-] } # used for string range storage
-
-arrayvec = { version = "0.7.6", optional = true, default-features = false } # used for fixed-len collects
-
-const_format = "0.2.33"                                       # used for providing helpful compiler output
-const_panic = { version = "0.2.9", default-features = false } # similarly, for formatting const panic output
-
-pyo3 = { workspace = true, optional = true }
-regex-syntax = { version = "0.8.4", optional = true } # For nautilus
-
-fs2 = { workspace = true, optional = true } # used by OnDisk Corpus for file locking
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
 serial_test = { workspace = true, optional = true, default-features = false, features = [
@@ -299,17 +300,6 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
-# Optional
-clap = { workspace = true, optional = true }
-num_enum = { workspace = true, optional = true }
-fastbloom = { workspace = true, optional = true }
-# For Lua Mutators
-# TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>
-mlua = { version = "0.10.3", features = [
-  "lua54",
-  "vendored",
-  "macros",
-], optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }                # For (*nix) libc

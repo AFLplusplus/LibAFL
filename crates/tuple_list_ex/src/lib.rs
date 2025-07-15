@@ -793,7 +793,7 @@ macro_rules! tuple_for_each_mut {
 #[macro_export]
 macro_rules! map_tuple_list_type {
     ($Tuple:ty, $Mapper:ty) => {
-        <$Tuple as $crate::tuples::Map<$Mapper>>::MapResult
+        <$Tuple as $crate::Map<$Mapper>>::MapResult
     };
 }
 
@@ -828,13 +828,13 @@ macro_rules! merge_tuple_list_type {
 
    // Base case: when only two types are provided, apply the Merge trait directly
    ($Type1:ty, $Type2:ty) => {
-        <$Type1 as $crate::tuples::Merge<$Type2>>::MergeResult
+        <$Type1 as $crate::Merge<$Type2>>::MergeResult
     };
 
     // Recursive case: when more than two types are provided
     ($Type1:ty, $Type2:ty, $( $rest:ty ),+) => {
         merge_tuple_list_type!(
-            <$Type1 as $crate::tuples::Merge<$Type2>>::MergeResult,
+            <$Type1 as $crate::Merge<$Type2>>::MergeResult,
             $( $rest ),+
         )
     };
@@ -873,11 +873,11 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 mod test {
     use core::marker::PhantomData;
 
+    #[cfg(feature = "alloc")]
+    use ownedref::OwnedMutSlice;
     use tuple_list::{tuple_list, tuple_list_type};
 
-    #[cfg(feature = "alloc")]
-    use crate::ownedref::OwnedMutSlice;
-    use crate::tuples::{Map, MappingFunctor, Merge, type_eq};
+    use crate::{Map, MappingFunctor, Merge, type_eq};
 
     #[test]
     // for type name tests

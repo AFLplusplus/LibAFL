@@ -27,10 +27,10 @@ document-features = ["dep:document-features"]
 #! ### General Features
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = []
+std = ["alloc"]
 
 ## Enables all features that allocate in `no_std`
-alloc = []
+alloc = ["ownedref"]
 
 ## Enables serde support for tuple lists
 serde = ["alloc", "dep:serde"]
@@ -52,6 +52,7 @@ serde = { workspace = true, default-features = false, features = [
 ], optional = true }
 tuple_list = { workspace = true }
 typeid = { workspace = true }
+ownedref = { workspace = true, optional = true }
 
 [lints]
 workspace = true

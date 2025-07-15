@@ -27,7 +27,7 @@ document-features = ["dep:document-features"]
 #! ### General Features
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = []
+std = ["alloc"]
 
 ## Enables all features that allocate in `no_std`
 alloc = []

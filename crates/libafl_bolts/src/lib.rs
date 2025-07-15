@@ -56,9 +56,6 @@ pub extern crate alloc;
 
 #[cfg(feature = "std")]
 pub use build_id2 as build_id;
-#[cfg(feature = "ctor")]
-#[doc(hidden)]
-pub use ctor;
 #[cfg(feature = "alloc")]
 pub use serde_anymap::anymap;
 #[cfg(all(
@@ -82,7 +79,6 @@ pub mod os;
 pub use serde_anymap::serdeany;
 #[cfg(feature = "std")]
 pub mod staterestore;
-// TODO: reenable once ahash works in no-alloc
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 pub use tuple_list_ex as tuples;
 
@@ -93,6 +89,9 @@ pub use argparse::*;
 
 #[cfg(feature = "std")]
 pub mod target_args;
+pub use no_std_time::format_duration;
+#[cfg(feature = "alloc")]
+pub use serde_anymap::impl_serdeany;
 #[cfg(feature = "std")]
 pub use target_args::*;
 
@@ -103,7 +102,7 @@ pub use libafl_core::{
     AsIter, AsIterMut, AsSlice, AsSliceMut, ClientId, Error, HasLen, HasRefCnt, Named, Truncate,
 };
 pub use no_std_time::current_time;
-pub use ownedref;
+pub use ownedref::{self, subrange};
 pub use shmem_providers as shmem;
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.

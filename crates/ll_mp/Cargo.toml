@@ -27,7 +27,7 @@ document-features = ["dep:document-features"]
 #! ### General Features
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = ["libafl_core/std", "shmem_providers/std"]
+std = ["libafl_core/std", "shmem_providers/std", "alloc"]
 
 ## Enables all features that allocate in `no_std`
 alloc = [
@@ -64,19 +64,20 @@ rustversion = { workspace = true }
 
 [dependencies]
 # Document all features of this crate (for `cargo doc`)
+backtrace = { workspace = true }
 document-features = { workspace = true, optional = true }
-miniz_oxide = { version = "0.8.0", optional = true }
+exceptional = { workspace = true }
 hostname = { version = "0.4.0", optional = true }            # Is there really no gethostname in the stdlib?
-postcard = { workspace = true, optional = true }             # no_std compatible serde serialization format
+libafl_core = { workspace = true, features = ["serde"] }
 log = { workspace = true }
-tuple_list = { workspace = true }
-libafl_core = { workspace = true }
+miniz_oxide = { version = "0.8.0", optional = true }
 nix = { workspace = true, features = ["socket"] }
 no_std_time = { workspace = true }
+postcard = { workspace = true, optional = true }             # no_std compatible serde serialization format
 serde = { workspace = true, features = ["alloc", "derive"] }
-shmem_providers = { workspace = true }
-exceptional = { workspace = true }
 serial_test = { workspace = true }
+shmem_providers = { workspace = true }
+tuple_list = { workspace = true }
 
 [[example]]
 name = "llmp_test"

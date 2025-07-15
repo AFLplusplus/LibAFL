@@ -359,7 +359,7 @@ fn fuzz(
         unsafe {
             cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
         }
-        let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
+        let cmpmap = unsafe { AflppCmpLogMap::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = AflppCmpLogObserver::new("cmplog", cmpmap, true);
         let cmplog_ref = cmplog_observer.handle();

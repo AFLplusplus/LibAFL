@@ -58,6 +58,3 @@ pub mod unix_signals;
 #[cfg(all(windows, feature = "std"))]
 #[expect(missing_docs, overflowing_literals)]
 pub mod windows_exceptions;
-
-#[cfg(unix)]
-pub use unix_signals::CTRL_C_EXIT;

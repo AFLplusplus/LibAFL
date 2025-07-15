@@ -13,8 +13,7 @@ use core::{
 };
 
 use libafl::observers::{CmpMap, CmpValues, CmplogBytes, cmp::AflppCmpLogHeader};
-use libafl_bolts::{HasLen, ownedref::OwnedRefMut};
-use libafl_core::Error;
+use libafl_bolts::{Error, HasLen, ownedref::OwnedRefMut};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use shmem_providers::ShMem;
 pub use stages::*;

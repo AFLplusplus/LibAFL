@@ -50,5 +50,9 @@ extern crate std;
 #[doc(hidden)]
 pub extern crate alloc;
 
+#[cfg(feature = "serdeany_autoreg")]
+#[doc(hidden)]
+pub use ctor;
+
 pub mod anymap;
 pub mod serdeany;

@@ -1166,7 +1166,7 @@ pub fn generate_minibsod<W: Write>(
         writeln!(writer, "Received signal {signal}")?;
     }
     writeln!(writer, "{:━^100}", " BACKTRACE ")?;
-    writeln!(writer, "{:?}", backtrace::Backtrace::new())?;
+    writeln!(writer, "{:?}", std::backtrace::Backtrace::force_capture())?;
     writeln!(writer, "{:━^100}", " MAPS ")?;
     write_minibsod(writer)
 }

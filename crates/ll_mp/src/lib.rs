@@ -101,19 +101,15 @@ Check out the `llmp_test` example in ./examples, or build it with `cargo run --e
     )
 )]
 
+extern crate alloc;
 #[cfg(feature = "std")]
-#[macro_use]
 extern crate std;
-#[doc(hidden)]
-pub extern crate alloc;
 
 #[cfg(feature = "std")]
 use alloc::boxed::Box;
 #[cfg(feature = "std")]
 use alloc::string::ToString;
-#[cfg(feature = "alloc")]
-use alloc::vec;
-use alloc::{string::String, vec::Vec};
+use alloc::{string::String, vec, vec::Vec};
 #[cfg(feature = "std")]
 use core::net::SocketAddr;
 #[cfg(not(target_pointer_width = "64"))]
@@ -327,6 +323,7 @@ pub enum TcpRequest {
     },
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<&Vec<u8>> for TcpRequest {
     type Error = Error;
 
@@ -335,6 +332,7 @@ impl TryFrom<&Vec<u8>> for TcpRequest {
     }
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<Vec<u8>> for TcpRequest {
     type Error = Error;
 
@@ -356,6 +354,7 @@ pub struct TcpRemoteNewMessage {
     payload: Vec<u8>,
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<&Vec<u8>> for TcpRemoteNewMessage {
     type Error = Error;
 
@@ -364,6 +363,7 @@ impl TryFrom<&Vec<u8>> for TcpRemoteNewMessage {
     }
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<Vec<u8>> for TcpRemoteNewMessage {
     type Error = Error;
 
@@ -400,6 +400,7 @@ pub enum TcpResponse {
     },
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<&Vec<u8>> for TcpResponse {
     type Error = Error;
 
@@ -408,6 +409,7 @@ impl TryFrom<&Vec<u8>> for TcpResponse {
     }
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<Vec<u8>> for TcpResponse {
     type Error = Error;
 

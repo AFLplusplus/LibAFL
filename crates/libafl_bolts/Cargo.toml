@@ -27,12 +27,12 @@ all-features = true
 
 [features]
 default = [
-  "std",
-  "derive",
-  "rand_trait",
-  "gzip",
-  "serdeany_autoreg",
   "alloc",
+  "derive",
+  "gzip",
+  "rand_trait",
+  "serdeany_autoreg",
+  "std",
   "xxh3",
 ]
 document-features = ["dep:document-features"]
@@ -44,22 +44,23 @@ document-features = ["dep:document-features"]
 std = [
   "alloc",
   "backtrace",
+  "backtrace",
+  "fast_rands/std",
   "hostname",
   "libafl_core/nix",
+  "libafl_core/nix",
   "libafl_core/std",
+  "libafl_core/std",
+  "ll_mp/std",
   "nix",
   "no_std_time/std",
   "serde/std",
-  "libafl_core/std",
-  "libafl_core/nix",
-  "shmem_providers/std",
-  "uuid",
-  "backtrace",
-  "uds",
   "serial_test",
   "shmem_providers/std",
   "simd",
   "uds",
+  "uds",
+  "uuid",
   "uuid",
 ]
 
@@ -67,8 +68,10 @@ std = [
 alloc = [
   "ahash",
   "erased-serde/alloc",
+  "fast_rands/alloc",
   "hashbrown",
   "libafl_core/alloc",
+  "ll_mp/alloc",
   "no_std_time/alloc",
   "postcard",
   "serde/alloc",
@@ -81,7 +84,7 @@ derive = ["libafl_derive"]
 
 ## If set, libafl_bolt's `rand` implementations will implement `rand_core::CoreRng`
 ## and, inversely, all seedable `rand_core::RngCore` types can be used as Rng for LibAFL.
-rand_trait = ["rand_core"]
+rand_trait = ["fast_rands/rand_trait"]
 
 ## Will build the `pyo3` bindings
 python = ["pyo3", "std", "libafl_core/python"]
@@ -102,7 +105,7 @@ frida_cli = ["cli"]
 errors_backtrace = ["backtrace"]
 
 ## Enables gzip compression in certain parts of the lib
-gzip = ["miniz_oxide", "alloc"]
+gzip = ["miniz_oxide", "alloc", "ll_mp/gzip"]
 
 ## Replaces `ahash` with the potentially faster [`xxh3`](https://github.com/Cyan4973/xxHash) in some parts of the lib.
 ## This yields a stable and fast hash, but may increase the resulting binary size slightly
@@ -116,10 +119,10 @@ xxh3 = ["xxhash-rust"]
 ## With this feature, stored state remains deserializable across multiple compilations of LibAFL.
 ## The rust doc specifically states that "multiple types may map to the same type name", so it could potentially lead to bugs.
 ## However, we make sure that no two types with the same name ever exist.
-stable_anymap = []
+stable_anymap = ["serde_anymap/stable_anymap"]
 
 ## Automatically register all `#[derive(SerdeAny)]` types at startup.
-serdeany_autoreg = ["ctor"]
+serdeany_autoreg = ["serde_anymap/serdeany_autoreg"]
 
 #! ### Stable SIMD features
 
@@ -138,6 +141,7 @@ itertools = "0.14.0"
 [dependencies]
 build_id2 = { workspace = true }
 core_affinity2 = { workspace = true }
+exceptional = { workspace = true }
 fast_rands = { workspace = true }
 libafl_core = { workspace = true, features = ["postcard"] }
 libafl_derive = { workspace = true, default-features = true, optional = true }
@@ -148,7 +152,7 @@ ownedref = { workspace = true }
 serde_anymap = { workspace = true }
 shmem_providers = { workspace = true }
 static_assertions = { workspace = true }
-tuple_list_ex = { workspace = true }
+tuple_list_ex = { workspace = true, features = ["serde"] }
 typeid = { workspace = true }
 
 ahash = { workspace = true, optional = true } # The hash function already used in hashbrown
@@ -157,7 +161,6 @@ clap = { workspace = true, features = [
   "derive",
   "wrap_help",
 ], optional = true } # CLI parsing, for libafl_bolts::cli / the `cli` feature
-ctor = { optional = true, version = "0.4.0" }
 erased-serde = { version = "0.4.5", default-features = false, optional = true } # erased serde
 hashbrown = { workspace = true, features = [
   "serde",
@@ -175,7 +178,6 @@ nix = { workspace = true, optional = true, default-features = false, features = 
 num_enum = { workspace = true, default-features = false }
 postcard = { workspace = true, optional = true } # no_std compatible serde serialization format
 pyo3 = { workspace = true, optional = true, features = ["serde", "macros"] }
-rand_core = { version = "0.9.0", optional = true }
 serde = { workspace = true, default-features = false, features = [
   "derive",
 ] } # serialization lib

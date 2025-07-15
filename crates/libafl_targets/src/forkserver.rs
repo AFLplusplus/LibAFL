@@ -15,8 +15,10 @@ use libafl::executors::forkserver::{
     FS_NEW_OPT_SHDMEM_FUZZ, FS_NEW_VERSION_MAX, FS_OPT_ERROR, MAX_INPUT_SIZE_DEFAULT, SHM_ENV_VAR,
     SHM_FUZZ_ENV_VAR, SHM_FUZZ_MAP_SIZE_ENV_VAR, SHMEM_FUZZ_HDR_SIZE,
 };
-use libafl_bolts::os::{ChildHandle, ForkResult};
-use libafl_core::Error;
+use libafl_bolts::{
+    Error,
+    os::{ChildHandle, ForkResult},
+};
 use nix::{
     sys::signal::{SigHandler, Signal},
     unistd::Pid,

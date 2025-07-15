@@ -24,7 +24,7 @@ pub type TypeRepr = u128;
 pub type TypeRepr = Cow<'static, str>;
 
 /// Error string when no types at all have been registered yet.
-pub(crate) const ERR_EMPTY_TYPES_REGISTER: &str = "Empty types registry. Please enable the `serdeany_autoreg` feature in libafl_bolts or register all required types manually using RegistryBuilder::register().";
+pub(crate) const ERR_EMPTY_TYPES_REGISTER: &str = "Empty types registry. Please enable the `serdeany_autoreg` feature for serde_anymap or register all required types manually using RegistryBuilder::register().";
 
 #[cfg(not(feature = "stable_anymap"))]
 fn type_repr<T>() -> TypeRepr

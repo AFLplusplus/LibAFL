@@ -12,7 +12,7 @@ use std::{
 };
 
 use hashbrown::HashSet;
-use libafl_core::Error;
+use libafl_bolts::Error;
 use rangemap::RangeMap;
 
 /// A basic block struct

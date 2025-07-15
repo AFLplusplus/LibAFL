@@ -15,10 +15,18 @@ use std::{
     sync::OnceLock,
 };
 
+#[cfg(unix)]
+pub use exceptional::unix_signals;
+#[cfg(unix)]
+pub use exceptional::unix_signals::CTRL_C_EXIT;
+#[cfg(windows)]
+pub use exceptional::windows_exceptions;
 use libafl_core::format;
 // Allow a few extra features we need for the whole module
 #[cfg(unix)]
 use libc::pid_t;
+#[cfg(all(unix, feature = "std"))]
+pub use shmem_providers::pipes;
 #[cfg(all(windows, feature = "std"))]
 pub use windows_exceptions::CTRL_C_EXIT;
 

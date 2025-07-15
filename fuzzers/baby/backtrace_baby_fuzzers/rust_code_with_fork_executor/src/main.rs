@@ -67,12 +67,13 @@ pub fn main() {
     // Create an observation channel using the signals map
 
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", signals_ptr, signals_len) };
-    // Create a stacktrace observer
-    let bt_observer = BacktraceObserver::new(
+    // # Safety
+    // We just created the shmem and it's large enough.
+    let bt_observer = unsafe { BacktraceObserver::from_shmem(
         "BacktraceObserver",
-        unsafe { OwnedRefMut::from_shmem(&mut bt) },
+        &mut bt,
         libafl::observers::HarnessType::Child,
-    );
+    )};
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let mut feedback = MaxMapFeedback::new(&observer);

@@ -405,7 +405,7 @@ fn fuzz(
         unsafe {
             cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
         }
-        let cmpmap = unsafe { OwnedRefMut::<AflppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
+        let cmpmap = unsafe { AflppCmpLogMap::from_shmem(&mut cmplog_shmem) };
 
         let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
 
