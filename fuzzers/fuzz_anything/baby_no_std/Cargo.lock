@@ -297,7 +297,6 @@ dependencies = [
  "minibsod",
  "no_std_time",
  "num_enum",
- "once_cell",
  "ownedref",
  "postcard",
  "rustversion",

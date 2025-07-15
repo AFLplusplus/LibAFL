@@ -2,9 +2,10 @@ use core::marker::PhantomData;
 
 use hashbrown::HashMap;
 use libafl::executors::hooks::ExecutorHook;
-use once_cell::sync::Lazy;
+use std::cell::LazyCell;
+
 /// The list of functions that this execution has observed
-pub static mut FUNCTION_LIST: Lazy<HashMap<usize, usize>> = Lazy::new(HashMap::new);
+pub static mut FUNCTION_LIST: LazyCell<HashMap<usize, usize>> = LazyCell::new(HashMap::new);
 
 #[unsafe(no_mangle)]
 /// The runtime code inserted at every callinst invokation (if you used the function-logging.cc)

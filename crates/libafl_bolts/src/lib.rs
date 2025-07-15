@@ -356,7 +356,7 @@ pub fn get_thread_id() -> u64 {
 mod windows_logging {
     use core::ptr;
 
-    use once_cell::sync::OnceCell;
+    use std::cell::OnceCell;
     use winapi::um::{
         fileapi::WriteFile, handleapi::INVALID_HANDLE_VALUE, processenv::GetStdHandle,
         winbase::STD_OUTPUT_HANDLE, winnt::HANDLE,

@@ -85,7 +85,6 @@ shmem_providers = { workspace = true }
 libc = { workspace = true }
 nix = { workspace = true, optional = true }
 hashbrown = { workspace = true, default-features = true }
-once_cell = "1.19.0"
 log = { workspace = true }
 rustversion = { workspace = true }
 

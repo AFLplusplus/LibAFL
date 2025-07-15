@@ -227,7 +227,6 @@ windows = { workspace = true, features = [
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
 ] }
-once_cell = "1.10.0"
 winapi = { version = "0.3", features = [
   "fileapi",
   "handleapi",
