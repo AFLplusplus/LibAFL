@@ -95,7 +95,7 @@ use {
 /// Localhost addr, this is used, for example, for LLMP Client, which connects to this address
 pub const IP_LOCALHOST: &str = "127.0.0.1";
 
-/// The client ID for various use cases across LibAFL
+/// The client ID for various use cases across `LibAFL`
 #[repr(transparent)]
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

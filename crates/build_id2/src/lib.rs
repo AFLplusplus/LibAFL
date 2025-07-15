@@ -1,7 +1,7 @@
 //! Based on <https://github.com/alecmocatta/build_id>
 //! (C) Alec Mocatta <alec@mocatta.net> under license MIT or Apache 2
 //!
-//! Maintained by the LibAFL team.
+//! Maintained by the `LibAFL` team.
 #![doc = include_str!("../../../README.md")]
 /*! */
 #![cfg_attr(not(test), warn(

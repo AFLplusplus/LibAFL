@@ -1,4 +1,4 @@
-//! A map that can retrieve values by type - and is SerDe serializable.
+//! A map that can retrieve values by type - and is `Serde` serializable.
 #![doc = include_str!("../../../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
