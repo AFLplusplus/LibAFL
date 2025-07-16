@@ -388,6 +388,16 @@ pub fn parse_args() -> FuzzerOptions {
     FuzzerOptions::parse()
 }
 
+/// Needed for targets, which doesn't have `std::env::args_os()` (FreeBSD for example)
+#[must_use]
+pub fn parse_from<I, T>(itr: I) -> FuzzerOptions
+where
+    I: IntoIterator<Item = T>,
+    T: Into<std::ffi::OsString> + Clone,
+{
+    FuzzerOptions::parse_from(itr)
+}
+
 #[cfg(all(
     test,
     any(feature = "cli", feature = "qemu_cli", feature = "frida_cli")
