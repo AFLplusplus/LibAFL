@@ -225,12 +225,18 @@ pub struct FuzzerOptions {
 
     /// The maximum total allocation size that the `ASan` allocator should allocate
     #[cfg(feature = "frida_cli")]
-    #[arg(
+    #[cfg_attr(target_pointer_width = "64", arg(
         short = 'M',
         long,
         default_value = "4294967296",  // 1_usize << 32
         help_heading = "ASan Options"
-    )]
+    ))]
+    #[cfg_attr(target_pointer_width = "32", arg(
+        short = 'M',
+        long,
+        default_value =  "2147483648",  // 1_usize << 31
+        help_heading = "ASan Options"
+    ))]
     pub max_total_allocation: usize,
 
     /// Instruct `ASan` to panic if the max `ASan` allocation size is exceeded
