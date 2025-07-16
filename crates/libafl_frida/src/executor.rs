@@ -202,7 +202,11 @@ where
             helper.borrow_mut().disable_excludes
         );
         if !helper.borrow_mut().disable_excludes {
-            for range in ranges.gaps(&(0..u64::MAX)) {
+            #[cfg(target_pointer_width = "64")]
+            let range_end = u64::MAX;
+            #[cfg(target_pointer_width = "32")]
+            let range_end = u32::MAX as u64;
+            for range in ranges.gaps(&(0..range_end)) {
                 log::info!("excluding range: {:x}-{:x}", range.start, range.end);
                 stalker.exclude(&MemoryRange::new(
                     NativePointer(range.start as *mut c_void),
