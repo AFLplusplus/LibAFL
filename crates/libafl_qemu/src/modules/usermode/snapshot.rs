@@ -1077,17 +1077,17 @@ where
             }
 
             #[cfg(not(any(cpu_target = "arm", cpu_target = "riscv32")))]
-            if sys_const == SYS_mmap {
-                if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
-                    if let Some(h) = emulator_modules.get_mut::<SnapshotModule>() {
-                        h.add_mapped(result, a1 as usize, Some(prot));
-                    } else {
-                        let snap = emulator_modules
-                            .get_mut::<OptionalModule<SnapshotModule>>()
-                            .unwrap();
-                        let h = snap.get_inner_module_mut();
-                        h.add_mapped(result, a1 as usize, Some(prot));
-                    }
+            if sys_const == SYS_mmap
+                && let Ok(prot) = MmapPerms::try_from(a2 as i32)
+            {
+                if let Some(h) = emulator_modules.get_mut::<SnapshotModule>() {
+                    h.add_mapped(result, a1 as usize, Some(prot));
+                } else {
+                    let snap = emulator_modules
+                        .get_mut::<OptionalModule<SnapshotModule>>()
+                        .unwrap();
+                    let h = snap.get_inner_module_mut();
+                    h.add_mapped(result, a1 as usize, Some(prot));
                 }
             }
 
