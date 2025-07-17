@@ -303,7 +303,7 @@ impl FridaInstrumentationHelperBuilder {
         callback: Option<F>,
     ) -> Self {
         let name = path
-            .file_name()
+            .file_stem()
             .and_then(|name| name.to_str())
             .unwrap_or_else(|| {
                 panic!(
@@ -311,16 +311,14 @@ impl FridaInstrumentationHelperBuilder {
                     path.display()
                 )
             });
-        let script_prefix = include_str!("script.js");
         let file_contents = read_to_string(path)
             .unwrap_or_else(|err| panic!("Failed to read script {}: {err:?}", path.display()));
-        let payload = script_prefix.to_string() + &file_contents;
         let gum = Gum::obtain();
         let backend = match backend {
             FridaScriptBackend::V8 => Backend::obtain_v8(&gum),
             FridaScriptBackend::QuickJS => Backend::obtain_qjs(&gum),
         };
-        Script::load(&backend, name, payload, callback).unwrap();
+        Script::load(&backend, name, file_contents, callback).unwrap();
         self
     }
 
