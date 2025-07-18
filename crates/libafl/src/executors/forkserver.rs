@@ -513,12 +513,11 @@ impl Forkserver {
         // # Saftey
         // The pipe file descriptors used for `setpipe` are valid at this point.
         let fsrv_handle = unsafe {
-            match command
+            match ConfigTarget::setsid(command
                 .env("LD_BIND_NOW", "1")
                 .envs(envs)
                 .setlimit(memlimit)
-                .set_coredump(afl_debug)
-                .setsid()
+                .set_coredump(afl_debug))
                 .setpipe(
                     st_pipe.read_end().unwrap(),
                     st_pipe.write_end().unwrap(),
