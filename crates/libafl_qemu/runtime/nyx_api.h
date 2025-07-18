@@ -14,6 +14,7 @@
   // userspace
   #include <stdarg.h>
   #include <stdio.h>
+  #include <stdlib.h>
 
   #ifdef __MINGW64__
     #ifndef uint64_t
@@ -38,6 +39,7 @@
   // Linux kernel
   #include <linux/stdarg.h>
   #include <linux/types.h>
+  #include <linux/kernel.h>
 #endif
 
 #define HYPERCALL_KAFL_RAX_ID 0x01f
@@ -118,6 +120,15 @@ static inline uint64_t kAFL_hypercall(uint64_t p1, uint64_t p2) {
   uint64_t nr = HYPERCALL_KAFL_RAX_ID;
   asm volatile("vmcall" : "=a"(nr) : "a"(nr), "b"(p1), "c"(p2));
   return nr;
+}
+#else
+static inline uint32_t kAFL_hypercall(uint32_t p1, uint32_t p2) {
+  #ifdef __KERNEL__
+  BUG();
+  #else
+  abort();
+  #endif
+  return 0;
 }
 #endif
 

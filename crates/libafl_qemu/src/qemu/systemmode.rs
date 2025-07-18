@@ -260,7 +260,7 @@ impl Qemu {
                 track,
                 true,
                 device_filter.enum_id(),
-                device_filter.devices(&mut v),
+                device_filter.devices(&mut v) as *mut *mut _,
             )
         }
     }
