@@ -136,7 +136,7 @@ unicorn-engine = "2.0.1" # Used in libafl_unicorn
 uuid = { version = "1.10.0", features = ["serde", "v4"] }
 which = "8.0.0"
 windows = "0.59.0"
-z3 = "0.13.1"
+z3 = "0.12.1"
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
 
 [workspace.lints.rust]
