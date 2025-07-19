@@ -1,4 +1,5 @@
 pub mod filters;
+pub mod logic;
 
 #[cfg(feature = "usermode")]
 pub use addr2line::*;

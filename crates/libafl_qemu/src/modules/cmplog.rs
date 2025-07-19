@@ -204,11 +204,12 @@ where
     I: Unpin,
     S: Unpin + HasMetadata,
 {
-    if let Some(h) = emulator_modules.get::<CmpLogModule>() {
-        if !h.must_instrument(pc) {
-            return None;
-        }
+    if let Some(h) = emulator_modules.get::<CmpLogModule>()
+        && !h.must_instrument(pc)
+    {
+        return None;
     }
+
     let state = state.expect("The gen_unique_cmp_ids hook works only for in-process fuzzing. Is the Executor initialized?");
     if state.metadata_map().get::<QemuCmpsMapMetadata>().is_none() {
         state.add_metadata(QemuCmpsMapMetadata::new());
@@ -238,11 +239,12 @@ where
     I: Unpin,
     S: HasMetadata + Unpin,
 {
-    if let Some(h) = emulator_modules.get::<CmpLogChildModule>() {
-        if !h.must_instrument(pc) {
-            return None;
-        }
+    if let Some(h) = emulator_modules.get::<CmpLogChildModule>()
+        && !h.must_instrument(pc)
+    {
+        return None;
     }
+
     Some(hash_64_fast(pc.into()) & (CMPLOG_MAP_W as u64 - 1))
 }
 

@@ -567,9 +567,9 @@ pub mod pybind {
     #[pyclass(unsendable, name = "StdRand")]
     #[expect(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
-    /// Python class for StdRand
+    /// Python class for `StdRand`
     pub struct PythonStdRand {
-        /// Rust wrapped StdRand object
+        /// Rust wrapped `StdRand` object
         pub inner: StdRand,
     }
 

@@ -49,26 +49,26 @@ impl<'a> EasyElf<'a> {
     #[must_use]
     pub fn resolve_symbol(&self, name: &str, load_addr: GuestAddr) -> Option<GuestAddr> {
         for sym in &self.elf.syms {
-            if let Some(sym_name) = self.elf.strtab.get_at(sym.st_name) {
-                if sym_name == name {
-                    return if sym.st_value == 0 {
-                        None
-                    } else if self.is_pic() {
-                        #[cfg(cpu_target = "arm")]
-                        // Required because of arm interworking addresses aka bit(0) for thumb mode
-                        let addr = (sym.st_value as GuestAddr + load_addr) & !(0x1 as GuestAddr);
-                        #[cfg(not(cpu_target = "arm"))]
-                        let addr = sym.st_value as GuestAddr + load_addr;
-                        Some(addr)
-                    } else {
-                        #[cfg(cpu_target = "arm")]
-                        // Required because of arm interworking addresses aka bit(0) for thumb mode
-                        let addr = (sym.st_value as GuestAddr) & !(0x1 as GuestAddr);
-                        #[cfg(not(cpu_target = "arm"))]
-                        let addr = sym.st_value as GuestAddr;
-                        Some(addr)
-                    };
-                }
+            if let Some(sym_name) = self.elf.strtab.get_at(sym.st_name)
+                && sym_name == name
+            {
+                return if sym.st_value == 0 {
+                    None
+                } else if self.is_pic() {
+                    #[cfg(cpu_target = "arm")]
+                    // Required because of arm interworking addresses aka bit(0) for thumb mode
+                    let addr = (sym.st_value as GuestAddr + load_addr) & !(0x1 as GuestAddr);
+                    #[cfg(not(cpu_target = "arm"))]
+                    let addr = sym.st_value as GuestAddr + load_addr;
+                    Some(addr)
+                } else {
+                    #[cfg(cpu_target = "arm")]
+                    // Required because of arm interworking addresses aka bit(0) for thumb mode
+                    let addr = (sym.st_value as GuestAddr) & !(0x1 as GuestAddr);
+                    #[cfg(not(cpu_target = "arm"))]
+                    let addr = sym.st_value as GuestAddr;
+                    Some(addr)
+                };
             }
         }
         None

@@ -81,6 +81,9 @@ pub struct ForkserverBytesCoverageSugar<'a> {
     /// Fuzz `iterations` number of times, instead of indefinitely; implies use of `fuzz_loop_for`
     #[builder(default = None)]
     iterations: Option<u64>,
+    /// Disable redirection of stdout to /dev/null on unix build targets
+    #[builder(default = None)]
+    enable_stdout: Option<bool>,
 }
 
 impl ForkserverBytesCoverageSugar<'_> {
@@ -337,11 +340,19 @@ impl ForkserverBytesCoverageSugar<'_> {
             .remote_broker_addr(self.remote_broker_addr);
 
         #[cfg(unix)]
-        let launcher = launcher.stdout_file(Some("/dev/null"));
-        match launcher.build().launch() {
-            Ok(()) => (),
-            Err(Error::ShuttingDown) => log::info!("\nFuzzing stopped by user. Good Bye."),
-            Err(err) => panic!("Fuzzingg failed {err:?}"),
+        if self.enable_stdout.unwrap_or(false) {
+            match launcher.build().launch() {
+                Ok(()) => (),
+                Err(Error::ShuttingDown) => log::info!("\nFuzzing stopped by user. Good Bye."),
+                Err(err) => panic!("Fuzzingg failed {err:?}"),
+            }
+        } else {
+            let launcher = launcher.stdout_file(Some("/dev/null"));
+            match launcher.build().launch() {
+                Ok(()) => (),
+                Err(Error::ShuttingDown) => log::info!("\nFuzzing stopped by user. Good Bye."),
+                Err(err) => panic!("Fuzzingg failed {err:?}"),
+            }
         }
     }
 }
@@ -367,6 +378,7 @@ pub mod pybind {
         iterations: Option<u64>,
         tokens_file: Option<PathBuf>,
         timeout: Option<u64>,
+        enable_stdout: Option<bool>,
     }
 
     #[pymethods]
@@ -380,7 +392,8 @@ pub mod pybind {
             cores,
             iterations=None,
             tokens_file=None,
-            timeout=None
+            timeout=None,
+            enable_stdout=None
         ))]
         fn new(
             input_dirs: Vec<PathBuf>,
@@ -390,6 +403,7 @@ pub mod pybind {
             iterations: Option<u64>,
             tokens_file: Option<PathBuf>,
             timeout: Option<u64>,
+            enable_stdout: Option<bool>,
         ) -> Self {
             Self {
                 input_dirs,
@@ -399,6 +413,7 @@ pub mod pybind {
                 iterations,
                 tokens_file,
                 timeout,
+                enable_stdout,
             }
         }
 
@@ -416,6 +431,7 @@ pub mod pybind {
                 .timeout(self.timeout)
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
+                .enable_stdout(self.enable_stdout)
                 .build()
                 .run();
         }
