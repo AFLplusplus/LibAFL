@@ -17,7 +17,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{HasObserverHandle, map::MapFeedbackMetadata},
+    feedbacks::map::MapFeedbackMetadata,
     fuzzer::Evaluator,
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
@@ -400,13 +400,13 @@ where
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
-    pub fn new<F>(map_feedback: &F) -> Self
+    pub fn new(observer_handle: &Handle<C>, map_name: &'static str) -> Self
     where
-        F: HasObserverHandle<Observer = C> + Named,
+        C: Named,
     {
-        let map_name = map_feedback.name().clone();
+        let map_name = Cow::from(map_name);
         Self {
-            map_observer_handle: map_feedback.observer_handle().clone(),
+            map_observer_handle: observer_handle.clone(),
             map_name: map_name.clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
@@ -419,11 +419,11 @@ where
 
     /// Create a new [`CalibrationStage`], but without checking stability.
     #[must_use]
-    pub fn ignore_stability<F>(map_feedback: &F) -> Self
+    pub fn ignore_stability<F>(observer_handle: &Handle<C>, map_name: &'static str) -> Self
     where
-        F: HasObserverHandle<Observer = C> + Named,
+        C: Named,
     {
-        let mut ret = Self::new(map_feedback);
+        let mut ret = Self::new(observer_handle, map_name);
         ret.track_stability = false;
         ret
     }
