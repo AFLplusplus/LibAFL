@@ -1,7 +1,8 @@
 //! An `afl`-style forkserver fuzzer.
 //! Use this if your target has complex state that needs to be reset.
+use alloc::borrow::Cow;
 use core::{net::SocketAddr, time::Duration};
-use std::{borrow::Cow, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use libafl::{
     Error, HasMetadata,

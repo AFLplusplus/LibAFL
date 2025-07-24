@@ -1,12 +1,13 @@
 //! In-Process fuzzing made easy.
 //! Use this sugar for scaling `libfuzzer`-style fuzzers.
 
+use alloc::borrow::Cow;
 use core::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
     time::Duration,
 };
-use std::{borrow::Cow, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use libafl::{
     Error, HasMetadata,
