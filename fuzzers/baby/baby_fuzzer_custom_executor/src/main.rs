@@ -1,4 +1,3 @@
-use libafl_bolts::tuples::Handled;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{marker::PhantomData, path::PathBuf, ptr::write};
@@ -23,7 +22,12 @@ use libafl::{
     state::{HasCorpus, HasExecutions, StdState},
     BloomInputFilter,
 };
-use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{
+    current_nanos, nonzero,
+    rands::StdRand,
+    tuples::{tuple_list, Handled},
+    AsSlice,
+};
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
 static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;

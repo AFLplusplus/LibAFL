@@ -1,7 +1,6 @@
 //! An `afl`-style forkserver fuzzer.
 //! Use this if your target has complex state that needs to be reset.
 use core::{net::SocketAddr, time::Duration};
-use libafl_bolts::tuples::Handled;
 use std::{fs, path::PathBuf};
 
 use libafl::{
@@ -38,7 +37,7 @@ use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{Merge, tuple_list},
+    tuples::{Handled, Merge, tuple_list},
 };
 use libafl_targets::AflppCmpLogMap;
 use typed_builder::TypedBuilder;
@@ -152,8 +151,7 @@ impl ForkserverBytesCoverageSugar<'_> {
             // Extra MapFeedback to deduplicate finds according to the cov map
             let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
-            let calibration =
-                CalibrationStage::new(&edges_observer.observer_handle(), "map_feedback");
+            let calibration = CalibrationStage::new(&edges_observer.handle(), "map_feedback");
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR

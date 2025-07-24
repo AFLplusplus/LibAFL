@@ -4,7 +4,6 @@
 //#![feature(min_const_generics)]
 
 use core::time::Duration;
-use libafl_bolts::tuples::Handled;
 use std::{env, path::PathBuf};
 
 use libafl::{
@@ -22,7 +21,11 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error, Fuzzer,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{
+    rands::StdRand,
+    tuples::{tuple_list, Handled},
+    AsSlice,
+};
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
 mod input;

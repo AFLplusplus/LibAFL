@@ -2,8 +2,6 @@
 use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
-use libafl_bolts::tuples::Handled;
-
 use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -47,7 +45,7 @@ use libafl_bolts::{
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{Merge, tuple_list},
+    tuples::{Handled, Merge, tuple_list},
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;

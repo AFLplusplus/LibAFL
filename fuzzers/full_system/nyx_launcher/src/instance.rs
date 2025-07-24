@@ -1,4 +1,3 @@
-use libafl_bolts::tuples::Handled;
 use std::process;
 
 use libafl::{
@@ -30,7 +29,7 @@ use libafl::{
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Handled, Merge},
 };
 use libafl_nyx::{
     cmplog::NyxCmpObserver, executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings,

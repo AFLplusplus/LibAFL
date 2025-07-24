@@ -1,5 +1,4 @@
 use core::{cell::RefCell, time::Duration};
-use libafl_bolts::tuples::Handled;
 use std::{
     env,
     fs::{self, OpenOptions},

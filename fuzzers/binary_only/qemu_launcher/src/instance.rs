@@ -1,5 +1,4 @@
 use core::fmt::Debug;
-use libafl_bolts::tuples::Handled;
 use std::{fs, ops::Range, process};
 
 use libafl::{
@@ -32,7 +31,7 @@ use libafl::{
 use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
-    tuples::{tuple_list, MatchFirstType, Merge, Prepend},
+    tuples::{tuple_list, Handled, MatchFirstType, Merge, Prepend},
 };
 use libafl_qemu::{
     elf::EasyElf,
@@ -182,9 +181,8 @@ where
         let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);
         let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
-        let calibration = CalibrationStage::new(&edges_observer.observer_handle(), "map_feedback");
-        let calibration_cmplog =
-            CalibrationStage::new(&edges_observer.observer_handle(), "map_feedback");
+        let calibration = CalibrationStage::new(&edges_observer.handle(), "map_feedback");
+        let calibration_cmplog = CalibrationStage::new(&edges_observer.handle(), "map_feedback");
 
         let stats_stage = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),

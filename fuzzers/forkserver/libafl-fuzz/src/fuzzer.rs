@@ -1,4 +1,3 @@
-use libafl_bolts::tuples::Handled;
 use std::{
     borrow::Cow,
     cell::RefCell,

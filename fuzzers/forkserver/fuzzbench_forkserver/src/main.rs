@@ -1,5 +1,4 @@
 use core::{cell::RefCell, time::Duration};
-use libafl_bolts::tuples::Handled;
 use std::{
     env,
     fs::{self, OpenOptions},
@@ -41,7 +40,7 @@ use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSliceMut, StdTargetArgs,
 };
 use libafl_targets::cmps::AflppCmpLogMap;

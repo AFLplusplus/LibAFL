@@ -1,7 +1,6 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 use core::time::Duration;
-use libafl_bolts::tuples::Handled;
 #[cfg(feature = "crash")]
 use std::ptr;
 use std::{env, path::PathBuf};
@@ -33,7 +32,7 @@ use libafl::{
 };
 use libafl_bolts::{
     rands::StdRand,
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};

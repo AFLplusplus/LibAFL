@@ -1,7 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
 use core::cell::RefCell;
-use libafl_bolts::tuples::Handled;
 #[cfg(unix)]
 use std::os::unix::io::FromRawFd;
 use std::{
@@ -45,7 +44,7 @@ use libafl_bolts::{
     current_time,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{

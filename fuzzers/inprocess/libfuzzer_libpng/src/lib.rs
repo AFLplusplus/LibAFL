@@ -1,6 +1,10 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 use core::time::Duration;
+#[cfg(feature = "crash")]
+use std::ptr;
+use std::{env, path::PathBuf};
+
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
@@ -23,17 +27,13 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
-use libafl_bolts::tuples::Handled;
 use libafl_bolts::{
     rands::StdRand,
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_FOUND};
 use mimalloc::MiMalloc;
-#[cfg(feature = "crash")]
-use std::ptr;
-use std::{env, path::PathBuf};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -94,7 +94,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let time_observer = TimeObserver::new("time");
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
-    let calibration = CalibrationStage::new(&edges_observer.handle(), "edges");
+    let calibration = CalibrationStage::new(&edges_observer.lol(), "edges");
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

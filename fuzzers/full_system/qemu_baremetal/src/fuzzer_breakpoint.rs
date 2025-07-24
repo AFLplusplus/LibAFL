@@ -1,6 +1,5 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of kernels
 use core::time::Duration;
-use libafl_bolts::tuples::Handled;
 use std::{env, path::PathBuf, process};
 
 use libafl::{
@@ -25,7 +24,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::tuple_list,
+    tuples::{tuple_list, Handled},
 };
 use libafl_qemu::{
     breakpoint::Breakpoint,
