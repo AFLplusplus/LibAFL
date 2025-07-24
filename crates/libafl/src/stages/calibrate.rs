@@ -400,26 +400,28 @@ where
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
-    pub fn new(observer_handle: &Handle<C>, map_feedback_name: &'static str) -> Self
+    pub fn new(observer_handle: &Handle<C>, map_feedback_name: Cow<'static, str>) -> Self
     where
         C: Named,
     {
-        let map_name = Cow::from(map_feedback_name);
         Self {
             map_observer_handle: observer_handle.clone(),
-            map_name: map_name.clone(),
+            map_name: map_feedback_name.clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
             phantom: PhantomData,
             name: Cow::Owned(
-                CALIBRATION_STAGE_NAME.to_owned() + ":" + map_name.into_owned().as_str(),
+                CALIBRATION_STAGE_NAME.to_owned() + ":" + map_feedback_name.into_owned().as_str(),
             ),
         }
     }
 
     /// Create a new [`CalibrationStage`], but without checking stability.
     #[must_use]
-    pub fn ignore_stability<F>(observer_handle: &Handle<C>, map_feedback_name: &'static str) -> Self
+    pub fn ignore_stability<F>(
+        observer_handle: &Handle<C>,
+        map_feedback_name: Cow<'static, str>,
+    ) -> Self
     where
         C: Named,
     {

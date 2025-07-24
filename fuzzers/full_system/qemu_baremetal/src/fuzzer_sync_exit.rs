@@ -122,7 +122,7 @@ pub fn fuzz() {
         let calibration_feedback = MaxMapFeedback::new(&edges_observer);
         let mut stages = tuple_list!(
             StdMutationalStage::new(mutator),
-            CalibrationStage::new(&calibration_feedback.handle(), "edges")
+            CalibrationStage::new(&edges_observer.handle(), "edges")
         );
 
         // Create a QEMU in-process executor

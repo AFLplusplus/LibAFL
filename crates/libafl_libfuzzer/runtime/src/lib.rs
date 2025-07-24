@@ -197,6 +197,7 @@ macro_rules! fuzz_with {
             let grimoire = grimoire_metadata.should();
 
             let edges_observer = edge_maker().track_indices().track_novelties();
+            let edges_observer_name = edges_observer.name().clone();
             let size_edges_observer = MappedEdgeMapObserver::new(edge_maker(), SizeValueObserver::default());
 
             let keep_observer = LibfuzzerKeepFeedback::new();
@@ -231,7 +232,7 @@ macro_rules! fuzz_with {
             let generalization = GeneralizationStage::new(&edges_observer);
             let generalization = IfStage::new(|_, _, _, _| Ok(grimoire.into()), tuple_list!(generalization));
 
-            let calibration = CalibrationStage::new(&edges_observer.handle(), edges_observer.name());
+            let calibration = CalibrationStage::new(&edges_observer.handle(), edges_observer_name);
 
             let add_extra_feedback = $extra_feedback;
             let coverage_feedback = add_extra_feedback(
