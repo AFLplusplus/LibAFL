@@ -172,7 +172,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     let calibration = IfStage::new(
         |_, _, _, _| Ok(!opt.sequential_queue),
         tuple_list!(TimeTrackingStageWrapper::<CalibrationTime, _, _>::new(
-            alibrationStage::new(&edges_observer.handle(), "edges");
+            CalibrationStage::new(&edges_observer.handle(), "edges");
         )),
     );
 
