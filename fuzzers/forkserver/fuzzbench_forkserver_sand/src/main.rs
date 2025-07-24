@@ -1,4 +1,5 @@
 use core::{cell::RefCell, time::Duration};
+use libafl_bolts::tuples::Handled;
 use std::{
     env,
     fs::{self, OpenOptions},
@@ -276,7 +277,7 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new(&edges_observer.handle(), "shared_mem");
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

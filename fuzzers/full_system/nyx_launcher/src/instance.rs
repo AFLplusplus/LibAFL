@@ -1,3 +1,4 @@
+use libafl_bolts::tuples::Handled;
 use std::process;
 
 use libafl::{
@@ -87,7 +88,7 @@ where
 
         // let stdout_observer = StdOutObserver::new("hprintf_output");
 
-        let calibration = CalibrationStage::new(&map_feedback);
+        let calibration = CalibrationStage::new(&trace_observer.handle(), "trace");
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR

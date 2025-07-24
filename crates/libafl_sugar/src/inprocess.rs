@@ -6,6 +6,7 @@ use core::{
     net::SocketAddr,
     time::Duration,
 };
+use libafl_bolts::tuples::Handled;
 use std::{fs, path::PathBuf};
 
 use libafl::{
@@ -170,7 +171,8 @@ where
             // Extra MapFeedback to deduplicate finds according to the cov map
             let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
-            let calibration = CalibrationStage::new(&map_feedback);
+            let calibration =
+                CalibrationStage::new(&edges_observer.observer_handle(), "map_feedback");
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR

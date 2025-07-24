@@ -187,6 +187,7 @@ macro_rules! fuzz_with {
             misc::should_use_grimoire,
             observers::{MappedEdgeMapObserver, SizeValueObserver},
         };
+        use libafl_bolts::tuples::Handled;
 
         let edge_maker = &$edge_maker;
 
@@ -230,7 +231,7 @@ macro_rules! fuzz_with {
             let generalization = GeneralizationStage::new(&edges_observer);
             let generalization = IfStage::new(|_, _, _, _| Ok(grimoire.into()), tuple_list!(generalization));
 
-            let calibration = CalibrationStage::new(&map_feedback);
+            let calibration = CalibrationStage::new(&edges_observer.observer_handle(), edges_observer.name());
 
             let add_extra_feedback = $extra_feedback;
             let coverage_feedback = add_extra_feedback(

@@ -1,6 +1,7 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
 use core::cell::RefCell;
+use libafl_bolts::tuples::Handled;
 #[cfg(unix)]
 use std::os::unix::io::FromRawFd;
 use std::{
@@ -276,7 +277,7 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new(&edges_observer.handle(), "edges");
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

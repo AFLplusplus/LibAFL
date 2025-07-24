@@ -1,3 +1,4 @@
+use libafl_bolts::tuples::Handled;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{marker::PhantomData, path::PathBuf, ptr::write};
@@ -85,7 +86,7 @@ pub fn main() {
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
 
-    let calibration_stage = CalibrationStage::new(&feedback);
+    let calibration_stage = CalibrationStage::new(&observer.handle(), "signals");
     let stats_stage = AflStatsStage::builder()
         .map_observer(&observer)
         .build()

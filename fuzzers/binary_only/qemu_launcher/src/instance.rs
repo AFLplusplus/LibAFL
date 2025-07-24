@@ -1,4 +1,5 @@
 use core::fmt::Debug;
+use libafl_bolts::tuples::Handled;
 use std::{fs, ops::Range, process};
 
 use libafl::{
@@ -181,8 +182,9 @@ where
         let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);
         let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
-        let calibration = CalibrationStage::new(&map_feedback);
-        let calibration_cmplog = CalibrationStage::new(&map_feedback);
+        let calibration = CalibrationStage::new(&edges_observer.observer_handle(), "map_feedback");
+        let calibration_cmplog =
+            CalibrationStage::new(&edges_observer.observer_handle(), "map_feedback");
 
         let stats_stage = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),
