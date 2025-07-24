@@ -19,6 +19,11 @@ fn main() {
 
     let mut harness_wrap = cc::Build::new();
 
+    if let Ok(flags) = env::var("CFLAGS") {
+        println!("cargo:rerun-if-env-changed=CFLAGS");
+        harness_wrap.flags(flags.split_whitespace());
+    }
+
     harness_wrap.cpp(true).file("src/harness_wrap.cpp");
 
     harness_wrap.compile("harness_wrap");
