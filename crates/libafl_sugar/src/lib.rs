@@ -63,6 +63,8 @@ pub const CORPUS_CACHE_SIZE: usize = 4096;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
+extern crate alloc;
+
 /// The sugar python module
 #[cfg(feature = "python")]
 #[pymodule]

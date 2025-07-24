@@ -1,5 +1,5 @@
 use core::time::Duration;
-use std::{env, path::PathBuf};
+use std::{borrow::Cow, env, path::PathBuf};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
@@ -24,7 +24,7 @@ use libafl::{
 };
 use libafl_bolts::{
     rands::StdRand,
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
@@ -71,7 +71,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("edges"));
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
