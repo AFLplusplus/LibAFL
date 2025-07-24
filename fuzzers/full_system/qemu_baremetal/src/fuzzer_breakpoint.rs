@@ -1,6 +1,6 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of kernels
 use core::time::Duration;
-use std::{env, path::PathBuf, process};
+use std::{borrow::Cow, env, path::PathBuf, process};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
@@ -184,7 +184,7 @@ pub fn fuzz() {
         let calibration_feedback = MaxMapFeedback::new(&edges_observer);
         let mut stages = tuple_list!(
             StdMutationalStage::new(mutator),
-            CalibrationStage::new(&edges_observer.handle(), "edges")
+            CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("edges"))
         );
 
         // Create a QEMU in-process executor

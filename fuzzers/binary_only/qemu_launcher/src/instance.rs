@@ -1,5 +1,5 @@
 use core::fmt::Debug;
-use std::{fs, ops::Range, process};
+use std::{borrow::Cow, fs, ops::Range, process};
 
 use libafl::{
     corpus::{Corpus, HasCurrentCorpusId, InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -181,8 +181,10 @@ where
         let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);
         let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
-        let calibration = CalibrationStage::new(&edges_observer.handle(), "map_feedback");
-        let calibration_cmplog = CalibrationStage::new(&edges_observer.handle(), "map_feedback");
+        let calibration =
+            CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("map_feedback"));
+        let calibration_cmplog =
+            CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("map_feedback"));
 
         let stats_stage = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),

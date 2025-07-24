@@ -6,7 +6,7 @@ use core::{
     net::SocketAddr,
     time::Duration,
 };
-use std::{fs, path::PathBuf};
+use std::{borrow::Cow, fs, path::PathBuf};
 
 use libafl::{
     Error, HasMetadata,
@@ -170,7 +170,8 @@ where
             // Extra MapFeedback to deduplicate finds according to the cov map
             let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
-            let calibration = CalibrationStage::new(&edges_observer.handle(), "map_feedback");
+            let calibration =
+                CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("map_feedback"));
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR

@@ -1,4 +1,4 @@
-use std::process;
+use std::{borrow::Cow, process};
 
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -87,7 +87,7 @@ where
 
         // let stdout_observer = StdOutObserver::new("hprintf_output");
 
-        let calibration = CalibrationStage::new(&trace_observer.handle(), "trace");
+        let calibration = CalibrationStage::new(&trace_observer.handle(), Cow::Borrowed("trace"));
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
