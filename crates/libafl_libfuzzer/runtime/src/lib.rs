@@ -187,7 +187,7 @@ macro_rules! fuzz_with {
             misc::should_use_grimoire,
             observers::{MappedEdgeMapObserver, SizeValueObserver},
         };
-        use libafl_bolts::tuples::Handled;
+        use libafl_bolts::{tuples::Handled, Named};
 
         let edge_maker = &$edge_maker;
 
