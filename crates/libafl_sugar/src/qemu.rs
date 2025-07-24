@@ -1,10 +1,11 @@
 //! In-Process fuzzer with `QEMU`-based binary-only instrumentation
+use alloc::borrow::Cow;
 use core::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
     time::Duration,
 };
-use std::{borrow::Cow, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use libafl::{
     HasMetadata,
