@@ -11,7 +11,7 @@ enum RawOption<'a> {
     Flag { name: &'a str, value: &'a str },
 }
 
-fn parse_option(arg: &str) -> Option<RawOption> {
+fn parse_option(arg: &str) -> Option<RawOption<'_>> {
     if arg.starts_with("--") {
         None
     } else if arg.starts_with('-') {
