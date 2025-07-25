@@ -1,6 +1,5 @@
 use core::{cell::RefCell, time::Duration};
 use std::{
-    borrow::Cow,
     env,
     fs::{self, OpenOptions},
     io::Write,
@@ -41,7 +40,7 @@ use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
+    tuples::{tuple_list, Merge},
     AsSliceMut, StdTargetArgs,
 };
 use libafl_targets::cmps::AflppCmpLogMap;
@@ -263,7 +262,7 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("shared_mem"));
+    let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

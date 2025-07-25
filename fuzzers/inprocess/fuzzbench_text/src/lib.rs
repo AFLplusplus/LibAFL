@@ -2,11 +2,11 @@
 use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
+
 use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
-    borrow::Cow,
     env,
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
@@ -50,7 +50,7 @@ use libafl_bolts::{
     os::{dup2, dup_and_mute_outputs},
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
+    tuples::{tuple_list, Merge},
     AsSlice,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
@@ -337,7 +337,7 @@ fn fuzz_binary(
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("edges"));
+    let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -557,7 +557,7 @@ fn fuzz_text(
     // New maximization map feedback linked to the edges observer and the feedback state
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("edges"));
+    let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

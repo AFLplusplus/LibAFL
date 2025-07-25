@@ -1,6 +1,6 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{borrow::Cow, marker::PhantomData, path::PathBuf, ptr::write};
+use std::{marker::PhantomData, path::PathBuf, ptr::write};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -22,12 +22,7 @@ use libafl::{
     state::{HasCorpus, HasExecutions, StdState},
     BloomInputFilter,
 };
-use libafl_bolts::{
-    current_nanos, nonzero,
-    rands::StdRand,
-    tuples::{tuple_list, Handled},
-    AsSlice,
-};
+use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
 static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
@@ -90,7 +85,7 @@ pub fn main() {
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
 
-    let calibration_stage = CalibrationStage::new(&observer.handle(), Cow::Borrowed("signals"));
+    let calibration_stage = CalibrationStage::new(&feedback);
     let stats_stage = AflStatsStage::builder()
         .map_observer(&observer)
         .build()
