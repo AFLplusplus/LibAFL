@@ -4,7 +4,6 @@ use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::FromRawFd;
 use std::{
-    borrow::Cow,
     env,
     fs::{self, File, OpenOptions},
     io::Write,
@@ -44,7 +43,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
+    tuples::{tuple_list, Merge},
     AsSlice,
 };
 use libafl_qemu::{
@@ -288,7 +287,7 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("edges"));
+    let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

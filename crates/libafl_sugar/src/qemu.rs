@@ -1,5 +1,4 @@
 //! In-Process fuzzer with `QEMU`-based binary-only instrumentation
-use alloc::borrow::Cow;
 use core::{
     fmt::{self, Debug, Formatter},
     net::SocketAddr,
@@ -36,7 +35,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{Handled, Merge, tuple_list},
+    tuples::{Merge, tuple_list},
 };
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::modules::CmpLogModule;
@@ -188,10 +187,8 @@ where
             // Extra MapFeedback to deduplicate finds according to the cov map
             let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
-            let calibration =
-                CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("map_feedback"));
-            let calibration_cmplog =
-                CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("map_feedback"));
+            let calibration = CalibrationStage::new(&map_feedback);
+            let calibration_cmplog = CalibrationStage::new(&map_feedback);
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
