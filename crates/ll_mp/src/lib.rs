@@ -127,6 +127,8 @@ use core::{
     sync::atomic::{AtomicU16, Ordering, fence},
     time::Duration,
 };
+#[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
+use std::backtrace::Backtrace;
 #[cfg(feature = "std")]
 use std::{
     env,
@@ -136,8 +138,6 @@ use std::{
     thread,
 };
 
-#[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
-use backtrace::Backtrace;
 #[cfg(all(unix, not(miri)))]
 use exceptional::unix_signals::setup_signal_handler;
 #[cfg(unix)]
@@ -1183,7 +1183,7 @@ where
             #[cfg(all(feature = "llmp_debug", feature = "std"))]
             {
                 #[cfg(debug_assertions)]
-                let bt = Backtrace::new();
+                let bt = Backtrace::capture();
                 #[cfg(not(debug_assertions))]
                 let bt = "<n/a (release)>";
                 let shm = self.out_shmems.last().unwrap();
@@ -2059,7 +2059,7 @@ where
         #[cfg(feature = "llmp_debug")]
         //{
         //#[cfg(debug_assertions)]
-        //let bt = Backtrace::new();
+        //let bt = Backtrace::capture();
         //#[cfg(not(debug_assertions))]
         //let bt = "<n/a (release)>";
         log::info!(
@@ -3924,7 +3924,7 @@ impl<SHM, SP> LlmpClient<SHM, SP> {
 mod tests {
 
     use core::time::Duration;
-    use std::thread::sleep;
+    use std::{thread::sleep, vec};
 
     use serial_test::serial;
     use shmem_providers::{ShMemProvider, StdShMemProvider};
