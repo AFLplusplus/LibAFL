@@ -59,7 +59,6 @@ static inline long area_is_valid(const void *ptr, size_t len) {
   long valid_len;
 
 #if defined(_WIN32)
-  if (IsBadReadPtr(ptr, len)) { return 0; }
   valid_len = (long)len;
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
   if (!dymmy_initialized) {
