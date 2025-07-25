@@ -1,4 +1,4 @@
-use std::{borrow::Cow, process};
+use std::process;
 
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -29,7 +29,7 @@ use libafl::{
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    tuples::{tuple_list, Handled, Merge},
+    tuples::{tuple_list, Merge},
 };
 use libafl_nyx::{
     cmplog::NyxCmpObserver, executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings,
@@ -87,7 +87,7 @@ where
 
         // let stdout_observer = StdOutObserver::new("hprintf_output");
 
-        let calibration = CalibrationStage::new(&trace_observer.handle(), Cow::Borrowed("trace"));
+        let calibration = CalibrationStage::new(&map_feedback);
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR

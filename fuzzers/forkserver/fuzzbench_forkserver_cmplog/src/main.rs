@@ -1,6 +1,5 @@
 use core::{cell::RefCell, time::Duration};
 use std::{
-    borrow::Cow,
     env,
     fs::{self, OpenOptions},
     io::Write,
@@ -265,7 +264,7 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&edges_observer.handle(), Cow::Borrowed("shared_mem"));
+    let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

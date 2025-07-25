@@ -17,7 +17,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::map::MapFeedbackMetadata,
+    feedbacks::{HasObserverHandle, map::MapFeedbackMetadata},
     fuzzer::Evaluator,
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
@@ -79,17 +79,17 @@ impl Default for UnstableEntriesMetadata {
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Debug, Clone)]
-pub struct CalibrationStage<C, E, I, O, OT, S> {
+pub struct CalibrationStage<C, I, O, OT, S> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
     name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    phantom: PhantomData<(E, I, O, OT, S)>,
+    phantom: PhantomData<(I, O, OT, S)>,
 }
 
-impl<C, E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, I, O, OT, S>
+impl<C, E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, I, O, OT, S>
 where
     E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<I, S>,
@@ -372,7 +372,7 @@ where
     }
 }
 
-impl<C, E, I, O, OT, S> Restartable<S> for CalibrationStage<C, E, I, O, OT, S>
+impl<C, I, O, OT, S> Restartable<S> for CalibrationStage<C, I, O, OT, S>
 where
     S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
@@ -391,7 +391,7 @@ where
     }
 }
 
-impl<C, E, I, O, OT, S> CalibrationStage<C, E, I, O, OT, S>
+impl<C, I, O, OT, S> CalibrationStage<C, I, O, OT, S>
 where
     C: AsRef<O>,
     O: MapObserver,
@@ -400,38 +400,36 @@ where
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
-    pub fn new(observer_handle: &Handle<C>, map_feedback_name: Cow<'static, str>) -> Self
+    pub fn new<F>(map_feedback: &F) -> Self
     where
-        C: Named,
+        F: HasObserverHandle<Observer = C> + Named,
     {
+        let map_name = map_feedback.name().clone();
         Self {
-            map_observer_handle: observer_handle.clone(),
-            map_name: map_feedback_name.clone(),
+            map_observer_handle: map_feedback.observer_handle().clone(),
+            map_name: map_name.clone(),
             stage_max: CAL_STAGE_START,
             track_stability: true,
             phantom: PhantomData,
             name: Cow::Owned(
-                CALIBRATION_STAGE_NAME.to_owned() + ":" + map_feedback_name.into_owned().as_str(),
+                CALIBRATION_STAGE_NAME.to_owned() + ":" + map_name.into_owned().as_str(),
             ),
         }
     }
 
     /// Create a new [`CalibrationStage`], but without checking stability.
     #[must_use]
-    pub fn ignore_stability<F>(
-        observer_handle: &Handle<C>,
-        map_feedback_name: Cow<'static, str>,
-    ) -> Self
+    pub fn ignore_stability<F>(map_feedback: &F) -> Self
     where
-        C: Named,
+        F: HasObserverHandle<Observer = C> + Named,
     {
-        let mut ret = Self::new(observer_handle, map_feedback_name);
+        let mut ret = Self::new(map_feedback);
         ret.track_stability = false;
         ret
     }
 }
 
-impl<C, E, I, O, OT, S> Named for CalibrationStage<C, E, I, O, OT, S> {
+impl<C, I, O, OT, S> Named for CalibrationStage<C, I, O, OT, S> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
