@@ -3,12 +3,13 @@
 use core::{cell::RefCell, marker::PhantomData};
 
 use libafl_bolts::Error;
+use serde::{Deserialize, Serialize};
 
 use crate::corpus::{Corpus, CorpusId, Testcase};
 
 /// An dynamic corpus type accepting two types of corpus at runtime. This helps rustc better
 /// reason about the bounds compared to dyn objects.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DynamicCorpus<C1, C2, I> {
     /// Corpus1 implementation
     Corpus1(C1, PhantomData<I>),
@@ -26,7 +27,11 @@ macro_rules! select_corpus {
     };
 }
 
-impl<C1, C2, I> DynamicCorpus<C1, C2, I> {
+impl<C1, C2, I> DynamicCorpus<C1, C2, I>
+where
+    C1: Corpus<I>,
+    C2: Corpus<I>,
+{
     /// Create a `DynamicCorpus` with Corpus1 variant.
     pub fn corpus1(c: C1) -> Self {
         Self::Corpus1(c, PhantomData)
