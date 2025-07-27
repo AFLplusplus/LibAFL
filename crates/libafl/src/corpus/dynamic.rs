@@ -1,5 +1,6 @@
 //! Dynamic corpus that allows users to switch corpus types at runtime.
-use std::{cell::RefCell, marker::PhantomData};
+
+use core::{cell::RefCell, marker::PhantomData};
 
 use libafl_bolts::Error;
 
