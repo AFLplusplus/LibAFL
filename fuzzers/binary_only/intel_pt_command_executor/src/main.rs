@@ -1,5 +1,5 @@
 use std::{
-    env, ffi::CString, num::NonZero, os::unix::ffi::OsStrExt, path::PathBuf, slice, time::Duration,
+    env, ffi::CString, num::NonZero, os::unix::ffi::OsStrExt, path::PathBuf, time::Duration,
 };
 
 use libafl::{
@@ -20,7 +20,7 @@ use libafl::{
     state::StdState,
 };
 use libafl_bolts::{core_affinity, rands::StdRand, tuples::tuple_list};
-use libafl_intelpt::{IntelPT, PAGE_SIZE};
+use libafl_intelpt::{AddrFilter, AddrFilterType, AddrFilters, IntelPT, PAGE_SIZE};
 
 // Coverage map
 const MAP_SIZE: usize = 4096;
@@ -90,25 +90,31 @@ pub fn main() {
 
     // The target is a ET_DYN elf, it will be relocated by the loader with this offset.
     // see https://github.com/torvalds/linux/blob/c1e939a21eb111a6d6067b38e8e04b8809b64c4e/arch/x86/include/asm/elf.h#L234C1-L239C38
-    const DEFAULT_MAP_WINDOW: usize = (1 << 47) - PAGE_SIZE;
-    const ELF_ET_DYN_BASE: usize = (DEFAULT_MAP_WINDOW / 3 * 2) & !(PAGE_SIZE - 1);
+    const DEFAULT_MAP_WINDOW: u64 = (1 << 47) - PAGE_SIZE as u64;
+    const ELF_ET_DYN_BASE: u64 = (DEFAULT_MAP_WINDOW / 3 * 2) & !(PAGE_SIZE as u64 - 1);
 
     // Set the instruction pointer (IP) filter and memory image of our target.
     // These information can be retrieved from `readelf -l` (for example)
-    let code_memory_addresses = ELF_ET_DYN_BASE + 0x15000..=ELF_ET_DYN_BASE + 0x14000 + 0x41000;
-
+    let (code_memory_start, code_memory_end) =
+        (ELF_ET_DYN_BASE + 0x6000, ELF_ET_DYN_BASE + 0x6000 + 0x3dfd9);
+    let filters = AddrFilters::new(&[AddrFilter::new(
+        code_memory_start,
+        code_memory_end,
+        AddrFilterType::FILTER,
+    )])
+    .unwrap();
     let intel_pt = IntelPT::builder()
         .cpu(cpu.0)
         .inherit(true)
-        .ip_filters(slice::from_ref(&code_memory_addresses))
+        .ip_filters(&filters)
         .build()
         .unwrap();
 
     let sections = [SectionInfo {
         filename: target_path.to_string_lossy().to_string(),
-        offset: 0x14000,
-        size: (*code_memory_addresses.end() - *code_memory_addresses.start() + 1) as u64,
-        virtual_address: *code_memory_addresses.start() as u64,
+        offset: 0x6000,
+        size: code_memory_end - code_memory_start,
+        virtual_address: code_memory_start,
     }];
 
     let hook = unsafe { IntelPTHook::builder().map_ptr(MAP_PTR).map_len(MAP_SIZE) }
