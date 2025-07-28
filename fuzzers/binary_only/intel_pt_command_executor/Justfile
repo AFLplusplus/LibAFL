@@ -3,6 +3,9 @@ import "../../../just/libafl.just"
 FUZZER_NAME := "intel_pt_command_executor"
 
 [unix]
+default: run
+
+[unix]
 target_dir:
     mkdir -p {{ TARGET_DIR }}
 
