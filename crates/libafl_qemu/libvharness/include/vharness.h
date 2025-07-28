@@ -6,14 +6,16 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define VHARNESS_MAX_INPUT_SIZE (1 * 1024 * 1024)
+
 struct vharness_input {
-  char *input;
+  volatile char *input;
   size_t input_max_size;
   size_t input_size;
   size_t pos;
 };
 
-struct vharness_input vharness_init(size_t max_input_size);
+struct vharness_input vharness_init(void);
 void vharness_reset(struct vharness_input *vinput, size_t input_size);
 
 size_t vharness_remaining_size(struct vharness_input *vinput);

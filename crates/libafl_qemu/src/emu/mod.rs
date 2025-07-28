@@ -14,8 +14,8 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 #[cfg(doc)]
 use crate::modules::EmulatorModule;
 use crate::{
-    CPU, Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk,
-    QemuParams, QemuShutdownCause, Regs,
+    HostMemoryChunk, Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError,
+    QemuMemoryChunk, QemuParams, QemuShutdownCause, Regs,
     breakpoint::{Breakpoint, BreakpointId},
     command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
     modules::EmulatorModuleTuple,
@@ -100,8 +100,7 @@ pub enum EmulatorExitError {
 
 #[derive(Debug, Clone)]
 pub struct InputLocation {
-    mem_chunk: QemuMemoryChunk,
-    cpu: CPU,
+    host_chunk: HostMemoryChunk,
     ret_register: Option<Regs>,
 }
 
@@ -187,21 +186,23 @@ impl From<SnapshotManagerCheckError> for EmulatorDriverError {
 
 impl InputLocation {
     #[must_use]
-    pub fn new(mem_chunk: QemuMemoryChunk, cpu: CPU, ret_register: Option<Regs>) -> Self {
-        Self {
-            mem_chunk,
-            cpu,
-            ret_register,
-        }
-    }
+    pub fn new(
+        qemu: Qemu,
+        mem_chunk: &QemuMemoryChunk,
+        ret_register: Option<Regs>,
+    ) -> Option<Self> {
+        let phys_mem_chunk = mem_chunk.to_phys_mem_chunk(qemu)?;
+        let host_chunk = phys_mem_chunk.to_host_chunk()?;
 
-    pub fn cpu(&self) -> CPU {
-        self.cpu
+        Some(Self {
+            host_chunk,
+            ret_register,
+        })
     }
 
     #[must_use]
-    pub fn mem_chunk(&self) -> &QemuMemoryChunk {
-        &self.mem_chunk
+    pub fn host_chunk(&self) -> &HostMemoryChunk {
+        &self.host_chunk
     }
 
     #[must_use]

@@ -9,12 +9,12 @@ STATIC_CHECKS
 static char llqprintf_buffer[LQEMU_PRINTF_MAX_SIZE] = {0};
 #endif
 
-noinline lqword libafl_qemu_start_virt(void *buf_vaddr, lqword max_len) {
+noinline lqword libafl_qemu_start_virt(volatile void *buf_vaddr, lqword max_len) {
   return _lqemu_custom_insn_call2(LIBAFL_QEMU_COMMAND_START_VIRT,
                                   (lqword)buf_vaddr, max_len);
 }
 
-noinline lqword libafl_qemu_start_phys(void *buf_paddr, lqword max_len) {
+noinline lqword libafl_qemu_start_phys(volatile void *buf_paddr, lqword max_len) {
   return _lqemu_custom_insn_call2(LIBAFL_QEMU_COMMAND_START_PHYS,
                                   (lqword)buf_paddr, max_len);
 }

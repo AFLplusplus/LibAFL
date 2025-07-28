@@ -19,9 +19,9 @@
 #define LQEMU_VERSION_MAJOR 0
 #define LQEMU_VERSION_MINOR 1
 
-lqword libafl_qemu_start_virt(void *buf_vaddr, lqword max_len);
+lqword libafl_qemu_start_virt(volatile void *buf_vaddr, lqword max_len);
 
-lqword libafl_qemu_start_phys(void *buf_paddr, lqword max_len);
+lqword libafl_qemu_start_phys(volatile void *buf_paddr, lqword max_len);
 
 lqword libafl_qemu_input_virt(void *buf_vaddr, lqword max_len);
 

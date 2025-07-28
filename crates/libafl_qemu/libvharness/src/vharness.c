@@ -5,18 +5,18 @@
 
 #include "vharness.h"
 
-struct vharness_input vharness_init(size_t input_max_size) {
-  char *input = malloc(input_max_size);
+volatile char input_buf[VHARNESS_MAX_INPUT_SIZE];
 
-  // make sure the pages are really allocated
-  for (size_t i = 0; i < input_max_size; i += getpagesize()) {
-    input[i] = 'A';
+struct vharness_input vharness_init(void) {
+  // make sure the input is really allocated
+  for (size_t i = 0; i < VHARNESS_MAX_INPUT_SIZE; i += getpagesize()) {
+    input_buf[i] = 0;
   }
 
   return (struct vharness_input){
-      .input = input,
+      .input = input_buf,
       .input_size = 0,
-      .input_max_size = input_max_size,
+      .input_max_size = VHARNESS_MAX_INPUT_SIZE,
       .pos = 0,
   };
 }
@@ -36,7 +36,7 @@ bool vharness_get_buf(struct vharness_input *vinput, void *buf,
     return false;
   }
 
-  memcpy(buf, vinput->input + vinput->pos, buf_len);
+  memcpy(buf, (const char*) vinput->input + vinput->pos, buf_len);
   vinput->pos += buf_len;
 
   return true;
