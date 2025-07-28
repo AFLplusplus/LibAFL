@@ -1248,6 +1248,15 @@ impl QemuMemoryChunk {
         }
     }
 
+    /// Interpert the VM memory chunk as multiple host memory segments.
+    ///
+    /// This will take into account possible physical memory fragmentation.
+    pub fn to_host_segments(&self, qemu: Qemu) -> HostMemorySegments {
+        let segments: Vec<HostMemoryChunk> = self.host_iter(qemu).collect();
+
+        HostMemorySegments::new(segments)
+    }
+
     pub fn read_vec(&self, qemu: Qemu) -> Result<Vec<u8>, QemuRWError> {
         // # Safety
         // This is safe because we read exactly `self.size` bytes from QEMU.

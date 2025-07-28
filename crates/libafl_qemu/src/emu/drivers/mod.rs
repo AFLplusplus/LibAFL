@@ -111,9 +111,11 @@ where
         input: &I,
     ) -> Result<(), EmulatorDriverError> {
         if let Some(input_location) = self.input_location.get_mut() {
-            let ret_value = input_location
-                .host_chunk
-                .write(input.target_bytes().as_slice());
+            let ret_value = unsafe {
+                input_location
+                    .segments
+                    .write(input.target_bytes().as_slice())
+            };
 
             if let Some(reg) = input_location.ret_register {
                 qemu.current_cpu()
