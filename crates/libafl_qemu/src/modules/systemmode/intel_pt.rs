@@ -1,18 +1,15 @@
-use std::{
-    fmt::Debug,
-    ops::{Range, RangeInclusive},
-};
+use std::fmt::Debug;
 
 use libafl::{HasMetadata, observers::ObserversTuple};
-pub use libafl_intelpt::SectionInfo;
+pub use libafl_intelpt::{AddrFilter, AddrFilterType, AddrFilters, SectionInfo};
 use libafl_intelpt::{Image, IntelPT, IntelPTBuilder};
-use libafl_qemu_sys::{CPUArchStatePtr, GuestAddr};
+use libafl_qemu_sys::CPUArchStatePtr;
 use num_traits::SaturatingAdd;
 use typed_builder::TypedBuilder;
 
 use crate::{
     EmulatorModules, NewThreadHook, Qemu, QemuParams,
-    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, ExitKind},
+    modules::{EmulatorModule, EmulatorModuleTuple, ExitKind},
 };
 
 #[derive(Debug, TypedBuilder)]
@@ -34,6 +31,13 @@ pub struct IntelPTModule<T = u8> {
 impl IntelPTModule {
     pub fn default_pt_builder() -> IntelPTBuilder {
         IntelPT::builder().exclude_kernel(false)
+    }
+}
+
+impl<T> IntelPTModule<T> {
+    pub fn enable_tracing(&mut self) {
+        let pt = self.pt.as_mut().expect("Intel PT module not initialized.");
+        pt.enable_tracing().unwrap();
     }
 }
 
@@ -65,8 +69,9 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
-        let pt = self.pt.as_mut().expect("Intel PT module not initialized.");
-        pt.enable_tracing().unwrap();
+        if self.pt.is_none() {
+            panic!("Intel PT module not initialized.");
+        }
     }
 
     fn post_exec<OT, ET>(
@@ -94,30 +99,6 @@ where
                 .dump_last_trace_to_file()
                 .inspect_err(|e| log::warn!("Intel PT trace save to file failed: {e}"));
         }
-    }
-}
-
-impl<T> AddressFilter for IntelPTModule<T>
-where
-    T: Debug + 'static,
-{
-    fn register(&mut self, address_range: &Range<GuestAddr>) {
-        let pt = self.pt.as_mut().unwrap();
-        let mut filters = pt.ip_filters();
-        let range_inclusive =
-            RangeInclusive::new(address_range.start as usize, address_range.end as usize - 1);
-        filters.push(range_inclusive);
-        pt.set_ip_filters(&filters).unwrap()
-    }
-
-    fn allowed(&self, address: &GuestAddr) -> bool {
-        let pt = self.pt.as_ref().unwrap();
-        for f in pt.ip_filters() {
-            if f.contains(&(*address as usize)) {
-                return true;
-            }
-        }
-        false
     }
 }
 
