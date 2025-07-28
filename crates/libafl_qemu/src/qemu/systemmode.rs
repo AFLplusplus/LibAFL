@@ -1,8 +1,9 @@
 use std::{
+    cmp::min,
     ffi::{CStr, CString, c_void},
     marker::PhantomData,
     mem::MaybeUninit,
-    ptr::{NonNull, null_mut},
+    ptr::{NonNull, copy_nonoverlapping, null_mut},
     slice,
 };
 
@@ -39,6 +40,12 @@ pub struct PhysMemoryChunk {
     size: usize,
     qemu: Qemu,
     cpu: CPU,
+}
+
+#[derive(Debug, Clone)]
+pub struct HostMemoryChunk {
+    addr: *mut u8,
+    size: usize,
 }
 
 pub struct PhysMemoryIter {
@@ -370,6 +377,20 @@ impl QemuMemoryChunk {
     }
 }
 
+impl HostMemoryChunk {
+    pub fn write(&self, buf: &[u8]) -> usize {
+        let write_len = min(buf.len(), self.size);
+
+        unsafe {
+            // TODO: replace with volatile_copy_nonoverlapping when stabilized.
+            // check if write_volatile can generate something as efficient as that.
+            copy_nonoverlapping(buf.as_ptr(), self.addr, write_len);
+        }
+
+        write_len
+    }
+}
+
 impl PhysMemoryChunk {
     #[must_use]
     pub fn new(addr: GuestPhysAddr, size: usize, qemu: Qemu, cpu: CPU) -> Self {
@@ -379,6 +400,17 @@ impl PhysMemoryChunk {
             qemu,
             cpu,
         }
+    }
+
+    /// Convert a physical memory chunk into a host memory chunk.
+    // TODO: allow multiple host chunks
+    pub fn to_host_chunk(&self) -> Option<HostMemoryChunk> {
+        let addr = self.addr_host_ptr_mut()?;
+
+        Some(HostMemoryChunk {
+            addr: addr.as_ptr(),
+            size: self.size,
+        })
     }
 
     pub fn addr_host_ptr(&self) -> Option<*const u8> {

@@ -175,13 +175,9 @@ where
                 .map_err(|_| EmulatorDriverError::MultipleSnapshotDefinition)?;
 
             // Save input location for next runs
-            emu.driver_mut()
-                .input_setter_mut()
-                .set_input_location(InputLocation::new(
-                    self.input_location.clone(),
-                    qemu.current_cpu().unwrap(),
-                    ret_reg,
-                ))?;
+            emu.driver_mut().input_setter_mut().set_input_location(
+                InputLocation::new(qemu, &self.input_location, ret_reg).unwrap(),
+            )?;
 
             // Auto page filtering if option is enabled
             #[cfg(feature = "systemmode")]

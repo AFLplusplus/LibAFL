@@ -12,8 +12,8 @@ use libafl_bolts::{
 #[cfg(feature = "systemmode")]
 use crate::PhysMemoryChunk;
 use crate::{
-    Emulator, EmulatorExitError, EmulatorExitResult, InputLocation, IsSnapshotManager, Qemu,
-    QemuError, QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError,
+    Emulator, EmulatorExitError, EmulatorExitResult, GuestReg, InputLocation, IsSnapshotManager,
+    Qemu, QemuError, QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError,
     SnapshotManagerError,
     command::{CommandError, CommandManager, IsCommand},
     modules::EmulatorModuleTuple,
@@ -111,18 +111,15 @@ where
         input: &I,
     ) -> Result<(), EmulatorDriverError> {
         if let Some(input_location) = self.input_location.get_mut() {
-            // TODO: cache host memory in input location (and thus in the underlying mem chunk)
-            // when it it set the first time. That way, we never need this hack.
-            // We need that because the vCPU can change between runs, if the guest OS decides so.
-            input_location.cpu = qemu.current_cpu().unwrap();
-
             let ret_value = input_location
-                .mem_chunk
-                .write(qemu, input.target_bytes().as_slice())
-                .unwrap();
+                .host_chunk
+                .write(input.target_bytes().as_slice());
 
             if let Some(reg) = input_location.ret_register {
-                input_location.cpu.write_reg(reg, ret_value).unwrap();
+                qemu.current_cpu()
+                    .unwrap() // if we end up there, qemu must be running the cpu asking for the input
+                    .write_reg(reg, ret_value as GuestReg)
+                    .unwrap();
             }
         }
 
