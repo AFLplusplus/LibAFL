@@ -1210,6 +1210,44 @@ impl QemuMemoryChunk {
         Ok(output_sliced.len().try_into().unwrap())
     }
 
+    /// Interpret the VM memory chunk as a host slice.
+    ///
+    /// If the underlying memory cannot be represented as a slice
+    /// (for example, if the memory is fragmented in the host address space),
+    /// [`None`] is returned.
+    pub fn to_phys_mem_chunk(&self, qemu: Qemu) -> Option<PhysMemoryChunk> {
+        match self.addr {
+            GuestAddrKind::Physical(paddr) => Some(PhysMemoryChunk::new(
+                paddr,
+                self.size as usize,
+                qemu,
+                self.cpu.or_else(|| qemu.current_cpu())?,
+            )),
+
+            GuestAddrKind::Virtual(start_vaddr) => {
+                let start_paddr = self.cpu.unwrap().get_phys_addr(start_vaddr)?;
+                let page_size = qemu.target_page_size() as GuestVirtAddr;
+
+                for offset in (0..self.size as GuestVirtAddr).step_by(page_size) {
+                    let vaddr = start_vaddr + offset as GuestVirtAddr;
+                    let paddr = self.cpu.unwrap().get_phys_addr(vaddr)?;
+
+                    if paddr != start_paddr + offset as GuestPhysAddr {
+                        // non contiguous memory
+                        return None;
+                    }
+                }
+
+                Some(PhysMemoryChunk::new(
+                    start_paddr,
+                    self.size as usize,
+                    qemu,
+                    self.cpu.unwrap(),
+                ))
+            }
+        }
+    }
+
     pub fn read_vec(&self, qemu: Qemu) -> Result<Vec<u8>, QemuRWError> {
         // # Safety
         // This is safe because we read exactly `self.size` bytes from QEMU.

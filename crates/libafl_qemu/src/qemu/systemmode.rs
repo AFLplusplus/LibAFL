@@ -2,7 +2,7 @@ use std::{
     ffi::{CStr, CString, c_void},
     marker::PhantomData,
     mem::MaybeUninit,
-    ptr::null_mut,
+    ptr::{NonNull, null_mut},
     slice,
 };
 
@@ -96,10 +96,10 @@ impl CPU {
                 page as GuestVirtAddr,
                 attrs.as_mut_ptr(),
             );
-            let mask = Qemu::get_unchecked().target_page_mask();
+            let mask = Qemu::get_unchecked().target_page_offset_mask();
             let offset = (vaddr & (mask as GuestVirtAddr)) as GuestPhysAddr;
-            #[expect(clippy::cast_sign_loss)]
-            if paddr == (-1i64 as GuestPhysAddr) {
+
+            if paddr == u64::MAX {
                 None
             } else {
                 Some(paddr + offset)
@@ -177,6 +177,10 @@ impl CPU {
                 true,
             );
         }
+    }
+
+    pub fn host_addr(&self, addr: GuestPhysAddr) -> *const u8 {
+        unsafe { libafl_qemu_sys::libafl_paddr2host(self.cpu_ptr, addr, false) }
     }
 }
 
@@ -306,14 +310,25 @@ impl Qemu {
         }
     }
 
+    /// Get the size in bytes of a guest page.
     #[must_use]
     pub fn target_page_size(&self) -> usize {
-        unsafe { libafl_qemu_sys::qemu_target_page_size() }
+        unsafe { libafl_qemu_sys::libafl_target_page_size() }
     }
 
+    /// Get the mask of a guest page.
+    /// This will return the mask for the page part of the address,
+    /// not the offset.
     #[must_use]
     pub fn target_page_mask(&self) -> usize {
-        unsafe { libafl_qemu_sys::qemu_target_page_mask() as usize }
+        unsafe { libafl_qemu_sys::libafl_target_page_mask() as usize }
+    }
+
+    /// Get the mask of a guest page's offset.
+    /// This will return the mask for the offset part of the address.
+    #[must_use]
+    pub fn target_page_offset_mask(&self) -> usize {
+        unsafe { libafl_qemu_sys::libafl_target_page_offset_mask() as usize }
     }
 }
 
@@ -364,6 +379,34 @@ impl PhysMemoryChunk {
             qemu,
             cpu,
         }
+    }
+
+    pub fn addr_host_ptr(&self) -> Option<*const u8> {
+        let host_addr: *const u8 =
+            unsafe { libafl_qemu_sys::libafl_paddr2host(self.cpu.cpu_ptr, self.addr, false) };
+
+        Some(host_addr)
+    }
+
+    pub fn addr_host_ptr_mut(&self) -> Option<NonNull<u8>> {
+        let host_addr: *mut u8 =
+            unsafe { libafl_qemu_sys::libafl_paddr2host(self.cpu.cpu_ptr, self.addr, true) };
+
+        NonNull::new(host_addr)
+    }
+
+    pub fn as_host_slice(&self) -> Option<&[u8]> {
+        let host_ptr = self.addr_host_ptr()?;
+        Some(unsafe { slice::from_raw_parts(host_ptr, self.size) })
+    }
+
+    pub fn as_host_slice_mut(&self) -> Option<&mut [u8]> {
+        let mut host_ptr = self.addr_host_ptr_mut()?;
+        Some(unsafe { slice::from_raw_parts_mut(host_ptr.as_mut(), self.size) })
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
     }
 }
 

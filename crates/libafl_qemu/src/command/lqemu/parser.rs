@@ -5,93 +5,31 @@ use libafl::{executors::ExitKind, inputs::HasTargetBytes};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 use libc::c_uint;
 
+use super::{
+    AddressAllowCommand, EndCommand, LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand,
+    StartCommand, TestCommand, VersionCommand, bindings,
+};
 use crate::{
-    GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
+    GuestReg, InputSetter, IsSnapshotManager, MapKind, Qemu, QemuMemoryChunk, Regs,
+    StdEmulatorDriver,
     command::{
-        AddressAllowCommand, CommandError, CommandManager, EndCommand, InputCommand, IsCommand,
-        LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand, StartCommand, StdCommandManager,
-        TestCommand, VersionCommand, bindings,
+        CommandError, CommandManager, NativeCommandParser, StdCommandManager, lqemu::SetMapCommand,
     },
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
     sync_exit::ExitArgs,
 };
 
-#[cfg(all(cpu_target = "x86_64", feature = "systemmode"))]
-pub mod nyx;
-
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
-
-pub trait NativeCommandParser<C, CM, ED, ET, I, S, SM> {
-    type OutputCommand: IsCommand<C, CM, ED, ET, I, S, SM>;
-
-    const COMMAND_ID: c_uint;
-
-    fn parse(
-        qemu: Qemu,
-        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Self::OutputCommand, CommandError>;
-}
-
-pub struct InputPhysCommandParser;
-impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
-    for InputPhysCommandParser
-where
-    I: HasTargetBytes,
-{
-    type OutputCommand = InputCommand;
-
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_PHYS.0;
-
-    fn parse(
-        qemu: Qemu,
-        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Self::OutputCommand, CommandError> {
-        let input_phys_addr: GuestPhysAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
-        let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
-
-        Ok(InputCommand::new(
-            QemuMemoryChunk::phys(
-                input_phys_addr,
-                max_input_size,
-                Some(qemu.current_cpu().unwrap()),
-            ),
-            qemu.current_cpu().unwrap(),
-        ))
-    }
-}
-
-pub struct InputVirtCommandParser;
-impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
-    for InputVirtCommandParser
-where
-    I: HasTargetBytes,
-{
-    type OutputCommand = InputCommand;
-
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INPUT_VIRT.0;
-
-    fn parse(
-        qemu: Qemu,
-        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
-    ) -> Result<Self::OutputCommand, CommandError> {
-        let input_virt_addr: GuestVirtAddr =
-            qemu.read_reg(arch_regs_map[ExitArgs::Arg1])? as GuestVirtAddr;
-        let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
-
-        Ok(InputCommand::new(
-            QemuMemoryChunk::virt(input_virt_addr, max_input_size, qemu.current_cpu().unwrap()),
-            qemu.current_cpu().unwrap(),
-        ))
-    }
-}
 
 pub struct StartPhysCommandParser;
 
-impl<C, ET, I, S, SM> NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, IS, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver<IS>, ET, I, S, SM>
     for StartPhysCommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
+    IS: InputSetter<I, S>,
     S: Unpin,
     SM: IsSnapshotManager,
 {
@@ -116,11 +54,13 @@ where
 
 pub struct StartVirtCommandParser;
 
-impl<C, ET, I, S, SM> NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, IS, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver<IS>, ET, I, S, SM>
     for StartVirtCommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
     I: HasTargetBytes + Unpin,
+    IS: InputSetter<I, S>,
     S: Unpin,
     SM: IsSnapshotManager,
 {
@@ -145,7 +85,7 @@ where
 }
 
 pub struct SaveCommandParser;
-impl<C, CM, ET, I, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver, ET, I, S, SM>
+impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>
     for SaveCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -166,10 +106,10 @@ where
 }
 
 pub struct LoadCommandParser;
-impl<C, CM, ET, I, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver, ET, I, S, SM>
+impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>
     for LoadCommandParser
 where
-    CM: CommandManager<C, StdEmulatorDriver, ET, I, S, SM>,
+    CM: CommandManager<C, StdEmulatorDriver<IS>, ET, I, S, SM>,
     SM: IsSnapshotManager,
 {
     type OutputCommand = LoadCommand;
@@ -186,7 +126,8 @@ where
 
 pub struct EndCommandParser;
 
-impl<C, ET, I, S, SM> NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, IS, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver<IS>, ET, I, S, SM>
     for EndCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -231,9 +172,10 @@ impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let client_version = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
+        let major = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
+        let minor = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?.into();
 
-        Ok(VersionCommand::new(client_version))
+        Ok(VersionCommand::new(major, minor))
     }
 }
 
@@ -314,5 +256,49 @@ where
             received_value,
             GuestReg::from(bindings::LIBAFL_QEMU_TEST_VALUE),
         ))
+    }
+}
+
+pub struct SetMapCommandParser;
+impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>
+    for SetMapCommandParser
+where
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
+{
+    type OutputCommand = SetMapCommand;
+    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SET_MAP.0;
+
+    fn parse(
+        qemu: Qemu,
+        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+    ) -> Result<Self::OutputCommand, CommandError> {
+        let map_addr: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+        let map: bindings::lqemu_map = unsafe { qemu.read_mem_val(map_addr)? };
+
+        let kind = match map.map_kind {
+            bindings::lqemu_map_kind_LQEMU_MAP_COV => MapKind::Cov,
+
+            bindings::lqemu_map_kind_LQEMU_MAP_CMP => MapKind::Cmp,
+
+            _ => return Err(CommandError::InvalidParameters),
+        };
+
+        let map = match map.addr_kind {
+            bindings::lqemu_addr_kind_LQEMU_ADDR_PHYS => {
+                QemuMemoryChunk::phys(map.addr, map.len, qemu.current_cpu())
+            }
+
+            bindings::lqemu_addr_kind_LQEMU_ADDR_VIRT => QemuMemoryChunk::virt(
+                map.addr as GuestVirtAddr,
+                map.len,
+                qemu.current_cpu().unwrap(),
+            ),
+
+            _ => return Err(CommandError::InvalidParameters),
+        };
+
+        Ok(SetMapCommand::new(kind, map))
     }
 }
