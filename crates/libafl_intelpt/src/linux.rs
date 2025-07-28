@@ -8,7 +8,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{ffi::CStr, fmt::Debug, ops::RangeInclusive, ptr};
+use core::{ffi::CStr, fmt::Debug, ptr};
 use std::{
     fs,
     io::{Read, Seek, SeekFrom},
@@ -23,19 +23,17 @@ use std::{
 use arbitrary_int::u4;
 use bitbybit::bitfield;
 use caps::{CapSet, Capability};
-use libafl_bolts::{Error, hash_64_fast};
+use libafl_bolts::Error;
 pub use libipt::{
     asid::Asid,
+    enc_dec_builder::{AddrFilter, AddrFilterType, AddrFilters},
     image::{Image, SectionCache, SectionInfo},
     status::Status,
 };
 use libipt::{
     block::BlockDecoder,
-    enc_dec_builder::{
-        AddrFilterRange, AddrFilterType, AddrFilters, AddrFiltersBuilder, Cpu,
-        EncoderDecoderBuilder,
-    },
-    error::{PtError, PtErrorCode},
+    enc_dec_builder::{Cpu, EncoderDecoderBuilder},
+    error::PtError,
 };
 use num_enum::TryFromPrimitive;
 use num_traits::{Euclid, SaturatingAdd};
@@ -47,6 +45,7 @@ use perf_event_open_sys::{
 use raw_cpuid::CpuId;
 
 use super::{PAGE_SIZE, availability};
+use crate::decoder::Decoder;
 
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
@@ -101,9 +100,9 @@ pub struct IntelPT {
     aux_head: *mut u64,
     aux_tail: *mut u64,
     previous_decode_head: u64,
-    ip_filters: Vec<RangeInclusive<usize>>,
     // The lifetime of BlockDecoder<'a> is irrelevant during the building phase.
     decoder_builder: EncoderDecoderBuilder<BlockDecoder<'static>>,
+    exclude_hv: bool,
     #[cfg(feature = "export_raw")]
     last_decode_trace: Vec<u8>,
 }
@@ -120,12 +119,13 @@ impl IntelPT {
     /// Set filters based on Instruction Pointer (IP)
     ///
     /// Only instructions in `filters` ranges will be traced.
-    pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<usize>]) -> Result<(), Error> {
+    fn set_ip_filters(&mut self, filters: &AddrFilters) -> Result<(), Error> {
         let str_filter = filters
             .iter()
+            .filter(|f| f.filter_type == AddrFilterType::FILTER)
             .map(|filter| {
-                let size = filter.end() - filter.start();
-                format!("filter {:#016x}/{:#016x} ", filter.start(), size)
+                let size = filter.to - filter.from;
+                format!("filter {:#016x}/{:#016x} ", filter.from, size)
             })
             .reduce(|acc, s| acc + &s)
             .unwrap_or_default();
@@ -138,11 +138,15 @@ impl IntelPT {
                     Ok(()) => String::new(),
                     Err(reasons) => format!(" Possible reasons: {reasons}"),
                 };
-                let not_enough_filters = if filters.len() > nr_addr_filters().unwrap_or(0) as usize
+                let n_set_filters = filters
+                    .iter()
+                    .filter(|f| f.filter_type == AddrFilterType::FILTER)
+                    .count();
+                let not_enough_filters = if n_set_filters > nr_addr_filters().unwrap_or(0) as usize
                 {
                     format!(
                         " Not enough filters, trying to set {} filters while {} available.",
-                        filters.len(),
+                        n_set_filters,
                         nr_addr_filters().unwrap_or(0)
                     )
                 } else {
@@ -152,40 +156,11 @@ impl IntelPT {
                     "Failed to set IP filters.{not_enough_filters}{availability}"
                 )))
             }
-            0 => {
-                self.ip_filters = filters.to_vec();
-                Ok(())
-            }
+            0 => Ok(()),
             ret => Err(Error::unsupported(format!(
                 "Failed to set IP filter, ioctl returned unexpected value {ret}"
             ))),
         }
-    }
-
-    /// Get the current IP filters configuration
-    #[must_use]
-    pub fn ip_filters(&self) -> Vec<RangeInclusive<usize>> {
-        self.ip_filters.clone()
-    }
-
-    fn ip_filters_to_addr_filter(&self) -> AddrFilters {
-        let mut builder = AddrFiltersBuilder::new();
-        let mut iter = self.ip_filters.iter().map(|f| {
-            AddrFilterRange::new(*f.start() as u64, *f.end() as u64, AddrFilterType::FILTER)
-        });
-        if let Some(f) = iter.next() {
-            builder.addr0(f);
-            if let Some(f) = iter.next() {
-                builder.addr1(f);
-                if let Some(f) = iter.next() {
-                    builder.addr2(f);
-                    if let Some(f) = iter.next() {
-                        builder.addr3(f);
-                    }
-                }
-            }
-        }
-        builder.build()
     }
 
     /// Start tracing
@@ -222,40 +197,6 @@ impl IntelPT {
         }
     }
 
-    // /// Fill the coverage map by decoding the PT traces and reading target memory through `read_mem`
-    // ///
-    // /// This function consumes the traces.
-    // ///
-    // /// # Example
-    // ///
-    // /// An example `read_mem` callback function for the (inprocess) `intel_pt_babyfuzzer` could be:
-    // /// ```
-    // /// let read_mem = |buf: &mut [u8], addr: u64| {
-    // ///     let src = addr as *const u8;
-    // ///     let dst = buf.as_mut_ptr();
-    // ///     let size = buf.len();
-    // ///     unsafe {
-    // ///         core::ptr::copy_nonoverlapping(src, dst, size);
-    // ///     }
-    // /// };
-    // /// ```
-    // #[allow(clippy::cast_possible_wrap)]
-    // pub fn decode_with_callback<F, T>(&mut self, read_memory: F, map: &mut [T]) -> Result<(), Error>
-    // where
-    //     F: Fn(&mut [u8], u64),
-    //     T: SaturatingAdd + From<u8> + Debug,
-    // {
-    //     self.decode_traces_into_map_common(
-    //         None,
-    //         Some(|buff: &mut [u8], addr: u64, _: Asid| {
-    //             debug_assert!(i32::try_from(buff.len()).is_ok());
-    //             read_memory(buff, addr);
-    //             buff.len() as i32
-    //         }),
-    //         map,
-    //     )
-    // }
-
     /// Fill the coverage map by decoding the PT traces
     ///
     /// This function consumes the traces.
@@ -266,25 +207,6 @@ impl IntelPT {
         map_len: usize,
     ) -> Result<(), Error>
     where
-        T: SaturatingAdd + From<u8> + Debug,
-    {
-        self.decode_traces_into_map_common(
-            Some(image),
-            None::<fn(_: &mut [u8], _: u64, _: Asid) -> i32>,
-            map_ptr,
-            map_len,
-        )
-    }
-
-    fn decode_traces_into_map_common<F, T>(
-        &mut self,
-        image: Option<&mut Image>,
-        read_memory: Option<F>,
-        map_ptr: *mut T,
-        map_len: usize,
-    ) -> Result<(), Error>
-    where
-        F: Fn(&mut [u8], u64, Asid) -> i32,
         T: SaturatingAdd + From<u8> + Debug,
     {
         let head = unsafe { self.aux_head.read_volatile() };
@@ -333,43 +255,21 @@ impl IntelPT {
                 self.last_decode_trace.set_len(len);
             }
         }
-        let builder = unsafe { self.decoder_builder.clone().buffer_from_raw(data_ptr, len) }
-            .filter(self.ip_filters_to_addr_filter());
 
-        let mut decoder = builder.build().map_err(error_from_pt_error)?;
-        decoder.set_image(image).map_err(error_from_pt_error)?;
-        if let Some(rm) = read_memory {
-            decoder.image().set_callback(Some(rm));
-        }
-
-        let mut previous_block_end_ip = 0;
-        let mut status;
-        'sync: loop {
-            match decoder.sync_forward() {
-                Ok(s) => {
-                    status = s;
-                    Self::decode_blocks(
-                        &mut decoder,
-                        &mut status,
-                        &mut previous_block_end_ip,
-                        skip,
-                        map_ptr,
-                        map_len,
-                    )?;
-                }
-                Err(e) => {
-                    if e.code() != PtErrorCode::Eos {
-                        log::info!("PT error in sync forward {e:?}");
-                    }
-                    break 'sync;
-                }
-            }
-        }
+        let decoder = Decoder::new(
+            self.decoder_builder.clone(),
+            self.exclude_hv,
+            image,
+            data_ptr,
+            len,
+            skip,
+            map_ptr,
+            map_len,
+        )?;
+        let offset = decoder.decode_traces_into_map()?;
 
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
         // might not contain a PSB packet.
-        decoder.sync_backward().map_err(error_from_pt_error)?;
-        let offset = decoder.sync_offset().map_err(error_from_pt_error)?;
         unsafe { self.aux_tail.write_volatile(tail + offset) };
         self.previous_decode_head = head;
         Ok(())
@@ -404,82 +304,6 @@ impl IntelPT {
             );
             data.assume_init()
         }
-    }
-
-    #[inline]
-    fn decode_blocks<T>(
-        decoder: &mut BlockDecoder,
-        status: &mut Status,
-        previous_block_end_ip: &mut u64,
-        skip: u64,
-        map_ptr: *mut T,
-        map_len: usize,
-    ) -> Result<(), Error>
-    where
-        T: SaturatingAdd + From<u8> + Debug,
-    {
-        #[cfg(debug_assertions)]
-        let mut trace_entry_iters: (u64, u64) = (0, 0);
-
-        'block: loop {
-            let offset = decoder.offset().map_err(error_from_pt_error)?;
-            #[cfg(debug_assertions)]
-            {
-                if trace_entry_iters.0 == offset {
-                    trace_entry_iters.1 += 1;
-                    if trace_entry_iters.1 > 1000 {
-                        log::warn!(
-                            "Decoder got stuck at trace offset {offset:x}. Make sure the decoder Image has the right content and offsets."
-                        );
-                        break 'block;
-                    }
-                } else {
-                    trace_entry_iters = (offset, 0);
-                }
-            }
-
-            while status.event_pending() {
-                match decoder.event() {
-                    Ok((_, s)) => {
-                        *status = s;
-                    }
-                    Err(e) => {
-                        log::info!("PT error in event {e:?}");
-                        break 'block;
-                    }
-                }
-            }
-
-            match decoder.decode_next() {
-                Ok((b, s)) => {
-                    *status = s;
-
-                    if b.ninsn() > 0 && skip < offset {
-                        let id = hash_64_fast(*previous_block_end_ip) ^ hash_64_fast(b.ip());
-                        // SAFETY: the index is < map_len since the modulo operation is applied
-                        unsafe {
-                            let map_loc = map_ptr.add(id as usize % map_len);
-                            *map_loc = (*map_loc).saturating_add(&1u8.into());
-                        }
-                        *previous_block_end_ip = b.end_ip();
-                    }
-
-                    if status.eos() {
-                        break 'block;
-                    }
-                }
-                Err(e) => {
-                    if e.code() != PtErrorCode::Eos {
-                        let offset = decoder.offset().map_err(error_from_pt_error)?;
-                        log::info!(
-                            "PT error in block next {e:?} trace offset {offset:x} last decoded block end {previous_block_end_ip:x}"
-                        );
-                    }
-                    break 'block;
-                }
-            }
-        }
-        Ok(())
     }
 
     /// Get the raw trace used in the last decoding
@@ -528,7 +352,7 @@ pub struct IntelPTBuilder {
     inherit: bool,
     perf_buffer_size: usize,
     perf_aux_buffer_size: usize,
-    ip_filters: Vec<RangeInclusive<usize>>,
+    ip_filters: AddrFilters,
 }
 
 impl Default for IntelPTBuilder {
@@ -545,9 +369,9 @@ impl Default for IntelPTBuilder {
     ///     .inherit(false)
     ///     .perf_buffer_size(128 * PAGE_SIZE + PAGE_SIZE)
     ///     .unwrap()
-    ///     .perf_aux_buffer_size(4 * 1024 * 1024)
+    ///     .perf_aux_buffer_size(16 * 1024 * 1024)
     ///     .unwrap()
-    ///     .ip_filters(&[]);
+    ///     .ip_filters(&Default::default());
     /// assert_eq!(builder, IntelPTBuilder::default());
     /// ```
     fn default() -> Self {
@@ -558,8 +382,8 @@ impl Default for IntelPTBuilder {
             exclude_hv: true,
             inherit: false,
             perf_buffer_size: 128 * PAGE_SIZE + PAGE_SIZE,
-            perf_aux_buffer_size: 4 * 1024 * 1024,
-            ip_filters: Vec::new(),
+            perf_aux_buffer_size: 16 * 1024 * 1024,
+            ip_filters: AddrFilters::default(),
         }
     }
 }
@@ -624,7 +448,8 @@ impl IntelPTBuilder {
 
         let mut decoder_builder = EncoderDecoderBuilder::new()
             .set_end_on_call(true)
-            .set_end_on_jump(true);
+            .set_end_on_jump(true)
+            .filter(self.ip_filters);
         if let Some(cpu) = current_cpu() {
             decoder_builder = decoder_builder.cpu(cpu);
         }
@@ -638,14 +463,12 @@ impl IntelPTBuilder {
             aux_head,
             aux_tail,
             previous_decode_head: 0,
-            ip_filters: Vec::with_capacity(*NR_ADDR_FILTERS.as_ref().unwrap_or(&0) as usize),
             decoder_builder,
+            exclude_hv: self.exclude_hv,
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
         };
-        if !self.ip_filters.is_empty() {
-            intel_pt.set_ip_filters(&self.ip_filters)?;
-        }
+        intel_pt.set_ip_filters(&self.ip_filters)?;
         Ok(intel_pt)
     }
 
@@ -742,10 +565,8 @@ impl IntelPTBuilder {
 
     #[must_use]
     /// Set filters based on Instruction Pointer (IP)
-    ///
-    /// Only instructions in `filters` ranges will be traced.
-    pub fn ip_filters(mut self, filters: &[RangeInclusive<usize>]) -> Self {
-        self.ip_filters = filters.to_vec();
+    pub const fn ip_filters(mut self, filters: &AddrFilters) -> Self {
+        self.ip_filters = *filters;
         self
     }
 }
