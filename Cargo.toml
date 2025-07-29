@@ -106,7 +106,7 @@ fastbloom = { version = "0.12.0", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false } # A faster hashmap, nostd compatible
 just = "=1.40.0"
 libc = "0.2.159" # For (*nix) libc
-libipt = "0.3.0"
+libipt = "0.4.0"
 log = "0.4.22"
 meminterval = "0.4.1"
 mimalloc = { version = "0.1.43", default-features = false }
