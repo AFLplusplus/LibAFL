@@ -12,3 +12,4 @@ libafl = { path = "../../../crates/libafl", default-features = false, features =
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
 libafl_intelpt = { path = "../../../crates/libafl_intelpt" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
+object = "0.37.1"
