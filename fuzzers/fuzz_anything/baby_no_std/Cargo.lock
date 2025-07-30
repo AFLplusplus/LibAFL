@@ -119,6 +119,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "exceptional"
+version = "0.15.3"
+dependencies = [
+ "libafl_core",
+ "libc",
+ "num_enum",
+ "rustversion",
+]
+
+[[package]]
+name = "fast_rands"
+version = "0.15.3"
+dependencies = [
+ "rustversion",
+ "serde",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -139,8 +157,10 @@ dependencies = [
  "const_panic",
  "hashbrown",
  "libafl_bolts",
+ "libafl_core",
  "libc",
  "libm",
+ "ll_mp",
  "log",
  "meminterval",
  "num-traits",
@@ -158,21 +178,38 @@ version = "0.15.3"
 dependencies = [
  "ahash",
  "erased-serde",
+ "exceptional",
+ "fast_rands",
  "hashbrown",
+ "libafl_core",
  "libc",
+ "ll_mp",
  "log",
  "mach2",
+ "no_std_time",
  "num_enum",
- "once_cell",
+ "ownedref",
  "postcard",
  "rustversion",
  "serde",
+ "serde_anymap",
+ "shmem_providers",
  "static_assertions",
  "tuple_list",
+ "tuple_list_ex",
  "typeid",
  "winapi",
  "windows",
  "windows-result",
+]
+
+[[package]]
+name = "libafl_core"
+version = "0.15.3"
+dependencies = [
+ "postcard",
+ "rustversion",
+ "serde",
 ]
 
 [[package]]
@@ -186,6 +223,21 @@ name = "libm"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
+
+[[package]]
+name = "ll_mp"
+version = "0.15.3"
+dependencies = [
+ "exceptional",
+ "libafl_core",
+ "log",
+ "no_std_time",
+ "postcard",
+ "rustversion",
+ "serde",
+ "shmem_providers",
+ "tuple_list",
+]
 
 [[package]]
 name = "log"
@@ -210,6 +262,13 @@ checksum = "c6f8614cf855d251be1c2138d330c04f134923fddec0dcfc8b6f58ac499bf248"
 dependencies = [
  "num-traits",
  "serde",
+]
+
+[[package]]
+name = "no_std_time"
+version = "0.15.3"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]
@@ -247,6 +306,15 @@ name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
+
+[[package]]
+name = "ownedref"
+version = "0.15.3"
+dependencies = [
+ "libafl_core",
+ "rustversion",
+ "serde",
+]
 
 [[package]]
 name = "postcard"
@@ -294,6 +362,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_anymap"
+version = "0.15.3"
+dependencies = [
+ "ahash",
+ "erased-serde",
+ "hashbrown",
+ "libafl_core",
+ "postcard",
+ "rustversion",
+ "serde",
+ "static_assertions",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -302,6 +384,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "shmem_providers"
+version = "0.15.3"
+dependencies = [
+ "fast_rands",
+ "hashbrown",
+ "libafl_core",
+ "libc",
+ "log",
+ "postcard",
+ "rustversion",
+ "serde",
 ]
 
 [[package]]
@@ -355,6 +451,18 @@ name = "tuple_list"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "141fb9f71ee586d956d7d6e4d5a9ef8e946061188520140f7591b668841d502e"
+
+[[package]]
+name = "tuple_list_ex"
+version = "0.15.3"
+dependencies = [
+ "libafl_core",
+ "ownedref",
+ "rustversion",
+ "serde",
+ "tuple_list",
+ "typeid",
+]
 
 [[package]]
 name = "typeid"

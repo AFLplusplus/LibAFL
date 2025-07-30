@@ -62,12 +62,8 @@ impl GzipCompressor {
 
     /// Decompression.
     pub fn decompress(&self, buf: &[u8]) -> Result<Vec<u8>, Error> {
-        let decompressed = decompress_to_vec(buf);
-
-        match decompressed {
-            Ok(buf) => Ok(buf),
-            Err(_) => Err(Error::compression()),
-        }
+        decompress_to_vec(buf)
+            .map_err(|err| Error::illegal_state(format!("Failed to decompress: {err:?}")))
     }
 }
 
