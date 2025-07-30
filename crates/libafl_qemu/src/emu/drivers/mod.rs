@@ -492,10 +492,15 @@ where
             Ok(exit_reason) => exit_reason,
             Err(exit_error) => match exit_error {
                 EmulatorExitError::UnexpectedExit => {
-                    if let Some(snapshot_id) = emulator.driver.snapshot_id.get() {
-                        emulator.snapshot_manager.restore(qemu, snapshot_id)?;
+                    if emulator.started {
+                        if let Some(snapshot_id) = emulator.driver.snapshot_id.get() {
+                            emulator.snapshot_manager.restore(qemu, snapshot_id)?;
+                        }
+
+                        return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)));
+                    } else {
+                        Err(exit_error.clone())?
                     }
-                    return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)));
                 }
                 _ => Err(exit_error.clone())?,
             },

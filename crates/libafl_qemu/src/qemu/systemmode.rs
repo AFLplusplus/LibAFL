@@ -8,8 +8,8 @@ use std::{
 
 use libafl_qemu_sys::{
     GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr, libafl_load_qemu_snapshot,
-    libafl_page_from_addr, libafl_qemu_current_paging_id, libafl_save_qemu_snapshot, qemu_cleanup,
-    qemu_main_loop, vm_start,
+    libafl_page_from_addr, libafl_qemu_current_paging_id, libafl_qemu_run,
+    libafl_save_qemu_snapshot, qemu_cleanup,
 };
 use libc::EXIT_SUCCESS;
 use num_traits::Zero;
@@ -244,8 +244,7 @@ impl Qemu {
     #[expect(clippy::trivially_copy_pass_by_ref)]
     pub(super) unsafe fn run_inner(&self) {
         unsafe {
-            vm_start();
-            qemu_main_loop();
+            libafl_qemu_run();
         }
     }
 
