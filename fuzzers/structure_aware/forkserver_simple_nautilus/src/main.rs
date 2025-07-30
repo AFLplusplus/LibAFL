@@ -42,7 +42,7 @@ use nix::sys::signal::Signal;
 )]
 struct Opt {
     #[arg(
-        help = "The instrumented binary we want to fuzz",
+        help = "Instrumented binary we want to fuzz",
         name = "EXEC",
         required = true
     )]
@@ -81,8 +81,16 @@ struct Opt {
     )]
     signal: Signal,
 
-    #[arg(help = "The nautilus grammar file", short)]
+    #[arg(help = "Nautilus grammar file (Python or JSON)", short)]
     grammar: PathBuf,
+
+    #[arg(
+        help = "Nautilus tree depth",
+        short = 'T',
+        long = "tree-depth",
+        default_value = "15"
+    )]
+    tree_depth: usize,
 }
 
 pub fn main() {
@@ -111,7 +119,7 @@ pub fn main() {
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let context = NautilusContext::from_file(15, opt.grammar).unwrap();
+    let context = NautilusContext::from_file(opt.tree_depth, opt.grammar).unwrap();
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
