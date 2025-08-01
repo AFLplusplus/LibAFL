@@ -1,6 +1,6 @@
 //! Stage to compute and report AFL++ stats
 use alloc::{borrow::Cow, string::String, vec::Vec};
-use core::{fmt::Display, marker::PhantomData, time::Duration};
+use core::{fmt::{Display, Debug}, marker::PhantomData, time::Duration};
 use std::{
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, Write},
@@ -14,7 +14,7 @@ use libafl_bolts::{
     Named,
     core_affinity::CoreId,
     current_time,
-    tuples::{Handle, Handled, MatchNameRef},
+    tuples::{Handle, Handled, MatchName},
 };
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +25,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::{Event, EventFirer, EventWithStats},
     executors::HasObservers,
+    feedbacks::MapFeedbackMetadata,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
@@ -73,8 +74,9 @@ libafl_bolts::impl_serdeany!(FuzzTime);
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<C, E, EM, I, O, S, Z> {
+pub struct AflStatsStage<C, I> {
     map_observer_handle: Handle<C>,
+    map_name: Cow<'static, str>,
     stats_file_path: Option<PathBuf>,
     plot_file_path: Option<PathBuf>,
     start_time: u64,
@@ -112,7 +114,7 @@ pub struct AflStatsStage<C, E, EM, I, O, S, Z> {
     autotokens_enabled: bool,
     /// The core we are bound to
     core_id: CoreId,
-    phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
+    phantom: PhantomData<I>,
 }
 
 /// AFL++'s `fuzzer_stats`
@@ -190,9 +192,9 @@ pub struct AflFuzzerStats<'a> {
     /// TODO
     cpu_affinity: usize,
     /// how many edges have been found
-    edges_found: u64,
+    edges_found: usize,
     /// Size of our edges map
-    total_edges: u64,
+    total_edges: usize,
     /// how many edges are non-deterministic
     var_byte_count: usize,
     /// TODO:
@@ -224,19 +226,19 @@ pub struct AFLPlotData<'a> {
     pending_total: &'a usize,
     pending_favs: &'a usize,
     /// Note: renamed `map_size` -> `total_edges` for consistency with `fuzzer_stats`
-    total_edges: &'a u64,
+    total_edges: &'a usize,
     saved_crashes: &'a u64,
     saved_hangs: &'a u64,
     max_depth: &'a u64,
     execs_per_sec: &'a u64,
     /// Note: renamed `total_execs` -> `execs_done` for consistency with `fuzzer_stats`
     execs_done: &'a u64,
-    edges_found: &'a u64,
+    edges_found: &'a usize,
 }
 
-impl<C, E, EM, I, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, I, O, S, Z>
+impl<C, E, EM, I, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, I>
 where
-    C: AsRef<O> + Named,
+    C: AsRef<E::Observers> + Named,
     E: HasObservers,
     EM: EventFirer<I, S>,
     Z: HasScheduler<I, S>,
@@ -248,9 +250,9 @@ where
         + HasNamedMetadata
         + Stoppable
         + HasCurrentCorpusId,
-    E::Observers: MatchNameRef,
-    O: MapObserver,
-    C: AsRef<O> + Named,
+    E::Observers: MapObserver + MatchName,
+    for<'de> <E::Observers as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static + Debug,
+    C: AsRef<E::Observers> + Named,
     Z::Scheduler: HasQueueCycles,
 {
     #[expect(clippy::too_many_lines)]
@@ -299,13 +301,16 @@ where
         self.maybe_update_cycles(queue_cycles);
         self.maybe_update_cycles_wo_finds(queue_cycles);
 
-        let observers = executor.observers();
-        let map_observer = observers
-            .get(&self.map_observer_handle)
-            .ok_or_else(|| Error::key_not_found("invariant: MapObserver not found".to_string()))?
-            .as_ref();
-        let filled_entries_in_map = map_observer.count_bytes();
-        let map_size = map_observer.usable_count();
+        let map_feedback = state
+            .named_metadata_map()
+            .get::<MapFeedbackMetadata<<E::Observers as MapObserver>::Entry>>(&self.map_name)
+            .unwrap();
+
+        let filled_entries_in_map = map_feedback.num_covered_map_indexes;
+        let map_size = executor.observers()[&self.map_observer_handle]
+            .as_ref()
+            .usable_count();
+
         // Since we do not calibrate when using `QueueScheduler`; we cannot calculate unstable entries.
         let unstable_entries_in_map = state
             .metadata_map()
@@ -370,7 +375,7 @@ where
             #[cfg(not(unix))]
             peak_rss_mb: 0, // TODO for Windows
             cpu_affinity: self.core_id.0,
-            total_edges: map_size as u64,
+            total_edges: map_size,
             edges_found: filled_entries_in_map,
             var_byte_count: unstable_entries_in_map,
             havoc_expansion: 0, // TODO
@@ -435,7 +440,7 @@ where
     }
 }
 
-impl<C, E, EM, I, O, S, Z> Restartable<S> for AflStatsStage<C, E, EM, I, O, S, Z> {
+impl<C, I, S> Restartable<S> for AflStatsStage<C, I> {
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         Ok(true)
     }
@@ -445,17 +450,13 @@ impl<C, E, EM, I, O, S, Z> Restartable<S> for AflStatsStage<C, E, EM, I, O, S, Z
     }
 }
 
-impl<C, E, EM, I, O, S, Z> AflStatsStage<C, E, EM, I, O, S, Z>
+impl<C, I> AflStatsStage<C, I>
 where
-    E: HasObservers,
-    EM: EventFirer<I, S>,
-    S: HasImported + HasMetadata + HasExecutions,
-    C: AsRef<O> + Named,
-    O: MapObserver,
+    C: Named,
 {
     /// Builder for `AflStatsStage`
     #[must_use]
-    pub fn builder() -> AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
+    pub fn builder() -> AflStatsStageBuilder<C, I> {
         AflStatsStageBuilder::new()
     }
 
@@ -514,7 +515,10 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_crash(&mut self, testcase: &Testcase<I>, state: &S) {
+    fn maybe_update_last_crash<S>(&mut self, testcase: &Testcase<I>, state: &S)
+    where
+        S: HasExecutions,
+    {
         #[cfg(feature = "track_hit_feedbacks")]
         if testcase
             .hit_objectives()
@@ -526,7 +530,10 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_hang(&mut self, testcase: &Testcase<I>, state: &S) {
+    fn maybe_update_last_hang<S>(&mut self, testcase: &Testcase<I>, state: &S)
+    where
+        S: HasExecutions,
+    {
         if testcase
             .hit_objectives()
             .contains(&Cow::Borrowed(TIMEOUT_FEEDBACK_NAME))
@@ -558,7 +565,7 @@ where
 
     #[expect(clippy::cast_precision_loss)]
     #[expect(clippy::unused_self)]
-    fn calculate_stability(&self, unstable_entries: usize, filled_entries: u64) -> f64 {
+    fn calculate_stability(&self, unstable_entries: usize, filled_entries: usize) -> f64 {
         ((filled_entries as f64 - unstable_entries as f64) / filled_entries as f64) * 100.0
     }
 }
@@ -648,11 +655,12 @@ pub fn get_run_cmdline() -> Cow<'static, str> {
 
 /// The Builder for `AflStatsStage`
 #[derive(Debug)]
-pub struct AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
+pub struct AflStatsStageBuilder<C, I> {
     stats_file_path: Option<PathBuf>,
     plot_file_path: Option<PathBuf>,
     core_id: Option<CoreId>,
     map_observer_handle: Option<Handle<C>>,
+    map_name: Option<String>,
     uses_autotokens: bool,
     report_interval: Duration,
     dict_count: usize,
@@ -660,16 +668,12 @@ pub struct AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
     banner: String,
     version: String,
     target_mode: String,
-    phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
+    phantom_data: PhantomData<I>,
 }
 
-impl<C, E, EM, I, O, S, Z> AflStatsStageBuilder<C, E, EM, I, O, S, Z>
+impl<C, I> AflStatsStageBuilder<C, I>
 where
-    C: AsRef<O> + Named,
-    E: HasObservers,
-    EM: EventFirer<I, S>,
-    O: MapObserver,
-    S: HasImported + HasMetadata + HasExecutions,
+    C: Named,
 {
     fn new() -> Self {
         Self {
@@ -678,6 +682,7 @@ where
             plot_file_path: None,
             core_id: None,
             map_observer_handle: None,
+            map_name: None,
             uses_autotokens: false,
             dict_count: 0,
             exec_timeout: 0,
@@ -718,6 +723,14 @@ where
         self.map_observer_handle = Some(map_observer.handle());
         self
     }
+
+    /// map name to check the filled count
+    #[must_use]
+    pub fn map_name(mut self, map_name: &str) -> Self {
+        self.map_name = Some(map_name.to_string());
+        self
+    }
+
     /// If we use autotokens provided by the target
     #[must_use]
     pub fn uses_autotokens(mut self, uses: bool) -> Self {
@@ -782,10 +795,13 @@ where
     /// No `MapObserver` supplied to the builder
     /// No `stats_file_path` provieded
     #[allow(clippy::type_complexity)]
-    pub fn build(self) -> Result<AflStatsStage<C, E, EM, I, O, S, Z>, Error> {
+    pub fn build(self) -> Result<AflStatsStage<C, I>, Error> {
         if self.map_observer_handle.is_none() {
             return Err(Error::illegal_argument("Must set `map_observer`"));
         }
+        let Some(map_name) = self.map_name else {
+                return Err(Error::illegal_argument("Must set `map_name`"));
+        };
         if let Some(ref plot_file) = self.plot_file_path {
             Self::create_plot_data_file(plot_file)?;
         }
@@ -794,6 +810,7 @@ where
         }
         Ok(AflStatsStage {
             stats_file_path: self.stats_file_path,
+            map_name: Cow::Owned(map_name),
             plot_file_path: self.plot_file_path,
             map_observer_handle: self.map_observer_handle.unwrap(),
             start_time: current_time().as_secs(),
@@ -820,7 +837,7 @@ where
             dict_count: self.dict_count,
             core_id: self.core_id.unwrap_or(CoreId(0)),
             autotokens_enabled: self.uses_autotokens,
-            phantom_data: PhantomData,
+            phantom: PhantomData,
         })
     }
 }
