@@ -186,6 +186,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         .core_id(core_id)
         .report_interval(Duration::from_secs(opt.stats_interval))
         .map_observer(&edges_observer)
+        .map_name("edges")
         .uses_autotokens(!opt.no_autodict)
         .tokens(&tokens)
         .banner(opt.executable.display().to_string())
