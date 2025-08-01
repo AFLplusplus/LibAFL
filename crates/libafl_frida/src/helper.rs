@@ -31,6 +31,8 @@ use yaxpeax_arch::Arch;
 use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
+#[cfg(target_arch = "x86")]
+use yaxpeax_x86::protected_mode::InstDecoder;
 
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
@@ -301,7 +303,7 @@ impl FridaInstrumentationHelperBuilder {
         callback: Option<F>,
     ) -> Self {
         let name = path
-            .file_name()
+            .file_stem()
             .and_then(|name| name.to_str())
             .unwrap_or_else(|| {
                 panic!(
@@ -309,16 +311,14 @@ impl FridaInstrumentationHelperBuilder {
                     path.display()
                 )
             });
-        let script_prefix = include_str!("script.js");
         let file_contents = read_to_string(path)
             .unwrap_or_else(|err| panic!("Failed to read script {}: {err:?}", path.display()));
-        let payload = script_prefix.to_string() + &file_contents;
         let gum = Gum::obtain();
         let backend = match backend {
             FridaScriptBackend::V8 => Backend::obtain_v8(&gum),
             FridaScriptBackend::QuickJS => Backend::obtain_qjs(&gum),
         };
-        Script::load(&backend, name, payload, callback).unwrap();
+        Script::load(&backend, name, file_contents, callback).unwrap();
         self
     }
 
@@ -639,7 +639,7 @@ where
         let ranges = Rc::clone(ranges);
         let runtimes = Rc::clone(runtimes);
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         let decoder = InstDecoder::default();
 
         #[cfg(target_arch = "aarch64")]
@@ -698,7 +698,7 @@ where
                     None
                 };
 
-                #[cfg(target_arch = "x86_64")]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         let start = output.writer().pc();
@@ -814,18 +814,21 @@ where
     fn workaround_gum_allocate_near() {
         unsafe {
             for _ in 0..512 {
+                let map_flags = MapFlags::MAP_PRIVATE;
+                #[cfg(not(target_os = "freebsd"))]
+                let map_flags = map_flags | MapFlags::MAP_NORESERVE;
                 mmap_anonymous(
                     None,
                     core::num::NonZeroUsize::new_unchecked(128 * 1024),
                     ProtFlags::PROT_NONE,
-                    MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                    map_flags,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
                 mmap_anonymous(
                     None,
                     core::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
                     ProtFlags::PROT_NONE,
-                    MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                    map_flags,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
             }

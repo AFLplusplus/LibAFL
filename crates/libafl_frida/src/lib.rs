@@ -309,7 +309,8 @@ impl FridaOptions {
 
 impl Default for FridaOptions {
     fn default() -> Self {
-        Self {
+        #[cfg(target_pointer_width = "64")]
+        return Self {
             enable_asan: false,
             enable_asan_leak_detection: false,
             enable_asan_continue_after_error: false,
@@ -321,7 +322,21 @@ impl Default for FridaOptions {
             enable_drcov: false,
             instrument_suppress_locations: None,
             enable_cmplog: false,
-        }
+        };
+        #[cfg(target_pointer_width = "32")]
+        return Self {
+            enable_asan: false,
+            enable_asan_leak_detection: false,
+            enable_asan_continue_after_error: false,
+            enable_asan_allocation_backtraces: false,
+            asan_max_allocation: 1 << 30,
+            asan_max_total_allocation: 1 << 31,
+            asan_max_allocation_panics: false,
+            enable_coverage: true,
+            enable_drcov: false,
+            instrument_suppress_locations: None,
+            enable_cmplog: false,
+        };
     }
 }
 

@@ -2778,8 +2778,9 @@ where
                                 size_of::<LlmpClientExitInfo>()
                             )));
                         }
-                        let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
-                        let client_id = ClientId((*exitinfo).client_id);
+                        let exitinfo =
+                            ((*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo).read_unaligned();
+                        let client_id = ClientId(exitinfo.client_id);
                         log::info!(
                             "Client exit message received!, we are removing clients whose client_group_id is {client_id:#?}"
                         );
@@ -3191,9 +3192,9 @@ where
                 .alloc_next(size_of::<LlmpClientExitInfo>())
                 .expect("Could not allocate a new message in shared map.");
             (*msg).tag = LLMP_TAG_CLIENT_EXIT;
-            #[expect(clippy::cast_ptr_alignment)]
-            let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
-            (*exitinfo).client_id = client_id;
+            let mut exitinfo =
+                ((*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo).read_unaligned();
+            exitinfo.client_id = client_id;
             sender.send(msg, true)
         }
     }

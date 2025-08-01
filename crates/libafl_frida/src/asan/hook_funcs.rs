@@ -1254,6 +1254,7 @@ impl AsanRuntime {
     ) {
     }
 
+    #[cfg(target_pointer_width = "64")]
     #[inline]
     #[expect(non_snake_case)]
     pub fn hook___cxa_allocate_exception(
@@ -1264,6 +1265,20 @@ impl AsanRuntime {
         unsafe {
             self.allocator_mut()
                 .alloc((size + 0x8f) & 0xfffffffffffffff0, 8)
+                .add(0x80)
+        }
+    }
+    #[cfg(target_pointer_width = "32")]
+    #[inline]
+    #[expect(non_snake_case)]
+    pub fn hook___cxa_allocate_exception(
+        &mut self,
+        _original: extern "C" fn(size: usize) -> *const c_void,
+        size: usize,
+    ) -> *const c_void {
+        unsafe {
+            self.allocator_mut()
+                .alloc((size + 0x8f) & 0xfffffff0, 4)
                 .add(0x80)
         }
     }
