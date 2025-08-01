@@ -715,8 +715,10 @@ impl Allocator {
 
         let mut occupied_ranges: Vec<(usize, usize)> = vec![];
         // max(userspace address) this is usually 0x8_0000_0000_0000 - 1 on x64 linux.
-        #[cfg(unix)]
+        #[cfg(all(unix, not(target_arch = "x86")))]
         let mut userspace_max: usize = 0;
+        #[cfg(all(unix, target_arch = "x86"))]
+        let userspace_max: usize = 0;
 
         // Enumerate memory ranges that are already occupied.
 
@@ -855,7 +857,8 @@ impl Default for Allocator {
     fn default() -> Self {
         let page_size = MmapOptions::page_size();
 
-        Self {
+        #[cfg(target_pointer_width = "64")]
+        return Self {
             max_allocation: 1 << 30,
             max_allocation_panics: false,
             max_total_allocation: 1 << 32,
@@ -873,7 +876,27 @@ impl Default for Allocator {
             total_allocation_size: 0,
             base_mapping_addr: 0,
             current_mapping_addr: 0,
-        }
+        };
+        #[cfg(target_pointer_width = "32")]
+        return Self {
+            max_allocation: 1 << 30,
+            max_allocation_panics: false,
+            max_total_allocation: 1 << 31,
+            allocation_backtraces: false,
+            page_size,
+            pre_allocated_shadow_mappings: Vec::new(),
+            using_pre_allocated_shadow_mapping: false,
+            mappings: BTreeMap::new(),
+            shadow_offset: 0,
+            shadow_bit: 0,
+            allocations: BTreeMap::new(),
+            shadow_pages: RangeSet::new(),
+            allocation_queue: BTreeMap::new(),
+            largest_allocation: 0,
+            total_allocation_size: 0,
+            base_mapping_addr: 0,
+            current_mapping_addr: 0,
+        };
     }
 }
 

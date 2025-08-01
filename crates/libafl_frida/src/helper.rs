@@ -31,6 +31,8 @@ use yaxpeax_arch::Arch;
 use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
+#[cfg(target_arch = "x86")]
+use yaxpeax_x86::protected_mode::InstDecoder;
 
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
@@ -639,7 +641,7 @@ where
         let ranges = Rc::clone(ranges);
         let runtimes = Rc::clone(runtimes);
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         let decoder = InstDecoder::default();
 
         #[cfg(target_arch = "aarch64")]
@@ -698,7 +700,7 @@ where
                     None
                 };
 
-                #[cfg(target_arch = "x86_64")]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 if let Some(details) = res {
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         let start = output.writer().pc();
