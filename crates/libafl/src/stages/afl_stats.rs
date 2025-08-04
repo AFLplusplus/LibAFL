@@ -722,12 +722,6 @@ where
         self.report_interval = interval;
         self
     }
-    /// Our `MapObserver`
-    #[must_use]
-    pub fn map_observer(mut self, map_observer: &C) -> Self {
-        self.map_observer_handle = Some(map_observer.handle());
-        self
-    }
 
     /// map name to check the filled count
     #[must_use]
