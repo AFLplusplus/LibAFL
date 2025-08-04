@@ -87,8 +87,7 @@ pub fn main() {
 
     let calibration_stage = CalibrationStage::new(&feedback);
     let stats_stage = AflStatsStage::builder()
-        .map_observer(&observer)
-        .map_name(&feedback)
+        .map_feedback(&feedback)
         .build()
         .unwrap();
 

@@ -29,7 +29,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::{Event, EventFirer, EventWithStats},
     executors::HasObservers,
-    feedbacks::MapFeedbackMetadata,
+    feedbacks::{MapFeedbackMetadata, HasObserverHandle},
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
@@ -731,11 +731,12 @@ where
 
     /// map name to check the filled count
     #[must_use]
-    pub fn map_name<F>(mut self, map_feedback: &F) -> Self
+    pub fn map_feedback<F>(mut self, map_feedback: &F) -> Self
     where
-        F: Named,
+        F: Named + HasObserverHandle<Observer = C>,
     {
         self.map_name = Some(map_feedback.name().to_string());
+        self.map_observer_handle = Some(map_feedback.observer_handle().clone());
         self
     }
 
@@ -804,11 +805,8 @@ where
     /// No `stats_file_path` provieded
     #[allow(clippy::type_complexity)]
     pub fn build(self) -> Result<AflStatsStage<C, I, O>, Error> {
-        if self.map_observer_handle.is_none() {
-            return Err(Error::illegal_argument("Must set `map_observer`"));
-        }
         let Some(map_name) = self.map_name else {
-            return Err(Error::illegal_argument("Must set `map_name`"));
+            return Err(Error::illegal_argument("Must set `map_feedback`"));
         };
         if let Some(ref plot_file) = self.plot_file_path {
             Self::create_plot_data_file(plot_file)?;
