@@ -1,6 +1,10 @@
 //! Stage to compute and report AFL++ stats
 use alloc::{borrow::Cow, string::String, vec::Vec};
-use core::{fmt::{Display, Debug}, marker::PhantomData, time::Duration};
+use core::{
+    fmt::{Debug, Display},
+    marker::PhantomData,
+    time::Duration,
+};
 use std::{
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, Write},
@@ -74,7 +78,7 @@ libafl_bolts::impl_serdeany!(FuzzTime);
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<C, I> {
+pub struct AflStatsStage<C, I, O> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
     stats_file_path: Option<PathBuf>,
@@ -114,7 +118,7 @@ pub struct AflStatsStage<C, I> {
     autotokens_enabled: bool,
     /// The core we are bound to
     core_id: CoreId,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<(I, O)>,
 }
 
 /// AFL++'s `fuzzer_stats`
@@ -236,10 +240,11 @@ pub struct AFLPlotData<'a> {
     edges_found: &'a usize,
 }
 
-impl<C, E, EM, I, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, I>
+impl<C, E, EM, I, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, I, O>
 where
-    C: AsRef<E::Observers> + Named,
+    C: AsRef<O> + Named,
     E: HasObservers,
+    <E as HasObservers>::Observers: MatchName,
     EM: EventFirer<I, S>,
     Z: HasScheduler<I, S>,
     S: HasImported
@@ -250,9 +255,9 @@ where
         + HasNamedMetadata
         + Stoppable
         + HasCurrentCorpusId,
-    E::Observers: MapObserver + MatchName,
-    for<'de> <E::Observers as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static + Debug,
-    C: AsRef<E::Observers> + Named,
+    O: MapObserver,
+    for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static + Debug,
+    C: AsRef<O> + Named,
     Z::Scheduler: HasQueueCycles,
 {
     #[expect(clippy::too_many_lines)]
@@ -303,13 +308,13 @@ where
 
         let map_feedback = state
             .named_metadata_map()
-            .get::<MapFeedbackMetadata<<E::Observers as MapObserver>::Entry>>(&self.map_name)
+            .get::<MapFeedbackMetadata<<O as MapObserver>::Entry>>(&self.map_name)
             .unwrap();
 
         let filled_entries_in_map = map_feedback.num_covered_map_indexes;
-        let map_size = executor.observers()[&self.map_observer_handle]
-            .as_ref()
-            .usable_count();
+        let observers = executor.observers();
+        let map = observers[&self.map_observer_handle].as_ref();
+        let map_size = map.usable_count();
 
         // Since we do not calibrate when using `QueueScheduler`; we cannot calculate unstable entries.
         let unstable_entries_in_map = state
@@ -440,7 +445,7 @@ where
     }
 }
 
-impl<C, I, S> Restartable<S> for AflStatsStage<C, I> {
+impl<C, I, O, S> Restartable<S> for AflStatsStage<C, I, O> {
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         Ok(true)
     }
@@ -450,13 +455,13 @@ impl<C, I, S> Restartable<S> for AflStatsStage<C, I> {
     }
 }
 
-impl<C, I> AflStatsStage<C, I>
+impl<C, I, O> AflStatsStage<C, I, O>
 where
     C: Named,
 {
     /// Builder for `AflStatsStage`
     #[must_use]
-    pub fn builder() -> AflStatsStageBuilder<C, I> {
+    pub fn builder() -> AflStatsStageBuilder<C, I, O> {
         AflStatsStageBuilder::new()
     }
 
@@ -655,7 +660,7 @@ pub fn get_run_cmdline() -> Cow<'static, str> {
 
 /// The Builder for `AflStatsStage`
 #[derive(Debug)]
-pub struct AflStatsStageBuilder<C, I> {
+pub struct AflStatsStageBuilder<C, I, O> {
     stats_file_path: Option<PathBuf>,
     plot_file_path: Option<PathBuf>,
     core_id: Option<CoreId>,
@@ -668,10 +673,10 @@ pub struct AflStatsStageBuilder<C, I> {
     banner: String,
     version: String,
     target_mode: String,
-    phantom_data: PhantomData<I>,
+    phantom_data: PhantomData<(I, O)>,
 }
 
-impl<C, I> AflStatsStageBuilder<C, I>
+impl<C, I, O> AflStatsStageBuilder<C, I, O>
 where
     C: Named,
 {
@@ -726,8 +731,11 @@ where
 
     /// map name to check the filled count
     #[must_use]
-    pub fn map_name(mut self, map_name: &str) -> Self {
-        self.map_name = Some(map_name.to_string());
+    pub fn map_name<F>(mut self, map_feedback: &F) -> Self
+    where
+        F: Named,
+    {
+        self.map_name = Some(map_feedback.name().to_string());
         self
     }
 
@@ -795,12 +803,12 @@ where
     /// No `MapObserver` supplied to the builder
     /// No `stats_file_path` provieded
     #[allow(clippy::type_complexity)]
-    pub fn build(self) -> Result<AflStatsStage<C, I>, Error> {
+    pub fn build(self) -> Result<AflStatsStage<C, I, O>, Error> {
         if self.map_observer_handle.is_none() {
             return Err(Error::illegal_argument("Must set `map_observer`"));
         }
         let Some(map_name) = self.map_name else {
-                return Err(Error::illegal_argument("Must set `map_name`"));
+            return Err(Error::illegal_argument("Must set `map_name`"));
         };
         if let Some(ref plot_file) = self.plot_file_path {
             Self::create_plot_data_file(plot_file)?;
