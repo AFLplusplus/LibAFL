@@ -3,6 +3,9 @@
 This is a an example how to fuzz binary-only dlls on Windows.
 The example fuzzer will explore [gdiplus](https://learn.microsoft.com/en-us/windows/win32/gdiplus/-gdiplus-gdi-start) on Windows, using the [Frida](https://frida.re/) DBI.
 
+## Pre-requisites
+This example depends on the msvc linker, ensure that Visual Studio 2017 or later or Build Tools for Visual Studio were installed with the Visual C++ option.
+
 ## Build
 
 To build this example, run `cargo build --release` in this folder.
