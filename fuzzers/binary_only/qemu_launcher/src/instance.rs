@@ -187,15 +187,13 @@ where
         let stats_stage = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),
             tuple_list!(AflStatsStage::builder()
-                .map_observer(&edges_observer)
-                .map_name(&map_feedback)
+                .map_feedback(&map_feedback)
                 .build()?),
         );
         let stats_stage_cmplog = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),
             tuple_list!(AflStatsStage::builder()
-                .map_observer(&edges_observer)
-                .map_name(&map_feedback)
+                .map_feedback(&map_feedback)
                 .build()?),
         );
 
