@@ -18,7 +18,7 @@ use libafl_bolts::{
     Named,
     core_affinity::CoreId,
     current_time,
-    tuples::{Handle, Handled, MatchName},
+    tuples::{Handle, MatchName},
 };
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +29,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::{Event, EventFirer, EventWithStats},
     executors::HasObservers,
-    feedbacks::{MapFeedbackMetadata, HasObserverHandle},
+    feedbacks::{HasObserverHandle, MapFeedbackMetadata},
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
