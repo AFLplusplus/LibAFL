@@ -1,4 +1,4 @@
-//! LibAFL version of the [`Nautilus`](https://github.com/nautilus-fuzz/nautilus) grammar fuzzer
+//! `LibAFL` version of the [`Nautilus`](https://github.com/nautilus-fuzz/nautilus) grammar fuzzer
 #![doc = include_str!("README.md")]
 
 #[allow(missing_docs)]

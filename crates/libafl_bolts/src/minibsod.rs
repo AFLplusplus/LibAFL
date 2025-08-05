@@ -715,8 +715,23 @@ fn write_crash<W: Write>(
 ) -> Result<(), std::io::Error> {
     writeln!(
         writer,
-        "Received signal {} at{:016x}, fault address: 0x{:016x}",
+        "Received signal {} at {:016x}, fault address: 0x{:016x}",
         signal, ucontext.uc_mcontext.mc_rip, ucontext.uc_mcontext.mc_fs
+    )?;
+
+    Ok(())
+}
+
+#[cfg(all(target_os = "freebsd", target_arch = "x86"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:016x}",
+        signal, ucontext.uc_mcontext.mc_eip
     )?;
 
     Ok(())
@@ -730,7 +745,7 @@ fn write_crash<W: Write>(
 ) -> Result<(), std::io::Error> {
     writeln!(
         writer,
-        "Received signal {} at{:016x}, fault address: 0x{:016x}",
+        "Received signal {} at {:016x}, fault address: 0x{:016x}",
         signal, ucontext.uc_mcontext.mc_rip, ucontext.uc_mcontext.mc_cs
     )?;
 
@@ -745,7 +760,7 @@ fn write_crash<W: Write>(
 ) -> Result<(), std::io::Error> {
     writeln!(
         writer,
-        "Received signal {} at{:016x}, fault address: 0x{:016x}",
+        "Received signal {} at {:016x}, fault address: 0x{:016x}",
         signal, ucontext.sc_rip, ucontext.sc_fs
     )?;
 
@@ -760,7 +775,7 @@ fn write_crash<W: Write>(
 ) -> Result<(), std::io::Error> {
     writeln!(
         writer,
-        "Received signal {} at{:016x}",
+        "Received signal {} at {:016x}",
         signal, ucontext.sc_elr
     )?;
 

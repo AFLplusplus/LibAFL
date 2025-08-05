@@ -79,17 +79,17 @@ impl Default for UnstableEntriesMetadata {
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Debug, Clone)]
-pub struct CalibrationStage<C, E, I, O, OT, S> {
+pub struct CalibrationStage<C, I, O, OT, S> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
     name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    phantom: PhantomData<(E, I, O, OT, S)>,
+    phantom: PhantomData<(I, O, OT, S)>,
 }
 
-impl<C, E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, I, O, OT, S>
+impl<C, E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, I, O, OT, S>
 where
     E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<I, S>,
@@ -372,7 +372,7 @@ where
     }
 }
 
-impl<C, E, I, O, OT, S> Restartable<S> for CalibrationStage<C, E, I, O, OT, S>
+impl<C, I, O, OT, S> Restartable<S> for CalibrationStage<C, I, O, OT, S>
 where
     S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
@@ -391,7 +391,7 @@ where
     }
 }
 
-impl<C, E, I, O, OT, S> CalibrationStage<C, E, I, O, OT, S>
+impl<C, I, O, OT, S> CalibrationStage<C, I, O, OT, S>
 where
     C: AsRef<O>,
     O: MapObserver,
@@ -429,7 +429,7 @@ where
     }
 }
 
-impl<C, E, I, O, OT, S> Named for CalibrationStage<C, E, I, O, OT, S> {
+impl<C, I, O, OT, S> Named for CalibrationStage<C, I, O, OT, S> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
