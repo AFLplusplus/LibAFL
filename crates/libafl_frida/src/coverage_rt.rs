@@ -181,6 +181,56 @@ impl CoverageRuntime {
         ops_vec[..ops_vec.len()].to_vec().into_boxed_slice()
     }
 
+    /// Write inline instrumentation for coverage
+    #[cfg(target_arch = "x86")]
+    pub fn generate_inline_code(&mut self, h32: u64) -> Box<[u8]> {
+        let mut borrow = self.0.borrow_mut();
+        let prev_loc_ptr = &raw mut borrow.previous_pc;
+        let map_addr_ptr = &raw mut borrow.map;
+        let h32 = h32 as u32;
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::x86::X86Relocation>::new(0);
+        dynasm!(ops
+            ;   .arch x86
+            // Store the context
+            ; mov    DWORD [esp-0x88], eax
+            ; lahf
+            ; mov    DWORD [esp-0x90], eax
+            ; mov    DWORD [esp-0x98], ebx
+
+            // Load the previous_pc
+            ; mov eax, DWORD prev_loc_ptr as _
+            ; mov eax, DWORD [eax]
+
+            // Calculate the edge id
+            ; mov ebx, h32 as i32
+            ; xor eax, ebx
+
+            // Load the map byte address
+            ; mov ebx, DWORD map_addr_ptr as _
+            ; add eax, ebx
+
+            // Update the map byte
+            ; mov bl, BYTE [eax]
+            ; add bl, 0x1
+            ; adc bl, 0x0
+            ; mov BYTE [eax], bl
+
+            // Update the previous_pc value
+            ; mov eax, DWORD prev_loc_ptr as _
+            ; mov ebx, h32 as i32
+            ; mov DWORD [eax], ebx
+
+            // Restore the context
+            ; mov    ebx, DWORD [esp-0x98]
+            ; mov    eax, DWORD [esp-0x90]
+            ; sahf
+            ; mov    eax, DWORD [esp-0x88]
+        );
+        let ops_vec = ops.finalize().unwrap();
+
+        ops_vec[..ops_vec.len()].to_vec().into_boxed_slice()
+    }
+
     /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
