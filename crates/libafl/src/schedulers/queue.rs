@@ -53,6 +53,7 @@ where
             // TODO deal with corpus_counts decreasing due to removals
             if self.runs_in_current_cycle >= state.corpus().count() as u64 {
                 self.queue_cycles += 1;
+                self.runs_in_current_cycle = 0;
             }
             <Self as Scheduler<I, S>>::set_current_scheduled(self, state, Some(id))?;
             Ok(id)
