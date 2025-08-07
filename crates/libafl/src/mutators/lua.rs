@@ -11,10 +11,9 @@ use core::cell::Cell;
 #[cfg(feature = "std")]
 use std::{fs, path::Path};
 
-use libafl_bolts::{
-    Error, Named,
-    rands::{Rand, StdRand},
-};
+#[cfg(all(feature = "lua_mutator", feature = "std"))]
+use libafl_bolts::rands::StdRand;
+use libafl_bolts::{Error, Named, rands::Rand};
 use mlua::{Function, HookTriggers, Lua, VmState, prelude::LuaError};
 
 use super::MutationResult;
