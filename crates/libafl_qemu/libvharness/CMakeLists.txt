@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.23)
 project("vharness")
 
 set(VHARNESS_API "lqemu" CACHE STRING "The backend API to use to communicate with the fuzzer")
