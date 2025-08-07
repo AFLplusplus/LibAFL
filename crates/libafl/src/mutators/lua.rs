@@ -37,7 +37,9 @@ fn convert_error(err: LuaError) -> Error {
 }
 
 /// Create an initial Rng with a fixed state..
+#[cfg(all(feature = "lua_mutator", feature = "std"))]
 struct RandState(StdRand);
+#[cfg(all(feature = "lua_mutator", feature = "std"))]
 impl HasRand for RandState {
     type Rand = StdRand;
     fn rand(&self) -> &Self::Rand {

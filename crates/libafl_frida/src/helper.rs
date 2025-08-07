@@ -699,26 +699,26 @@ where
                 };
 
                 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                if let Some(details) = res {
-                    if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
-                        let start = output.writer().pc();
-                        rt.emit_shadow_check(
-                            address,
-                            output,
-                            instr.bytes().len(),
-                            details.0,
-                            details.1,
-                            details.2,
-                            details.3,
-                            details.4,
-                        );
-                        log::trace!(
-                            "emitted shadow_check for {:x} at {:x}-{:x}",
-                            address,
-                            start,
-                            output.writer().pc()
-                        );
-                    }
+                if let Some(details) = res
+                    && let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>()
+                {
+                    let start = output.writer().pc();
+                    rt.emit_shadow_check(
+                        address,
+                        output,
+                        instr.bytes().len(),
+                        details.0,
+                        details.1,
+                        details.2,
+                        details.3,
+                        details.4,
+                    );
+                    log::trace!(
+                        "emitted shadow_check for {:x} at {:x}-{:x}",
+                        address,
+                        start,
+                        output.writer().pc()
+                    );
                 }
 
                 #[cfg(target_arch = "aarch64")]
@@ -740,21 +740,13 @@ where
                     feature = "cmplog",
                     any(target_arch = "aarch64", target_arch = "x86_64")
                 ))]
-                if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>() {
-                    if let Some((op1, op2, shift, special_case)) =
+                if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>()
+                    && let Some((op1, op2, shift, special_case)) =
                         CmpLogRuntime::cmplog_is_interesting_instruction(decoder, address, instr)
-                    //change this as well
-                    {
-                        //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                        rt.emit_comparison_handling(
-                            address,
-                            output,
-                            &op1,
-                            &op2,
-                            &shift,
-                            &special_case,
-                        );
-                    }
+                //change this as well
+                {
+                    //emit code that saves the relevant data in runtime(passes it to x0, x1)
+                    rt.emit_comparison_handling(address, output, &op1, &op2, &shift, &special_case);
                 }
 
                 if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
