@@ -103,14 +103,7 @@ where
             match self.decoder.resync() {
                 Ok(s) => {
                     self.status = s;
-                    if self.status.eos() {
-                        return Ok(());
-                    }
-
-                    // If exclude_hv is set and we are in root VMX operation, continue resyncing
-                    if self.exclude_hv || matches!(self.vmx_non_root, Some(true)) {
-                        return Ok(());
-                    }
+                    return Ok(());
                 }
                 Err(e) => match e.code() {
                     PtErrorCode::Eos => return Ok(()),
@@ -149,39 +142,62 @@ where
                 self.handle_event()?;
             }
 
-            // If exclude_hv is set and we are in root VMX operation, bail out
-            if self.exclude_hv && matches!(self.vmx_non_root, Some(false)) {
-                return Ok(());
+            let offset = self.decoder.offset().map_err(error_from_pt_error)?;
+            if self.should_ignore_vmx_root() || offset <= self.trace_skip {
+                self.ignore_block()?;
+            } else {
+                self.decode_block()?;
             }
 
-            match self.decoder.decode_next() {
-                Ok((b, s)) => {
-                    self.status = s;
-                    let offset = self.decoder.offset().map_err(error_from_pt_error)?;
-                    if b.ninsn() > 0 && self.trace_skip < offset {
-                        let id = hash_64_fast(self.previous_block_end_ip) ^ hash_64_fast(b.ip());
-                        // SAFETY: the index is < map_len since the modulo operation is applied
-                        unsafe {
-                            let map_loc = self.map_ptr.add(id as usize % self.map_len);
-                            *map_loc = (*map_loc).saturating_add(&1u8.into());
-                        }
-                        self.previous_block_end_ip = b.end_ip();
-                    }
+            if self.status.eos() {
+                return Ok(());
+            }
+        }
+    }
 
-                    if self.status.eos() {
-                        return Ok(());
+    fn decode_block(&mut self) -> Result<(), Error> {
+        match self.decoder.decode_next() {
+            Ok((b, s)) => {
+                self.status = s;
+                if b.ninsn() > 0 {
+                    let id = hash_64_fast(self.previous_block_end_ip) ^ hash_64_fast(b.ip());
+                    // SAFETY: the index is < map_len since the modulo operation is applied
+                    unsafe {
+                        let map_loc = self.map_ptr.add(id as usize % self.map_len);
+                        *map_loc = (*map_loc).saturating_add(&1u8.into());
                     }
+                    self.previous_block_end_ip = b.end_ip();
                 }
-                Err(e) => {
-                    if e.code() != PtErrorCode::Eos {
-                        let offset = self.decoder.offset().map_err(error_from_pt_error)?;
-                        log::info!(
-                            "PT error in block next {e:?} trace offset {offset:x} last decoded block end {:x}",
-                            self.previous_block_end_ip
-                        );
-                    }
-                    return Err(error_from_pt_error(e));
+                Ok(())
+            }
+            Err(e) => {
+                if e.code() != PtErrorCode::Eos {
+                    let offset = self.decoder.offset().map_err(error_from_pt_error)?;
+                    log::info!(
+                        "PT error in block next {e:?} trace offset {offset:x} last decoded block end {:x}",
+                        self.previous_block_end_ip
+                    );
                 }
+                Err(error_from_pt_error(e))
+            }
+        }
+    }
+
+    fn ignore_block(&mut self) -> Result<(), Error> {
+        match self.decoder.decode_next() {
+            Ok((_, s)) => {
+                self.status = s;
+                Ok(())
+            }
+            Err(e) => {
+                if e.code() != PtErrorCode::Eos {
+                    let offset = self.decoder.offset().map_err(error_from_pt_error)?;
+                    log::trace!(
+                        "PT error in ignore block {e:?} trace offset {offset:x} last decoded block end {:x}",
+                        self.previous_block_end_ip
+                    );
+                }
+                Err(error_from_pt_error(e))
             }
         }
     }
@@ -199,5 +215,10 @@ where
             }
             Err(e) => Err(Error::illegal_state(format!("PT error in event {e:?}"))),
         }
+    }
+
+    /// Returns true if `exclude_hv` is set and we are in root VMX operation
+    fn should_ignore_vmx_root(&self) -> bool {
+        self.exclude_hv && matches!(self.vmx_non_root, Some(false))
     }
 }

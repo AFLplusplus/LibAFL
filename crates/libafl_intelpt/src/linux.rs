@@ -365,7 +365,7 @@ impl Default for IntelPTBuilder {
     ///     .pid(None)
     ///     .all_cpus()
     ///     .exclude_kernel(true)
-    ///     .exclude_hv(true)
+    ///     .exclude_hv(false)
     ///     .inherit(false)
     ///     .perf_buffer_size(128 * PAGE_SIZE + PAGE_SIZE)
     ///     .unwrap()
@@ -379,7 +379,7 @@ impl Default for IntelPTBuilder {
             pid: None,
             cpu: -1,
             exclude_kernel: true,
-            exclude_hv: true,
+            exclude_hv: false,
             inherit: false,
             perf_buffer_size: 128 * PAGE_SIZE + PAGE_SIZE,
             perf_aux_buffer_size: 16 * 1024 * 1024,
