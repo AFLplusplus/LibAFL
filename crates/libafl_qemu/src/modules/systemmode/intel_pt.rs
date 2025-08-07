@@ -30,7 +30,7 @@ pub struct IntelPTModule<T = u8> {
 
 impl IntelPTModule {
     pub fn default_pt_builder() -> IntelPTBuilder {
-        IntelPT::builder().exclude_kernel(false)
+        IntelPT::builder().exclude_kernel(false).exclude_hv(true)
     }
 }
 
