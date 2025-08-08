@@ -166,7 +166,7 @@ impl ToolWrapper for ArWrapper {
             .map(|r| {
                 let arg_as_path = PathBuf::from(r);
                 if r.ends_with('.') {
-                    r.to_string()
+                    r.clone()
                 } else {
                     if let Some(extension) = arg_as_path.extension() {
                         let extension = extension.to_str().unwrap();
