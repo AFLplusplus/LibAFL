@@ -953,9 +953,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.31"
+version = "1.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3a42d84bb6b69d3a8b3eaacf0d88f179e1929695e1ad012b6cf64d9caaa5fd2"
+checksum = "2352e5597e9c544d5e6d9c95190d5d27738ade584fa8db0a16e130e5c2b5296e"
 dependencies = [
  "jobserver",
  "libc",
@@ -1543,9 +1543,9 @@ checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 
 [[package]]
 name = "cxx"
-version = "1.0.164"
+version = "1.0.165"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "635d77fac8a67ea3f5fa1fa5ae3632a990c1ae3fb032a35909454440f242a493"
+checksum = "2ec86e4f9370c2854b666e028abc6f13293d1c6d71fed36c30e36ae187820847"
 dependencies = [
  "cc",
  "cxxbridge-cmd",
@@ -1557,9 +1557,9 @@ dependencies = [
 
 [[package]]
 name = "cxxbridge-cmd"
-version = "1.0.164"
+version = "1.0.165"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fb15efd6f5bc4d9e932df88b017b8e1596bcff6ea2ab4e5514bb534d956158e"
+checksum = "8be9d7d5eb916d5b0abf1c7b227cffef0e78360edd0f1ad51c74c842a10bddc8"
 dependencies = [
  "clap",
  "codespan-reporting",
@@ -1571,15 +1571,15 @@ dependencies = [
 
 [[package]]
 name = "cxxbridge-flags"
-version = "1.0.164"
+version = "1.0.165"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0dbbd6d062bb9c2d5b16b897f427d82972c7e1641dfe8c124df6baf4f82c2aa"
+checksum = "257b02e5351fee494f1984c8174a9ee40b0ca54c704b03f171e8a8778a4f9f7e"
 
 [[package]]
 name = "cxxbridge-macro"
-version = "1.0.164"
+version = "1.0.165"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b6f789577a4ee64be1aed84f5a1baa8b76fcbc993337f19570a0222a91fd9c0"
+checksum = "99eccbd132b9c9b4433682e404ee3157fe5673d569e779ad3610c59bf7feacc2"
 dependencies = [
  "indexmap",
  "proc-macro2",
@@ -2486,9 +2486,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.15.4"
+version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5971ac85611da7067dbfcabef3c70ebb5606018acd9e2a3903a0da507521e0d5"
+checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
  "allocator-api2",
  "equivalent",
@@ -2847,7 +2847,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe4cd85333e22411419a0bcae1297d25e58c9443848b11dc6a86fefe8c78a661"
 dependencies = [
  "equivalent",
- "hashbrown 0.15.4",
+ "hashbrown 0.15.5",
 ]
 
 [[package]]
@@ -3166,7 +3166,7 @@ dependencies = [
  "dlmalloc",
  "document-features",
  "env_logger",
- "hashbrown 0.15.4",
+ "hashbrown 0.15.5",
  "itertools 0.14.0",
  "libc",
  "log",
@@ -3764,7 +3764,7 @@ version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "234cf4f4a04dc1f57e24b96cc0cd600cf2af460d4161ac5ecdd0af8e1f3b2a38"
 dependencies = [
- "hashbrown 0.15.4",
+ "hashbrown 0.15.5",
 ]
 
 [[package]]
@@ -5527,9 +5527,9 @@ dependencies = [
 
 [[package]]
 name = "slab"
-version = "0.4.10"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04dc19736151f35336d325007ac991178d504a119863a2fcb3758cdb5e52c50d"
+checksum = "7a2ae44ef20feb57a68b23d846850f861394c2e02dc425a50098ae8c90267589"
 
 [[package]]
 name = "smallvec"
