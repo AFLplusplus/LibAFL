@@ -197,7 +197,7 @@ where
         for (func_name, entry_bb) in &self.func_to_entry_bb {
             entry_bb_locs.push(*entry_bb);
             let mut entry = EntryBasicBlockInfo {
-                calling_func: func_name.to_string(),
+                calling_func: func_name.clone(),
                 node_loc: *entry_bb,
                 successor_edges: vec![],
             };

@@ -577,7 +577,7 @@ impl SnapshotModule {
     /// Unmap is allowed if it is not part of the pre-snapshot region. maybe check if it's part
     /// of qemu's guest memory or not?
     pub fn is_unmap_allowed(&mut self, start: GuestAddr, mut size: usize) -> bool {
-        if size % SNAPSHOT_PAGE_SIZE != 0 {
+        if !size.is_multiple_of(SNAPSHOT_PAGE_SIZE) {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
 
@@ -594,7 +594,7 @@ impl SnapshotModule {
         }
 
         let total_size = {
-            if size % SNAPSHOT_PAGE_SIZE != 0 {
+            if !size.is_multiple_of(SNAPSHOT_PAGE_SIZE) {
                 size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
             }
             let mut mapping = self.new_maps.lock().unwrap();
@@ -623,7 +623,7 @@ impl SnapshotModule {
         mut size: usize,
         perms: Option<MmapPerms>,
     ) {
-        if size % SNAPSHOT_PAGE_SIZE != 0 {
+        if !size.is_multiple_of(SNAPSHOT_PAGE_SIZE) {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
         let mut mapping = self.new_maps.lock().unwrap();
@@ -669,7 +669,7 @@ impl SnapshotModule {
     }
 
     pub fn remove_mapped(&mut self, start: GuestAddr, mut size: usize) {
-        if size % SNAPSHOT_PAGE_SIZE != 0 {
+        if !size.is_multiple_of(SNAPSHOT_PAGE_SIZE) {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
 
@@ -989,11 +989,11 @@ where
             }
 
             #[cfg(not(any(cpu_target = "arm", cpu_target = "riscv32")))]
-            if sys_const == SYS_mmap {
-                if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
-                    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-                    h.add_mapped(result, a1 as usize, Some(prot));
-                }
+            if sys_const == SYS_mmap
+                && let Ok(prot) = MmapPerms::try_from(a2 as i32)
+            {
+                let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+                h.add_mapped(result, a1 as usize, Some(prot));
             }
 
             if sys_const == SYS_mremap {
