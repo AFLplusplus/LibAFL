@@ -33,8 +33,10 @@ use yaxpeax_arch::LengthedInstruction;
 use yaxpeax_arm::armv8::a64::ARMv8;
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
+#[cfg(target_arch = "x86")]
+use yaxpeax_x86::protected_mode::InstDecoder;
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 use crate::{
     allocator::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, utils::disas_count,
@@ -224,7 +226,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "aarch64")]
                 writeln!(output, "pc : 0x{:016x} ", error.pc).unwrap();
 
-                #[cfg(target_arch = "x86_64")]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 for (reg, name) in ASAN_SAVE_REGISTER_NAMES
                     .iter()
                     .enumerate()
@@ -248,6 +250,8 @@ impl AsanErrors {
 
                 #[cfg(target_arch = "x86_64")]
                 writeln!(output, "rip: 0x{:016x}", error.pc).unwrap();
+                #[cfg(target_arch = "x86")]
+                writeln!(output, "eip: 0x{:08x}", error.pc).unwrap();
 
                 #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
@@ -255,11 +259,18 @@ impl AsanErrors {
                 #[cfg(target_arch = "aarch64")]
                 let decoder = <ARMv8 as Arch>::Decoder::default();
 
-                #[cfg(target_arch = "x86_64")]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 let decoder = InstDecoder::minimal();
 
                 let start_pc = error.pc - 4 * 5;
                 #[cfg(target_arch = "x86_64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { core::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
+                    11,
+                );
+                // FIXME: later for x86, magic numbers to const?
+                #[cfg(target_arch = "x86")]
                 let insts = disas_count(
                     &decoder,
                     unsafe { core::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
@@ -493,7 +504,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "aarch64")]
                 writeln!(output, "pc : 0x{pc:016x} ").unwrap();
 
-                #[cfg(target_arch = "x86_64")]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 for reg in 0..ASAN_SAVE_REGISTER_COUNT {
                     if basereg.is_some() && reg == basereg.unwrap() as usize {
                         output
@@ -504,9 +515,17 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
+                    #[cfg(target_arch = "x86_64")]
                     write!(
                         output,
                         "{}: 0x{:016x} ",
+                        ASAN_SAVE_REGISTER_NAMES[reg], registers[reg]
+                    )
+                    .unwrap();
+                    #[cfg(target_arch = "x86")]
+                    write!(
+                        output,
+                        "{}: 0x{:08x} ",
                         ASAN_SAVE_REGISTER_NAMES[reg], registers[reg]
                     )
                     .unwrap();
@@ -518,6 +537,8 @@ impl AsanErrors {
 
                 #[cfg(target_arch = "x86_64")]
                 writeln!(output, "Rip: 0x{pc:016x}").unwrap();
+                #[cfg(target_arch = "x86")]
+                writeln!(output, "Eip: 0x{pc:08x}").unwrap();
 
                 #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
@@ -525,12 +546,19 @@ impl AsanErrors {
                 #[cfg(target_arch = "aarch64")]
                 let decoder = <ARMv8 as Arch>::Decoder::default();
 
-                #[cfg(target_arch = "x86_64")]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 let decoder = InstDecoder::minimal();
 
                 let start_pc = pc;
 
                 #[cfg(target_arch = "x86_64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { core::slice::from_raw_parts(*start_pc as *mut u8, 15 * 11) },
+                    11,
+                );
+                // FIXME: later for x86, magic numbers to const?
+                #[cfg(target_arch = "x86")]
                 let insts = disas_count(
                     &decoder,
                     unsafe { core::slice::from_raw_parts(*start_pc as *mut u8, 15 * 11) },

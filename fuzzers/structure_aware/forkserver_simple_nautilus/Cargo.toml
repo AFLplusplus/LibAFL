@@ -1,6 +1,6 @@
 [package]
 name = "forkserver_simple"
-version = "0.15.3"
+version = "0.15.4"
 authors = ["tokatoka <tokazerkje@outlook.com>"]
 edition = "2021"
 
@@ -22,6 +22,7 @@ libafl = { path = "../../../crates/libafl", features = [
   "std",
   "derive",
   "nautilus",
+  "nautilus_py",
 ] }
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
