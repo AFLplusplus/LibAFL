@@ -92,6 +92,8 @@ slirp = [
 intel_pt = ["systemmode", "x86_64", "dep:libafl_intelpt"]
 intel_pt_export_raw = ["intel_pt", "libafl_intelpt/export_raw"]
 
+nyx = ["systemmode", "x86_64"]
+
 # Requires the binary's build.rs to call `build_libafl_qemu`
 shared = ["libafl_qemu_sys/shared"]
 
@@ -146,6 +148,7 @@ rustversion = { workspace = true }
 bindgen = { workspace = true }
 cc = { workspace = true }
 just = { workspace = true }
+cmake = { workspace = true }
 
 [lib]
 name = "libafl_qemu"

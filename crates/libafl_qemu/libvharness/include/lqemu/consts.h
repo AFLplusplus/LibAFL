@@ -1,0 +1,6 @@
+#ifndef LQEMU_CONSTS_H
+#define LQEMU_CONSTS_H
+
+#define LQEMU_PRINTF_MAX_SIZE 4096
+
+#endif
