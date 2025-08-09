@@ -1199,13 +1199,12 @@ where
     }
 
     // Don't sanitize the sanitizer!
-    if let Some(asan_mappings) = &h.asan_mappings {
-        if asan_mappings
+    if let Some(asan_mappings) = &h.asan_mappings
+        && asan_mappings
             .iter()
             .any(|m| m.start() <= pc && pc < m.end())
-        {
-            return None;
-        }
+    {
+        return None;
     }
 
     Some(pc.into())
@@ -1296,13 +1295,12 @@ where
     }
 
     // Don't sanitize the sanitizer!
-    if let Some(asan_mappings) = &h.asan_mappings {
-        if asan_mappings
+    if let Some(asan_mappings) = &h.asan_mappings
+        && asan_mappings
             .iter()
             .any(|m| m.start() <= pc && pc < m.end())
-        {
-            return Some(0);
-        }
+    {
+        return Some(0);
     }
 
     Some(pc.into())

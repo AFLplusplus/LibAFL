@@ -12,6 +12,9 @@ pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
 
+pub mod dynamic;
+pub use dynamic::DynamicCorpus;
+
 #[cfg(feature = "std")]
 pub mod inmemory_ondisk;
 #[cfg(feature = "std")]

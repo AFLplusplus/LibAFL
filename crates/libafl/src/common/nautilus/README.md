@@ -1,4 +1,4 @@
-# Nautilus 2.0 LibAFL Mutator
+# Nautilus 2.0 `LibAFL` Mutator
 
 Nautilus is a coverage guided, grammar-based mutator. You can use it to improve your test coverage and find more bugs. By specifying the grammar of semi-valid inputs, Nautilus is able to perform complex mutation and to uncover more interesting test cases. Many of the ideas behind the original fuzzer are documented in a paper published at NDSS 2019.
 
@@ -7,7 +7,7 @@ Nautilus is a coverage guided, grammar-based mutator. You can use it to improve 
 </p>
 
 Version 2.0 has added many improvements to this early prototype.
-Features from version 2.0 we support in LibAFL:
+Features from version 2.0 we support in `LibAFL`:
 
 * Support for grammars specified in python
 * Support for non-context free grammars using python scripts to generate inputs from the structure
