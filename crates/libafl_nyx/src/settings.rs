@@ -1,3 +1,7 @@
+extern crate alloc;
+
+use alloc::borrow::Cow;
+
 use typed_builder::TypedBuilder;
 
 const DEFAULT_INPUT_BUFFER_SIZE: usize = 1024 * 1024;
@@ -5,7 +9,7 @@ const DEFAULT_TIMEOUT_SECS: u8 = 2;
 const DEFAULT_TIMEOUT_MICRO_SECS: u32 = 0;
 const DEFAULT_SNAP_MODE: bool = true;
 
-#[derive(Debug, Copy, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder)]
 pub struct NyxSettings {
     /// The CPU core for the Nyx process.
     ///
@@ -44,4 +48,10 @@ pub struct NyxSettings {
     /// `timeout_secs`.
     #[builder(default = DEFAULT_TIMEOUT_MICRO_SECS)]
     pub timeout_micro_secs: u32,
+
+    /// The workdir path for the Nyx process.
+    ///
+    /// Defaults to reading the value from the config in the share directory if `None`.
+    #[builder(default = None, setter(strip_option))]
+    pub workdir_path: Option<Cow<'static, str>>,
 }

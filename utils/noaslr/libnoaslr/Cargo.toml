@@ -1,6 +1,6 @@
 [package]
 name = "libnoaslr"
-version = "0.15.3"
+version = "0.15.4"
 edition = "2024"
 
 [lib]
