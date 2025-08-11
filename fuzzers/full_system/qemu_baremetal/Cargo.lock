@@ -754,11 +754,12 @@ checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
 
 [[package]]
 name = "fastbloom"
-version = "0.12.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29ec576c163744bef8707859f6aeb322bcf56b8da61215d99f77d6e33160ff01"
+checksum = "18c1ddb9231d8554c2d6bdf4cfaabf0c59251658c68b6c95cd52dd0c513a912a"
 dependencies = [
  "getrandom 0.3.3",
+ "libm",
  "siphasher",
 ]
 
@@ -1071,7 +1072,7 @@ checksum = "441225017b106b9f902e97947a6d31e44ebcf274b91bdbfb51e5c477fcd468e5"
 
 [[package]]
 name = "libafl"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1107,7 +1108,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_bolts"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1142,7 +1143,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_derive"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1151,7 +1152,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "addr2line 0.25.0",
  "bindgen",
@@ -1189,7 +1190,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu_build"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "bindgen",
  "cc",
@@ -1204,7 +1205,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu_sys"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "libafl_qemu_build",
  "libc",
@@ -1217,7 +1218,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_targets"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "bindgen",
  "cc",
@@ -1299,9 +1300,9 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "mach2"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b955cdeb2a02b9117f121ce63aa52d08ade45de53e48fe6a38b39c10f6f709"
+checksum = "6a1b95cd5421ec55b445b5ae102f5ea0e768de1f82bd3001e11f426c269c3aea"
 dependencies = [
  "libc",
 ]
@@ -1314,9 +1315,9 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
 name = "meminterval"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6f8614cf855d251be1c2138d330c04f134923fddec0dcfc8b6f58ac499bf248"
+checksum = "8e0f9a537564310a87dc77d5c88a407e27dd0aa740e070f0549439cfcc68fcfd"
 dependencies = [
  "num-traits",
  "serde",
@@ -1591,7 +1592,7 @@ dependencies = [
 
 [[package]]
 name = "qemu_baremetal"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "env_logger",
  "libafl",
