@@ -36,7 +36,7 @@ bool vharness_get_buf(struct vharness_input *vinput, void *buf,
     return false;
   }
 
-  memcpy(buf, (const char*) vinput->input + vinput->pos, buf_len);
+  memcpy(buf, (const char *)vinput->input + vinput->pos, buf_len);
   vinput->pos += buf_len;
 
   return true;
