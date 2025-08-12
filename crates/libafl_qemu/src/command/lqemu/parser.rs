@@ -1,8 +1,12 @@
+#[cfg(feature = "usermode")]
+use std::slice;
 use std::{ffi::CStr, sync::OnceLock};
 
 use enum_map::{EnumMap, enum_map};
 use libafl::{executors::ExitKind, inputs::HasTargetBytes};
-use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
+#[cfg(feature = "systemmode")]
+use libafl_qemu_sys::GuestPhysAddr;
+use libafl_qemu_sys::{GuestAddr, GuestVirtAddr};
 use libc::c_uint;
 
 use super::{
@@ -10,19 +14,21 @@ use super::{
     StartCommand, TestCommand, VersionCommand, bindings,
 };
 use crate::{
-    GuestReg, InputSetter, IsSnapshotManager, MapKind, Qemu, QemuMemoryChunk, Regs,
+    GuestReg, InputLocation, InputSetter, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs,
     StdEmulatorDriver,
-    command::{
-        CommandError, CommandManager, NativeCommandParser, StdCommandManager, lqemu::SetMapCommand,
-    },
+    command::{CommandError, CommandManager, NativeCommandParser, StdCommandManager},
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
     sync_exit::ExitArgs,
 };
+#[cfg(feature = "systemmode")]
+use crate::{MapKind, command::lqemu::SetMapCommand};
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
+#[cfg(feature = "systemmode")]
 pub struct StartPhysCommandParser;
 
+#[cfg(feature = "systemmode")]
 impl<C, ET, I, IS, S, SM>
     NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver<IS>, ET, I, S, SM>
     for StartPhysCommandParser
@@ -44,10 +50,12 @@ where
         let input_phys_addr: GuestPhysAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
-        Ok(StartCommand::new(QemuMemoryChunk::phys(
-            input_phys_addr,
-            max_input_size,
-            Some(qemu.current_cpu().unwrap()),
+        let memory_chunk =
+            QemuMemoryChunk::phys(input_phys_addr, max_input_size, qemu.current_cpu());
+
+        Ok(StartCommand::new(InputLocation::new(
+            memory_chunk,
+            Some(arch_regs_map[ExitArgs::Ret]),
         )))
     }
 }
@@ -76,11 +84,28 @@ where
             qemu.read_reg(arch_regs_map[ExitArgs::Arg1])? as GuestVirtAddr;
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
-        Ok(StartCommand::new(QemuMemoryChunk::virt(
-            input_virt_addr,
-            max_input_size,
-            qemu.current_cpu().unwrap(),
-        )))
+        #[cfg(feature = "usermode")]
+        {
+            let memory_chunk = unsafe {
+                slice::from_raw_parts(input_virt_addr as *const u8, max_input_size as usize)
+            };
+
+            Ok(StartCommand::new(InputLocation::new(
+                Box::from(memory_chunk),
+                Some(arch_regs_map[ExitArgs::Ret]),
+            )))
+        }
+
+        #[cfg(feature = "systemmode")]
+        {
+            let memory_chunk =
+                QemuMemoryChunk::virt(input_virt_addr, max_input_size, qemu.current_cpu().unwrap());
+
+            Ok(StartCommand::new(InputLocation::new(
+                memory_chunk,
+                Some(arch_regs_map[ExitArgs::Ret]),
+            )))
+        }
     }
 }
 
@@ -259,7 +284,9 @@ where
     }
 }
 
+#[cfg(feature = "systemmode")]
 pub struct SetMapCommandParser;
+#[cfg(feature = "systemmode")]
 impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>
     for SetMapCommandParser
 where

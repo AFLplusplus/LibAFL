@@ -1,7 +1,9 @@
 //! Emulator Drivers, as the name suggests, drive QEMU execution
 //! They are used to perform specific actions on the emulator before and / or after QEMU runs.
 
-use std::{cell::OnceCell, collections::HashMap, fmt::Debug};
+#[cfg(feature = "systemmode")]
+use std::collections::HashMap;
+use std::{cell::OnceCell, fmt::Debug};
 
 use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::ObserversTuple};
 use libafl_bolts::{
@@ -111,16 +113,12 @@ where
         input: &I,
     ) -> Result<(), EmulatorDriverError> {
         if let Some(input_location) = self.input_location.get_mut() {
-            let ret_value = unsafe {
-                input_location
-                    .segments
-                    .write(input.target_bytes().as_slice())
-            };
+            let ret_value = input_location.write(input.target_bytes().as_slice());
 
-            if let Some(reg) = input_location.ret_register {
+            if let Some(reg) = input_location.ret_register() {
                 qemu.current_cpu()
                     .unwrap() // if we end up there, qemu must be running the cpu asking for the input
-                    .write_reg(reg, ret_value as GuestReg)
+                    .write_reg(*reg, ret_value as GuestReg)
                     .unwrap();
             }
         }
@@ -350,6 +348,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
             #[cfg(feature = "x86_64")]
             process_only: self.process_only,
             print_commands: self.print_commands,
+            #[cfg(feature = "systemmode")]
             maps: HashMap::new(),
         }
     }

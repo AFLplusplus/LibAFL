@@ -1215,6 +1215,7 @@ impl QemuMemoryChunk {
     /// If the underlying memory cannot be represented as a slice
     /// (for example, if the memory is fragmented in the host address space),
     /// [`None`] is returned.
+    #[cfg(feature = "systemmode")]
     pub fn to_phys_mem_chunk(&self, qemu: Qemu) -> Option<PhysMemoryChunk> {
         match self.addr {
             GuestAddrKind::Physical(paddr) => Some(PhysMemoryChunk::new(
@@ -1246,15 +1247,6 @@ impl QemuMemoryChunk {
                 ))
             }
         }
-    }
-
-    /// Interpert the VM memory chunk as multiple host memory segments.
-    ///
-    /// This will take into account possible physical memory fragmentation.
-    pub fn to_host_segments(&self, qemu: Qemu) -> HostMemorySegments {
-        let segments: Vec<HostMemoryChunk> = self.host_iter(qemu).collect();
-
-        HostMemorySegments::new(segments)
     }
 
     pub fn read_vec(&self, qemu: Qemu) -> Result<Vec<u8>, QemuRWError> {

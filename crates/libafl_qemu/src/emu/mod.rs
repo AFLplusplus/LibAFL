@@ -14,8 +14,7 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 #[cfg(doc)]
 use crate::modules::EmulatorModule;
 use crate::{
-    HostMemorySegments, Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError,
-    QemuMemoryChunk, QemuParams, QemuShutdownCause, Regs,
+    Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuParams, QemuShutdownCause,
     breakpoint::{Breakpoint, BreakpointId},
     command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
     modules::EmulatorModuleTuple,
@@ -98,16 +97,6 @@ pub enum EmulatorExitError {
     BreakpointNotFound(GuestAddr),
 }
 
-/// The fuzzing input location.
-///
-/// We store the memory segments to which the input should be written,
-/// and the return register containing the number bytes effectively written.
-#[derive(Debug, Clone)]
-pub struct InputLocation {
-    segments: HostMemorySegments,
-    ret_register: Option<Regs>,
-}
-
 /// The high-level interface to [`Qemu`].
 ///
 /// It embeds multiple structures aiming at making QEMU usage easier:
@@ -185,28 +174,6 @@ impl From<SnapshotManagerError> for EmulatorDriverError {
 impl From<SnapshotManagerCheckError> for EmulatorDriverError {
     fn from(sm_check_error: SnapshotManagerCheckError) -> Self {
         EmulatorDriverError::SMCheckError(sm_check_error)
-    }
-}
-
-impl InputLocation {
-    #[must_use]
-    pub fn new(qemu: Qemu, mem_chunk: &QemuMemoryChunk, ret_register: Option<Regs>) -> Self {
-        let segments = mem_chunk.to_host_segments(qemu);
-
-        Self {
-            segments,
-            ret_register,
-        }
-    }
-
-    #[must_use]
-    pub fn segments(&self) -> &HostMemorySegments {
-        &self.segments
-    }
-
-    #[must_use]
-    pub fn ret_register(&self) -> &Option<Regs> {
-        &self.ret_register
     }
 }
 

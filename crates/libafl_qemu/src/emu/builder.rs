@@ -59,7 +59,7 @@ impl<C, I, S>
 }
 
 #[cfg(feature = "usermode")]
-impl<C, I, IS, S>
+impl<C, I, S>
     EmulatorBuilder<
         C,
         StdCommandManager<S>,

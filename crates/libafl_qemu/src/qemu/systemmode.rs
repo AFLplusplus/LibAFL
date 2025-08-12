@@ -67,7 +67,7 @@ pub struct PhysMemoryIter {
     qemu: Qemu,
     cpu: CPU,
 }
-
+//
 #[expect(dead_code)]
 pub struct HostMemoryIter {
     addr: GuestPhysAddr, // This address is correct when the iterator enters next, except if the remaining len is 0
@@ -347,6 +347,15 @@ impl Qemu {
     #[must_use]
     pub fn target_page_offset_mask(&self) -> usize {
         unsafe { libafl_qemu_sys::libafl_target_page_offset_mask() as usize }
+    }
+
+    /// Interpret the VM memory chunk as multiple host memory segments.
+    ///
+    /// This will take into account possible physical memory fragmentation.
+    pub fn to_host_segments(&self, qemu: crate::qemu::Qemu) -> HostMemorySegments {
+        let segments: Vec<HostMemoryChunk> = self.host_iter(qemu).collect();
+
+        HostMemorySegments::new(segments)
     }
 }
 

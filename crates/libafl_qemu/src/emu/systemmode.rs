@@ -16,6 +16,42 @@ pub enum SnapshotManager {
 
 pub type StdSnapshotManager = FastSnapshotManager;
 
+/// The fuzzing input location.
+///
+/// We store the memory location to which the input should be written,
+/// and the return register containing the number bytes effectively written.
+#[derive(Debug, Clone)]
+pub struct InputLocation {
+    location: HostMemorySegments,
+    ret_register: Option<Regs>,
+}
+
+impl InputLocation {
+    #[must_use]
+    pub fn new(qemu: Qemu, mem_chunk: &QemuMemoryChunk, ret_register: Option<Regs>) -> Self {
+        let location = mem_chunk.to_host_segments(qemu);
+
+        Self {
+            location,
+            ret_register,
+        }
+    }
+
+    #[must_use]
+    pub fn location(&self) -> &HostMemorySegments {
+        &self.location
+    }
+
+    #[must_use]
+    pub fn ret_register(&self) -> &Option<Regs> {
+        &self.ret_register
+    }
+
+    pub fn write(&mut self, input: &[u8]) -> usize {
+        self.location.segments.write(input)
+    }
+}
+
 impl IsSnapshotManager for SnapshotManager {
     fn save(&mut self, qemu: Qemu) -> SnapshotId {
         match self {

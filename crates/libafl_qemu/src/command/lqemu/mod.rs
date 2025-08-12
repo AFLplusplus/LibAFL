@@ -15,17 +15,21 @@ use paste::paste;
 pub mod parser;
 use parser::{
     EndCommandParser, LoadCommandParser, LqprintfCommandParser, SaveCommandParser,
-    SetMapCommandParser, StartPhysCommandParser, StartVirtCommandParser, TestCommandParser,
-    VaddrFilterAllowRangeCommandParser, VersionCommandParser,
+    StartVirtCommandParser, TestCommandParser, VaddrFilterAllowRangeCommandParser,
+    VersionCommandParser,
 };
+#[cfg(feature = "systemmode")]
+use parser::{SetMapCommandParser, StartPhysCommandParser};
 
 use super::{CommandError, IsCommand, IsStdCommandManager};
 use crate::{
     Emulator, EmulatorDriverError, EmulatorDriverResult, EmulatorExitResult, GuestReg,
-    InputLocation, InputSetter, IsSnapshotManager, MapKind, QemuMemoryChunk, Regs,
-    StdEmulatorDriver, define_std_command_manager_bound, define_std_command_manager_inner,
+    InputLocation, InputSetter, IsSnapshotManager, Regs, StdEmulatorDriver,
+    define_std_command_manager_bound, define_std_command_manager_inner,
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
 };
+#[cfg(feature = "systemmode")]
+use crate::{MapKind, QemuMemoryChunk};
 
 mod bindings {
     #![expect(non_upper_case_globals)]
@@ -43,6 +47,33 @@ mod bindings {
 pub const VERSION_MAJOR: u64 = bindings::LQEMU_VERSION_MAJOR as u64;
 pub const VERSION_MINOR: u64 = bindings::LQEMU_VERSION_MINOR as u64;
 
+#[cfg(feature = "usermode")]
+define_std_command_manager_bound!(
+    StdCommandManager,
+    HasTargetBytes,
+    [
+        StartCommand,
+        SaveCommand,
+        LoadCommand,
+        EndCommand,
+        VersionCommand,
+        AddressAllowCommand,
+        LqprintfCommand,
+        TestCommand
+    ],
+    [
+        StartVirtCommandParser,
+        SaveCommandParser,
+        LoadCommandParser,
+        EndCommandParser,
+        VersionCommandParser,
+        VaddrFilterAllowRangeCommandParser,
+        LqprintfCommandParser,
+        TestCommandParser
+    ]
+);
+
+#[cfg(feature = "systemmode")]
 define_std_command_manager_bound!(
     StdCommandManager,
     HasTargetBytes,
@@ -142,7 +173,7 @@ where
 
 #[derive(Debug, Clone)]
 pub struct StartCommand {
-    input_location: QemuMemoryChunk,
+    input_location: InputLocation,
 }
 
 impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM> for StartCommand
@@ -161,7 +192,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>,
-        ret_reg: Option<Regs>,
+        _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
 
@@ -177,7 +208,7 @@ where
             // Save input location for next runs
             emu.driver_mut()
                 .input_setter_mut()
-                .set_input_location(InputLocation::new(qemu, &self.input_location, ret_reg))?;
+                .set_input_location(self.input_location.clone())?;
 
             // Auto page filtering if option is enabled
             #[cfg(feature = "systemmode")]
@@ -383,11 +414,14 @@ where
     }
 }
 
+#[cfg(feature = "systemmode")]
 #[derive(Debug, Clone)]
 pub struct SetMapCommand {
     kind: MapKind,
     map: QemuMemoryChunk,
 }
+
+#[cfg(feature = "systemmode")]
 impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>
     for SetMapCommand
 where
@@ -421,6 +455,7 @@ where
     }
 }
 
+#[cfg(feature = "systemmode")]
 impl SetMapCommand {
     pub fn new(kind: MapKind, map: QemuMemoryChunk) -> Self {
         Self { kind, map }
@@ -472,11 +507,7 @@ impl Display for LoadCommand {
 
 impl Display for StartCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Start fuzzing with input @{}",
-            self.input_location.addr()
-        )
+        write!(f, "Start fuzzing with input @{:?}", self.input_location)
     }
 }
 
@@ -507,7 +538,7 @@ impl Display for PageAllowCommand {
 
 impl StartCommand {
     #[must_use]
-    pub fn new(input_location: QemuMemoryChunk) -> Self {
+    pub fn new(input_location: InputLocation) -> Self {
         Self { input_location }
     }
 }
