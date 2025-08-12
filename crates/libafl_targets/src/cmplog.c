@@ -127,8 +127,8 @@ void __libafl_targets_cmplog_routines_len(uintptr_t k, const uint8_t *ptr1,
                                           const uint8_t *ptr2, size_t len) {
   if (!libafl_cmplog_enabled) { return; }
 
-  if (area_is_valid(ptr1, CMPLOG_RTN_LEN) <= 0 ||
-      area_is_valid(ptr2, CMPLOG_RTN_LEN) <= 0) {
+  if (area_is_valid(ptr1, len) <= 0 ||
+      area_is_valid(ptr2, len) <= 0) {
     return;
   }
 
@@ -157,8 +157,8 @@ void __libafl_targets_cmplog_routines_extended_len(uintptr_t k, const uint8_t *p
                                                    const uint8_t *ptr2, size_t len) {
   if (!libafl_cmplog_enabled) { return; }
 
-  if ((area_is_valid(ptr1, CMPLOG_RTN_LEN)) <= 0 ||
-      (area_is_valid(ptr2, CMPLOG_RTN_LEN)) <= 0) {
+  if ((area_is_valid(ptr1, len)) <= 0 ||
+      (area_is_valid(ptr2, len)) <= 0) {
     return;
   }
 
