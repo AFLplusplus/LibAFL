@@ -8,7 +8,7 @@ runs:
       run: |
         apt-get update 
         apt-get install -y qemu-utils sudo python3-msgpack python3-jinja2 curl python3-dev gcc-arm-none-eabi \
-          gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
+          gcc-arm-linux-gnueabi g++-arm-linux-gnueabi cmake
     - name: Remove old rust
       shell: bash
       run: sudo apt purge -y 'rust*' 'cargo*'
