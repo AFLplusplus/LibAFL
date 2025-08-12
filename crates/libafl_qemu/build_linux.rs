@@ -106,14 +106,9 @@ pub fn build() {
     let vharness_stub_bindings_file = stub_dir.join(format!("{api}_stub_bindings.rs"));
 
     if env::var("DOCS_RS").is_ok() || cfg!(feature = "clippy") {
-        fs::copy(&vharness_stub_bindings_file, &vharness_bindings_file).expect(
-            format!(
-                "Could not copy stub bindings file from {} to {}.",
+        fs::copy(&vharness_stub_bindings_file, &vharness_bindings_file).unwrap_or_else(|_| panic!("Could not copy stub bindings file from {} to {}.",
                 vharness_stub_bindings_file.display(),
-                vharness_bindings_file.display()
-            )
-            .as_str(),
-        );
+                vharness_bindings_file.display()));
         return; // only build when we're not generating docs
     }
 
