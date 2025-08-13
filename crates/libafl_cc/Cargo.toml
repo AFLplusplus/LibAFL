@@ -45,7 +45,7 @@ cc = { workspace = true, features = ["parallel"] }
 which = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.build-dependencies]
-glob = "0.3.1"
+glob = "0.3.3"
 
 [dependencies]
 serde = { workspace = true, default-features = false, features = [
