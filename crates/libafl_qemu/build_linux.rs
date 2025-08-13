@@ -18,9 +18,6 @@ pub fn build() {
         r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "riscv32", "riscv64", "x86_64"))"#
     );
 
-    let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let src_dir = PathBuf::from(src_dir);
-
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_dir = PathBuf::from(&out_dir);
 

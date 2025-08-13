@@ -2,19 +2,14 @@
 name = "libvharness_sys"
 version.workspace = true
 edition = "2024"
-authors = [ "Romain Malmain <rmalmain@pm.me>" ]
+authors = ["Romain Malmain <rmalmain@pm.me>"]
 description = "libvharness Rust bindings"
 documentation = "https://docs.rs/libafl_qemu"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "README.md"
 license = "MIT"
 keywords = ["fuzzing", "qemu", "instrumentation"]
-categories = [
-    "external-ffi-bindings",
-    "embedded",
-    "os",
-    "no-std",
-]
+categories = ["external-ffi-bindings", "embedded", "os", "no-std"]
 
 [features]
 static = []
@@ -33,6 +28,9 @@ ppc = []
 hexagon = []
 riscv32 = []
 riscv64 = []
+
+# special feature for clippy, don't use in normal projects
+clippy = []
 
 [build-dependencies]
 cmake = "0.1.54"

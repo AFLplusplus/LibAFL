@@ -1,6 +1,4 @@
-use std::{env, fs};
-use std::path::PathBuf;
-use std::process::Command;
+use std::{env, fs, path::PathBuf, process::Command};
 
 const LIBVHARNESS_URL: &str = "https://github.com/rmalmain/libvharness.git";
 const LIBVHARNESS_DIRNAME: &str = "libvharness";
@@ -118,6 +116,7 @@ fn main() {
         "static"
     };
 
+    println!("cargo:rerun-if-env-changed=LIBVHARNESS_GEN_STUBS");
     println!(
         "cargo:rustc-link-search={}/build",
         vharness_out_dir.display()
@@ -145,7 +144,7 @@ fn main() {
             .write_to_file(&gen_binding)
             .expect("Could not write libvharness bindings.");
 
-        if !cfg!(feature = "nyx") {
+        if env::var("LIBVHARNESS_GEN_STUBS").is_ok() && cpu_target == "x86_64" && api == "lqemu" {
             fs::copy(gen_binding, vharness_stub).unwrap();
         }
     }

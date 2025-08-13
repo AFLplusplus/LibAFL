@@ -459,8 +459,8 @@ where
                             EmulatorExitResult::QemuExit(qemu_shutdown_cause) => {
                                 panic!("QEMU shut down unexpectedly: {qemu_shutdown_cause:?}");
                             }
-                            EmulatorExitResult::Breakpoint(_breakpoint) => {},
-                            EmulatorExitResult::CustomInsn(_custom_insn) => {},
+                            EmulatorExitResult::Breakpoint(_breakpoint) => {}
+                            EmulatorExitResult::CustomInsn(_custom_insn) => {}
                             EmulatorExitResult::Crash => {
                                 panic!("Unexpected crash")
                             }

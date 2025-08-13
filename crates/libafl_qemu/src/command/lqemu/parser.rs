@@ -11,7 +11,7 @@ use libc::c_uint;
 
 use super::{
     AddressAllowCommand, EndCommand, LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand,
-    StartCommand, TestCommand, VersionCommand, bindings,
+    StartCommand, TestCommand, VersionCommand,
 };
 use crate::{
     GuestReg, InputLocation, InputSetter, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs,
@@ -41,7 +41,7 @@ where
 {
     type OutputCommand = StartCommand;
 
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_PHYS.0;
+    const COMMAND_ID: c_uint = libvharness_sys::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_PHYS.0;
 
     fn parse(
         qemu: Qemu,
@@ -74,7 +74,7 @@ where
 {
     type OutputCommand = StartCommand;
 
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_VIRT.0;
+    const COMMAND_ID: c_uint = libvharness_sys::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_VIRT.0;
 
     fn parse(
         qemu: Qemu,
@@ -120,7 +120,7 @@ where
 {
     type OutputCommand = SaveCommand;
 
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SAVE.0;
+    const COMMAND_ID: c_uint = libvharness_sys::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SAVE.0;
 
     fn parse(
         _qemu: Qemu,
@@ -139,7 +139,7 @@ where
 {
     type OutputCommand = LoadCommand;
 
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LOAD.0;
+    const COMMAND_ID: c_uint = libvharness_sys::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LOAD.0;
 
     fn parse(
         _qemu: Qemu,
@@ -162,7 +162,7 @@ where
 {
     type OutputCommand = EndCommand;
 
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_END.0;
+    const COMMAND_ID: c_uint = libvharness_sys::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_END.0;
 
     fn parse(
         qemu: Qemu,
@@ -191,7 +191,7 @@ impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
 {
     type OutputCommand = VersionCommand;
 
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VERSION.0;
+    const COMMAND_ID: c_uint = libvharness_sys::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VERSION.0;
 
     fn parse(
         qemu: Qemu,
@@ -214,7 +214,8 @@ where
 {
     type OutputCommand = AddressAllowCommand;
 
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0;
+    const COMMAND_ID: c_uint =
+        libvharness_sys::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0;
 
     fn parse(
         qemu: Qemu,
@@ -235,7 +236,7 @@ where
     S: Unpin,
 {
     type OutputCommand = LqprintfCommand;
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LQPRINTF.0;
+    const COMMAND_ID: c_uint = libvharness_sys::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LQPRINTF.0;
 
     fn parse(
         qemu: Qemu,
@@ -269,7 +270,7 @@ where
     S: Unpin,
 {
     type OutputCommand = TestCommand;
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_TEST.0;
+    const COMMAND_ID: c_uint = libvharness_sys::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_TEST.0;
 
     fn parse(
         qemu: Qemu,
@@ -279,7 +280,7 @@ where
 
         Ok(TestCommand::new(
             received_value,
-            GuestReg::from(bindings::LIBAFL_QEMU_TEST_VALUE),
+            GuestReg::from(libvharness_sys::LIBAFL_QEMU_TEST_VALUE),
         ))
     }
 }
@@ -295,29 +296,29 @@ where
     S: Unpin,
 {
     type OutputCommand = SetMapCommand;
-    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SET_MAP.0;
+    const COMMAND_ID: c_uint = libvharness_sys::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SET_MAP.0;
 
     fn parse(
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
         let map_addr: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
-        let map: bindings::lqemu_map = unsafe { qemu.read_mem_val(map_addr)? };
+        let map: libvharness_sys::lqemu_map = unsafe { qemu.read_mem_val(map_addr)? };
 
         let kind = match map.map_kind {
-            bindings::lqemu_map_kind_LQEMU_MAP_COV => MapKind::Cov,
+            libvharness_sys::lqemu_map_kind_LQEMU_MAP_COV => MapKind::Cov,
 
-            bindings::lqemu_map_kind_LQEMU_MAP_CMP => MapKind::Cmp,
+            libvharness_sys::lqemu_map_kind_LQEMU_MAP_CMP => MapKind::Cmp,
 
             _ => return Err(CommandError::InvalidParameters),
         };
 
         let map = match map.addr_kind {
-            bindings::lqemu_addr_kind_LQEMU_ADDR_PHYS => {
+            libvharness_sys::lqemu_addr_kind_LQEMU_ADDR_PHYS => {
                 QemuMemoryChunk::phys(map.addr, map.len, qemu.current_cpu())
             }
 
-            bindings::lqemu_addr_kind_LQEMU_ADDR_VIRT => QemuMemoryChunk::virt(
+            libvharness_sys::lqemu_addr_kind_LQEMU_ADDR_VIRT => QemuMemoryChunk::virt(
                 map.addr as GuestVirtAddr,
                 map.len,
                 qemu.current_cpu().unwrap(),

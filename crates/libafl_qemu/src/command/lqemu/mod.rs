@@ -31,21 +31,8 @@ use crate::{
 #[cfg(feature = "systemmode")]
 use crate::{MapKind, QemuMemoryChunk};
 
-mod bindings {
-    #![expect(non_upper_case_globals)]
-    #![expect(non_camel_case_types)]
-    #![expect(non_snake_case)]
-    #![expect(unused)]
-    #![expect(clippy::all)]
-    #![expect(clippy::pedantic)]
-    #![allow(unsafe_op_in_unsafe_fn)]
-    #![allow(warnings)]
-
-    include!(concat!(env!("OUT_DIR"), "/lqemu_bindings.rs"));
-}
-
-pub const VERSION_MAJOR: u64 = bindings::LQEMU_VERSION_MAJOR as u64;
-pub const VERSION_MINOR: u64 = bindings::LQEMU_VERSION_MINOR as u64;
+pub const VERSION_MAJOR: u64 = libvharness_sys::LQEMU_VERSION_MAJOR as u64;
+pub const VERSION_MINOR: u64 = libvharness_sys::LQEMU_VERSION_MINOR as u64;
 
 #[cfg(feature = "usermode")]
 define_std_command_manager_bound!(
@@ -105,9 +92,9 @@ define_std_command_manager_bound!(
 #[derive(Debug, Clone, Enum, TryFromPrimitive)]
 #[repr(u64)]
 pub enum NativeExitKind {
-    Unknown = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_UNKNOWN.0 as u64, // Should not be used
-    Ok = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_OK.0 as u64,           // Normal exit
-    Crash = bindings::LibaflQemuEndStatus_LIBAFL_QEMU_END_CRASH.0 as u64, // Crash reported in the VM
+    Unknown = libvharness_sys::LibaflQemuEndStatus_LIBAFL_QEMU_END_UNKNOWN.0 as u64, // Should not be used
+    Ok = libvharness_sys::LibaflQemuEndStatus_LIBAFL_QEMU_END_OK.0 as u64,           // Normal exit
+    Crash = libvharness_sys::LibaflQemuEndStatus_LIBAFL_QEMU_END_CRASH.0 as u64, // Crash reported in the VM
 }
 
 #[derive(Debug, Clone)]

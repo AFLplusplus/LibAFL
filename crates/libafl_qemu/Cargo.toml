@@ -99,7 +99,7 @@ shared = ["libafl_qemu_sys/shared"]
 
 #! ## Internal features, don't use in normal projects
 ## clippy workaround
-clippy = ["libafl_qemu_sys/clippy"]
+clippy = ["libafl_qemu_sys/clippy", "libvharness_sys/clippy"]
 
 [dependencies]
 libafl = { workspace = true, features = ["std", "derive", "regex"] }
