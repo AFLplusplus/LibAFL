@@ -290,6 +290,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
         )
     }
 
+    #[must_use]
     pub fn hooks_locked(self, hooks_locked: bool) -> Self {
         Self::new(
             self.input_setter,
@@ -326,6 +327,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
         )
     }
 
+    #[must_use]
     pub fn print_commands(self, print_commands: bool) -> Self {
         Self::new(
             self.input_setter,
@@ -371,6 +373,7 @@ pub struct StdEmulatorDriver<IS> {
 }
 
 impl StdEmulatorDriver<StdInputSetter> {
+    #[must_use]
     pub fn builder() -> StdEmulatorDriverBuilder<StdInputSetter> {
         StdEmulatorDriverBuilder::<StdInputSetter>::default()
     }
@@ -497,9 +500,9 @@ where
                         }
 
                         return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)));
-                    } else {
-                        Err(exit_error.clone())?
                     }
+
+                    Err(exit_error.clone())?
                 }
                 _ => Err(exit_error.clone())?,
             },

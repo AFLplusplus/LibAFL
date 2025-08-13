@@ -4,8 +4,6 @@ use std::{
     process::Command,
 };
 
-use libafl_qemu_build::maybe_generate_stub_bindings;
-
 static LIBAFL_QEMU_RUNTIME_TEST: &str = r#"
 #include <stdio.h>
 #include "libafl_qemu.h"
@@ -13,45 +11,12 @@ static LIBAFL_QEMU_RUNTIME_TEST: &str = r#"
 void __libafl_qemu_testfile() {}
 "#;
 
-pub fn build_libvharness(src_dir: &Path, arch: &str) -> (PathBuf, String) {
-    let vharness_dir = src_dir.join("libvharness");
-    let toolchains_dir = vharness_dir.join("toolchains");
-
-    let toolchain_file = toolchains_dir.join(format!("{arch}-generic.cmake"));
-
-    let api = if cfg!(feature = "nyx") {
-        "nyx".to_string()
-    } else {
-        "lqemu".to_string()
-    };
-
-    let out = cmake::Config::new("libvharness")
-        .define("CMAKE_TOOLCHAIN_FILE", &toolchain_file)
-        .define("VHARNESS_API", &api)
-        .define("VHARNESS_INCLUDE_ONLY", "ON")
-        .define("VHARNESS_TESTS", "OFF")
-        .build();
-
-    (out.join("include/api.h"), api)
-}
-
 #[expect(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
     println!(
         r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "riscv32", "riscv64", "x86_64"))"#
     );
-
-    let emulation_mode = if cfg!(feature = "usermode") {
-        "usermode"
-    } else if cfg!(feature = "systemmode") {
-        "systemmode"
-    } else {
-        unreachable!(
-            "The macros `assert_unique_feature` and `assert_at_least_one_feature` in \
-            `libafl_qemu_sys/build_linux.rs` should panic before this code is reached."
-        );
-    };
 
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let src_dir = PathBuf::from(src_dir);
@@ -64,8 +29,6 @@ pub fn build() {
     target_dir.pop();
     target_dir.pop();
     // let include_dir = target_dir.join("include");
-
-    let stub_dir = src_dir.join("stubs");
 
     let qemu_asan_guest = cfg!(all(feature = "asan_guest", not(feature = "hexagon")));
     let qemu_asan_host = cfg!(all(feature = "asan_host", not(feature = "hexagon")));
@@ -100,23 +63,15 @@ pub fn build() {
         env::var("CPU_TARGET").unwrap_or_else(|_| "x86_64".to_string())
     };
 
-    let (vharness_hdr, api) = build_libvharness(&src_dir, cpu_target.as_str());
-
-    let vharness_bindings_file = out_dir.join(format!("{api}_bindings.rs"));
-    let vharness_stub_bindings_file = stub_dir.join(format!("{api}_stub_bindings.rs"));
-
-    if env::var("DOCS_RS").is_ok() || cfg!(feature = "clippy") {
-        fs::copy(&vharness_stub_bindings_file, &vharness_bindings_file).unwrap_or_else(|_| panic!("Could not copy stub bindings file from {} to {}.",
-                vharness_stub_bindings_file.display(),
-                vharness_bindings_file.display()));
-        return; // only build when we're not generating docs
-    }
-
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
     println!(
         "cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))"
     );
+
+    if env::var("DOCS_RS").is_ok() || cfg!(feature = "clippy") {
+        return; // only build when we're not generating docs
+    }
 
     let cross_cc = if cfg!(feature = "usermode") && (qemu_asan_guest || qemu_asan_host) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
@@ -132,32 +87,6 @@ pub fn build() {
     } else {
         String::new()
     };
-
-    bindgen::Builder::default()
-        .derive_debug(true)
-        .derive_default(true)
-        .impl_debug(true)
-        .generate_comments(true)
-        .default_enum_style(bindgen::EnumVariation::NewType {
-            is_global: true,
-            is_bitfield: true,
-        })
-        // .rust_edition(bindgen::RustEdition::Edition2024)
-        .header(vharness_hdr.display().to_string())
-        .generate()
-        .expect("Exit bindings generation failed.")
-        .write_to_file(&vharness_bindings_file)
-        .expect("Could not write bindings.");
-
-    if !cfg!(feature = "nyx") {
-        maybe_generate_stub_bindings(
-            &cpu_target,
-            emulation_mode,
-            vharness_stub_bindings_file.as_path(),
-            vharness_bindings_file.as_path(),
-        );
-    }
-
     let asan_rust = cfg!(feature = "asan_rust");
 
     if cfg!(feature = "usermode") && !asan_rust && (qemu_asan_guest || qemu_asan_host) {

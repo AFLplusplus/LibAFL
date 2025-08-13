@@ -119,15 +119,15 @@ num-traits = { workspace = true, default-features = true }
 num_enum = { workspace = true, default-features = true }
 goblin = "0.10.0"
 libc = { workspace = true }
-strum = "0.27.0"
-strum_macros = "0.27.0"
-syscall-numbers = "4.0.0"
+strum = "0.27.2"
+strum_macros = "0.27.2"
+syscall-numbers = "4.0.2"
 meminterval = { workspace = true }
-thread_local = "1.1.8"
+thread_local = "1.1.9"
 capstone = "0.13.0"
 rangemap = { workspace = true }
 log = { workspace = true }
-object = "0.37.0"
+object = "0.37.3"
 addr2line = "0.25.0"
 paste = { workspace = true }
 enum-map = "2.7.3"
@@ -136,7 +136,8 @@ toml = { workspace = true, optional = true } # For parsing the injections toml f
 pyo3 = { workspace = true, optional = true, features = ["multiple-pymethods"] }
 bytes-utils = "0.1.4"
 typed-builder = { workspace = true }
-getset = "0.1.3"
+getset = "0.1.6"
+libvharness_sys = { workspace = true }
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
@@ -148,7 +149,6 @@ rustversion = { workspace = true }
 bindgen = { workspace = true }
 cc = { workspace = true }
 just = { workspace = true }
-cmake = { workspace = true }
 
 [lib]
 name = "libafl_qemu"

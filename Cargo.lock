@@ -21,7 +21,7 @@ dependencies = [
  "fallible-iterator",
  "gimli 0.32.0",
  "memmap2",
- "object 0.37.2",
+ "object 0.37.3",
  "rustc-demangle",
  "smallvec",
  "typed-arena",
@@ -3369,7 +3369,6 @@ dependencies = [
  "bytes-utils",
  "capstone",
  "cc",
- "cmake",
  "document-features",
  "enum-map",
  "getset",
@@ -3384,11 +3383,12 @@ dependencies = [
  "libafl_qemu_sys",
  "libafl_targets",
  "libc",
+ "libvharness_sys",
  "log",
  "meminterval",
  "num-traits",
  "num_enum",
- "object 0.37.2",
+ "object 0.37.3",
  "paste",
  "pyo3",
  "pyo3-build-config 0.25.1",
@@ -3686,6 +3686,14 @@ dependencies = [
  "openssl-sys",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "libvharness_sys"
+version = "0.15.4"
+dependencies = [
+ "bindgen 0.72.0",
+ "cmake",
 ]
 
 [[package]]
@@ -4215,9 +4223,9 @@ dependencies = [
 
 [[package]]
 name = "object"
-version = "0.37.2"
+version = "0.37.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3e3d0a7419f081f4a808147e845310313a39f322d7ae1f996b7f001d6cbed04"
+checksum = "ff76201f031d8863c38aa7f905eca4f53abbfa15f609db4277d44cd8938f33fe"
 dependencies = [
  "flate2",
  "memchr",

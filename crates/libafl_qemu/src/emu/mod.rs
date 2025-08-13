@@ -442,6 +442,11 @@ where
     }
 
     /// Start the emulator until a start even occurs
+    ///
+    /// # Safety
+    ///
+    /// This will make QEMU start. The calling thread will be running QEMU until an event stops it.
+    /// This is (at least) as unsafe as running QEMU.
     pub unsafe fn start(&mut self) -> Result<(), EmulatorDriverError> {
         loop {
             let mut exit_result = unsafe { self.run_qemu() };
@@ -454,8 +459,8 @@ where
                             EmulatorExitResult::QemuExit(qemu_shutdown_cause) => {
                                 panic!("QEMU shut down unexpectedly: {qemu_shutdown_cause:?}");
                             }
-                            EmulatorExitResult::Breakpoint(_breakpoint) => continue,
-                            EmulatorExitResult::CustomInsn(_custom_insn) => continue,
+                            EmulatorExitResult::Breakpoint(_breakpoint) => {},
+                            EmulatorExitResult::CustomInsn(_custom_insn) => {},
                             EmulatorExitResult::Crash => {
                                 panic!("Unexpected crash")
                             }

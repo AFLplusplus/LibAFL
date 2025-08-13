@@ -21,6 +21,7 @@ members = [
   "crates/libafl_qemu/libafl_qemu_build",
   "crates/libafl_qemu/libafl_qemu_runner",
   "crates/libafl_qemu/libafl_qemu_sys",
+  "crates/libafl_qemu/libvharness_sys",
   "crates/libafl_sugar",
   "crates/libafl_concolic/test/dump_constraints",
   "crates/libafl_concolic/test/runtime_test",
@@ -79,6 +80,7 @@ libafl_tinyinst = { path = "./crates/libafl_tinyinst", version = "0.15.4", defau
 libafl_qemu = { path = "./crates/libafl_qemu", version = "0.15.4", default-features = false }
 libafl_qemu_build = { path = "./crates/libafl_qemu/libafl_qemu_build", version = "0.15.4", default-features = false }
 libafl_qemu_sys = { path = "./crates/libafl_qemu/libafl_qemu_sys", version = "0.15.4", default-features = false }
+libvharness_sys = { path = "./crates/libafl_qemu/libvharness_sys", version = "0.15.4", default-features = false }
 libafl_sugar = { path = "./crates/libafl_sugar", version = "0.15.4", default-features = false }
 dump_constraints = { path = "./crates/libafl_concolic/test/dump_constraints", version = "0.15.2", default-features = false }
 runtime_test = { path = "./crates/libafl_concolic/test/runtime_test", version = "0.15.2", default-features = false }

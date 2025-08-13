@@ -18,8 +18,6 @@ use libafl::Error;
 use libafl_qemu_sys::GuestAddr;
 use serde::{Deserialize, Serialize};
 
-#[cfg(not(cpu_target = "hexagon"))]
-use crate::SYS_execve;
 use crate::{
     CallingConvention, Qemu,
     elf::EasyElf,
@@ -31,6 +29,8 @@ use crate::{
     qemu::{ArchExtras, Hook, SyscallHookResult},
 };
 
+#[cfg(not(cpu_target = "hexagon"))]
+use crate::SYS_execve;
 #[cfg(cpu_target = "hexagon")]
 /// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.
 /// <https://github.com/qemu/qemu/blob/11be70677c70fdccd452a3233653949b79e97908/linux-user/hexagon/syscall_nr.h#L230>

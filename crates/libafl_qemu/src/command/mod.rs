@@ -45,7 +45,7 @@ macro_rules! define_std_command_manager_inner {
                     marker::PhantomData,
                 };
                 use enum_map::EnumMap;
-                use crate::{
+                use $crate::{
                     command::{IsStdCommandManager, CommandManager, CommandError, NativeCommandParser, IsCommand}, get_exit_arch_regs, modules::{utils::filters::HasStdFiltersTuple, EmulatorModuleTuple}, sync_exit::ExitArgs, Emulator, EmulatorDriverError, EmulatorDriverResult, IsSnapshotManager, Qemu, Regs, StdEmulatorDriver, InputSetter,
                 };
                 use std::ffi::c_uint;
@@ -115,6 +115,7 @@ macro_rules! define_std_command_manager_inner {
                 }
 
                 #[derive(Clone, Debug)]
+                #[expect(clippy::enum_variant_names)]
                 pub enum [<$name Commands>]
                 {
                     // StartPhysCommand(StartPhysCommand)
