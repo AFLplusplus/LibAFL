@@ -293,7 +293,7 @@ where
                         &mut libs,
                         LibInfo {
                             name: path.clone(),
-                            off: region.start(),
+                            off: region.start() as GuestAddr,
                         },
                     );
                 }

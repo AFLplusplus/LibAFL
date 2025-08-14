@@ -71,7 +71,7 @@ pub struct MemoryRegionInfo {
 
 #[derive(Clone, Default, Debug)]
 pub struct MappingInfo {
-    pub tree: IntervalTree<GuestAddr, MemoryRegionInfo>,
+    pub tree: IntervalTree<u64, MemoryRegionInfo>,
     pub size: usize,
 }
 
@@ -83,9 +83,9 @@ pub struct MappingInfo {
 #[derive(Debug, Clone)]
 pub enum IntervalSnapshotFilter {
     All,
-    AllowList(Vec<Range<GuestAddr>>),
-    DenyList(Vec<Range<GuestAddr>>),
-    ZeroList(Vec<Range<GuestAddr>>),
+    AllowList(Vec<Range<u64>>),
+    DenyList(Vec<Range<u64>>),
+    ZeroList(Vec<Range<u64>>),
 }
 
 #[derive(Clone, Default, Debug)]
@@ -108,7 +108,7 @@ impl IntervalSnapshotFilters {
     }
 
     #[must_use]
-    pub fn to_skip(&self, addr: GuestAddr) -> Option<&Range<GuestAddr>> {
+    pub fn to_skip(&self, addr: u64) -> Option<&Range<u64>> {
         for filter in &self.filters {
             match filter {
                 IntervalSnapshotFilter::All => return None,
@@ -130,7 +130,7 @@ impl IntervalSnapshotFilters {
     }
 
     #[must_use]
-    pub fn to_zero(&self, addr: GuestAddr) -> Option<&Range<GuestAddr>> {
+    pub fn to_zero(&self, addr: u64) -> Option<&Range<u64>> {
         for filter in &self.filters {
             if let IntervalSnapshotFilter::ZeroList(zero_list) = filter {
                 let zero = zero_list.iter().find(|range| range.contains(&addr));
@@ -238,6 +238,8 @@ impl SnapshotModule {
         self.mmap_start = qemu.get_mmap_start();
         self.pages.clear();
         for map in qemu.mappings() {
+            println!("mapping: {map:?}");
+
             let mut addr = map.start();
             while addr < map.end() {
                 let zero = self.interval_filter.to_zero(addr);
@@ -247,7 +249,7 @@ impl SnapshotModule {
                     continue;
                 }
                 let mut info = SnapshotPageInfo {
-                    addr,
+                    addr: addr as GuestAddr,
                     perms: map.flags(),
                     private: map.is_priv(),
                     data: None,
@@ -256,11 +258,12 @@ impl SnapshotModule {
                     // TODO not just for R pages
                     unsafe {
                         info.data = Some(Box::new(core::mem::zeroed()));
-                        qemu.read_mem_unchecked(addr, &mut info.data.as_mut().unwrap()[..]);
+                        qemu.read_mem(addr as GuestAddr, &mut info.data.as_mut().unwrap()[..])
+                            .unwrap();
                     }
                 }
-                self.pages.insert(addr, info);
-                addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
+                self.pages.insert(addr as GuestAddr, info);
+                addr += SNAPSHOT_PAGE_SIZE as u64;
             }
 
             self.maps.tree.insert(
@@ -329,13 +332,13 @@ impl SnapshotModule {
                     addr = range.end;
                     continue;
                 }
-                if let Some(saved_page) = saved_pages_list.remove(&addr) {
+                if let Some(saved_page) = saved_pages_list.remove(&(addr as GuestAddr)) {
                     if saved_page.perms.readable() {
                         let mut current_page_content: MaybeUninit<[u8; SNAPSHOT_PAGE_SIZE]> =
                             MaybeUninit::uninit();
 
                         if saved_page.perms != map.flags() {
-                            perm_errors.push((addr, saved_page.perms, map.flags()));
+                            perm_errors.push((addr as GuestAddr, saved_page.perms, map.flags()));
                             log::warn!(
                                 "\t0x{:x}: Flags do not match: saved is {:?} and current is {:?}",
                                 addr,
@@ -346,7 +349,7 @@ impl SnapshotModule {
 
                         unsafe {
                             qemu.read_mem(
-                                addr,
+                                addr as GuestAddr,
                                 current_page_content.as_mut_ptr().as_mut().unwrap(),
                             )
                             .unwrap();
@@ -375,7 +378,7 @@ impl SnapshotModule {
                                 offsets.iter().fold(String::new(), |acc, offset| format!(
                                     "{}, 0x{:x}",
                                     acc,
-                                    addr + *offset as GuestAddr
+                                    addr + *offset as u64
                                 ))
                             );
                             content_mismatch = true;
@@ -385,7 +388,7 @@ impl SnapshotModule {
                     log::warn!("\tpage not found @addr 0x{addr:x}");
                 }
 
-                addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
+                addr += SNAPSHOT_PAGE_SIZE as u64;
             }
         }
 
@@ -474,7 +477,7 @@ impl SnapshotModule {
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
-                        if self.interval_filter.to_skip(*page).is_some() {
+                        if self.interval_filter.to_skip(*page as u64).is_some() {
                             if !Self::modify_mapping(qemu, new_maps, *page) {
                                 return true; // Restore later
                             }
@@ -504,13 +507,13 @@ impl SnapshotModule {
                 for entry in self
                     .maps
                     .tree
-                    .query_mut(*page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
+                    .query_mut((*page as u64)..((*page as u64) + SNAPSHOT_PAGE_SIZE as u64))
                 {
                     if !entry.value.perms.unwrap_or(MmapPerms::None).writable()
                         && !entry.value.changed
                     {
                         qemu.mprotect(
-                            entry.interval.start,
+                            entry.interval.start as GuestAddr,
                             (entry.interval.end - entry.interval.start) as usize,
                             MmapPerms::ReadWrite,
                         )
@@ -519,7 +522,7 @@ impl SnapshotModule {
                     }
                 }
 
-                if self.interval_filter.to_skip(*page).is_some() {
+                if self.interval_filter.to_skip(*page as u64).is_some() {
                     unsafe { qemu.write_mem_unchecked(*page, &SNAPSHOT_PAGE_ZEROES) };
                 } else if let Some(info) = self.pages.get_mut(page) {
                     // TODO avoid duplicated memcpy
@@ -533,10 +536,10 @@ impl SnapshotModule {
             unsafe { (*acc.get()).clear() };
         }
 
-        for entry in self.maps.tree.query_mut(0..GuestAddr::MAX) {
+        for entry in self.maps.tree.query_mut(0..(GuestAddr::MAX as u64)) {
             if entry.value.changed {
                 qemu.mprotect(
-                    entry.interval.start,
+                    entry.interval.start as GuestAddr,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
                 )
@@ -558,11 +561,11 @@ impl SnapshotModule {
         let mut found = false;
         for entry in maps
             .tree
-            .query_mut(page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
+            .query_mut((page as u64)..((page as u64) + SNAPSHOT_PAGE_SIZE as u64))
         {
             if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
                 drop(qemu.mprotect(
-                    entry.interval.start,
+                    entry.interval.start as GuestAddr,
                     (entry.interval.end - entry.interval.start) as usize,
                     MmapPerms::ReadWrite,
                 ));
@@ -583,7 +586,7 @@ impl SnapshotModule {
 
         self.maps
             .tree
-            .query(start..(start + (size as GuestAddr)))
+            .query((start as u64)..((start as u64) + (size as u64)))
             .next()
             .is_none()
     }
@@ -599,7 +602,7 @@ impl SnapshotModule {
             }
             let mut mapping = self.new_maps.lock().unwrap();
             mapping.tree.insert(
-                start..(start + (size as GuestAddr)),
+                (start as u64)..(start as u64 + (size as u64)),
                 MemoryRegionInfo {
                     perms,
                     changed: true,
@@ -628,7 +631,7 @@ impl SnapshotModule {
         }
         let mut mapping = self.new_maps.lock().unwrap();
 
-        let interval = Interval::new(start, start + (size as GuestAddr));
+        let interval = Interval::new(start as u64, start as u64 + (size as u64));
         let mut found = vec![]; //  TODO optimize
         for entry in mapping.tree.query(interval) {
             found.push((*entry.interval, entry.value.perms));
@@ -675,7 +678,7 @@ impl SnapshotModule {
 
         let mut mapping = self.new_maps.lock().unwrap();
 
-        let interval = Interval::new(start, start + (size as GuestAddr));
+        let interval = Interval::new(start as u64, (start as u64) + (size as u64));
         let mut found = vec![]; //  TODO optimize
         for entry in mapping.tree.query(interval) {
             found.push((*entry.interval, entry.value.perms));
@@ -686,7 +689,7 @@ impl SnapshotModule {
 
             mapping.tree.delete(i);
             for page in (i.start..i.end).step_by(SNAPSHOT_PAGE_SIZE) {
-                self.page_access_no_cache(page);
+                self.page_access_no_cache(page as GuestAddr);
             }
 
             if i.start < overlap.start {
@@ -713,7 +716,7 @@ impl SnapshotModule {
     pub fn reset_maps(&mut self, qemu: Qemu) {
         let new_maps = self.new_maps.get_mut().unwrap();
 
-        for entry in self.maps.tree.query(0..GuestAddr::MAX) {
+        for entry in self.maps.tree.query(0..(GuestAddr::MAX as u64)) {
             let mut found = vec![]; //  TODO optimize
             for overlap in new_maps.tree.query(*entry.interval) {
                 found.push((
@@ -726,7 +729,7 @@ impl SnapshotModule {
             if found.is_empty() {
                 //panic!("A pre-snapshot memory region was unmapped");
                 qemu.map_fixed(
-                    entry.interval.start,
+                    entry.interval.start as GuestAddr,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
                 )
@@ -734,7 +737,7 @@ impl SnapshotModule {
             } else if found.len() == 1 && found[0].0 == *entry.interval {
                 if found[0].1 && found[0].2 != entry.value.perms {
                     qemu.mprotect(
-                        entry.interval.start,
+                        entry.interval.start as GuestAddr,
                         (entry.interval.end - entry.interval.start) as usize,
                         entry.value.perms.unwrap(),
                     )
@@ -743,7 +746,7 @@ impl SnapshotModule {
             } else {
                 //  TODO check for holes
                 qemu.mprotect(
-                    entry.interval.start,
+                    entry.interval.start as GuestAddr,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
                 )
@@ -756,11 +759,12 @@ impl SnapshotModule {
         }
 
         let mut to_unmap = vec![];
-        for entry in new_maps.tree.query(0..GuestAddr::MAX) {
+        for entry in new_maps.tree.query(0..(GuestAddr::MAX as u64)) {
             to_unmap.push((*entry.interval, entry.value.changed, entry.value.perms));
         }
         for (i, ..) in to_unmap {
-            qemu.unmap(i.start, (i.end - i.start) as usize).unwrap();
+            qemu.unmap(i.start as GuestAddr, (i.end - i.start) as usize)
+                .unwrap();
             new_maps.tree.delete(i);
         }
 
