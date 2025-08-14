@@ -897,7 +897,7 @@ jobs:
       - name: Increase map sizes
         run: ./scripts/shmem_limits_macos.sh
       - name: Clippy
-        run: cargo clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
+        run: cargo clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test --exclude libvharness_sys
 
   ubuntu-cross-android-arm64:
     runs-on: ubuntu-24.04
