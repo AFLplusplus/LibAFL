@@ -55,7 +55,8 @@ fn main() {
 
     let vharness_rev = vharness_dir.join("QEMU_REVISION");
     if !vharness_rev.exists()
-        || fs::read_to_string(&vharness_rev).expect("Failed to read QEMU_REVISION") != LIBVHARNESS_COMMIT
+        || fs::read_to_string(&vharness_rev).expect("Failed to read QEMU_REVISION")
+            != LIBVHARNESS_COMMIT
     {
         drop(fs::remove_dir_all(&vharness_dir));
     }

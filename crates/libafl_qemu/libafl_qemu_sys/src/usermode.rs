@@ -14,7 +14,7 @@ use strum_macros::EnumIter;
 
 use crate::MmapPerms;
 #[cfg(target_os = "linux")]
-use crate::{GuestAddr, libafl_mapinfo};
+use crate::libafl_mapinfo;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Copy, Clone, EnumIter, PartialEq, Eq)]
 #[repr(i32)]
@@ -28,9 +28,9 @@ pub enum VerifyAccess {
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct MapInfo {
-    start: GuestAddr,
-    end: GuestAddr,
-    offset: GuestAddr,
+    start: u64,
+    end: u64,
+    offset: u64,
     path: Option<String>,
     flags: i32,
     is_priv: i32,
@@ -80,17 +80,17 @@ impl Display for MapInfo {
 #[cfg_attr(feature = "python", pymethods)]
 impl MapInfo {
     #[must_use]
-    pub fn start(&self) -> GuestAddr {
+    pub fn start(&self) -> u64 {
         self.start
     }
 
     #[must_use]
-    pub fn end(&self) -> GuestAddr {
+    pub fn end(&self) -> u64 {
         self.end
     }
 
     #[must_use]
-    pub fn offset(&self) -> GuestAddr {
+    pub fn offset(&self) -> u64 {
         self.offset
     }
 
