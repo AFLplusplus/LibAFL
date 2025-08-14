@@ -119,6 +119,12 @@ popd || exit 1
 
 sleep 20
 
+pushd crates/libafl_qemu/libvharness
+cargo publish "$@"
+popd || exit 1
+
+sleep 20
+
 pushd crates/libafl_qemu/libafl_qemu_runner
 cargo publish "$@"
 popd || exit 1

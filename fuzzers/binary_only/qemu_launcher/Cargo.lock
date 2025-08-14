@@ -21,7 +21,7 @@ dependencies = [
  "fallible-iterator",
  "gimli 0.32.0",
  "memmap2",
- "object 0.37.1",
+ "object 0.37.3",
  "rustc-demangle",
  "smallvec",
  "typed-arena",
@@ -482,6 +482,15 @@ checksum = "724842fa9b144f9b89b3f3d371a89f3455eea660361d13a554f68f8ae5d6c13a"
 dependencies = [
  "clap",
  "roff",
+]
+
+[[package]]
+name = "cmake"
+version = "0.1.54"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7caa3f9de89ddbe2c607f4101924c5abec803763ae9534e4f4d7d8f84aa81f0"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -974,11 +983,12 @@ checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
 
 [[package]]
 name = "fastbloom"
-version = "0.12.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33f26ab05af2bdfeeb680ec3002f1bfb8065f3d486b9b3db354103c80bd71866"
+checksum = "18c1ddb9231d8554c2d6bdf4cfaabf0c59251658c68b6c95cd52dd0c513a912a"
 dependencies = [
  "getrandom 0.3.3",
+ "libm",
  "siphasher",
 ]
 
@@ -1064,9 +1074,9 @@ dependencies = [
 
 [[package]]
 name = "getset"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3586f256131df87204eb733da72e3d3eb4f343c639f4b7be279ac7c48baeafe"
+checksum = "9cf0fc11e47561d47397154977bc219f4cf809b2974facc3ccb3b89e2436f912"
 dependencies = [
  "proc-macro-error2",
  "proc-macro2",
@@ -1446,7 +1456,7 @@ dependencies = [
  "shellexpand",
  "similar",
  "snafu",
- "strum 0.27.1",
+ "strum 0.27.2",
  "target",
  "tempfile",
  "typed-arena",
@@ -1462,7 +1472,7 @@ checksum = "441225017b106b9f902e97947a6d31e44ebcf274b91bdbfb51e5c477fcd468e5"
 
 [[package]]
 name = "libafl"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1500,7 +1510,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_bolts"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1535,7 +1545,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_derive"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1544,7 +1554,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "addr2line 0.25.0",
  "bindgen",
@@ -1563,18 +1573,19 @@ dependencies = [
  "libafl_qemu_sys",
  "libafl_targets",
  "libc",
+ "libvharness_sys",
  "log",
  "meminterval",
  "num-traits",
  "num_enum",
- "object 0.37.1",
+ "object 0.37.3",
  "paste",
  "rangemap",
  "rustversion",
  "serde",
  "serde_yaml",
- "strum 0.27.1",
- "strum_macros 0.27.1",
+ "strum 0.27.2",
+ "strum_macros 0.27.2",
  "syscall-numbers",
  "thread_local",
  "toml",
@@ -1583,7 +1594,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu_build"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "bindgen",
  "cc",
@@ -1598,20 +1609,20 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu_sys"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "libafl_qemu_build",
  "libc",
  "num_enum",
  "paste",
  "rustversion",
- "strum 0.27.1",
- "strum_macros 0.27.1",
+ "strum 0.27.2",
+ "strum_macros 0.27.2",
 ]
 
 [[package]]
 name = "libafl_targets"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "bindgen",
  "cc",
@@ -1682,6 +1693,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "libvharness_sys"
+version = "0.15.4"
+dependencies = [
+ "bindgen",
+ "cmake",
+]
+
+[[package]]
 name = "libz-sys"
 version = "1.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1744,9 +1763,9 @@ dependencies = [
 
 [[package]]
 name = "mach2"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b955cdeb2a02b9117f121ce63aa52d08ade45de53e48fe6a38b39c10f6f709"
+checksum = "6a1b95cd5421ec55b445b5ae102f5ea0e768de1f82bd3001e11f426c269c3aea"
 dependencies = [
  "libc",
 ]
@@ -1759,9 +1778,9 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
 name = "meminterval"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6f8614cf855d251be1c2138d330c04f134923fddec0dcfc8b6f58ac499bf248"
+checksum = "8e0f9a537564310a87dc77d5c88a407e27dd0aa740e070f0549439cfcc68fcfd"
 dependencies = [
  "num-traits",
  "serde",
@@ -1919,9 +1938,9 @@ dependencies = [
 
 [[package]]
 name = "object"
-version = "0.37.1"
+version = "0.37.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03fd943161069e1768b4b3d050890ba48730e590f57e56d4aa04e7e090e61b4a"
+checksum = "ff76201f031d8863c38aa7f905eca4f53abbfa15f609db4277d44cd8938f33fe"
 dependencies = [
  "flate2",
  "memchr",
@@ -2096,7 +2115,7 @@ dependencies = [
 
 [[package]]
 name = "qemu_launcher"
-version = "0.15.3"
+version = "0.15.4"
 dependencies = [
  "clap",
  "env_logger",
@@ -2420,9 +2439,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "0.6.8"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87607cb1398ed59d48732e575a4c28a7a8ebf2454b964fe3f224f2afc07909e1"
+checksum = "40734c41988f7306bb04f0ecf60ec0f3f1caa34290e4e8ea471dcd3346483b83"
 dependencies = [
  "serde",
 ]
@@ -2598,11 +2617,11 @@ dependencies = [
 
 [[package]]
 name = "strum"
-version = "0.27.1"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f64def088c51c9510a8579e3c5d67c65349dcf755e5479ad3d010aa6454e2c32"
+checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
 dependencies = [
- "strum_macros 0.27.1",
+ "strum_macros 0.27.2",
 ]
 
 [[package]]
@@ -2620,14 +2639,13 @@ dependencies = [
 
 [[package]]
 name = "strum_macros"
-version = "0.27.1"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c77a8c5abcaf0f9ce05d62342b7d298c346515365c36b673df4ebe3ced01fde8"
+checksum = "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
 dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "rustversion",
  "syn",
 ]
 
@@ -2723,12 +2741,11 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.8"
+version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b9ef9bad013ada3808854ceac7b46812a6465ba368859a37e2100283d2d719c"
+checksum = "f60246a4944f24f6e018aa17cdeffb7818b76356965d03b07d6a9886e8962185"
 dependencies = [
  "cfg-if",
- "once_cell",
 ]
 
 [[package]]
@@ -2776,14 +2793,17 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.8.22"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05ae329d1f08c4d17a59bed7ff5b5a769d062e64a62d34a3261b219e62cd5aae"
+checksum = "75129e1dc5000bfbaa9fee9d1b21f974f9fbad9daec557a521ee6e080825f6e8"
 dependencies = [
+ "indexmap",
  "serde",
  "serde_spanned",
- "toml_datetime",
- "toml_edit",
+ "toml_datetime 0.7.0",
+ "toml_parser",
+ "toml_writer",
+ "winnow",
 ]
 
 [[package]]
@@ -2791,6 +2811,12 @@ name = "toml_datetime"
 version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3da5db5a963e24bc68be8b17b6fa82814bb22ee8660f192bb182771d498f09a3"
+
+[[package]]
+name = "toml_datetime"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bade1c3e902f58d73d3f294cd7f20391c1cb2fbcb643b73566bc773971df91e3"
 dependencies = [
  "serde",
 ]
@@ -2802,18 +2828,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "310068873db2c5b3e7659d2cc35d21855dbafa50d1ce336397c666e3cb08137e"
 dependencies = [
  "indexmap",
- "serde",
- "serde_spanned",
- "toml_datetime",
- "toml_write",
+ "toml_datetime 0.6.9",
  "winnow",
 ]
 
 [[package]]
-name = "toml_write"
-version = "0.1.1"
+name = "toml_parser"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfb942dfe1d8e29a7ee7fcbde5bd2b9a25fb89aa70caea2eba3bee836ff41076"
+checksum = "b551886f449aa90d4fe2bdaa9f4a2577ad2dde302c61ecf262d80b116db95c10"
+dependencies = [
+ "winnow",
+]
+
+[[package]]
+name = "toml_writer"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc842091f2def52017664b53082ecbbeb5c7731092bad69d2c63050401dfd64"
 
 [[package]]
 name = "tuple_list"
