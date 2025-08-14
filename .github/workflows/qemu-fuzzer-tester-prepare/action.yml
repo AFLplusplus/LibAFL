@@ -13,9 +13,6 @@ runs:
       shell: bash
       run: sudo apt purge -y 'rust*' 'cargo*'
     - uses: dtolnay/rust-toolchain@stable
-      env:
-        RUSTUP_HOME: /usr/local/rustup
-        CARGO_HOME: /usr/local/cargo
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
