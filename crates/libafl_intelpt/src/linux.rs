@@ -243,7 +243,9 @@ impl IntelPT {
                 (ptr, None)
             } else {
                 // Head pointer wrapped, the trace is split
+                log::trace!("Handling split trace");
                 let mut owned_data = self.join_split_trace(head_wrap, tail_wrap);
+                debug_assert_eq!(owned_data.len(), len);
                 (owned_data.as_mut_ptr(), Some(owned_data))
             }
         };
