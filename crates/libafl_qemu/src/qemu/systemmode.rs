@@ -348,15 +348,6 @@ impl Qemu {
     pub fn target_page_offset_mask(&self) -> usize {
         unsafe { libafl_qemu_sys::libafl_target_page_offset_mask() as usize }
     }
-
-    /// Interpret the VM memory chunk as multiple host memory segments.
-    ///
-    /// This will take into account possible physical memory fragmentation.
-    pub fn to_host_segments(&self, qemu: crate::qemu::Qemu) -> HostMemorySegments {
-        let segments: Vec<HostMemoryChunk> = self.host_iter(qemu).collect();
-
-        HostMemorySegments::new(segments)
-    }
 }
 
 impl QemuMemoryChunk {
@@ -388,6 +379,15 @@ impl QemuMemoryChunk {
                 .flatten()
                 .into_iter(),
         )
+    }
+
+    /// Interpret the VM memory chunk as multiple host memory segments.
+    ///
+    /// This will take into account possible physical memory fragmentation.
+    pub fn to_host_segments(&self, qemu: Qemu) -> HostMemorySegments {
+        let segments: Vec<HostMemoryChunk> = self.host_iter(qemu).collect();
+
+        HostMemorySegments::new(segments)
     }
 }
 

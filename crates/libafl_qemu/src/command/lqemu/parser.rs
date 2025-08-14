@@ -54,7 +54,8 @@ where
             QemuMemoryChunk::phys(input_phys_addr, max_input_size, qemu.current_cpu());
 
         Ok(StartCommand::new(InputLocation::new(
-            memory_chunk,
+            qemu,
+            &memory_chunk,
             Some(arch_regs_map[ExitArgs::Ret]),
         )))
     }
@@ -102,7 +103,8 @@ where
                 QemuMemoryChunk::virt(input_virt_addr, max_input_size, qemu.current_cpu().unwrap());
 
             Ok(StartCommand::new(InputLocation::new(
-                memory_chunk,
+                qemu,
+                &memory_chunk,
                 Some(arch_regs_map[ExitArgs::Ret]),
             )))
         }
@@ -315,12 +317,12 @@ where
 
         let map = match map.addr_kind {
             libvharness_sys::lqemu_addr_kind_LQEMU_ADDR_PHYS => {
-                QemuMemoryChunk::phys(map.addr, map.len, qemu.current_cpu())
+                QemuMemoryChunk::phys(map.addr, map.len as GuestAddr, qemu.current_cpu())
             }
 
             libvharness_sys::lqemu_addr_kind_LQEMU_ADDR_VIRT => QemuMemoryChunk::virt(
                 map.addr as GuestVirtAddr,
-                map.len,
+                map.len as GuestAddr,
                 qemu.current_cpu().unwrap(),
             ),
 

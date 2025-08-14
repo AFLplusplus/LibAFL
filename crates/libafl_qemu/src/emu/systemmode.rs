@@ -4,7 +4,8 @@ use hashbrown::HashMap;
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
-    DeviceSnapshotFilter, Emulator, Qemu, SnapshotId, SnapshotManagerError,
+    DeviceSnapshotFilter, Emulator, HostMemorySegments, Qemu, QemuMemoryChunk, Regs, SnapshotId,
+    SnapshotManagerError,
     emu::{IsSnapshotManager, QemuSnapshotCheckResult},
 };
 
@@ -48,7 +49,7 @@ impl InputLocation {
     }
 
     pub fn write(&mut self, input: &[u8]) -> usize {
-        self.location.segments.write(input)
+        unsafe { self.location.write(input) }
     }
 }
 
