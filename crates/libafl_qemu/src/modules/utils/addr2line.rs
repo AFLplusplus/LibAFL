@@ -1,3 +1,4 @@
+#![allow(clippy::unnecessary_cast)]
 //! Utils for addr2line
 
 use std::{borrow::Cow, fmt::Write, fs};

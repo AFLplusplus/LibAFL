@@ -1,4 +1,5 @@
 #![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::unnecessary_cast)]
 
 use std::{env, fmt::Debug, fs, ops::Range, path::PathBuf};
 

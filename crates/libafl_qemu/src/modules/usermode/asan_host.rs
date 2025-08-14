@@ -1,5 +1,6 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::needless_pass_by_value)] // default compiler complains about Option<&mut T> otherwise, and this is used extensively.
+#![allow(clippy::unnecessary_cast)]
 
 use core::{fmt, slice};
 use std::{
