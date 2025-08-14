@@ -53,6 +53,13 @@ fn main() {
 
     let toolchain_file = toolchains_dir.join(format!("{cpu_target}-generic.cmake"));
 
+    let vharness_rev = vharness_dir.join("QEMU_REVISION");
+    if !vharness_rev.exists()
+        || fs::read_to_string(&vharness_rev).expect("Failed to read QEMU_REVISION") != LIBVHARNESS_COMMIT
+    {
+        drop(fs::remove_dir_all(&vharness_dir));
+    }
+
     if !vharness_dir.exists() {
         fs::create_dir_all(&vharness_dir).unwrap();
         assert!(
@@ -95,6 +102,8 @@ fn main() {
                 .unwrap()
                 .success()
         );
+
+        fs::write(&vharness_rev, LIBVHARNESS_COMMIT).unwrap();
     }
 
     let vharness_out_dir = cmake::Config::new(&vharness_dir)
