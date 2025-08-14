@@ -2,8 +2,12 @@ use core::fmt::Debug;
 
 use libafl_bolts::{Error, hash_64_fast};
 use libipt::{
-    block::BlockDecoder, enc_dec_builder::EncoderDecoderBuilder, error::PtErrorCode,
-    event::EventType, image::Image, status::Status,
+    block::BlockDecoder,
+    enc_dec_builder::EncoderDecoderBuilder,
+    error::{PtError, PtErrorCode},
+    event::EventType,
+    image::Image,
+    status::Status,
 };
 use num_traits::SaturatingAdd;
 
@@ -81,21 +85,46 @@ where
     }
 
     fn decode_and_resync_loop(&mut self) -> Result<(), Error> {
+        const MAX_RESYNC_TRIALS: usize = 32;
+        let mut last_error_offset = 0;
+        let mut last_error_count = 0;
+
         loop {
             match self.decode_blocks_loop() {
-                Ok(()) if self.status.eos() => return Ok(()),
-                Ok(()) | Err(_) => (),
+                Ok(()) => {
+                    debug_assert!(
+                        self.status.eos(),
+                        "PT decoder decode_blocks_loop should return Ok only at the end of stream"
+                    );
+                    return Ok(());
+                }
+                Err(e) if e.code() == PtErrorCode::Eos => return Ok(()),
+                Err(_) => (),
+            }
+
+            let offset = self.decoder.offset().map_err(error_from_pt_error)?;
+            if offset == last_error_offset {
+                last_error_count += 1;
+                if last_error_count > MAX_RESYNC_TRIALS {
+                    return Err(Error::illegal_state(format!(
+                        "PT Decoder got stuck at trace offset {offset:x}.\
+                        Make sure the decoder Image has the right content and offsets.\
+                        Trying to continue decoding.",
+                    )));
+                }
+            } else {
+                last_error_offset = offset;
             }
 
             match self.resync_loop() {
                 Ok(()) if self.status.eos() => return Ok(()),
                 Ok(()) => (),
-                Err(e) => return Err(e),
+                Err(e) => return Err(error_from_pt_error(e)),
             }
         }
     }
 
-    fn resync_loop(&mut self) -> Result<(), Error>
+    fn resync_loop(&mut self) -> Result<(), PtError>
     where
         T: SaturatingAdd + From<u8> + Debug,
     {
@@ -108,41 +137,22 @@ where
                 Err(e) => match e.code() {
                     PtErrorCode::Eos => return Ok(()),
                     PtErrorCode::EventIgnored => self.handle_event()?,
-                    _ => return Err(Error::illegal_state(format!("PT error in resync {e:?}"))),
+                    _ => return Err(e),
                 },
             }
         }
     }
 
-    fn decode_blocks_loop(&mut self) -> Result<(), Error>
+    fn decode_blocks_loop(&mut self) -> Result<(), PtError>
     where
         T: SaturatingAdd + From<u8> + Debug,
     {
-        #[cfg(debug_assertions)]
-        let mut trace_entry_iters: (u64, u64) = (0, 0);
-
         loop {
-            #[cfg(debug_assertions)]
-            {
-                let offset = self.decoder.offset().map_err(error_from_pt_error)?;
-                if trace_entry_iters.0 == offset {
-                    trace_entry_iters.1 += 1;
-                    if trace_entry_iters.1 > 1000 {
-                        return Err(Error::illegal_state(format!(
-                            "PT Decoder got stuck at trace offset {offset:x}.\
-                            Make sure the decoder Image has the right content and offsets.",
-                        )));
-                    }
-                } else {
-                    trace_entry_iters = (offset, 0);
-                }
-            }
-
             while self.status.event_pending() {
                 self.handle_event()?;
             }
 
-            let offset = self.decoder.offset().map_err(error_from_pt_error)?;
+            let offset = self.decoder.offset()?;
             if self.should_ignore_vmx_root() || offset <= self.trace_skip {
                 self.ignore_block()?;
             } else {
@@ -155,7 +165,7 @@ where
         }
     }
 
-    fn decode_block(&mut self) -> Result<(), Error> {
+    fn decode_block(&mut self) -> Result<(), PtError> {
         match self.decoder.decode_next() {
             Ok((b, s)) => {
                 self.status = s;
@@ -172,18 +182,18 @@ where
             }
             Err(e) => {
                 if e.code() != PtErrorCode::Eos {
-                    let offset = self.decoder.offset().map_err(error_from_pt_error)?;
+                    let offset = self.decoder.offset()?;
                     log::info!(
                         "PT error in block next {e:?} trace offset {offset:x} last decoded block end {:x}",
                         self.previous_block_end_ip
                     );
                 }
-                Err(error_from_pt_error(e))
+                Err(e)
             }
         }
     }
 
-    fn ignore_block(&mut self) -> Result<(), Error> {
+    fn ignore_block(&mut self) -> Result<(), PtError> {
         match self.decoder.decode_next() {
             Ok((_, s)) => {
                 self.status = s;
@@ -191,18 +201,18 @@ where
             }
             Err(e) => {
                 if e.code() != PtErrorCode::Eos {
-                    let offset = self.decoder.offset().map_err(error_from_pt_error)?;
+                    let offset = self.decoder.offset()?;
                     log::trace!(
                         "PT error in ignore block {e:?} trace offset {offset:x} last decoded block end {:x}",
                         self.previous_block_end_ip
                     );
                 }
-                Err(error_from_pt_error(e))
+                Err(e)
             }
         }
     }
 
-    fn handle_event(&mut self) -> Result<(), Error> {
+    fn handle_event(&mut self) -> Result<(), PtError> {
         match self.decoder.event() {
             Ok((event, s)) => {
                 self.status = s;
@@ -213,7 +223,7 @@ where
                 }
                 Ok(())
             }
-            Err(e) => Err(Error::illegal_state(format!("PT error in event {e:?}"))),
+            Err(e) => Err(e),
         }
     }
 
