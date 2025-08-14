@@ -2,7 +2,7 @@ use std::{env, fs, path::PathBuf, process::Command};
 
 const LIBVHARNESS_URL: &str = "https://github.com/rmalmain/libvharness.git";
 const LIBVHARNESS_DIRNAME: &str = "libvharness";
-const LIBVHARNESS_COMMIT: &str = "620a15282388afcf87ffd81b9a9a7dea1ed86d6e";
+const LIBVHARNESS_COMMIT: &str = "aaaafd55c7f5dca3d2fe8b726a2b8f131a8bbff7";
 
 fn main() {
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
