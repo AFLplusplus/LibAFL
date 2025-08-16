@@ -28,7 +28,7 @@ pub struct NyxEmulatorDriver {
     allow_page_on_start: bool, // when fuzzing starts, all modules will only accept the current page table
     #[builder(default = false)]
     print_commands: bool,
-    #[builder(default = (1024 * 1024))]
+    #[builder(default = 1024 * 1024)]
     max_input_size: usize,
 }
 
