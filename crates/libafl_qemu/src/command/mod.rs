@@ -11,7 +11,10 @@ use crate::{
 };
 
 pub mod lqemu;
-pub use lqemu::StdCommandManager;
+pub use lqemu::{
+    AddressAllowCommand, EndCommand, LoadCommand, LqprintfCommand, SaveCommand, SetMapCommand,
+    StartCommand, StdCommandManager, TestCommand, VersionCommand,
+};
 
 #[cfg(feature = "nyx")]
 pub mod nyx;
