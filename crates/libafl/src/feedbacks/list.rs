@@ -110,15 +110,7 @@ where
                 self.novelty.insert(*v);
             }
         }
-        if !self.novelty.is_empty() {
-            if let Some(mut file) = self.file.as_ref() {
-                for line in &self.novelty {
-                    file.write_all(format!("0x{line:x}\n").as_bytes()).unwrap();
-                }
-            }
-            return true;
-        }
-        false
+        !self.novelty.is_empty()
     }
 
     fn append_list_observer_metadata<S: HasNamedMetadata>(&mut self, state: &mut S) {
@@ -129,6 +121,12 @@ where
 
         for v in &self.novelty {
             history_set.set.insert(*v);
+        }
+
+        if let Some(mut file) = self.file.as_ref() {
+            for line in &self.novelty {
+                file.write_all(format!("0x{line:x}\n").as_bytes()).unwrap();
+            }
         }
     }
 }
