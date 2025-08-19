@@ -3,6 +3,8 @@ use core::{
     fmt::{Debug, LowerHex},
     hash::Hash,
 };
+#[cfg(feature = "std")]
+use std::{fs::File, io::Write, path::Path};
 
 use hashbrown::HashSet;
 use libafl_bolts::{
@@ -17,9 +19,6 @@ use crate::{
     feedbacks::{Feedback, StateInitializer},
     observers::ListObserver,
 };
-
-#[cfg(feature = "std")]
-use std::{fs::File, io::Write, path::Path};
 
 /// The metadata to remember past observed value
 #[derive(Debug, Serialize, Deserialize)]
@@ -69,6 +68,7 @@ impl<T> HasRefCnt for ListFeedbackMetadata<T> {
 pub struct ListFeedback<T> {
     observer_handle: Handle<ListObserver<T>>,
     novelty: HashSet<T>,
+    #[cfg(feature = "std")]
     file: Option<File>,
 }
 
@@ -200,6 +200,7 @@ impl<T> ListFeedback<T> {
         Self {
             observer_handle: observer.handle(),
             novelty: HashSet::new(),
+            #[cfg(feature = "std")]
             file: None,
         }
     }
