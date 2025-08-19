@@ -115,11 +115,6 @@ where
         }
     }
 
-    #[cfg(not(feature = "std"))]
-    #[allow(clippy::unused_self)]
-    #[inline]
-    fn dump_coverage(&self) {}
-
     fn append_list_observer_metadata<S: HasNamedMetadata>(&mut self, state: &mut S) {
         let history_set = state
             .named_metadata_map_mut()
@@ -130,6 +125,7 @@ where
             history_set.set.insert(*v);
         }
 
+        #[cfg(feature = "std")]
         self.dump_coverage();
     }
 }
