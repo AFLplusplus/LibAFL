@@ -116,6 +116,7 @@ where
     }
 
     #[cfg(not(feature = "std"))]
+    #[allow(clippy::unused_self)]
     #[inline]
     fn dump_coverage(&self) {}
 
