@@ -1,5 +1,8 @@
 use alloc::borrow::Cow;
-use core::{fmt::Debug, hash::Hash};
+use core::{
+    fmt::{Debug, LowerHex},
+    hash::Hash,
+};
 
 use hashbrown::HashSet;
 use libafl_bolts::{
@@ -13,12 +16,10 @@ use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::ListObserver,
-    std::fmt::LowerHex,
-    std::fs::File,
-    std::io::Write,
-    std::path::Path,
-    std::string::ToString,
 };
+
+#[cfg(feature = "std")]
+use std::{fs::File, io::Write, path::Path};
 
 /// The metadata to remember past observed value
 #[derive(Debug, Serialize, Deserialize)]
@@ -78,15 +79,7 @@ libafl_bolts::impl_serdeany!(
 
 impl<T> ListFeedback<T>
 where
-    T: Debug
-        + Eq
-        + Hash
-        + for<'a> Deserialize<'a>
-        + Serialize
-        + 'static
-        + Copy
-        + ToString
-        + LowerHex,
+    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + 'static + Copy + LowerHex,
 {
     fn has_interesting_list_observer_feedback<OT, S>(
         &mut self,
@@ -113,6 +106,19 @@ where
         !self.novelty.is_empty()
     }
 
+    #[cfg(feature = "std")]
+    fn dump_coverage(&mut self) {
+        if let Some(mut file) = self.file.as_ref() {
+            for line in &self.novelty {
+                file.write_all(format!("0x{line:x}\n").as_bytes()).unwrap();
+            }
+        }
+    }
+
+    #[cfg(not(feature = "std"))]
+    #[inline]
+    fn dump_coverage(&self) {}
+
     fn append_list_observer_metadata<S: HasNamedMetadata>(&mut self, state: &mut S) {
         let history_set = state
             .named_metadata_map_mut()
@@ -123,11 +129,7 @@ where
             history_set.set.insert(*v);
         }
 
-        if let Some(mut file) = self.file.as_ref() {
-            for line in &self.novelty {
-                file.write_all(format!("0x{line:x}\n").as_bytes()).unwrap();
-            }
-        }
+        self.dump_coverage();
     }
 }
 
@@ -154,7 +156,6 @@ where
         + Default
         + Copy
         + 'static
-        + ToString
         + LowerHex,
 {
     fn is_interesting(
@@ -205,6 +206,7 @@ impl<T> ListFeedback<T> {
 
     /// Creates a new [`ListFeedback`], deciding if the given [`ListObserver`] value of a run is interesting.
     /// Will dump newly observed addresses to `path`. If `path` exists, the file will be truncated.
+    #[cfg(feature = "std")]
     pub fn with_coverage_dump<P: AsRef<Path>>(observer: &ListObserver<T>, path: P) -> Self {
         let file = Some(File::create(path).unwrap());
 
