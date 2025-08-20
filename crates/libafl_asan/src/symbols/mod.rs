@@ -5,7 +5,7 @@
 //! linked
 use alloc::fmt::Debug;
 use core::{
-    ffi::{CStr, c_char, c_void},
+    ffi::{CStr, c_char, c_int, c_void},
     ptr::null_mut,
     sync::atomic::{AtomicPtr, Ordering},
 };
@@ -18,6 +18,8 @@ use crate::{GuestAddr, patch::Patches};
 pub mod dlsym;
 
 pub mod nop;
+
+static GET_ERRNO_LOCATION_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 
 pub struct AtomicGuestAddr {
     addr: AtomicPtr<c_void>,
@@ -119,4 +121,32 @@ pub enum FunctionPointerError {
     BadAddress(GuestAddr),
     #[error("Patched address: {0}")]
     PatchedAddress(GuestAddr),
+}
+
+#[derive(Debug)]
+struct FunctionErrnoLocation;
+
+impl Function for FunctionErrnoLocation {
+    #[cfg(target_os = "linux")]
+    const NAME: &CStr = c"__errno_location";
+    #[cfg(target_vendor = "apple")]
+    const NAME: &CStr = c"___error";
+    type Func = unsafe extern "C" fn() -> *mut c_int;
+}
+
+fn get_errno_location<S: Symbols>() -> Result<<FunctionErrnoLocation as Function>::Func, <S as Symbols>::Error> {
+    let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
+        S::lookup(FunctionErrnoLocation::NAME)
+    })?;
+    let f = FunctionErrnoLocation::as_ptr(addr)
+        .map_err(|e| LibcFileReaderError::InvalidPointerType(e))?;
+    Ok(f)
+}
+
+pub fn errno() -> Result<c_int, LibcMapError<S>> {
+    unsafe { asan_swap(false) };
+    let errno_location = get_errno_location()?;
+    unsafe { asan_swap(true) };
+    let errno = unsafe { *errno_location() };
+    Ok(errno)
 }

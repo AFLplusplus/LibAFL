@@ -48,9 +48,11 @@ impl Function for FunctionMprotect {
     const NAME: &'static CStr = c"mprotect";
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Debug)]
 struct FunctionErrnoLocation;
 
+#[cfg(target_os = "linux")]
 impl Function for FunctionErrnoLocation {
     type Func = unsafe extern "C" fn() -> *mut c_int;
     const NAME: &'static CStr = c"__errno_location";
@@ -94,7 +96,6 @@ impl<S: Symbols> Eq for LibcMmap<S> {}
 static MMAP_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 static MUNMAP_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 static MPROTECT_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
-static GET_ERRNO_LOCATION_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 static MADVISE_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 
 impl<S: Symbols> LibcMmap<S> {
@@ -122,29 +123,12 @@ impl<S: Symbols> LibcMmap<S> {
         Ok(f)
     }
 
-    fn get_errno_location() -> Result<<FunctionErrnoLocation as Function>::Func, LibcMapError<S>> {
-        let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
-            S::lookup(FunctionErrnoLocation::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
-        })?;
-        let f =
-            FunctionErrnoLocation::as_ptr(addr).map_err(|e| LibcMapError::InvalidPointerType(e))?;
-        Ok(f)
-    }
-
     pub fn get_madvise() -> Result<<FunctionMadvise as Function>::Func, LibcMapError<S>> {
         let addr = MADVISE_ADDR.try_get_or_insert_with(|| {
             S::lookup(FunctionMadvise::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
         })?;
         let f = FunctionMadvise::as_ptr(addr).map_err(|e| LibcMapError::InvalidPointerType(e))?;
         Ok(f)
-    }
-
-    fn errno() -> Result<c_int, LibcMapError<S>> {
-        unsafe { asan_swap(false) };
-        let errno_location = Self::get_errno_location()?;
-        unsafe { asan_swap(true) };
-        let errno = unsafe { *errno_location() };
-        Ok(errno)
     }
 }
 
@@ -166,7 +150,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
         };
         unsafe { asan_swap(true) };
         if map == libc::MAP_FAILED {
-            let errno = Self::errno()?;
+            let errno = errno();
             Err(LibcMapError::FailedToMap(len, errno))
         } else {
             let addr = map as GuestAddr;

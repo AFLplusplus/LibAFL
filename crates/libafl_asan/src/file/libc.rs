@@ -38,18 +38,9 @@ impl Function for FunctionRead {
     type Func = unsafe extern "C" fn(c_int, *mut c_char, size_t) -> ssize_t;
 }
 
-#[derive(Debug)]
-struct FunctionErrnoLocation;
-
-impl Function for FunctionErrnoLocation {
-    const NAME: &CStr = c"__errno_location";
-    type Func = unsafe extern "C" fn() -> *mut c_int;
-}
-
 static OPEN_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 static CLOSE_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 static READ_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
-static GET_ERRNO_LOCATION_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 
 #[derive(Debug)]
 pub struct LibcFileReader<S: Symbols> {
@@ -84,25 +75,6 @@ impl<S: Symbols> LibcFileReader<S> {
             FunctionRead::as_ptr(addr).map_err(|e| LibcFileReaderError::InvalidPointerType(e))?;
         Ok(f)
     }
-
-    fn get_errno_location()
-    -> Result<<FunctionErrnoLocation as Function>::Func, LibcFileReaderError<S>> {
-        let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
-            S::lookup(FunctionErrnoLocation::NAME)
-                .map_err(|e| LibcFileReaderError::FailedToFindSymbol(e))
-        })?;
-        let f = FunctionErrnoLocation::as_ptr(addr)
-            .map_err(|e| LibcFileReaderError::InvalidPointerType(e))?;
-        Ok(f)
-    }
-
-    fn errno() -> Result<c_int, LibcFileReaderError<S>> {
-        unsafe { asan_swap(false) };
-        let errno_location = Self::get_errno_location()?;
-        unsafe { asan_swap(true) };
-        let errno = unsafe { *errno_location() };
-        Ok(errno)
-    }
 }
 
 impl<S: Symbols> FileReader for LibcFileReader<S> {
@@ -113,7 +85,7 @@ impl<S: Symbols> FileReader for LibcFileReader<S> {
         let fd = unsafe { fn_open(path.as_ptr() as *const c_char, O_NONBLOCK | O_RDONLY, 0) };
         unsafe { asan_swap(true) };
         if fd < 0 {
-            let errno = Self::errno().unwrap();
+            let errno = errno().unwrap();
             return Err(LibcFileReaderError::FailedToOpen(errno));
         }
         Ok(LibcFileReader {
