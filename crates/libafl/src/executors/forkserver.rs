@@ -254,7 +254,8 @@ impl ConfigTarget for Command {
         }
     }
 
-    #[expect(trivial_numeric_casts)]
+    // libc::rlim_t is i64 in freebsd and trivial_numeric_casts check will failed
+    #[cfg_attr(not(target_os = "freebsd"), expect(trivial_numeric_casts))]
     fn setlimit(&mut self, memlimit: u64) -> &mut Self {
         if memlimit == 0 {
             return self;
@@ -513,19 +514,20 @@ impl Forkserver {
         // # Saftey
         // The pipe file descriptors used for `setpipe` are valid at this point.
         let fsrv_handle = unsafe {
-            match command
-                .env("LD_BIND_NOW", "1")
-                .envs(envs)
-                .setlimit(memlimit)
-                .set_coredump(afl_debug)
-                .setsid()
-                .setpipe(
-                    st_pipe.read_end().unwrap(),
-                    st_pipe.write_end().unwrap(),
-                    ctl_pipe.read_end().unwrap(),
-                    ctl_pipe.write_end().unwrap(),
-                )
-                .spawn()
+            match ConfigTarget::setsid(
+                command
+                    .env("LD_BIND_NOW", "1")
+                    .envs(envs)
+                    .setlimit(memlimit)
+                    .set_coredump(afl_debug),
+            )
+            .setpipe(
+                st_pipe.read_end().unwrap(),
+                st_pipe.write_end().unwrap(),
+                ctl_pipe.read_end().unwrap(),
+                ctl_pipe.write_end().unwrap(),
+            )
+            .spawn()
             {
                 Ok(fsrv_handle) => fsrv_handle,
                 Err(err) => {

@@ -285,6 +285,7 @@ where
     }
 
     #[allow(clippy::needless_pass_by_value)] // no longer a problem in nightly
+    #[allow(clippy::collapsible_if)]
     fn gen_blocks_calls<ET, I, S>(
         qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, I, S>,

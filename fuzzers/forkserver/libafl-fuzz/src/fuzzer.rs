@@ -185,7 +185,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         .plot_file(fuzzer_dir.join("plot_data"))
         .core_id(core_id)
         .report_interval(Duration::from_secs(opt.stats_interval))
-        .map_observer(&edges_observer)
+        .map_feedback(&map_feedback)
         .uses_autotokens(!opt.no_autodict)
         .tokens(&tokens)
         .banner(opt.executable.display().to_string())
@@ -389,7 +389,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     } else {
         // If we aren't auto resuming, copy all the files to our queue directory.
         let mut id = 0;
-        state.walk_initial_inputs(&[opt.input_dir.clone()], |path: &PathBuf| {
+        state.walk_initial_inputs(std::slice::from_ref(&opt.input_dir), |path: &PathBuf| {
             let mut filename = path
                 .file_name()
                 .ok_or(Error::illegal_state(format!(

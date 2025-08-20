@@ -236,6 +236,7 @@ pub struct PTraceCommandConfigurator {
 
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 impl CommandConfigurator<Pid> for PTraceCommandConfigurator {
+    #[allow(unreachable_code)]
     fn spawn_child(&mut self, target_bytes: OwnedSlice<'_, u8>) -> Result<Pid, Error> {
         use nix::{
             sys::{

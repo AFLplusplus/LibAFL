@@ -123,7 +123,7 @@ impl Context {
         *self
             .names_to_nt_id
             .get(nt)
-            .expect(&("no such nonterminal: ".to_owned() + nt))
+            .unwrap_or_else(|| panic!("{}", ("no such nonterminal: ".to_owned() + nt)))
     }
 
     #[must_use]

@@ -10,7 +10,7 @@ use core::{
 use libafl_bolts::{
     Named,
     rands::Rand,
-    tuples::{HasConstLen, NamedTuple, tuple_list, tuple_list_type},
+    tuples::{NamedTuple, tuple_list, tuple_list_type},
 };
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +22,6 @@ use crate::{
         MutationResult, Mutator, MutatorsTuple,
         token_mutations::{TokenInsert, TokenReplace},
     },
-    nonzero,
     state::{HasCorpus, HasRand},
 };
 
@@ -280,7 +279,8 @@ pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
     tuple_list!(TokenInsert::new(), TokenReplace::new())
 }
 
-/// A logging [`Mutator`] that wraps around a [`HavocScheduledMutator`].
+/// A [`Mutator`] that wraps a [`ScheduledMutator`] and logs the names of the scheduled mutations
+/// into a [`LogMutationMetadata`] (if the mutated input was added to the corpus).
 #[derive(Debug)]
 pub struct LoggerScheduledMutator<SM> {
     name: Cow<'static, str>,
@@ -344,19 +344,13 @@ where
     SM::Mutations: MutatorsTuple<I, S> + NamedTuple,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(nonzero!(7)))
+    fn iterations(&self, state: &mut S, input: &I) -> u64 {
+        self.scheduled.iterations(state, input)
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(<SM::Mutations as HasConstLen>::LEN != 0);
-        // # Safety
-        // In debug we check the length. Worst case we end up with an illegal MutationId and fail later.
-        state
-            .rand_mut()
-            .below(unsafe { NonZero::new(<SM::Mutations as HasConstLen>::LEN).unwrap_unchecked() })
-            .into()
+    fn schedule(&self, state: &mut S, input: &I) -> MutationId {
+        self.scheduled.schedule(state, input)
     }
 
     fn scheduled_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
