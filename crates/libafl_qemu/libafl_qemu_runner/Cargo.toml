@@ -68,4 +68,4 @@ log = { version = "0.4.22", features = ["release_max_level_info"] }
 readonly = { version = "0.2.12" }
 libafl_bolts = { path = "../../libafl_bolts" }
 libafl_qemu = { path = "../" }
-thiserror = { version = "2.0.11" }
+thiserror = { version = "2.0.16" }
