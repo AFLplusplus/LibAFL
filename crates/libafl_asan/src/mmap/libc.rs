@@ -10,10 +10,11 @@ use core::{
     ptr::null_mut,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
+use std::borrow::Cow;
 
 #[cfg(target_os = "linux")]
 use libc::{MADV_DONTDUMP, MADV_HUGEPAGE};
-use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE, off_t, size_t};
+use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE, c_char, off_t, size_t};
 use log::trace;
 use thiserror::Error;
 
@@ -48,7 +49,6 @@ impl Function for FunctionMprotect {
     const NAME: &'static CStr = c"mprotect";
 }
 
-#[cfg(target_os = "linux")]
 #[derive(Debug)]
 struct FunctionErrnoLocation;
 
@@ -56,6 +56,20 @@ struct FunctionErrnoLocation;
 impl Function for FunctionErrnoLocation {
     type Func = unsafe extern "C" fn() -> *mut c_int;
     const NAME: &'static CStr = c"__errno_location";
+}
+
+#[cfg(target_vendor = "apple")]
+impl Function for FunctionErrnoLocation {
+    type Func = unsafe extern "C" fn() -> *mut c_int;
+    const NAME: &'static CStr = c"__error";
+}
+
+#[derive(Debug)]
+struct FunctionStrError;
+
+impl Function for FunctionStrError {
+    type Func = unsafe extern "C" fn(errnum: c_int) -> *const c_char;
+    const NAME: &'static CStr = c"strerror";
 }
 
 #[derive(Debug)]
@@ -96,6 +110,8 @@ impl<S: Symbols> Eq for LibcMmap<S> {}
 static MMAP_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 static MUNMAP_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 static MPROTECT_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
+static GET_ERRNO_LOCATION_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
+static STRERROR_LOCATION: AtomicGuestAddr = AtomicGuestAddr::new();
 static MADVISE_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
 
 impl<S: Symbols> LibcMmap<S> {
@@ -123,12 +139,51 @@ impl<S: Symbols> LibcMmap<S> {
         Ok(f)
     }
 
+    fn get_errno_location() -> Result<<FunctionErrnoLocation as Function>::Func, LibcMapError<S>> {
+        let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
+            S::lookup(FunctionErrnoLocation::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
+        })?;
+        let f =
+            FunctionErrnoLocation::as_ptr(addr).map_err(|e| LibcMapError::InvalidPointerType(e))?;
+        Ok(f)
+    }
+
+    fn get_strerror() -> Result<<FunctionStrError as Function>::Func, LibcMapError<S>> {
+        let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
+            S::lookup(FunctionStrError::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
+        })?;
+        let f = FunctionStrError::as_ptr(addr).map_err(|e| LibcMapError::InvalidPointerType(e))?;
+        Ok(f)
+    }
+
     pub fn get_madvise() -> Result<<FunctionMadvise as Function>::Func, LibcMapError<S>> {
         let addr = MADVISE_ADDR.try_get_or_insert_with(|| {
             S::lookup(FunctionMadvise::NAME).map_err(|e| LibcMapError::FailedToFindSymbol(e))
         })?;
         let f = FunctionMadvise::as_ptr(addr).map_err(|e| LibcMapError::InvalidPointerType(e))?;
         Ok(f)
+    }
+
+    fn errno() -> Result<c_int, LibcMapError<S>> {
+        unsafe { asan_swap(false) };
+        let errno_location = Self::get_errno_location()?;
+        unsafe { asan_swap(true) };
+        let errno = unsafe { *errno_location() };
+        Ok(errno)
+    }
+
+    fn last_error_str<'a>() -> Result<Cow<'a, str>, LibcMapError<S>> {
+        let errno = Self::errno()?;
+        unsafe { asan_swap(false) };
+        let strerror = Self::get_strerror()?;
+        // # Safety
+        // Call to strerror fn should be safe (assuming we got a pointer to the right one).
+        let error_cstr = unsafe { strerror(errno) };
+        unsafe { asan_swap(true) };
+
+        // # Safety
+        // calling the `strerror` libc functions with the correct `errno`
+        Ok(unsafe { CStr::from_ptr(error_cstr).to_string_lossy() })
     }
 }
 
@@ -150,7 +205,7 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
         };
         unsafe { asan_swap(true) };
         if map == libc::MAP_FAILED {
-            let errno = errno();
+            let errno = Self::errno()?;
             Err(LibcMapError::FailedToMap(len, errno))
         } else {
             let addr = map as GuestAddr;

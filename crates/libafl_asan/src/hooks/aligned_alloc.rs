@@ -19,7 +19,7 @@ pub unsafe extern "C" fn aligned_alloc(alignment: size_t, size: size_t) -> *mut 
             n != 0 && (n & (n - 1)) == 0
         }
 
-        if alignment % size_of::<GuestAddr>() != 0 {
+        if !alignment.is_multiple_of(size_of::<GuestAddr>()) {
             asan_panic(
                 c"aligned_alloc - alignment is not a multiple of pointer size".as_ptr()
                     as *const c_char,
