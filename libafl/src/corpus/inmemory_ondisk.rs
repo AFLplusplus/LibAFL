@@ -473,7 +473,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
     fn remove_testcase(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         if let Some(filename) = testcase.filename() {
-            let mut ctr = 0;
+            let mut ctr = String::new();
             if self.locking {
                 let lockfile_path = self.dir_path.join(format!(".{filename}"));
                 let mut lockfile = OpenOptions::new()
@@ -481,17 +481,16 @@ impl<I> InMemoryOnDiskCorpus<I> {
                     .read(true)
                     .open(&lockfile_path)?;
 
-                let mut ctr_bytes = [0; 4];
                 lockfile.lock_exclusive()?;
-                lockfile.read(&mut ctr_bytes)?;
-                ctr = u32::from_le_bytes(ctr_bytes);
+                lockfile.read_to_string(&mut ctr)?;
+                ctr = ctr.trim().to_string();
 
-                if ctr == 1 {
+                if ctr == "1" {
                     FileExt::unlock(&lockfile)?;
                     drop(fs::remove_file(lockfile_path));
                 } else {
                     lockfile.seek(SeekFrom::Start(0))?;
-                    lockfile.write_all(&(ctr - 1).to_le_bytes())?;
+                    lockfile.write_all(&(ctr.parse::<u32>()? - 1).to_le_bytes())?;
                     return Ok(());
                 }
             }
