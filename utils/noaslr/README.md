@@ -1,4 +1,5 @@
 # NOASLR
+
 `noaslr` is a launcher for running applications with ASLR disabled without having
 to disable the feature system-wide.
 
@@ -10,31 +11,37 @@ file passed as its single argument. By passing `/proc/self/maps` as its argument
 it can be observed that the application loads at the same default address each
 time it is run.
 
-# Test
-## App
-```
-$ just run
-```
-## Library
+## Test
 
-```
-$ just runlib
+### App
+
+```sh
+just run
 ```
 
-# Example
-## App
-```
-$ ./target/debug/noaslr ./target/debug/demo -- /proc/self/maps
-```
-## Library
+### Library
 
-```
-$ LD_PRELOAD=target/debug/libnoaslr.so ./target/debug/demo /proc/self/maps
+```sh
+just runlib
 ```
 
-## Output
-...
+## Example
 
+### App
+
+```sh
+./target/debug/noaslr ./target/debug/demo -- /proc/self/maps
+```
+
+### Library
+
+```sh
+LD_PRELOAD=target/debug/libnoaslr.so ./target/debug/demo /proc/self/maps
+```
+
+### Output
+
+```sh
 555555554000-55555556d000 r--p 00000000 fd:03 78381550                   /home/jon/git/LibAFL/utils/noaslr/target/debug/demo
 55555556d000-5555556a1000 r-xp 00019000 fd:03 78381550                   /home/jon/git/LibAFL/utils/noaslr/target/debug/demo
 5555556a1000-5555556ee000 r--p 0014d000 fd:03 78381550                   /home/jon/git/LibAFL/utils/noaslr/target/debug/demo
@@ -80,14 +87,19 @@ ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsysca
 
 ```
 
-# About
-## APP
+## About
+
+### APP
+
 `noaslr` does the following:
+
 * Uses the `personality` API to set the flag `ADDR_NO_RANDOMIZE`.
 * Uses the `execve` API to launch the child application.
 
-## Lib
+### Lib
+
 `libnoasl` does the following:
+
 * Uses rusts `ctor` crate to define a function as `__attribute__((constructor))`
 * Uses the `personality` API to determine if the flag `ADDR_NO_RANDOMIZE` is set
 * If the flag is set, the constructor returns, otherwise...
@@ -96,8 +108,10 @@ ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsysca
 * Reads the program environment variables from `/proc/self/environ`
 * Uses the `execvpe` API to re-launch the application
 
-# Usage
-```
+## Usage
+
+```sh
+
 Tool launching applications with ASLR disabled
 
 Usage: noaslr <PROGRAM> [-- <ARGS>...]
@@ -115,4 +129,5 @@ Options:
 
   -V, --version
           Print version
+
 ```

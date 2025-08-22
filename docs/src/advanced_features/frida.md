@@ -15,7 +15,7 @@ If you are on Windows, you'll need to install llvm tools.
 ## Harness & Instrumentation
 
 LibAFL uses Frida's [__Stalker__](https://frida.re/docs/stalker/) to trace the execution of your program and instrument your harness.
-Thus, you have to compile your harness to a dynamic library. Frida instruments your PUT after dynamically loading it.
+Thus, you have to compile your harness to a dynamic library. Frida instruments your target after dynamically loading it.
 
 In our `frida_libpng` example, we load the dynamic library and find the symbol to harness as follows:
 

@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use lain::traits::Mutatable;
 use libafl::{
+    corpus::CorpusId,
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
@@ -26,6 +27,11 @@ where
         self.inner.rng_mut().set_seed(state.rand_mut().next());
         input.mutate(&mut self.inner, None);
         Ok(MutationResult::Mutated)
+    }
+
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
     }
 }
 

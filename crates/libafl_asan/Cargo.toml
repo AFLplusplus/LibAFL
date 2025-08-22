@@ -1,0 +1,102 @@
+[package]
+name = "libafl_asan"
+description = "Address sanitizer library for LibAFL"
+edition = "2024"
+rust-version = "1.87"
+keywords = ["fuzzing", "address", "sanitizer", "asan"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+#! # Features
+default = [
+  "dlmalloc",
+  "document-features",
+  "global_allocator",
+  "guest",
+  "hooks",
+  "host",
+  "libc",
+  "linux",
+  "mimalloc",
+  "test",
+  "tracking",
+]
+## Enable support for the `dlmalloc` allocator backend
+dlmalloc = ["dep:dlmalloc"]
+## Enable documentation of features
+document-features = ["dep:document-features"]
+## Configure a global allocator (using dlmalloc or mimalloc as configured)
+global_allocator = []
+## Enable support for shadow memory and tracking in the guest
+guest = []
+## Enable support for hooking functions in the guest
+hooks = []
+## Enable support for shadow memory and tracking in the host
+host = ["dep:syscalls"]
+## Intialize all allocations with 0xff
+initialize = []
+## Enable use of the `libc` library to support creation of mappings, read/write, logging etc (more OS agnostic)
+libc = ["dep:libc"]
+## Enable the use of direct syscalls (supported by `rustix`) to interact with the operating system (Linux specific).
+linux = ["dep:rustix", "dep:syscalls"]
+## Enable the `baby_mimalloc` allocator
+mimalloc = ["dep:baby-mimalloc"]
+##  Disable the magic used to support `no_std` environments for running unit and integration tests (we only run our tests on Linux right now).
+test = ["dlmalloc", "guest", "libc"]
+## Enable support for memory tracking
+tracking = []
+
+[dependencies]
+baby-mimalloc = { version = "0.2.1", default-features = false, features = [
+  "spin_mutex",
+], optional = true }
+bitflags = { version = "2.8.0", default-features = false }
+document-features = { version = "0.2.11", optional = true }
+dlmalloc = { version = "0.2.7", default-features = false, optional = true }
+itertools = { version = "0.14.0", default-features = false }
+log = { version = "0.4.22", default-features = false, features = [
+  "release_max_level_info",
+] }
+libc = { version = "0.2.169", default-features = false, optional = true }
+nostd-musl = { version = "0.1.6", default-features = false, features = [
+  "optimized-assembly",
+] }
+nostd-printf = { version = "0.1.4", default-features = false }
+
+readonly = { version = "0.2.12", default-features = false }
+rustix = { version = "1.0.0", default-features = false, features = [
+  "fs",
+  "mm",
+  "process",
+  "stdio",
+], optional = true }
+spin = { version = "0.10.0", default-features = false, features = [
+  "lazy",
+  "mutex",
+  "spin_mutex",
+] }
+syscalls = { version = "0.6.18", default-features = false, optional = true }
+thiserror = { version = "2.0.11", default-features = false }
+ahash = { version = "0.8.12", default-features = false }
+hashbrown = { version = "0.15.3", default-features = false }
+
+[build-dependencies]
+cc = { version = "1.2.13" }
+
+[dev-dependencies]
+env_logger = { version = "0.11.6" }
+mockall = { version = "0.13.1" }
+widestring = { version = "1.1.0" }

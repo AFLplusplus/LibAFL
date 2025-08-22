@@ -1,18 +1,15 @@
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::ClientDescription,
+    events::{
+        ClientDescription, EventFirer, EventReceiver, EventRestarter, ProgressReporter, SendExiting,
+    },
     inputs::BytesInput,
-    monitors::Monitor,
     state::StdState,
     Error,
 };
 use libafl_bolts::rands::StdRand;
 
-use crate::{
-    instance::{ClientMgr, Instance},
-    options::FuzzerOptions,
-};
-
+use crate::{instance::Instance, options::FuzzerOptions};
 #[allow(clippy::module_name_repetitions)]
 pub type ClientState =
     StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
@@ -26,12 +23,19 @@ impl Client<'_> {
         Client { options }
     }
 
-    pub fn run<M: Monitor>(
+    pub fn run<EM>(
         &self,
         state: Option<ClientState>,
-        mgr: ClientMgr<M>,
+        mgr: EM,
         client_description: ClientDescription,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        EM: EventFirer<BytesInput, ClientState>
+            + EventRestarter<ClientState>
+            + ProgressReporter<ClientState>
+            + SendExiting
+            + EventReceiver<BytesInput, ClientState>,
+    {
         let instance = Instance::builder()
             .options(self.options)
             .mgr(mgr)

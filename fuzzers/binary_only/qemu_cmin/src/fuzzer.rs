@@ -1,6 +1,7 @@
-//! A libfuzzer-like fuzzer using qemu for binary-only coverage
+//! A binary-only corpus minimizer using qemu, similar to AFL++ afl-cmin
 #[cfg(feature = "i386")]
 use core::mem::size_of;
+use core::str::from_utf8;
 #[cfg(feature = "snapshot")]
 use core::time::Duration;
 use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
@@ -20,7 +21,6 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{
-    core_affinity::Cores,
     os::unix_signals::Signal,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -30,8 +30,10 @@ use libafl_bolts::{
 #[cfg(feature = "fork")]
 use libafl_qemu::QemuForkExecutor;
 use libafl_qemu::{
-    elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, Emulator, GuestAddr,
-    GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuShutdownCause, Regs,
+    elf::EasyElf,
+    modules::{edges::StdEdgeCoverageChildModule, RedirectStdoutModule},
+    ArchExtras, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason,
+    QemuShutdownCause, Regs,
 };
 #[cfg(feature = "snapshot")]
 use libafl_qemu::{modules::SnapshotModule, QemuExecutor};
@@ -86,12 +88,6 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Timeout in seconds", default_value_t = 1_u64)]
     timeout: u64,
 
-    #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]
-    port: u16,
-
-    #[arg(long, help = "Cpu cores to use", default_value = "all", value_parser = Cores::from_cmdline)]
-    cores: Cores,
-
     #[clap(short, long, help = "Enable output from the fuzzer clients")]
     verbose: bool,
 
@@ -137,17 +133,38 @@ pub fn fuzz() -> Result<(), Error> {
         ))
     };
 
+    let stdout_callback = |buf: &[u8]| {
+        if let Ok(s) = from_utf8(buf) {
+            let msg = s.trim_end();
+            if msg.len() != 0 {
+                log::info!("{msg}");
+            }
+        }
+    };
+
+    let redirect_stdout_module = if options.verbose {
+        RedirectStdoutModule::new()
+            .with_stderr(stdout_callback)
+            .with_stdout(stdout_callback)
+    } else {
+        RedirectStdoutModule::new()
+    };
+
     #[cfg(feature = "fork")]
-    let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
-        .const_map_observer(edges_observer.as_mut())
-        .build()?);
+    let modules = tuple_list!(
+        StdEdgeCoverageChildModule::builder()
+            .const_map_observer(edges_observer.as_mut())
+            .build()?,
+        redirect_stdout_module
+    );
 
     #[cfg(feature = "snapshot")]
     let modules = tuple_list!(
         StdEdgeCoverageChildModule::builder()
             .const_map_observer(edges_observer.as_mut())
             .build()?,
-        SnapshotModule::new()
+        SnapshotModule::new(),
+        redirect_stdout_module,
     );
 
     let emulator = Emulator::empty()
@@ -180,9 +197,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
-    let monitor = SimpleMonitor::with_user_monitor(|s| {
-        println!("{s}");
-    });
+    let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
         Ok(res) => res,
@@ -304,20 +319,20 @@ pub fn fuzz() -> Result<(), Error> {
         Duration::from_millis(5000),
     )?;
 
-    println!("Importing {} seeds...", files.len());
+    log::info!("Importing {} seeds...", files.len());
 
     if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &files)
             .unwrap_or_else(|_| {
-                println!("Failed to load initial corpus");
+                log::error!("Failed to load initial corpus");
                 process::exit(0);
             });
-        println!("Imported {} seeds from disk.", state.corpus().count());
+        log::info!("Imported {} seeds from disk.", state.corpus().count());
     }
 
     let size = state.corpus().count();
-    println!(
+    log::info!(
         "Removed {} duplicates from {} seeds",
         files.len() - size,
         files.len()

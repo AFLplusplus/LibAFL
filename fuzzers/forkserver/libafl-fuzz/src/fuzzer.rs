@@ -16,14 +16,17 @@ use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::ProgressReporter,
-    executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
+    executors::{
+        forkserver::{ForkserverExecutor, ForkserverExecutorBuilder, SHM_CMPLOG_ENV_VAR},
+        StdChildArgs,
+    },
     feedback_and, feedback_or, feedback_or_fast,
     feedbacks::{
         CaptureTimeoutFeedback, ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback,
     },
     fuzzer::StdFuzzer,
-    inputs::{BytesInput, NopTargetBytesConverter},
-    mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens},
+    inputs::BytesInput,
+    mutators::{havoc_mutations, tokens_mutations, AflppRedQueen, HavocScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::{BaseSchedule, PowerSchedule},
@@ -51,11 +54,11 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, TargetArgs,
+    AsSliceMut, StdTargetArgs,
 };
 #[cfg(feature = "nyx")]
 use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
-use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
+use libafl_targets::{cmps::AflppCmpLogMap, AflppCmpLogObserver, AflppCmplogTracingStage};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -176,13 +179,13 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     let mut tokens = Tokens::new();
     tokens = tokens.add_from_files(&opt.dicts)?;
 
-    // Create a AFLStatsStage;
+    // Create a AflStatsStage;
     let afl_stats_stage = AflStatsStage::builder()
         .stats_file(fuzzer_dir.join("fuzzer_stats"))
         .plot_file(fuzzer_dir.join("plot_data"))
         .core_id(core_id)
         .report_interval(Duration::from_secs(opt.stats_interval))
-        .map_observer(&edges_observer)
+        .map_feedback(&map_feedback)
         .uses_autotokens(!opt.no_autodict)
         .tokens(&tokens)
         .banner(opt.executable.display().to_string())
@@ -263,7 +266,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     // Create our Mutational Stage.
     // We can either have a simple MutationalStage (for Queue scheduling)
     // Or one that utilizes scheduling metadadata (Weighted Random scheduling)
-    let mutation = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+    let mutation = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
     let inner_mutational_stage = if opt.sequential_queue {
         SupportedMutationalStages::StdMutational(StdMutationalStage::new(mutation), PhantomData)
     } else {
@@ -386,7 +389,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     } else {
         // If we aren't auto resuming, copy all the files to our queue directory.
         let mut id = 0;
-        state.walk_initial_inputs(&[opt.input_dir.clone()], |path: &PathBuf| {
+        state.walk_initial_inputs(std::slice::from_ref(&opt.input_dir), |path: &PathBuf| {
             let mut filename = path
                 .file_name()
                 .ok_or(Error::illegal_state(format!(
@@ -472,16 +475,16 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
 
     if run_cmplog {
         // The CmpLog map shared between the CmpLog observer and CmpLog executor
-        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
+        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AflppCmpLogMap>().unwrap();
 
         // Let the Forkserver know the CmpLog shared memory map ID.
         unsafe {
-            cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
+            cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
         }
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
         // Create the CmpLog observer.
-        let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AflppCmpLogObserver::new("cmplog", cmpmap, true);
         let cmplog_ref = cmplog_observer.handle();
 
         // Create the CmpLog executor.
@@ -493,11 +496,11 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
             .unwrap();
 
         // Create the CmpLog tracing stage.
-        let tracing = AFLppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
+        let tracing = AflppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 
         // Create a randomic Input2State stage
         let rq = MultiMutationalStage::<_, _, BytesInput, _, _, _>::new(
-            AFLppRedQueen::with_cmplog_options(true, true),
+            AflppRedQueen::with_cmplog_options(true, true),
         );
 
         // Create an IfStage and wrap the CmpLog stages in it.
@@ -567,7 +570,7 @@ fn base_forkserver_builder<'a>(
     opt: &'a Opt,
     shmem_provider: &'a mut UnixShMemProvider,
     fuzzer_dir: &Path,
-) -> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
+) -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable.clone())
         .coverage_map_size(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))

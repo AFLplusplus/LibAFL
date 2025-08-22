@@ -1,0 +1,61 @@
+import "../../../just/libafl-qemu.just"
+import "../fuzzer_name.just"
+
+libc_SOURCE_DIR := source_directory()
+
+[unix]
+compile_libc:
+  #!/bin/sh
+  . {{ DOTENV }}
+  RUSTFLAGS="-C panic=abort" \
+  cargo \
+    build \
+    --package libafl_asan_libc \
+    --target $CROSS_TARGET \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }}
+
+[unix]
+fix_libc:
+  #!/bin/sh
+  . {{ DOTENV }}
+  cargo \
+    fix \
+    --package libafl_asan_libc \
+    --target ${CROSS_TARGET} \
+    --profile {{ PROFILE }} \
+    --target-dir {{ TARGET_DIR }} \
+    --features test \
+    --allow-dirty
+
+[unix]
+link_libc: compile_libc
+  #!/bin/sh
+  . {{ DOTENV }}
+  ${CROSS_CC} \
+    ${LIBAFL_QEMU_ASAN_CFLAGS} \
+    -shared \
+    -nodefaultlibs \
+    -nostartfiles \
+    -nostdlib \
+    -g \
+    -u dlsym \
+    -u dlerror \
+    -o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libafl_asan_libc.so \
+    -Wl,-hlibc.so.6 \
+    -Wl,--version-script={{ libc_SOURCE_DIR }}/libc.map \
+    -Wl,--gc-sections \
+    -Wl,--no-undefined \
+    {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_asan_libc.a \
+
+[unix]
+strip_libc: link_libc
+	#!/bin/sh
+	. {{ DOTENV }}
+	${CROSS_STRIP} \
+		--strip-unneeded \
+		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_asan_libc.so \
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libafl_asan_libc.so
+
+[unix]
+build_libc: strip_libc

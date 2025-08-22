@@ -2,11 +2,11 @@
 
 use core::cell::RefCell;
 #[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::FromRawFd;
 use std::{
     env,
     fs::{self, File, OpenOptions},
-    io::{self, Write},
+    io::Write,
     path::PathBuf,
     process,
     ptr::NonNull,
@@ -24,8 +24,8 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
-        StdScheduledMutator, Tokens,
+        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, HavocScheduledMutator,
+        StdMOptMutator, Tokens,
     },
     observers::{CanTrack, ConstMapObserver, HitcountsMapObserver, TimeObserver},
     schedulers::{
@@ -38,9 +38,10 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
+#[cfg(unix)]
+use libafl_bolts::os::dup_and_mute_outputs;
 use libafl_bolts::{
     current_time,
-    os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -57,8 +58,6 @@ use libafl_qemu::{
     QemuShutdownCause, Regs,
 };
 use libafl_targets::{CMPLOG_MAP_PTR, EDGES_MAP_DEFAULT_SIZE};
-#[cfg(unix)]
-use nix::unistd::dup;
 
 /// The fuzzer main
 pub fn main() {
@@ -223,16 +222,19 @@ fn fuzz(
             .open(&logfile)?,
     );
 
+    // We forward all outputs to dev/null, but keep a copy around for the fuzzer output.
+    //
+    // # Safety
+    // stdout and stderr should still be open at this point in time.
     #[cfg(unix)]
-    let mut stdout_cpy = unsafe {
-        let new_fd = dup(io::stdout().as_raw_fd())?;
-        File::from_raw_fd(new_fd)
-    };
+    let (new_stdout, _new_stderr) = unsafe { dup_and_mute_outputs()? };
+    // # Safety
+    // The new stdout is open at this point, and we will don't use it anywhere else.
     #[cfg(unix)]
-    let file_null = File::open("/dev/null")?;
+    let mut stdout_cpy = unsafe { File::from_raw_fd(new_stdout) };
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = SimpleMonitor::with_user_monitor(|s| {
+    let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{s}").unwrap();
         #[cfg(windows)]
@@ -308,7 +310,9 @@ fn fuzz(
     });
 
     // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+        I2SRandReplace::new()
+    )));
 
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(
@@ -401,13 +405,6 @@ fn fuzz(
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
-    // Remove target output (logs still survive)
-    #[cfg(unix)]
-    {
-        let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        dup2(null_fd, io::stderr().as_raw_fd())?;
-    }
     // reopen file to make sure we're at the end
     log.replace(
         OpenOptions::new()

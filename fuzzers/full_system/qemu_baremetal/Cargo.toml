@@ -1,6 +1,6 @@
 [package]
 name = "qemu_baremetal"
-version = "0.15.2"
+version = "0.15.4"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
@@ -9,8 +9,11 @@ authors = [
 edition = "2021"
 
 [features]
-default = ["std", "low_level"]
+default = ["std", "low_level", "arm"]
 std = []
+
+arm = ["libafl_qemu/arm"]
+i386 = ["libafl_qemu/i386"]
 
 low_level = [
 ] # The low-level way to interact with LibAFL QEMU, with direct calls to QEMU's functions
@@ -26,15 +29,14 @@ lto = "fat"
 codegen-units = 1
 
 [dependencies]
-libafl = { path = "../../../libafl" }
-libafl_bolts = { path = "../../../libafl_bolts" }
-libafl_targets = { path = "../../../libafl_targets" }
-libafl_qemu = { path = "../../../libafl_qemu", features = [
-  "arm",
+libafl = { path = "../../../crates/libafl" }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_targets = { path = "../../../crates/libafl_targets" }
+libafl_qemu = { path = "../../../crates/libafl_qemu", features = [
   "systemmode",
 ], default-features = false }
 env_logger = "0.11.5"
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 
 [build-dependencies]
-libafl_qemu_build = { path = "../../../libafl_qemu/libafl_qemu_build" }
+libafl_qemu_build = { path = "../../../crates/libafl_qemu/libafl_qemu_build" }

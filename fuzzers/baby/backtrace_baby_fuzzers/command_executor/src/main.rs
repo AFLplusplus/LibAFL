@@ -15,9 +15,8 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
-    inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::{get_asan_runtime_flags, AsanBacktraceObserver, StdMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
@@ -26,10 +25,11 @@ use libafl::{
 };
 use libafl_bolts::{
     nonzero,
+    ownedref::OwnedSlice,
     rands::StdRand,
     shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
     tuples::tuple_list,
-    AsSlice, AsSliceMut,
+    AsSliceMut,
 };
 
 pub fn main() {
@@ -87,10 +87,10 @@ pub fn main() {
         timeout: Duration,
     }
 
-    impl CommandConfigurator<BytesInput> for MyExecutor {
+    impl CommandConfigurator<Child> for MyExecutor {
         #[allow(unknown_lints)] // stable doesn't even know of the lint
         #[allow(clippy::zombie_processes)] // only a problem on nightly
-        fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
+        fn spawn_child(&mut self, target_bytes: OwnedSlice<'_, u8>) -> Result<Child, Error> {
             let mut command = Command::new("./test_command");
 
             let command = command
@@ -104,7 +104,7 @@ pub fn main() {
 
             let child = command.spawn().expect("failed to start process");
             let mut stdin = child.stdin.as_ref().unwrap();
-            stdin.write_all(input.target_bytes().as_slice())?;
+            stdin.write_all(&target_bytes)?;
             Ok(child)
         }
 
@@ -117,8 +117,11 @@ pub fn main() {
     }
 
     let timeout = Duration::from_secs(5);
-    let mut executor =
-        MyExecutor { shmem_id, timeout }.into_executor(tuple_list!(observer, bt_observer));
+    let mut executor = MyExecutor { shmem_id, timeout }.into_executor(
+        tuple_list!(observer, bt_observer),
+        None,
+        None,
+    );
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(nonzero!(32));
@@ -129,7 +132,7 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer

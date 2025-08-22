@@ -5,31 +5,31 @@ use clap::Parser;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{forkserver::ForkserverExecutor, HasObservers},
+    executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
     feedback_and_fast, feedback_or,
     feedbacks::{
         CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback, TimeFeedback,
     },
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::Fuzzer,
     generators::{NautilusContext, NautilusGenerator},
-    inputs::{NautilusInput, NautilusTargetBytesConverter},
+    inputs::{NautilusBytesConverter, NautilusInput},
     monitors::SimpleMonitor,
     mutators::{
-        NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator,
-        StdScheduledMutator, Tokens,
+        HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
+        NautilusSpliceMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::StdState,
-    HasMetadata,
+    BloomInputFilter, HasMetadata, StdFuzzerBuilder,
 };
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled},
-    AsSliceMut, TargetArgs, Truncate,
+    AsSliceMut, StdTargetArgs, Truncate,
 };
 use nix::sys::signal::Signal;
 
@@ -42,7 +42,7 @@ use nix::sys::signal::Signal;
 )]
 struct Opt {
     #[arg(
-        help = "The instrumented binary we want to fuzz",
+        help = "Instrumented binary we want to fuzz",
         name = "EXEC",
         required = true
     )]
@@ -81,8 +81,16 @@ struct Opt {
     )]
     signal: Signal,
 
-    #[arg(help = "The nautilus grammar file", short)]
+    #[arg(help = "Nautilus grammar file (Python or JSON)", short)]
     grammar: PathBuf,
+
+    #[arg(
+        help = "Nautilus tree depth",
+        short = 'T',
+        long = "tree-depth",
+        default_value = "15"
+    )]
+    tree_depth: usize,
 }
 
 pub fn main() {
@@ -111,7 +119,7 @@ pub fn main() {
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let context = NautilusContext::from_file(15, opt.grammar).unwrap();
+    let context = NautilusContext::from_file(opt.tree_depth, opt.grammar).unwrap();
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -166,7 +174,14 @@ pub fn main() {
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let converter = NautilusBytesConverter::new(&context);
+    let mut fuzzer = StdFuzzerBuilder::new()
+        .input_filter(BloomInputFilter::default())
+        .target_bytes_converter(converter)
+        .scheduler(scheduler)
+        .feedback(feedback)
+        .objective(objective)
+        .build();
 
     // If we should debug the child
     let debug_child = opt.debug_child;
@@ -186,7 +201,6 @@ pub fn main() {
         .coverage_map_size(MAP_SIZE)
         .timeout(Duration::from_millis(opt.timeout))
         .kill_signal(opt.signal)
-        .target_bytes_converter(NautilusTargetBytesConverter::new(&context))
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
@@ -207,7 +221,7 @@ pub fn main() {
     state.add_metadata(tokens);
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_stack_pow(
+    let mutator = HavocScheduledMutator::with_max_stack_pow(
         tuple_list!(
             NautilusRandomMutator::new(&context),
             NautilusRandomMutator::new(&context),

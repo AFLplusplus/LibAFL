@@ -4,10 +4,10 @@ out
 vendor
 
 # cargo lockfiles except from binaries
-**/Cargo.lock
-# !fuzzers/**/Cargo.lock
-# !utils/**/Cargo.lock
-
+Cargo.lock
+./**/Cargo.lock
+# Un-ignore Cargo.lock files within the fuzzers directory
+!./fuzzers/**/Cargo.lock
 
 .DS_Store
 .env
@@ -34,6 +34,8 @@ cur_input
 .venv
 
 crashes
+corpus
+!**/src/corpus
 
 callgrind.out.*
 perf.data
@@ -47,6 +49,7 @@ test.dict
 # Ignore all built fuzzers
 AFLplusplus
 test_*
+!test_harness.cpp
 *_fuzzer
 
 # Ignore common dummy and logfiles
@@ -63,8 +66,8 @@ __pycache__
 **/corpus_discovered
 **/libxml2-*.tar.gz
 
-libafl_nyx/QEMU-Nyx
-libafl_nyx/packer
+**/libafl_nyx/QEMU-Nyx
+**/libafl_nyx/packer
 
 .z3-trace
 

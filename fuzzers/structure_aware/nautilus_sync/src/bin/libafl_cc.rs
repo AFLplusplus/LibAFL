@@ -8,7 +8,7 @@ pub fn main() {
         let mut dir = env::current_exe().unwrap();
         let wrapper_name = dir.file_name().unwrap().to_str().unwrap();
 
-        let is_cpp = match wrapper_name[wrapper_name.len()-2..].to_lowercase().as_str() {
+        let _is_cpp = match wrapper_name[wrapper_name.len()-2..].to_lowercase().as_str() {
             "cc" => false,
             "++" | "pp" | "xx" => true,
             _ => panic!("Could not figure out if c or c++ wrapper was called. Expected {dir:?} to end with c or cxx"),

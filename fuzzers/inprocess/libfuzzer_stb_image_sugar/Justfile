@@ -18,7 +18,7 @@ cxx:
 fuzzer: cxx
     #!/bin/bash
     cargo build --profile {{PROFILE}}
-    cp {{FUZZER}} .
+    {{LIBAFL_CC}} -o ./{{FUZZER_NAME}} harness.c -lglib-2.0 -lgio-2.0 -lgmodule-2.0
 
 [linux]
 [macos]

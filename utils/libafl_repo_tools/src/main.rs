@@ -84,7 +84,7 @@ use tokio::{process::Command, task::JoinSet};
 use walkdir::{DirEntry, WalkDir};
 use which::which;
 
-const REF_LLVM_VERSION: u32 = 19;
+const REF_LLVM_VERSION: u32 = 20;
 
 fn is_workspace_toml(path: &Path) -> bool {
     for line in read_to_string(path).unwrap().lines() {
@@ -132,7 +132,6 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
     let mut gen_lockfile_cmd = Command::new("cargo");
 
     gen_lockfile_cmd
-        .arg("+nightly")
         .arg("generate-lockfile")
         .arg("--manifest-path")
         .arg(cargo_file_path.as_path());
@@ -149,12 +148,10 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
     if !res.status.success() {
         let stdout = from_utf8(&res.stdout).unwrap();
         let stderr = from_utf8(&res.stderr).unwrap();
-        return Err(io::Error::new(
-            ErrorKind::Other,
-            format!(
-                "Cargo generate-lockfile failed. Run cargo generate-lockfile for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {gen_lockfile_cmd:?}"
-            ),
-        ));
+        return Err(io::Error::other(format!(
+            "Cargo generate-lockfile failed. Run cargo generate-lockfile for {}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {gen_lockfile_cmd:?}",
+            cargo_file_path.display()
+        )));
     }
 
     Ok(())
@@ -177,7 +174,6 @@ async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) 
     let mut fmt_command = Command::new("cargo");
 
     fmt_command
-        .arg("+nightly")
         .arg("fmt")
         .arg("--manifest-path")
         .arg(cargo_file_path.as_path());
@@ -199,12 +195,10 @@ async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) 
     if !res.status.success() {
         let stdout = from_utf8(&res.stdout).unwrap();
         let stderr = from_utf8(&res.stderr).unwrap();
-        return Err(io::Error::new(
-            ErrorKind::Other,
-            format!(
-                "Cargo fmt failed. Run cargo fmt for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}"
-            ),
-        ));
+        return Err(io::Error::other(format!(
+            "Cargo fmt failed. Run cargo fmt for \"{}\".\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}",
+            cargo_file_path.display()
+        )));
     }
 
     Ok(())
@@ -244,14 +238,14 @@ async fn run_clang_fmt(
         let stdout = from_utf8(&res.stdout).unwrap();
         let stderr = from_utf8(&res.stderr).unwrap();
         println!("{stderr}");
-        Err(io::Error::new(
-            ErrorKind::Other,
-            format!("{clang} failed.\nstdout:{stdout}\nstderr:{stderr}"),
-        ))
+        Err(io::Error::other(format!(
+            "{clang} failed.\nstdout:{stdout}\nstderr:{stderr}"
+        )))
     }
 }
 
 /// extracts (major, minor, patch) version from `clang-format --version` output.
+#[must_use]
 pub fn parse_llvm_fmt_version(fmt_str: &str) -> Option<(u32, u32, u32)> {
     let re =
         Regex::new(r"clang-format version (?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)").unwrap();
@@ -282,11 +276,13 @@ async fn main() -> io::Result<()> {
         Err(_) => std::env::current_dir().expect("Failed to get LibAFL root directory."),
     };
 
-    println!("Using {libafl_root_dir:#?} as the project root");
+    println!(
+        "Using \"{}\" as the project root",
+        libafl_root_dir.display()
+    );
     let rust_excluded_directories = RegexSet::new([
         r".*target.*",
         r".*utils/noaslr.*",
-        r".*utils/gdb_qemu.*",
         r".*docs/listings/baby_fuzzer/listing-.*",
         r".*LibAFL/Cargo.toml.*",
         r".*AFLplusplus.*",
@@ -326,16 +322,10 @@ async fn main() -> io::Result<()> {
         .collect();
 
     // cargo version
-    println!(
-        "Using {}",
-        get_version_string("cargo", &["+nightly"]).await?
-    );
+    println!("Using {}", get_version_string("cargo", &[]).await?);
 
     // rustfmt version
-    println!(
-        "Using {}",
-        get_version_string("cargo", &["+nightly", "fmt"]).await?
-    );
+    println!("Using {}", get_version_string("cargo", &["fmt"]).await?);
 
     let mut tokio_joinset = JoinSet::new();
 
@@ -366,6 +356,7 @@ async fn main() -> io::Result<()> {
             )
         } else if which(unspecified_clang_format).is_ok() {
             let version_str = get_version_string(unspecified_clang_format, &[]).await?;
+            println!("{version_str}");
             let (major, _, _) = parse_llvm_fmt_version(&version_str).unwrap();
 
             if major == REF_LLVM_VERSION {
@@ -446,13 +437,16 @@ async fn main() -> io::Result<()> {
 }
 
 async fn get_version_string(path: &str, args: &[&str]) -> Result<String, io::Error> {
-    let version = Command::new(path)
+    let res = Command::new(path)
         .args(args)
         .arg("--version")
         .output()
-        .await?
-        .stdout;
-    Ok(from_utf8(&version).unwrap().replace('\n', ""))
+        .await?;
+    assert!(
+        res.status.success(),
+        "Failed to run {path} {args:?}: {res:?}"
+    );
+    Ok(from_utf8(&res.stdout).unwrap().replace('\n', ""))
 }
 
 #[expect(clippy::needless_pass_by_value)]

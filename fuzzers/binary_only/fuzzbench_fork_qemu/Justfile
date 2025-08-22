@@ -21,7 +21,7 @@ run: build harness
       --profile {{ PROFILE }} \
       {{ BUILD_DIR }}/harness \
       -- \
-      --libafl-in ../../inprocess/libfuzzer_libpng/corpus \
+      --libafl-in ./corpus \
       --libafl-out ./out
 
 [unix]
@@ -29,7 +29,7 @@ test: build harness
     #!/bin/bash
 
     rm -rf out/
-    timeout 15s {{ FUZZER }} {{ BUILD_DIR }}/harness -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out out ./harness | tee fuzz_stdout.log
+    timeout 15s {{ FUZZER }} {{ BUILD_DIR }}/harness -- --libafl-in ./corpus --libafl-out out ./harness | tee fuzz_stdout.log
     if grep -qa "objectives: 1" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else

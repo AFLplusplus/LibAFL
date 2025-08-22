@@ -8,7 +8,7 @@ Then use the output as input of the `construct_automata` crate.
 
 Here an example using the Ruby grammar:
 
-```
+```sh
 ./gnf_converter.py --gf grammars/ruby_grammar.json --out ruby_gnf.json --start PROGRAM
 cd construct_automata
 RUSTFLAGS="-C target-cpu=native" cargo run --release -- --gf ../ruby_gnf.json --out ../ruby_automaton.postcard

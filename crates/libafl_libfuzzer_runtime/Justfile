@@ -1,0 +1,10 @@
+set windows-shell := ['cmd.exe', '/c']
+set unstable
+
+[unix]
+build:
+    ./build.sh
+
+[windows]
+build:
+    powershell -File build.ps1

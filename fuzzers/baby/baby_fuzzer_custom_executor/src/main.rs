@@ -15,14 +15,14 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::HasTargetBytes,
-    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, AflStatsStage, CalibrationStage},
     state::{HasCorpus, HasExecutions, StdState},
+    BloomInputFilter,
 };
 use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
-
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
 static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
@@ -87,7 +87,7 @@ pub fn main() {
 
     let calibration_stage = CalibrationStage::new(&feedback);
     let stats_stage = AflStatsStage::builder()
-        .map_observer(&observer)
+        .map_feedback(&feedback)
         .build()
         .unwrap();
 
@@ -138,8 +138,14 @@ pub fn main() {
     #[cfg(not(feature = "bloom_input_filter"))]
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
     #[cfg(feature = "bloom_input_filter")]
-    let mut fuzzer =
-        StdFuzzer::with_bloom_input_filter(scheduler, feedback, objective, 10_000_000, 0.001);
+    let filter = BloomInputFilter::new(10_000_000, 0.001);
+    #[cfg(feature = "bloom_input_filter")]
+    let mut fuzzer = StdFuzzer::builder()
+        .input_filter(filter)
+        .scheduler(scheduler)
+        .feedback(feedback)
+        .objective(objective)
+        .build();
 
     // Create the executor for an in-process function with just one observer
     let executor = CustomExecutor::new(&state);
@@ -155,7 +161,7 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(
         calibration_stage,
         StdMutationalStage::new(mutator),

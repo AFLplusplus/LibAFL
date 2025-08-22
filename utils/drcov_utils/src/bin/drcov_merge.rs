@@ -40,16 +40,22 @@ fn main() {
         println!("Unique block mode");
     }
 
-    println!("Reading inital drcov file from {initial_input:?}");
+    println!("Reading inital drcov file from {}", initial_input.display());
     let mut main_drcov = DrCovReader::read(initial_input).expect("Failed to read fist input!");
 
     for input in inputs {
-        if let Ok(current_drcov) = DrCovReader::read(input)
-            .map_err(|err| eprintln!("Warning: failed to read drcov file at {input:?}: {err:?}"))
-        {
-            println!("Merging {input:?}");
+        if let Ok(current_drcov) = DrCovReader::read(input).map_err(|err| {
+            eprintln!(
+                "Warning: failed to read drcov file at {}: {err:?}",
+                input.display()
+            );
+        }) {
+            println!("Merging {}", input.display());
             if let Err(err) = main_drcov.merge(&current_drcov, opts.unique) {
-                eprintln!("Warning: failed to merge drcov file at {input:?}: {err:?}");
+                eprintln!(
+                    "Warning: failed to merge drcov file at {}: {err:?}",
+                    input.display()
+                );
             }
         }
     }

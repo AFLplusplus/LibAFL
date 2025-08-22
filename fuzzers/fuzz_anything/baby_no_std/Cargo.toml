@@ -1,6 +1,6 @@
 [package]
 name = "baby_no_std"
-version = "0.15.2"
+version = "0.15.4"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
@@ -18,8 +18,8 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { default-features = false, path = "../../../libafl" }
-libafl_bolts = { default-features = false, path = "../../../libafl_bolts" }
+libafl = { default-features = false, path = "../../../crates/libafl" }
+libafl_bolts = { default-features = false, path = "../../../crates/libafl_bolts" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 static-alloc = "0.2.3"
 

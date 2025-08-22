@@ -6,9 +6,9 @@ edition = "2021"
 
 [dependencies]
 env_logger = "0.11.5"
-libafl = { path = "../../../libafl", default-features = false, features = [
+libafl = { path = "../../../crates/libafl", default-features = false, features = [
   "intel_pt",
 ] }
-libafl_bolts = { path = "../../../libafl_bolts" }
-libafl_intelpt = { path = "../../../libafl_intelpt" }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_intelpt = { path = "../../../crates/libafl_intelpt" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }

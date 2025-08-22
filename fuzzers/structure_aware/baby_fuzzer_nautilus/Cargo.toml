@@ -1,6 +1,6 @@
 [package]
 name = "baby_fuzzer_nautilus"
-version = "0.15.2"
+version = "0.15.4"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
@@ -22,6 +22,6 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl", features = ["default", "nautilus"] }
-libafl_bolts = { path = "../../../libafl_bolts" }
+libafl = { path = "../../../crates/libafl", features = ["default", "nautilus"] }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }

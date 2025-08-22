@@ -1,6 +1,6 @@
 [package]
 name = "fuzzer_custom_executor"
-version = "0.15.2"
+version = "0.15.4"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
@@ -24,5 +24,5 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl/" }
-libafl_bolts = { path = "../../../libafl_bolts/" }
+libafl = { path = "../../../crates/libafl/" }
+libafl_bolts = { path = "../../../crates/libafl_bolts/" }

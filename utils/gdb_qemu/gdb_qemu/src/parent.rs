@@ -2,12 +2,12 @@ use std::{
     fmt,
     io::{Read, Write},
     net::{SocketAddr, TcpStream},
-    os::fd::RawFd,
+    os::fd::OwnedFd,
     thread::spawn,
     time::{Duration, SystemTime},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use nix::unistd::read;
 
 use crate::{args::ParentArgs, exit::Exit};
@@ -43,19 +43,19 @@ impl fmt::Display for Channel {
 pub struct Parent {
     port: u16,
     timeout: u64,
-    fd1: RawFd,
-    fd2: RawFd,
+    fd1: Option<OwnedFd>,
+    fd2: Option<OwnedFd>,
 }
 
 impl Parent {
     const BUFFER_SIZE: usize = 16 << 10;
 
-    pub fn new(args: &impl ParentArgs, fd1: RawFd, fd2: RawFd) -> Parent {
+    pub fn new(args: &impl ParentArgs, fd1: OwnedFd, fd2: OwnedFd) -> Parent {
         Parent {
             port: args.port(),
             timeout: args.timeout(),
-            fd1,
-            fd2,
+            fd1: Some(fd1),
+            fd2: Some(fd2),
         }
     }
 
@@ -102,7 +102,7 @@ impl Parent {
         Ok(())
     }
 
-    fn pumpfd(input: RawFd, output: &mut impl Write, channel: Channel) -> Result<()> {
+    fn pumpfd(input: &OwnedFd, output: &mut impl Write, channel: Channel) -> Result<()> {
         let mut buffer = [0u8; Parent::BUFFER_SIZE];
         loop {
             let n = read(input, &mut buffer).map_err(|e| anyhow!("Failed to read input: {e:}"))?;
@@ -144,7 +144,7 @@ impl Parent {
         }
     }
 
-    pub fn run(&self) -> Result<()> {
+    pub fn run(mut self) -> Result<()> {
         let stream = self.connect()?;
         info!("Connected to client: {stream:#?}");
 
@@ -165,12 +165,18 @@ impl Parent {
         });
 
         let mut stderr1 = std::io::stderr();
-        let fd1 = self.fd1;
-        let stdout_pump = spawn(move || Self::pumpfd(fd1, &mut stderr1, Channel::Stdout).unwrap());
+        let fd1 = self
+            .fd1
+            .take()
+            .expect("Fd already taken. Called run twice?");
+        let stdout_pump = spawn(move || Self::pumpfd(&fd1, &mut stderr1, Channel::Stdout).unwrap());
 
         let mut stderr2 = std::io::stderr();
-        let fd2 = self.fd2;
-        let stderr_pump = spawn(move || Self::pumpfd(fd2, &mut stderr2, Channel::StdErr).unwrap());
+        let fd2 = self
+            .fd2
+            .take()
+            .expect("Fd already taken. Called run twice?");
+        let stderr_pump = spawn(move || Self::pumpfd(&fd2, &mut stderr2, Channel::StdErr).unwrap());
 
         reader
             .join()

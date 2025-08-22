@@ -1,12 +1,11 @@
 [package]
 name = "libfuzzer_stb_image_sugar"
-version = "0.15.2"
+version = "0.15.4"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
 ]
 edition = "2021"
-build = "build.rs"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -26,16 +25,21 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl" }
-libafl_bolts = { path = "../../../libafl_bolts" }
-libafl_targets = { path = "../../../libafl_targets", features = [
+libafl = { path = "../../../crates/libafl" }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_pcguard_edges",
   "sancov_cmplog",
   "libfuzzer",
 ] }
-libafl_sugar = { path = "../../../libafl_sugar" }
+libafl_sugar = { path = "../../../crates/libafl_sugar" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 mimalloc = { version = "0.1.43", default-features = false }
+libafl_cc = { path = "../../../crates/libafl_cc" }
 
 [build-dependencies]
 cc = { version = "1.1.21", features = ["parallel"] }
+
+[lib]
+name = "libfuzzer_stb_image_sugar"
+crate-type = ["staticlib"]

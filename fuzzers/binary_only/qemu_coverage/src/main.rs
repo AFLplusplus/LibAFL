@@ -1,4 +1,4 @@
-//! A libfuzzer-like fuzzer using qemu for binary-only coverage
+//! A qemu test case runner to generate drcov coverage outputs
 #[cfg(target_os = "linux")]
 mod fuzzer;
 

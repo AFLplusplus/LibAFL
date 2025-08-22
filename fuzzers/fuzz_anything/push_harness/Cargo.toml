@@ -1,6 +1,6 @@
 [package]
 name = "push_harness"
-version = "0.15.2"
+version = "0.15.4"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
@@ -22,7 +22,7 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl" }
-libafl_bolts = { path = "../../../libafl_bolts" }
+libafl = { path = "../../../crates/libafl" }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 klo-routines = { version = "0.1.0", git = "https://github.com/andreafioraldi/klo-routines.git", rev = "b8e2fb6" }

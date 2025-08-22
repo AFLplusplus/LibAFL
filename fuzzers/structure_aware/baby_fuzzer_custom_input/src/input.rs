@@ -2,6 +2,7 @@ use core::num::NonZeroUsize;
 use std::{borrow::Cow, hash::Hash};
 
 use libafl::{
+    corpus::CorpusId,
     generators::{Generator, RandBytesGenerator},
     inputs::{BytesInput, HasTargetBytes, Input},
     mutators::{MutationResult, Mutator},
@@ -18,7 +19,7 @@ use serde::{Deserialize, Serialize};
 /// - `optional_byte_array` is binary data passed as a command line arg, and it is only passed if it is not `None` in the input,
 /// - `num` is an arbitrary number (`i16` in this case)
 /// - `boolean` models the presence or absence of a command line flag that does not require additional data
-#[derive(Serialize, Deserialize, Clone, Debug, Hash, SerdeAny)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, SerdeAny)]
 pub struct CustomInput {
     pub byte_array: Vec<u8>,
     pub optional_byte_array: Option<Vec<u8>>,
@@ -125,6 +126,10 @@ where
         };
         Ok(MutationResult::Mutated)
     }
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<G> Named for ToggleOptionalByteArrayMutator<G> {
@@ -140,6 +145,11 @@ impl<S> Mutator<CustomInput, S> for ToggleBooleanMutator {
     fn mutate(&mut self, _state: &mut S, input: &mut CustomInput) -> Result<MutationResult, Error> {
         input.boolean = !input.boolean;
         Ok(MutationResult::Mutated)
+    }
+
+    #[inline]
+    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        Ok(())
     }
 }
 

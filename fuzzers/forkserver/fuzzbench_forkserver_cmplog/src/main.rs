@@ -11,14 +11,17 @@ use clap::{Arg, ArgAction, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::forkserver::ForkserverExecutor,
+    executors::{
+        forkserver::{ForkserverExecutor, AFL_MAP_SIZE_ENV_VAR, SHM_CMPLOG_ENV_VAR},
+        StdChildArgs,
+    },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{
-        havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations, StdMOptMutator, Tokens,
+        havoc_mutations, token_mutations::AflppRedQueen, tokens_mutations, StdMOptMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
@@ -37,11 +40,11 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, TargetArgs,
+    AsSliceMut, StdTargetArgs,
 };
 use libafl_targets::{
-    cmps::{observers::AFLppCmpLogObserver, stages::AFLppCmplogTracingStage},
-    AFLppCmpLogMap,
+    cmps::{observers::AflppCmpLogObserver, stages::AflppCmplogTracingStage},
+    AflppCmpLogMap,
 };
 use nix::sys::signal::Signal;
 
@@ -249,7 +252,7 @@ fn fuzz(
     }
     let shmem_buf = shmem.as_slice_mut();
     // To let know the AFL++ binary that we have a big map
-    std::env::set_var("AFL_MAP_SIZE", format!("{MAP_SIZE}"));
+    std::env::set_var(AFL_MAP_SIZE_ENV_VAR, format!("{MAP_SIZE}"));
 
     // Create an observation channel using the hitcounts map of AFL++
     let edges_observer = unsafe {
@@ -351,14 +354,14 @@ fn fuzz(
 
     if let Some(exec) = &cmplog_exec {
         // The cmplog map shared between observer and executor
-        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
+        let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AflppCmpLogMap>().unwrap();
         // let the forkserver know the shmid
         unsafe {
-            cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
+            cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
         }
         let cmpmap = unsafe { OwnedRefMut::from_shmem(&mut cmplog_shmem) };
 
-        let cmplog_observer = AFLppCmpLogObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = AflppCmpLogObserver::new("cmplog", cmpmap, true);
         let cmplog_ref = cmplog_observer.handle();
 
         let cmplog_executor = ForkserverExecutor::builder()
@@ -366,17 +369,19 @@ fn fuzz(
             .debug_child(debug_child)
             .shmem_provider(&mut shmem_provider)
             .parse_afl_cmdline(arguments)
+            .coverage_map_size(MAP_SIZE)
             .is_persistent(true)
+            // increase timeouts for cmplog
             .timeout(timeout * 10)
             .kill_signal(signal)
             .build(tuple_list!(cmplog_observer))
             .unwrap();
 
-        let tracing = AFLppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
+        let tracing = AflppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 
         // Setup a randomic Input2State stage
         let rq: MultiMutationalStage<_, _, BytesInput, _, _, _> =
-            MultiMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));
+            MultiMutationalStage::new(AflppRedQueen::with_cmplog_options(true, true));
 
         let cb = |_fuzzer: &mut _,
                   _executor: &mut _,
