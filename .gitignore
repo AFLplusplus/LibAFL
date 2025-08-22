@@ -35,6 +35,7 @@ cur_input
 
 crashes
 corpus
+!**/src/corpus
 
 callgrind.out.*
 perf.data
@@ -48,6 +49,7 @@ test.dict
 # Ignore all built fuzzers
 AFLplusplus
 test_*
+!test_harness.cpp
 *_fuzzer
 
 # Ignore common dummy and logfiles
@@ -64,8 +66,8 @@ __pycache__
 **/corpus_discovered
 **/libxml2-*.tar.gz
 
-libafl_nyx/QEMU-Nyx
-libafl_nyx/packer
+**/libafl_nyx/QEMU-Nyx
+**/libafl_nyx/packer
 
 .z3-trace
 

@@ -173,7 +173,7 @@ pub fn fuzz() {
             TimeFeedback::new(&time_observer)
         );
 
-        let map_feedback = MaxMapFeedback::new(&edges_observer);
+        let map_feedback = MaxMapFeedback::with_name("edges_objective", &edges_observer);
 
         // A feedback to choose if an input is a solution or not
         let mut objective = feedback_and_fast!(
@@ -218,7 +218,6 @@ pub fn fuzz() {
             timeout,
         )
         .expect("Failed to create QemuExecutor");
-
         // Instead of calling the timeout handler and restart the process, trigger a breakpoint ASAP
         executor.break_on_timeout();
 

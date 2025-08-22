@@ -17,6 +17,9 @@ mkdir in || true
 
 echo aaaaaaaaaa > in/a
 
+# Enable target stderr output
+export LIBAFL_FUZZBENCH_DEBUG=1
+
 timeout 10s "$QEMU_LAUNCHER" -o out -i in -j ../../injections.toml -v -- ./static >/dev/null 2>fuzz.log || true
 if ! grep -Ei "found.*injection" fuzz.log; then
     echo "Fuzzer does not generate any testcases or any crashes"

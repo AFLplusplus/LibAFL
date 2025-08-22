@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
     cell::RefCell,
     fs::{File, OpenOptions},
@@ -6,24 +8,15 @@ use std::{
 
 use clap::Parser;
 use libafl::{
-    events::{
-        ClientDescription, EventConfig, Launcher, LlmpEventManagerBuilder, SimpleEventManager,
-    },
+    events::{ClientDescription, EventConfig, Launcher, SimpleEventManager},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
 use libafl_bolts::{
     core_affinity::CoreId,
     current_time,
-    llmp::LlmpBroker,
+    os::dup,
     shmem::{ShMemProvider, StdShMemProvider},
-    staterestore::StateRestorer,
-    tuples::tuple_list,
-};
-#[cfg(unix)]
-use {
-    nix::unistd::dup,
-    std::os::unix::io::{AsRawFd, FromRawFd},
 };
 
 use crate::{client::Client, options::FuzzerOptions};

@@ -17,7 +17,7 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes, Input},
+    inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator,
@@ -40,6 +40,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_nanos,
+    ownedref::OwnedSlice,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Handled},
@@ -207,7 +208,11 @@ fn fuzz(
             .unwrap()
             .new_shmem(DEFAULT_SIZE)
             .unwrap();
-        concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
+        // # Safety
+        // The only place we access this env from
+        unsafe {
+            concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
+        }
 
         // The concolic observer observers the concolic shared memory map.
         let concolic_observer = ConcolicObserver::new("concolic", concolic_shmem.as_slice_mut());
@@ -243,9 +248,9 @@ fn fuzz(
 #[derive(Default, Debug)]
 pub struct MyCommandConfigurator;
 
-impl CommandConfigurator<BytesInput> for MyCommandConfigurator {
-    fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
-        input.to_file("cur_input")?;
+impl CommandConfigurator<Child> for MyCommandConfigurator {
+    fn spawn_child(&mut self, target_bytes: OwnedSlice<'_, u8>) -> Result<Child, Error> {
+        fs::write("cur_input", target_bytes.as_slice())?;
 
         Ok(Command::new("./target_symcc.out")
             .arg("cur_input")

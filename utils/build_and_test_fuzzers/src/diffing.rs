@@ -130,12 +130,12 @@ pub fn extend_diffing_crates_with_deps(
     let diffing_crates_orig = diffing_crates.clone();
     for file in diffing_crates_orig {
         let manifest = cargo_toml::Manifest::from_path(file).expect("cannot read manifest");
-        if let Some(package) = manifest.package {
-            if let Some(names) = deps_map.get(&package.name) {
-                for name in names {
-                    if let Some(path) = crate_names.get(name) {
-                        diffing_crates.insert(path.clone());
-                    }
+        if let Some(package) = manifest.package
+            && let Some(names) = deps_map.get(&package.name)
+        {
+            for name in names {
+                if let Some(path) = crate_names.get(name) {
+                    diffing_crates.insert(path.clone());
                 }
             }
         }

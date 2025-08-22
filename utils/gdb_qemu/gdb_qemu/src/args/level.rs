@@ -1,7 +1,7 @@
 use clap::ValueEnum;
 use simplelog::LevelFilter;
 
-#[derive(ValueEnum, Debug, Clone, Copy)]
+#[derive(ValueEnum, Debug, Copy, Clone)]
 pub enum Level {
     Off,
     Error,

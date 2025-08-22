@@ -187,13 +187,13 @@ where
         let stats_stage = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),
             tuple_list!(AflStatsStage::builder()
-                .map_observer(&edges_observer)
+                .map_feedback(&map_feedback)
                 .build()?),
         );
         let stats_stage_cmplog = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),
             tuple_list!(AflStatsStage::builder()
-                .map_observer(&edges_observer)
+                .map_feedback(&map_feedback)
                 .build()?),
         );
 
@@ -367,6 +367,7 @@ where
         }
     }
 
+    #[allow(clippy::type_complexity)] // TODO: make less complex
     fn reset_executor_snapshot_module<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>(
         executor: &mut QemuExecutor<'a, C, CM, ED, EM, (SnapshotModule, ET), H, I, OT, S, SM, Z>,
         qemu: Qemu,
@@ -390,6 +391,7 @@ where
             .reset(qemu);
     }
 
+    #[allow(clippy::type_complexity)]
     fn reset_shadow_executor_snapshot_module<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SOT, Z>(
         executor: &mut ShadowExecutor<
             QemuExecutor<'a, C, CM, ED, EM, (SnapshotModule, ET), H, I, OT, S, SM, Z>,

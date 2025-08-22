@@ -86,8 +86,8 @@ struct Opt {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct ProgramOutput {
-    len: i32,
+pub struct ProgramOutput {
+    pub len: i32,
 }
 
 pub fn main() {
@@ -252,7 +252,7 @@ pub fn main() {
             .output
             .clone()
             .expect("no stdout");
-        let out: ProgramOutput = serde_json::from_slice(&stdout).unwrap();
+        let out: ProgramOutput = serde_json::from_slice(&cmd_stdout).unwrap();
         println!(
             "Program output from CommandExecutor after serde_json::from_slice is {:?}",
             &out

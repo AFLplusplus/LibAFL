@@ -9,16 +9,15 @@
 use symcc_runtime::{
     export_runtime,
     filter::{CallStackCoverage, NoFloat},
-    tracing::{self, StdShMemMessageFileWriter},
-    Runtime,
+    tracing, Runtime, StdShMem,
 };
 
 export_runtime!(
     NoFloat => NoFloat;
     CallStackCoverage::default() => CallStackCoverage; // QSym-style expression pruning
     tracing::TracingRuntime::new(
-        StdShMemMessageFileWriter::from_stdshmem_default_env()
+        tracing::StdShMemMessageFileWriter::from_stdshmem_default_env()
             .expect("unable to construct tracing runtime writer. (missing env?)"),
         false
-    ) => tracing::TracingRuntime
+    ) => tracing::TracingRuntime<StdShMem>
 );

@@ -5,7 +5,7 @@ use libafl::{
 };
 use libafl_bolts::ClientId;
 
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone)]
 pub struct LibAflFuzzEventHook {
     exit_on_solution: bool,
 }
