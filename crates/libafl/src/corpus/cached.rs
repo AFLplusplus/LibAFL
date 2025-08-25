@@ -29,21 +29,20 @@ impl<I> CachedOnDiskCorpus<I>
 where
     I: Input,
 {
-    fn cache_testcase<'a>(
-        &'a self,
-        testcase: &'a RefCell<Testcase<I>>,
-        id: CorpusId,
-    ) -> Result<(), Error> {
-        if testcase.borrow().input().is_none() {
-            self.load_input_into(&mut testcase.borrow_mut())?;
+    fn cache_testcase_input<'a>(&'a self, testcase: &'a mut Testcase<I>) -> Result<(), Error> {
+        let id = testcase
+            .corpus_id()
+            .ok_or(Error::unknown("The testcase is not associated with an id"))?;
+        if testcase.input().is_none() {
+            self.inner.load_input_into(testcase)?;
             let mut borrowed_num = 0;
             while self.cached_indexes.borrow().len() >= self.cache_max_len {
-                let removed = self.cached_indexes.borrow_mut().pop_front().unwrap();
+                let to_be_evicted = self.cached_indexes.borrow_mut().pop_front().unwrap();
 
-                if let Ok(mut borrowed) = self.inner.get_from_all(removed)?.try_borrow_mut() {
+                if let Ok(mut borrowed) = self.inner.get_from_all(to_be_evicted)?.try_borrow_mut() {
                     *borrowed.input_mut() = None;
                 } else {
-                    self.cached_indexes.borrow_mut().push_back(removed);
+                    self.cached_indexes.borrow_mut().push_back(to_be_evicted);
                     borrowed_num += 1;
                     if self.cache_max_len == borrowed_num {
                         break;
@@ -106,16 +105,12 @@ where
     /// Get by id; considers only enabled testcases
     #[inline]
     fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        let testcase = { self.inner.get(id)? };
-        self.cache_testcase(testcase, id)?;
-        Ok(testcase)
+        self.inner.get(id)
     }
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
     fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        let testcase = { self.inner.get_from_all(id)? };
-        self.cache_testcase(testcase, id)?;
-        Ok(testcase)
+        self.inner.get_from_all(id)
     }
 
     /// Current testcase scheduled
@@ -169,7 +164,8 @@ where
 
     #[inline]
     fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.inner.load_input_into(testcase)
+        self.cache_testcase_input(testcase)?;
+        Ok(())
     }
 
     #[inline]
