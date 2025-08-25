@@ -91,6 +91,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<I, S>,
     I: Input,
+    S: HasExecutions,
 {
     executor.observers_mut().pre_exec_all(state, &input)?;
 
