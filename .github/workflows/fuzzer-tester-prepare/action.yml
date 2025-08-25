@@ -23,6 +23,10 @@ runs:
       if: ${{ inputs.fuzzer-name == 'fuzz_anything/baby_no_std' }}
       shell: bash
       run: rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+    - name: Add toolchain
+      if: ${{ inputs.fuzzer-name == 'binary_only/tinyinst_simple' }}
+      shell: bash
+      run: cargo install cxxbridge-cmd
     - name: Add nyx deps
       if: ${{ inputs.fuzzer-name == 'full_system/nyx_launcher' || inputs.fuzzer-name == 'full_system/nyx_libxml2_standalone' || inputs.fuzzer-name == 'full_system/nyx_libxml2_parallel' }}
       shell: bash
