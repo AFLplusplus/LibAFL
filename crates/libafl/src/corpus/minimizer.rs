@@ -6,7 +6,7 @@ use core::{hash::Hash, marker::PhantomData, time::Duration};
 
 use hashbrown::{HashMap, HashSet};
 use libafl_bolts::{
-    AsIter, Named, current_time,
+    AsIter, Named,
     tuples::{Handle, Handled},
 };
 use num_traits::ToPrimitive;
@@ -112,8 +112,8 @@ where
                     let (exit_kind, mut total_time, _) =
                         run_target_with_timing(fuzzer, executor, state, mgr, &input, false)?;
                     if exit_kind != ExitKind::Ok {
-                        total_time = Duration::from_secs(1)
-                    };
+                        total_time = Duration::from_secs(1);
+                    }
                     state
                         .corpus()
                         .get(id)?

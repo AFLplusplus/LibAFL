@@ -93,13 +93,13 @@ where
     I: Input,
     S: HasExecutions,
 {
-    executor.observers_mut().pre_exec_all(state, &input)?;
+    executor.observers_mut().pre_exec_all(state, input)?;
 
     let start = current_time();
-    let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+    let exit_kind = executor.run_target(fuzzer, state, mgr, input)?;
     let mut has_errors = had_errors;
-    if exit_kind != ExitKind::Ok {
-        if !had_errors {
+    if exit_kind != ExitKind::Ok
+        && !had_errors {
             mgr.log(
                 state,
                 LogSeverity::Warn,
@@ -108,12 +108,11 @@ where
 
             has_errors = true;
         }
-    }
     let duration = current_time() - start;
 
     executor
         .observers_mut()
-        .post_exec_all(state, &input, &exit_kind)?;
+        .post_exec_all(state, input, &exit_kind)?;
 
     Ok((exit_kind, duration, has_errors))
 }
