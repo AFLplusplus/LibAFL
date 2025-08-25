@@ -98,16 +98,15 @@ where
     let start = current_time();
     let exit_kind = executor.run_target(fuzzer, state, mgr, input)?;
     let mut has_errors = had_errors;
-    if exit_kind != ExitKind::Ok
-        && !had_errors {
-            mgr.log(
-                state,
-                LogSeverity::Warn,
-                "Corpus entry errored on execution!".into(),
-            )?;
+    if exit_kind != ExitKind::Ok && !had_errors {
+        mgr.log(
+            state,
+            LogSeverity::Warn,
+            "Corpus entry errored on execution!".into(),
+        )?;
 
-            has_errors = true;
-        }
+        has_errors = true;
+    }
     let duration = current_time() - start;
 
     executor
