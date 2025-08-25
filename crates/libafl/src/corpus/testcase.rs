@@ -52,6 +52,8 @@ pub struct Testcase<I> {
     scheduled_count: usize,
     /// Number of executions done at discovery time
     executions: u64,
+    /// The [`CorpusId`], if added to a corpus
+    corpus_id: Option<CorpusId>,
     /// Parent [`CorpusId`], if known
     parent_id: Option<CorpusId>,
     /// If the testcase is "disabled"
@@ -207,6 +209,18 @@ impl<I> Testcase<I> {
         self.disabled = disabled;
     }
 
+    /// Get the corpus id of the testcase
+    #[inline]
+    pub fn corpus_id(&self) -> Option<CorpusId> {
+        self.corpus_id
+    }
+
+    /// Set the corpus id of the testcase
+    #[inline]
+    pub fn set_corpus_id(&mut self, id: Option<CorpusId>) {
+        self.corpus_id = id;
+    }
+
     /// Get the hit feedbacks
     #[inline]
     #[cfg(feature = "track_hit_feedbacks")]
@@ -250,6 +264,7 @@ impl<I> Testcase<I> {
             cached_len: None,
             executions: 0,
             scheduled_count: 0,
+            corpus_id: None,
             parent_id: None,
             disabled: false,
             objectives_found: 0,
@@ -275,6 +290,7 @@ impl<I> Testcase<I> {
             cached_len: None,
             executions: 0,
             scheduled_count: 0,
+            corpus_id: None,
             parent_id: Some(parent_id),
             disabled: false,
             objectives_found: 0,
@@ -302,6 +318,7 @@ impl<I> Testcase<I> {
             cached_len: None,
             executions: 0,
             scheduled_count: 0,
+            corpus_id: None,
             parent_id: None,
             disabled: false,
             objectives_found: 0,
@@ -350,6 +367,7 @@ impl<I> Default for Testcase<I> {
             exec_time: None,
             cached_len: None,
             scheduled_count: 0,
+            corpus_id: None,
             parent_id: None,
             #[cfg(feature = "std")]
             file_path: None,
