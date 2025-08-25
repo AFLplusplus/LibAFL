@@ -54,12 +54,12 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
 
     fn alloc(&mut self, len: usize, align: usize) -> Result<GuestAddr, Self::Error> {
         debug!("alloc - len: {len:#x}, align: {align:#x}");
-        if align % size_of::<GuestAddr>() != 0 {
+        if !align.is_multiple_of(size_of::<GuestAddr>()) {
             Err(DefaultFrontendError::InvalidAlignment(align))?;
         }
         let size = len + align;
         let allocated_size = (self.red_zone_size * 2) + Self::align_up(size);
-        assert!(allocated_size % Self::ALLOC_ALIGN_SIZE == 0);
+        assert!(allocated_size.is_multiple_of(Self::ALLOC_ALIGN_SIZE));
         let ptr = unsafe {
             self.backend.alloc(
                 Layout::from_size_align(allocated_size, Self::ALLOC_ALIGN_SIZE)
@@ -84,7 +84,7 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
         } else {
             rz + align - (rz % align)
         };
-        assert!(align == 0 || data % align == 0);
+        assert!(align == 0 || data.is_multiple_of(align));
         assert!(data + len <= orig + allocated_size);
 
         self.allocations.insert(
@@ -171,7 +171,7 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> DefaultFrontend<B, S, T> {
         red_zone_size: usize,
         quarantine_size: usize,
     ) -> Result<DefaultFrontend<B, S, T>, DefaultFrontendError<S, T>> {
-        if red_zone_size % Self::ALLOC_ALIGN_SIZE != 0 {
+        if !red_zone_size.is_multiple_of(Self::ALLOC_ALIGN_SIZE) {
             Err(DefaultFrontendError::InvalidRedZoneSize(red_zone_size))?;
         }
         Ok(DefaultFrontend::<B, S, T> {
