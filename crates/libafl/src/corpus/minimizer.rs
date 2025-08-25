@@ -21,6 +21,7 @@ use crate::{
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
+    stages::run_target_with_timing,
     state::{HasCorpus, HasExecutions},
 };
 
@@ -108,23 +109,11 @@ where
                         .load_input(state.corpus())?
                         .clone();
 
-                    executor.observers_mut().pre_exec_all(state, &input)?;
-                    let start = current_time();
-                    let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
-                    let total_time = if exit_kind == ExitKind::Ok {
-                        current_time() - start
-                    } else {
-                        mgr.log(
-                            state,
-                            LogSeverity::Warn,
-                            "Corpus entry errored on execution!".into(),
-                        )?;
-                        // assume one second as default time
-                        Duration::from_secs(1)
+                    let (exit_kind, mut total_time, _) =
+                        run_target_with_timing(fuzzer, executor, state, mgr, &input, false)?;
+                    if exit_kind != ExitKind::Ok {
+                        total_time = Duration::from_secs(1)
                     };
-                    executor
-                        .observers_mut()
-                        .post_exec_all(state, &input, &exit_kind)?;
                     state
                         .corpus()
                         .get(id)?
