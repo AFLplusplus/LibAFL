@@ -13,7 +13,7 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasScheduler,
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
@@ -22,7 +22,7 @@ use crate::{
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
-    schedulers::powersched::SchedulerMetadata,
+    schedulers::{RemovableScheduler, Scheduler, powersched::SchedulerMetadata},
     stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions},
 };
@@ -90,9 +90,7 @@ where
     OT: ObserversTuple<I, S>,
     E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<I, S>,
-    Z: Evaluator<E, EM, I, S>,
     I: Input,
-    S: HasCurrentTestcase<I> + HasExecutions,
 {
     executor.observers_mut().pre_exec_all(state, &input)?;
 
@@ -146,7 +144,7 @@ where
         + HasExecutions
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, I, S> + HasScheduler<I, S>,
     I: Input,
 {
     #[inline]
