@@ -22,7 +22,7 @@ use crate::{
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
-    schedulers::{RemovableScheduler, Scheduler, powersched::SchedulerMetadata},
+    schedulers::powersched::SchedulerMetadata,
     stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions},
 };
