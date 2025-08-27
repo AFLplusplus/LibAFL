@@ -3,11 +3,13 @@ import "libafl-cc.just"
 ARCH := env("ARCH", "x86_64")
 OPTIMIZATIONS := env("OPTIMIZATIONS", if ARCH == "ppc" { "no" } else { "yes" })
 
-LIBPNG_ROOT :=  DEPS_DIR / "libpng-1.6.50"
+LIBPNG_VERSION := "1.6.50"
+LIBPNG_ROOT :=  DEPS_DIR /  "libpng-" + LIBPNG_VERSION
 LIBPNG_BUILD := TARGET_DIR / "build-png"
 LIBPNG_INCLUDE := LIBPNG_ROOT
 
-ZLIB_ROOT := DEPS_DIR / "zlib-1.3.1"
+ZLIB_VERSION := "zlib-1.3.1"
+ZLIB_ROOT := DEPS_DIR / ZLIB_VERSION
 ZLIB_BUILD := TARGET_DIR / "build-zlib"
 ZLIB_INCLUDE := ZLIB_BUILD / "zlib" / "include"
 ZLIB_LIB := ZLIB_BUILD / "zlib" / "lib"
@@ -24,9 +26,9 @@ deps_dir:
 
 [unix]
 zlib_wget: deps_dir
-    wget -O "{{ DEPS_DIR }}/zlib-1.3.1.tar.gz" https://zlib.net/fossils/zlib-1.3.1.tar.gz
+    wget -O "{{ DEPS_DIR }}/{{ ZLIB_VERSION }}.tar.gz" https://zlib.net/fossils/{{ ZLIB_VERSION }}.tar.gz
 
-    tar zxvf {{ DEPS_DIR }}/zlib-1.3.1.tar.gz -C {{ DEPS_DIR }}
+    tar zxvf {{ DEPS_DIR }}/{{ ZLIB_VERSION }}.tar.gz -C {{ DEPS_DIR }}
 
 [unix]
 zlib feat: zlib_wget (cc feat)
@@ -39,13 +41,14 @@ zlib feat: zlib_wget (cc feat)
 
 [unix]
 libpng_wget: deps_dir
-    wget -O "{{ DEPS_DIR }}/v1.6.50.tar.gz" https://github.com/glennrp/libpng/archive/refs/tags/v1.6.50.tar.gz
+    wget -O "{{ DEPS_DIR }}/v{{ LIBPNG_VERSION }}.tar.gz" https://github.com/glennrp/libpng/archive/refs/tags/v{{ LIBPNG_VERSION }}.tar.gz
 
-    tar -xvf "{{ DEPS_DIR }}/v1.6.50.tar.gz" -C {{ DEPS_DIR }}
+    tar -xvf "{{ DEPS_DIR }}/v{{ LIBPNG_VERSION }}.tar.gz" -C {{ DEPS_DIR }}
 
     rm -rf {{ LIBPNG_BUILD }}
     mkdir {{ LIBPNG_BUILD }}
 
+#feenableexcept doesn't exist on macos. Since it's only used in the testing lib, we trick autotools to disable it.
 [unix]
 libpng feat: (zlib feat) libpng_wget (cc feat)
     cd {{ LIBPNG_BUILD }}/ && \
@@ -53,9 +56,8 @@ libpng feat: (zlib feat) libpng_wget (cc feat)
         CFLAGS="-I{{ ZLIB_INCLUDE }}" \
         CPPFLAGS="-I{{ ZLIB_INCLUDE }}" \
         LDFLAGS="-L{{ ZLIB_LIB }}" \
-        # feenableexcept doesn't exist on macos. Since it's only used in the testing lib, we trick autotools to disable it.
-        ac_cv_func_feenableexcept=no \ 
-        {{ DEPS_DIR }}/libpng-1.6.50/configure \
+        ac_cv_func_feenableexcept=no \
+        {{ DEPS_DIR }}/libpng-{{LIBPNG_VERSION}}/configure \
             --enable-shared=no \
             --with-pic=yes \
             --enable-hardware-optimizations={{ OPTIMIZATIONS }}
