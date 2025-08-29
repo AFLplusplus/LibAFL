@@ -988,6 +988,7 @@ pub mod unix_shmem {
             }
 
             /// Create a new [`MmapShMemProvider`] where filename is used as the shmem id.
+            #[must_use]
             pub fn with_filename_as_id() -> Self {
                 Self {
                     use_fd_as_id: false,
@@ -1012,11 +1013,7 @@ pub mod unix_shmem {
             fn new() -> Result<Self, Error> {
                 // Apple uses it for served shmem provider, which uses fd
                 // Others will just use filename
-                let use_fd_as_id = if cfg!(target_vendor = "apple") {
-                    true
-                } else {
-                    false
-                };
+                let use_fd_as_id = cfg!(target_vendor = "apple");
                 Ok(Self { use_fd_as_id })
             }
 
