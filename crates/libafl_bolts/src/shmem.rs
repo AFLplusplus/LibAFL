@@ -674,7 +674,6 @@ pub mod unix_shmem {
 
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
-        #[cfg(target_vendor = "apple")]
         use alloc::string::ToString;
         use core::{
             ffi::CStr,
