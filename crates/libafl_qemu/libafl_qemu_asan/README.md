@@ -28,7 +28,7 @@ and combining alternative implementations of the various key components.
 - `host` - Enable support for shadow memory and tracking in the host
 - `libc` - Enable use of `LibcMmap` to support creation of mappings using
 `libc`
-- `linux` - Enable use of `LinuxMmap` to support creation of mappings and
+- `linux` - Enable use of `MmapRegion` to support creation of mappings and
 host interaction using `rustix`.
 - `std` - Disable the magic used to support `no_std` environments
 

@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "linux", target_os = "linux"))]
+#[cfg(all(test, feature = "syscalls", target_os = "linux"))]
 mod tests {
     use libafl_asan::{env::Env, file::linux::LinuxFileReader};
     #[test]
