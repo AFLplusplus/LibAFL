@@ -121,6 +121,15 @@ impl IntelPT {
     /// Only instructions in `filters` ranges will be traced.
     /// NOTE: only filters of type `AddrFilterType::FILTER` are supported.
     fn set_ip_filters(&mut self, filters: &AddrFilters) -> Result<(), Error> {
+        if filters
+            .iter()
+            .any(|f| f.filter_type == AddrFilterType::STOP)
+        {
+            return Err(Error::unsupported(
+                "only filters of type `AddrFilterType::FILTER` are supported",
+            ));
+        }
+
         let str_filter = filters
             .iter()
             .filter(|f| f.filter_type == AddrFilterType::FILTER)
