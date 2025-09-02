@@ -119,12 +119,13 @@ impl IntelPT {
     /// Set filters based on Instruction Pointer (IP)
     ///
     /// Only instructions in `filters` ranges will be traced.
+    /// NOTE: only filters of type `AddrFilterType::FILTER` are supported.
     fn set_ip_filters(&mut self, filters: &AddrFilters) -> Result<(), Error> {
         let str_filter = filters
             .iter()
             .filter(|f| f.filter_type == AddrFilterType::FILTER)
             .map(|filter| {
-                let size = filter.to - filter.from;
+                let size = filter.to - filter.from + 1;
                 format!("filter {:#016x}/{:#016x} ", filter.from, size)
             })
             .reduce(|acc, s| acc + &s)
