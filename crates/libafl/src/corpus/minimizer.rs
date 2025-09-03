@@ -20,7 +20,10 @@ use crate::{
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
-    schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore, testcase_score::LowerIsBetter},
+    schedulers::{
+        LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore,
+        testcase_score::LowerIsBetter,
+    },
     stages::run_target_with_timing,
     state::{HasCorpus, HasExecutions},
 };
