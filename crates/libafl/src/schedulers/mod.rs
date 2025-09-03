@@ -4,7 +4,7 @@ use alloc::{borrow::ToOwned, string::ToString};
 use core::{hash::Hash, marker::PhantomData};
 
 pub mod testcase_score;
-pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
+pub use testcase_score::{LenTimeMulTestcasePenalty, TestcasePenalty, TestcaseScore};
 
 pub mod queue;
 pub use queue::QueueScheduler;
