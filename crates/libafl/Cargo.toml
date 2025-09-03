@@ -286,7 +286,7 @@ bitvec = { version = "1.0.1", optional = true, features = [
 arrayvec = { version = "0.7.6", optional = true, default-features = false } # used for fixed-len collects
 
 const_format = "0.2.33"                                       # used for providing helpful compiler output
-const_panic = { version = "0.2.9", default-features = false } # similarly, for formatting const panic output
+const_panic = { version = "0.2.14", default-features = false } # similarly, for formatting const panic output
 
 pyo3 = { workspace = true, optional = true }
 regex-syntax = { version = "0.8.4", optional = true } # For nautilus
