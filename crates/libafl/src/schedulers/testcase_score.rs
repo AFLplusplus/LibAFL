@@ -15,11 +15,14 @@ use crate::{
     state::HasCorpus,
 };
 
-/// Compute the favor factor of a [`Testcase`]. Higher is better.
+/// Compute the favor factor of a [`Testcase`]. Higher is better unless `LowerIsBetter` is implemented.
 pub trait TestcaseScore<I, S> {
     /// Computes the favor factor of a [`Testcase`]. Higher is better.
     fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error>;
 }
+
+/// Marker trait for those scores where lower score is better
+pub trait LowerIsBetter {}
 
 /// Multiply the testcase size with the execution time.
 /// This favors small and quick testcases.
@@ -38,6 +41,8 @@ where
             * entry.load_len(state.corpus())? as f64)
     }
 }
+
+impl LowerIsBetter for LenTimeMulTestcaseScore {}
 
 /// Constants for powerschedules
 const POWER_BETA: f64 = 1.0;

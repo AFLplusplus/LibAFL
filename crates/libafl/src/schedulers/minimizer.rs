@@ -15,7 +15,10 @@ use crate::{
     feedbacks::MapIndexesMetadata,
     observers::CanTrack,
     require_index_tracking,
-    schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
+    schedulers::{
+        LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore,
+        testcase_score::LowerIsBetter,
+    },
     state::{HasCorpus, HasRand},
 };
 
@@ -82,7 +85,7 @@ pub struct MinimizerScheduler<CS, F, I, M, S> {
 impl<CS, F, M, I, O, S> RemovableScheduler<I, S> for MinimizerScheduler<CS, F, I, M, O>
 where
     CS: RemovableScheduler<I, S> + Scheduler<I, S>,
-    F: TestcaseScore<I, S>,
+    F: TestcaseScore<I, S> + LowerIsBetter,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
