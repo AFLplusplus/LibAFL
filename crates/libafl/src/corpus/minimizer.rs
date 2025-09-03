@@ -20,15 +20,12 @@ use crate::{
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
-    schedulers::{
-        LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore,
-        testcase_score::LowerIsBetter,
-    },
+    schedulers::{LenTimeMulTestcasePenalty, RemovableScheduler, Scheduler, TestcasePenalty},
     stages::run_target_with_timing,
     state::{HasCorpus, HasExecutions},
 };
 
-/// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
+/// Minimizes a corpus according to coverage maps, weighting by the specified `TestcasePenalty`.
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
@@ -39,7 +36,7 @@ pub struct MapCorpusMinimizer<C, E, I, O, S, T, TS> {
 
 /// Standard corpus minimizer, which weights inputs by length and time.
 pub type StdCorpusMinimizer<C, E, I, O, S, T> =
-    MapCorpusMinimizer<C, E, I, O, S, T, LenTimeMulTestcaseScore>;
+    MapCorpusMinimizer<C, E, I, O, S, T, LenTimeMulTestcasePenalty>;
 
 impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
 where
@@ -62,7 +59,7 @@ where
     I: Input,
     S: HasMetadata + HasCorpus<I> + HasExecutions,
     T: Copy + Hash + Eq,
-    TS: TestcaseScore<I, S> + LowerIsBetter,
+    TS: TestcasePenalty<I, S>,
 {
     /// Do the minimization
     #[expect(clippy::too_many_lines)]
