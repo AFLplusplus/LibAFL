@@ -221,7 +221,7 @@ fn generate_mutations(
             SymExpr::NotEqual { a, b } => Some(translation[&a].eq(&translation[&b]).not().into()),
             SymExpr::BoolAnd { a, b } => Some(Bool::and(&[&bool!(a), &bool!(b)]).into()),
             SymExpr::BoolOr { a, b } => Some(Bool::or(&[&bool!(a), &bool!(b)]).into()),
-            SymExpr::BoolXor { a, b } => Some(bool!(a).xor(&bool!(b)).into()),
+            SymExpr::BoolXor { a, b } => Some(bool!(a).xor(bool!(b)).into()),
             SymExpr::And { a, b } => bv_binop!(a bvand b),
             SymExpr::Or { a, b } => bv_binop!(a bvor b),
             SymExpr::Xor { a, b } => bv_binop!(a bvxor b),
