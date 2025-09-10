@@ -119,7 +119,7 @@ fn generate_mutations(
 ) -> Vec<Vec<(usize, u8)>> {
     use hashbrown::HashMap;
     use z3::{
-        Solver, Params,
+        Params, Solver,
         ast::{Ast, BV, Bool, Dynamic},
     };
     fn build_extract(bv: &BV, offset: u64, length: u64, little_endian: bool) -> BV {
