@@ -354,11 +354,6 @@ jobs:
           echo "fuzzer_name=$fname" >> $GITHUB_OUTPUT
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Z3
-        if: ${{ matrix.fuzzer == 'inprocess/libfuzzer_libpng_cmin' }}
-        uses: cda-tum/setup-z3@v1
-        with:
-          add_to_library_path: true
       - name: Prepare
         uses: ./.github/workflows/fuzzer-tester-prepare
         with:

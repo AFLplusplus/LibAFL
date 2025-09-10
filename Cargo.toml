@@ -115,7 +115,7 @@ num_enum = { version = "0.7.3", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 paste = "1.0.15"
 postcard = { version = "1.0.10", features = [
-  "alloc",
+    "alloc",
 ], default-features = false } # no_std compatible serde serialization format
 pyo3 = { version = "0.24.1", features = ["auto-initialize"] }
 pyo3-build-config = "0.25.0"
@@ -136,7 +136,7 @@ unicorn-engine = "2.0.1" # Used in libafl_unicorn
 uuid = { version = "1.18.0", features = ["serde", "v4"] }
 which = "8.0.0"
 windows = "0.59.0"
-z3 = {git = "https://github.com/prove-rs/z3.rs", branch = "z3-version-feature-gate", default-features = false }
+z3 = { version = "0.18.2", default-features = false }
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
 
 [workspace.lints.rust]
