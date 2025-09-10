@@ -114,9 +114,7 @@ impl<'a, EM, I, TE, S, Z> ConcolicTracingStage<'a, EM, I, TE, S, Z> {
 
 #[cfg(feature = "concolic_mutation")]
 #[expect(clippy::too_many_lines)]
-fn generate_mutations(
-    iter: impl Iterator<Item = (SymExprRef, SymExpr)> + Send + Sync,
-) -> Vec<Vec<(usize, u8)>> {
+fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<Vec<(usize, u8)>> {
     use hashbrown::HashMap;
     use z3::{
         Params, Solver,
