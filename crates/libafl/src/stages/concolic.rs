@@ -10,7 +10,6 @@ use libafl_bolts::{
     Named,
     tuples::{Handle, MatchNameRef},
 };
-use z3::{Config, Params};
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::stats::PerfFeature;
@@ -120,7 +119,7 @@ fn generate_mutations(
 ) -> Vec<Vec<(usize, u8)>> {
     use hashbrown::HashMap;
     use z3::{
-        Solver,
+        Solver, Params,
         ast::{Ast, BV, Bool, Dynamic},
     };
     fn build_extract(bv: &BV, offset: u64, length: u64, little_endian: bool) -> BV {
@@ -399,8 +398,6 @@ where
         let testcase = state.current_testcase()?.clone();
 
         let mutations = testcase.metadata::<ConcolicMetadata>().ok().map(|meta| {
-            let mut cfg = Config::new();
-            cfg.set_timeout_msec(10_000);
             start_timer!(state);
             let mutations = { generate_mutations(meta.iter_messages()) };
             mark_feature_time!(state, PerfFeature::Mutate);
