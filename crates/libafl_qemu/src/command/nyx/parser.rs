@@ -1,21 +1,19 @@
-use std::{ffi::CStr, sync::OnceLock};
+use std::ffi::CStr;
 
 use enum_map::EnumMap;
-use libafl::{executors::ExitKind, inputs::HasTargetBytes};
+use libafl::inputs::HasTargetBytes;
 use libafl_qemu_sys::GuestVirtAddr;
 use libc::c_uint;
 
 use crate::{
-    GuestReg, IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
+    GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdNyxEmulatorDriver,
     command::{
-        CommandError, NativeExitKind,
+        CommandError, NativeCommandParser,
         nyx::{
             AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand,
             NyxCommandManager, PanicCommand, PrintfCommand, RangeSubmitCommand, ReleaseCommand,
             SetAgentConfigCommand, SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
-            bindings,
         },
-        parser::NativeCommandParser,
     },
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
     sync_exit::ExitArgs,
@@ -24,8 +22,8 @@ use crate::{
 fn get_guest_string(qemu: Qemu, string_ptr_reg: Regs) -> Result<String, CommandError> {
     let str_addr = qemu.read_reg(string_ptr_reg)? as GuestVirtAddr;
 
-    let mut msg_chunk: [u8; bindings::HPRINTF_MAX_SIZE as usize] =
-        [0; bindings::HPRINTF_MAX_SIZE as usize];
+    let mut msg_chunk: [u8; libvharness_sys::HPRINTF_MAX_SIZE as usize] =
+        [0; libvharness_sys::HPRINTF_MAX_SIZE as usize];
     qemu.read_mem(str_addr.try_into().unwrap(), &mut msg_chunk)?;
 
     Ok(CStr::from_bytes_until_nul(&msg_chunk)
@@ -35,8 +33,6 @@ fn get_guest_string(qemu: Qemu, string_ptr_reg: Regs) -> Result<String, CommandE
         .to_string())
 }
 
-pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
-
 pub struct AcquireCommandParser;
 impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM> for AcquireCommandParser
 where
@@ -44,7 +40,7 @@ where
 {
     type OutputCommand = AcquireCommand;
 
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_ACQUIRE;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_ACQUIRE;
 
     fn parse(
         _qemu: Qemu,
@@ -55,7 +51,8 @@ where
 }
 
 pub struct GetPayloadCommandParser;
-impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM>
+    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for GetPayloadCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -65,7 +62,7 @@ where
 {
     type OutputCommand = GetPayloadCommand;
 
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_GET_PAYLOAD;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_GET_PAYLOAD;
 
     fn parse(
         qemu: Qemu,
@@ -78,7 +75,8 @@ where
 }
 
 pub struct SubmitCR3CommandParser;
-impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM>
+    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for SubmitCR3CommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -87,7 +85,7 @@ where
     SM: IsSnapshotManager,
 {
     type OutputCommand = SubmitCR3Command;
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_SUBMIT_CR3;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_SUBMIT_CR3;
 
     fn parse(
         _qemu: Qemu,
@@ -98,7 +96,8 @@ where
 }
 
 pub struct RangeSubmitCommandParser;
-impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM>
+    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for RangeSubmitCommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -107,7 +106,7 @@ where
     SM: IsSnapshotManager,
 {
     type OutputCommand = RangeSubmitCommand;
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_RANGE_SUBMIT;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_RANGE_SUBMIT;
 
     fn parse(
         qemu: Qemu,
@@ -124,7 +123,8 @@ where
 }
 
 pub struct SubmitPanicCommandParser;
-impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM>
+    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for SubmitPanicCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -133,7 +133,7 @@ where
     SM: IsSnapshotManager,
 {
     type OutputCommand = SubmitPanicCommand;
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_SUBMIT_PANIC;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_SUBMIT_PANIC;
 
     fn parse(
         _qemu: Qemu,
@@ -144,7 +144,8 @@ where
 }
 
 pub struct PanicCommandParser;
-impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM>
+    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for PanicCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -153,7 +154,7 @@ where
     SM: IsSnapshotManager,
 {
     type OutputCommand = PanicCommand;
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_PANIC;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_PANIC;
 
     fn parse(
         _qemu: Qemu,
@@ -164,7 +165,8 @@ where
 }
 
 pub struct UserAbortCommandParser;
-impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM>
+    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for UserAbortCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -173,7 +175,7 @@ where
     SM: IsSnapshotManager,
 {
     type OutputCommand = UserAbortCommand;
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_USER_ABORT;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_USER_ABORT;
 
     fn parse(
         qemu: Qemu,
@@ -186,7 +188,8 @@ where
 }
 
 pub struct NextPayloadCommandParser;
-impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM>
+    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for NextPayloadCommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -196,7 +199,7 @@ where
 {
     type OutputCommand = NextPayloadCommand;
 
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_NEXT_PAYLOAD;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_NEXT_PAYLOAD;
 
     fn parse(
         _qemu: Qemu,
@@ -207,7 +210,8 @@ where
 }
 
 pub struct ReleaseCommandParser;
-impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM>
+    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for ReleaseCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -217,7 +221,7 @@ where
 {
     type OutputCommand = ReleaseCommand;
 
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_RELEASE;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_RELEASE;
 
     fn parse(
         _qemu: Qemu,
@@ -235,7 +239,7 @@ where
 {
     type OutputCommand = GetHostConfigCommand;
 
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_GET_HOST_CONFIG;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_GET_HOST_CONFIG;
 
     fn parse(
         qemu: Qemu,
@@ -245,7 +249,7 @@ where
 
         Ok(GetHostConfigCommand::new(QemuMemoryChunk::virt(
             host_config_addr,
-            GuestReg::try_from(size_of::<bindings::host_config_t>()).unwrap(),
+            GuestReg::try_from(size_of::<libvharness_sys::host_config_t>()).unwrap(),
             qemu.current_cpu().unwrap(),
         )))
     }
@@ -259,7 +263,7 @@ where
 {
     type OutputCommand = SetAgentConfigCommand;
 
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_SET_AGENT_CONFIG;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_SET_AGENT_CONFIG;
 
     fn parse(
         qemu: Qemu,
@@ -269,7 +273,7 @@ where
 
         // # Safety
         // We use the C struct directly to get the agent config
-        let agent_config: bindings::agent_config_t =
+        let agent_config: libvharness_sys::agent_config_t =
             unsafe { qemu.read_mem_val(agent_config_addr as u64)? };
 
         Ok(SetAgentConfigCommand::new(agent_config))
@@ -283,7 +287,7 @@ where
 {
     type OutputCommand = PrintfCommand;
 
-    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_PRINTF;
+    const COMMAND_ID: c_uint = libvharness_sys::HYPERCALL_KAFL_PRINTF;
 
     fn parse(
         qemu: Qemu,

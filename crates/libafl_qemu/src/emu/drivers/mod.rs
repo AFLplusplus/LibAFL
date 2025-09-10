@@ -21,10 +21,12 @@ use crate::{
     modules::EmulatorModuleTuple,
 };
 
-#[cfg(all(cpu_target = "x86_64", feature = "systemmode"))]
+#[cfg(feature = "nyx")]
 pub mod nyx;
-#[cfg(all(cpu_target = "x86_64", feature = "systemmode"))]
-pub use nyx::{NyxEmulatorDriver, NyxEmulatorDriverBuilder};
+#[cfg(feature = "nyx")]
+pub use nyx::{StdNyxEmulatorDriver, StdNyxInputSetter};
+
+pub type StdEmulatorDriver = GenericEmulatorDriver<StdInputSetter>;
 
 #[derive(Debug, Clone)]
 pub enum EmulatorDriverResult<C> {
@@ -134,29 +136,6 @@ where
 
     fn input_location(&self) -> Option<&InputLocation> {
         self.input_location.get()
-    }
-}
-
-#[cfg(feature = "nyx")]
-impl<I, IS, S> NyxInputSetter<I, S> for SyxInputSetter<IS>
-where
-    I: HasTargetBytes + HasConcolicInput + Debug,
-    IS: NyxInputSetter<I, S>,
-    S: HasCurrentTestcase<I> + HasMetadata,
-{
-    fn set_input_struct_location(
-        &mut self,
-        location: InputLocation,
-    ) -> Result<(), EmulatorDriverError> {
-        self.inner.set_input_struct_location(location)
-    }
-
-    fn input_struct_location(&self) -> Option<&InputLocation> {
-        self.inner.input_struct_location()
-    }
-
-    fn max_input_size(&self) -> usize {
-        self.inner.max_input_size()
     }
 }
 
@@ -340,8 +319,8 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
         )
     }
 
-    pub fn build(self) -> StdEmulatorDriver<IS> {
-        StdEmulatorDriver {
+    pub fn build(self) -> GenericEmulatorDriver<IS> {
+        GenericEmulatorDriver {
             input_setter: self.input_setter,
             snapshot_id: OnceCell::new(),
             hooks_locked: self.hooks_locked,
@@ -358,7 +337,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
 
 #[derive(Debug, Clone, Default)]
 #[allow(clippy::struct_excessive_bools)] // cfg dependent
-pub struct StdEmulatorDriver<IS> {
+pub struct GenericEmulatorDriver<IS> {
     input_setter: IS,
     snapshot_id: OnceCell<SnapshotId>,
     hooks_locked: bool,
@@ -372,14 +351,23 @@ pub struct StdEmulatorDriver<IS> {
     maps: HashMap<MapKind, PhysMemoryChunk>,
 }
 
-impl StdEmulatorDriver<StdInputSetter> {
+#[cfg(not(feature = "nyx"))]
+impl GenericEmulatorDriver<StdInputSetter> {
     #[must_use]
     pub fn builder() -> StdEmulatorDriverBuilder<StdInputSetter> {
         StdEmulatorDriverBuilder::<StdInputSetter>::default()
     }
 }
 
-impl<IS> StdEmulatorDriver<IS> {
+#[cfg(feature = "nyx")]
+impl GenericEmulatorDriver<StdNyxInputSetter> {
+    #[must_use]
+    pub fn builder() -> StdEmulatorDriverBuilder<StdNyxInputSetter> {
+        StdEmulatorDriverBuilder::<StdNyxInputSetter>::default()
+    }
+}
+
+impl<IS> GenericEmulatorDriver<IS> {
     pub fn write_input<I, S>(
         &mut self,
         qemu: Qemu,
@@ -437,7 +425,7 @@ impl<IS> StdEmulatorDriver<IS> {
 }
 
 // TODO: replace handlers with generics to permit compile-time customization of handlers
-impl<C, CM, ET, I, IS, S, SM> EmulatorDriver<C, CM, ET, I, S, SM> for StdEmulatorDriver<IS>
+impl<C, CM, ET, I, IS, S, SM> EmulatorDriver<C, CM, ET, I, S, SM> for GenericEmulatorDriver<IS>
 where
     C: IsCommand<CM::Commands, CM, Self, ET, I, S, SM>,
     CM: CommandManager<C, Self, ET, I, S, SM, Commands = C>,

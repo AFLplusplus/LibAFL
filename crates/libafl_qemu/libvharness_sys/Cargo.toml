@@ -12,10 +12,11 @@ keywords = ["fuzzing", "qemu", "instrumentation"]
 categories = ["external-ffi-bindings", "embedded", "os", "no-std"]
 
 [features]
-static = []
-shared = []
+# Special platforms
+linux = []
+linux-kernel = []
 
-# Use Nyx API instead of the LibAFL QEMU API
+# Use the Nyx API instead of the LibAFL API
 nyx = []
 
 # supported archs

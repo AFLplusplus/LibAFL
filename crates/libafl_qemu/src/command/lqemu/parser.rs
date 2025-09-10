@@ -14,8 +14,8 @@ use super::{
     StartCommand, TestCommand, VersionCommand,
 };
 use crate::{
-    GuestReg, InputLocation, InputSetter, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs,
-    StdEmulatorDriver,
+    GenericEmulatorDriver, GuestReg, InputLocation, InputSetter, IsSnapshotManager, Qemu,
+    QemuMemoryChunk, Regs,
     command::{CommandError, CommandManager, NativeCommandParser, StdCommandManager},
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
     sync_exit::ExitArgs,
@@ -30,7 +30,7 @@ pub struct StartPhysCommandParser;
 
 #[cfg(feature = "systemmode")]
 impl<C, ET, I, IS, S, SM>
-    NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver<IS>, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for StartPhysCommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -64,7 +64,7 @@ where
 pub struct StartVirtCommandParser;
 
 impl<C, ET, I, IS, S, SM>
-    NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver<IS>, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for StartVirtCommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -112,7 +112,7 @@ where
 }
 
 pub struct SaveCommandParser;
-impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>
+impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for SaveCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -133,10 +133,10 @@ where
 }
 
 pub struct LoadCommandParser;
-impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>
+impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for LoadCommandParser
 where
-    CM: CommandManager<C, StdEmulatorDriver<IS>, ET, I, S, SM>,
+    CM: CommandManager<C, GenericEmulatorDriver<IS>, ET, I, S, SM>,
     SM: IsSnapshotManager,
 {
     type OutputCommand = LoadCommand;
@@ -154,7 +154,7 @@ where
 pub struct EndCommandParser;
 
 impl<C, ET, I, IS, S, SM>
-    NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver<IS>, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for EndCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -290,7 +290,7 @@ where
 #[cfg(feature = "systemmode")]
 pub struct SetMapCommandParser;
 #[cfg(feature = "systemmode")]
-impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>
+impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for SetMapCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,

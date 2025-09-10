@@ -23,8 +23,8 @@ use parser::{SetMapCommandParser, StartPhysCommandParser};
 
 use super::{CommandError, IsCommand, IsStdCommandManager};
 use crate::{
-    Emulator, EmulatorDriverError, EmulatorDriverResult, EmulatorExitResult, GuestReg,
-    InputLocation, InputSetter, IsSnapshotManager, Regs, StdEmulatorDriver,
+    Emulator, EmulatorDriverError, EmulatorDriverResult, EmulatorExitResult, GenericEmulatorDriver,
+    GuestReg, InputLocation, InputSetter, IsSnapshotManager, Regs,
     define_std_command_manager_bound, define_std_command_manager_inner,
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
 };
@@ -99,7 +99,8 @@ pub enum NativeExitKind {
 
 #[derive(Debug, Clone)]
 pub struct SaveCommand;
-impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM> for SaveCommand
+impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>
+    for SaveCommand
 where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
@@ -112,7 +113,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>,
+        emu: &mut Emulator<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
@@ -129,7 +130,8 @@ where
 #[derive(Debug, Clone)]
 pub struct LoadCommand;
 
-impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM> for LoadCommand
+impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>
+    for LoadCommand
 where
     SM: IsSnapshotManager,
 {
@@ -139,7 +141,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>,
+        emu: &mut Emulator<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
@@ -163,7 +165,8 @@ pub struct StartCommand {
     input_location: InputLocation,
 }
 
-impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM> for StartCommand
+impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>
+    for StartCommand
 where
     CM: IsStdCommandManager,
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -178,7 +181,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>,
+        emu: &mut Emulator<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
@@ -225,8 +228,8 @@ pub struct EndCommand {
     exit_kind: Option<ExitKind>,
 }
 
-impl<C, ET, I, IS, S, SM> IsCommand<C, StdCommandManager<S>, StdEmulatorDriver<IS>, ET, I, S, SM>
-    for EndCommand
+impl<C, ET, I, IS, S, SM>
+    IsCommand<C, StdCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM> for EndCommand
 where
     ET: EmulatorModuleTuple<I, S>,
     I: HasTargetBytes + Unpin,
@@ -239,7 +242,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, StdCommandManager<S>, StdEmulatorDriver<IS>, ET, I, S, SM>,
+        emu: &mut Emulator<C, StdCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
@@ -409,7 +412,7 @@ pub struct SetMapCommand {
 }
 
 #[cfg(feature = "systemmode")]
-impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>
+impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for SetMapCommand
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -422,7 +425,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, CM, StdEmulatorDriver<IS>, ET, I, S, SM>,
+        emu: &mut Emulator<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let phys_mem_chunk = self

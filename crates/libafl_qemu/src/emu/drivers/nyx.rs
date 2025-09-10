@@ -2,7 +2,9 @@ use std::{cell::OnceCell, cmp::min, ptr, slice::from_raw_parts};
 
 use libafl::inputs::HasTargetBytes;
 
-use crate::{EmulatorDriverError, InputLocation, InputSetter, Qemu, command::nyx::bindings};
+use crate::{EmulatorDriverError, GenericEmulatorDriver, InputLocation, InputSetter, Qemu};
+
+pub type StdNyxEmulatorDriver = GenericEmulatorDriver<StdNyxInputSetter>;
 
 #[derive(Clone, Debug)]
 pub struct StdNyxInputSetter {
@@ -44,14 +46,14 @@ where
 {
     fn write_input(
         &mut self,
-        qemu: Qemu,
+        _qemu: Qemu,
         _state: &mut S,
         input: &I,
     ) -> Result<(), EmulatorDriverError> {
         let input_len =
             i32::try_from(min(self.max_input_size, input.target_bytes().len())).unwrap();
 
-        let kafl_payload = bindings::kAFL_payload {
+        let kafl_payload = libvharness_sys::kAFL_payload {
             size: input_len,
             ..Default::default()
         };
@@ -59,21 +61,21 @@ where
         let kafl_payload_buf = unsafe {
             from_raw_parts(
                 ptr::from_ref(&kafl_payload) as *const u8,
-                size_of::<bindings::kAFL_payload>(),
+                size_of::<libvharness_sys::kAFL_payload>(),
             )
         };
 
-        let input_struct_mem_chunk = &self.input_struct_location.get().unwrap().mem_chunk;
-
         // TODO: manage endianness correctly.
-        input_struct_mem_chunk.write(qemu, kafl_payload_buf)?;
+        self.input_struct_location
+            .get_mut()
+            .unwrap()
+            .write(kafl_payload_buf);
 
         // write struct first
         self.input_location
-            .get()
+            .get_mut()
             .unwrap()
-            .mem_chunk
-            .write(qemu, input.target_bytes().as_ref())?;
+            .write(input.target_bytes().as_ref());
 
         Ok(())
     }

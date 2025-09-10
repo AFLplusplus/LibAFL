@@ -17,7 +17,71 @@ fn main() {
     target_dir.pop();
     target_dir.pop();
 
-    let vharness_dir = target_dir.join(LIBVHARNESS_DIRNAME);
+    println!("cargo:rerun-if-env-changed=VHARNESS_DIR");
+    let vharness_dir = if let Some(vharness_dir) = env::var_os("VHARNESS_DIR") {
+        println!("cargo:rerun-if-env-changed={}", vharness_dir.display());
+        PathBuf::from(&vharness_dir)
+    } else {
+        let vharness_dir = target_dir.join(LIBVHARNESS_DIRNAME);
+
+        let vharness_rev = vharness_dir.join("QEMU_REVISION");
+        if !vharness_rev.exists()
+            || fs::read_to_string(&vharness_rev).expect("Failed to read QEMU_REVISION")
+                != LIBVHARNESS_COMMIT
+        {
+            drop(fs::remove_dir_all(&vharness_dir));
+        }
+
+        if !vharness_dir.exists() {
+            fs::create_dir_all(&vharness_dir).unwrap();
+            assert!(
+                Command::new("git")
+                    .current_dir(&vharness_dir)
+                    .arg("init")
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            assert!(
+                Command::new("git")
+                    .current_dir(&vharness_dir)
+                    .arg("remote")
+                    .arg("add")
+                    .arg("origin")
+                    .arg(LIBVHARNESS_URL)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            assert!(
+                Command::new("git")
+                    .current_dir(&vharness_dir)
+                    .arg("fetch")
+                    .arg("--depth")
+                    .arg("1")
+                    .arg("origin")
+                    .arg(LIBVHARNESS_COMMIT)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            assert!(
+                Command::new("git")
+                    .current_dir(&vharness_dir)
+                    .arg("checkout")
+                    .arg("FETCH_HEAD")
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+
+            fs::write(&vharness_rev, LIBVHARNESS_COMMIT).unwrap();
+        }
+
+        vharness_dir
+    };
+
+    let vharness_out_dir = target_dir.join("vharness_out");
     let toolchains_dir = vharness_dir.join("toolchains");
     let vharness_stub = src_dir.join("stub.rs");
 
@@ -27,6 +91,14 @@ fn main() {
         "nyx".to_string()
     } else {
         "lqemu".to_string()
+    };
+
+    let platform = if cfg!(feature = "linux") {
+        "linux".to_string()
+    } else if cfg!(feature = "linux-kernel") {
+        "linux-kernel".to_string()
+    } else {
+        "generic".to_string()
     };
 
     let cpu_target = if cfg!(feature = "x86_64") {
@@ -51,93 +123,61 @@ fn main() {
         env::var("CPU_TARGET").unwrap_or_else(|_| "x86_64".to_string())
     };
 
-    let toolchain_file = toolchains_dir.join(format!("{cpu_target}-generic.cmake"));
+    let toolchain_file = toolchains_dir.join(format!("{cpu_target}-{platform}.cmake"));
 
-    let vharness_rev = vharness_dir.join("QEMU_REVISION");
-    if !vharness_rev.exists()
-        || fs::read_to_string(&vharness_rev).expect("Failed to read QEMU_REVISION")
-            != LIBVHARNESS_COMMIT
-    {
-        drop(fs::remove_dir_all(&vharness_dir));
+    if !toolchain_file.exists() {
+        println!("Unsupported toolchain: target CPU {cpu_target} - platform {platform}");
     }
 
-    if !vharness_dir.exists() {
-        fs::create_dir_all(&vharness_dir).unwrap();
-        assert!(
-            Command::new("git")
-                .current_dir(&vharness_dir)
-                .arg("init")
-                .status()
-                .unwrap()
-                .success()
-        );
-        assert!(
-            Command::new("git")
-                .current_dir(&vharness_dir)
-                .arg("remote")
-                .arg("add")
-                .arg("origin")
-                .arg(LIBVHARNESS_URL)
-                .status()
-                .unwrap()
-                .success()
-        );
-        assert!(
-            Command::new("git")
-                .current_dir(&vharness_dir)
-                .arg("fetch")
-                .arg("--depth")
-                .arg("1")
-                .arg("origin")
-                .arg(LIBVHARNESS_COMMIT)
-                .status()
-                .unwrap()
-                .success()
-        );
-        assert!(
-            Command::new("git")
-                .current_dir(&vharness_dir)
-                .arg("checkout")
-                .arg("FETCH_HEAD")
-                .status()
-                .unwrap()
-                .success()
-        );
-
-        fs::write(&vharness_rev, LIBVHARNESS_COMMIT).unwrap();
+    if vharness_out_dir.exists() {
+        fs::remove_dir_all(&vharness_out_dir).unwrap();
     }
 
-    let vharness_out_dir = cmake::Config::new(&vharness_dir)
+    // target vharness compilation
+    cmake::Config::new(&vharness_dir)
         .define("CMAKE_TOOLCHAIN_FILE", &toolchain_file)
         .define("VHARNESS_API", &api)
         .define("VHARNESS_TESTS", "OFF")
+        .define("VHARNESS_INCLUDE_ONLY", "ON")
+        .out_dir(&vharness_out_dir)
+        .build();
+
+    // host vharness_compilation
+    let vharness_out_dir = cmake::Config::new(&vharness_dir)
+        .define(
+            "CMAKE_TOOLCHAIN_FILE",
+            &toolchains_dir.join(format!("{cpu_target}-generic.cmake")),
+        )
+        .define("VHARNESS_API", &api)
+        .define("VHARNESS_TESTS", "OFF")
+        .define("VHARNESS_INCLUDE_ONLY", "ON")
         .build();
 
     let vharness_include_dir = vharness_out_dir.join("include");
 
-    if cfg!(feature = "static") && cfg!(feature = "shared") {
-        panic!("Both static and dynamic features are set.");
-    }
+    // if cfg!(feature = "static") && cfg!(feature = "shared") {
+    //     panic!("Both static and dynamic features are set.");
+    // }
 
-    let link_kind = if cfg!(feature = "shared") {
-        "dylib"
-    } else {
-        // fall back to static linking.
-        "static"
-    };
+    // let link_kind = if cfg!(feature = "shared") {
+    //     "dylib"
+    // } else {
+    //     // fall back to static linking.
+    //     "static"
+    // };
 
     println!("cargo:rerun-if-env-changed=LIBVHARNESS_GEN_STUBS");
-    println!(
-        "cargo:rustc-link-search={}/build",
-        vharness_out_dir.display()
-    );
-    println!("cargo:rustc-link-lib={link_kind}=vharness");
+    // println!(
+    //     "cargo:rustc-link-search={}/build",
+    //     vharness_out_dir.display()
+    // );
+    // println!("cargo:rustc-link-lib={link_kind}=vharness");
 
     if env::var("DOCS_RS").is_ok() || cfg!(feature = "clippy") {
         fs::copy(vharness_stub, gen_binding).unwrap();
     } else {
         bindgen::Builder::default()
-            .header(format!("{}/api.h", vharness_include_dir.display()))
+            .header(format!("{}/{api}.h", vharness_include_dir.display()))
             .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
             .clang_arg(format!("-I{}", vharness_include_dir.display()))
             .derive_debug(true)

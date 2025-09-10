@@ -8,12 +8,16 @@ use crate::FastSnapshotManager;
 #[cfg(doc)]
 use crate::config::QemuConfig;
 use crate::{
-    Emulator, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError, QemuParams,
-    StdEmulatorDriver, StdInputSetter, StdSnapshotManager,
-    command::{NopCommandManager, StdCommandManager},
+    Emulator, GenericEmulatorDriver, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError,
+    QemuParams, StdSnapshotManager,
+    command::NopCommandManager,
     config::QemuConfigBuilder,
     modules::{EmulatorModule, EmulatorModuleTuple},
 };
+#[cfg(all(not(feature = "nyx"), feature = "systemmode"))]
+use crate::{StdEmulatorDriver, command::StdCommandManager};
+#[cfg(feature = "nyx")]
+use crate::{StdNyxEmulatorDriver, command::nyx::NyxCommandManager};
 
 /// An [`Emulator`] Builder.
 ///
@@ -63,7 +67,7 @@ impl<C, I, S>
     EmulatorBuilder<
         C,
         StdCommandManager<S>,
-        StdEmulatorDriver<StdInputSetter>,
+        StdEmulatorDriver,
         (),
         QemuConfigBuilder,
         I,
@@ -88,12 +92,12 @@ where
     }
 }
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(not(feature = "nyx"), feature = "systemmode"))]
 impl<C, I, S>
     EmulatorBuilder<
         C,
         StdCommandManager<S>,
-        StdEmulatorDriver<StdInputSetter>,
+        StdEmulatorDriver,
         (),
         QemuConfigBuilder,
         I,
@@ -111,7 +115,37 @@ where
             modules: (),
             command_manager: StdCommandManager::default(),
             snapshot_manager: FastSnapshotManager::default(),
-            driver: StdEmulatorDriver::builder().build(),
+            driver: GenericEmulatorDriver::builder().build(),
+            qemu_parameters: None,
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "nyx")]
+impl<C, I, S>
+    EmulatorBuilder<
+        C,
+        NyxCommandManager<S>,
+        StdNyxEmulatorDriver,
+        (),
+        QemuConfigBuilder,
+        I,
+        S,
+        StdSnapshotManager,
+    >
+where
+    S: HasExecutions + Unpin,
+    I: HasTargetBytes,
+{
+    #[expect(clippy::should_implement_trait)]
+    #[must_use]
+    pub fn default() -> Self {
+        Self {
+            modules: (),
+            command_manager: NyxCommandManager::default(),
+            snapshot_manager: FastSnapshotManager::default(),
+            driver: GenericEmulatorDriver::builder().build(),
             qemu_parameters: None,
             phantom: PhantomData,
         }

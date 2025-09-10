@@ -10,10 +10,14 @@ use crate::{
     sync_exit::ExitArgs,
 };
 
+#[cfg(not(feature = "nyx"))]
 pub mod lqemu;
+#[cfg(all(not(feature = "nyx"), feature = "systemmode"))]
+pub use lqemu::SetMapCommand;
+#[cfg(not(feature = "nyx"))]
 pub use lqemu::{
-    AddressAllowCommand, EndCommand, LoadCommand, LqprintfCommand, SaveCommand, SetMapCommand,
-    StartCommand, StdCommandManager, TestCommand, VersionCommand,
+    AddressAllowCommand, EndCommand, LoadCommand, LqprintfCommand, SaveCommand, StartCommand,
+    StdCommandManager, TestCommand, VersionCommand,
 };
 
 #[cfg(feature = "nyx")]
@@ -49,7 +53,7 @@ macro_rules! define_std_command_manager_inner {
                 };
                 use enum_map::EnumMap;
                 use $crate::{
-                    command::{IsStdCommandManager, CommandManager, CommandError, NativeCommandParser, IsCommand}, get_exit_arch_regs, modules::{utils::filters::HasStdFiltersTuple, EmulatorModuleTuple}, sync_exit::ExitArgs, Emulator, EmulatorDriverError, EmulatorDriverResult, IsSnapshotManager, Qemu, Regs, StdEmulatorDriver, InputSetter,
+                    command::{IsStdCommandManager, CommandManager, CommandError, NativeCommandParser, IsCommand}, get_exit_arch_regs, modules::{utils::filters::HasStdFiltersTuple, EmulatorModuleTuple}, sync_exit::ExitArgs, Emulator, EmulatorDriverError, EmulatorDriverResult, IsSnapshotManager, Qemu, Regs, GenericEmulatorDriver, InputSetter,
                 };
                 use std::ffi::c_uint;
 
@@ -94,7 +98,7 @@ macro_rules! define_std_command_manager_inner {
                     }
                 }
 
-                impl<C, ET, I, IS, S, SM> CommandManager<C, StdEmulatorDriver<IS>, ET, I, S, SM> for $name<S>
+                impl<C, ET, I, IS, S, SM> CommandManager<C, GenericEmulatorDriver<IS>, ET, I, S, SM> for $name<S>
                 where
                     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
                     I: $($input_bound)? + Unpin,
@@ -111,7 +115,7 @@ macro_rules! define_std_command_manager_inner {
 
                         match cmd_id {
                             // <StartPhysCommandParser as NativeCommandParser<S>>::COMMAND_ID => Ok(StdCommandManagerCommands::StartPhysCommandParserCmd(<StartPhysCommandParser as NativeCommandParser<S>>::parse(qemu, arch_regs_map)?)),
-                            $(<$native_command_parser as NativeCommandParser<C, Self, StdEmulatorDriver<IS>, ET, I, S, SM>>::COMMAND_ID => Ok(<$native_command_parser as NativeCommandParser<C, Self, StdEmulatorDriver<IS>, ET, I, S, SM>>::parse(qemu, arch_regs_map)?.into())),+,
+                            $(<$native_command_parser as NativeCommandParser<C, Self, GenericEmulatorDriver<IS>, ET, I, S, SM>>::COMMAND_ID => Ok(<$native_command_parser as NativeCommandParser<C, Self, GenericEmulatorDriver<IS>, ET, I, S, SM>>::parse(qemu, arch_regs_map)?.into())),+,
                             _ => Err(CommandError::UnknownCommand(cmd_id.into())),
                         }
                     }
@@ -125,7 +129,7 @@ macro_rules! define_std_command_manager_inner {
                     $($command($command)),+,
                 }
 
-                impl<C, ET, I, IS, S, SM> IsCommand<C, $name<S>, StdEmulatorDriver<IS>, ET, I, S, SM> for [<$name Commands>]
+                impl<C, ET, I, IS, S, SM> IsCommand<C, $name<S>, GenericEmulatorDriver<IS>, ET, I, S, SM> for [<$name Commands>]
                 where
                     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
                     I: $($input_bound)? + Unpin,
@@ -135,12 +139,12 @@ macro_rules! define_std_command_manager_inner {
                 {
                     fn usable_at_runtime(&self) -> bool {
                         match self {
-                            $([<$name Commands>]::$command(cmd) => <$command as IsCommand<C, $name<S>, StdEmulatorDriver<IS>, ET, I, S, SM>>::usable_at_runtime(cmd)),+
+                            $([<$name Commands>]::$command(cmd) => <$command as IsCommand<C, $name<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>>::usable_at_runtime(cmd)),+
                         }
                     }
 
                     fn run(&self,
-                        emu: &mut Emulator<C, $name<S>, StdEmulatorDriver<IS>, ET, I, S, SM>,
+                        emu: &mut Emulator<C, $name<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>,
                         ret_reg: Option<Regs>
                     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
                         match self {
@@ -194,7 +198,6 @@ pub trait IsCommand<C, CM, ED, ET, I, S, SM>: Clone + Debug {
     fn usable_at_runtime(&self) -> bool;
 
     /// Command handler.
-    ///     - `input`: The input for the current emulator run.
     ///     - `ret_reg`: The register in which the guest return value should be written, if any.
     /// Returns
     ///     - `InnerHandlerResult`: How the high-level handler should behave

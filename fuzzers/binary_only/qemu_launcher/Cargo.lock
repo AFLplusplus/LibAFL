@@ -485,15 +485,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cmake"
-version = "0.1.54"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7caa3f9de89ddbe2c607f4101924c5abec803763ae9534e4f4d7d8f84aa81f0"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "cobs"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1573,7 +1564,6 @@ dependencies = [
  "libafl_qemu_sys",
  "libafl_targets",
  "libc",
- "libvharness_sys",
  "log",
  "meminterval",
  "num-traits",
@@ -1690,14 +1680,6 @@ checksum = "c0ff37bd590ca25063e35af745c343cb7a0271906fb7b37e4813e8f79f00268d"
 dependencies = [
  "bitflags",
  "libc",
-]
-
-[[package]]
-name = "libvharness_sys"
-version = "0.15.4"
-dependencies = [
- "bindgen",
- "cmake",
 ]
 
 [[package]]
