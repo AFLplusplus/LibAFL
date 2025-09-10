@@ -62,10 +62,10 @@ vergen = { version = "9.0.1", features = ["build", "cargo", "rustc", "si"] }
 vergen-git2 = "1.0.1"
 
 [dependencies]
-clap = { version = "4.5.18", features = ["derive", "string"] }
+clap = { version = "4.5.45", features = ["derive", "string"] }
 env_logger = { version = "0.11.5" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 readonly = { version = "0.2.12" }
 libafl_bolts = { path = "../../libafl_bolts" }
 libafl_qemu = { path = "../" }
-thiserror = { version = "2.0.11" }
+thiserror = { version = "2.0.16" }

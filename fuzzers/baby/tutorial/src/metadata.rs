@@ -4,7 +4,7 @@ use libafl::{
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata, StateInitializer},
-    schedulers::{MinimizerScheduler, TestcaseScore},
+    schedulers::{MinimizerScheduler, TestcasePenalty},
     Error, HasMetadata,
 };
 use libafl_bolts::{Named, SerdeAny};
@@ -17,9 +17,9 @@ pub struct PacketLenMetadata {
     pub length: u64,
 }
 
-pub struct PacketLenTestcaseScore {}
+pub struct PacketLenTestcasePenalty {}
 
-impl<I, S> TestcaseScore<I, S> for PacketLenTestcaseScore
+impl<I, S> TestcasePenalty<I, S> for PacketLenTestcasePenalty
 where
     S: HasMetadata,
 {
@@ -32,7 +32,7 @@ where
 }
 
 pub type PacketLenMinimizerScheduler<CS, I, S> =
-    MinimizerScheduler<CS, PacketLenTestcaseScore, I, MapIndexesMetadata, S>;
+    MinimizerScheduler<CS, PacketLenTestcasePenalty, I, MapIndexesMetadata, S>;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct PacketLenFeedback {

@@ -116,7 +116,7 @@ hashbrown = { workspace = true, default-features = true, features = [
 ] } # A faster hashmap, nostd compatible
 num-traits = { workspace = true, default-features = true }
 num_enum = { workspace = true, default-features = true }
-goblin = "0.10.0"
+goblin = "0.10.1"
 libc = { workspace = true }
 strum = "0.27.2"
 strum_macros = "0.27.2"

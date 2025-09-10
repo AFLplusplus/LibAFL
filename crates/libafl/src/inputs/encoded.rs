@@ -320,9 +320,9 @@ mod tests {
     fn test_targetbytes_fuzzer_builds() {
         const TRUE_VAL: bool = true;
 
-        let observer = ValueObserver::new("test_value", OwnedRef::Ref(&TRUE_VAL));
-        let mut true_feedback = BoolValueFeedback::new(&observer.handle());
-        let mut true_objective = BoolValueFeedback::new(&observer.handle());
+        let true_observer = ValueObserver::new("test_value", OwnedRef::Ref(&TRUE_VAL));
+        let mut feedback = BoolValueFeedback::new(&true_observer.handle());
+        let mut objective = tuple_list!();
 
         let (bytes_converter, input) = setup_encoder_decoder();
         let input_clone = input.clone();
@@ -332,8 +332,8 @@ mod tests {
             StdRand::new(),
             InMemoryCorpus::new(),
             InMemoryCorpus::new(),
-            &mut true_feedback,
-            &mut true_objective,
+            &mut feedback,
+            &mut objective,
         )
         .unwrap();
 
@@ -345,13 +345,13 @@ mod tests {
         let mut fuzzer = StdFuzzer::builder()
             .target_bytes_converter(bytes_converter)
             .scheduler(QueueScheduler::new())
-            .feedback(true_feedback)
-            .objective(true_objective)
+            .feedback(feedback)
+            .objective(objective)
             .build();
 
         let mut executor = InProcessExecutor::new(
             &mut harness_fn,
-            tuple_list!(observer),
+            tuple_list!(true_observer),
             &mut fuzzer,
             &mut state,
             &mut event_mgr,
