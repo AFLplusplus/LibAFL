@@ -4,8 +4,6 @@ use libafl::inputs::HasTargetBytes;
 
 use crate::{EmulatorDriverError, GenericEmulatorDriver, InputLocation, InputSetter, Qemu};
 
-pub type StdNyxEmulatorDriver = GenericEmulatorDriver<StdNyxInputSetter>;
-
 #[derive(Clone, Debug)]
 pub struct StdNyxInputSetter {
     input_location: OnceCell<InputLocation>,

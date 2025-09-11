@@ -11,8 +11,8 @@ use crate::{
         CommandError, NativeCommandParser,
         nyx::{
             AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand,
-            NyxCommandManager, PanicCommand, PrintfCommand, RangeSubmitCommand, ReleaseCommand,
-            SetAgentConfigCommand, SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
+            PanicCommand, PrintfCommand, RangeSubmitCommand, ReleaseCommand, SetAgentConfigCommand,
+            StdCommandManager, SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
         },
     },
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
@@ -52,7 +52,7 @@ where
 
 pub struct GetPayloadCommandParser;
 impl<C, ET, I, S, SM>
-    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for GetPayloadCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -76,7 +76,7 @@ where
 
 pub struct SubmitCR3CommandParser;
 impl<C, ET, I, S, SM>
-    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for SubmitCR3CommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -97,7 +97,7 @@ where
 
 pub struct RangeSubmitCommandParser;
 impl<C, ET, I, S, SM>
-    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for RangeSubmitCommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -124,7 +124,7 @@ where
 
 pub struct SubmitPanicCommandParser;
 impl<C, ET, I, S, SM>
-    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for SubmitPanicCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -145,7 +145,7 @@ where
 
 pub struct PanicCommandParser;
 impl<C, ET, I, S, SM>
-    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for PanicCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -166,7 +166,7 @@ where
 
 pub struct UserAbortCommandParser;
 impl<C, ET, I, S, SM>
-    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for UserAbortCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -189,7 +189,7 @@ where
 
 pub struct NextPayloadCommandParser;
 impl<C, ET, I, S, SM>
-    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for NextPayloadCommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -211,7 +211,7 @@ where
 
 pub struct ReleaseCommandParser;
 impl<C, ET, I, S, SM>
-    NativeCommandParser<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+    NativeCommandParser<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for ReleaseCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,

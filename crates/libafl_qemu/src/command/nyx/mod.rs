@@ -152,7 +152,7 @@ macro_rules! define_nyx_command_manager {
 }
 
 define_nyx_command_manager!(
-    NyxCommandManager,
+    StdCommandManager,
     [
         AcquireCommand,
         ReleaseCommand,
@@ -213,7 +213,7 @@ impl GetPayloadCommand {
     }
 }
 
-impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM> IsCommand<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for GetPayloadCommand
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -227,7 +227,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
+        emu: &mut Emulator<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
@@ -268,7 +268,7 @@ where
 #[derive(Debug, Clone)]
 pub struct NextPayloadCommand;
 
-impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM> IsCommand<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for NextPayloadCommand
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -282,7 +282,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
+        emu: &mut Emulator<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
@@ -324,7 +324,7 @@ where
 #[derive(Debug, Clone)]
 pub struct SubmitCR3Command;
 
-impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM> IsCommand<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for SubmitCR3Command
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -338,7 +338,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
+        emu: &mut Emulator<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
@@ -370,7 +370,7 @@ impl RangeSubmitCommand {
     }
 }
 
-impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM> IsCommand<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for RangeSubmitCommand
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -384,7 +384,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
+        emu: &mut Emulator<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         log::info!("Allow address range: {:#x?}", self.allowed_range);
@@ -411,7 +411,7 @@ where
 #[derive(Debug, Clone)]
 pub struct PanicCommand;
 
-impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM> IsCommand<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for PanicCommand
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -425,7 +425,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
+        emu: &mut Emulator<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
@@ -453,7 +453,7 @@ where
 #[derive(Debug, Clone)]
 pub struct SubmitPanicCommand;
 
-impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM> IsCommand<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for SubmitPanicCommand
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -467,7 +467,7 @@ where
 
     fn run(
         &self,
-        _emu: &mut Emulator<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
+        _emu: &mut Emulator<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         // TODO: add breakpoint to submit panic addr / page and associate it with a panic command
@@ -486,7 +486,7 @@ impl UserAbortCommand {
     }
 }
 
-impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM> IsCommand<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for UserAbortCommand
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -500,7 +500,7 @@ where
 
     fn run(
         &self,
-        _emu: &mut Emulator<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
+        _emu: &mut Emulator<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         log::error!("Nyx Guest Abort: {}", self.content);
@@ -511,7 +511,7 @@ where
 
 #[derive(Debug, Clone)]
 pub struct ReleaseCommand;
-impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
+impl<C, ET, I, S, SM> IsCommand<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>
     for ReleaseCommand
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -525,7 +525,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
+        emu: &mut Emulator<C, StdCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();

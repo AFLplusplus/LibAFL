@@ -25,7 +25,10 @@ use crate::{
 pub mod nyx;
 #[cfg(feature = "nyx")]
 pub use nyx::{StdNyxEmulatorDriver, StdNyxInputSetter};
+#[cfg(feature = "nyx")]
+pub type StdEmulatorDriver = GenericEmulatorDriver<StdNyxInputSetter>;
 
+#[cfg(not(feature = "nyx"))]
 pub type StdEmulatorDriver = GenericEmulatorDriver<StdInputSetter>;
 
 #[derive(Debug, Clone)]

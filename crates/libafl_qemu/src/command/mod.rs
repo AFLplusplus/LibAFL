@@ -22,6 +22,12 @@ pub use lqemu::{
 
 #[cfg(feature = "nyx")]
 pub mod nyx;
+#[cfg(feature = "nyx")]
+pub use nyx::{
+    AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand, PanicCommand,
+    PrintfCommand, RangeSubmitCommand, ReleaseCommand, SetAgentConfigCommand, StdCommandManager,
+    SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
+};
 
 #[macro_export]
 macro_rules! define_std_command_manager_bound {
