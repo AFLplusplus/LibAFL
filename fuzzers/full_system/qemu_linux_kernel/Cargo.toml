@@ -29,7 +29,10 @@ libafl_qemu = { path = "../../../crates/libafl_qemu", default-features = false, 
   #"paranoid_debug"
 ] }
 libafl_targets = { path = "../../../crates/libafl_targets" }
-libvharness_sys = { path = "../../../crates/libafl_qemu/libvharness_sys", features = ["x86_64", "linux-kernel"] }
+libvharness_sys = { path = "../../../crates/libafl_qemu/libvharness_sys", features = [
+  "x86_64",
+  "linux-kernel",
+] }
 
 env_logger = "0.11.5"
 log = "0.4.22"

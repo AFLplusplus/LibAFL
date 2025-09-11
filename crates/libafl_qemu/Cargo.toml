@@ -62,13 +62,25 @@ fork = ["libafl/fork"]
 x86_64 = ["libafl_qemu_sys/x86_64", "libvharness_sys/x86_64"]
 i386 = ["libafl_qemu_sys/i386", "libvharness_sys/i386"] # build qemu for i386
 arm = ["libafl_qemu_sys/arm", "libvharness_sys/arm"] # build qemu for arm
-aarch64 = ["libafl_qemu_sys/aarch64", "libvharness_sys/aarch64"] # build qemu for aarch64
+aarch64 = [
+  "libafl_qemu_sys/aarch64",
+  "libvharness_sys/aarch64",
+] # build qemu for aarch64
 # build qemu for mips (el, use with the 'be' feature of mips be)
 mips = ["libafl_qemu_sys/mips", "libvharness_sys/mips"]
 ppc = ["libafl_qemu_sys/ppc", "libvharness_sys/ppc"] # build qemu for powerpc
-hexagon = ["libafl_qemu_sys/hexagon", "libvharness_sys/hexagon"] # build qemu for hexagon
-riscv32 = ["libafl_qemu_sys/riscv32", "libvharness_sys/riscv32"] # build qemu for riscv 32bit
-riscv64 = ["libafl_qemu_sys/riscv64", "libvharness_sys/riscv64"] # build qemu for riscv 64bit
+hexagon = [
+  "libafl_qemu_sys/hexagon",
+  "libvharness_sys/hexagon",
+] # build qemu for hexagon
+riscv32 = [
+  "libafl_qemu_sys/riscv32",
+  "libvharness_sys/riscv32",
+] # build qemu for riscv 32bit
+riscv64 = [
+  "libafl_qemu_sys/riscv64",
+  "libvharness_sys/riscv64",
+] # build qemu for riscv 64bit
 
 ## Big Endian mode
 be = ["libafl_qemu_sys/be"]
