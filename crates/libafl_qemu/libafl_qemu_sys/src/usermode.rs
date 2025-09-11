@@ -175,9 +175,9 @@ impl From<libafl_mapinfo> for MapInfo {
         };
 
         MapInfo {
-            start: map_info.start,
-            end: map_info.end,
-            offset: map_info.offset,
+            start: map_info.start as u64,
+            end: map_info.end as u64,
+            offset: map_info.offset as u64,
             path,
             flags: map_info.flags,
             is_priv: map_info.is_priv,
