@@ -117,15 +117,10 @@ impl<'a, EM, I, TE, S, Z> ConcolicTracingStage<'a, EM, I, TE, S, Z> {
 fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<Vec<(usize, u8)>> {
     use hashbrown::HashMap;
     use z3::{
-        Config, Context, Solver, Symbol,
+        Params, Solver,
         ast::{Ast, BV, Bool, Dynamic},
     };
-    fn build_extract<'ctx>(
-        bv: &BV<'ctx>,
-        offset: u64,
-        length: u64,
-        little_endian: bool,
-    ) -> BV<'ctx> {
+    fn build_extract(bv: &BV, offset: u64, length: u64, little_endian: bool) -> BV {
         let size = u64::from(bv.get_size());
         assert_eq!(
             size % 8,
@@ -153,10 +148,10 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
     let mut res = Vec::new();
 
-    let mut cfg = Config::new();
-    cfg.set_timeout_msec(10_000);
-    let ctx = Context::new(&cfg);
-    let solver = Solver::new(&ctx);
+    let solver = Solver::new();
+    let mut params = Params::new();
+    params.set_u32("timeout", 10_000);
+    solver.set_params(&params);
 
     let mut translation = HashMap::<SymExprRef, Dynamic>::new();
 
@@ -180,18 +175,14 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
     for (id, msg) in iter {
         let z3_expr: Option<Dynamic> = match msg {
-            SymExpr::InputByte { offset, .. } => {
-                Some(BV::new_const(&ctx, Symbol::Int(offset as u32), 8).into())
-            }
-            SymExpr::Integer { value, bits } => {
-                Some(BV::from_u64(&ctx, value, u32::from(bits)).into())
-            }
+            SymExpr::InputByte { offset, .. } => Some(BV::new_const(offset as u32, 8).into()),
+            SymExpr::Integer { value, bits } => Some(BV::from_u64(value, u32::from(bits)).into()),
             SymExpr::Integer128 { high: _, low: _ } => todo!(),
             SymExpr::IntegerFromBuffer {} => todo!(),
-            SymExpr::NullPointer => Some(BV::from_u64(&ctx, 0, usize::BITS).into()),
-            SymExpr::True => Some(Bool::from_bool(&ctx, true).into()),
-            SymExpr::False => Some(Bool::from_bool(&ctx, false).into()),
-            SymExpr::Bool { value } => Some(Bool::from_bool(&ctx, value).into()),
+            SymExpr::NullPointer => Some(BV::from_u64(0, usize::BITS).into()),
+            SymExpr::True => Some(Bool::from_bool(true).into()),
+            SymExpr::False => Some(Bool::from_bool(false).into()),
+            SymExpr::Bool { value } => Some(Bool::from_bool(value).into()),
             SymExpr::Neg { op } => Some(bv!(op).bvneg().into()),
             SymExpr::Add { a, b } => bv_binop!(a bvadd b),
             SymExpr::Sub { a, b } => bv_binop!(a bvsub b),
@@ -224,11 +215,11 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                     )
                 })
             }
-            SymExpr::Equal { a, b } => Some(translation[&a]._eq(&translation[&b]).into()),
-            SymExpr::NotEqual { a, b } => Some(translation[&a]._eq(&translation[&b]).not().into()),
-            SymExpr::BoolAnd { a, b } => Some(Bool::and(&ctx, &[&bool!(a), &bool!(b)]).into()),
-            SymExpr::BoolOr { a, b } => Some(Bool::or(&ctx, &[&bool!(a), &bool!(b)]).into()),
-            SymExpr::BoolXor { a, b } => Some(bool!(a).xor(&bool!(b)).into()),
+            SymExpr::Equal { a, b } => Some(translation[&a].eq(&translation[&b]).into()),
+            SymExpr::NotEqual { a, b } => Some(translation[&a].eq(&translation[&b]).not().into()),
+            SymExpr::BoolAnd { a, b } => Some(Bool::and(&[&bool!(a), &bool!(b)]).into()),
+            SymExpr::BoolOr { a, b } => Some(Bool::or(&[&bool!(a), &bool!(b)]).into()),
+            SymExpr::BoolXor { a, b } => Some(bool!(a).xor(bool!(b)).into()),
             SymExpr::And { a, b } => bv_binop!(a bvand b),
             SymExpr::Or { a, b } => bv_binop!(a bvor b),
             SymExpr::Xor { a, b } => bv_binop!(a bvxor b),
@@ -237,7 +228,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             SymExpr::Trunc { op, bits } => Some(bv!(op).extract(u32::from(bits - 1), 0).into()),
             SymExpr::BoolToBit { op } => Some(
                 bool!(op)
-                    .ite(&BV::from_u64(&ctx, 1, 1), &BV::from_u64(&ctx, 0, 1))
+                    .ite(&BV::from_u64(1, 1), &BV::from_u64(0, 1))
                     .into(),
             ),
             SymExpr::Concat { a, b } => bv_binop!(a concat b),
@@ -351,7 +342,6 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             }
         }
     }
-
     res
 }
 

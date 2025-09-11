@@ -10,7 +10,7 @@ use libafl_bolts::{
     tuples::{Handle, Handled},
 };
 use num_traits::ToPrimitive;
-use z3::{Config, Context, Optimize, ast::Bool};
+use z3::{Optimize, ast::Bool};
 
 use crate::{
     Error, HasMetadata, HasScheduler,
@@ -80,9 +80,7 @@ where
         // don't delete this else it won't work after restart
         let current = *state.corpus().current();
 
-        let cfg = Config::default();
-        let ctx = Context::new(&cfg);
-        let opt = Optimize::new(&ctx);
+        let opt = Optimize::new();
 
         let mut seed_exprs = HashMap::new();
         let mut cov_map = HashMap::new();
@@ -147,7 +145,7 @@ where
                 ),
             )?;
 
-            let seed_expr = Bool::fresh_const(&ctx, "seed");
+            let seed_expr = Bool::fresh_const("seed");
             let observers = executor.observers();
             let obs = observers[&self.observer_handle].as_ref();
 
