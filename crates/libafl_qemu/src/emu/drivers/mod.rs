@@ -121,7 +121,10 @@ where
             let ret_value = input_location.write(input.target_bytes().as_slice());
 
             if let Some(reg) = input_location.ret_register() {
-                input_location.cpu().write_reg(*reg, ret_value as GuestReg).unwrap();
+                input_location
+                    .cpu()
+                    .write_reg(*reg, ret_value as GuestReg)
+                    .unwrap();
             }
         }
 

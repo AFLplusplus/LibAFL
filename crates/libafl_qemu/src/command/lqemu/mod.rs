@@ -258,7 +258,10 @@ where
             .snapshot_id()
             .ok_or(EmulatorDriverError::SnapshotNotFound)?;
 
-        log::trace!("Restore snapshot @ PC {:x?}", qemu.read_reg(Regs::Pc).unwrap());
+        log::trace!(
+            "Restore snapshot @ PC {:x?}",
+            qemu.read_reg(Regs::Pc).unwrap()
+        );
         emu.snapshot_manager_mut().restore(qemu, &snapshot_id)?;
         log::trace!("PC after restore: {:x?}", qemu.read_reg(Regs::Pc).unwrap());
 

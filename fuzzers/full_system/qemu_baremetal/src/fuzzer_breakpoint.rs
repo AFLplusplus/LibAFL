@@ -33,8 +33,7 @@ use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::edges::StdEdgeCoverageModule,
-    GuestPhysAddr, GuestReg, QemuMemoryChunk,
-    InputLocation,
+    GuestPhysAddr, GuestReg, InputLocation, QemuMemoryChunk,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
@@ -123,16 +122,15 @@ pub fn fuzz() {
         emu.add_breakpoint(
             Breakpoint::with_command(
                 main_addr,
-                StartCommand::new(
-                    InputLocation::new(
-                        qemu,
-                        &QemuMemoryChunk::phys(
-                            input_addr,
-                            unsafe { MAX_INPUT_SIZE } as GuestReg,
-                            qemu.cpu_from_index(0).unwrap(),
-                        ),
-                        None,
-                    ))
+                StartCommand::new(InputLocation::new(
+                    qemu,
+                    &QemuMemoryChunk::phys(
+                        input_addr,
+                        unsafe { MAX_INPUT_SIZE } as GuestReg,
+                        qemu.cpu_from_index(0).unwrap(),
+                    ),
+                    None,
+                ))
                 .into(),
                 true,
             ),

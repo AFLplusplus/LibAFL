@@ -316,9 +316,11 @@ where
         };
 
         let map = match map.addr_kind {
-            libvharness_sys::lqemu_addr_kind_LQEMU_ADDR_PHYS => {
-                QemuMemoryChunk::phys(map.addr as GuestPhysAddr, map.len as GuestAddr, qemu.current_cpu().unwrap())
-            }
+            libvharness_sys::lqemu_addr_kind_LQEMU_ADDR_PHYS => QemuMemoryChunk::phys(
+                map.addr as GuestPhysAddr,
+                map.len as GuestAddr,
+                qemu.current_cpu().unwrap(),
+            ),
 
             libvharness_sys::lqemu_addr_kind_LQEMU_ADDR_VIRT => QemuMemoryChunk::virt(
                 map.addr as GuestVirtAddr,

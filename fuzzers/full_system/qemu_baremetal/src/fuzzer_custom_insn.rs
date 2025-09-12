@@ -25,7 +25,10 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_qemu::{emu::Emulator, executor::QemuExecutor, modules::edges::StdEdgeCoverageModule, QemuSnapshotManager};
+use libafl_qemu::{
+    emu::Emulator, executor::QemuExecutor, modules::edges::StdEdgeCoverageModule,
+    QemuSnapshotManager,
+};
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 pub fn fuzz() {
