@@ -625,6 +625,7 @@ mod seal {
         Named,
         tuples::{Handle, Merge, type_eq},
     };
+    use tuple_list::tuple_list;
 
     pub trait InnerBorrowMut {
         type Borrowed<'a>
@@ -688,29 +689,30 @@ mod seal {
         Tail: for<'b> StackedExtract<
                 'a,
                 (&'b Handle<T>, HTail),
-                (&'a mut Head, Visited),
+                <Visited as Merge<(&'a mut Head, ())>>::MergeResult,
                 Result = (
                     Option<&'a mut T>,
-                    <<Tail as Merge<Visited>>::MergeResult as StackedExtract<'a, HTail, ()>>::Result,
+                    <<Visited as Merge<Tail>>::MergeResult as StackedExtract<'a, HTail, ()>>::Result,
                 ),
             >,
-        Tail: Merge<Visited>,
-        <Tail as Merge<Visited>>::MergeResult: StackedExtract<'a, HTail, ()>,
+        Visited: Merge<(&'a mut Head, ())>,
+        Visited: Merge<Tail>,
+        <Visited as Merge<Tail>>::MergeResult: StackedExtract<'a, HTail, ()>,
         T: 'a,
     {
         type Result = (
             Option<&'a mut T>,
-            <<Tail as Merge<Visited>>::MergeResult as StackedExtract<'a, HTail, ()>>::Result,
+            <<Visited as Merge<Tail>>::MergeResult as StackedExtract<'a, HTail, ()>>::Result,
         );
 
         fn extract(self, handles: (&Handle<T>, HTail), visited: Visited) -> Self::Result {
             if type_eq::<Head, T>() && &handles.0.name == self.0.name() {
                 (
                     unsafe { (core::ptr::from_mut(self.0) as *mut T).as_mut() },
-                    self.1.merge(visited).extract(handles.1, ()),
+                    visited.merge(self.1).extract(handles.1, ()),
                 )
             } else {
-                self.1.extract(handles, (self.0, visited))
+                self.1.extract(handles, visited.merge(tuple_list!(self.0)))
             }
         }
     }
@@ -1361,6 +1363,26 @@ mod test {
                 tuple.get_all_mut(tuple_list!(&handle_1, &handle_1_clone));
             assert!(rec_1.is_some());
             assert!(rec_1_clone.is_none());
+        }
+
+        #[test]
+        fn test_preserve_order() {
+            let a = MyHandled::new("a");
+            let a_handle = a.handle();
+            let b = MyHandled::new("a"); // note: same name
+            let b_handle = b.handle();
+
+            let mut tuple = tuple_list!(a, b);
+
+            // pass the same handle twice, get two mutable references to the same value
+            // cannot pattern match to tuple_list, because it cannot deal with mut
+            let tuple_list!(_rec_a, rec_b) = tuple.get_all_mut(tuple_list!(&a_handle, &b_handle));
+
+            rec_b.unwrap().0 = "b".to_string();
+
+            let tuple_list!(a, b) = tuple;
+            assert_eq!(a.0, "a");
+            assert_eq!(b.0, "b");
         }
     }
 }
