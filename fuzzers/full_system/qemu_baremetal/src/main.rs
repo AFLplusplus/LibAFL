@@ -5,8 +5,8 @@ mod fuzzer_low_level;
 #[cfg(all(target_os = "linux", feature = "breakpoint"))]
 mod fuzzer_breakpoint;
 
-#[cfg(all(target_os = "linux", feature = "sync_exit"))]
-mod fuzzer_sync_exit;
+#[cfg(all(target_os = "linux", feature = "custom_insn"))]
+mod fuzzer_custom_insn;
 
 #[cfg(target_os = "linux")]
 pub fn main() {
@@ -16,8 +16,8 @@ pub fn main() {
     #[cfg(feature = "breakpoint")]
     fuzzer_breakpoint::fuzz();
 
-    #[cfg(feature = "sync_exit")]
-    fuzzer_sync_exit::fuzz();
+    #[cfg(feature = "custom_insn")]
+    fuzzer_custom_insn::fuzz();
 }
 
 #[cfg(not(target_os = "linux"))]

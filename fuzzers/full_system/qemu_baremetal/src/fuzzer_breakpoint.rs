@@ -34,6 +34,7 @@ use libafl_qemu::{
     executor::QemuExecutor,
     modules::edges::StdEdgeCoverageModule,
     GuestPhysAddr, GuestReg, QemuMemoryChunk,
+    InputLocation,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
@@ -105,25 +106,33 @@ pub fn fuzz() {
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
 
+        // Choose modules to use
+        let modules = tuple_list!(StdEdgeCoverageModule::builder()
+            .map_observer(edges_observer.as_mut())
+            .build()?);
+
         // Initialize QEMU Emulator
-        let emu = Emulator::builder()
+        let mut emu = Emulator::builder()
             .qemu_parameters(args)
-            .prepend_module(
-                StdEdgeCoverageModule::builder()
-                    .map_observer(edges_observer.as_mut())
-                    .build()?,
-            )
+            .modules(modules)
             .build()?;
+
+        let qemu = emu.qemu();
 
         // Set breakpoints of interest with corresponding commands.
         emu.add_breakpoint(
             Breakpoint::with_command(
                 main_addr,
-                StartCommand::new(QemuMemoryChunk::phys(
-                    input_addr,
-                    unsafe { MAX_INPUT_SIZE } as GuestReg,
-                    None,
-                ))
+                StartCommand::new(
+                    InputLocation::new(
+                        qemu,
+                        &QemuMemoryChunk::phys(
+                            input_addr,
+                            unsafe { MAX_INPUT_SIZE } as GuestReg,
+                            qemu.cpu_from_index(0).unwrap(),
+                        ),
+                        None,
+                    ))
                 .into(),
                 true,
             ),
@@ -140,6 +149,10 @@ pub fn fuzz() {
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
+
+        unsafe {
+            emu.start().unwrap();
+        }
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR

@@ -113,7 +113,7 @@ where
 {
     fn write_input(
         &mut self,
-        qemu: Qemu,
+        _qemu: Qemu,
         _state: &mut S,
         input: &I,
     ) -> Result<(), EmulatorDriverError> {
@@ -121,10 +121,7 @@ where
             let ret_value = input_location.write(input.target_bytes().as_slice());
 
             if let Some(reg) = input_location.ret_register() {
-                qemu.current_cpu()
-                    .unwrap() // if we end up there, qemu must be running the cpu asking for the input
-                    .write_reg(*reg, ret_value as GuestReg)
-                    .unwrap();
+                input_location.cpu().write_reg(*reg, ret_value as GuestReg).unwrap();
             }
         }
 

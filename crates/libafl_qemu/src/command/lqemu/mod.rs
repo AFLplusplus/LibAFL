@@ -212,7 +212,7 @@ where
             // Make sure JIT cache is empty just before starting
             qemu.flush_jit();
 
-            log::info!("Fuzzing starts");
+            log::info!("Fuzzing starts @ PC {:x}", qemu.read_reg(Regs::Pc).unwrap());
 
             return Ok(Some(EmulatorDriverResult::ReturnToClient(
                 EmulatorExitResult::FuzzingStarts,
@@ -258,7 +258,9 @@ where
             .snapshot_id()
             .ok_or(EmulatorDriverError::SnapshotNotFound)?;
 
+        log::trace!("Restore snapshot @ PC {:x?}", qemu.read_reg(Regs::Pc).unwrap());
         emu.snapshot_manager_mut().restore(qemu, &snapshot_id)?;
+        log::trace!("PC after restore: {:x?}", qemu.read_reg(Regs::Pc).unwrap());
 
         #[cfg(feature = "paranoid_debug")]
         emu.snapshot_manager_mut().check(qemu, &snapshot_id)?;

@@ -6,7 +6,7 @@ use libafl_qemu_sys::GuestPhysAddr;
 use crate::{
     DeviceSnapshotFilter, Emulator, HostMemorySegments, Qemu, QemuMemoryChunk, Regs, SnapshotId,
     SnapshotManagerError,
-    emu::{IsSnapshotManager, QemuSnapshotCheckResult},
+    emu::{IsSnapshotManager, QemuSnapshotCheckResult}, CPU
 };
 
 #[derive(Debug, Clone)]
@@ -25,6 +25,7 @@ pub type StdSnapshotManager = FastSnapshotManager;
 pub struct InputLocation {
     location: HostMemorySegments,
     ret_register: Option<Regs>,
+    cpu: CPU,
 }
 
 impl InputLocation {
@@ -35,6 +36,7 @@ impl InputLocation {
         Self {
             location,
             ret_register,
+            cpu: mem_chunk.cpu(),
         }
     }
 
@@ -46,6 +48,11 @@ impl InputLocation {
     #[must_use]
     pub fn ret_register(&self) -> &Option<Regs> {
         &self.ret_register
+    }
+
+    #[must_use]
+    pub fn cpu(&self) -> CPU {
+        self.cpu
     }
 
     pub fn write(&mut self, input: &[u8]) -> usize {

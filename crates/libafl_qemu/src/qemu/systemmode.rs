@@ -357,11 +357,7 @@ impl QemuMemoryChunk {
             addr: self.addr,
             remaining_len: self.size as usize,
             qemu,
-            cpu: if let Some(cpu) = self.cpu {
-                cpu
-            } else {
-                qemu.current_cpu().unwrap()
-            },
+            cpu: self.cpu,
         }
     }
 

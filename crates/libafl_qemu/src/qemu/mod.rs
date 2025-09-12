@@ -127,7 +127,7 @@ pub enum QemuParams {
 pub struct QemuMemoryChunk {
     addr: GuestAddrKind,
     size: GuestReg,
-    cpu: Option<CPU>,
+    cpu: CPU,
 }
 
 #[derive(Debug, Clone)]
@@ -1143,7 +1143,12 @@ impl QemuMemoryChunk {
     }
 
     #[must_use]
-    pub fn phys(addr: GuestPhysAddr, size: GuestReg, cpu: Option<CPU>) -> Self {
+    pub fn cpu(&self) -> CPU {
+        self.cpu
+    }
+
+    #[must_use]
+    pub fn phys(addr: GuestPhysAddr, size: GuestReg, cpu: CPU) -> Self {
         Self {
             addr: GuestAddrKind::Physical(addr),
             size,
@@ -1156,7 +1161,7 @@ impl QemuMemoryChunk {
         Self {
             addr: GuestAddrKind::Virtual(addr),
             size,
-            cpu: Some(cpu),
+            cpu,
         }
     }
 
@@ -1201,8 +1206,6 @@ impl QemuMemoryChunk {
             }
             GuestAddrKind::Virtual(vaddr) => unsafe {
                 self.cpu
-                    .as_ref()
-                    .unwrap()
                     .read_mem_unchecked(vaddr.try_into().unwrap(), output_sliced);
             },
         }
@@ -1222,16 +1225,16 @@ impl QemuMemoryChunk {
                 paddr,
                 self.size as usize,
                 qemu,
-                self.cpu.or_else(|| qemu.current_cpu())?,
+                self.cpu,
             )),
 
             GuestAddrKind::Virtual(start_vaddr) => {
-                let start_paddr = self.cpu.unwrap().get_phys_addr(start_vaddr)?;
+                let start_paddr = self.cpu.get_phys_addr(start_vaddr)?;
                 let page_size = qemu.target_page_size() as GuestVirtAddr;
 
                 for offset in (0..self.size as GuestVirtAddr).step_by(page_size) {
                     let vaddr = start_vaddr + offset as GuestVirtAddr;
-                    let paddr = self.cpu.unwrap().get_phys_addr(vaddr)?;
+                    let paddr = self.cpu.get_phys_addr(vaddr)?;
 
                     if paddr != start_paddr + offset as GuestPhysAddr {
                         // non contiguous memory
@@ -1243,7 +1246,7 @@ impl QemuMemoryChunk {
                     start_paddr,
                     self.size as usize,
                     qemu,
-                    self.cpu.unwrap(),
+                    self.cpu,
                 ))
             }
         }
@@ -1286,8 +1289,6 @@ impl QemuMemoryChunk {
             }
             GuestAddrKind::Virtual(vaddr) => {
                 self.cpu
-                    .as_ref()
-                    .unwrap()
                     .write_mem(vaddr.try_into().unwrap(), input_sliced)?;
             }
         }
