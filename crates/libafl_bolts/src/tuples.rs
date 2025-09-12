@@ -621,11 +621,12 @@ where
 
 #[cfg(feature = "alloc")]
 mod seal {
+    use tuple_list::tuple_list;
+
     use crate::{
         Named,
         tuples::{Handle, Merge, type_eq},
     };
-    use tuple_list::tuple_list;
 
     pub trait InnerBorrowMut {
         type Borrowed<'a>
