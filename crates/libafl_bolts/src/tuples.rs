@@ -557,10 +557,6 @@ pub trait MatchNameRef {
 
 /// Get multiple values using a tuple of handles
 ///
-/// This trait allows retrieving multiple values from a collection using a tuple of handles.
-/// The handles are references to `Handle<T>` objects, and the result is a tuple of
-/// `Option<&T>` values corresponding to each handle.
-///
 /// # Example
 /// ```ignore
 /// let tuple = tuple_list!(a, b, c);
@@ -579,16 +575,16 @@ pub trait GetAll<HandleTuple> {
     where
         Self: 'a;
 
-    /// Get all values using a tuple of handles
+    /// Get all values from a tuple of handles, the order is preserved
     fn get_all(&self, handles: HandleTuple) -> Self::GetAllResult<'_>;
 
-    /// Get all mutable values using a tuple of handles
+    /// Get all mutable values from a tuple of handles, the order is preserved
     ///
     /// # Safety
     ///
     /// There is no way to get multiple mutable references to the same collection without using unsafe code.
     ///
-    /// Should be safe if no two handles point to the same Target.
+    /// Safe if no two handles point to the same Target.
     unsafe fn get_all_mut(&mut self, handles: HandleTuple) -> Self::GetAllMutResult<'_>;
 }
 
@@ -607,7 +603,6 @@ where
     }
 }
 
-// Implementation for empty tuple
 #[cfg(feature = "alloc")]
 impl<M> GetAll<()> for M
 where
@@ -628,7 +623,6 @@ where
     unsafe fn get_all_mut(&mut self, _handles: ()) -> Self::GetAllMutResult<'_> {}
 }
 
-// Implementation for non-empty tuple
 #[cfg(feature = "alloc")]
 impl<M, T, Tail> GetAll<(&Handle<T>, Tail)> for M
 where
