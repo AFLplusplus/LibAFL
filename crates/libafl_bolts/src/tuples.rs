@@ -620,6 +620,7 @@ where
     fn get_all_mut(&mut self, _handles: ()) -> Self::GetAllMutResult<'_> {}
 }
 
+#[cfg(feature = "alloc")]
 mod seal {
     use crate::{
         Named,
