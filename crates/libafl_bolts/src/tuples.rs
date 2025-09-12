@@ -236,7 +236,7 @@ pub trait ExtractFirstRefType {
 
 impl ExtractFirstRefType for () {
     fn take<'a, T: 'static>(self) -> (Option<&'a T>, Self) {
-        (None, ())
+        tuple_list!(None)
     }
 }
 
@@ -283,7 +283,7 @@ pub trait ExtractFirstRefMutType {
 
 impl ExtractFirstRefMutType for () {
     fn take<'a, T: 'static>(self) -> (Option<&'a mut T>, Self) {
-        (None, ())
+        tuple_list!(None)
     }
 }
 
@@ -561,7 +561,7 @@ pub trait MatchNameRef {
 /// ```ignore
 /// let tuple = tuple_list!(a, b, c);
 /// let handles = tuple_list!(&a_handle, &c_handle);
-/// let (a_ref, (c_ref, ())) = tuple.get_all(handles);
+/// let tuple_list!(a_ref, c_ref) = tuple.get_all(handles);
 /// ```
 #[cfg(feature = "alloc")]
 pub trait GetAll<HandleTuple> {
@@ -604,9 +604,9 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<M> GetAll<()> for M
+impl<Head, Tail> GetAll<()> for (Head, Tail)
 where
-    M: MatchNameRef,
+    (Head, Tail): MatchNameRef,
 {
     type GetAllResult<'a>
         = ()
@@ -624,29 +624,38 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<M, T, Tail> GetAll<(&Handle<T>, Tail)> for M
+impl<Head, Tail, T, HandleTail> GetAll<(&Handle<T>, HandleTail)> for (Head, Tail)
 where
-    M: MatchNameRef + GetAll<Tail>,
+    (Head, Tail): MatchNameRef + GetAll<HandleTail>,
     T: 'static,
 {
     type GetAllResult<'a>
-        = (Option<&'a T>, <M as GetAll<Tail>>::GetAllResult<'a>)
+        = (
+        Option<&'a T>,
+        <(Head, Tail) as GetAll<HandleTail>>::GetAllResult<'a>,
+    )
     where
         Self: 'a;
 
     type GetAllMutResult<'a>
-        = (Option<&'a mut T>, <M as GetAll<Tail>>::GetAllMutResult<'a>)
+        = (
+        Option<&'a mut T>,
+        <(Head, Tail) as GetAll<HandleTail>>::GetAllMutResult<'a>,
+    )
     where
         Self: 'a;
 
-    fn get_all(&self, handles: (&Handle<T>, Tail)) -> Self::GetAllResult<'_> {
+    fn get_all(&self, handles: (&Handle<T>, HandleTail)) -> Self::GetAllResult<'_> {
         let (head_handle, tail_handles) = handles;
         let head_result = self.get(head_handle);
-        let tail_result = <M as GetAll<Tail>>::get_all(self, tail_handles);
+        let tail_result = <(Head, Tail) as GetAll<HandleTail>>::get_all(self, tail_handles);
         (head_result, tail_result)
     }
 
-    unsafe fn get_all_mut(&mut self, handles: (&Handle<T>, Tail)) -> Self::GetAllMutResult<'_> {
+    unsafe fn get_all_mut(
+        &mut self,
+        handles: (&Handle<T>, HandleTail),
+    ) -> Self::GetAllMutResult<'_> {
         let (head_handle, tail_handles) = handles;
         // We need to use unsafe code to get multiple mutable references
         let self_ptr = self as *mut Self;
@@ -1165,15 +1174,14 @@ mod test {
         #[test]
         fn test_get_all_one() {
             let (tuple, handles) = get_tuple();
-            let recovered = tuple.get_all(tuple_list!(&handles.0));
-            assert_eq!(recovered, (Some(&tuple.0), ()));
+            let tuple_list!(a_rec) = tuple.get_all(tuple_list!(&handles.0));
+            assert_eq!(a_rec, Some(&tuple.0));
         }
 
         #[test]
         fn test_get_all_two() {
             let (tuple, handles) = get_tuple();
-            let recovered = tuple.get_all(tuple_list!(&handles.0, &handles.1));
-            let (a_rec, (b_rec, ())) = recovered;
+            let tuple_list!(a_rec, b_rec) = tuple.get_all(tuple_list!(&handles.0, &handles.1));
             assert_eq!(a_rec, Some(&tuple.0));
             assert_eq!(b_rec, Some(&tuple.1.0));
         }
@@ -1181,8 +1189,8 @@ mod test {
         #[test]
         fn test_get_all_all() {
             let (tuple, handles) = get_tuple();
-            let recovered = tuple.get_all(tuple_list!(&handles.0, &handles.1, &handles.2));
-            let (a_rec, (b_rec, (c_rec, ()))) = recovered;
+            let tuple_list!(a_rec, b_rec, c_rec) =
+                tuple.get_all(tuple_list!(&handles.0, &handles.1, &handles.2));
             assert_eq!(a_rec, Some(&tuple.0));
             assert_eq!(b_rec, Some(&tuple.1.0));
             assert_eq!(c_rec, Some(&tuple.1.1.0));
@@ -1191,8 +1199,8 @@ mod test {
         #[test]
         fn test_get_all_reverse() {
             let (tuple, handles) = get_tuple();
-            let recovered = tuple.get_all(tuple_list!(&handles.2, &handles.1, &handles.0));
-            let (c_rec, (b_rec, (a_rec, ()))) = recovered;
+            let tuple_list!(c_rec, b_rec, a_rec) =
+                tuple.get_all(tuple_list!(&handles.2, &handles.1, &handles.0));
             assert_eq!(c_rec, Some(&tuple.1.1.0));
             assert_eq!(b_rec, Some(&tuple.1.0));
             assert_eq!(a_rec, Some(&tuple.0));
@@ -1206,7 +1214,7 @@ mod test {
             #[expect(clippy::unit_cmp)]
             // needs its own scope to make the clippy expect work
             {
-                assert_eq!(recovered, ());
+                assert_eq!(recovered, tuple_list!());
             }
         }
 
@@ -1214,7 +1222,7 @@ mod test {
         fn test_get_all_mut_one() {
             let (mut tuple, handles) = get_tuple();
             let recovered = unsafe { tuple.get_all_mut(tuple_list!(&handles.0)) };
-            let (a_rec, ()) = recovered;
+            let tuple_list!(a_rec) = recovered;
             a_rec.unwrap().0.push_str("_modified_a");
             assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
         }
@@ -1222,8 +1230,8 @@ mod test {
         #[test]
         fn test_get_all_mut_two() {
             let (mut tuple, handles) = get_tuple();
-            let recovered = unsafe { tuple.get_all_mut(tuple_list!(&handles.0, &handles.1)) };
-            let (a_rec, (b_rec, ())) = recovered;
+            let tuple_list!(a_rec, b_rec) =
+                unsafe { tuple.get_all_mut(tuple_list!(&handles.0, &handles.1)) };
             a_rec.unwrap().0.push_str("_modified_a");
             b_rec.unwrap().0.push_str("_modified_b");
             assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
@@ -1233,9 +1241,8 @@ mod test {
         #[test]
         fn test_get_all_mut_all() {
             let (mut tuple, handles) = get_tuple();
-            let recovered =
+            let tuple_list!(a_rec, b_rec, c_rec) =
                 unsafe { tuple.get_all_mut(tuple_list!(&handles.0, &handles.1, &handles.2)) };
-            let (a_rec, (b_rec, (c_rec, ()))) = recovered;
             a_rec.unwrap().0.push_str("_modified_a");
             b_rec.unwrap().0.push_str("_modified_b");
             c_rec.unwrap().0.push_str("_modified_c");
@@ -1247,15 +1254,31 @@ mod test {
         #[test]
         fn test_get_all_mut_reverse() {
             let (mut tuple, handles) = get_tuple();
-            let recovered =
+            let tuple_list!(c_rec, b_rec, a_rec) =
                 unsafe { tuple.get_all_mut(tuple_list!(&handles.2, &handles.1, &handles.0)) };
-            let (c_rec, (b_rec, (a_rec, ()))) = recovered;
             c_rec.unwrap().0.push_str("_modified_c");
             b_rec.unwrap().0.push_str("_modified_b");
             a_rec.unwrap().0.push_str("_modified_a");
             assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
             assert_eq!(tuple.get(&handles.1).unwrap().0, "b_modified_b");
             assert_eq!(tuple.get(&handles.2).unwrap().0, "c_modified_c");
+        }
+
+        #[test]
+        fn test_get_all_mut_unsafe() {
+            let (mut tuple, handles) = get_tuple();
+            let handle_1 = handles.0;
+            let handle_1_clone = handle_1.clone();
+
+            // pass the same handle twice, get two mutable references to the same value
+            // cannot pattern match to tuple_list, because it cannot deal with mut
+            let (mut rec_1, (mut rec_1_clone, ())) =
+                unsafe { tuple.get_all_mut(tuple_list!(&handle_1, &handle_1_clone)) };
+            rec_1.as_mut().unwrap().0.push_str("_modified_a");
+            assert_eq!(rec_1_clone.as_ref().unwrap().0, "a_modified_a");
+
+            rec_1_clone.as_mut().unwrap().0.push_str("_modified_b");
+            assert_eq!(rec_1.as_ref().unwrap().0, "a_modified_a_modified_b");
         }
     }
 }
