@@ -444,7 +444,6 @@ jobs:
     name: 🤖 ${{ matrix.fuzzer }}
     needs:
       - fuzzers-preflight # Check that all the fuzzers listed for testing or explicitly ignored
-      - qemu-changes # Only build if the QEMU code has changed
     if: ${{ needs.qemu-changes.outputs.qemu == 'true' }}
     strategy:
       matrix:
