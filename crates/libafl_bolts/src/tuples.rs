@@ -621,6 +621,52 @@ where
 
 #[cfg(feature = "alloc")]
 mod seal {
+    //! The logic in this section enables the [`super::GetAll::get_all_mut`] implementation.
+    //!
+    //! This works by treating tuple lists like queues; first, we convert a mutable ref to a tuple
+    //! list into a tuple list of mutable refs. With this, we then check each member of the tuple
+    //! list against the head of the handle list. If the head doesn't match, we append the head to
+    //! a list of already visited nodes. If the head matches, we extract the head and restart
+    //! traversal _without_ the head by merging the visited list with the tail of the current list.
+    //! If we ever hit the tail of the current list, we pop the top handle off and continue the
+    //! search from the start.
+    //!
+    //! Visualised, you can think of this something like this:
+    //!
+    //! ```text
+    //! handles:    [a, c, e]
+    //! tuple list: [a, b, c, d]
+    //! visited:    []
+    //!
+    //! 'a' matches 'a', so we stash 'a' continue with:
+    //! handles:    [c, e]
+    //! tuple list: [b, c, d]
+    //! visited:    []
+    //!
+    //! 'c' does not match 'b', so we push to the visited list and continue with:
+    //! handles:    [c, e]
+    //! tuple list: [c, d]
+    //! visited:    [b]
+    //!
+    //! 'c' matches; stash 'c', merge visited to list, and continue:
+    //! handles:    [e]
+    //! tuple list: [b, d]
+    //! visited:    []
+    //!
+    //! 'b' and 'd' do not match, so we make it to the base case:
+    //! handles:    [e]
+    //! tuple list: []
+    //! visited:    [b, d]
+    //!
+    //! We set the 'e' match to None, merge visited to list, then continue:
+    //! handles:    []
+    //! tuple list: [b, d]
+    //! visited:    []
+    //!
+    //! Handles is now empty, so we return () (list terminator) and end up with:
+    //! [Some(a), Some(c), None]
+    //! ```
+
     use tuple_list::tuple_list;
 
     use crate::{
