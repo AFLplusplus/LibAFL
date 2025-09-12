@@ -555,6 +555,43 @@ pub trait MatchNameRef {
     fn get_mut<T>(&mut self, rf: &Handle<T>) -> Option<&mut T>;
 }
 
+/// Get multiple values using a tuple of handles
+///
+/// This trait allows retrieving multiple values from a collection using a tuple of handles.
+/// The handles are references to `Handle<T>` objects, and the result is a tuple of
+/// `Option<&T>` values corresponding to each handle.
+///
+/// # Example
+/// ```ignore
+/// let tuple = tuple_list!(a, b, c);
+/// let handles = tuple_list!(&a_handle, &c_handle);
+/// let (a_ref, (c_ref, ())) = tuple.get_all(handles);
+/// ```
+#[cfg(feature = "alloc")]
+pub trait GetAll<HandleTuple> {
+    /// The result type of getting all values
+    type GetAllResult<'a>
+    where
+        Self: 'a;
+
+    /// The result type of getting all mutable values
+    type GetAllMutResult<'a>
+    where
+        Self: 'a;
+
+    /// Get all values using a tuple of handles
+    fn get_all(&self, handles: HandleTuple) -> Self::GetAllResult<'_>;
+
+    /// Get all mutable values using a tuple of handles
+    ///
+    /// # Safety
+    ///
+    /// There is no way to get multiple mutable references to the same collection without using unsafe code.
+    ///
+    /// Should be safe if no two handles point to the same Target.
+    unsafe fn get_all_mut(&mut self, handles: HandleTuple) -> Self::GetAllMutResult<'_>;
+}
+
 #[cfg(feature = "alloc")]
 #[expect(deprecated)]
 impl<M> MatchNameRef for M
@@ -567,6 +604,63 @@ where
 
     fn get_mut<T>(&mut self, rf: &Handle<T>) -> Option<&mut T> {
         self.match_name_mut::<T>(&rf.name)
+    }
+}
+
+// Implementation for empty tuple
+#[cfg(feature = "alloc")]
+impl<M> GetAll<()> for M
+where
+    M: MatchNameRef,
+{
+    type GetAllResult<'a>
+        = ()
+    where
+        Self: 'a;
+
+    type GetAllMutResult<'a>
+        = ()
+    where
+        Self: 'a;
+
+    fn get_all(&self, _handles: ()) -> Self::GetAllResult<'_> {}
+
+    unsafe fn get_all_mut(&mut self, _handles: ()) -> Self::GetAllMutResult<'_> {}
+}
+
+// Implementation for non-empty tuple
+#[cfg(feature = "alloc")]
+impl<M, T, Tail> GetAll<(&Handle<T>, Tail)> for M
+where
+    M: MatchNameRef + GetAll<Tail>,
+    T: 'static,
+{
+    type GetAllResult<'a>
+        = (Option<&'a T>, <M as GetAll<Tail>>::GetAllResult<'a>)
+    where
+        Self: 'a;
+
+    type GetAllMutResult<'a>
+        = (Option<&'a mut T>, <M as GetAll<Tail>>::GetAllMutResult<'a>)
+    where
+        Self: 'a;
+
+    fn get_all(&self, handles: (&Handle<T>, Tail)) -> Self::GetAllResult<'_> {
+        let (head_handle, tail_handles) = handles;
+        let head_result = self.get(head_handle);
+        let tail_result = <M as GetAll<Tail>>::get_all(self, tail_handles);
+        (head_result, tail_result)
+    }
+
+    unsafe fn get_all_mut(&mut self, handles: (&Handle<T>, Tail)) -> Self::GetAllMutResult<'_> {
+        let (head_handle, tail_handles) = handles;
+        // We need to use unsafe code to get multiple mutable references
+        let self_ptr = self as *mut Self;
+        unsafe {
+            let head_result = (*self_ptr).get_mut(head_handle);
+            let tail_result = (*self_ptr).get_all_mut(tail_handles);
+            (head_result, tail_result)
+        }
     }
 }
 
@@ -1021,5 +1115,153 @@ mod test {
         tuple_for_each_mut!(f2, core::fmt::Display, t, |x| {
             log::info!("{x}");
         });
+    }
+
+    #[cfg(feature = "alloc")]
+    mod get_all {
+        use alloc::{
+            borrow::Cow,
+            string::{String, ToString as _},
+        };
+
+        use tuple_list::{tuple_list, tuple_list_type};
+
+        use crate::tuples::{GetAll as _, Handle, Handled as _, MatchNameRef as _, Named};
+
+        #[derive(Debug, PartialEq)]
+        struct MyHandled(String, Cow<'static, str>);
+        impl Named for MyHandled {
+            fn name(&self) -> &Cow<'static, str> {
+                &self.1
+            }
+        }
+
+        impl MyHandled {
+            fn new(name: &str) -> Self {
+                Self(name.to_string(), Cow::Owned(name.to_string()))
+            }
+        }
+
+        #[expect(clippy::type_complexity)]
+        fn get_tuple() -> (
+            tuple_list_type!(MyHandled, MyHandled, MyHandled),
+            (Handle<MyHandled>, Handle<MyHandled>, Handle<MyHandled>),
+        ) {
+            let a = MyHandled::new("a");
+            let a_handle = a.handle();
+            let b = MyHandled::new("b");
+            let b_handle = b.handle();
+            let c = MyHandled::new("c");
+            let c_handle = c.handle();
+            (tuple_list!(a, b, c), (a_handle, b_handle, c_handle))
+        }
+
+        #[test]
+        fn test_get_all_empty() {
+            let (tuple, _handles) = get_tuple();
+            #[expect(clippy::let_unit_value)]
+            let recovered = tuple.get_all(tuple_list!());
+            #[expect(clippy::unit_cmp)]
+            // needs its own scope to make the clippy expect work
+            {
+                assert_eq!(recovered, ());
+            }
+        }
+
+        #[test]
+        fn test_get_all_one() {
+            let (tuple, handles) = get_tuple();
+            let recovered = tuple.get_all(tuple_list!(&handles.0));
+            assert_eq!(recovered, (Some(&tuple.0), ()));
+        }
+
+        #[test]
+        fn test_get_all_two() {
+            let (tuple, handles) = get_tuple();
+            let recovered = tuple.get_all(tuple_list!(&handles.0, &handles.1));
+            let (a_rec, (b_rec, ())) = recovered;
+            assert_eq!(a_rec, Some(&tuple.0));
+            assert_eq!(b_rec, Some(&tuple.1.0));
+        }
+
+        #[test]
+        fn test_get_all_all() {
+            let (tuple, handles) = get_tuple();
+            let recovered = tuple.get_all(tuple_list!(&handles.0, &handles.1, &handles.2));
+            let (a_rec, (b_rec, (c_rec, ()))) = recovered;
+            assert_eq!(a_rec, Some(&tuple.0));
+            assert_eq!(b_rec, Some(&tuple.1.0));
+            assert_eq!(c_rec, Some(&tuple.1.1.0));
+        }
+
+        #[test]
+        fn test_get_all_reverse() {
+            let (tuple, handles) = get_tuple();
+            let recovered = tuple.get_all(tuple_list!(&handles.2, &handles.1, &handles.0));
+            let (c_rec, (b_rec, (a_rec, ()))) = recovered;
+            assert_eq!(c_rec, Some(&tuple.1.1.0));
+            assert_eq!(b_rec, Some(&tuple.1.0));
+            assert_eq!(a_rec, Some(&tuple.0));
+        }
+
+        #[test]
+        fn test_get_all_mut_empty() {
+            let mut tuple = get_tuple().0;
+            #[expect(clippy::let_unit_value)]
+            let recovered = unsafe { tuple.get_all_mut(tuple_list!()) };
+            #[expect(clippy::unit_cmp)]
+            // needs its own scope to make the clippy expect work
+            {
+                assert_eq!(recovered, ());
+            }
+        }
+
+        #[test]
+        fn test_get_all_mut_one() {
+            let (mut tuple, handles) = get_tuple();
+            let recovered = unsafe { tuple.get_all_mut(tuple_list!(&handles.0)) };
+            let (a_rec, ()) = recovered;
+            a_rec.unwrap().0.push_str("_modified_a");
+            assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
+        }
+
+        #[test]
+        fn test_get_all_mut_two() {
+            let (mut tuple, handles) = get_tuple();
+            let recovered = unsafe { tuple.get_all_mut(tuple_list!(&handles.0, &handles.1)) };
+            let (a_rec, (b_rec, ())) = recovered;
+            a_rec.unwrap().0.push_str("_modified_a");
+            b_rec.unwrap().0.push_str("_modified_b");
+            assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
+            assert_eq!(tuple.get(&handles.1).unwrap().0, "b_modified_b");
+        }
+
+        #[test]
+        fn test_get_all_mut_all() {
+            let (mut tuple, handles) = get_tuple();
+            let recovered =
+                unsafe { tuple.get_all_mut(tuple_list!(&handles.0, &handles.1, &handles.2)) };
+            let (a_rec, (b_rec, (c_rec, ()))) = recovered;
+            a_rec.unwrap().0.push_str("_modified_a");
+            b_rec.unwrap().0.push_str("_modified_b");
+            c_rec.unwrap().0.push_str("_modified_c");
+            assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
+            assert_eq!(tuple.get(&handles.1).unwrap().0, "b_modified_b");
+            assert_eq!(tuple.get(&handles.2).unwrap().0, "c_modified_c");
+        }
+
+        #[test]
+        fn test_get_all_mut_reverse() {
+            let (mut tuple, handles) = get_tuple();
+            let recovered =
+                unsafe { tuple.get_all_mut(tuple_list!(&handles.2, &handles.1, &handles.0)) };
+            let (c_rec, (b_rec, (a_rec, ()))) = recovered;
+            c_rec.unwrap().0.push_str("_modified_c");
+            b_rec.unwrap().0.push_str("_modified_b");
+            a_rec.unwrap().0.push_str("_modified_a");
+            assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
+            assert_eq!(tuple.get(&handles.1).unwrap().0, "b_modified_b");
+            assert_eq!(tuple.get(&handles.2).unwrap().0, "c_modified_c");
+        }
     }
 }
