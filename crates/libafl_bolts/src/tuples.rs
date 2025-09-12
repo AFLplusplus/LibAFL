@@ -15,12 +15,14 @@ use core::{
 use serde::{Deserialize, Serialize};
 pub use tuple_list::{TupleList, tuple_list, tuple_list_type};
 
-use crate::HasLen;
 #[cfg(feature = "alloc")]
 use crate::Named;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use crate::hash_std;
-use crate::tuples::seal::{InnerBorrowMut, StackedExtract};
+use crate::{
+    HasLen,
+    tuples::seal::{InnerBorrowMut, StackedExtract},
+};
 
 /// Returns if the type `T` is equal to `U`, ignoring lifetimes.
 #[must_use]
@@ -619,8 +621,10 @@ where
 }
 
 mod seal {
-    use crate::Named;
-    use crate::tuples::{Handle, Merge, type_eq};
+    use crate::{
+        Named,
+        tuples::{Handle, Merge, type_eq},
+    };
 
     pub trait InnerBorrowMut {
         type Borrowed<'a>
