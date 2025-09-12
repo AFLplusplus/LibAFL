@@ -1,7 +1,7 @@
 use libafl_bolts::Error;
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
-use crate::{Emulator, GuestMaps, NopSnapshotManager, Regs, TargetSignalHandling};
+use crate::{CPU, Emulator, GuestMaps, NopSnapshotManager, Regs, TargetSignalHandling};
 
 pub type StdSnapshotManager = NopSnapshotManager;
 
@@ -13,14 +13,16 @@ pub type StdSnapshotManager = NopSnapshotManager;
 pub struct InputLocation {
     location: Box<[u8]>,
     ret_register: Option<Regs>,
+    cpu: CPU,
 }
 
 impl InputLocation {
     #[must_use]
-    pub fn new(location: Box<[u8]>, ret_register: Option<Regs>) -> Self {
+    pub fn new(location: Box<[u8]>, ret_register: Option<Regs>, cpu: CPU) -> Self {
         Self {
             location,
             ret_register,
+            cpu,
         }
     }
 
@@ -40,6 +42,11 @@ impl InputLocation {
     #[must_use]
     pub fn ret_register(&self) -> &Option<Regs> {
         &self.ret_register
+    }
+
+    #[must_use]
+    pub fn cpu(&self) -> CPU {
+        self.cpu
     }
 }
 

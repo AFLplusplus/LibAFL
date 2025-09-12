@@ -94,6 +94,7 @@ where
             Ok(StartCommand::new(InputLocation::new(
                 Box::from(memory_chunk),
                 Some(arch_regs_map[ExitArgs::Ret]),
+                qemu.current_cpu().unwrap(),
             )))
         }
 
