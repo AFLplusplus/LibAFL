@@ -13,10 +13,9 @@ use serde::{Serialize, de::DeserializeOwned};
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, HasMetadata, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{
-        Corpus, CorpusId, HasCurrentCorpusId, HasTestcase,
-        testcase::{HasTestcaseMetadata, TestcaseMetadata},
+        Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, HasTestcaseMetadata, TestcaseMetadata,
     },
     events::{
         Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter,
@@ -424,30 +423,34 @@ where
             ExecuteInputResult::Corpus => {
                 // Not a solution
                 // Add the input to the main corpus
-                let mut testcase = Testcase::from(input.clone());
+                let mut md = TestcaseMetadata::default();
+
                 #[cfg(feature = "track_hit_feedbacks")]
                 self.feedback_mut()
-                    .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
+                    .append_hit_feedbacks(md.hit_feedbacks_mut())?;
                 self.feedback_mut()
-                    .append_metadata(state, manager, observers, &mut testcase)?;
-                let id = state.corpus_mut().add(testcase)?;
+                    .append_metadata(state, manager, observers, &mut md)?;
+
+                let id = state.corpus_mut().add(Rc::new(input.clone()), md)?;
                 self.scheduler_mut().on_add(state, id)?;
 
                 Ok(Some(id))
             }
             ExecuteInputResult::Solution => {
                 // The input is a solution, add it to the respective corpus
-                let mut testcase = Testcase::from(input.clone());
-                testcase.set_parent_id_optional(*state.corpus().current());
-                if let Ok(mut tc) = state.current_testcase_mut() {
+                let mut md = TestcaseMetadata::default();
+
+                md.set_parent_id_optional(*state.corpus().current());
+
+                if let Ok(mut tc) = state.current_testcase() {
                     tc.found_objective();
                 }
                 #[cfg(feature = "track_hit_feedbacks")]
                 self.objective_mut()
                     .append_hit_feedbacks(testcase.hit_objectives_mut())?;
                 self.objective_mut()
-                    .append_metadata(state, manager, observers, &mut testcase)?;
-                state.solutions_mut().add(testcase)?;
+                    .append_metadata(state, manager, observers, &mut md)?;
+                state.solutions_mut().add(Rc::new(input.clone()), md)?;
 
                 Ok(None)
             }
@@ -726,7 +729,9 @@ where
             self.objective_mut()
                 .append_metadata(state, manager, &*observers, &mut tc_md)?;
             // we don't care about solution id
-            let id = state.solutions_mut().add(Rc::new(input.clone()), tc_md.clone())?;
+            let id = state
+                .solutions_mut()
+                .add(Rc::new(input.clone()), tc_md.clone())?;
 
             manager.fire(
                 state,

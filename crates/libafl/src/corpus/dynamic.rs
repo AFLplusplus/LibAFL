@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
-use crate::corpus::{Corpus, CorpusId, Testcase};
+use crate::corpus::{Corpus, CorpusId, Testcase, TestcaseMetadata};
 
 /// An dynamic corpus type accepting two types of corpus at runtime. This helps rustc better
 /// reason about the bounds compared to dyn objects.
@@ -39,17 +39,17 @@ where
     C1: Corpus<I>,
     C2: Corpus<I>,
 {
-    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+    fn add(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error> {
         match self {
-            Self::Corpus1(c1, _) => c1.add(testcase),
-            Self::Corpus2(c2, _) => c2.add(testcase),
+            Self::Corpus1(c1, _) => c1.add(input, md),
+            Self::Corpus2(c2, _) => c2.add(input, md),
         }
     }
 
-    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+    fn add_disabled(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error> {
         match self {
-            Self::Corpus1(c1, _) => c1.add_disabled(testcase),
-            Self::Corpus2(c2, _) => c2.add_disabled(testcase),
+            Self::Corpus1(c1, _) => c1.add_disabled(input, md),
+            Self::Corpus2(c2, _) => c2.add_disabled(input, md),
         }
     }
 
@@ -95,17 +95,14 @@ where
         }
     }
 
-    fn get(&self, id: CorpusId) -> Result<Rc<Testcase<I>>, Error> {
+    /// Get testcase by id
+    fn get_from<const ENABLED: bool>(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
         match self {
-            Self::Corpus1(c1, _) => c1.get(id),
-            Self::Corpus2(c2, _) => c2.get(id),
-        }
-    }
-
-    fn get_from_all(&self, id: CorpusId) -> Result<Rc<Testcase<I>>, Error> {
-        match self {
-            Self::Corpus1(c1, _) => c1.get_from_all(id),
-            Self::Corpus2(c2, _) => c2.get_from_all(id),
+            Self::Corpus1(c1, _) => c1.get_from(id),
+            Self::Corpus2(c2, _) => c2.get_from(id),
         }
     }
 
@@ -151,10 +148,15 @@ where
         }
     }
 
-    // fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-    //     match self {
-    //         Self::Corpus1(c1, _) => c1.replace(idx, testcase),
-    //         Self::Corpus2(c2, _) => c2.replace(idx, testcase),
-    //     }
-    // }
+    fn replace(
+        &mut self,
+        id: CorpusId,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        match self {
+            Self::Corpus1(c1, _) => c1.replace(id, input, md),
+            Self::Corpus2(c2, _) => c2.replace(id, input, md),
+        }
+    }
 }

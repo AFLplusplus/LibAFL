@@ -27,7 +27,7 @@ where
 /// Compute the favor factor of a [`Testcase`]. Lower  is better.
 pub trait TestcasePenalty<I, S> {
     /// Computes the favor factor of a [`Testcase`]. Higher is better.
-    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error>;
+    fn compute(state: &S, corpus_id: CorpusId) -> Result<f64, Error>;
 }
 
 /// Multiply the testcase size with the execution time.

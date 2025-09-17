@@ -9,6 +9,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(feature = "std")]
+use libafl_bolts::core_affinity::{CoreId, Cores};
+use libafl_bolts::{
+    current_time,
+    rands::{Rand, StdRand},
+    serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
+};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::ClientPerfStats;
 use crate::{
@@ -21,18 +30,6 @@ use crate::{
     inputs::{Input, NopInput},
     stages::StageId,
 };
-
-#[cfg(feature = "std")]
-use libafl_bolts::core_affinity::{CoreId, Cores};
-use libafl_bolts::{
-    current_time,
-    rands::{Rand, StdRand},
-    serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
-};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-
-mod stack;
-pub use stack::StageStack;
 
 mod stack;
 pub use stack::StageStack;

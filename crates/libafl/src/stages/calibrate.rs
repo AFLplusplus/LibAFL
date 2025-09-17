@@ -13,7 +13,7 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasMetadataMut, HasNamedMetadataMut,
+    Error, HasMetadata, HasMetadataMut, HasNamedMetadataMut, HasScheduler,
     corpus::{Corpus, HasCurrentCorpusId, HasTestcaseMetadata, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},

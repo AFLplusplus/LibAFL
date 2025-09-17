@@ -19,8 +19,8 @@ pub use cache::{Cache, FifoCache, IdentityCache};
 pub mod single;
 pub use single::SingleCorpus;
 
-pub mod dynamic;
-pub use dynamic::DynamicCorpus;
+// pub mod dynamic;
+// pub use dynamic::DynamicCorpus;
 
 pub mod combined;
 pub use combined::CombinedCorpus;
