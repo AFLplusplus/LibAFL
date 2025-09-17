@@ -23,7 +23,7 @@ env_logger = { version = "0.11.6" }
 libfuzzer-sys = { version = "0.4" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 mockall = { version = "0.13.1" }
-thiserror = { version = "2.0.11" }
+thiserror = { version = "2.0.16" }
 
 [[bin]]
 name = "guest_shadow"

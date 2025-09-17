@@ -24,12 +24,18 @@ where
     fn compute(state: &S, corpus_id: CorpusId) -> Result<f64, Error>;
 }
 
+/// Compute the favor factor of a [`Testcase`]. Lower  is better.
+pub trait TestcasePenalty<I, S> {
+    /// Computes the favor factor of a [`Testcase`]. Higher is better.
+    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error>;
+}
+
 /// Multiply the testcase size with the execution time.
 /// This favors small and quick testcases.
 #[derive(Debug, Clone)]
-pub struct LenTimeMulTestcaseScore {}
+pub struct LenTimeMulTestcasePenalty {}
 
-impl<I, S> TestcaseScore<I, S> for LenTimeMulTestcaseScore
+impl<I, S> TestcasePenalty<I, S> for LenTimeMulTestcasePenalty
 where
     S: HasCorpus<I>,
     I: HasLen,

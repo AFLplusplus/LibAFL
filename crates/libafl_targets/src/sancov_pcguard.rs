@@ -290,7 +290,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
                 let edges_map_len = (*edges_map_ptr).len();
                 MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1);
                 assert!(
-                    (MAX_EDGES_FOUND <= edges_map_len),
+                    MAX_EDGES_FOUND <= edges_map_len,
                     "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({edges_map_len}). Use the LIBAFL_EDGES_MAP_DEFAULT_SIZE env to increase it at compile time."
                 );
             }

@@ -9,6 +9,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::stats::ClientPerfStats;
+use crate::{
+    Error, HasMetadata, HasMetadataMut, HasNamedMetadata, HasNamedMetadataMut,
+    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
+    events::{Event, EventFirer, EventWithStats, LogSeverity},
+    feedbacks::StateInitializer,
+    fuzzer::{Evaluator, ExecuteInputResult},
+    generators::Generator,
+    inputs::{Input, NopInput},
+    stages::StageId,
+};
+
 #[cfg(feature = "std")]
 use libafl_bolts::core_affinity::{CoreId, Cores};
 use libafl_bolts::{
@@ -18,20 +31,8 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-#[cfg(feature = "std")]
-use crate::fuzzer::ExecuteInputResult;
-#[cfg(feature = "introspection")]
-use crate::monitors::stats::ClientPerfStats;
-use crate::{
-    Error, HasMetadata, HasMetadataMut, HasNamedMetadata, HasNamedMetadataMut,
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
-    events::{Event, EventFirer, EventWithStats, LogSeverity},
-    feedbacks::StateInitializer,
-    fuzzer::Evaluator,
-    generators::Generator,
-    inputs::{Input, NopInput},
-    stages::StageId,
-};
+mod stack;
+pub use stack::StageStack;
 
 mod stack;
 pub use stack::StageStack;
@@ -714,15 +715,15 @@ where
                     "Skipping input that we could not load from {}: {err:?}",
                     path.display()
                 );
-                return Ok(ExecuteInputResult::default());
+                return Ok(ExecuteInputResult::None);
             }
         };
         if config.forced {
-            let (_id, result) = fuzzer.add_input(self, executor, manager, input)?;
-            Ok(result)
+            let _ = fuzzer.add_input(self, executor, manager, input)?;
+            Ok(ExecuteInputResult::Corpus)
         } else {
             let (res, _) = fuzzer.evaluate_input(self, executor, manager, &input)?;
-            if !(res.is_corpus() || res.is_solution()) {
+            if res == ExecuteInputResult::None {
                 fuzzer.add_disabled_input(self, input)?;
                 log::warn!(
                     "Input {} was not interesting, adding as disabled.",
@@ -750,7 +751,7 @@ where
             match self.next_file() {
                 Ok(path) => {
                     let res = self.load_file(&path, manager, fuzzer, executor, &mut config)?;
-                    if config.exit_on_solution && res.is_solution() {
+                    if config.exit_on_solution && matches!(res, ExecuteInputResult::Solution) {
                         return Err(Error::invalid_corpus(format!(
                             "Input {} resulted in a solution.",
                             path.display()
@@ -1054,11 +1055,11 @@ where
         for _ in 0..num {
             let input = generator.generate(self)?;
             if forced {
-                let (_, _) = fuzzer.add_input(self, executor, manager, input)?;
+                let _ = fuzzer.add_input(self, executor, manager, input)?;
                 added += 1;
             } else {
                 let (res, _) = fuzzer.evaluate_input(self, executor, manager, &input)?;
-                if res.is_corpus() {
+                if res != ExecuteInputResult::None {
                     added += 1;
                 }
             }
