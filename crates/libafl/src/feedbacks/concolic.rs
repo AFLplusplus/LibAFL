@@ -13,8 +13,8 @@ use libafl_bolts::{
 };
 
 use crate::{
-    Error, HasMetadata,
-    corpus::Testcase,
+    Error, HasMetadataMut,
+    corpus::testcase::TestcaseMetadata,
     feedbacks::{Feedback, StateInitializer},
     observers::concolic::ConcolicObserver,
 };
@@ -38,18 +38,15 @@ impl<'map> ConcolicFeedback<'map> {
         }
     }
 
-    fn add_concolic_feedback_to_metadata<I, OT>(
-        &mut self,
-        observers: &OT,
-        testcase: &mut Testcase<I>,
-    ) where
+    fn add_concolic_feedback_to_metadata<OT>(&mut self, observers: &OT, md: &mut TestcaseMetadata)
+    where
         OT: MatchName,
     {
         if let Some(metadata) = observers
             .get(&self.observer_handle)
             .map(ConcolicObserver::create_metadata_from_current_map)
         {
-            testcase.metadata_map_mut().insert(metadata);
+            md.metadata_map_mut().insert(metadata);
         }
     }
 }
@@ -76,9 +73,9 @@ where
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        self.add_concolic_feedback_to_metadata(observers, testcase);
+        self.add_concolic_feedback_to_metadata::<OT>(observers, md);
         Ok(())
     }
 }

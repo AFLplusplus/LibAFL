@@ -9,8 +9,8 @@ use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata,
-    corpus::{Corpus, CorpusId, Testcase},
+    Error, HasMetadataMut,
+    corpus::{Corpus, CorpusId, HasTestcaseMetadata, Testcase},
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand},
 };
@@ -66,9 +66,9 @@ impl<F> ProbabilitySamplingScheduler<F> {
     pub fn store_probability<I, S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
         F: TestcaseScore<I, S>,
-        S: HasCorpus<I> + HasMetadata + HasRand,
+        S: HasCorpus<I> + HasMetadataMut + HasRand,
     {
-        let prob = F::compute(state, &mut *state.corpus().get(id)?.borrow_mut())?;
+        let prob = F::compute(state, id)?;
         debug_assert!(
             prob >= 0.0 && prob.is_finite(),
             "scheduler probability is {prob}; to work correctly it must be >= 0.0 and finite"
@@ -86,13 +86,13 @@ impl<F> ProbabilitySamplingScheduler<F> {
 impl<F, I, S> RemovableScheduler<I, S> for ProbabilitySamplingScheduler<F>
 where
     F: TestcaseScore<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<I> + HasMetadataMut + HasRand,
 {
     fn on_remove(
         &mut self,
         state: &mut S,
         id: CorpusId,
-        _testcase: &Option<Testcase<I>>,
+        _testcase: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
@@ -108,7 +108,7 @@ where
         &mut self,
         state: &mut S,
         id: CorpusId,
-        _prev: &Testcase<I>,
+        _prev: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
@@ -125,14 +125,15 @@ where
 impl<F, I, S> Scheduler<I, S> for ProbabilitySamplingScheduler<F>
 where
     F: TestcaseScore<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<I> + HasMetadataMut + HasRand,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         let current_id = *state.corpus().current();
+
         state
             .corpus()
             .get(id)?
-            .borrow_mut()
+            .testcase_metadata_mut()
             .set_parent_id_optional(current_id);
 
         if state.metadata_map().get::<ProbabilityMetadata>().is_none() {
@@ -206,7 +207,10 @@ mod tests {
     where
         S: HasCorpus<I>,
     {
-        fn compute(_state: &S, _: &mut Testcase<I>) -> Result<f64, Error> {
+        fn compute(
+            _state: &S,
+            _entry: &mut Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataRefMut<'_>>,
+        ) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }

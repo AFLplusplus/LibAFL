@@ -3,6 +3,21 @@
 use alloc::{borrow::ToOwned, string::ToString};
 use core::{hash::Hash, marker::PhantomData};
 
+use libafl_bolts::{
+    generic_hash_std,
+    rands::Rand,
+    tuples::{Handle, MatchName, MatchNameRef},
+};
+
+use crate::{
+    Error, HasMetadata, HasMetadataMut,
+    corpus::{
+        Corpus, CorpusId, HasTestcase, HasTestcaseMetadata, SchedulerTestcaseMetadata, Testcase,
+    },
+    random_corpus_id,
+    state::{HasCorpus, HasRand},
+};
+
 pub mod testcase_score;
 pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
 
@@ -27,29 +42,20 @@ pub mod weighted;
 pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
 pub mod tuneable;
-use libafl_bolts::{
-    generic_hash_std,
-    rands::Rand,
-    tuples::{Handle, MatchName, MatchNameRef},
-};
 pub use tuneable::*;
 
-use crate::{
-    Error, HasMetadata,
-    corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    random_corpus_id,
-    state::{HasCorpus, HasRand},
-};
-
 /// The scheduler also implements `on_remove` and `on_replace` if it implements this stage.
-pub trait RemovableScheduler<I, S> {
+pub trait RemovableScheduler<I, S>
+where
+    S: HasCorpus<I>,
+{
     /// Removed the given entry from the corpus at the given index
-    /// When you remove testcases, make sure that that testcase is not currently fuzzed one!
+    /// When you remove testcases, make sure that testcase is not currently fuzzed one!
     fn on_remove(
         &mut self,
         _state: &mut S,
         _id: CorpusId,
-        _testcase: &Option<Testcase<I>>,
+        _testcase: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -59,7 +65,7 @@ pub trait RemovableScheduler<I, S> {
         &mut self,
         _state: &mut S,
         _id: CorpusId,
-        _prev: &Testcase<I>,
+        _prev: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -73,13 +79,14 @@ pub fn on_add_metadata_default<CS, I, S>(
 ) -> Result<(), Error>
 where
     CS: AflScheduler,
-    S: HasTestcase<I> + HasCorpus<I>,
+    S: HasCorpus<I> + HasTestcase<I> + HasMetadataMut,
 {
     let current_id = *state.corpus().current();
 
     let mut depth = match current_id {
         Some(parent_idx) => state
             .testcase(parent_idx)?
+            .testcase_metadata()
             .metadata::<SchedulerTestcaseMetadata>()?
             .depth(),
         None => 0,
@@ -90,12 +97,13 @@ where
 
     // Attach a `SchedulerTestcaseMetadata` to the queue entry.
     depth += 1;
-    let mut testcase = state.testcase_mut(id)?;
-    testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
+    let testcase = state.testcase(id)?;
+    let mut md = testcase.testcase_metadata_mut();
+    md.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
         depth,
         scheduler.last_hash(),
     ));
-    testcase.set_parent_id_optional(current_id);
+    md.set_parent_id_optional(current_id);
     Ok(())
 }
 
@@ -108,7 +116,7 @@ pub fn on_evaluation_metadata_default<CS, O, OT, S>(
 where
     CS: AflScheduler,
     CS::ObserverRef: AsRef<O>,
-    S: HasMetadata,
+    S: HasMetadataMut,
     O: Hash,
     OT: MatchName,
 {
@@ -138,8 +146,10 @@ where
     let current_id = *state.corpus().current();
 
     if let Some(id) = current_id {
-        let mut testcase = state.testcase_mut(id)?;
-        let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
+        let testcase = state.testcase(id)?;
+        let mut md = testcase.testcase_metadata_mut();
+
+        let tcmeta = md.metadata_mut::<SchedulerTestcaseMetadata>()?;
 
         if tcmeta.handicap() >= 4 {
             tcmeta.set_handicap(tcmeta.handicap() - 4);
@@ -220,11 +230,7 @@ where
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
-        state
-            .corpus()
-            .get(id)?
-            .borrow_mut()
-            .set_parent_id_optional(current_id);
+        state.corpus().get(id)?.set_parent_id_optional(current_id);
 
         Ok(())
     }

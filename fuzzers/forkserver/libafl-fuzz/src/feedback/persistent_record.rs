@@ -78,7 +78,7 @@ where
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<I>,
+        _md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         if self.should_run() {
             let file_path = testcase

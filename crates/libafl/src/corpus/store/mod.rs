@@ -1,11 +1,11 @@
 //! Stores are collections managing testcases
 
-use core::cell::RefCell;
-use std::rc::Rc;
+use alloc::rc::Rc;
 
 use libafl_bolts::Error;
 
 use super::{CorpusId, Testcase};
+use crate::corpus::testcase::{HasTestcaseMetadata, TestcaseMetadata};
 
 pub mod maps;
 pub use maps::{BtreeCorpusMap, HashCorpusMap, InMemoryCorpusMap};
@@ -14,10 +14,13 @@ pub mod inmemory;
 pub use inmemory::InMemoryStore;
 
 pub mod ondisk;
-pub use ondisk::OnDiskStore;
+pub use ondisk::{OnDiskMetadataFormat, OnDiskStore};
 
 /// A store is responsible for storing and retrieving [`Testcase`]s, ordered by add time.
 pub trait Store<I> {
+    /// A [`TestcaseMetadata`] cell.
+    type TestcaseMetadataCell: HasTestcaseMetadata;
+
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
 
@@ -35,22 +38,39 @@ pub trait Store<I> {
     }
 
     /// Store the testcase associated to corpus_id to the enabled set.
-    fn add(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<(), Error>;
+    fn add(&mut self, id: CorpusId, input: Rc<I>, md: TestcaseMetadata) -> Result<(), Error>;
 
     /// Store the testcase associated to corpus_id to the disabled set.
-    fn add_disabled(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<(), Error>;
+    fn add_disabled(
+        &mut self,
+        id: CorpusId,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<(), Error>;
+
+    /// Get testcase by id; considers only enabled testcases
+    fn get(&self, id: CorpusId) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        Self::get_from::<true>(self, id)
+    }
+
+    /// Get testcase by id; considers both enabled and disabled testcases
+    fn get_from_all(&self, id: CorpusId) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        Self::get_from::<false>(self, id)
+    }
+
+    /// Get testcase by id
+    fn get_from<const ENABLED: bool>(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
 
     /// Replaces the [`Testcase`] at the given idx in the enabled set, returning the existing.
-    fn replace(&mut self, id: CorpusId, new_testcase: Testcase<I>) -> Result<Testcase<I>, Error>;
-
-    /// Removes an entry from the corpus, returning it; considers both enabled and disabled testcases
-    fn remove(&mut self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error>;
-
-    /// Get by id; considers only enabled testcases
-    fn get(&self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error>;
-
-    /// Get by id; considers both enabled and disabled testcases
-    fn get_from_all(&self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error>;
+    fn replace(
+        &mut self,
+        id: CorpusId,
+        input: Rc<I>,
+        metadata: TestcaseMetadata,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
 
     /// Get the prev corpus id in chronological order
     fn prev(&self, id: CorpusId) -> Option<CorpusId>;
@@ -69,4 +89,10 @@ pub trait Store<I> {
 
     /// Get the nth corpus id; considers both enabled and disabled testcases
     fn nth_from_all(&self, nth: usize) -> CorpusId;
+}
+
+/// A Store with removable entries
+pub trait RemovableStore<I>: Store<I> {
+    /// Removes an entry from the corpus, returning it; considers both enabled and disabled testcases
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
 }

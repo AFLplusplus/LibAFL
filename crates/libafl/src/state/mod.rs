@@ -2,13 +2,7 @@
 
 #[cfg(feature = "std")]
 use alloc::vec::Vec;
-use core::{
-    borrow::BorrowMut,
-    cell::{Ref, RefMut},
-    fmt::Debug,
-    marker::PhantomData,
-    time::Duration,
-};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::{
     fs,
@@ -24,15 +18,12 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-mod stack;
-pub use stack::StageStack;
-
 #[cfg(feature = "std")]
 use crate::fuzzer::ExecuteInputResult;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::ClientPerfStats;
 use crate::{
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasMetadataMut, HasNamedMetadata, HasNamedMetadataMut,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     feedbacks::StateInitializer,
@@ -41,6 +32,10 @@ use crate::{
     inputs::{Input, NopInput},
     stages::StageId,
 };
+
+mod stack;
+pub use stack::StageStack;
+
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
@@ -51,6 +46,7 @@ pub trait HasCorpus<I> {
 
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;
+
     /// The testcase corpus (mutable)
     fn corpus_mut(&mut self) -> &mut Self::Corpus;
 }
@@ -160,6 +156,7 @@ pub trait HasStartTime {
     /// The starting time (mutable)
     fn start_time_mut(&mut self) -> &mut Duration;
 
+    /// Get the time elapsed since start.
     fn time_since_start(&self) -> Duration {
         let start_time = self.start_time();
         let current_time = current_time();
@@ -302,15 +299,12 @@ where
     C: Corpus<I>,
 {
     /// To get the testcase
-    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<I>>, Error> {
+    fn testcase(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, <Self::Corpus as Corpus<I>>::TestcaseMetadataCell>, Error> {
         let tc = self.corpus().get(id)?;
-        Ok(tc.borrow())
-    }
-
-    /// To get mutable testcase
-    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<I>>, Error> {
-        let tc = self.corpus().get(id)?;
-        Ok(tc.borrow_mut())
+        Ok(tc)
     }
 }
 
@@ -341,7 +335,9 @@ impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC> {
     fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
+}
 
+impl<C, I, R, SC> HasMetadataMut for StdState<C, I, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
@@ -355,7 +351,9 @@ impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC> {
     fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
         &self.named_metadata
     }
+}
 
+impl<C, I, R, SC> HasNamedMetadataMut for StdState<C, I, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
@@ -464,14 +462,9 @@ pub trait HasCurrentTestcase<I>: HasCorpus<I> {
     /// Gets the current [`Testcase`] we are fuzzing
     ///
     /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
-    fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error>;
-    //fn current_testcase(&self) -> Result<&Testcase<I>, Error>;
-
-    /// Gets the current [`Testcase`] we are fuzzing (mut)
-    ///
-    /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
-    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error>;
-    //fn current_testcase_mut(&self) -> Result<&mut Testcase<I>, Error>;
+    fn current_testcase(
+        &self,
+    ) -> Result<Testcase<I, <Self::Corpus as Corpus<I>>::TestcaseMetadataCell>, Error>;
 
     /// Gets a cloned representation of the current [`Testcase`].
     ///
@@ -488,29 +481,21 @@ where
     T: HasCorpus<I> + HasCurrentCorpusId,
     I: Clone,
 {
-    fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error> {
+    fn current_testcase(
+        &self,
+    ) -> Result<Testcase<I, <Self::Corpus as Corpus<I>>::TestcaseMetadataCell>, Error> {
         let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::key_not_found(
                 "We are not currently processing a testcase",
             ));
         };
 
-        Ok(self.corpus().get(corpus_id)?.borrow())
-    }
-
-    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error> {
-        let Some(corpus_id) = self.current_corpus_id()? else {
-            return Err(Error::illegal_state(
-                "We are not currently processing a testcase",
-            ));
-        };
-
-        Ok(self.corpus().get(corpus_id)?.borrow_mut())
+        self.corpus().get(corpus_id)
     }
 
     fn current_input_cloned(&self) -> Result<I, Error> {
-        let mut testcase = self.current_testcase_mut()?;
-        Ok(testcase.borrow_mut().load_input(self.corpus())?.clone())
+        let testcase = self.current_testcase()?;
+        Ok(testcase.cloned_input())
     }
 }
 
@@ -1243,7 +1228,10 @@ impl<I> HasMaxSize for NopState<I> {
     }
 }
 
-impl<I> HasCorpus<I> for NopState<I> {
+impl<I> HasCorpus<I> for NopState<I>
+where
+    I: Input,
+{
     type Corpus = InMemoryCorpus<I>;
 
     fn corpus(&self) -> &Self::Corpus {
@@ -1293,7 +1281,9 @@ impl<I> HasMetadata for NopState<I> {
     fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
+}
 
+impl<I> HasMetadataMut for NopState<I> {
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
@@ -1303,7 +1293,9 @@ impl<I> HasNamedMetadata for NopState<I> {
     fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
         &self.named_metadata
     }
+}
 
+impl<I> HasNamedMetadataMut for NopState<I> {
     fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
         &mut self.named_metadata
     }

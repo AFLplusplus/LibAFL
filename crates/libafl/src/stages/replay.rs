@@ -12,7 +12,7 @@ use libafl_bolts::{Named, impl_serdeany};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, Evaluator, HasMetadata,
+    Error, Evaluator, HasMetadataMut,
     corpus::{Corpus, CorpusId},
     stages::{Restartable, Stage},
     state::{HasCorpus, HasSolutions},
@@ -108,7 +108,7 @@ impl<I> ReplayStage<I> {
 
 impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for ReplayStage<I>
 where
-    S: HasCorpus<I> + HasSolutions<I> + HasMetadata,
+    S: HasCorpus<I> + HasSolutions<I> + HasMetadataMut,
     Z: Evaluator<E, EM, I, S>,
     I: Clone,
 {
@@ -132,9 +132,8 @@ where
 
             log::info!("Replaying corpus: {id}");
             let input = {
-                let mut tc = state.corpus().get(id)?.borrow_mut();
-                let input = tc.load_input(state.corpus())?;
-                input.clone()
+                let tc = state.corpus().get(id)?;
+                tc.input().as_ref().clone()
             };
 
             fuzzer.evaluate_input(state, executor, manager, &input)?;
@@ -151,9 +150,8 @@ where
             }
             log::info!("Replaying solution: {id}");
             let input = {
-                let mut tc = state.solutions().get(id)?.borrow_mut();
-                let input = tc.load_input(state.corpus())?;
-                input.clone()
+                let tc = state.solutions().get(id)?;
+                tc.input().as_ref().clone()
             };
 
             fuzzer.evaluate_input(state, executor, manager, &input)?;
@@ -165,7 +163,7 @@ where
 
 impl<I, S> Restartable<S> for ReplayStage<I>
 where
-    S: HasMetadata,
+    S: HasMetadataMut,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         state.metadata_or_insert_with(ReplayRestarterMetadata::default);

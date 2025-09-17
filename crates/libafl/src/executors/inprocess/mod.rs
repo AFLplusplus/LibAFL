@@ -2,7 +2,7 @@
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 //!
 //! Needs the `fork` feature flag.
-use alloc::boxed::Box;
+use alloc::{boxed::Box, rc::Rc};
 use core::{
     borrow::BorrowMut,
     ffi::c_void,
@@ -15,8 +15,9 @@ use core::{
 use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
-    Error, HasMetadata,
-    corpus::{Corpus, Testcase, testcase::TestcaseMetadata},
+    Error,
+    common::HasMetadataMut,
+    corpus::{Corpus, HasTestcaseMetadata, testcase::TestcaseMetadata},
     events::{Event, EventFirer, EventRestarter, EventWithStats},
     executors::{
         Executor, ExitKind, HasObservers,
@@ -344,25 +345,25 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
         .expect("In run_observers_and_save_state objective failure.");
 
     if is_solution {
-        let testcase_md = TestcaseMetadata::builder()
+        let mut testcase_md = TestcaseMetadata::builder()
             .executions(*state.executions())
             .parent_id(*state.corpus().current())
             .build();
 
-        let mut new_testcase = Testcase::new(input.clone(), testcase_md);
-        new_testcase.add_metadata(exitkind);
+        testcase_md.add_metadata(exitkind);
 
-        if let Ok(mut tc) = state.current_testcase_mut() {
-            tc.found_objective();
+        if let Ok(tc) = state.current_testcase() {
+            tc.testcase_metadata_mut().found_objective();
         }
 
         fuzzer
             .objective_mut()
-            .append_metadata(state, event_mgr, &*observers, &mut new_testcase)
+            .append_metadata(state, event_mgr, &*observers, &mut testcase_md)
             .expect("Failed adding metadata");
+
         state
             .solutions_mut()
-            .add(new_testcase)
+            .add(Rc::new(input.clone()), testcase_md)
             .expect("In run_observers_and_save_state solutions failure.");
 
         let event = Event::Objective {

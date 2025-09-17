@@ -1,6 +1,7 @@
 //! Dynamic corpus that allows users to switch corpus types at runtime.
 
-use core::{cell::RefCell, marker::PhantomData};
+use alloc::rc::Rc;
+use core::marker::PhantomData;
 
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
@@ -38,13 +39,6 @@ where
     C1: Corpus<I>,
     C2: Corpus<I>,
 {
-    fn peek_free_id(&self) -> CorpusId {
-        match self {
-            Self::Corpus1(c1, _) => c1.peek_free_id(),
-            Self::Corpus2(c2, _) => c2.peek_free_id(),
-        }
-    }
-
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         match self {
             Self::Corpus1(c1, _) => c1.add(testcase),
@@ -56,16 +50,6 @@ where
         match self {
             Self::Corpus1(c1, _) => c1.add_disabled(testcase),
             Self::Corpus2(c2, _) => c2.add_disabled(testcase),
-        }
-    }
-
-    fn cloned_input_for_id(&self, idx: CorpusId) -> Result<I, Error>
-    where
-        I: Clone,
-    {
-        match self {
-            Self::Corpus1(c1, _) => c1.cloned_input_for_id(idx),
-            Self::Corpus2(c2, _) => c2.cloned_input_for_id(idx),
         }
     }
 
@@ -111,14 +95,14 @@ where
         }
     }
 
-    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, id: CorpusId) -> Result<Rc<Testcase<I>>, Error> {
         match self {
             Self::Corpus1(c1, _) => c1.get(id),
             Self::Corpus2(c2, _) => c2.get(id),
         }
     }
 
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get_from_all(&self, id: CorpusId) -> Result<Rc<Testcase<I>>, Error> {
         match self {
             Self::Corpus1(c1, _) => c1.get_from_all(id),
             Self::Corpus2(c2, _) => c2.get_from_all(id),
@@ -136,13 +120,6 @@ where
         match self {
             Self::Corpus1(c1, _) => c1.last(),
             Self::Corpus2(c2, _) => c2.last(),
-        }
-    }
-
-    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        match self {
-            Self::Corpus1(c1, _) => c1.load_input_into(testcase),
-            Self::Corpus2(c2, _) => c2.load_input_into(testcase),
         }
     }
 
@@ -174,24 +151,10 @@ where
         }
     }
 
-    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
-        match self {
-            Self::Corpus1(c1, _) => c1.remove(id),
-            Self::Corpus2(c2, _) => c2.remove(id),
-        }
-    }
-
-    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        match self {
-            Self::Corpus1(c1, _) => c1.replace(idx, testcase),
-            Self::Corpus2(c2, _) => c2.replace(idx, testcase),
-        }
-    }
-
-    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
-        match self {
-            Self::Corpus1(c1, _) => c1.store_input_from(testcase),
-            Self::Corpus2(c2, _) => c2.store_input_from(testcase),
-        }
-    }
+    // fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+    //     match self {
+    //         Self::Corpus1(c1, _) => c1.replace(idx, testcase),
+    //         Self::Corpus2(c2, _) => c2.replace(idx, testcase),
+    //     }
+    // }
 }

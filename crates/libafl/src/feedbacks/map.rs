@@ -26,8 +26,8 @@ use super::simd::SimdMapFeedback;
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
-    Error, HasMetadata, HasNamedMetadata,
-    corpus::Testcase,
+    Error, HasMetadataMut, HasNamedMetadataMut,
+    corpus::testcase::TestcaseMetadata,
     events::{Event, EventFirer, EventWithStats},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
@@ -320,7 +320,7 @@ impl<C, N, O, R, S> StateInitializer<S> for MapFeedback<C, N, O, R>
 where
     O: MapObserver,
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
-    S: HasNamedMetadata,
+    S: HasNamedMetadataMut,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
@@ -339,7 +339,7 @@ where
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     OT: MatchName,
     R: Reducer<O::Entry>,
-    S: HasNamedMetadata + HasExecutions,
+    S: HasNamedMetadataMut + HasExecutions,
 {
     fn is_interesting(
         &mut self,
@@ -368,11 +368,11 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         if let Some(novelties) = self.novelties.as_mut().map(core::mem::take) {
             let meta = MapNoveltiesMetadata::new(novelties);
-            testcase.add_metadata(meta);
+            md.add_metadata(meta);
         }
         let observer = observers.get(&self.map_ref).expect("MapObserver not found. This is likely because you entered the crash handler with the wrong executor/observer").as_ref();
         let initial = observer.initial();
@@ -403,7 +403,7 @@ where
                 indices.push(i);
             }
             let meta = MapIndexesMetadata::new(indices);
-            if testcase.try_add_metadata(meta).is_err() {
+            if md.try_add_metadata(meta).is_err() {
                 return Err(Error::key_exists(
                     "MapIndexesMetadata is already attached to this testcase. You should not have more than one observer with tracking.",
                 ));
@@ -531,7 +531,7 @@ where
 {
     fn is_interesting_default<OT, S>(&mut self, state: &mut S, observers: &OT) -> bool
     where
-        S: HasNamedMetadata,
+        S: HasNamedMetadataMut,
         OT: MatchName,
     {
         let mut interesting = false;

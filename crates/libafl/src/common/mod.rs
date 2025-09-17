@@ -3,17 +3,45 @@
 use alloc::boxed::Box;
 use core::any::type_name;
 
-#[cfg(feature = "nautilus")]
-pub mod nautilus;
-
 use libafl_bolts::{
     Error,
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
 };
+
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
+
 /// Trait for elements offering metadata
 pub trait HasMetadata {
     /// A map, storing all metadata
     fn metadata_map(&self) -> &SerdeAnyMap;
+
+    /// Check for a metadata
+    ///
+    /// # Note
+    /// For performance reasons, you likely want to use [`Self::metadata_or_insert_with`] instead
+    #[inline]
+    fn has_metadata<M>(&self) -> bool
+    where
+        M: SerdeAny,
+    {
+        self.metadata_map().get::<M>().is_some()
+    }
+
+    /// To get metadata
+    #[inline]
+    fn metadata<M>(&self) -> Result<&M, Error>
+    where
+        M: SerdeAny,
+    {
+        self.metadata_map()
+            .get::<M>()
+            .ok_or_else(|| Error::key_not_found(format!("{} not found", type_name::<M>())))
+    }
+}
+
+/// Trait for elements offering mutable metadata
+pub trait HasMetadataMut: HasMetadata {
     /// A map, storing all metadata (mutable)
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap;
 
@@ -53,29 +81,6 @@ pub trait HasMetadata {
         self.metadata_map_mut().remove::<M>()
     }
 
-    /// Check for a metadata
-    ///
-    /// # Note
-    /// For performance reasons, you likely want to use [`Self::metadata_or_insert_with`] instead
-    #[inline]
-    fn has_metadata<M>(&self) -> bool
-    where
-        M: SerdeAny,
-    {
-        self.metadata_map().get::<M>().is_some()
-    }
-
-    /// To get metadata
-    #[inline]
-    fn metadata<M>(&self) -> Result<&M, Error>
-    where
-        M: SerdeAny,
-    {
-        self.metadata_map()
-            .get::<M>()
-            .ok_or_else(|| Error::key_not_found(format!("{} not found", type_name::<M>())))
-    }
-
     /// To get mutable metadata
     #[inline]
     fn metadata_mut<M>(&mut self) -> Result<&mut M, Error>
@@ -92,6 +97,33 @@ pub trait HasMetadata {
 pub trait HasNamedMetadata {
     /// A map, storing all metadata
     fn named_metadata_map(&self) -> &NamedSerdeAnyMap;
+
+    /// Check for a metadata
+    ///
+    /// # Note
+    /// You likely want to use [`Self::named_metadata_or_insert_with`] for performance reasons.
+    #[inline]
+    fn has_named_metadata<M>(&self, name: &str) -> bool
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_map().contains::<M>(name)
+    }
+
+    /// To get named metadata
+    #[inline]
+    fn named_metadata<M>(&self, name: &str) -> Result<&M, Error>
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_map()
+            .get::<M>(name)
+            .ok_or_else(|| Error::key_not_found(format!("{} not found", type_name::<M>())))
+    }
+}
+
+/// Trait for elements offering named metadata
+pub trait HasNamedMetadataMut: HasNamedMetadata {
     /// A map, storing all metadata (mutable)
     fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap;
 
@@ -134,29 +166,6 @@ pub trait HasNamedMetadata {
     {
         self.named_metadata_map_mut()
             .get_or_insert_with::<M>(name, default)
-    }
-
-    /// Check for a metadata
-    ///
-    /// # Note
-    /// You likely want to use [`Self::named_metadata_or_insert_with`] for performance reasons.
-    #[inline]
-    fn has_named_metadata<M>(&self, name: &str) -> bool
-    where
-        M: SerdeAny,
-    {
-        self.named_metadata_map().contains::<M>(name)
-    }
-
-    /// To get named metadata
-    #[inline]
-    fn named_metadata<M>(&self, name: &str) -> Result<&M, Error>
-    where
-        M: SerdeAny,
-    {
-        self.named_metadata_map()
-            .get::<M>(name)
-            .ok_or_else(|| Error::key_not_found(format!("{} not found", type_name::<M>())))
     }
 
     /// To get mutable named metadata

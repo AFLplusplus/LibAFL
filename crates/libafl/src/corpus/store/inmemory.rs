@@ -1,24 +1,49 @@
-use core::{cell::RefCell, marker::PhantomData};
-use std::rc::Rc;
+//! An in-memory store
+
+use alloc::rc::Rc;
+use core::marker::PhantomData;
 
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
 use super::{InMemoryCorpusMap, Store};
-use crate::corpus::{CorpusId, Testcase};
+use crate::{
+    corpus::{
+        CorpusId, Testcase,
+        testcase::{HasInstantiableTestcaseMetadata, TestcaseMetadata},
+    },
+    inputs::Input,
+};
 
 /// The map type in which testcases are stored (disable the feature `corpus_btreemap` to use a `HashMap` instead of `BTreeMap`)
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
-pub struct InMemoryStore<I, M> {
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct InMemoryStore<I, M, TMC> {
     enabled_map: M,
     disabled_map: M,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<(I, TMC)>,
 }
 
-impl<I, M> Store<I> for InMemoryStore<I, M>
+impl<I, M, TMC> Default for InMemoryStore<I, M, TMC>
 where
-    M: InMemoryCorpusMap<Testcase<I>>,
+    M: Default,
 {
+    fn default() -> Self {
+        Self {
+            enabled_map: M::default(),
+            disabled_map: M::default(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I, M, TMC> Store<I> for InMemoryStore<I, M, TMC>
+where
+    M: InMemoryCorpusMap<Testcase<I, TMC>>,
+    TMC: HasInstantiableTestcaseMetadata + Clone,
+    I: Input,
+{
+    type TestcaseMetadataCell = TMC;
+
     fn count(&self) -> usize {
         self.enabled_map.count()
     }
@@ -31,46 +56,55 @@ where
         self.enabled_map.is_empty()
     }
 
-    fn add(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<(), Error> {
-        Ok(self.enabled_map.add(id, testcase))
+    fn add(&mut self, id: CorpusId, input: Rc<I>, md: TestcaseMetadata) -> Result<(), Error> {
+        Ok(self
+            .enabled_map
+            .add(id, Testcase::new(input, TMC::instantiate(md))))
     }
 
-    fn add_disabled(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<(), Error> {
-        Ok(self.disabled_map.add(id, testcase))
+    fn add_disabled(
+        &mut self,
+        id: CorpusId,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<(), Error> {
+        Ok(self
+            .disabled_map
+            .add(id, Testcase::new(input, TMC::instantiate(md))))
     }
 
-    fn replace(&mut self, id: CorpusId, new_testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        self.enabled_map.replace(id, new_testcase).ok_or_else(|| {
-            Error::key_not_found(format!("Index {id} not found, could not replace."))
-        })
-    }
+    fn get_from<const ENABLED: bool>(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        if ENABLED {
+            self.enabled_map
+                .get(id)
+                .cloned()
+                .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
+        } else {
+            let mut testcase = self.enabled_map.get(id);
 
-    fn remove(&mut self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error> {
-        let mut testcase = self.enabled_map.remove(id);
+            if testcase.is_none() {
+                testcase = self.disabled_map.get(id);
+            }
 
-        if testcase.is_none() {
-            testcase = self.disabled_map.remove(id);
+            testcase
+                .cloned()
+                .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
         }
-
-        testcase
-            .map(|x| x.clone())
-            .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
     }
 
-    fn get(&self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error> {
-        self.enabled_map
-            .get(id)
-            .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
-    }
-
-    fn get_from_all(&self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error> {
-        let mut testcase = self.enabled_map.get(id);
-
-        if testcase.is_none() {
-            testcase = self.disabled_map.get(id);
-        }
-
-        testcase.ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))
+    fn replace(
+        &mut self,
+        id: CorpusId,
+        input: Rc<I>,
+        metadata: TestcaseMetadata,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        Ok(self
+            .enabled_map
+            .replace(id, Testcase::new(input, TMC::instantiate(metadata)))
+            .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))?)
     }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {

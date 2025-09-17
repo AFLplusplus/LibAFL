@@ -21,7 +21,8 @@ use libafl_bolts::Named;
 pub use mutational::StdMutationalPushStage;
 
 use crate::{
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasScheduler,
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadataMut,
+    HasScheduler,
     common::HasNamedMetadata,
     corpus::{CorpusId, HasCurrentCorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
@@ -244,7 +245,7 @@ impl<CS, EM, I, OT, PS, Z> Named for PushStageAdapter<CS, EM, I, OT, PS, Z> {
 
 impl<CS, EM, I, OT, PS, S, Z> Restartable<S> for PushStageAdapter<CS, EM, I, OT, PS, Z>
 where
-    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

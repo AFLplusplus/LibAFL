@@ -26,7 +26,10 @@ use serde::{Deserialize, Serialize};
 use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 use crate::{
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
-    corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
+    corpus::{
+        Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase,
+        testcase::HasTestcaseMetadata,
+    },
     events::{Event, EventFirer, EventWithStats},
     executors::HasObservers,
     feedbacks::{HasObserverHandle, MapFeedbackMetadata},
@@ -273,7 +276,7 @@ where
                 "state is not currently processing a corpus index",
             ));
         };
-        let testcase = state.corpus().get(corpus_idx)?.borrow();
+        let testcase = state.corpus().get(corpus_idx)?;
         // NOTE: scheduled_count represents the amount of fuzz runs a
         // testcase has had. Since this stage is kept at the very end of stage list,
         // the entry would have been fuzzed already (and should contain IsFavoredMetadata) but would have a scheduled count of zero
@@ -489,14 +492,14 @@ where
         Ok(())
     }
 
-    fn maybe_update_is_favored_size(&mut self, testcase: &Testcase<I>) {
+    fn maybe_update_is_favored_size<M: HasTestcaseMetadata>(&mut self, testcase: &Testcase<I, M>) {
         if testcase.has_metadata::<IsFavoredMetadata>() {
             self.is_favored_size += 1;
         }
     }
 
-    fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<I>) {
-        if let Some(exec_time) = testcase.exec_time() {
+    fn maybe_update_slowest_exec<M: HasTestcaseMetadata>(&mut self, testcase: &Testcase<I, M>) {
+        if let Some(exec_time) = testcase.testcase_metadata().exec_time() {
             if exec_time > &self.slowest_exec {
                 self.slowest_exec = *exec_time;
             }
@@ -507,8 +510,11 @@ where
         self.has_fuzzed_size += 1;
     }
 
-    fn maybe_update_max_depth(&mut self, testcase: &Testcase<I>) {
-        if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>() {
+    fn maybe_update_max_depth<M: HasTestcaseMetadata>(&mut self, testcase: &Testcase<I, M>) {
+        if let Ok(metadata) = testcase
+            .testcase_metadata()
+            .metadata::<SchedulerTestcaseMetadata>()
+        {
             if metadata.depth() > self.max_depth {
                 self.max_depth = metadata.depth();
             }

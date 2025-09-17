@@ -1,6 +1,6 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
-use alloc::{string::ToString, vec::Vec};
+use alloc::{rc::Rc, string::ToString, vec::Vec};
 #[cfg(feature = "std")]
 use core::hash::Hash;
 use core::{fmt::Debug, time::Duration};
@@ -13,9 +13,10 @@ use serde::{Serialize, de::DeserializeOwned};
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, HasMetadata,
+    Error, HasMetadata, HasMetadataMut,
     corpus::{
-        Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase, testcase::TestcaseMetadata,
+        Corpus, CorpusId, HasCurrentCorpusId, HasTestcase,
+        testcase::{HasTestcaseMetadata, TestcaseMetadata},
     },
     events::{
         Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter,
@@ -451,19 +452,17 @@ where
     ) -> Result<Option<CorpusId>, Error> {
         let corpus = if exec_res.is_corpus() {
             // Add the input to the main corpus
-            let tc_md = TestcaseMetadata::builder()
+            let mut tc_md = TestcaseMetadata::builder()
                 .executions(*state.executions())
                 .build();
 
-            let testcase = Testcase::new(input.clone(), tc_md);
-
             #[cfg(feature = "track_hit_feedbacks")]
             self.feedback_mut()
-                .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
+                .append_hit_feedbacks(tc_md.hit_feedbacks_mut())?;
             self.feedback_mut()
-                .append_metadata(state, manager, observers, &mut testcase)?;
+                .append_metadata(state, manager, observers, &mut tc_md)?;
 
-            let id = state.corpus_mut().add(testcase)?;
+            let id = state.corpus_mut().add(Rc::new(input.clone()), tc_md)?;
             self.scheduler_mut().on_add(state, id)?;
             Ok(Some(id))
         } else {
@@ -472,23 +471,22 @@ where
 
         if exec_res.is_solution() {
             // The input is a solution, add it to the respective corpus
-            let tc_md = TestcaseMetadata::builder()
+            let mut tc_md = TestcaseMetadata::builder()
                 .executions(*state.executions())
                 .parent_id(*state.corpus().current())
                 .build();
 
-            let mut testcase = Testcase::new(input.clone(), tc_md);
-            testcase.add_metadata(*exit_kind);
+            tc_md.add_metadata(*exit_kind);
 
-            if let Ok(mut tc) = state.current_testcase_mut() {
-                tc.found_objective();
+            if let Ok(tc) = state.current_testcase() {
+                tc.testcase_metadata_mut().found_objective();
             }
             #[cfg(feature = "track_hit_feedbacks")]
             self.objective_mut()
-                .append_hit_feedbacks(testcase.hit_objectives_mut())?;
+                .append_hit_feedbacks(tc_md.hit_objectives_mut())?;
             self.objective_mut()
-                .append_metadata(state, manager, observers, &mut testcase)?;
-            state.solutions_mut().add(testcase)?;
+                .append_metadata(state, manager, observers, &mut tc_md)?;
+            state.solutions_mut().add(Rc::new(input.clone()), tc_md)?;
         }
         corpus
     }
@@ -729,10 +727,9 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
-        let tc_md = TestcaseMetadata::builder()
+        let mut tc_md = TestcaseMetadata::builder()
             .executions(*state.executions())
             .build();
-        let mut testcase = Testcase::new(input.clone(), tc_md);
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
@@ -752,11 +749,13 @@ where
         if is_solution {
             #[cfg(feature = "track_hit_feedbacks")]
             self.objective_mut()
-                .append_hit_feedbacks(testcase.hit_objectives_mut())?;
+                .append_hit_feedbacks(tc_md.hit_objectives_mut())?;
             self.objective_mut()
-                .append_metadata(state, manager, &*observers, &mut testcase)?;
+                .append_metadata(state, manager, &*observers, &mut tc_md)?;
             // we don't care about solution id
-            let _ = state.solutions_mut().add(testcase.clone())?;
+            let _ = state
+                .solutions_mut()
+                .add(Rc::new(input.clone()), tc_md.clone())?;
 
             manager.fire(
                 state,
@@ -791,8 +790,8 @@ where
             .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
         // Add the input to the main corpus
         self.feedback_mut()
-            .append_metadata(state, manager, &*observers, &mut testcase)?;
-        let id = state.corpus_mut().add(testcase)?;
+            .append_metadata(state, manager, &*observers, &mut tc_md)?;
+        let id = state.corpus_mut().add(Rc::new(input.clone()), tc_md)?;
         self.scheduler_mut().on_add(state, id)?;
 
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
@@ -825,10 +824,10 @@ where
             .disabled(true)
             .build();
 
-        let mut testcase = Testcase::new(input.clone(), tc_md);
-
         // Add the disabled input to the main corpus
-        let id = state.corpus_mut().add_disabled(testcase)?;
+        let id = state
+            .corpus_mut()
+            .add_disabled(Rc::new(input.clone()), tc_md)?;
         Ok(id)
     }
 }
@@ -981,10 +980,12 @@ where
         state.introspection_stats_mut().mark_manager_time();
 
         {
-            if let Ok(mut testcase) = state.testcase_mut(id) {
-                let scheduled_count = testcase.scheduled_count();
+            if let Ok(testcase) = state.testcase(id) {
+                let mut md = testcase.testcase_metadata_mut();
+
+                let scheduled_count = md.scheduled_count();
                 // increase scheduled count, this was fuzz_level in afl
-                testcase.set_scheduled_count(scheduled_count + 1);
+                md.set_scheduled_count(scheduled_count + 1);
             }
         }
 

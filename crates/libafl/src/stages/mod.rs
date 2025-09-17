@@ -46,7 +46,7 @@ pub use unicode::*;
 pub use verify_timeouts::{TimeoutsToVerify, VerifyTimeoutsStage};
 
 use crate::{
-    Error, HasNamedMetadata,
+    Error, HasNamedMetadata, HasNamedMetadataMut,
     corpus::{CorpusId, HasCurrentCorpusId},
     events::SendExiting,
     state::{HasCurrentStageId, HasExecutions, MaybeHasClientPerfMonitor, Stoppable},
@@ -337,7 +337,7 @@ where
 
 impl<CB, E, EM, S, Z> Restartable<S> for ClosureStage<CB, E, EM, Z>
 where
-    S: HasNamedMetadata + HasCurrentCorpusId,
+    S: HasNamedMetadataMut + HasCurrentCorpusId,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
@@ -385,7 +385,7 @@ impl RetryCountRestartHelper {
     /// Don't allow restart
     pub fn no_retry<S>(state: &mut S, name: &str) -> Result<bool, Error>
     where
-        S: HasNamedMetadata + HasCurrentCorpusId,
+        S: HasNamedMetadataMut + HasCurrentCorpusId,
     {
         Self::should_restart(state, name, 1)
     }
@@ -395,7 +395,7 @@ impl RetryCountRestartHelper {
     /// Returns `true` if the stage should run
     pub fn should_restart<S>(state: &mut S, name: &str, max_retries: usize) -> Result<bool, Error>
     where
-        S: HasNamedMetadata + HasCurrentCorpusId,
+        S: HasNamedMetadataMut + HasCurrentCorpusId,
     {
         let corpus_id = state.current_corpus_id()?.ok_or_else(|| {
             Error::illegal_state(
@@ -434,7 +434,7 @@ impl RetryCountRestartHelper {
     /// Clears the progress
     pub fn clear_progress<S>(state: &mut S, name: &str) -> Result<(), Error>
     where
-        S: HasNamedMetadata,
+        S: HasNamedMetadataMut,
     {
         state.named_metadata_mut::<Self>(name)?.tries_remaining = None;
         Ok(())
@@ -508,7 +508,7 @@ impl ExecutionCountRestartHelper {
     /// Initialize progress for the stage this wrapper wraps.
     pub fn should_restart<S>(&mut self, state: &mut S, name: &str) -> Result<bool, Error>
     where
-        S: HasNamedMetadata + HasExecutions,
+        S: HasNamedMetadataMut + HasExecutions,
     {
         let executions = *state.executions();
         let metadata =
@@ -522,7 +522,7 @@ impl ExecutionCountRestartHelper {
     /// Clear progress for the stage this wrapper wraps.
     pub fn clear_progress<S>(&mut self, state: &mut S, name: &str) -> Result<(), Error>
     where
-        S: HasNamedMetadata,
+        S: HasNamedMetadataMut,
     {
         self.started_at_execs = None;
         let _metadata = state.remove_named_metadata::<ExecutionCountRestartHelperMetadata>(name);

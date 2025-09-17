@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadata,
-    corpus::Testcase,
+    corpus::{Testcase, testcase::HasTestcaseMetadata},
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
 };
@@ -107,8 +107,12 @@ impl GeneralizedInputMetadata {
 impl<S> MutatedTransform<BytesInput, S> for GeneralizedInputMetadata {
     type Post = Self;
 
-    fn try_transform_from(base: &mut Testcase<BytesInput>, _state: &S) -> Result<Self, Error> {
+    fn try_transform_from<M: HasTestcaseMetadata>(
+        base: &Testcase<BytesInput, M>,
+        _state: &S,
+    ) -> Result<Self, Error> {
         let meta = base
+            .testcase_metadata()
             .metadata_map()
             .get::<GeneralizedInputMetadata>()
             .ok_or_else(|| {

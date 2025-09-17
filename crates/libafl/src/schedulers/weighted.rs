@@ -14,7 +14,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata,
+    Error, HasMetadataMut,
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     random_corpus_id,
     schedulers::{
@@ -115,7 +115,7 @@ where
     #[must_use]
     pub fn new<S>(state: &mut S, observer: &C) -> Self
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         Self::with_schedule(state, observer, None)
     }
@@ -124,7 +124,7 @@ where
     #[must_use]
     pub fn with_schedule<S>(state: &mut S, observer: &C, strat: Option<PowerSchedule>) -> Self
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         let _ = state.metadata_or_insert_with(|| SchedulerMetadata::new(strat));
         let _ = state.metadata_or_insert_with(WeightedScheduleMetadata::new);
@@ -158,7 +158,7 @@ where
     pub fn create_alias_table<I, S>(&self, state: &mut S) -> Result<(), Error>
     where
         F: TestcaseScore<I, S>,
-        S: HasCorpus<I> + HasMetadata,
+        S: HasCorpus<I> + HasMetadataMut,
     {
         let n = state.corpus().count();
 
@@ -173,8 +173,7 @@ where
         let mut sum: f64 = 0.0;
 
         for i in state.corpus().ids() {
-            let mut testcase = state.corpus().get(i)?.borrow_mut();
-            let weight = F::compute(state, &mut *testcase)?;
+            let weight = F::compute(state, i)?;
             weights.insert(i, weight);
             sum += weight;
         }
@@ -257,13 +256,16 @@ where
     }
 }
 
-impl<C, F, I, O, S> RemovableScheduler<I, S> for WeightedScheduler<C, F, O> {
+impl<C, F, I, O, S> RemovableScheduler<I, S> for WeightedScheduler<C, F, O>
+where
+    S: HasCorpus<I>,
+{
     /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_remove(
         &mut self,
         _state: &mut S,
         _id: CorpusId,
-        _prev: &Option<Testcase<I>>,
+        _testcase: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
     ) -> Result<(), Error> {
         self.table_invalidated = true;
         Ok(())
@@ -274,7 +276,7 @@ impl<C, F, I, O, S> RemovableScheduler<I, S> for WeightedScheduler<C, F, O> {
         &mut self,
         _state: &mut S,
         _id: CorpusId,
-        _prev: &Testcase<I>,
+        _prev: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
     ) -> Result<(), Error> {
         self.table_invalidated = true;
         Ok(())
@@ -308,7 +310,7 @@ where
     C: AsRef<O> + Named,
     F: TestcaseScore<I, S>,
     O: Hash,
-    S: HasCorpus<I> + HasMetadata + HasRand + HasTestcase<I>,
+    S: HasCorpus<I> + HasMetadataMut + HasRand + HasTestcase<I>,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {

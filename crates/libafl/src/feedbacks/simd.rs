@@ -20,8 +20,8 @@ use super::{DifferentIsNovel, Feedback, HasObserverHandle, MapFeedback, StateIni
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
 use crate::{
-    HasNamedMetadata,
-    corpus::Testcase,
+    HasNamedMetadataMut,
+    corpus::testcase::TestcaseMetadata,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::MapFeedbackMetadata,
@@ -49,7 +49,7 @@ where
 {
     fn is_interesting_u8_simd_optimized<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
     where
-        S: HasNamedMetadata,
+        S: HasNamedMetadataMut,
         OT: MatchName,
     {
         // TODO Replace with match_name_type when stable
@@ -155,7 +155,7 @@ impl<C, O, S, R, V> StateInitializer<S> for SimdMapFeedback<C, O, R, V>
 where
     O: MapObserver,
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
-    S: HasNamedMetadata,
+    S: HasNamedMetadataMut,
     R: SimdReducer<V>,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
@@ -192,7 +192,7 @@ where
     EM: EventFirer<I, S>,
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     OT: MatchName,
-    S: HasNamedMetadata + HasExecutions,
+    S: HasNamedMetadataMut + HasExecutions,
     R: SimdReducer<V>,
     V: VectorType + Copy + Eq,
     R::PrimitiveReducer: Reducer<u8>,
@@ -253,9 +253,8 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        self.map
-            .append_metadata(state, manager, observers, testcase)
+        self.map.append_metadata(state, manager, observers, md)
     }
 }

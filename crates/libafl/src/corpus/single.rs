@@ -1,14 +1,20 @@
-use core::{cell::RefCell, marker::PhantomData};
-use std::{rc::Rc, vec::Vec};
+//! A simple corpus, with a backing store.
+//!
+//! A [`SingleCorpus`] owns a single store, in which every testcase is added.
+
+use alloc::rc::Rc;
+use core::marker::PhantomData;
+use std::vec::Vec;
 
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
 use super::{Corpus, CorpusCounter, CorpusId, Testcase, store::Store};
+use crate::corpus::testcase::TestcaseMetadata;
 
 /// You average corpus.
 /// It has one backing store, used to store / retrieve testcases.
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SingleCorpus<I, S> {
     /// The backing testcase store
     store: S,
@@ -21,11 +27,11 @@ pub struct SingleCorpus<I, S> {
     phantom: PhantomData<I>,
 }
 
-impl<I, S> SingleCorpus<I, S>
+impl<I, S> Default for SingleCorpus<I, S>
 where
     S: Default,
 {
-    pub fn new() -> Self {
+    fn default() -> Self {
         Self {
             store: S::default(),
             counter: CorpusCounter::default(),
@@ -36,10 +42,22 @@ where
     }
 }
 
+impl<I, S> SingleCorpus<I, S>
+where
+    S: Default,
+{
+    /// Create a new [`SingleCorpus`]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl<I, S> Corpus<I> for SingleCorpus<I, S>
 where
     S: Store<I>,
 {
+    type TestcaseMetadataCell = S::TestcaseMetadataCell;
+
     fn count(&self) -> usize {
         self.store.count()
     }
@@ -52,32 +70,33 @@ where
         self.store.count_all()
     }
 
-    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+    fn add(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error> {
         let new_id = self.counter.new_id();
-        self.store.add(new_id, testcase)?;
+        self.store.add(new_id, input, md)?;
         Ok(new_id)
     }
 
-    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+    fn add_disabled(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error> {
         let new_id = self.counter.new_id();
-        self.store.add_disabled(new_id, testcase)?;
+        self.store.add_disabled(new_id, input, md)?;
         Ok(new_id)
     }
 
-    fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        self.store.replace(id, testcase)
+    /// Get testcase by id
+    fn get_from<const ENABLED: bool>(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        self.store.get_from::<ENABLED>(id)
     }
 
-    fn remove(&mut self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error> {
-        self.store.remove(id)
-    }
-
-    fn get(&self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error> {
-        self.store.get(id)
-    }
-
-    fn get_from_all(&self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error> {
-        self.store.get_from_all(id)
+    fn replace(
+        &mut self,
+        id: CorpusId,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        self.store.replace(id, input, md)
     }
 
     fn current(&self) -> &Option<CorpusId> {

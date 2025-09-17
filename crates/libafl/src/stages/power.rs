@@ -11,7 +11,7 @@ use libafl_bolts::Named;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasNamedMetadataMut,
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
@@ -23,7 +23,7 @@ use crate::{
         mutational::{MutatedTransform, MutatedTransformPost},
     },
     start_timer,
-    state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
 };
 
 /// The unique id for this stage
@@ -47,7 +47,7 @@ impl<E, F, EM, I, M, S, Z> Named for PowerMutationalStage<E, F, EM, I, M, S, Z> 
 
 impl<E, F, EM, I, M, S, Z> MutationalStage<S> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    S: HasCurrentTestcase<I>,
+    S: HasCorpus<I> + HasCurrentCorpusId,
     F: TestcaseScore<I, S>,
 {
     type Mutator = M;
@@ -67,8 +67,8 @@ where
     #[expect(clippy::cast_sign_loss)]
     fn iterations(&self, state: &mut S) -> Result<usize, Error> {
         // Update handicap
-        let mut testcase = state.current_testcase_mut()?;
-        let score = F::compute(state, &mut testcase)? as usize;
+        let current_corpus_id = state.current_corpus_id()?.unwrap();
+        let score = F::compute(state, current_corpus_id)? as usize;
 
         Ok(score)
     }
@@ -105,7 +105,7 @@ where
 
 impl<E, F, EM, I, M, S, Z> Restartable<S> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase
@@ -122,7 +122,11 @@ where
     E: Executor<EM, I, S, Z> + HasObservers,
     F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
-    S: HasMetadata + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
+    S: HasMetadata
+        + HasRand
+        + HasCurrentTestcase<I>
+        + MaybeHasClientPerfMonitor
+        + HasCurrentCorpusId,
     I: MutatedTransform<I, S> + Clone,
     Z: Evaluator<E, EM, I, S>,
 {
@@ -160,9 +164,9 @@ where
             .saturating_sub(self.execs_since_progress_start(state)?);
         */
         let num = self.iterations(state)?;
-        let mut testcase = state.current_testcase_mut()?;
+        let testcase = state.current_testcase()?;
 
-        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
+        let Ok(input) = I::try_transform_from(&testcase, state) else {
             return Ok(());
         };
         drop(testcase);

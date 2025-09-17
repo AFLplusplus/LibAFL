@@ -12,8 +12,8 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata,
-    corpus::Corpus,
+    Error, HasMetadata, HasMetadataMut,
+    corpus::{Corpus, HasTestcaseMetadata},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
@@ -119,7 +119,7 @@ pub struct GramatronSpliceMutator;
 
 impl<S> Mutator<GramatronInput, S> for GramatronSpliceMutator
 where
-    S: HasRand + HasCorpus<GramatronInput> + HasMetadata,
+    S: HasRand + HasCorpus<GramatronInput> + HasMetadataMut,
 {
     fn mutate(
         &mut self,
@@ -136,14 +136,14 @@ where
 
         let rand_num = state.rand_mut().next();
 
-        let other_testcase_ref = state.corpus().get(id)?;
-        let mut other_testcase = other_testcase_ref.borrow_mut();
+        let other_testcase = state.corpus().get(id)?;
+        let mut other_md = other_testcase.testcase_metadata_mut();
 
-        if !other_testcase.has_metadata::<GramatronIdxMapMetadata>() {
-            let meta = GramatronIdxMapMetadata::new(other_testcase.input());
-            other_testcase.add_metadata(meta);
+        if !other_md.has_metadata::<GramatronIdxMapMetadata>() {
+            let meta = GramatronIdxMapMetadata::new(other_testcase.input().as_ref());
+            other_md.add_metadata(meta);
         }
-        let meta = other_testcase
+        let meta = other_md
             .metadata_map()
             .get::<GramatronIdxMapMetadata>()
             .unwrap();

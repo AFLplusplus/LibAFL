@@ -6,7 +6,7 @@ use num_traits::Zero;
 
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, SchedulerTestcaseMetadata, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcaseMetadata, SchedulerTestcaseMetadata},
     feedbacks::MapIndexesMetadata,
     schedulers::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
@@ -16,9 +16,12 @@ use crate::{
 };
 
 /// Compute the favor factor of a [`Testcase`]. Higher is better.
-pub trait TestcaseScore<I, S> {
+pub trait TestcaseScore<I, S>
+where
+    S: HasCorpus<I>,
+{
     /// Computes the favor factor of a [`Testcase`]. Higher is better.
-    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error>;
+    fn compute(state: &S, corpus_id: CorpusId) -> Result<f64, Error>;
 }
 
 /// Multiply the testcase size with the execution time.
@@ -32,10 +35,12 @@ where
     I: HasLen,
 {
     #[expect(clippy::cast_precision_loss)]
-    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
+    fn compute(state: &S, corpus_id: CorpusId) -> Result<f64, Error> {
+        let testcase = state.corpus().get(corpus_id)?;
+        let md = testcase.testcase_metadata();
+
         // TODO maybe enforce entry.exec_time().is_some()
-        Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as f64
-            * entry.load_len(state.corpus())? as f64)
+        Ok(md.exec_time().map_or(1, |d| d.as_millis()) as f64 * testcase.input_len() as f64)
     }
 }
 
@@ -55,24 +60,24 @@ where
 {
     /// Compute the `power` we assign to each corpus entry
     #[expect(clippy::cast_precision_loss, clippy::too_many_lines)]
-    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
+    fn compute(state: &S, corpus_id: CorpusId) -> Result<f64, Error> {
         let psmeta = state.metadata::<SchedulerMetadata>()?;
+        let corpus = state.corpus();
+        let testcase = corpus.get(corpus_id)?;
+        let md = testcase.testcase_metadata();
 
         let fuzz_mu = if let Some(strat) = psmeta.strat() {
             if *strat.base() == BaseSchedule::COE {
-                let corpus = state.corpus();
                 let mut n_paths = 0;
                 let mut v = 0.0;
-                let cur_index = state.corpus().current().unwrap();
+                let cur_index = corpus.current().unwrap();
                 for id in corpus.ids() {
                     let n_fuzz_entry = if cur_index == id {
-                        entry
-                            .metadata::<SchedulerTestcaseMetadata>()?
-                            .n_fuzz_entry()
+                        md.metadata::<SchedulerTestcaseMetadata>()?.n_fuzz_entry()
                     } else {
                         corpus
                             .get(id)?
-                            .borrow()
+                            .testcase_metadata()
                             .metadata::<SchedulerTestcaseMetadata>()?
                             .n_fuzz_entry()
                     };
@@ -94,7 +99,7 @@ where
         };
 
         let mut perf_score = 100.0;
-        let q_exec_us = entry
+        let q_exec_us = md
             .exec_time()
             .ok_or_else(|| Error::key_not_found("exec_time not set".to_string()))?
             .as_nanos() as f64;
@@ -106,8 +111,8 @@ where
             psmeta.bitmap_size() / psmeta.bitmap_entries()
         };
 
-        let favored = entry.has_metadata::<IsFavoredMetadata>();
-        let tcmeta = entry.metadata::<SchedulerTestcaseMetadata>()?;
+        let favored = md.has_metadata::<IsFavoredMetadata>();
+        let tcmeta = md.metadata::<SchedulerTestcaseMetadata>()?;
 
         if q_exec_us * 0.1 > avg_exec_us {
             perf_score = 10.0;
@@ -179,7 +184,7 @@ where
                     }
                 }
                 BaseSchedule::FAST => {
-                    if entry.scheduled_count() != 0 {
+                    if md.scheduled_count() != 0 {
                         let lg = libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()]));
 
                         match lg {
@@ -218,11 +223,11 @@ where
                     }
                 }
                 BaseSchedule::LIN => {
-                    factor = (entry.scheduled_count() as f64)
+                    factor = (md.scheduled_count() as f64)
                         / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
                 }
                 BaseSchedule::QUAD => {
-                    factor = ((entry.scheduled_count() * entry.scheduled_count()) as f64)
+                    factor = ((md.scheduled_count() * md.scheduled_count()) as f64)
                         / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
                 }
             }
@@ -250,7 +255,7 @@ where
             perf_score = HAVOC_MAX_MULT * 100.0;
         }
 
-        if entry.objectives_found() > 0 && psmeta.strat().is_some_and(|s| s.avoid_crash()) {
+        if md.objectives_found() > 0 && psmeta.strat().is_some_and(|s| s.avoid_crash()) {
             perf_score *= 0.00;
         }
 
@@ -269,23 +274,25 @@ where
 {
     /// Compute the `weight` used in weighted corpus entry selection algo
     #[expect(clippy::cast_precision_loss)]
-    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
+    fn compute(state: &S, corpus_id: CorpusId) -> Result<f64, Error> {
         let mut weight = 1.0;
         let psmeta = state.metadata::<SchedulerMetadata>()?;
+        let testcase = state.corpus().get(corpus_id)?;
+        let md = testcase.testcase_metadata();
 
-        let tcmeta = entry.metadata::<SchedulerTestcaseMetadata>()?;
+        let tcmeta = md.metadata::<SchedulerTestcaseMetadata>()?;
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
         // This methoud is called in corpus's on_add() method. Fuzz_level is zero at that time.
-        if entry.scheduled_count() == 0 || psmeta.cycles() == 0 {
+        if md.scheduled_count() == 0 || psmeta.cycles() == 0 {
             return Ok(weight);
         }
 
-        let q_exec_us = entry
+        let q_exec_us = md
             .exec_time()
             .ok_or_else(|| Error::key_not_found("exec_time not set".to_string()))?
             .as_nanos() as f64;
-        let favored = entry.has_metadata::<IsFavoredMetadata>();
+        let favored = md.has_metadata::<IsFavoredMetadata>();
 
         let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
         let avg_bitmap_size = psmeta.bitmap_size_log() / psmeta.bitmap_entries() as f64;
@@ -312,9 +319,10 @@ where
             libm::log2(q_bitmap_size).max(1.0) / avg_bitmap_size
         };
 
-        let tc_ref = match entry.metadata_map().get::<MapIndexesMetadata>() {
-            Some(meta) => meta.refcnt() as f64,
-            None => 0.0,
+        let tc_ref = if let Some(meta) = md.metadata_map().get::<MapIndexesMetadata>() {
+            meta.refcnt() as f64
+        } else {
+            0.0
         };
 
         let avg_top_size = match state.metadata::<TopRatedsMetadata>() {
@@ -333,11 +341,11 @@ where
         }
 
         // was it fuzzed before?
-        if entry.scheduled_count() == 0 {
+        if md.scheduled_count() == 0 {
             weight *= 2.0;
         }
 
-        if entry.objectives_found() > 0 && psmeta.strat().is_some_and(|s| s.avoid_crash()) {
+        if md.objectives_found() > 0 && psmeta.strat().is_some_and(|s| s.avoid_crash()) {
             weight *= 0.00;
         }
 

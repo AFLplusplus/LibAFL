@@ -3,8 +3,8 @@
 use alloc::borrow::ToOwned;
 
 use crate::{
-    Error,
-    corpus::{Corpus, CorpusId},
+    Error, HasMetadataMut,
+    corpus::{Corpus, CorpusId, HasTestcaseMetadata},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::HasCorpus,
 };
@@ -16,20 +16,19 @@ pub struct QueueScheduler {
     runs_in_current_cycle: u64,
 }
 
-impl<I, S> RemovableScheduler<I, S> for QueueScheduler {}
+impl<I, S> RemovableScheduler<I, S> for QueueScheduler where S: HasCorpus<I> {}
 
 impl<I, S> Scheduler<I, S> for QueueScheduler
 where
-    S: HasCorpus<I>,
+    S: HasCorpus<I> + HasMetadataMut,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
-        state
-            .corpus()
-            .get(id)?
-            .borrow_mut()
-            .set_parent_id_optional(current_id);
+        let current_tc = state.corpus().get(id)?;
+        let mut current_md = current_tc.testcase_metadata_mut();
+
+        current_md.set_parent_id_optional(current_id);
 
         Ok(())
     }

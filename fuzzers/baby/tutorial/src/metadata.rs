@@ -21,9 +21,12 @@ pub struct PacketLenTestcaseScore {}
 
 impl<I, S> TestcaseScore<I, S> for PacketLenTestcaseScore
 where
-    S: HasMetadata,
+    S: HasCorpus<I> + HasMetadata,
 {
-    fn compute(_state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
+    fn compute(
+        _state: &S,
+        entry: &mut Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataRefMut<'_>>,
+    ) -> Result<f64, Error> {
         Ok(entry
             .metadata_map()
             .get::<PacketLenMetadata>()

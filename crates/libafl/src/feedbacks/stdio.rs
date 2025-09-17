@@ -9,8 +9,8 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata,
-    corpus::Testcase,
+    Error, HasMetadataMut,
+    corpus::testcase::TestcaseMetadata,
     feedbacks::{Feedback, StateInitializer},
     observers::{StdErrObserver, StdOutObserver},
 };
@@ -33,10 +33,10 @@ pub struct StdOutToMetadataFeedback {
 impl StdOutToMetadataFeedback {
     /// Append to the testcase the generated metadata in case of a new corpus item.
     #[inline]
-    fn append_stdout_observation_to_testcase<I, OT>(
+    fn append_stdout_observation_to_testcase<OT>(
         &mut self,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error>
     where
         OT: MatchName,
@@ -50,9 +50,7 @@ impl StdOutToMetadataFeedback {
             .ok_or(Error::illegal_state("StdOutObserver has no stdout"))?;
         let stdout = String::from_utf8_lossy(buffer).into_owned();
 
-        testcase
-            .metadata_map_mut()
-            .insert(StdOutMetadata { stdout });
+        md.metadata_map_mut().insert(StdOutMetadata { stdout });
 
         Ok(())
     }
@@ -76,9 +74,9 @@ where
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        self.append_stdout_observation_to_testcase(observers, testcase)
+        self.append_stdout_observation_to_testcase(observers, md)
     }
 }
 
@@ -132,7 +130,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         let observer = observers
             .get(&self.o_ref)
@@ -143,9 +141,7 @@ where
             .ok_or(Error::illegal_state("StdErrObserver has no stderr"))?;
         let stderr = String::from_utf8_lossy(buffer).into_owned();
 
-        testcase
-            .metadata_map_mut()
-            .insert(StdErrMetadata { stderr });
+        md.metadata_map_mut().insert(StdErrMetadata { stderr });
 
         Ok(())
     }

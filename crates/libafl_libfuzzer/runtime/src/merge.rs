@@ -211,7 +211,7 @@ pub fn merge(
     }
 
     for id in fuzzer.scheduler().current().clone() {
-        let mut testcase = state.corpus_mut().get(id)?.borrow_mut();
+        let mut testcase = state.corpus().get(id)?;
         let file_path = testcase
             .file_path_mut()
             .as_mut()

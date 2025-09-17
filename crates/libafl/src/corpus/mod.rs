@@ -1,14 +1,20 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
-use core::{cell::RefCell, fmt, marker::PhantomData};
-use std::{rc::Rc, string::String};
+use alloc::rc::Rc;
+use core::{fmt, marker::PhantomData};
+use std::{cell::RefCell, string::String};
 
 use serde::{Deserialize, Serialize};
 
 use crate::Error;
 
 pub mod testcase;
-pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
+pub use testcase::{
+    HasTestcase, HasTestcaseMetadata, SchedulerTestcaseMetadata, Testcase, TestcaseMetadata,
+};
+
+pub mod cache;
+pub use cache::{Cache, FifoCache, IdentityCache};
 
 pub mod single;
 pub use single::SingleCorpus;
@@ -17,7 +23,7 @@ pub mod dynamic;
 pub use dynamic::DynamicCorpus;
 
 pub mod combined;
-pub use combined::{CombinedCorpus, FifoCache, IdentityCache};
+pub use combined::CombinedCorpus;
 
 #[cfg(all(feature = "cmin", unix))]
 pub mod minimizer;
@@ -30,28 +36,38 @@ pub use nop::NopCorpus;
 pub mod store;
 pub use store::{InMemoryStore, OnDiskStore, maps};
 
+/// The standard fully in-memory corpus map.
 #[cfg(not(feature = "corpus_btreemap"))]
-pub type InMemoryCorpusMap<I> = maps::HashCorpusMap<Testcase<I>>;
+pub type StdInMemoryCorpusMap<I> = maps::HashCorpusMap<Testcase<I, Rc<RefCell<TestcaseMetadata>>>>;
 
+/// The standard fully in-memory corpus map.
 #[cfg(feature = "corpus_btreemap")]
-pub type InMemoryCorpusMap<I> = maps::BtreeCorpusMap<Testcase<I>>;
+pub type StdInMemoryCorpusMap<I> = maps::BtreeCorpusMap<Testcase<I, Rc<RefCell<TestcaseMetadata>>>>;
 
-pub type InMemoryCorpus<I> = SingleCorpus<I, InMemoryStore<I, InMemoryCorpusMap<I>>>;
+/// The standard fully in-memory store.
+pub type StdInMemoryStore<I> =
+    InMemoryStore<I, StdInMemoryCorpusMap<I>, Rc<RefCell<TestcaseMetadata>>>;
 
+/// The standard fully on-disk store.
+pub type StdOnDiskStore<I> = OnDiskStore<I, StdInMemoryCorpusMap<I>>;
+
+/// The standard in-memory corpus.
+pub type InMemoryCorpus<I> = SingleCorpus<I, StdInMemoryStore<I>>;
+
+/// The standard fully on-disk corpus.
 #[cfg(feature = "std")]
 pub type OnDiskCorpus<I> = SingleCorpus<I, OnDiskStore<I, maps::HashCorpusMap<String>>>;
 
-pub type InMemoryOnDiskCorpus<I> = CombinedCorpus<
-    IdentityCache,
-    InMemoryStore<I, InMemoryCorpusMap<I>>,
-    OnDiskStore<I, InMemoryCorpusMap<I>>,
-    I,
->;
+/// The standard corpus for storing on disk and in-memory.
+pub type InMemoryOnDiskCorpus<I> =
+    CombinedCorpus<IdentityCache, StdInMemoryStore<I>, StdOnDiskStore<I>, I>;
 
+/// The standard corpus for storing on disk and in-memory with a cache.
+/// Useful for very large corpuses.
 pub type CachedOnDiskCorpus<I> = CombinedCorpus<
-    FifoCache<InMemoryStore<I, InMemoryCorpusMap<I>>, OnDiskStore<I, InMemoryCorpusMap<I>>, I>,
-    InMemoryStore<I, InMemoryCorpusMap<I>>,
-    OnDiskStore<I, InMemoryCorpusMap<I>>,
+    FifoCache<StdInMemoryStore<I>, StdOnDiskStore<I>, I>,
+    StdInMemoryStore<I>,
+    StdOnDiskStore<I>,
     I,
 >;
 
@@ -60,6 +76,8 @@ pub type CachedOnDiskCorpus<I> = CombinedCorpus<
 #[repr(transparent)]
 pub struct CorpusId(pub usize);
 
+/// A counter for [`Corpus`] implementors.
+/// Useful to generate fresh [`CorpusId`]s.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct CorpusCounter {
     /// A fresh, progressive ID
@@ -115,6 +133,9 @@ macro_rules! random_corpus_id_with_disabled {
 
 /// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus<I>: Sized {
+    /// A [`TestcaseMetadata`] cell.
+    type TestcaseMetadataCell: HasTestcaseMetadata;
+
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
 
@@ -130,22 +151,34 @@ pub trait Corpus<I>: Sized {
     }
 
     /// Add an enabled testcase to the corpus and return its index
-    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error>;
+    fn add(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error>;
 
     /// Add a disabled testcase to the corpus and return its index
-    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error>;
+    fn add_disabled(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error>;
 
-    /// Replaces the [`Testcase`] at the given idx, returning the existing.
-    fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error>;
+    /// Get testcase by id; considers only enabled testcases
+    fn get(&self, id: CorpusId) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        Self::get_from::<true>(self, id)
+    }
 
-    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
-    fn remove(&mut self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error>;
+    /// Get testcase by id, looking at the enabled and disabled stores.
+    fn get_from_all(&self, id: CorpusId) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        Self::get_from::<false>(self, id)
+    }
 
-    /// Get by id; considers only enabled testcases
-    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error>;
+    /// Get testcase by id
+    fn get_from<const ENABLED: bool>(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
 
-    /// Get by id; considers both enabled and disabled testcases
-    fn get_from_all(&self, id: CorpusId) -> Result<Rc<RefCell<Testcase<I>>>, Error>;
+    /// Replace a [`Testcase`] by another one.
+    fn replace(
+        &mut self,
+        id: CorpusId,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<CorpusId>;
@@ -155,9 +188,6 @@ pub trait Corpus<I>: Sized {
 
     /// Get the next corpus id
     fn next(&self, id: CorpusId) -> Option<CorpusId>;
-
-    // /// Peek the next free corpus id
-    // fn peek_free_id(&self) -> CorpusId;
 
     /// Get the prev corpus id
     fn prev(&self, id: CorpusId) -> Option<CorpusId>;
@@ -268,7 +298,7 @@ where
 impl CorpusCounter {
     fn new_id(&mut self) -> CorpusId {
         let old = self.current_id;
-        self.current_id.saturating_add(1);
+        self.current_id += 1;
         CorpusId(old)
     }
 }

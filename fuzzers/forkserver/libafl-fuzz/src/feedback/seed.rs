@@ -93,7 +93,7 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         self.inner
             .append_metadata(state, manager, observers, testcase)?;

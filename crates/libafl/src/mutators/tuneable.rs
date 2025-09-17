@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
-    Error, HasMetadata,
+    Error, HasMetadata, HasMetadataMut,
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
@@ -69,7 +69,7 @@ impl TuneableScheduledMutatorMetadata {
     }
 
     /// Gets the stored metadata, used to alter the [`TuneableScheduledMutator`] behavior, mut
-    pub fn get_mut<S: HasMetadata>(state: &mut S) -> Result<&mut Self, Error> {
+    pub fn get_mut<S: HasMetadataMut>(state: &mut S) -> Result<&mut Self, Error> {
         state
             .metadata_map_mut()
             .get_mut::<Self>()
@@ -89,7 +89,7 @@ pub struct TuneableScheduledMutator<MT> {
 impl<I, MT, S> Mutator<I, S> for TuneableScheduledMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata,
+    S: HasRand + HasMetadataMut,
 {
     #[inline]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -129,7 +129,7 @@ impl<MT> Named for TuneableScheduledMutator<MT> {
 impl<I, MT, S> ScheduledMutator<I, S> for TuneableScheduledMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata,
+    S: HasRand + HasMetadataMut,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
@@ -212,7 +212,7 @@ impl<MT> TuneableScheduledMutator<MT> {
     pub fn new<S>(state: &mut S, mutations: MT) -> Self
     where
         MT: NamedTuple,
-        S: HasRand + HasMetadata,
+        S: HasRand + HasMetadataMut,
     {
         if !state.has_metadata::<TuneableScheduledMutatorMetadata>() {
             state.add_metadata(TuneableScheduledMutatorMetadata::default());
@@ -233,7 +233,7 @@ impl<MT> TuneableScheduledMutator<MT> {
     /// as it internally only needs a single metadata lookup
     pub fn set_iters<S>(&self, state: &mut S, iters: u64)
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
 
@@ -256,7 +256,7 @@ impl<MT> TuneableScheduledMutator<MT> {
         mut iter_probabilities_pow: Vec<f32>,
     ) -> Result<(), Error>
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         if iter_probabilities_pow.len() >= 32 {
             return Err(Error::illegal_argument(
@@ -276,7 +276,7 @@ impl<MT> TuneableScheduledMutator<MT> {
     /// Gets the set amount of iterations
     pub fn get_iters<S>(&self, state: &S) -> Option<u64>
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         let metadata = TuneableScheduledMutatorMetadata::get(state).unwrap();
         metadata.iters
@@ -285,7 +285,7 @@ impl<MT> TuneableScheduledMutator<MT> {
     /// Sets the mutation ids
     pub fn set_mutation_ids<S>(&self, state: &mut S, mutations: Vec<MutationId>)
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids = mutations;
@@ -302,7 +302,7 @@ impl<MT> TuneableScheduledMutator<MT> {
         mut mutation_probabilities: Vec<f32>,
     ) -> Result<(), Error>
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids.clear();
@@ -321,7 +321,7 @@ impl<MT> TuneableScheduledMutator<MT> {
         mutations: Vec<MutationId>,
         iters: u64,
     ) where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids = mutations;
@@ -332,7 +332,7 @@ impl<MT> TuneableScheduledMutator<MT> {
     /// Appends a mutation id to the end of the mutations
     pub fn push_mutation_id<S>(state: &mut S, mutation_id: MutationId)
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids.push(mutation_id);
@@ -341,7 +341,7 @@ impl<MT> TuneableScheduledMutator<MT> {
     /// Resets this to a randomic mutational stage
     pub fn reset<S>(self, state: &mut S)
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         let metadata = state
             .metadata_map_mut()

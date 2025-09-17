@@ -11,7 +11,7 @@ use libafl_bolts::Named;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, HasNamedMetadata,
+    Error, HasNamedMetadata, HasNamedMetadataMut,
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     inputs::Input,
@@ -35,11 +35,7 @@ impl<EM, I, TE, S, Z> TracingStage<EM, I, TE, S, Z>
 where
     TE: Executor<EM, I, S, Z> + HasObservers,
     TE::Observers: ObserversTuple<I, S>,
-    S: HasExecutions
-        + HasCorpus<I>
-        + HasNamedMetadata
-        + HasCurrentTestcase<I>
-        + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasCorpus<I> + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
 {
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
     /// own stage and you need to manage [`super::NestedStageRetryCountRestartHelper`] differently
@@ -98,7 +94,7 @@ where
 
 impl<EM, I, TE, S, Z> Restartable<S> for TracingStage<EM, I, TE, S, Z>
 where
-    S: HasNamedMetadata + HasCurrentCorpusId,
+    S: HasNamedMetadataMut + HasCurrentCorpusId,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         RetryCountRestartHelper::no_retry(state, &self.name)

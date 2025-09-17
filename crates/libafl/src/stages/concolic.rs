@@ -14,8 +14,8 @@ use libafl_bolts::{
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, HasMetadata, HasNamedMetadata,
-    corpus::HasCurrentCorpusId,
+    Error, HasMetadata, HasMetadataMut, HasNamedMetadataMut,
+    corpus::{HasCurrentCorpusId, HasTestcaseMetadata},
     executors::{Executor, HasObservers},
     observers::{ObserversTuple, concolic::ConcolicObserver},
     stages::{Restartable, RetryCountRestartHelper, Stage, TracingStage},
@@ -53,7 +53,7 @@ where
     TE::Observers: ObserversTuple<I, S>,
     S: HasExecutions
         + HasCorpus<I>
-        + HasNamedMetadata
+        + HasMetadataMut
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
@@ -70,7 +70,8 @@ where
         if let Some(observer) = self.inner.executor().observers().get(&self.observer_handle) {
             let metadata = observer.create_metadata_from_current_map();
             state
-                .current_testcase_mut()?
+                .current_testcase()?
+                .testcase_metadata_mut()
                 .metadata_map_mut()
                 .insert(metadata);
         }
@@ -80,7 +81,7 @@ where
 
 impl<EM, I, TE, S, Z> Restartable<S> for ConcolicTracingStage<'_, EM, I, TE, S, Z>
 where
-    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage

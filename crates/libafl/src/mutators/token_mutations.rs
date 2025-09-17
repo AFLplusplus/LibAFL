@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
 use crate::{
-    Error, HasMetadata,
+    Error, HasMetadata, HasMetadataMut,
     corpus::{CorpusId, HasCurrentCorpusId},
     inputs::{HasMutatorBytes, ResizableMutator},
     mutators::{
@@ -1325,7 +1325,7 @@ impl AflppRedQueen {
 
 impl<I, S> MultiMutator<I, S> for AflppRedQueen
 where
-    S: HasMetadata + HasRand + HasMaxSize + HasCorpus<I> + HasCurrentCorpusId,
+    S: HasMetadataMut + HasRand + HasMaxSize + HasCorpus<I> + HasCurrentCorpusId,
     I: ResizableMutator<u8> + From<Vec<u8>> + HasMutatorBytes,
 {
     #[expect(clippy::needless_range_loop, clippy::too_many_lines)]

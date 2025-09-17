@@ -1,6 +1,5 @@
 //! The feedbacks reduce observer state after each run to a single `is_interesting`-value.
 //! If a testcase is interesting, it may be added to a Corpus.
-
 // TODO: make S of Feedback<S> an associated type when specialisation + AT is stable
 
 use alloc::borrow::Cow;
@@ -8,52 +7,59 @@ use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use core::{fmt::Debug, marker::PhantomData};
 
-#[cfg(feature = "std")]
-pub use concolic::ConcolicFeedback;
-pub use differential::DiffFeedback;
 use libafl_bolts::{
     Named,
     tuples::{Handle, Handled, MatchName, MatchNameRef},
 };
-pub use list::*;
-pub use map::*;
-#[cfg(feature = "nautilus")]
-pub use nautilus::*;
-#[cfg(feature = "std")]
-pub use new_hash_feedback::NewHashFeedback;
-#[cfg(feature = "std")]
-pub use new_hash_feedback::NewHashFeedbackMetadata;
 use serde::{Deserialize, Serialize};
 
-use crate::{Error, corpus::Testcase, executors::ExitKind, observers::TimeObserver};
+#[cfg(feature = "introspection")]
+use crate::state::HasClientPerfMonitor;
+use crate::{
+    Error, corpus::testcase::TestcaseMetadata, executors::ExitKind, observers::TimeObserver,
+    state::HasCorpus,
+};
 
 #[cfg(feature = "std")]
 pub mod capture_feedback;
+#[cfg(feature = "std")]
+pub use capture_feedback::CaptureTimeoutFeedback;
 
 pub mod bool;
 pub use bool::BoolValueFeedback;
 
 #[cfg(feature = "std")]
 pub mod concolic;
+#[cfg(feature = "std")]
+pub use concolic::ConcolicFeedback;
+
 pub mod differential;
+pub use differential::DiffFeedback;
+
 /// The module for list feedback
 pub mod list;
+pub use list::*;
+
 pub mod map;
+pub use map::*;
+
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
+
 #[cfg(feature = "std")]
 pub mod new_hash_feedback;
+#[cfg(feature = "std")]
+pub use new_hash_feedback::NewHashFeedback;
+#[cfg(feature = "std")]
+pub use new_hash_feedback::NewHashFeedbackMetadata;
+
 #[cfg(feature = "simd")]
 pub mod simd;
 #[cfg(feature = "std")]
 pub mod stdio;
 pub mod transferred;
-
-#[cfg(feature = "std")]
-pub use capture_feedback::CaptureTimeoutFeedback;
-
-#[cfg(feature = "introspection")]
-use crate::state::HasClientPerfMonitor;
 
 #[cfg(feature = "value_bloom_feedback")]
 pub mod value_bloom;
@@ -143,7 +149,7 @@ pub trait Feedback<EM, I, OT, S>: StateInitializer<S> + Named {
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        _testcase: &mut Testcase<I>,
+        _md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -292,12 +298,10 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        self.first
-            .append_metadata(state, manager, observers, testcase)?;
-        self.second
-            .append_metadata(state, manager, observers, testcase)
+        self.first.append_metadata(state, manager, observers, md)?;
+        self.second.append_metadata(state, manager, observers, md)
     }
 }
 
@@ -652,10 +656,9 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        self.inner
-            .append_metadata(state, manager, observers, testcase)
+        self.inner.append_metadata(state, manager, observers, md)
     }
 }
 
@@ -698,7 +701,7 @@ macro_rules! feedback_and {
         $crate::feedbacks::EagerAndFeedback::new($head , feedback_and!($($tail),+))
     };
 }
-///
+
 /// Variadic macro to create a chain of (fast) [`AndFeedback`](FastAndFeedback)
 #[macro_export]
 macro_rules! feedback_and_fast {
@@ -749,7 +752,10 @@ macro_rules! feedback_not {
 impl<S> StateInitializer<S> for () {}
 
 /// Hack to use () as empty Feedback
-impl<EM, I, OT, S> Feedback<EM, I, OT, S> for () {
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ()
+where
+    S: HasCorpus<I>,
+{
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
@@ -919,7 +925,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         let Some(observer) = observers.get(&self.observer_handle) else {
             return Err(Error::illegal_state(
@@ -927,7 +933,7 @@ where
             ));
         };
 
-        *testcase.exec_time_mut() = *observer.last_runtime();
+        *md.exec_time_mut() = *observer.last_runtime();
         Ok(())
     }
 }
@@ -961,7 +967,10 @@ pub enum ConstFeedback {
 
 impl<S> StateInitializer<S> for ConstFeedback {}
 
-impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ConstFeedback {
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ConstFeedback
+where
+    S: HasCorpus<I>,
+{
     #[inline]
     fn is_interesting(
         &mut self,

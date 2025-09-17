@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use super::IndexesLenTimeMinimizerScheduler;
 use crate::{
-    Error, HasMetadata,
-    corpus::{Corpus, CorpusId},
+    Error, HasMetadataMut,
+    corpus::{Corpus, CorpusId, HasTestcaseMetadata},
     observers::CanTrack,
     schedulers::{
         Scheduler,
@@ -113,7 +113,7 @@ pub struct CoverageAccountingScheduler<'a, CS, I, O> {
 impl<CS, I, O, S> Scheduler<I, S> for CoverageAccountingScheduler<'_, CS, I, O>
 where
     CS: Scheduler<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<I> + HasMetadataMut + HasRand,
     I: HasLen,
     O: CanTrack,
 {
@@ -140,13 +140,8 @@ where
             self.inner.cull(state)?;
         }
         let mut id = self.inner.base_mut().next(state)?;
-        while {
-            !state
-                .corpus()
-                .get(id)?
-                .borrow()
-                .has_metadata::<IsFavoredMetadata>()
-        } && state.rand_mut().coinflip(self.skip_non_favored_prob)
+        while { !state.corpus().get(id)?.has_metadata::<IsFavoredMetadata>() }
+            && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
             id = self.inner.base_mut().next(state)?;
         }
@@ -175,7 +170,7 @@ where
     #[expect(clippy::cast_possible_wrap)]
     pub fn update_accounting_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
-        S: HasCorpus<I> + HasMetadata,
+        S: HasCorpus<I> + HasMetadataMut,
     {
         let mut indexes = vec![];
         let mut new_favoreds = vec![];
@@ -199,9 +194,10 @@ where
                             equal_score = true;
                         }
 
-                        let mut old = state.corpus().get_from_all(*old_id)?.borrow_mut();
+                        let old = state.corpus().get_from_all(*old_id)?;
+                        let mut md = old.testcase_metadata_mut();
                         let must_remove = {
-                            let old_meta = old.metadata_map_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
+                            let old_meta = md.metadata_map_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
                                 Error::key_not_found(format!(
                                     "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{old_id}"
                                 ))
@@ -211,7 +207,7 @@ where
                         };
 
                         if must_remove {
-                            drop(old.metadata_map_mut().remove::<AccountingIndexesMetadata>());
+                            drop(md.metadata_map_mut().remove::<AccountingIndexesMetadata>());
                         }
                     }
                 }
@@ -239,7 +235,7 @@ where
         state
             .corpus()
             .get(id)?
-            .borrow_mut()
+            .testcase_metadata_mut()
             .metadata_map_mut()
             .insert(AccountingIndexesMetadata::with_tcref(
                 indexes,
@@ -262,19 +258,21 @@ where
     /// Cull the `Corpus`
     pub fn accounting_cull<S>(&self, state: &S) -> Result<(), Error>
     where
-        S: HasCorpus<I> + HasMetadata,
+        S: HasCorpus<I> + HasMetadataMut,
     {
         let Some(top_rated) = state.metadata_map().get::<TopAccountingMetadata>() else {
             return Ok(());
         };
 
         for (_key, id) in &top_rated.map {
-            let mut entry = state.corpus().get(*id)?.borrow_mut();
+            let entry = state.corpus().get(*id)?;
             if entry.scheduled_count() > 0 {
                 continue;
             }
 
-            entry.add_metadata(IsFavoredMetadata {});
+            entry
+                .testcase_metadata_mut()
+                .add_metadata(IsFavoredMetadata {});
         }
 
         Ok(())
@@ -286,7 +284,7 @@ where
     /// Provide the observer responsible for determining new indexes.
     pub fn new<S>(observer: &O, state: &mut S, base: CS, accounting_map: &'a [u32]) -> Self
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {
@@ -317,7 +315,7 @@ where
         accounting_map: &'a [u32],
     ) -> Self
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {

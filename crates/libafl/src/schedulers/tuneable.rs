@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::RemovableScheduler;
 use crate::{
-    Error, HasMetadata,
+    Error, HasMetadata, HasMetadataMut,
     corpus::{Corpus, CorpusId},
     schedulers::Scheduler,
     state::HasCorpus,
@@ -36,7 +36,7 @@ impl TuneableScheduler {
     #[must_use]
     pub fn new<S>(state: &mut S) -> Self
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         if !state.has_metadata::<TuneableSchedulerMetadata>() {
             state.add_metadata(TuneableSchedulerMetadata::default());
@@ -46,7 +46,7 @@ impl TuneableScheduler {
 
     fn metadata_mut<S>(state: &mut S) -> &mut TuneableSchedulerMetadata
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         state
             .metadata_map_mut()
@@ -67,7 +67,7 @@ impl TuneableScheduler {
     /// Sets the next corpus id to be used
     pub fn set_next<S>(state: &mut S, next: CorpusId)
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         Self::metadata_mut(state).next = Some(next);
     }
@@ -83,7 +83,7 @@ impl TuneableScheduler {
     /// Resets this to a queue scheduler
     pub fn reset<S>(state: &mut S)
     where
-        S: HasMetadata,
+        S: HasMetadataMut,
     {
         let metadata = Self::metadata_mut(state);
         metadata.next = None;
@@ -101,7 +101,7 @@ impl TuneableScheduler {
     }
 }
 
-impl<I, S> RemovableScheduler<I, S> for TuneableScheduler {}
+impl<I, S> RemovableScheduler<I, S> for TuneableScheduler where S: HasCorpus<I> {}
 
 impl<I, S> Scheduler<I, S> for TuneableScheduler
 where
@@ -110,11 +110,7 @@ where
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
-        state
-            .corpus()
-            .get(id)?
-            .borrow_mut()
-            .set_parent_id_optional(current_id);
+        state.corpus().get(id)?.set_parent_id_optional(current_id);
 
         Ok(())
     }

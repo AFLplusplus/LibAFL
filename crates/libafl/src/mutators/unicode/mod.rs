@@ -35,7 +35,7 @@ where
 {
     type Post = UnicodeIdentificationMetadata;
 
-    fn try_transform_from(base: &mut Testcase<BytesInput>, state: &S) -> Result<Self, Error> {
+    fn try_transform_from(base: &Testcase<BytesInput>, state: &S) -> Result<Self, Error> {
         let input = base.load_input(state.corpus())?.clone();
         let metadata = base.metadata::<UnicodeIdentificationMetadata>().cloned()?;
         Ok((input, metadata))

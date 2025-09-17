@@ -9,6 +9,7 @@ use libafl_bolts::{
 
 use crate::{
     HasNamedMetadata,
+    corpus::testcase::TestcaseMetadata,
     feedbacks::{Feedback, StateInitializer},
     observers::{ObserversTuple, ValueObserver},
 };
@@ -86,7 +87,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        _testcase: &mut crate::corpus::Testcase<I>,
+        _md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         Ok(())
     }

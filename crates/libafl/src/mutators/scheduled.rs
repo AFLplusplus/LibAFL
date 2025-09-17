@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 use crate::{
-    Error, HasMetadata,
-    corpus::{Corpus, CorpusId},
+    Error, HasMetadataMut,
+    corpus::{Corpus, CorpusId, HasTestcaseMetadata},
     mutators::{
         MutationResult, Mutator, MutatorsTuple,
         token_mutations::{TokenInsert, TokenReplace},
@@ -306,15 +306,18 @@ where
 
     fn post_exec(&mut self, state: &mut S, corpus_id: Option<CorpusId>) -> Result<(), Error> {
         if let Some(id) = corpus_id {
-            let mut testcase = (*state.corpus_mut().get(id)?).borrow_mut();
+            let testcase = state.corpus().get(id)?;
             let mut log = Vec::<Cow<'static, str>>::new();
+
             while let Some(idx) = self.mutation_log.pop() {
                 let name = self.scheduled.mutations().name(idx.0).unwrap().clone(); // TODO maybe return an Error on None
                 log.push(name);
             }
+
             let meta = LogMutationMetadata::new(log);
-            testcase.add_metadata(meta);
+            testcase.testcase_metadata_mut().add_metadata(meta);
         }
+
         // Always reset the log for each run
         self.mutation_log.clear();
         Ok(())

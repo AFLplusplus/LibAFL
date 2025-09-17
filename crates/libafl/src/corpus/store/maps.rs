@@ -1,13 +1,13 @@
 //! Multiple map implementations for the in-memory store.
 
-use core::cell::RefCell;
-use std::{collections::BTreeMap, rc::Rc, vec::Vec};
+use std::{collections::BTreeMap, vec::Vec};
 
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 
 use crate::corpus::CorpusId;
 
+/// A trait implemented by in-memory corpus maps
 pub trait InMemoryCorpusMap<T> {
     /// Returns the number of testcases
     fn count(&self) -> usize;
@@ -20,14 +20,14 @@ pub trait InMemoryCorpusMap<T> {
     /// Store the testcase associated to corpus_id.
     fn add(&mut self, id: CorpusId, testcase: T);
 
-    /// Replaces the [`Testcase`] at the given idx, returning the existing.
-    fn replace(&mut self, id: CorpusId, new_testcase: T) -> Option<T>;
-
-    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
-    fn remove(&mut self, id: CorpusId) -> Option<Rc<RefCell<T>>>;
+    /// Get by id; considers only enabled testcases
+    fn get(&self, id: CorpusId) -> Option<&T>;
 
     /// Get by id; considers only enabled testcases
-    fn get(&self, id: CorpusId) -> Option<Rc<RefCell<T>>>;
+    fn get_mut(&mut self, id: CorpusId) -> Option<&mut T>;
+
+    /// Replace a testcase by another one
+    fn replace(&mut self, id: CorpusId, testcase: T) -> Option<T>;
 
     /// Get the prev corpus id in chronological order
     fn prev(&self, id: CorpusId) -> Option<CorpusId>;
@@ -45,31 +45,34 @@ pub trait InMemoryCorpusMap<T> {
     fn nth(&self, nth: usize) -> CorpusId;
 }
 
+/// A history for [`CorpusId`]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct CorpusIdHistory {
     keys: Vec<CorpusId>,
 }
 
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+/// A [`BTreeMap`] based [`InMemoryCorpusMap`]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BtreeCorpusMap<T> {
     /// A map of `CorpusId` to `Testcase`.
-    map: BTreeMap<CorpusId, Rc<RefCell<T>>>,
+    map: BTreeMap<CorpusId, T>,
     /// A list of available corpus ids
     history: CorpusIdHistory,
 }
 
 /// Keep track of the stored `Testcase` and the siblings ids (insertion order)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TestcaseStorageItem<T> {
     /// The stored testcase
-    pub testcase: Rc<RefCell<T>>,
+    pub testcase: T,
     /// Previously inserted id
     pub prev: Option<CorpusId>,
     /// Following inserted id
     pub next: Option<CorpusId>,
 }
 
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+/// A [`hashbrown::HashMap`] based [`InMemoryCorpusMap`]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HashCorpusMap<T> {
     /// A map of `CorpusId` to `TestcaseStorageItem`
     map: hashbrown::HashMap<CorpusId, TestcaseStorageItem<T>>,
@@ -81,6 +84,26 @@ pub struct HashCorpusMap<T> {
     history: CorpusIdHistory,
 }
 
+impl<T> Default for BtreeCorpusMap<T> {
+    fn default() -> Self {
+        Self {
+            map: BTreeMap::default(),
+            history: CorpusIdHistory::default(),
+        }
+    }
+}
+
+impl<T> Default for HashCorpusMap<T> {
+    fn default() -> Self {
+        Self {
+            map: hashbrown::HashMap::default(),
+            first_id: None,
+            last_id: None,
+            history: CorpusIdHistory::default(),
+        }
+    }
+}
+
 impl CorpusIdHistory {
     ///  Add a key to the history
     pub fn add(&mut self, id: CorpusId) {
@@ -90,7 +113,7 @@ impl CorpusIdHistory {
     }
 
     /// Remove a key from the history
-    fn remove(&mut self, id: CorpusId) {
+    pub fn remove(&mut self, id: CorpusId) {
         if let Ok(idx) = self.keys.binary_search(&id) {
             self.keys.remove(idx);
         }
@@ -130,45 +153,31 @@ impl<T> InMemoryCorpusMap<T> for HashCorpusMap<T> {
         self.map.insert(
             id,
             TestcaseStorageItem {
-                testcase: Rc::new(RefCell::new(testcase)),
+                testcase,
                 prev,
                 next: None,
             },
         );
     }
 
-    fn replace(&mut self, id: CorpusId, new_testcase: T) -> Option<T> {
-        match self.map.get_mut(&id) {
-            Some(entry) => Some(entry.testcase.replace(new_testcase)),
-            _ => None,
-        }
+    fn get(&self, id: CorpusId) -> Option<&T> {
+        self.map.get(&id).map(|inner| &inner.testcase)
     }
 
-    fn remove(&mut self, id: CorpusId) -> Option<Rc<RefCell<T>>> {
-        if let Some(item) = self.map.remove(&id) {
-            if let Some(prev) = item.prev {
-                self.history.remove(id);
-                self.map.get_mut(&prev).unwrap().next = item.next;
-            } else {
-                // first elem
-                self.first_id = item.next;
-            }
-
-            if let Some(next) = item.next {
-                self.map.get_mut(&next).unwrap().prev = item.prev;
-            } else {
-                // last elem
-                self.last_id = item.prev;
-            }
-
-            Some(item.testcase)
-        } else {
-            None
-        }
+    fn get_mut(&mut self, id: CorpusId) -> Option<&mut T> {
+        self.map.get_mut(&id).map(|storage| &mut storage.testcase)
     }
 
-    fn get(&self, id: CorpusId) -> Option<Rc<RefCell<T>>> {
-        self.map.get(&id).map(|inner| inner.testcase.clone())
+    fn replace(&mut self, id: CorpusId, testcase: T) -> Option<T> {
+        let old_tc = self.map.get_mut(&id)?;
+
+        let new_tc = TestcaseStorageItem {
+            testcase,
+            prev: old_tc.prev,
+            next: old_tc.next,
+        };
+
+        self.map.insert(id, new_tc).map(|storage| storage.testcase)
     }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {
@@ -209,23 +218,26 @@ impl<T> InMemoryCorpusMap<T> for BtreeCorpusMap<T> {
 
     fn add(&mut self, id: CorpusId, testcase: T) {
         // corpus.insert_key(id);
-        self.map.insert(id, Rc::new(RefCell::new(testcase)));
+        self.map.insert(id, testcase);
         self.history.add(id);
     }
 
-    fn replace(&mut self, id: CorpusId, new_testcase: T) -> Option<T> {
-        self.map
-            .get_mut(&id)
-            .map(|entry| entry.replace(new_testcase))
+    // fn replace(&mut self, id: CorpusId, new_testcase: T) -> Option<T> {
+    //     self.map
+    //         .get_mut(&id)
+    //         .map(|entry| entry.replace(new_testcase))
+    // }
+
+    fn get(&self, id: CorpusId) -> Option<&T> {
+        self.map.get(&id)
     }
 
-    fn remove(&mut self, id: CorpusId) -> Option<Rc<RefCell<T>>> {
-        self.history.remove(id);
-        self.map.remove(&id)
+    fn get_mut(&mut self, id: CorpusId) -> Option<&mut T> {
+        self.map.get_mut(&id)
     }
 
-    fn get(&self, id: CorpusId) -> Option<Rc<RefCell<T>>> {
-        self.map.get(&id).cloned()
+    fn replace(&mut self, id: CorpusId, testcase: T) -> Option<T> {
+        self.map.insert(id, testcase)
     }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {

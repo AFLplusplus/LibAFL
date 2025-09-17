@@ -9,7 +9,8 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    HasNamedMetadata,
+    HasNamedMetadataMut,
+    corpus::testcase::TestcaseMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::ListObserver,
@@ -81,7 +82,7 @@ where
     ) -> bool
     where
         OT: MatchName,
-        S: HasNamedMetadata,
+        S: HasNamedMetadataMut,
     {
         let observer = observers.get(&self.observer_handle).unwrap();
         // TODO register the list content in a testcase metadata
@@ -99,7 +100,7 @@ where
         !self.novelty.is_empty()
     }
 
-    fn append_list_observer_metadata<S: HasNamedMetadata>(&mut self, state: &mut S) {
+    fn append_list_observer_metadata<S: HasNamedMetadataMut>(&mut self, state: &mut S) {
         let history_set = state
             .named_metadata_map_mut()
             .get_mut::<ListFeedbackMetadata<T>>(self.name())
@@ -113,7 +114,7 @@ where
 
 impl<S, T> StateInitializer<S> for ListFeedback<T>
 where
-    S: HasNamedMetadata,
+    S: HasNamedMetadataMut,
     T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
@@ -125,7 +126,7 @@ where
 impl<EM, I, OT, S, T> Feedback<EM, I, OT, S> for ListFeedback<T>
 where
     OT: MatchName,
-    S: HasNamedMetadata,
+    S: HasNamedMetadataMut,
     T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
 {
     fn is_interesting(
@@ -149,7 +150,7 @@ where
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        _testcase: &mut crate::corpus::Testcase<I>,
+        _md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         self.append_list_observer_metadata(state);
         Ok(())

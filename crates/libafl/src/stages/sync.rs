@@ -15,7 +15,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasMetadataMut, HasNamedMetadata, HasNamedMetadataMut,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{Event, EventConfig, EventFirer, EventWithStats, llmp::LlmpEventConverter},
     executors::{Executor, ExitKind, HasObservers},
@@ -80,7 +80,7 @@ where
     Z: Evaluator<E, EM, I, S>,
     S: HasCorpus<I>
         + HasRand
-        + HasMetadata
+        + HasMetadataMut
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
@@ -155,7 +155,7 @@ where
 
 impl<CB, E, EM, I, S, Z> Restartable<S> for SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
@@ -253,7 +253,7 @@ where
     ICB: InputConverter<From = DI, To = I>,
     S: HasExecutions
         + HasRand
-        + HasMetadata
+        + HasMetadataMut
         + HasSolutions<I>
         + HasCurrentTestcase<I>
         + Stoppable
@@ -280,7 +280,7 @@ where
                 last_id.map_or_else(|| state.corpus().first(), |id| state.corpus().next(id));
 
             while let Some(id) = cur_id {
-                let input = state.corpus().cloned_input_for_id(id)?;
+                let input = state.corpus().get(id)?.cloned_input();
 
                 self.client.fire(
                     state,

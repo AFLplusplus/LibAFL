@@ -10,8 +10,8 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata,
-    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
+    Error, HasMetadata, HasMetadataMut,
+    corpus::{Corpus, CorpusId, HasTestcase},
     schedulers::{
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler, on_add_metadata_default,
         on_evaluation_metadata_default, on_next_metadata_default,
@@ -280,27 +280,7 @@ pub struct PowerQueueScheduler<C, O> {
     phantom: PhantomData<O>,
 }
 
-impl<C, I, O, S> RemovableScheduler<I, S> for PowerQueueScheduler<C, O> {
-    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
-    fn on_remove(
-        &mut self,
-        _state: &mut S,
-        _id: CorpusId,
-        _prev: &Option<Testcase<I>>,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
-
-    /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
-    fn on_replace(
-        &mut self,
-        _state: &mut S,
-        _id: CorpusId,
-        _prev: &Testcase<I>,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
-}
+impl<C, I, O, S> RemovableScheduler<I, S> for PowerQueueScheduler<C, O> where S: HasCorpus<I> {}
 
 impl<C, O> AflScheduler for PowerQueueScheduler<C, O> {
     type ObserverRef = C;
@@ -326,7 +306,7 @@ impl<C, O> HasQueueCycles for PowerQueueScheduler<C, O> {
 
 impl<C, I, O, S> Scheduler<I, S> for PowerQueueScheduler<C, O>
 where
-    S: HasCorpus<I> + HasMetadata + HasTestcase<I>,
+    for<'a> S: HasCorpus<I> + HasMetadataMut + HasTestcase<I>,
     O: Hash,
     C: AsRef<O>,
 {
@@ -389,7 +369,7 @@ where
     #[must_use]
     pub fn new<S>(state: &mut S, observer: &C, strat: PowerSchedule) -> Self
     where
-        S: HasMetadata,
+        S: HasMetadata + HasMetadataMut,
     {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(strat)));
