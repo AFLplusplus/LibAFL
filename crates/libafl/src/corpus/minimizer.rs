@@ -104,8 +104,14 @@ where
                         // Execute the input; we cannot rely on the metadata already being present.
                         let input = tc.input();
 
-                        let (exit_kind, mut total_time, _) =
-                            run_target_with_timing(fuzzer, executor, state, mgr, input.as_ref(), false)?;
+                        let (exit_kind, mut total_time, _) = run_target_with_timing(
+                            fuzzer,
+                            executor,
+                            state,
+                            mgr,
+                            input.as_ref(),
+                            false,
+                        )?;
                         if exit_kind != ExitKind::Ok {
                             total_time = Duration::from_secs(1);
                         }

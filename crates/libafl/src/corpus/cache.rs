@@ -296,7 +296,12 @@ where
         }
     }
 
-    fn disable(&mut self, id: CorpusId, cache_store: &mut CS, fallback_store: &mut FS) -> Result<(), Error> {
+    fn disable(
+        &mut self,
+        id: CorpusId,
+        cache_store: &mut CS,
+        fallback_store: &mut FS,
+    ) -> Result<(), Error> {
         cache_store.disable(id)?;
         fallback_store.disable(id)
     }
@@ -421,7 +426,12 @@ where
         )
     }
 
-    fn disable(&mut self, id: CorpusId, cache_store: &mut CS, fallback_store: &mut FS) -> Result<(), Error> {
+    fn disable(
+        &mut self,
+        id: CorpusId,
+        cache_store: &mut CS,
+        fallback_store: &mut FS,
+    ) -> Result<(), Error> {
         cache_store.disable(id)?;
         fallback_store.disable(id)
     }

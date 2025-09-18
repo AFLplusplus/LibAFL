@@ -191,13 +191,12 @@ mod tests {
 
     use crate::{
         Error,
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
         state::{HasCorpus, StdState},
     };
-    use crate::corpus::CorpusId;
 
     const FACTOR: f64 = 1337.0;
 
@@ -208,10 +207,7 @@ mod tests {
     where
         S: HasCorpus<I>,
     {
-        fn compute(
-            _state: &S,
-            _corpus_id: CorpusId,
-        ) -> Result<f64, Error> {
+        fn compute(_state: &S, _corpus_id: CorpusId) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }

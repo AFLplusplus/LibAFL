@@ -79,9 +79,11 @@ where
     }
 
     fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
-        self.cache.borrow_mut().disable(id,
-                                        &mut *self.cache_store.borrow_mut(),
-                                        &mut self.fallback_store)
+        self.cache.borrow_mut().disable(
+            id,
+            &mut *self.cache_store.borrow_mut(),
+            &mut self.fallback_store,
+        )
     }
 
     fn replace_metadata(
