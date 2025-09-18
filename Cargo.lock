@@ -3532,11 +3532,12 @@ dependencies = [
 
 [[package]]
 name = "libipt"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "975943706827c4d4f6b22771e71512af9b4cf7144680003600db11ada92f8383"
+checksum = "4c3143c4dae9794d23fa2bbc6315847fdf3ef718caa09a7ba09238bce19fe9d4"
 dependencies = [
  "bitflags 2.9.1",
+ "derive_more",
  "libipt-sys",
  "num_enum",
 ]
