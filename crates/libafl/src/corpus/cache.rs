@@ -76,6 +76,14 @@ pub trait Cache<CS, FS, I> {
         fallback_store: &FS,
     ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
 
+    /// Disable an entry
+    fn disable(
+        &mut self,
+        id: CorpusId,
+        cache_store: &mut CS,
+        fallback_store: &mut FS,
+    ) -> Result<(), Error>;
+
     /// Replace a testcase in the cache
     fn replace_metadata(
         &mut self,
@@ -288,6 +296,11 @@ where
         }
     }
 
+    fn disable(&mut self, id: CorpusId, cache_store: &mut CS, fallback_store: &mut FS) -> Result<(), Error> {
+        cache_store.disable(id)?;
+        fallback_store.disable(id)
+    }
+
     // fn replace(
     //     &mut self,
     //     id: CorpusId,
@@ -406,6 +419,11 @@ where
             |cache_store, corpus_id| cache_store.remove(corpus_id),
             |fallback_store, corpus_id| fallback_store.get_from::<ENABLED>(corpus_id),
         )
+    }
+
+    fn disable(&mut self, id: CorpusId, cache_store: &mut CS, fallback_store: &mut FS) -> Result<(), Error> {
+        cache_store.disable(id)?;
+        fallback_store.disable(id)
     }
 
     fn replace_metadata(

@@ -281,6 +281,12 @@ where
         self.disk_mgr.load_testcase(&tc_id)
     }
 
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        let tc = self.enabled_map.remove(id).ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))?;
+        self.disabled_map.add(id, tc);
+        Ok(())
+    }
+
     fn replace_metadata(
         &mut self,
         _id: CorpusId,

@@ -57,6 +57,10 @@ impl<I> Corpus<I> for NopCorpus<I> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
+    fn disable(&mut self, _id: CorpusId) -> Result<(), Error> {
+        Err(Error::unsupported("Unsupported by NopCorpus"))
+    }
+
     /// Current testcase scheduled
     #[inline]
     fn current(&self) -> &Option<CorpusId> {

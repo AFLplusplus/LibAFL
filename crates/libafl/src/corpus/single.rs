@@ -88,8 +88,8 @@ where
         self.store.get_from::<ENABLED>(id)
     }
 
-    fn disable(&mut self, id: CorpusId) {
-
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.store.disable(id)
     }
 
     fn replace_metadata(
