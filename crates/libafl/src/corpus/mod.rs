@@ -36,8 +36,6 @@ pub use nop::NopCorpus;
 pub mod store;
 pub use store::{InMemoryStore, OnDiskStore, maps};
 
-use crate::corpus::cache::WritebackOnFlushPolicy;
-
 /// The standard fully in-memory corpus map.
 #[cfg(not(feature = "corpus_btreemap"))]
 pub type StdInMemoryCorpusMap<I> = maps::HashCorpusMap<Testcase<I, Rc<RefCell<TestcaseMetadata>>>>;
@@ -66,7 +64,6 @@ pub type InMemoryOnDiskCorpus<I> = CombinedCorpus<
     StdInMemoryStore<I>,
     StdOnDiskStore<I>,
     I,
-    WritebackOnFlushPolicy,
 >;
 
 /// The standard corpus for storing on disk and in-memory with a cache.
@@ -76,7 +73,6 @@ pub type CachedOnDiskCorpus<I> = CombinedCorpus<
     StdInMemoryStore<I>,
     StdOnDiskStore<I>,
     I,
-    WritebackOnFlushPolicy,
 >;
 
 /// An abstraction for the index that identify a testcase in the corpus

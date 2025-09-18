@@ -5,7 +5,7 @@
 //!     - a **cache store** holding on the testcases with quick access.
 //!     - a **backing store** with more expensive access, used when the testcase cannot be found in the cache store.
 
-use alloc::rc::Rc;
+use alloc::{rc::Rc, vec::Vec};
 use std::{cell::RefCell, collections::VecDeque, marker::PhantomData};
 
 use libafl_bolts::Error;
@@ -21,39 +21,40 @@ use crate::{
 };
 
 /// Describes how a change to metadata should be propagated to the fallback store
-#[derive(Debug)]
-pub enum CachePolicy {
-    /// Propagate the changes when the cell gets dropped.
-    /// Expect more writes to the fallback store, with
-    WritebackOnDrop,
-    /// Propagate the changes when the cache is flushed explicitly.
-    /// Less writes to the fallback stores will be issued, but the used is responsible for
-    /// flushing the cache regularly, to avoid data loss.
-    WritebackOnFlush,
-}
-
-/// Describe a cache policy
 pub trait HasCachePolicy {
-    /// The cache policy
-    const CACHE_POLICY: CachePolicy;
+    /// Mark a corpus id as dirty
+    fn dirty(&self, corpus_id: CorpusId);
 }
 
-/// An implementor for [`CachePolicy::WritebackOnDrop`]
+/// Propagate the changes when the cell gets dropped.
+/// Expect more writes to the fallback store.
 #[derive(Debug)]
 pub struct WritebackOnDropPolicy;
 impl HasCachePolicy for WritebackOnDropPolicy {
-    const CACHE_POLICY: CachePolicy = CachePolicy::WritebackOnDrop;
+    fn dirty(&self, _corpus_id: CorpusId) {
+        // do nothing
+    }
 }
 
-/// An implementor for [`CachePolicy::WritebackOnFlush`]
+/// Propagate the changes when the cache is flushed explicitly.
+///
+/// Less writes to the fallback stores will be issued, but the used is responsible for
+/// flushing the cache regularly.
+/// If the cache is not flushed, no data will be written to the fallback store, resulting in
+/// data loss.
 #[derive(Debug)]
-pub struct WritebackOnFlushPolicy;
+pub struct WritebackOnFlushPolicy {
+    dirty_entries: RefCell<Vec<CorpusId>>,
+}
+
 impl HasCachePolicy for WritebackOnFlushPolicy {
-    const CACHE_POLICY: CachePolicy = CachePolicy::WritebackOnFlush;
+    fn dirty(&self, corpus_id: CorpusId) {
+        self.dirty_entries.borrow_mut().push(corpus_id);
+    }
 }
 
 /// A cache, managing a cache store and a fallback store.
-pub trait Cache<CS, FS, I, P> {
+pub trait Cache<CS, FS, I> {
     /// A [`TestcaseMetadata`] cell.
     type TestcaseMetadataCell: IsTestcaseMetadataCell;
 
@@ -105,25 +106,47 @@ pub trait Cache<CS, FS, I, P> {
     /// Mark a corpus entry as written explicitly, for subsequent flushes.
     ///
     /// Thus, a cache [`Self::flush`] should propagate to entries marked as [`Self::written`].
-    fn written(&mut self, id: CorpusId);
+    fn written(&self, id: CorpusId);
 }
 
 /// A composed testcase metadata cell, linking the cached cell with the fallback cell.
-#[derive(Debug, Clone)]
-pub struct CacheTestcaseMetadataCell<CC, FC>
+#[derive(Debug)]
+pub struct CacheTestcaseMetadataCell<CC, CP, FC>
 where
     CC: IsTestcaseMetadataCell,
+    CP: HasCachePolicy,
     FC: IsTestcaseMetadataCell,
 {
     write_access: RefCell<bool>,
+    cache_policy: Rc<CP>,
     cache_cell: CC,
     fallback_cell: FC,
 }
 
+impl<CC, CP, FC> Clone for CacheTestcaseMetadataCell<CC, CP, FC>
+where
+    CC: IsTestcaseMetadataCell + Clone,
+    CP: HasCachePolicy,
+    FC: IsTestcaseMetadataCell + Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            write_access: self.write_access.clone(),
+            cache_policy: self.cache_policy.clone(),
+            cache_cell: self.cache_cell.clone(),
+            fallback_cell: self.fallback_cell.clone(),
+        }
+    }
+}
+
 /// An identity cache, storing everything both in the cache and the backing store.
+///
+/// It only supports [`WritebackOnFlushPolicy`] since all the testcases are stored in memory on load
+/// forever.
 #[derive(Debug)]
 pub struct IdentityCache<M> {
-    cell_map: M,
+    cell_map: RefCell<M>,
+    cache_policy: Rc<WritebackOnFlushPolicy>,
 }
 
 /// A `First In / First Out` cache policy.
@@ -134,14 +157,16 @@ pub struct FifoCache<CS, FS, I> {
     phantom: PhantomData<(I, CS, FS)>,
 }
 
-impl<CC, FC> CacheTestcaseMetadataCell<CC, FC>
+impl<CC, CP, FC> CacheTestcaseMetadataCell<CC, CP, FC>
 where
     CC: IsTestcaseMetadataCell,
+    CP: HasCachePolicy,
     FC: IsTestcaseMetadataCell,
 {
     /// Create a new [`CacheTestcaseMetadataCell`]
-    pub fn new(cache_cell: CC, fallback_cell: FC) -> Self {
+    pub fn new(cache_policy: Rc<CP>, cache_cell: CC, fallback_cell: FC) -> Self {
         Self {
+            cache_policy,
             write_access: RefCell::new(false),
             cache_cell,
             fallback_cell,
@@ -149,9 +174,10 @@ where
     }
 }
 
-impl<CC, FC> IsTestcaseMetadataCell for CacheTestcaseMetadataCell<CC, FC>
+impl<CC, CP, FC> IsTestcaseMetadataCell for CacheTestcaseMetadataCell<CC, CP, FC>
 where
     CC: IsTestcaseMetadataCell,
+    CP: HasCachePolicy,
     FC: IsTestcaseMetadataCell,
 {
     type TestcaseMetadataRef<'a>
@@ -196,9 +222,10 @@ where
     }
 }
 
-impl<CC, FC> Drop for CacheTestcaseMetadataCell<CC, FC>
+impl<CC, CP, FC> Drop for CacheTestcaseMetadataCell<CC, CP, FC>
 where
     CC: IsTestcaseMetadataCell,
+    CP: HasCachePolicy,
     FC: IsTestcaseMetadataCell,
 {
     fn drop(&mut self) {
@@ -206,7 +233,7 @@ where
     }
 }
 
-impl<CS, FS, I, M, P> Cache<CS, FS, I, P> for IdentityCache<M>
+impl<CS, FS, I, M> Cache<CS, FS, I> for IdentityCache<M>
 where
     CS: RemovableStore<I>,
     FS: Store<I>,
@@ -214,15 +241,25 @@ where
     M: InMemoryCorpusMap<
         Testcase<
             I,
-            Rc<CacheTestcaseMetadataCell<CS::TestcaseMetadataCell, FS::TestcaseMetadataCell>>,
+            Rc<
+                CacheTestcaseMetadataCell<
+                    CS::TestcaseMetadataCell,
+                    WritebackOnFlushPolicy,
+                    FS::TestcaseMetadataCell,
+                >,
+            >,
         >,
     >,
-    P: HasCachePolicy,
     <CS as Store<I>>::TestcaseMetadataCell: Clone,
     <FS as Store<I>>::TestcaseMetadataCell: Clone,
 {
-    type TestcaseMetadataCell =
-        Rc<CacheTestcaseMetadataCell<CS::TestcaseMetadataCell, FS::TestcaseMetadataCell>>;
+    type TestcaseMetadataCell = Rc<
+        CacheTestcaseMetadataCell<
+            CS::TestcaseMetadataCell,
+            WritebackOnFlushPolicy,
+            FS::TestcaseMetadataCell,
+        >,
+    >;
 
     fn add(
         &mut self,
@@ -254,16 +291,20 @@ where
         cache_store: &mut CS,
         fallback_store: &FS,
     ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
-        if let Some(tc) = self.cell_map.get(id) {
+        if let Some(tc) = self.cell_map.borrow().get(id) {
             Ok(tc.clone())
         } else {
             let (input, cc) = cache_store.get_from::<ENABLED>(id)?.into_inner();
             let (_, fc) = fallback_store.get_from::<ENABLED>(id)?.into_inner();
 
-            let cache_cell = Rc::new(CacheTestcaseMetadataCell::new(cc, fc));
+            let cache_cell = Rc::new(CacheTestcaseMetadataCell::new(
+                self.cache_policy.clone(),
+                cc,
+                fc,
+            ));
             let testcase = Testcase::new(input, cache_cell.clone());
 
-            self.cell_map.add(id, testcase.clone());
+            self.cell_map.borrow_mut().add(id, testcase.clone());
 
             Ok(testcase)
         }
@@ -302,8 +343,8 @@ where
         todo!()
     }
 
-    fn written(&mut self, _id: CorpusId) {
-        todo!()
+    fn written(&self, id: CorpusId) {
+        self.cache_policy.dirty(id)
     }
 }
 
@@ -350,7 +391,7 @@ where
     }
 }
 
-impl<CS, FS, I, P> Cache<CS, FS, I, P> for FifoCache<CS, FS, I>
+impl<CS, FS, I> Cache<CS, FS, I> for FifoCache<CS, FS, I>
 where
     CS: RemovableStore<I>,
     FS: Store<I>,
@@ -419,7 +460,7 @@ where
         todo!()
     }
 
-    fn written(&mut self, _id: CorpusId) {
+    fn written(&self, _id: CorpusId) {
         todo!()
     }
 }

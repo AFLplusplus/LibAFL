@@ -13,25 +13,25 @@ use crate::corpus::testcase::TestcaseMetadata;
 /// A [`CombinedCorpus`] tries first to use the main store according to some policy.
 /// If it fails, it falls back to the secondary store.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-pub struct CombinedCorpus<C, CS, FS, I, P> {
+pub struct CombinedCorpus<C, CS, FS, I> {
     /// The cache store
     cache_store: RefCell<CS>,
     /// The fallback store
     fallback_store: FS,
-    /// The policty taking decisions
-    cache: RefCell<C>,
+    /// The policy taking decisions
+    cache: Rc<RefCell<C>>,
     /// The corpus ID counter
     counter: CorpusCounter,
     /// The keys in order (use `Vec::binary_search`)
     keys: Vec<CorpusId>,
     /// The current ID
     current: Option<CorpusId>,
-    phantom: PhantomData<(I, P)>,
+    phantom: PhantomData<I>,
 }
 
-impl<C, CS, FS, I, P> Corpus<I> for CombinedCorpus<C, CS, FS, I, P>
+impl<C, CS, FS, I> Corpus<I> for CombinedCorpus<C, CS, FS, I>
 where
-    C: Cache<CS, FS, I, P>,
+    C: Cache<CS, FS, I>,
     CS: Store<I>,
     FS: Store<I>,
     I: Clone,
