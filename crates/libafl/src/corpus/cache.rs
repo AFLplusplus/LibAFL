@@ -59,17 +59,7 @@ pub trait Cache<CS, FS, I> {
     type TestcaseMetadataCell: IsTestcaseMetadataCell;
 
     /// Add a testcase to the cache
-    fn add(
-        &mut self,
-        id: CorpusId,
-        input: Rc<I>,
-        md: TestcaseMetadata,
-        cache_store: &mut CS,
-        fallback_store: &mut FS,
-    ) -> Result<(), Error>;
-
-    /// Add a disabled testcase to the cache
-    fn add_disabled(
+    fn add_shared<const ENABLED: bool>(
         &mut self,
         id: CorpusId,
         input: Rc<I>,
@@ -261,7 +251,7 @@ where
         >,
     >;
 
-    fn add(
+    fn add_shared<const ENABLED: bool>(
         &mut self,
         id: CorpusId,
         input: Rc<I>,
@@ -269,20 +259,8 @@ where
         cache_store: &mut CS,
         fallback_store: &mut FS,
     ) -> Result<(), Error> {
-        cache_store.add(id, input.clone(), md.clone())?;
-        fallback_store.add(id, input, md)
-    }
-
-    fn add_disabled(
-        &mut self,
-        id: CorpusId,
-        input: Rc<I>,
-        md: TestcaseMetadata,
-        cache_store: &mut CS,
-        fallback_store: &mut FS,
-    ) -> Result<(), Error> {
-        cache_store.add_disabled(id, input.clone(), md.clone())?;
-        fallback_store.add_disabled(id, input, md)
+        cache_store.add_shared::<ENABLED>(id, input.clone(), md.clone())?;
+        fallback_store.add_shared::<ENABLED>(id, input, md)
     }
 
     fn get_from<const ENABLED: bool>(
@@ -399,7 +377,7 @@ where
 {
     type TestcaseMetadataCell = CS::TestcaseMetadataCell;
 
-    fn add(
+    fn add_shared<const ENABLED: bool>(
         &mut self,
         id: CorpusId,
         input: Rc<I>,
@@ -407,18 +385,7 @@ where
         _cache_store: &mut CS,
         fallback_store: &mut FS,
     ) -> Result<(), Error> {
-        fallback_store.add(id, input, metadata)
-    }
-
-    fn add_disabled(
-        &mut self,
-        id: CorpusId,
-        input: Rc<I>,
-        metadata: TestcaseMetadata,
-        _cache_store: &mut CS,
-        fallback_store: &mut FS,
-    ) -> Result<(), Error> {
-        fallback_store.add_disabled(id, input, metadata)
+        fallback_store.add_shared::<ENABLED>(id, input, metadata)
     }
 
     fn get_from<const ENABLED: bool>(
@@ -433,7 +400,7 @@ where
             fallback_store,
             |cache_store, corpus_id, testcase| {
                 let (input, md) = testcase.into_inner();
-                cache_store.add(corpus_id, input, md.into_testcase_metadata())
+                cache_store.add_shared::<ENABLED>(corpus_id, input, md.into_testcase_metadata())
             },
             |cache_store, corpus_id| cache_store.get(corpus_id),
             |cache_store, corpus_id| cache_store.remove(corpus_id),

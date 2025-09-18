@@ -42,13 +42,11 @@ impl<I> Corpus<I> for NopCorpus<I> {
 
     /// Add an enabled testcase to the corpus and return its index
     #[inline]
-    fn add(&mut self, _input: Rc<I>, _md: TestcaseMetadata) -> Result<CorpusId, Error> {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
-    }
-
-    /// Add a disabled testcase to the corpus and return its index
-    #[inline]
-    fn add_disabled(&mut self, _input: Rc<I>, _md: TestcaseMetadata) -> Result<CorpusId, Error> {
+    fn add_shared<const ENABLED: bool>(
+        &mut self,
+        _input: Rc<I>,
+        _md: TestcaseMetadata,
+    ) -> Result<CorpusId, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 

@@ -289,9 +289,13 @@ where
                 .parent_id(Some(base_corpus_id))
                 .build();
 
-            fuzzer
-                .feedback_mut()
-                .append_metadata(state, manager, &*observers, &mut tc_md)?;
+            fuzzer.feedback_mut().append_metadata(
+                state,
+                manager,
+                &*observers,
+                &base,
+                &mut tc_md,
+            )?;
 
             let prev = state.corpus_mut().replace_metadata(base_corpus_id, tc_md)?;
 

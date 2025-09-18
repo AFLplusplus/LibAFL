@@ -368,6 +368,7 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
+        _input: &I,
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         if let Some(novelties) = self.novelties.as_mut().map(core::mem::take) {

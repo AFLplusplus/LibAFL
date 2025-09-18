@@ -177,6 +177,7 @@ where
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
+        _input: &I,
         _md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         self.append_list_observer_metadata(state);

@@ -50,24 +50,14 @@ where
         self.fallback_store.count_all()
     }
 
-    fn add(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error> {
+    fn add_shared<const ENABLED: bool>(
+        &mut self,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<CorpusId, Error> {
         let new_id = self.counter.new_id();
 
-        self.cache.borrow_mut().add(
-            new_id,
-            input,
-            md,
-            &mut *self.cache_store.borrow_mut(),
-            &mut self.fallback_store,
-        )?;
-
-        Ok(new_id)
-    }
-
-    fn add_disabled(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error> {
-        let new_id = self.counter.new_id();
-
-        self.cache.borrow_mut().add_disabled(
+        self.cache.borrow_mut().add_shared::<ENABLED>(
             new_id,
             input,
             md,

@@ -155,10 +155,24 @@ pub trait Corpus<I>: Sized {
     }
 
     /// Add an enabled testcase to the corpus and return its index
-    fn add(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error>;
+    fn add(&mut self, input: I, md: TestcaseMetadata) -> Result<CorpusId, Error> {
+        self.add_shared::<true>(Rc::new(input), md)
+    }
 
     /// Add a disabled testcase to the corpus and return its index
-    fn add_disabled(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error>;
+    fn add_disabled(&mut self, input: I, md: TestcaseMetadata) -> Result<CorpusId, Error> {
+        self.add_shared::<false>(Rc::new(input), md)
+    }
+
+    /// Add a testcase to the corpus, and returns its index.
+    /// The associated type tells whether the input should be added to the enabled or the disabled corpus.
+    ///
+    /// The input can be shared through [`Rc`].
+    fn add_shared<const ENABLED: bool>(
+        &mut self,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<CorpusId, Error>;
 
     /// Get testcase by id; considers only enabled testcases
     fn get(&self, id: CorpusId) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {

@@ -377,7 +377,7 @@ where
     S: HasExecutions
         + HasCorpus<I>
         + HasMetadata
-        + HasNamedMetadata
+        + HasNamedMetadataMut
         + HasCurrentTestcase<I>
         + MaybeHasClientPerfMonitor
         + HasCurrentCorpusId,
@@ -419,7 +419,7 @@ where
 #[cfg(feature = "concolic_mutation")]
 impl<I, S, Z> Restartable<S> for SimpleConcolicMutationalStage<I, Z>
 where
-    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

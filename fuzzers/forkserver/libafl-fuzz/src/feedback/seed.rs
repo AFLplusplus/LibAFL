@@ -93,6 +93,7 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
+        _input: &I,
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         self.inner

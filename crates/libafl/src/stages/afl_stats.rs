@@ -529,8 +529,9 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_crash<S>(&mut self, testcase: &Testcase<I>, state: &S)
+    fn maybe_update_last_crash<M, S>(&mut self, testcase: &Testcase<I, M>, state: &S)
     where
+        M: IsTestcaseMetadataCell,
         S: HasExecutions,
     {
         #[cfg(feature = "track_hit_feedbacks")]
@@ -544,8 +545,9 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_hang<S>(&mut self, testcase: &Testcase<I>, state: &S)
+    fn maybe_update_last_hang<M, S>(&mut self, testcase: &Testcase<I, M>, state: &S)
     where
+        M: IsTestcaseMetadataCell,
         S: HasExecutions,
     {
         if testcase

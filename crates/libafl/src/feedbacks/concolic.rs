@@ -73,6 +73,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
+        _input: &I,
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         self.add_concolic_feedback_to_metadata::<OT>(observers, md);

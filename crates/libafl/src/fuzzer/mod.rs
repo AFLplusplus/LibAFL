@@ -1,6 +1,6 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
-use alloc::{rc::Rc, string::ToString, vec::Vec};
+use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "std")]
 use core::hash::Hash;
 use core::{fmt::Debug, time::Duration};
@@ -429,9 +429,9 @@ where
                 self.feedback_mut()
                     .append_hit_feedbacks(md.hit_feedbacks_mut())?;
                 self.feedback_mut()
-                    .append_metadata(state, manager, observers, &mut md)?;
+                    .append_metadata(state, manager, observers, input, &mut md)?;
 
-                let id = state.corpus_mut().add(Rc::new(input.clone()), md)?;
+                let id = state.corpus_mut().add(input.clone(), md)?;
                 self.scheduler_mut().on_add(state, id)?;
 
                 Ok(Some(id))
@@ -447,10 +447,10 @@ where
                 }
                 #[cfg(feature = "track_hit_feedbacks")]
                 self.objective_mut()
-                    .append_hit_feedbacks(testcase.hit_objectives_mut())?;
+                    .append_hit_feedbacks(md.hit_objectives_mut())?;
                 self.objective_mut()
-                    .append_metadata(state, manager, observers, &mut md)?;
-                state.solutions_mut().add(Rc::new(input.clone()), md)?;
+                    .append_metadata(state, manager, observers, input, &mut md)?;
+                state.solutions_mut().add(input.clone(), md)?;
 
                 Ok(None)
             }
@@ -726,12 +726,15 @@ where
             #[cfg(feature = "track_hit_feedbacks")]
             self.objective_mut()
                 .append_hit_feedbacks(tc_md.hit_objectives_mut())?;
-            self.objective_mut()
-                .append_metadata(state, manager, &*observers, &mut tc_md)?;
+            self.objective_mut().append_metadata(
+                state,
+                manager,
+                &*observers,
+                &input,
+                &mut tc_md,
+            )?;
             // we don't care about solution id
-            let id = state
-                .solutions_mut()
-                .add(Rc::new(input.clone()), tc_md.clone())?;
+            let id = state.solutions_mut().add(input.clone(), tc_md.clone())?;
 
             manager.fire(
                 state,
@@ -765,11 +768,11 @@ where
 
         #[cfg(feature = "track_hit_feedbacks")]
         self.feedback_mut()
-            .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
+            .append_hit_feedbacks(tc_md.hit_feedbacks_mut())?;
         // Add the input to the main corpus
         self.feedback_mut()
-            .append_metadata(state, manager, &*observers, &mut tc_md)?;
-        let id = state.corpus_mut().add(Rc::new(input.clone()), tc_md)?;
+            .append_metadata(state, manager, &*observers, &input, &mut tc_md)?;
+        let id = state.corpus_mut().add(input.clone(), tc_md)?;
         self.scheduler_mut().on_add(state, id)?;
 
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
@@ -803,9 +806,7 @@ where
             .build();
 
         // Add the disabled input to the main corpus
-        let id = state
-            .corpus_mut()
-            .add_disabled(Rc::new(input.clone()), tc_md)?;
+        let id = state.corpus_mut().add_disabled(input.clone(), tc_md)?;
         Ok(id)
     }
 }

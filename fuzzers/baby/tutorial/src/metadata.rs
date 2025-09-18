@@ -64,11 +64,10 @@ impl<EM, OT, S> Feedback<EM, PacketData, OT, S> for PacketLenFeedback {
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<PacketData>,
+        _input: &PacketData,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        testcase
-            .metadata_map_mut()
-            .insert(PacketLenMetadata { length: self.len });
+        md.insert(PacketLenMetadata { length: self.len });
         Ok(())
     }
 }

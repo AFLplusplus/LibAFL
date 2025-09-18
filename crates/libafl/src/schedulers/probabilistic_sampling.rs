@@ -209,7 +209,7 @@ mod tests {
     {
         fn compute(
             _state: &S,
-            _entry: &mut Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataRefMut<'_>>,
+            _entry: &mut Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
         ) -> Result<f64, Error> {
             Ok(FACTOR)
         }

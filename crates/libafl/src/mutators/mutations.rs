@@ -1793,6 +1793,8 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::rc::Rc;
+
     use libafl_bolts::{
         rands::StdRand,
         tuples::{HasConstLen, tuple_list, tuple_list_type},
@@ -1800,8 +1802,12 @@ mod tests {
 
     use super::*;
     use crate::{
-        HasMetadata, corpus::InMemoryCorpus, feedbacks::ConstFeedback, inputs::BytesInput,
-        mutators::MutatorsTuple, state::StdState,
+        HasMetadata,
+        corpus::{InMemoryCorpus, TestcaseMetadata},
+        feedbacks::ConstFeedback,
+        inputs::BytesInput,
+        mutators::MutatorsTuple,
+        state::StdState,
     };
 
     type TestMutatorsTupleType = tuple_list_type!(
@@ -1868,7 +1874,10 @@ mod tests {
         let mut objective = ConstFeedback::new(false);
 
         corpus
-            .add(BytesInput::new(vec![0x42; 0x1337]).into())
+            .add(
+                Rc::new(BytesInput::new(vec![0x42; 0x1337])),
+                TestcaseMetadata::default(),
+            )
             .unwrap();
 
         StdState::new(

@@ -74,6 +74,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
+        _input: &I,
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         self.append_stdout_observation_to_testcase(observers, md)
@@ -130,6 +131,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
+        _input: &I,
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         let observer = observers

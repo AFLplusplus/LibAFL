@@ -37,11 +37,8 @@ pub trait Store<I> {
         self.count() == 0
     }
 
-    /// Store the testcase associated to corpus_id to the enabled set.
-    fn add(&mut self, id: CorpusId, input: Rc<I>, md: TestcaseMetadata) -> Result<(), Error>;
-
-    /// Store the testcase associated to corpus_id to the disabled set.
-    fn add_disabled(
+    /// Store the testcase associated to corpus_id to the set.
+    fn add_shared<const ENABLED: bool>(
         &mut self,
         id: CorpusId,
         input: Rc<I>,

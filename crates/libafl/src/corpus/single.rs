@@ -70,15 +70,13 @@ where
         self.store.count_all()
     }
 
-    fn add(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error> {
+    fn add_shared<const ENABLED: bool>(
+        &mut self,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<CorpusId, Error> {
         let new_id = self.counter.new_id();
-        self.store.add(new_id, input, md)?;
-        Ok(new_id)
-    }
-
-    fn add_disabled(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error> {
-        let new_id = self.counter.new_id();
-        self.store.add_disabled(new_id, input, md)?;
+        self.store.add_shared::<ENABLED>(new_id, input, md)?;
         Ok(new_id)
     }
 

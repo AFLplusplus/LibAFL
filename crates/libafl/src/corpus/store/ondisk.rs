@@ -246,20 +246,20 @@ where
         self.disabled_map.count()
     }
 
-    fn add(&mut self, id: CorpusId, input: Rc<I>, md: TestcaseMetadata) -> Result<(), Error> {
-        let testcase_id = self.disk_mgr.save_testcase(input, &md)?;
-        self.enabled_map.add(id, testcase_id);
-        Ok(())
-    }
-
-    fn add_disabled(
+    fn add_shared<const ENABLED: bool>(
         &mut self,
         id: CorpusId,
         input: Rc<I>,
         md: TestcaseMetadata,
     ) -> Result<(), Error> {
         let testcase_id = self.disk_mgr.save_testcase(input, &md)?;
-        self.disabled_map.add(id, testcase_id);
+
+        if ENABLED {
+            self.enabled_map.add(id, testcase_id);
+        } else {
+            self.disabled_map.add(id, testcase_id);
+        }
+
         Ok(())
     }
 

@@ -78,6 +78,7 @@ where
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
+        _input: &I,
         _md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         if self.should_run() {

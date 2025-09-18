@@ -6,7 +6,8 @@ use alloc::{
 };
 use core::{clone::Clone, marker::PhantomData};
 use std::{
-    fs,
+    fs::{self, File},
+    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -14,8 +15,8 @@ use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata,
-    corpus::{Corpus, CorpusId, Testcase},
+    Error, HasMetadataMut,
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, Testcase, TestcaseMetadata},
     inputs::Input,
     stages::{Restartable, Stage},
     state::{HasCorpus, HasRand, HasSolutions},
@@ -46,9 +47,9 @@ pub struct DumpToDiskStage<CB1, CB2, EM, I, S, Z> {
 
 impl<CB1, CB2, E, EM, I, S, P, Z> Stage<E, EM, S, Z> for DumpToDiskStage<CB1, CB2, EM, I, S, Z>
 where
-    CB1: FnMut(&Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>, &S) -> Vec<u8>,
-    CB2: FnMut(&Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>, &CorpusId) -> P,
-    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
+    CB1: FnMut(&I, &TestcaseMetadata, &S) -> Vec<u8>,
+    CB2: FnMut(&I, &TestcaseMetadata, &CorpusId) -> P,
+    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadataMut,
     P: AsRef<Path>,
 {
     #[inline]
@@ -56,11 +57,10 @@ where
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        _state: &mut S,
+        state: &mut S,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        // self.dump_state_to_disk(state)
-        Ok(())
+        self.dump_state_to_disk(state)
     }
 }
 
@@ -100,7 +100,7 @@ impl<CB1, EM, I, S, Z>
         Z,
     >
 where
-    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
+    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadataMut,
     I: Input,
 {
     /// Create a new [`DumpToDiskStage`] with a default `generate_filename` function.
@@ -142,7 +142,7 @@ where
 
 impl<CB1, CB2, EM, I, S, Z> DumpToDiskStage<CB1, CB2, EM, I, S, Z>
 where
-    S: HasMetadata + HasSolutions<I>,
+    S: HasMetadataMut + HasSolutions<I>,
 {
     /// Create a new [`DumpToDiskStage`] with a custom `generate_filename` function.
     pub fn new_with_custom_filenames<A, B>(
@@ -182,57 +182,62 @@ where
         })
     }
 
-    // #[inline]
-    // fn dump_state_to_disk<P: AsRef<Path>, M>(&mut self, state: &mut S) -> Result<(), Error>
-    // where
-    //     CB1: FnMut(&Testcase<I, M>, &S) -> Vec<u8>,
-    //     CB2: FnMut(&Testcase<I, M>, &CorpusId) -> P,
-    //     S: HasCorpus<I>,
-    //     M: HasTestcaseMetadata,
-    // {
-    //     let (mut corpus_id, mut solutions_id) =
-    //         if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
-    //             (
-    //                 meta.last_corpus.and_then(|x| state.corpus().next(x)),
-    //                 meta.last_solution.and_then(|x| state.solutions().next(x)),
-    //             )
-    //         } else {
-    //             (state.corpus().first(), state.solutions().first())
-    //         };
+    #[inline]
+    fn dump_state_to_disk<P: AsRef<Path>>(&mut self, state: &mut S) -> Result<(), Error>
+    where
+        CB1: FnMut(&I, &TestcaseMetadata, &S) -> Vec<u8>,
+        CB2: FnMut(&I, &TestcaseMetadata, &CorpusId) -> P,
+        S: HasCorpus<I>,
+    {
+        let (mut corpus_id, mut solutions_id) =
+            if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
+                (
+                    meta.last_corpus.and_then(|x| state.corpus().next(x)),
+                    meta.last_solution.and_then(|x| state.solutions().next(x)),
+                )
+            } else {
+                (state.corpus().first(), state.solutions().first())
+            };
 
-    //     while let Some(i) = corpus_id {
-    //         let testcase = state.corpus().get(i)?;
-    //         // state.corpus().load_input_into(&mut testcase)?;
-    //         let bytes = (self.to_bytes)(&testcase, state);
+        while let Some(i) = corpus_id {
+            let testcase = state.corpus().get(i)?;
 
-    //         let fname = self
-    //             .corpus_dir
-    //             .join((self.generate_filename)(&testcase, &i));
-    //         let mut f = File::create(fname)?;
-    //         drop(f.write_all(&bytes));
+            let input = testcase.input();
+            let md = testcase.testcase_metadata();
 
-    //         corpus_id = state.corpus().next(i);
-    //     }
+            let bytes = (self.to_bytes)(input.as_ref(), &*md, state);
 
-    //     while let Some(i) = solutions_id {
-    //         let testcase = state.solutions().get(i)?;
-    //         // state.solutions().load_input_into(&mut testcase)?;
-    //         let bytes = (self.to_bytes)(&testcase, state);
+            let fname = self
+                .corpus_dir
+                .join((self.generate_filename)(input.as_ref(), &*md, &i));
+            let mut f = File::create(fname)?;
+            drop(f.write_all(&bytes));
 
-    //         let fname = self
-    //             .solutions_dir
-    //             .join((self.generate_filename)(&testcase, &i));
-    //         let mut f = File::create(fname)?;
-    //         drop(f.write_all(&bytes));
+            corpus_id = state.corpus().next(i);
+        }
 
-    //         solutions_id = state.solutions().next(i);
-    //     }
+        while let Some(i) = solutions_id {
+            let testcase = state.solutions().get(i)?;
 
-    //     state.add_metadata(DumpToDiskMetadata {
-    //         last_corpus: state.corpus().last(),
-    //         last_solution: state.solutions().last(),
-    //     });
+            let input = testcase.input();
+            let md = testcase.testcase_metadata();
 
-    //     Ok(())
-    // }
+            let bytes = (self.to_bytes)(input.as_ref(), &*md, state);
+
+            let fname = self
+                .solutions_dir
+                .join((self.generate_filename)(input.as_ref(), &*md, &i));
+            let mut f = File::create(fname)?;
+            drop(f.write_all(&bytes));
+
+            solutions_id = state.solutions().next(i);
+        }
+
+        state.add_metadata(DumpToDiskMetadata {
+            last_corpus: state.corpus().last(),
+            last_solution: state.solutions().last(),
+        });
+
+        Ok(())
+    }
 }

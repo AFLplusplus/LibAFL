@@ -149,6 +149,7 @@ pub trait Feedback<EM, I, OT, S>: StateInitializer<S> + Named {
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
+        _input: &I,
         _md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         Ok(())
@@ -298,10 +299,13 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
+        input: &I,
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        self.first.append_metadata(state, manager, observers, md)?;
-        self.second.append_metadata(state, manager, observers, md)
+        self.first
+            .append_metadata(state, manager, observers, input, md)?;
+        self.second
+            .append_metadata(state, manager, observers, input, md)
     }
 }
 
@@ -656,9 +660,11 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
+        input: &I,
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        self.inner.append_metadata(state, manager, observers, md)
+        self.inner
+            .append_metadata(state, manager, observers, input, md)
     }
 }
 
@@ -925,6 +931,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
+        _input: &I,
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         let Some(observer) = observers.get(&self.observer_handle) else {

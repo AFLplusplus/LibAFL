@@ -11,7 +11,7 @@ use libafl_bolts::{Error, HasLen, Named, rands::Rand};
 
 use crate::{
     HasMetadata,
-    corpus::{CorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase, IsTestcaseMetadataCell, Testcase},
     inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{MutationResult, Mutator, Tokens, rand_range},
     nonzero,
@@ -35,7 +35,10 @@ where
 {
     type Post = UnicodeIdentificationMetadata;
 
-    fn try_transform_from(base: &Testcase<BytesInput>, state: &S) -> Result<Self, Error> {
+    fn try_transform_from<M: IsTestcaseMetadataCell>(
+        base: &Testcase<BytesInput, M>,
+        state: &S,
+    ) -> Result<Self, Error> {
         let input = base.load_input(state.corpus())?.clone();
         let metadata = base.metadata::<UnicodeIdentificationMetadata>().cloned()?;
         Ok((input, metadata))

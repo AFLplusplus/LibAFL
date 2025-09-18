@@ -140,7 +140,8 @@ where
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<BytesInput>,
+        _input: &I,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         match self.exit_kind {
             ExitKind::Crash | ExitKind::Oom if OomFeedback::oomed() => {

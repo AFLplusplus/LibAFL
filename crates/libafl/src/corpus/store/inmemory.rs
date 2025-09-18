@@ -56,21 +56,21 @@ where
         self.enabled_map.is_empty()
     }
 
-    fn add(&mut self, id: CorpusId, input: Rc<I>, md: TestcaseMetadata) -> Result<(), Error> {
-        Ok(self
-            .enabled_map
-            .add(id, Testcase::new(input, TMC::instantiate(md))))
-    }
-
-    fn add_disabled(
+    fn add_shared<const ENABLED: bool>(
         &mut self,
         id: CorpusId,
         input: Rc<I>,
         md: TestcaseMetadata,
     ) -> Result<(), Error> {
-        Ok(self
-            .disabled_map
-            .add(id, Testcase::new(input, TMC::instantiate(md))))
+        if ENABLED {
+            Ok(self
+                .enabled_map
+                .add(id, Testcase::new(input, TMC::instantiate(md))))
+        } else {
+            Ok(self
+                .disabled_map
+                .add(id, Testcase::new(input, TMC::instantiate(md))))
+        }
     }
 
     fn get_from<const ENABLED: bool>(

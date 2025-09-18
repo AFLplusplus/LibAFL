@@ -253,8 +253,10 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
+        input: &I,
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        self.map.append_metadata(state, manager, observers, md)
+        self.map
+            .append_metadata(state, manager, observers, input, md)
     }
 }

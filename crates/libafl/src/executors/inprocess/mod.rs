@@ -2,7 +2,7 @@
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 //!
 //! Needs the `fork` feature flag.
-use alloc::{boxed::Box, rc::Rc};
+use alloc::boxed::Box;
 use core::{
     borrow::BorrowMut,
     ffi::c_void,
@@ -358,12 +358,12 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
 
         fuzzer
             .objective_mut()
-            .append_metadata(state, event_mgr, &*observers, &mut testcase_md)
+            .append_metadata(state, event_mgr, &*observers, input, &mut testcase_md)
             .expect("Failed adding metadata");
 
         state
             .solutions_mut()
-            .add(Rc::new(input.clone()), testcase_md)
+            .add(input.clone(), testcase_md)
             .expect("In run_observers_and_save_state solutions failure.");
 
         let event = Event::Objective {
