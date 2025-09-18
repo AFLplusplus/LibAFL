@@ -13,7 +13,7 @@ use libafl_bolts::{Named, rands::Rand};
 use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata, HasNamedMetadata, HasNamedMetadataMut,
-    corpus::{CorpusId, HasCurrentCorpusId, Testcase, testcase::HasTestcaseMetadata},
+    corpus::{CorpusId, HasCurrentCorpusId, Testcase, testcase::IsTestcaseMetadataCell},
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
@@ -46,7 +46,7 @@ pub trait MutatedTransform<I, S>: Sized {
     type Post: MutatedTransformPost<S>;
 
     /// Transform the provided testcase into this type
-    fn try_transform_from<M: HasTestcaseMetadata>(
+    fn try_transform_from<M: IsTestcaseMetadataCell>(
         base: &Testcase<I, M>,
         state: &S,
     ) -> Result<Self, Error>;
@@ -64,7 +64,7 @@ where
     type Post = ();
 
     #[inline]
-    fn try_transform_from<M: HasTestcaseMetadata>(
+    fn try_transform_from<M: IsTestcaseMetadataCell>(
         base: &Testcase<I, M>,
         _state: &S,
     ) -> Result<Self, Error> {

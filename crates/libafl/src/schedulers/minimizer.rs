@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::HasQueueCycles;
 use crate::{
     Error, HasMetadata, HasMetadataMut,
-    corpus::{Corpus, CorpusId, HasTestcaseMetadata, Testcase},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, Testcase},
     feedbacks::MapIndexesMetadata,
     observers::CanTrack,
     require_index_tracking,
@@ -183,7 +183,7 @@ where
         &mut self,
         state: &mut S,
         id: CorpusId,
-        prev: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
+        prev: &<S::Corpus as Corpus<I>>::TestcaseMetadataCell,
     ) -> Result<(), Error> {
         self.base.on_replace(state, id, prev)?;
         self.update_score(state, id)

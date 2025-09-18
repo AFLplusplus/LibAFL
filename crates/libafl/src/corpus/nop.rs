@@ -103,12 +103,11 @@ impl<I> Corpus<I> for NopCorpus<I> {
         CorpusId::from(0_usize)
     }
 
-    fn replace(
+    fn replace_metadata(
         &mut self,
         _id: CorpusId,
-        _input: Rc<I>,
         _md: TestcaseMetadata,
-    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+    ) -> Result<Self::TestcaseMetadataCell, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 }

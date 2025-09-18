@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadataMut,
-    corpus::{Corpus, CorpusId, HasTestcaseMetadata, Testcase},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, Testcase},
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand},
 };
@@ -108,7 +108,7 @@ where
         &mut self,
         state: &mut S,
         id: CorpusId,
-        _prev: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
+        _prev: &<S::Corpus as Corpus<I>>::TestcaseMetadataCell,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()

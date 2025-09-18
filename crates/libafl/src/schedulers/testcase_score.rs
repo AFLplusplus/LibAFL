@@ -6,7 +6,7 @@ use num_traits::Zero;
 
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, CorpusId, HasTestcaseMetadata, SchedulerTestcaseMetadata},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, SchedulerTestcaseMetadata},
     feedbacks::MapIndexesMetadata,
     schedulers::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},

@@ -4,7 +4,8 @@ use alloc::rc::Rc;
 use core::marker::PhantomData;
 use std::{
     cell::{Ref, RefCell, RefMut},
-    fs::{self, File},
+    fs,
+    fs::OpenOptions,
     io::Write,
     path::{Path, PathBuf},
     string::String,
@@ -18,12 +19,14 @@ use super::{InMemoryCorpusMap, Store};
 use crate::{
     corpus::{
         CorpusId, Testcase,
-        testcase::{HasTestcaseMetadata, TestcaseMetadata},
+        testcase::{IsTestcaseMetadataCell, TestcaseMetadata},
     },
     inputs::Input,
 };
 
 /// An on-disk store
+///
+/// The maps only store the unique ID associated to the added [`Testcase`]s.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct OnDiskStore<I, M> {
     disk_mgr: Rc<DiskMgr<I>>,
@@ -99,22 +102,24 @@ impl OnDiskMetadataFormat {
 #[derive(Debug)]
 pub struct OnDiskTestcaseCell<I> {
     mgr: Rc<DiskMgr<I>>,
+    id: String,
     testcase_md: RefCell<TestcaseMetadata>,
-    modified: bool,
+    modified: RefCell<bool>,
 }
 
 impl<I> OnDiskTestcaseCell<I> {
     /// Get a new [`OnDiskTestcaseCell`].
-    pub fn new(mgr: Rc<DiskMgr<I>>, testcase_md: TestcaseMetadata) -> Self {
+    pub fn new(mgr: Rc<DiskMgr<I>>, id: String, testcase_md: TestcaseMetadata) -> Self {
         Self {
             mgr,
+            id,
             testcase_md: RefCell::new(testcase_md),
-            modified: false,
+            modified: RefCell::new(false),
         }
     }
 }
 
-impl<I> HasTestcaseMetadata for OnDiskTestcaseCell<I> {
+impl<I> IsTestcaseMetadataCell for OnDiskTestcaseCell<I> {
     type TestcaseMetadataRef<'a>
         = Ref<'a, TestcaseMetadata>
     where
@@ -129,24 +134,31 @@ impl<I> HasTestcaseMetadata for OnDiskTestcaseCell<I> {
     }
 
     fn testcase_metadata_mut<'a>(&'a self) -> RefMut<'a, TestcaseMetadata> {
+        *self.modified.borrow_mut() = true;
         self.testcase_md.borrow_mut()
     }
 
     fn into_testcase_metadata(self) -> TestcaseMetadata {
         self.testcase_md.clone().into_inner()
     }
+
+    fn replace_testcase_metadata(&self, _testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        todo!()
+    }
+
+    fn flush(&self) -> Result<(), Error> {
+        self.mgr
+            .save_metadata(&self.id, &*self.testcase_md.borrow())
+    }
 }
 
 impl<I> Drop for OnDiskTestcaseCell<I> {
     fn drop(&mut self) {
-        todo!()
+        self.flush().unwrap();
     }
 }
 
-impl<I> DiskMgr<I>
-where
-    I: Input,
-{
+impl<I> DiskMgr<I> {
     fn testcase_path(&self, testcase_id: &String) -> PathBuf {
         self.root_dir.join(&testcase_id)
     }
@@ -155,26 +167,38 @@ where
         self.root_dir.join(format!(".{}.metadata", testcase_id))
     }
 
-    fn save_testcase(&self, input: Rc<I>, md: TestcaseMetadata) -> Result<String, Error> {
-        let testcase_id = Testcase::<I, OnDiskTestcaseCell<I>>::compute_id(input.as_ref());
-        let testcase_path = self.testcase_path(&testcase_id);
-        // let mut lockfile = TestcaseLockfile::new(self, testcase_id)?;
+    /// The file is created if it does not exist, or reused if it's already there
+    pub fn save_metadata(&self, id: &String, md: &TestcaseMetadata) -> Result<(), Error> {
+        let testcase_md_path = self.testcase_md_path(id);
 
-        // if lockfile.inc_used() {
-        // save md to file
-        let ser_fmt = self.md_format.clone();
-        let testcase_md_path = self.testcase_md_path(&testcase_id);
+        let mut testcase_md_f = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(&testcase_md_path)?;
 
-        let mut testcase_md_f = File::create_new(testcase_md_path.as_path()).unwrap();
-        let testcase_md_ser = ser_fmt.to_vec(&md)?;
-
+        let testcase_md_ser = self.md_format.to_vec(&md)?;
         testcase_md_f.write_all(&testcase_md_ser)?;
 
-        // testcase_f.write_all(testcase.input().target_bytes().as_ref())?;
+        Ok(())
+    }
+}
+
+impl<I> DiskMgr<I>
+where
+    I: Input,
+{
+    fn save_input(&self, input: Rc<I>) -> Result<String, Error> {
+        let testcase_id = Testcase::<I, OnDiskTestcaseCell<I>>::compute_id(input.as_ref());
+        let testcase_path = self.testcase_path(&testcase_id);
         input.as_ref().to_file(testcase_path.as_path())?;
-        // }
 
         Ok(testcase_id)
+    }
+
+    fn save_testcase(&self, input: Rc<I>, md: &TestcaseMetadata) -> Result<String, Error> {
+        let id = self.save_input(input)?;
+        self.save_metadata(&id, md)?;
+        Ok(id)
     }
 
     /// prerequisite: the testcase should not have been "removed" before.
@@ -194,7 +218,7 @@ where
 
         Ok(Testcase::new(
             Rc::new(input),
-            OnDiskTestcaseCell::new(self.clone(), md),
+            OnDiskTestcaseCell::new(self.clone(), testcase_id.clone(), md),
         ))
     }
 }
@@ -223,7 +247,7 @@ where
     }
 
     fn add(&mut self, id: CorpusId, input: Rc<I>, md: TestcaseMetadata) -> Result<(), Error> {
-        let testcase_id = self.disk_mgr.save_testcase(input, md)?;
+        let testcase_id = self.disk_mgr.save_testcase(input, &md)?;
         self.enabled_map.add(id, testcase_id);
         Ok(())
     }
@@ -234,7 +258,7 @@ where
         input: Rc<I>,
         md: TestcaseMetadata,
     ) -> Result<(), Error> {
-        let testcase_id = self.disk_mgr.save_testcase(input, md)?;
+        let testcase_id = self.disk_mgr.save_testcase(input, &md)?;
         self.disabled_map.add(id, testcase_id);
         Ok(())
     }
@@ -257,18 +281,12 @@ where
         self.disk_mgr.load_testcase(&tc_id)
     }
 
-    fn replace(
+    fn replace_metadata(
         &mut self,
-        id: CorpusId,
-        input: Rc<I>,
-        md: TestcaseMetadata,
-    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
-        let new_testcase_id = self.disk_mgr.save_testcase(input, md)?;
-        let old_testcase_id = self
-            .enabled_map
-            .replace(id, new_testcase_id)
-            .ok_or_else(|| Error::key_not_found(format!("Index not found: {id}")))?;
-        self.disk_mgr.load_testcase(&old_testcase_id)
+        _id: CorpusId,
+        _metadata: TestcaseMetadata,
+    ) -> Result<Self::TestcaseMetadataCell, Error> {
+        todo!()
     }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {

@@ -13,7 +13,7 @@ use crate::corpus::testcase::TestcaseMetadata;
 /// A [`CombinedCorpus`] tries first to use the main store according to some policy.
 /// If it fails, it falls back to the secondary store.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-pub struct CombinedCorpus<C, CS, FS, I> {
+pub struct CombinedCorpus<C, CS, FS, I, P> {
     /// The cache store
     cache_store: RefCell<CS>,
     /// The fallback store
@@ -26,17 +26,17 @@ pub struct CombinedCorpus<C, CS, FS, I> {
     keys: Vec<CorpusId>,
     /// The current ID
     current: Option<CorpusId>,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<(I, P)>,
 }
 
-impl<C, CS, FS, I> Corpus<I> for CombinedCorpus<C, CS, FS, I>
+impl<C, CS, FS, I, P> Corpus<I> for CombinedCorpus<C, CS, FS, I, P>
 where
-    C: Cache<CS, FS, I, TestcaseMetadataCell = CS::TestcaseMetadataCell>,
+    C: Cache<CS, FS, I, P>,
     CS: Store<I>,
     FS: Store<I>,
     I: Clone,
 {
-    type TestcaseMetadataCell = CS::TestcaseMetadataCell;
+    type TestcaseMetadataCell = C::TestcaseMetadataCell;
 
     fn count(&self) -> usize {
         self.fallback_store.count()
@@ -88,15 +88,13 @@ where
         cache.get_from::<ENABLED>(id, cache_store, &self.fallback_store)
     }
 
-    fn replace(
+    fn replace_metadata(
         &mut self,
         id: CorpusId,
-        input: Rc<I>,
         md: TestcaseMetadata,
-    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
-        self.cache.borrow_mut().replace(
+    ) -> Result<Self::TestcaseMetadataCell, Error> {
+        self.cache.borrow_mut().replace_metadata(
             id,
-            input,
             md,
             &mut *self.cache_store.borrow_mut(),
             &mut self.fallback_store,

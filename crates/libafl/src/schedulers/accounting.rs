@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use super::IndexesLenTimeMinimizerScheduler;
 use crate::{
     Error, HasMetadataMut,
-    corpus::{Corpus, CorpusId, HasTestcaseMetadata},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     observers::CanTrack,
     schedulers::{
         Scheduler,

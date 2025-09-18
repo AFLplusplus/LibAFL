@@ -2,7 +2,6 @@
 
 use alloc::{
     borrow::{Cow, ToOwned},
-    rc::Rc,
     string::ToString,
 };
 use core::{fmt::Debug, hash::Hash, marker::PhantomData};
@@ -294,9 +293,7 @@ where
                 .feedback_mut()
                 .append_metadata(state, manager, &*observers, &mut tc_md)?;
 
-            let prev = state
-                .corpus_mut()
-                .replace(base_corpus_id, Rc::new(base), tc_md)?;
+            let prev = state.corpus_mut().replace_metadata(base_corpus_id, tc_md)?;
 
             fuzzer
                 .scheduler_mut()

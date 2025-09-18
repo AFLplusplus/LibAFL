@@ -28,7 +28,7 @@ use crate::{
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
     corpus::{
         Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase,
-        testcase::HasTestcaseMetadata,
+        testcase::IsTestcaseMetadataCell,
     },
     events::{Event, EventFirer, EventWithStats},
     executors::HasObservers,
@@ -492,13 +492,16 @@ where
         Ok(())
     }
 
-    fn maybe_update_is_favored_size<M: HasTestcaseMetadata>(&mut self, testcase: &Testcase<I, M>) {
+    fn maybe_update_is_favored_size<M: IsTestcaseMetadataCell>(
+        &mut self,
+        testcase: &Testcase<I, M>,
+    ) {
         if testcase.has_metadata::<IsFavoredMetadata>() {
             self.is_favored_size += 1;
         }
     }
 
-    fn maybe_update_slowest_exec<M: HasTestcaseMetadata>(&mut self, testcase: &Testcase<I, M>) {
+    fn maybe_update_slowest_exec<M: IsTestcaseMetadataCell>(&mut self, testcase: &Testcase<I, M>) {
         if let Some(exec_time) = testcase.testcase_metadata().exec_time() {
             if exec_time > &self.slowest_exec {
                 self.slowest_exec = *exec_time;
@@ -510,7 +513,7 @@ where
         self.has_fuzzed_size += 1;
     }
 
-    fn maybe_update_max_depth<M: HasTestcaseMetadata>(&mut self, testcase: &Testcase<I, M>) {
+    fn maybe_update_max_depth<M: IsTestcaseMetadataCell>(&mut self, testcase: &Testcase<I, M>) {
         if let Ok(metadata) = testcase
             .testcase_metadata()
             .metadata::<SchedulerTestcaseMetadata>()

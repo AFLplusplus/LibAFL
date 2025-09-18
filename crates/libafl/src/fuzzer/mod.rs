@@ -15,7 +15,7 @@ use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata,
     corpus::{
-        Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, HasTestcaseMetadata, TestcaseMetadata,
+        Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, IsTestcaseMetadataCell, TestcaseMetadata,
     },
     events::{
         Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter,

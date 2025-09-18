@@ -276,7 +276,7 @@ where
         &mut self,
         _state: &mut S,
         _id: CorpusId,
-        _prev: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
+        _prev: &<S::Corpus as Corpus<I>>::TestcaseMetadataCell,
     ) -> Result<(), Error> {
         self.table_invalidated = true;
         Ok(())

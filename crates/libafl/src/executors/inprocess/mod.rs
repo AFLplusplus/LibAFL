@@ -17,7 +17,7 @@ use libafl_bolts::tuples::{RefIndexable, tuple_list};
 use crate::{
     Error,
     common::HasMetadataMut,
-    corpus::{Corpus, HasTestcaseMetadata, testcase::TestcaseMetadata},
+    corpus::{Corpus, IsTestcaseMetadataCell, testcase::TestcaseMetadata},
     events::{Event, EventFirer, EventRestarter, EventWithStats},
     executors::{
         Executor, ExitKind, HasObservers,

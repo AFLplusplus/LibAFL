@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadata, HasMetadataMut,
-    corpus::{Corpus, HasTestcaseMetadata},
+    corpus::{Corpus, IsTestcaseMetadataCell},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},

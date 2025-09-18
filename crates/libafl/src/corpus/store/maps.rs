@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, vec::Vec};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 
-use crate::corpus::CorpusId;
+use crate::corpus::{CorpusId, IsTestcaseMetadataCell, TestcaseMetadata};
 
 /// A trait implemented by in-memory corpus maps
 pub trait InMemoryCorpusMap<T> {
@@ -26,8 +26,12 @@ pub trait InMemoryCorpusMap<T> {
     /// Get by id; considers only enabled testcases
     fn get_mut(&mut self, id: CorpusId) -> Option<&mut T>;
 
-    /// Replace a testcase by another one
-    fn replace(&mut self, id: CorpusId, testcase: T) -> Option<T>;
+    /// Replace the metadata of a given testcase
+    fn replace_metadata(
+        &mut self,
+        id: CorpusId,
+        testcase_metadata: TestcaseMetadata,
+    ) -> Option<TestcaseMetadata>;
 
     /// Get the prev corpus id in chronological order
     fn prev(&self, id: CorpusId) -> Option<CorpusId>;
@@ -125,7 +129,10 @@ impl CorpusIdHistory {
     }
 }
 
-impl<T> InMemoryCorpusMap<T> for HashCorpusMap<T> {
+impl<T> InMemoryCorpusMap<T> for HashCorpusMap<T>
+where
+    T: IsTestcaseMetadataCell,
+{
     fn count(&self) -> usize {
         self.map.len()
     }
@@ -168,16 +175,13 @@ impl<T> InMemoryCorpusMap<T> for HashCorpusMap<T> {
         self.map.get_mut(&id).map(|storage| &mut storage.testcase)
     }
 
-    fn replace(&mut self, id: CorpusId, testcase: T) -> Option<T> {
+    fn replace_metadata(
+        &mut self,
+        id: CorpusId,
+        testcase_metadata: TestcaseMetadata,
+    ) -> Option<TestcaseMetadata> {
         let old_tc = self.map.get_mut(&id)?;
-
-        let new_tc = TestcaseStorageItem {
-            testcase,
-            prev: old_tc.prev,
-            next: old_tc.next,
-        };
-
-        self.map.insert(id, new_tc).map(|storage| storage.testcase)
+        Some(old_tc.testcase.replace_testcase_metadata(testcase_metadata))
     }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {
@@ -207,7 +211,10 @@ impl<T> InMemoryCorpusMap<T> for HashCorpusMap<T> {
     }
 }
 
-impl<T> InMemoryCorpusMap<T> for BtreeCorpusMap<T> {
+impl<T> InMemoryCorpusMap<T> for BtreeCorpusMap<T>
+where
+    T: IsTestcaseMetadataCell,
+{
     fn count(&self) -> usize {
         self.map.len()
     }
@@ -222,12 +229,6 @@ impl<T> InMemoryCorpusMap<T> for BtreeCorpusMap<T> {
         self.history.add(id);
     }
 
-    // fn replace(&mut self, id: CorpusId, new_testcase: T) -> Option<T> {
-    //     self.map
-    //         .get_mut(&id)
-    //         .map(|entry| entry.replace(new_testcase))
-    // }
-
     fn get(&self, id: CorpusId) -> Option<&T> {
         self.map.get(&id)
     }
@@ -236,8 +237,13 @@ impl<T> InMemoryCorpusMap<T> for BtreeCorpusMap<T> {
         self.map.get_mut(&id)
     }
 
-    fn replace(&mut self, id: CorpusId, testcase: T) -> Option<T> {
-        self.map.insert(id, testcase)
+    fn replace_metadata(
+        &mut self,
+        id: CorpusId,
+        testcase_metadata: TestcaseMetadata,
+    ) -> Option<TestcaseMetadata> {
+        let tc = self.get_mut(id)?;
+        Some(tc.replace_testcase_metadata(testcase_metadata))
     }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {

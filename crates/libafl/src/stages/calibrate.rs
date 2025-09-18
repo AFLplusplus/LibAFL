@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadata, HasMetadataMut, HasNamedMetadataMut, HasScheduler,
-    corpus::{Corpus, HasCurrentCorpusId, HasTestcaseMetadata, SchedulerTestcaseMetadata},
+    corpus::{Corpus, HasCurrentCorpusId, IsTestcaseMetadataCell, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{HasObserverHandle, map::MapFeedbackMetadata},

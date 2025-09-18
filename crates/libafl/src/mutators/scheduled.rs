@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use super::MutationId;
 use crate::{
     Error, HasMetadataMut,
-    corpus::{Corpus, CorpusId, HasTestcaseMetadata},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     mutators::{
         MutationResult, Mutator, MutatorsTuple,
         token_mutations::{TokenInsert, TokenReplace},

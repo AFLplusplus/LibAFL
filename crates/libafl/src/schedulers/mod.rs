@@ -12,7 +12,7 @@ use libafl_bolts::{
 use crate::{
     Error, HasMetadata, HasMetadataMut,
     corpus::{
-        Corpus, CorpusId, HasTestcase, HasTestcaseMetadata, SchedulerTestcaseMetadata, Testcase,
+        Corpus, CorpusId, HasTestcase, IsTestcaseMetadataCell, SchedulerTestcaseMetadata, Testcase,
     },
     random_corpus_id,
     state::{HasCorpus, HasRand},
@@ -65,7 +65,7 @@ where
         &mut self,
         _state: &mut S,
         _id: CorpusId,
-        _prev: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
+        _prev: &<S::Corpus as Corpus<I>>::TestcaseMetadataCell,
     ) -> Result<(), Error> {
         Ok(())
     }

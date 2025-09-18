@@ -15,7 +15,7 @@ use libafl_bolts::{
 
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, HasTestcaseMetadata},
+    corpus::{Corpus, IsTestcaseMetadataCell},
     inputs::{GeneralizedInputMetadata, GeneralizedItem},
     mutators::{MutationResult, Mutator, token_mutations::Tokens},
     random_corpus_id,

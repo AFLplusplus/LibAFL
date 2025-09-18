@@ -15,7 +15,7 @@ use libafl_bolts::{
 use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata, HasMetadataMut, HasNamedMetadata, HasNamedMetadataMut,
-    corpus::{Corpus, HasCurrentCorpusId, HasTestcaseMetadata},
+    corpus::{Corpus, HasCurrentCorpusId, IsTestcaseMetadataCell},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, ResizableMutator},

@@ -90,13 +90,12 @@ where
         self.store.get_from::<ENABLED>(id)
     }
 
-    fn replace(
+    fn replace_metadata(
         &mut self,
         id: CorpusId,
-        input: Rc<I>,
         md: TestcaseMetadata,
-    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
-        self.store.replace(id, input, md)
+    ) -> Result<Self::TestcaseMetadataCell, Error> {
+        self.store.replace_metadata(id, md)
     }
 
     fn current(&self) -> &Option<CorpusId> {

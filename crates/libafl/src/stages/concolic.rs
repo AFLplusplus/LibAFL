@@ -15,7 +15,7 @@ use libafl_bolts::{
 use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata, HasMetadataMut, HasNamedMetadataMut,
-    corpus::{HasCurrentCorpusId, HasTestcaseMetadata},
+    corpus::{HasCurrentCorpusId, IsTestcaseMetadataCell},
     executors::{Executor, HasObservers},
     observers::{ObserversTuple, concolic::ConcolicObserver},
     stages::{Restartable, RetryCountRestartHelper, Stage, TracingStage},

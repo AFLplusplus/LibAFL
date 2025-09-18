@@ -4,7 +4,7 @@ use alloc::borrow::ToOwned;
 
 use crate::{
     Error, HasMetadataMut,
-    corpus::{Corpus, CorpusId, HasTestcaseMetadata},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::HasCorpus,
 };

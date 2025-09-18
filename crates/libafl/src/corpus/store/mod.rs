@@ -5,7 +5,7 @@ use alloc::rc::Rc;
 use libafl_bolts::Error;
 
 use super::{CorpusId, Testcase};
-use crate::corpus::testcase::{HasTestcaseMetadata, TestcaseMetadata};
+use crate::corpus::testcase::{IsTestcaseMetadataCell, TestcaseMetadata};
 
 pub mod maps;
 pub use maps::{BtreeCorpusMap, HashCorpusMap, InMemoryCorpusMap};
@@ -19,7 +19,7 @@ pub use ondisk::{OnDiskMetadataFormat, OnDiskStore};
 /// A store is responsible for storing and retrieving [`Testcase`]s, ordered by add time.
 pub trait Store<I> {
     /// A [`TestcaseMetadata`] cell.
-    type TestcaseMetadataCell: HasTestcaseMetadata;
+    type TestcaseMetadataCell: IsTestcaseMetadataCell;
 
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
@@ -65,12 +65,11 @@ pub trait Store<I> {
     ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
 
     /// Replaces the [`Testcase`] at the given idx in the enabled set, returning the existing.
-    fn replace(
+    fn replace_metadata(
         &mut self,
         id: CorpusId,
-        input: Rc<I>,
         metadata: TestcaseMetadata,
-    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
+    ) -> Result<Self::TestcaseMetadataCell, Error>;
 
     /// Get the prev corpus id in chronological order
     fn prev(&self, id: CorpusId) -> Option<CorpusId>;

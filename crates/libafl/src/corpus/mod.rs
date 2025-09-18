@@ -10,7 +10,7 @@ use crate::Error;
 
 pub mod testcase;
 pub use testcase::{
-    HasTestcase, HasTestcaseMetadata, SchedulerTestcaseMetadata, Testcase, TestcaseMetadata,
+    HasTestcase, IsTestcaseMetadataCell, SchedulerTestcaseMetadata, Testcase, TestcaseMetadata,
 };
 
 pub mod cache;
@@ -36,6 +36,8 @@ pub use nop::NopCorpus;
 pub mod store;
 pub use store::{InMemoryStore, OnDiskStore, maps};
 
+use crate::corpus::cache::WritebackOnFlushPolicy;
+
 /// The standard fully in-memory corpus map.
 #[cfg(not(feature = "corpus_btreemap"))]
 pub type StdInMemoryCorpusMap<I> = maps::HashCorpusMap<Testcase<I, Rc<RefCell<TestcaseMetadata>>>>;
@@ -59,8 +61,13 @@ pub type InMemoryCorpus<I> = SingleCorpus<I, StdInMemoryStore<I>>;
 pub type OnDiskCorpus<I> = SingleCorpus<I, OnDiskStore<I, maps::HashCorpusMap<String>>>;
 
 /// The standard corpus for storing on disk and in-memory.
-pub type InMemoryOnDiskCorpus<I> =
-    CombinedCorpus<IdentityCache, StdInMemoryStore<I>, StdOnDiskStore<I>, I>;
+pub type InMemoryOnDiskCorpus<I> = CombinedCorpus<
+    IdentityCache<StdInMemoryCorpusMap<I>>,
+    StdInMemoryStore<I>,
+    StdOnDiskStore<I>,
+    I,
+    WritebackOnFlushPolicy,
+>;
 
 /// The standard corpus for storing on disk and in-memory with a cache.
 /// Useful for very large corpuses.
@@ -69,6 +76,7 @@ pub type CachedOnDiskCorpus<I> = CombinedCorpus<
     StdInMemoryStore<I>,
     StdOnDiskStore<I>,
     I,
+    WritebackOnFlushPolicy,
 >;
 
 /// An abstraction for the index that identify a testcase in the corpus
@@ -134,7 +142,7 @@ macro_rules! random_corpus_id_with_disabled {
 /// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus<I>: Sized {
     /// A [`TestcaseMetadata`] cell.
-    type TestcaseMetadataCell: HasTestcaseMetadata;
+    type TestcaseMetadataCell: IsTestcaseMetadataCell;
 
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
@@ -172,13 +180,12 @@ pub trait Corpus<I>: Sized {
         id: CorpusId,
     ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
 
-    /// Replace a [`Testcase`] by another one.
-    fn replace(
+    /// Replace a [`TestcaseMetadata`] by another one.
+    fn replace_metadata(
         &mut self,
         id: CorpusId,
-        input: Rc<I>,
         md: TestcaseMetadata,
-    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
+    ) -> Result<Self::TestcaseMetadataCell, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<CorpusId>;

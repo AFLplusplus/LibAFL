@@ -30,13 +30,13 @@ use crate::{
 };
 
 /// A testcase metadata cell that can be instantiated only from a [`TestcaseMetadata`].
-pub trait HasInstantiableTestcaseMetadata: HasTestcaseMetadata {
+pub trait HasInstantiableTestcaseMetadata: IsTestcaseMetadataCell {
     /// Instantiate a testcase metadata cell from a [`TestcaseMetadata`].
     fn instantiate(metadata: TestcaseMetadata) -> Self;
 }
 
 /// Trait implemented by possible [`TestcaseMetadata`] cells.
-pub trait HasTestcaseMetadata {
+pub trait IsTestcaseMetadataCell {
     /// A reference to a testcase metadata.
     type TestcaseMetadataRef<'a>: Deref<Target = TestcaseMetadata>
     where
@@ -49,10 +49,25 @@ pub trait HasTestcaseMetadata {
 
     /// Get a reference to the testcase metadata.
     fn testcase_metadata<'a>(&'a self) -> Self::TestcaseMetadataRef<'a>;
+
     /// Get a mutable reference to the testcase metadata.
     fn testcase_metadata_mut<'a>(&'a self) -> Self::TestcaseMetadataRefMut<'a>;
+
     /// Consume the cell, and get the inner testcase metadata.
     fn into_testcase_metadata(self) -> TestcaseMetadata;
+
+    /// Replace the inner testcase metadata with new metadata, returning the old metadata
+    fn replace_testcase_metadata(&self, testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        let mut tc_ref = self.testcase_metadata_mut();
+        let old_tc = tc_ref.clone();
+        *tc_ref = testcase_metadata;
+        old_tc
+    }
+
+    /// Propagate metadata cell changes
+    fn flush(&self) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 /// A dummy (empty) [`TestcaseMetadata`] reference.
@@ -77,7 +92,7 @@ impl<'a> DerefMut for NopTestcaseMetadataRef<'a> {
     }
 }
 
-impl HasTestcaseMetadata for NopTestcaseMetadataCell {
+impl IsTestcaseMetadataCell for NopTestcaseMetadataCell {
     type TestcaseMetadataRef<'a> = NopTestcaseMetadataRef<'a>;
     type TestcaseMetadataRefMut<'a> = NopTestcaseMetadataRef<'a>;
 
@@ -92,9 +107,13 @@ impl HasTestcaseMetadata for NopTestcaseMetadataCell {
     fn into_testcase_metadata(self) -> TestcaseMetadata {
         panic!("Invalid testcase metadata")
     }
+
+    fn replace_testcase_metadata(&self, _testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        panic!("Invalid testcase metadata")
+    }
 }
 
-impl HasTestcaseMetadata for RefCell<TestcaseMetadata> {
+impl IsTestcaseMetadataCell for RefCell<TestcaseMetadata> {
     type TestcaseMetadataRef<'a> = Ref<'a, TestcaseMetadata>;
     type TestcaseMetadataRefMut<'a> = RefMut<'a, TestcaseMetadata>;
 
@@ -113,6 +132,10 @@ impl HasTestcaseMetadata for RefCell<TestcaseMetadata> {
     fn into_testcase_metadata(self) -> TestcaseMetadata {
         self.into_inner()
     }
+
+    fn replace_testcase_metadata(&self, testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        RefCell::replace(self, testcase_metadata)
+    }
 }
 
 impl HasInstantiableTestcaseMetadata for RefCell<TestcaseMetadata> {
@@ -121,9 +144,9 @@ impl HasInstantiableTestcaseMetadata for RefCell<TestcaseMetadata> {
     }
 }
 
-impl<T> HasTestcaseMetadata for Rc<T>
+impl<T> IsTestcaseMetadataCell for Rc<T>
 where
-    T: HasTestcaseMetadata + Clone,
+    T: IsTestcaseMetadataCell + Clone,
 {
     type TestcaseMetadataRef<'a>
         = T::TestcaseMetadataRef<'a>
@@ -149,6 +172,10 @@ where
     fn into_testcase_metadata(self) -> TestcaseMetadata {
         self.deref().clone().into_testcase_metadata()
     }
+
+    fn replace_testcase_metadata(&self, testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        T::replace_testcase_metadata(self, testcase_metadata)
+    }
 }
 
 impl<T> HasInstantiableTestcaseMetadata for Rc<T>
@@ -160,9 +187,9 @@ where
     }
 }
 
-impl<I, M> HasTestcaseMetadata for Testcase<I, M>
+impl<I, M> IsTestcaseMetadataCell for Testcase<I, M>
 where
-    M: HasTestcaseMetadata,
+    M: IsTestcaseMetadataCell,
 {
     type TestcaseMetadataRef<'a>
         = M::TestcaseMetadataRef<'a>
@@ -183,6 +210,10 @@ where
 
     fn into_testcase_metadata(self) -> TestcaseMetadata {
         self.metadata.into_testcase_metadata()
+    }
+
+    fn replace_testcase_metadata(&self, testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        self.metadata.replace_testcase_metadata(testcase_metadata)
     }
 }
 
@@ -257,7 +288,7 @@ where
 impl<I, M> Debug for Testcase<I, M>
 where
     I: Debug,
-    M: HasTestcaseMetadata,
+    M: IsTestcaseMetadataCell,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Testcase")
@@ -270,7 +301,7 @@ where
 
 impl<I, M> Serialize for Testcase<I, M>
 where
-    M: HasTestcaseMetadata,
+    M: IsTestcaseMetadataCell,
 {
     fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -282,7 +313,7 @@ where
 
 impl<'de, I, M> Deserialize<'de> for Testcase<I, M>
 where
-    M: HasTestcaseMetadata,
+    M: IsTestcaseMetadataCell,
 {
     fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
     where
@@ -315,6 +346,11 @@ impl<I, M> Testcase<I, M> {
     pub fn id(&self) -> &String {
         &self.id
     }
+
+    /// Decompose a [`Testcase`] into its inner input and metadata.
+    pub fn into_inner(self) -> (Rc<I>, M) {
+        (self.input, self.metadata)
+    }
 }
 
 impl<I, M> Testcase<I, M>
@@ -330,7 +366,7 @@ where
 impl<I, M> Testcase<I, M>
 where
     I: Input,
-    M: HasTestcaseMetadata,
+    M: IsTestcaseMetadataCell,
 {
     /// Create a new Testcase instance given an input
     pub fn new(input: Rc<I>, metadata: M) -> Self {
@@ -354,7 +390,7 @@ where
 
 impl<I, M> Testcase<I, M>
 where
-    M: HasTestcaseMetadata,
+    M: IsTestcaseMetadataCell,
     I: Clone,
 {
     /// Clone the input embedded in the [`Testcase`].
@@ -366,7 +402,7 @@ where
 /// Impl of a testcase
 impl<I, M> Testcase<I, M>
 where
-    M: HasTestcaseMetadata,
+    M: IsTestcaseMetadataCell,
 {
     /// Get the same testcase, with an owned [`TestcaseMetadata`].
     pub fn cloned(self) -> Testcase<I, RefCell<TestcaseMetadata>> {
@@ -375,11 +411,6 @@ where
             id: self.id,
             metadata: RefCell::new(self.metadata.into_testcase_metadata()),
         }
-    }
-
-    /// Decompose a [`Testcase`] into its inner input and metadata.
-    pub fn into_inner(self) -> (Rc<I>, TestcaseMetadata) {
-        (self.input, self.metadata.into_testcase_metadata())
     }
 
     /// Test whether the metadata map contains a metadata

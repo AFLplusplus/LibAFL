@@ -95,16 +95,12 @@ where
         }
     }
 
-    fn replace(
+    fn replace_metadata(
         &mut self,
-        id: CorpusId,
-        input: Rc<I>,
-        metadata: TestcaseMetadata,
-    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
-        Ok(self
-            .enabled_map
-            .replace(id, Testcase::new(input, TMC::instantiate(metadata)))
-            .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))?)
+        _id: CorpusId,
+        _metadata: TestcaseMetadata,
+    ) -> Result<Self::TestcaseMetadataCell, Error> {
+        todo!()
     }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {
