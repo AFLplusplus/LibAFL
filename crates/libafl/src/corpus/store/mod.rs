@@ -61,6 +61,8 @@ pub trait Store<I> {
         id: CorpusId,
     ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
 
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error>;
+
     /// Replaces the [`Testcase`] at the given idx in the enabled set, returning the existing.
     fn replace_metadata(
         &mut self,

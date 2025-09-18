@@ -14,7 +14,7 @@ use z3::{Optimize, ast::Bool};
 
 use crate::{
     Error, HasMetadata, HasScheduler,
-    corpus::Corpus,
+    corpus::{Corpus, IsTestcaseMetadataCell},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
@@ -97,31 +97,24 @@ where
         let mut curr = 0;
         while let Some(id) = cur_id {
             let (weight, executions) = {
-                if state.corpus().get(id)?.borrow().scheduled_count() == 0 {
-                    // Execute the input; we cannot rely on the metadata already being present.
+                {
+                    let tc = state.corpus().get(id)?;
+                    let md = tc.testcase_metadata();
+                    if md.scheduled_count() == 0 {
+                        // Execute the input; we cannot rely on the metadata already being present.
+                        let input = tc.input();
 
-                    let input = state
-                        .corpus()
-                        .get(id)?
-                        .borrow_mut()
-                        .load_input(state.corpus())?
-                        .clone();
-
-                    let (exit_kind, mut total_time, _) =
-                        run_target_with_timing(fuzzer, executor, state, mgr, &input, false)?;
-                    if exit_kind != ExitKind::Ok {
-                        total_time = Duration::from_secs(1);
+                        let (exit_kind, mut total_time, _) =
+                            run_target_with_timing(fuzzer, executor, state, mgr, input.as_ref(), false)?;
+                        if exit_kind != ExitKind::Ok {
+                            total_time = Duration::from_secs(1);
+                        }
+                        md.set_exec_time(total_time);
                     }
-                    state
-                        .corpus()
-                        .get(id)?
-                        .borrow_mut()
-                        .set_exec_time(total_time);
                 }
 
-                let mut testcase = state.corpus().get(id)?.borrow_mut();
                 (
-                    TS::compute(state, &mut *testcase)?
+                    TS::compute(state, id)?
                         .to_u64()
                         .expect("Weight must be computable."),
                     *state.executions(),
@@ -214,7 +207,8 @@ where
                     continue;
                 }
 
-                let removed = state.corpus_mut().remove(id)?;
+                let removed = state.corpus().disable(id)?;
+
                 // scheduler needs to know we've removed the input, or it will continue to try
                 // to use now-missing inputs
                 fuzzer

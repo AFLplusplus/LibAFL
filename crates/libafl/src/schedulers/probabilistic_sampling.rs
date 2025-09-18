@@ -197,6 +197,7 @@ mod tests {
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
         state::{HasCorpus, StdState},
     };
+    use crate::corpus::CorpusId;
 
     const FACTOR: f64 = 1337.0;
 
@@ -209,7 +210,7 @@ mod tests {
     {
         fn compute(
             _state: &S,
-            _entry: &mut Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
+            _corpus_id: CorpusId,
         ) -> Result<f64, Error> {
             Ok(FACTOR)
         }

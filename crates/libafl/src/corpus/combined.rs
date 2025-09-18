@@ -78,6 +78,12 @@ where
         cache.get_from::<ENABLED>(id, cache_store, &self.fallback_store)
     }
 
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.cache.borrow_mut().disable(id,
+                                        &mut *self.cache_store.borrow_mut(),
+                                        &mut self.fallback_store)
+    }
+
     fn replace_metadata(
         &mut self,
         id: CorpusId,

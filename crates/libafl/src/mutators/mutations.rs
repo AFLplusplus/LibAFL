@@ -1793,8 +1793,6 @@ pub fn str_decode(item: &str) -> Result<Vec<u8>, Error> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::rc::Rc;
-
     use libafl_bolts::{
         rands::StdRand,
         tuples::{HasConstLen, tuple_list, tuple_list_type},
@@ -1875,7 +1873,7 @@ mod tests {
 
         corpus
             .add(
-                Rc::new(BytesInput::new(vec![0x42; 0x1337])),
+                BytesInput::new(vec![0x42; 0x1337]),
                 TestcaseMetadata::default(),
             )
             .unwrap();

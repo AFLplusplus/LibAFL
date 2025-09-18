@@ -33,6 +33,9 @@ pub trait InMemoryCorpusMap<T> {
         testcase_metadata: TestcaseMetadata,
     ) -> Option<TestcaseMetadata>;
 
+    /// Remove a testcase from the map, returning the removed testcase if present.
+    fn remove(&mut self, id: CorpusId) -> Option<T>;
+
     /// Get the prev corpus id in chronological order
     fn prev(&self, id: CorpusId) -> Option<CorpusId>;
 
@@ -175,6 +178,21 @@ where
         self.map.get_mut(&id).map(|storage| &mut storage.testcase)
     }
 
+    fn remove(&mut self, id: CorpusId) -> Option<T> {
+        let entry = self.map.remove(&id)?;
+        self.history.remove(id);
+
+        if let Some(prev) = &entry.prev {
+            self.map.get_mut(prev).unwrap().next = entry.next;
+        }
+
+        if let Some(next) = &entry.next {
+            self.map.get_mut(next).unwrap().prev = entry.prev;
+        }
+
+        Some(entry.testcase)
+    }
+
     fn replace_metadata(
         &mut self,
         id: CorpusId,
@@ -235,6 +253,12 @@ where
 
     fn get_mut(&mut self, id: CorpusId) -> Option<&mut T> {
         self.map.get_mut(&id)
+    }
+
+    fn remove(&mut self, id: CorpusId) -> Option<T> {
+        let ret = self.map.remove(&id)?;
+        self.history.remove(id);
+        Some(ret)
     }
 
     fn replace_metadata(

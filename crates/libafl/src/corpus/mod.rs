@@ -190,6 +190,9 @@ pub trait Corpus<I>: Sized {
         id: CorpusId,
     ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
 
+    /// Disable a corpus entry
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error>;
+
     /// Replace a [`TestcaseMetadata`] by another one.
     fn replace_metadata(
         &mut self,
