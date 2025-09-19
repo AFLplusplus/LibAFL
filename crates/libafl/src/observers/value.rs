@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
     Error,
-    observers::{MapObserver, Observer, ObserverWithHashField},
+    observers::{DifferentialObserver, MapObserver, Observer, ObserverWithHashField},
 };
 
 /// A simple observer with a single value.
@@ -79,6 +79,8 @@ impl<T: Hash> ObserverWithHashField for ValueObserver<'_, T> {
         Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(self.value.as_ref()))
     }
 }
+
+impl<OTA, OTB, I, S, T> DifferentialObserver<OTA, OTB, I, S> for ValueObserver<'_, T> {}
 
 /// A simple observer with a single [`RefCell`]'d value.
 #[derive(Serialize, Deserialize, Debug)]
@@ -158,6 +160,8 @@ where
         Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(&*self.value.as_ref().borrow()))
     }
 }
+
+impl<OTA, OTB, I, S, T> DifferentialObserver<OTA, OTB, I, S> for RefCellValueObserver<'_, T> {}
 
 /// [`Iterator`] over [`RefCellValueObserver`] of a [`Deref`] to `[T]`.
 #[derive(Debug)]
