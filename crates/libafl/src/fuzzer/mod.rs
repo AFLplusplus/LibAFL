@@ -431,7 +431,7 @@ where
                 self.feedback_mut()
                     .append_metadata(state, manager, observers, input, &mut md)?;
 
-                let id = state.corpus_mut().add(input.clone(), md)?;
+                let id = state.corpus_mut().add_with_metadata(input.clone(), md)?;
                 self.scheduler_mut().on_add(state, id)?;
 
                 Ok(Some(id))
@@ -450,7 +450,7 @@ where
                     .append_hit_feedbacks(md.hit_objectives_mut())?;
                 self.objective_mut()
                     .append_metadata(state, manager, observers, input, &mut md)?;
-                state.solutions_mut().add(input.clone(), md)?;
+                state.solutions_mut().add_with_metadata(input.clone(), md)?;
 
                 Ok(None)
             }
@@ -734,7 +734,9 @@ where
                 &mut tc_md,
             )?;
             // we don't care about solution id
-            let id = state.solutions_mut().add(input.clone(), tc_md.clone())?;
+            let id = state
+                .solutions_mut()
+                .add_with_metadata(input.clone(), tc_md.clone())?;
 
             manager.fire(
                 state,
@@ -772,7 +774,7 @@ where
         // Add the input to the main corpus
         self.feedback_mut()
             .append_metadata(state, manager, &*observers, &input, &mut tc_md)?;
-        let id = state.corpus_mut().add(input.clone(), tc_md)?;
+        let id = state.corpus_mut().add_with_metadata(input.clone(), tc_md)?;
         self.scheduler_mut().on_add(state, id)?;
 
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
@@ -806,7 +808,9 @@ where
             .build();
 
         // Add the disabled input to the main corpus
-        let id = state.corpus_mut().add_disabled(input.clone(), tc_md)?;
+        let id = state
+            .corpus_mut()
+            .add_disabled_with_metadata(input.clone(), tc_md)?;
         Ok(id)
     }
 }

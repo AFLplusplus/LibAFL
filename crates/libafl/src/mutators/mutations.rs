@@ -1800,12 +1800,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        HasMetadata,
-        corpus::{InMemoryCorpus, TestcaseMetadata},
-        feedbacks::ConstFeedback,
-        inputs::BytesInput,
-        mutators::MutatorsTuple,
-        state::StdState,
+        HasMetadata, corpus::InMemoryCorpus, feedbacks::ConstFeedback, inputs::BytesInput,
+        mutators::MutatorsTuple, state::StdState,
     };
 
     type TestMutatorsTupleType = tuple_list_type!(
@@ -1871,12 +1867,7 @@ mod tests {
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);
 
-        corpus
-            .add(
-                BytesInput::new(vec![0x42; 0x1337]),
-                TestcaseMetadata::default(),
-            )
-            .unwrap();
+        corpus.add(BytesInput::new(vec![0x42; 0x1337])).unwrap();
 
         StdState::new(
             rand,

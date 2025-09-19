@@ -27,7 +27,7 @@ use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 use crate::{
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
     corpus::{
-        Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase,
+        Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, TestcaseMetadata,
         testcase::IsTestcaseMetadataCell,
     },
     events::{Event, EventFirer, EventWithStats},
@@ -277,24 +277,25 @@ where
             ));
         };
         let testcase = state.corpus().get(corpus_idx)?;
+        let md = &*testcase.testcase_metadata();
         // NOTE: scheduled_count represents the amount of fuzz runs a
         // testcase has had. Since this stage is kept at the very end of stage list,
         // the entry would have been fuzzed already (and should contain IsFavoredMetadata) but would have a scheduled count of zero
         // since the scheduled count is incremented after all stages have been run.
-        if testcase.scheduled_count() == 0 {
+        if md.scheduled_count() == 0 {
             // New testcase!
             self.cycles_wo_finds = 0;
             self.update_last_find();
             #[cfg(feature = "track_hit_feedbacks")]
             {
-                self.maybe_update_last_crash(&testcase, state);
-                self.maybe_update_last_hang(&testcase, state);
+                self.maybe_update_last_crash(md, state);
+                self.maybe_update_last_hang(md, state);
             }
             self.update_has_fuzzed_size();
-            self.maybe_update_is_favored_size(&testcase);
+            self.maybe_update_is_favored_size(md);
         }
-        self.maybe_update_slowest_exec(&testcase);
-        self.maybe_update_max_depth(&testcase);
+        self.maybe_update_slowest_exec(md);
+        self.maybe_update_max_depth(md);
 
         // See if we actually need to run the stage, if not, avoid dynamic value computation.
         if !self.check_interval() {
@@ -492,17 +493,14 @@ where
         Ok(())
     }
 
-    fn maybe_update_is_favored_size<M: IsTestcaseMetadataCell>(
-        &mut self,
-        testcase: &Testcase<I, M>,
-    ) {
-        if testcase.has_metadata::<IsFavoredMetadata>() {
+    fn maybe_update_is_favored_size(&mut self, md: &TestcaseMetadata) {
+        if md.has_metadata::<IsFavoredMetadata>() {
             self.is_favored_size += 1;
         }
     }
 
-    fn maybe_update_slowest_exec<M: IsTestcaseMetadataCell>(&mut self, testcase: &Testcase<I, M>) {
-        if let Some(exec_time) = testcase.testcase_metadata().exec_time() {
+    fn maybe_update_slowest_exec(&mut self, md: &TestcaseMetadata) {
+        if let Some(exec_time) = md.exec_time() {
             if exec_time > &self.slowest_exec {
                 self.slowest_exec = *exec_time;
             }
@@ -513,11 +511,8 @@ where
         self.has_fuzzed_size += 1;
     }
 
-    fn maybe_update_max_depth<M: IsTestcaseMetadataCell>(&mut self, testcase: &Testcase<I, M>) {
-        if let Ok(metadata) = testcase
-            .testcase_metadata()
-            .metadata::<SchedulerTestcaseMetadata>()
-        {
+    fn maybe_update_max_depth(&mut self, md: &TestcaseMetadata) {
+        if let Ok(metadata) = md.metadata::<SchedulerTestcaseMetadata>() {
             if metadata.depth() > self.max_depth {
                 self.max_depth = metadata.depth();
             }
@@ -529,13 +524,12 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_crash<M, S>(&mut self, testcase: &Testcase<I, M>, state: &S)
+    fn maybe_update_last_crash<S>(&mut self, md: &TestcaseMetadata, state: &S)
     where
-        M: IsTestcaseMetadataCell,
         S: HasExecutions,
     {
         #[cfg(feature = "track_hit_feedbacks")]
-        if testcase
+        if md
             .hit_objectives()
             .contains(&Cow::Borrowed(CRASH_FEEDBACK_NAME))
         {
@@ -545,12 +539,11 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_hang<M, S>(&mut self, testcase: &Testcase<I, M>, state: &S)
+    fn maybe_update_last_hang<S>(&mut self, md: &TestcaseMetadata, state: &S)
     where
-        M: IsTestcaseMetadataCell,
         S: HasExecutions,
     {
-        if testcase
+        if md
             .hit_objectives()
             .contains(&Cow::Borrowed(TIMEOUT_FEEDBACK_NAME))
         {

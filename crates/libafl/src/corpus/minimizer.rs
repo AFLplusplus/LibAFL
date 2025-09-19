@@ -217,9 +217,7 @@ where
 
                 // scheduler needs to know we've removed the input, or it will continue to try
                 // to use now-missing inputs
-                fuzzer
-                    .scheduler_mut()
-                    .on_remove(state, id, &Some(removed))?;
+                fuzzer.scheduler_mut().on_remove(state, id)?;
             }
 
             *state.corpus_mut().current_mut() = None; //we may have removed the current ID from the corpus

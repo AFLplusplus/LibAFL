@@ -101,7 +101,7 @@ mod tests {
     use libafl_bolts::rands::StdRand;
 
     use crate::{
-        corpus::{Corpus, OnDiskCorpus, Testcase},
+        corpus::{Corpus, OnDiskCorpus},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{QueueScheduler, Scheduler},
@@ -115,8 +115,8 @@ mod tests {
 
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();
-        let t = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "fancyfile".into());
-        q.add(t).unwrap();
+        // let t = Testcase::with_filename(), "fancyfile".into());
+        q.add(BytesInput::new(vec![0_u8; 4])).unwrap();
 
         let objective_q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/objective/path"))

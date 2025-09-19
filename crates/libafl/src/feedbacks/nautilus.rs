@@ -7,7 +7,7 @@ use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata,
+    Error, HasMetadataMut,
     common::nautilus::grammartec::{chunkstore::ChunkStore, context::Context},
     corpus::TestcaseMetadata,
     executors::ExitKind,
@@ -68,7 +68,7 @@ impl<'a> NautilusFeedback<'a> {
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error>
     where
-        S: HasCorpus<NautilusInput> + HasMetadata,
+        S: HasCorpus<NautilusInput> + HasMetadataMut,
     {
         let meta = state
             .metadata_map_mut()
@@ -91,7 +91,7 @@ impl<S> StateInitializer<S> for NautilusFeedback<'_> {}
 
 impl<EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusFeedback<'_>
 where
-    S: HasMetadata + HasCorpus<NautilusInput>,
+    S: HasMetadataMut + HasCorpus<NautilusInput>,
 {
     fn is_interesting(
         &mut self,

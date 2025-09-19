@@ -392,7 +392,7 @@ mod tests {
     use libafl_bolts::rands::{StdRand, XkcdRand};
 
     use crate::{
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus},
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasMutatorBytes},
         mutators::{
@@ -408,14 +408,10 @@ mod tests {
     fn test_mut_scheduled() {
         let rand = XkcdRand::with_seed(0);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus
-            .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
-            .unwrap();
-        corpus
-            .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
-            .unwrap();
+        corpus.add(vec![b'a', b'b', b'c'].into()).unwrap();
+        corpus.add(vec![b'd', b'e', b'f'].into()).unwrap();
 
-        let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
+        let mut input = corpus.get(corpus.first().unwrap()).unwrap().input().clone();
 
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);
@@ -442,10 +438,15 @@ mod tests {
     fn test_havoc() {
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus.add(Testcase::new(b"abc".to_vec().into())).unwrap();
-        corpus.add(Testcase::new(b"def".to_vec().into())).unwrap();
+        corpus.add(b"abc".to_vec().into()).unwrap();
+        corpus.add(b"def".to_vec().into()).unwrap();
 
-        let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
+        let mut input = corpus
+            .get(corpus.first().unwrap())
+            .unwrap()
+            .input()
+            .as_ref()
+            .clone();
         let input_prior = input.clone();
 
         let mut feedback = ConstFeedback::new(false);
@@ -483,10 +484,15 @@ mod tests {
     fn test_single_choice() {
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus.add(Testcase::new(b"abc".to_vec().into())).unwrap();
-        corpus.add(Testcase::new(b"def".to_vec().into())).unwrap();
+        corpus.add(b"abc".to_vec().into()).unwrap();
+        corpus.add(b"def".to_vec().into()).unwrap();
 
-        let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
+        let mut input = corpus
+            .get(corpus.first().unwrap())
+            .unwrap()
+            .input()
+            .as_ref()
+            .clone();
         let input_prior = input.clone();
 
         let mut feedback = ConstFeedback::new(false);

@@ -9,6 +9,7 @@ use alloc::{rc::Rc, vec::Vec};
 use std::{cell::RefCell, collections::VecDeque, marker::PhantomData};
 
 use libafl_bolts::Error;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{
@@ -28,7 +29,7 @@ pub trait HasCachePolicy {
 
 /// Propagate the changes when the cell gets dropped.
 /// Expect more writes to the fallback store.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WritebackOnDropPolicy;
 impl HasCachePolicy for WritebackOnDropPolicy {
     fn dirty(&self, _corpus_id: CorpusId) {
@@ -42,7 +43,7 @@ impl HasCachePolicy for WritebackOnDropPolicy {
 /// flushing the cache regularly.
 /// If the cache is not flushed, no data will be written to the fallback store, resulting in
 /// data loss.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WritebackOnFlushPolicy {
     dirty_entries: RefCell<Vec<CorpusId>>,
 }
@@ -108,7 +109,7 @@ pub trait Cache<CS, FS, I> {
 }
 
 /// A composed testcase metadata cell, linking the cached cell with the fallback cell.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CacheTestcaseMetadataCell<CC, CP, FC>
 where
     CC: IsTestcaseMetadataCell,
@@ -118,14 +119,14 @@ where
     write_access: RefCell<bool>,
     cache_policy: Rc<CP>,
     cache_cell: CC,
-    fallback_cell: FC,
+    fallback_cell: Rc<FC>,
 }
 
 impl<CC, CP, FC> Clone for CacheTestcaseMetadataCell<CC, CP, FC>
 where
     CC: IsTestcaseMetadataCell + Clone,
     CP: HasCachePolicy,
-    FC: IsTestcaseMetadataCell + Clone,
+    FC: IsTestcaseMetadataCell,
 {
     fn clone(&self) -> Self {
         Self {
@@ -137,18 +138,26 @@ where
     }
 }
 
+pub type StdIdentityCacheTestcaseMetadataCell<I, CS: RemovableStore<I>, FS: Store<I>> = Rc<
+    CacheTestcaseMetadataCell<
+        CS::TestcaseMetadataCell,
+        WritebackOnFlushPolicy,
+        FS::TestcaseMetadataCell,
+    >,
+>;
+
 /// An identity cache, storing everything both in the cache and the backing store.
 ///
 /// It only supports [`WritebackOnFlushPolicy`] since all the testcases are stored in memory on load
 /// forever.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct IdentityCache<M> {
     cell_map: RefCell<M>,
     cache_policy: Rc<WritebackOnFlushPolicy>,
 }
 
 /// A `First In / First Out` cache policy.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FifoCache<CS, FS, I> {
     cached_ids: VecDeque<CorpusId>,
     cache_max_len: usize,
@@ -167,7 +176,7 @@ where
             cache_policy,
             write_access: RefCell::new(false),
             cache_cell,
-            fallback_cell,
+            fallback_cell: Rc::new(fallback_cell),
         }
     }
 }
@@ -236,28 +245,10 @@ where
     CS: RemovableStore<I>,
     FS: Store<I>,
     I: Input,
-    M: InMemoryCorpusMap<
-        Testcase<
-            I,
-            Rc<
-                CacheTestcaseMetadataCell<
-                    CS::TestcaseMetadataCell,
-                    WritebackOnFlushPolicy,
-                    FS::TestcaseMetadataCell,
-                >,
-            >,
-        >,
-    >,
+    M: InMemoryCorpusMap<Testcase<I, StdIdentityCacheTestcaseMetadataCell<I, CS, FS>>>,
     <CS as Store<I>>::TestcaseMetadataCell: Clone,
-    <FS as Store<I>>::TestcaseMetadataCell: Clone,
 {
-    type TestcaseMetadataCell = Rc<
-        CacheTestcaseMetadataCell<
-            CS::TestcaseMetadataCell,
-            WritebackOnFlushPolicy,
-            FS::TestcaseMetadataCell,
-        >,
-    >;
+    type TestcaseMetadataCell = StdIdentityCacheTestcaseMetadataCell<I, CS, FS>;
 
     fn add_shared<const ENABLED: bool>(
         &mut self,
@@ -305,20 +296,6 @@ where
         cache_store.disable(id)?;
         fallback_store.disable(id)
     }
-
-    // fn replace(
-    //     &mut self,
-    //     id: CorpusId,
-    //     input: Rc<I>,
-    //     md: TestcaseMetadata,
-    //     cache_store: &mut CS,
-    //     fallback_store: &mut FS,
-    // ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
-    //     let old_tc = cache_store.replace(id, input.clone(), md.clone())?;
-    //     fallback_store.replace(id, input, md)?;
-
-    //     Ok(old_tc)
-    // }
 
     fn replace_metadata(
         &mut self,

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::HasQueueCycles;
 use crate::{
     Error, HasMetadata, HasMetadataMut,
-    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, Testcase},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     feedbacks::MapIndexesMetadata,
     observers::CanTrack,
     require_index_tracking,
@@ -87,13 +87,8 @@ where
     S: HasCorpus<I> + HasMetadataMut + HasRand,
 {
     /// Removes an entry from the corpus
-    fn on_remove(
-        &mut self,
-        state: &mut S,
-        id: CorpusId,
-        testcase: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
-    ) -> Result<(), Error> {
-        self.base.on_remove(state, id, testcase)?;
+    fn on_remove(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
+        self.base.on_remove(state, id)?;
         let mut entries =
             if let Some(meta) = state.metadata_map_mut().get_mut::<TopRatedsMetadata>() {
                 meta.map

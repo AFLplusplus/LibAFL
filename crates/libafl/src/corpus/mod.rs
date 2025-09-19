@@ -2,7 +2,6 @@
 
 use alloc::rc::Rc;
 use core::{fmt, marker::PhantomData};
-use std::{cell::RefCell, string::String};
 
 use serde::{Deserialize, Serialize};
 
@@ -36,44 +35,11 @@ pub use nop::NopCorpus;
 pub mod store;
 pub use store::{InMemoryStore, OnDiskStore, maps};
 
-/// The standard fully in-memory corpus map.
-#[cfg(not(feature = "corpus_btreemap"))]
-pub type StdInMemoryCorpusMap<I> = maps::HashCorpusMap<Testcase<I, Rc<RefCell<TestcaseMetadata>>>>;
-
-/// The standard fully in-memory corpus map.
-#[cfg(feature = "corpus_btreemap")]
-pub type StdInMemoryCorpusMap<I> = maps::BtreeCorpusMap<Testcase<I, Rc<RefCell<TestcaseMetadata>>>>;
-
-/// The standard fully in-memory store.
-pub type StdInMemoryStore<I> =
-    InMemoryStore<I, StdInMemoryCorpusMap<I>, Rc<RefCell<TestcaseMetadata>>>;
-
-/// The standard fully on-disk store.
-pub type StdOnDiskStore<I> = OnDiskStore<I, StdInMemoryCorpusMap<I>>;
-
-/// The standard in-memory corpus.
-pub type InMemoryCorpus<I> = SingleCorpus<I, StdInMemoryStore<I>>;
-
-/// The standard fully on-disk corpus.
-#[cfg(feature = "std")]
-pub type OnDiskCorpus<I> = SingleCorpus<I, OnDiskStore<I, maps::HashCorpusMap<String>>>;
-
-/// The standard corpus for storing on disk and in-memory.
-pub type InMemoryOnDiskCorpus<I> = CombinedCorpus<
-    IdentityCache<StdInMemoryCorpusMap<I>>,
-    StdInMemoryStore<I>,
-    StdOnDiskStore<I>,
-    I,
->;
-
-/// The standard corpus for storing on disk and in-memory with a cache.
-/// Useful for very large corpuses.
-pub type CachedOnDiskCorpus<I> = CombinedCorpus<
-    FifoCache<StdInMemoryStore<I>, StdOnDiskStore<I>, I>,
-    StdInMemoryStore<I>,
-    StdOnDiskStore<I>,
-    I,
->;
+pub mod collection;
+pub use collection::{
+    CachedOnDiskCorpus, InMemoryCorpus, InMemoryOnDiskCorpus, OnDiskCorpus, StdInMemoryCorpusMap,
+    StdInMemoryStore, StdOnDiskStore,
+};
 
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -155,12 +121,30 @@ pub trait Corpus<I>: Sized {
     }
 
     /// Add an enabled testcase to the corpus and return its index
-    fn add(&mut self, input: I, md: TestcaseMetadata) -> Result<CorpusId, Error> {
+    ///
+    /// The default [`TestcaseMetadata`] will be instantiated.
+    fn add(&mut self, input: I) -> Result<CorpusId, Error> {
+        self.add_shared::<true>(Rc::new(input), TestcaseMetadata::default())
+    }
+
+    /// Add an enabled testcase to the corpus and return its index
+    fn add_with_metadata(&mut self, input: I, md: TestcaseMetadata) -> Result<CorpusId, Error> {
         self.add_shared::<true>(Rc::new(input), md)
     }
 
     /// Add a disabled testcase to the corpus and return its index
-    fn add_disabled(&mut self, input: I, md: TestcaseMetadata) -> Result<CorpusId, Error> {
+    ///
+    /// The default [`TestcaseMetadata`] will be instantiated.
+    fn add_disabled(&mut self, input: I) -> Result<CorpusId, Error> {
+        self.add_shared::<false>(Rc::new(input), TestcaseMetadata::default())
+    }
+
+    /// Add a disabled testcase to the corpus and return its index
+    fn add_disabled_with_metadata(
+        &mut self,
+        input: I,
+        md: TestcaseMetadata,
+    ) -> Result<CorpusId, Error> {
         self.add_shared::<false>(Rc::new(input), md)
     }
 

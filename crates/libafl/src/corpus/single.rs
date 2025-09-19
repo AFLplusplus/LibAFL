@@ -32,23 +32,20 @@ where
     S: Default,
 {
     fn default() -> Self {
-        Self {
-            store: S::default(),
-            counter: CorpusCounter::default(),
-            keys: Vec::new(),
-            current: None,
-            phantom: PhantomData,
-        }
+        Self::new(S::default())
     }
 }
 
-impl<I, S> SingleCorpus<I, S>
-where
-    S: Default,
-{
+impl<I, S> SingleCorpus<I, S> {
     /// Create a new [`SingleCorpus`]
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(store: S) -> Self {
+        Self {
+            store,
+            counter: CorpusCounter::default(),
+            keys: Vec::default(),
+            current: None,
+            phantom: PhantomData,
+        }
     }
 }
 

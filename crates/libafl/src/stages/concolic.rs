@@ -394,9 +394,10 @@ where
             start_timer!(state);
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
         }
-        let testcase = state.current_testcase()?.clone();
+        let testcase = state.current_testcase()?;
+        let md = testcase.testcase_metadata();
 
-        let mutations = testcase.metadata::<ConcolicMetadata>().ok().map(|meta| {
+        let mutations = md.metadata::<ConcolicMetadata>().ok().map(|meta| {
             start_timer!(state);
             let mutations = { generate_mutations(meta.iter_messages()) };
             mark_feature_time!(state, PerfFeature::Mutate);

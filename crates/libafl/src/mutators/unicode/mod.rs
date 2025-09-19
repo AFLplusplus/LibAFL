@@ -10,7 +10,7 @@ use core::{
 use libafl_bolts::{Error, HasLen, Named, rands::Rand};
 
 use crate::{
-    HasMetadata,
+    HasMetadata, HasMetadataMut,
     corpus::{Corpus, CorpusId, HasTestcase, IsTestcaseMetadataCell, Testcase},
     inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{MutationResult, Mutator, Tokens, rand_range},
@@ -39,8 +39,11 @@ where
         base: &Testcase<BytesInput, M>,
         state: &S,
     ) -> Result<Self, Error> {
-        let input = base.load_input(state.corpus())?.clone();
-        let metadata = base.metadata::<UnicodeIdentificationMetadata>().cloned()?;
+        let input = base.input().as_ref().clone();
+        let metadata = base
+            .testcase_metadata()
+            .metadata::<UnicodeIdentificationMetadata>()
+            .cloned()?;
         Ok((input, metadata))
     }
 
@@ -55,8 +58,9 @@ where
 {
     fn post_exec(self, state: &mut S, corpus_id: Option<CorpusId>) -> Result<(), Error> {
         if let Some(corpus_id) = corpus_id {
-            let mut tc = state.testcase_mut(corpus_id)?;
-            tc.add_metadata(self);
+            let tc = state.testcase(corpus_id)?;
+            let mut md = tc.testcase_metadata_mut();
+            md.add_metadata(self);
         }
         Ok(())
     }

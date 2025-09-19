@@ -502,13 +502,13 @@ mod tests {
 
     use libafl_bolts::{
         rands::{Rand, XkcdRand},
-        tuples::IntoVec as _,
+        tuples::IntoVec,
     };
     use serde::{Deserialize, Serialize};
 
     use super::{Numeric, int_mutators};
     use crate::{
-        corpus::{Corpus as _, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus},
         inputs::value::I16Input,
         mutators::MutationResult,
         state::StdState,
@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn all_mutate_owned() {
         let mut corpus = InMemoryCorpus::new();
-        corpus.add(Testcase::new(42_i16.into())).unwrap();
+        corpus.add(42_i16.into()).unwrap();
         let mut state = StdState::new(
             XkcdRand::new(),
             corpus,

@@ -363,7 +363,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
 
         state
             .solutions_mut()
-            .add(input.clone(), testcase_md)
+            .add_with_metadata(input.clone(), testcase_md)
             .expect("In run_observers_and_save_state solutions failure.");
 
         let event = Event::Objective {

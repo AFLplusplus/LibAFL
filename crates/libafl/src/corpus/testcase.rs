@@ -117,10 +117,6 @@ impl IsTestcaseMetadataCell for RefCell<TestcaseMetadata> {
     type TestcaseMetadataRef<'a> = Ref<'a, TestcaseMetadata>;
     type TestcaseMetadataRefMut<'a> = RefMut<'a, TestcaseMetadata>;
 
-    // fn new(md: TestcaseMetadata) -> Self {
-    //     RefCell::new(md)
-    // }
-
     fn testcase_metadata<'a>(&'a self) -> Self::TestcaseMetadataRef<'a> {
         self.borrow()
     }
@@ -253,9 +249,11 @@ pub struct TestcaseMetadata {
     objectives_found: usize,
     /// Vector of `Feedback` names that deemed this `Testcase` as corpus worthy
     #[cfg(feature = "track_hit_feedbacks")]
+    #[builder(default)]
     hit_feedbacks: Vec<Cow<'static, str>>,
     /// Vector of `Feedback` names that deemed this `Testcase` as solution worthy
     #[cfg(feature = "track_hit_feedbacks")]
+    #[builder(default)]
     hit_objectives: Vec<Cow<'static, str>>,
 }
 

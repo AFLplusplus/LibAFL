@@ -989,7 +989,7 @@ mod tests {
 
     use crate::{
         StdFuzzer,
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus},
         events::llmp::restarting::{_ENV_FUZZER_SENDER, LlmpEventManagerBuilder},
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
@@ -1018,8 +1018,7 @@ mod tests {
         let time = TimeObserver::new("time");
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
-        let testcase = Testcase::new(vec![0; 4].into());
-        corpus.add(testcase).unwrap();
+        corpus.add(vec![0; 4].into()).unwrap();
 
         let solutions = InMemoryCorpus::<BytesInput>::new();
 

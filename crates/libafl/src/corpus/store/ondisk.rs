@@ -27,7 +27,7 @@ use crate::{
 /// An on-disk store
 ///
 /// The maps only store the unique ID associated to the added [`Testcase`]s.
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OnDiskStore<I, M> {
     disk_mgr: Rc<DiskMgr<I>>,
     enabled_map: M,
@@ -37,11 +37,20 @@ pub struct OnDiskStore<I, M> {
 }
 
 /// A Disk Manager, able to load and store [`Testcase`]s
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiskMgr<I> {
     root_dir: PathBuf,
     md_format: OnDiskMetadataFormat,
     phantom: PhantomData<I>,
+}
+
+/// An on-disk [`Testcase`] cell.
+#[derive(Debug)]
+pub struct OnDiskTestcaseCell<I> {
+    mgr: Rc<DiskMgr<I>>,
+    id: String,
+    testcase_md: RefCell<TestcaseMetadata>,
+    modified: RefCell<bool>,
 }
 
 /// Options for the the format of the on-disk metadata
@@ -98,15 +107,6 @@ impl OnDiskMetadataFormat {
     }
 }
 
-/// An on-disk [`Testcase`] cell.
-#[derive(Debug)]
-pub struct OnDiskTestcaseCell<I> {
-    mgr: Rc<DiskMgr<I>>,
-    id: String,
-    testcase_md: RefCell<TestcaseMetadata>,
-    modified: RefCell<bool>,
-}
-
 impl<I> OnDiskTestcaseCell<I> {
     /// Get a new [`OnDiskTestcaseCell`].
     pub fn new(mgr: Rc<DiskMgr<I>>, id: String, testcase_md: TestcaseMetadata) -> Self {
@@ -159,6 +159,21 @@ impl<I> Drop for OnDiskTestcaseCell<I> {
 }
 
 impl<I> DiskMgr<I> {
+    pub fn new(root_dir: PathBuf) -> Result<Self, Error> {
+        Self::new_with_format(root_dir, OnDiskMetadataFormat::default())
+    }
+
+    pub fn new_with_format(
+        root_dir: PathBuf,
+        md_format: OnDiskMetadataFormat,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            root_dir,
+            md_format,
+            phantom: PhantomData,
+        })
+    }
+
     fn testcase_path(&self, testcase_id: &String) -> PathBuf {
         self.root_dir.join(&testcase_id)
     }
@@ -220,6 +235,27 @@ where
             Rc::new(input),
             OnDiskTestcaseCell::new(self.clone(), testcase_id.clone(), md),
         ))
+    }
+}
+
+impl<I, M> OnDiskStore<I, M>
+where
+    M: Default,
+{
+    pub fn new(root: PathBuf) -> Result<Self, Error> {
+        Self::new_with_format(root, OnDiskMetadataFormat::default())
+    }
+
+    pub fn new_with_format(root: PathBuf, md_format: OnDiskMetadataFormat) -> Result<Self, Error> {
+        let disk_mgr = Rc::new(DiskMgr::new_with_format(root, md_format)?);
+
+        Ok(Self {
+            disk_mgr,
+            enabled_map: M::default(),
+            disabled_map: M::default(),
+            first: None,
+            last: None,
+        })
     }
 }
 

@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
-use super::{InMemoryCorpusMap, Store};
+use super::{InMemoryCorpusMap, RemovableStore, Store};
 use crate::{
     corpus::{
         CorpusId, Testcase,
@@ -138,6 +138,25 @@ where
             self.disabled_map.nth(nth.saturating_sub(nb_enabled))
         } else {
             self.enabled_map.nth(nth)
+        }
+    }
+}
+
+impl<I, M, TMC> RemovableStore<I> for InMemoryStore<I, M, TMC>
+where
+    M: InMemoryCorpusMap<Testcase<I, TMC>>,
+    TMC: HasInstantiableTestcaseMetadata + Clone,
+    I: Input,
+{
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        if let Some(tc) = self.enabled_map.remove(id) {
+            Ok(tc)
+        } else if let Some(tc) = self.disabled_map.remove(id) {
+            Ok(tc)
+        } else {
+            Err(Error::key_not_found(format!(
+                "Index {id} not found for remove"
+            )))
         }
     }
 }

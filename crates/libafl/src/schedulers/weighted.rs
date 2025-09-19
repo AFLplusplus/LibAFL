@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadataMut,
-    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase},
     random_corpus_id,
     schedulers::{
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler, on_add_metadata_default,
@@ -261,12 +261,7 @@ where
     S: HasCorpus<I>,
 {
     /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
-    fn on_remove(
-        &mut self,
-        _state: &mut S,
-        _id: CorpusId,
-        _testcase: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
-    ) -> Result<(), Error> {
+    fn on_remove(&mut self, _state: &mut S, _id: CorpusId) -> Result<(), Error> {
         self.table_invalidated = true;
         Ok(())
     }

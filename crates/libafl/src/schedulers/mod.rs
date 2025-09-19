@@ -11,9 +11,7 @@ use libafl_bolts::{
 
 use crate::{
     Error, HasMetadata, HasMetadataMut,
-    corpus::{
-        Corpus, CorpusId, HasTestcase, IsTestcaseMetadataCell, SchedulerTestcaseMetadata, Testcase,
-    },
+    corpus::{Corpus, CorpusId, HasTestcase, IsTestcaseMetadataCell, SchedulerTestcaseMetadata},
     random_corpus_id,
     state::{HasCorpus, HasRand},
 };
@@ -51,12 +49,7 @@ where
 {
     /// Removed the given entry from the corpus at the given index
     /// When you remove testcases, make sure that testcase is not currently fuzzed one!
-    fn on_remove(
-        &mut self,
-        _state: &mut S,
-        _id: CorpusId,
-        _testcase: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
-    ) -> Result<(), Error> {
+    fn on_remove(&mut self, _state: &mut S, _id: CorpusId) -> Result<(), Error> {
         Ok(())
     }
 

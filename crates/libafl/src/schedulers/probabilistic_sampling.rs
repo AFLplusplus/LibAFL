@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadataMut,
-    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, Testcase},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand},
 };
@@ -88,12 +88,7 @@ where
     F: TestcaseScore<I, S>,
     S: HasCorpus<I> + HasMetadataMut + HasRand,
 {
-    fn on_remove(
-        &mut self,
-        state: &mut S,
-        id: CorpusId,
-        _testcase: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
-    ) -> Result<(), Error> {
+    fn on_remove(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
             .get_mut::<ProbabilityMetadata>()
