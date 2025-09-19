@@ -35,17 +35,38 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    let common_exclude_features = [
+        "prelude",
+        "python",
+        "sancov_pcguard_edges",
+        "arm",
+        "aarch64",
+        "i386",
+        "be",
+        "systemmode",
+        "whole_archive",
+    ];
+    let exclude_features_str = common_exclude_features.join(",");
+
+    let lqemu_exclude_features = ["slirp", "intel_pt", "intel_pt_export_raw", "nyx"];
+    let lqemu_exclude_features: Vec<&str> = lqemu_exclude_features
+        .into_iter()
+        .chain(common_exclude_features)
+        .collect();
+    let lqemu_exclude_features_str = lqemu_exclude_features.join(",");
+
     // Exclude libafl_asan_libc since it is only a dummy library without any implementation anyway, but also because it needs to be built for `no_std`
-    let the_command = concat!(
+    let the_command = format!(
         "DOCS_RS=1 cargo hack check --workspace --each-feature --clean-per-run \
-        --exclude-features=prelude,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode,whole_archive \
-        --no-dev-deps --exclude libafl_libfuzzer --exclude libafl_qemu --exclude libafl_qemu_sys --exclude libafl_asan_libc --print-command-list; ",
+            --exclude-features={exclude_features_str} \
+            --no-dev-deps --exclude libafl_libfuzzer --exclude libafl_qemu --exclude libafl_qemu_sys --exclude libafl_asan_libc --print-command-list; "
+    ) + &format!(
         "DOCS_RS=1 cargo hack check -p libafl_qemu -p libafl_qemu_sys --each-feature --clean-per-run \
-        --exclude-features=prelude,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode,whole_archive,slirp,intel_pt,intel_pt_export_raw \
-        --no-dev-deps --features usermode --print-command-list"
+            --exclude-features={lqemu_exclude_features_str} \
+            --no-dev-deps --features usermode --print-command-list"
     );
 
-    let output = Command::new("sh").arg("-c").arg(the_command).output()?;
+    let output = Command::new("sh").arg("-c").arg(&the_command).output()?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let lines: Vec<&str> = stdout.trim().lines().collect();
 

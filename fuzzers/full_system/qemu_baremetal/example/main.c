@@ -1,15 +1,15 @@
-#ifdef TARGET_SYNC_EXIT
-  #include "libafl_qemu.h"
+#ifdef TARGET_CUSTOM_INSN
+  #include "lqemu.h"
 #endif
 
-#ifndef TARGET_SYNC_EXIT
+#ifndef TARGET_CUSTOM_INSN
 int __attribute__((noinline)) BREAKPOINT() {
   for (;;) {}
 }
 #endif
 
 int LLVMFuzzerTestOneInput(unsigned int *Data, unsigned int Size) {
-#ifdef TARGET_SYNC_EXIT
+#ifdef TARGET_CUSTOM_INSN
   libafl_qemu_start_phys((void *)Data, Size);
 #endif
   if (Data[3] == 0) {
@@ -28,7 +28,7 @@ int LLVMFuzzerTestOneInput(unsigned int *Data, unsigned int Size) {
       }
     }
   }
-#ifdef TARGET_SYNC_EXIT
+#ifdef TARGET_CUSTOM_INSN
   libafl_qemu_end(LIBAFL_QEMU_END_OK);
 #else
   return BREAKPOINT();

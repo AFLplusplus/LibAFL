@@ -7,7 +7,7 @@ It comes in three flavours (can be set through features):
 
 -`low_level`: The low-level way to interact with QEMU.
 -`breakpoint`: Interaction with QEMU using the command system, leveraging breakpoints.
--`sync_exit`: Interaction with QEMU using the command system, leveraging sync exits.
+-`custom_insn`: Interaction with QEMU using the command system, leveraging custom instructions.
 
 ## Prerequisite
 

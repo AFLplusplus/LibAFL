@@ -13,7 +13,7 @@ macro_rules! assert_unique_feature {
 }
 
 fn main() {
-    assert_unique_feature!("low_level", "breakpoint", "sync_exit");
+    assert_unique_feature!("low_level", "breakpoint", "custom_insn");
 
     build_libafl_qemu();
 }
