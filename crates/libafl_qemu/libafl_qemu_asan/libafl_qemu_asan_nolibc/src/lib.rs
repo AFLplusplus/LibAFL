@@ -12,7 +12,7 @@ use libafl_asan::{
     env::Env,
     file::linux::LinuxFileReader,
     logger::linux::LinuxLogger,
-    mmap::linux::LinuxMmap,
+    mmap::linux::MmapRegion,
     shadow::{
         Shadow,
         guest::{DefaultShadowLayout, GuestShadow},
@@ -24,8 +24,8 @@ use log::{Level, info, trace};
 use spin::{Lazy, Mutex};
 
 pub type ZasanFrontend = DefaultFrontend<
-    DlmallocBackend<LinuxMmap>,
-    GuestShadow<LinuxMmap, DefaultShadowLayout>,
+    DlmallocBackend<MmapRegion>,
+    GuestShadow<MmapRegion, DefaultShadowLayout>,
     GuestFastTracking,
 >;
 
@@ -42,8 +42,8 @@ static FRONTEND: Lazy<Mutex<ZasanFrontend>> = Lazy::new(|| {
         .unwrap_or(Level::Warn);
     LinuxLogger::initialize(level);
     info!("Zasan initializing...");
-    let backend = DlmallocBackend::<LinuxMmap>::new(PAGE_SIZE);
-    let shadow = GuestShadow::<LinuxMmap, DefaultShadowLayout>::new().unwrap();
+    let backend = DlmallocBackend::<MmapRegion>::new(PAGE_SIZE);
+    let shadow = GuestShadow::<MmapRegion, DefaultShadowLayout>::new().unwrap();
     let tracking = GuestFastTracking::new().unwrap();
     let frontend = ZasanFrontend::new(
         backend,

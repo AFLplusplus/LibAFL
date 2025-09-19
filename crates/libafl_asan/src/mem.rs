@@ -7,11 +7,11 @@ use crate::allocator::backend::dlmalloc::DlmallocBackend;
 
 #[cfg(all(
     feature = "global_allocator",
-    feature = "linux",
+    feature = "syscalls",
     target_os = "linux",
     not(feature = "libc")
 ))]
-type Mmap = crate::mmap::linux::LinuxMmap;
+type Mmap = crate::mmap::linux::MmapRegion;
 
 #[cfg(all(feature = "global_allocator", feature = "libc",))]
 type Mmap = crate::mmap::libc::LibcMmap<
