@@ -1,11 +1,12 @@
 //! Dynamic corpus that allows users to switch corpus types at runtime.
 
-use core::{cell::RefCell, marker::PhantomData};
+use alloc::rc::Rc;
+use core::marker::PhantomData;
 
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
-use crate::corpus::{Corpus, CorpusId, Testcase};
+use crate::corpus::{Corpus, CorpusId, Testcase, TestcaseMetadata};
 
 /// An dynamic corpus type accepting two types of corpus at runtime. This helps rustc better
 /// reason about the bounds compared to dyn objects.
@@ -38,34 +39,17 @@ where
     C1: Corpus<I>,
     C2: Corpus<I>,
 {
-    fn peek_free_id(&self) -> CorpusId {
+    fn add(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error> {
         match self {
-            Self::Corpus1(c1, _) => c1.peek_free_id(),
-            Self::Corpus2(c2, _) => c2.peek_free_id(),
+            Self::Corpus1(c1, _) => c1.add(input, md),
+            Self::Corpus2(c2, _) => c2.add(input, md),
         }
     }
 
-    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+    fn add_disabled(&mut self, input: Rc<I>, md: TestcaseMetadata) -> Result<CorpusId, Error> {
         match self {
-            Self::Corpus1(c1, _) => c1.add(testcase),
-            Self::Corpus2(c2, _) => c2.add(testcase),
-        }
-    }
-
-    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        match self {
-            Self::Corpus1(c1, _) => c1.add_disabled(testcase),
-            Self::Corpus2(c2, _) => c2.add_disabled(testcase),
-        }
-    }
-
-    fn cloned_input_for_id(&self, idx: CorpusId) -> Result<I, Error>
-    where
-        I: Clone,
-    {
-        match self {
-            Self::Corpus1(c1, _) => c1.cloned_input_for_id(idx),
-            Self::Corpus2(c2, _) => c2.cloned_input_for_id(idx),
+            Self::Corpus1(c1, _) => c1.add_disabled(input, md),
+            Self::Corpus2(c2, _) => c2.add_disabled(input, md),
         }
     }
 
@@ -111,17 +95,14 @@ where
         }
     }
 
-    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+    /// Get testcase by id
+    fn get_from<const ENABLED: bool>(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
         match self {
-            Self::Corpus1(c1, _) => c1.get(id),
-            Self::Corpus2(c2, _) => c2.get(id),
-        }
-    }
-
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        match self {
-            Self::Corpus1(c1, _) => c1.get_from_all(id),
-            Self::Corpus2(c2, _) => c2.get_from_all(id),
+            Self::Corpus1(c1, _) => c1.get_from(id),
+            Self::Corpus2(c2, _) => c2.get_from(id),
         }
     }
 
@@ -136,13 +117,6 @@ where
         match self {
             Self::Corpus1(c1, _) => c1.last(),
             Self::Corpus2(c2, _) => c2.last(),
-        }
-    }
-
-    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        match self {
-            Self::Corpus1(c1, _) => c1.load_input_into(testcase),
-            Self::Corpus2(c2, _) => c2.load_input_into(testcase),
         }
     }
 
@@ -174,24 +148,15 @@ where
         }
     }
 
-    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
+    fn replace(
+        &mut self,
+        id: CorpusId,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
         match self {
-            Self::Corpus1(c1, _) => c1.remove(id),
-            Self::Corpus2(c2, _) => c2.remove(id),
-        }
-    }
-
-    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        match self {
-            Self::Corpus1(c1, _) => c1.replace(idx, testcase),
-            Self::Corpus2(c2, _) => c2.replace(idx, testcase),
-        }
-    }
-
-    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
-        match self {
-            Self::Corpus1(c1, _) => c1.store_input_from(testcase),
-            Self::Corpus2(c2, _) => c2.store_input_from(testcase),
+            Self::Corpus1(c1, _) => c1.replace(id, input, md),
+            Self::Corpus2(c2, _) => c2.replace(id, input, md),
         }
     }
 }

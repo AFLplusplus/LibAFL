@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasTestcase},
     random_corpus_id,
     schedulers::{
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler, on_add_metadata_default,
@@ -173,8 +173,7 @@ where
         let mut sum: f64 = 0.0;
 
         for i in state.corpus().ids() {
-            let mut testcase = state.corpus().get(i)?.borrow_mut();
-            let weight = F::compute(state, &mut *testcase)?;
+            let weight = F::compute(state, i)?;
             weights.insert(i, weight);
             sum += weight;
         }
@@ -257,14 +256,12 @@ where
     }
 }
 
-impl<C, F, I, O, S> RemovableScheduler<I, S> for WeightedScheduler<C, F, O> {
+impl<C, F, I, O, S> RemovableScheduler<I, S> for WeightedScheduler<C, F, O>
+where
+    S: HasCorpus<I>,
+{
     /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
-    fn on_remove(
-        &mut self,
-        _state: &mut S,
-        _id: CorpusId,
-        _prev: &Option<Testcase<I>>,
-    ) -> Result<(), Error> {
+    fn on_remove(&mut self, _state: &mut S, _id: CorpusId) -> Result<(), Error> {
         self.table_invalidated = true;
         Ok(())
     }
@@ -274,7 +271,7 @@ impl<C, F, I, O, S> RemovableScheduler<I, S> for WeightedScheduler<C, F, O> {
         &mut self,
         _state: &mut S,
         _id: CorpusId,
-        _prev: &Testcase<I>,
+        _prev: &<S::Corpus as Corpus<I>>::TestcaseMetadataCell,
     ) -> Result<(), Error> {
         self.table_invalidated = true;
         Ok(())

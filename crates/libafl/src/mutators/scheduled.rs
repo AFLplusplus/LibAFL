@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use super::MutationId;
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     mutators::{
         MutationResult, Mutator, MutatorsTuple,
         token_mutations::{TokenInsert, TokenReplace},
@@ -306,15 +306,18 @@ where
 
     fn post_exec(&mut self, state: &mut S, corpus_id: Option<CorpusId>) -> Result<(), Error> {
         if let Some(id) = corpus_id {
-            let mut testcase = (*state.corpus_mut().get(id)?).borrow_mut();
+            let testcase = state.corpus().get(id)?;
             let mut log = Vec::<Cow<'static, str>>::new();
+
             while let Some(idx) = self.mutation_log.pop() {
                 let name = self.scheduled.mutations().name(idx.0).unwrap().clone(); // TODO maybe return an Error on None
                 log.push(name);
             }
+
             let meta = LogMutationMetadata::new(log);
-            testcase.add_metadata(meta);
+            testcase.testcase_metadata_mut().add_metadata(meta);
         }
+
         // Always reset the log for each run
         self.mutation_log.clear();
         Ok(())
@@ -389,7 +392,7 @@ mod tests {
     use libafl_bolts::rands::{StdRand, XkcdRand};
 
     use crate::{
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus},
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasMutatorBytes},
         mutators::{
@@ -405,14 +408,10 @@ mod tests {
     fn test_mut_scheduled() {
         let rand = XkcdRand::with_seed(0);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus
-            .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
-            .unwrap();
-        corpus
-            .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
-            .unwrap();
+        corpus.add(vec![b'a', b'b', b'c'].into()).unwrap();
+        corpus.add(vec![b'd', b'e', b'f'].into()).unwrap();
 
-        let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
+        let input = corpus.get(corpus.first().unwrap()).unwrap().input().clone();
 
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);
@@ -427,22 +426,28 @@ mod tests {
         .unwrap();
 
         let mut splice = SpliceMutator::new();
-        splice.mutate(&mut state, &mut input).unwrap();
+        let mut spliced_input = input.as_ref().clone();
+        splice.mutate(&mut state, &mut spliced_input).unwrap();
 
-        log::trace!("{:?}", input.mutator_bytes());
+        log::trace!("{:?}", spliced_input.mutator_bytes());
 
         // The pre-seeded rand should have spliced at position 2.
-        assert_eq!(input.mutator_bytes(), b"abf");
+        assert_eq!(spliced_input.mutator_bytes(), b"abf");
     }
 
     #[test]
     fn test_havoc() {
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus.add(Testcase::new(b"abc".to_vec().into())).unwrap();
-        corpus.add(Testcase::new(b"def".to_vec().into())).unwrap();
+        corpus.add(b"abc".to_vec().into()).unwrap();
+        corpus.add(b"def".to_vec().into()).unwrap();
 
-        let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
+        let mut input = corpus
+            .get(corpus.first().unwrap())
+            .unwrap()
+            .input()
+            .as_ref()
+            .clone();
         let input_prior = input.clone();
 
         let mut feedback = ConstFeedback::new(false);
@@ -480,10 +485,15 @@ mod tests {
     fn test_single_choice() {
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus.add(Testcase::new(b"abc".to_vec().into())).unwrap();
-        corpus.add(Testcase::new(b"def".to_vec().into())).unwrap();
+        corpus.add(b"abc".to_vec().into()).unwrap();
+        corpus.add(b"def".to_vec().into()).unwrap();
 
-        let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
+        let mut input = corpus
+            .get(corpus.first().unwrap())
+            .unwrap()
+            .input()
+            .as_ref()
+            .clone();
         let input_prior = input.clone();
 
         let mut feedback = ConstFeedback::new(false);

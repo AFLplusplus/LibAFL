@@ -204,14 +204,12 @@ pub fn merge(
     }
 
     for id in fuzzer.scheduler().removable() {
-        let testcase = state.corpus_mut().remove(id)?;
-        fuzzer
-            .scheduler_mut()
-            .on_remove(&mut state, id, &Some(testcase))?;
+        state.corpus_mut().disable(id)?;
+        fuzzer.scheduler_mut().on_remove(&mut state, id)?;
     }
 
     for id in fuzzer.scheduler().current().clone() {
-        let mut testcase = state.corpus_mut().get(id)?.borrow_mut();
+        let mut testcase = state.corpus().get(id)?;
         let file_path = testcase
             .file_path_mut()
             .as_mut()
@@ -228,10 +226,8 @@ pub fn merge(
             new_file_path.push(base);
             if new_file_path.exists() {
                 drop(testcase);
-                let testcase = state.corpus_mut().remove(id)?;
-                fuzzer
-                    .scheduler_mut()
-                    .on_remove(&mut state, id, &Some(testcase))?;
+                state.corpus_mut().remove(id)?;
+                fuzzer.scheduler_mut().on_remove(&mut state, id)?;
             } else {
                 // False-positive: file_path is used just below
                 rename(&file_path, &new_file_path)?;

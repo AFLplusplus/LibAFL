@@ -230,7 +230,7 @@ hashbrown = { workspace = true, features = [
   "ahash",
 ], default-features = false } # A faster hashmap, nostd compatible
 num-traits = { workspace = true, default-features = false }
-serde = { workspace = true, features = ["alloc"] } # serialization lib
+serde = { workspace = true, features = ["alloc", "rc"] } # serialization lib
 postcard = { workspace = true } # no_std compatible serde serialization format
 bincode = { version = "2.0.1", optional = true, features = ["serde"] }
 bitbybit = { workspace = true }

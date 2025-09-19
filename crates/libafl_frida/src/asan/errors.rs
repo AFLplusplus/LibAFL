@@ -13,7 +13,7 @@ use frida_gum::interceptor::Interceptor;
 use frida_gum::{Gum, Process};
 use libafl::{
     Error, HasMetadata,
-    corpus::Testcase,
+    corpus::TestcaseMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
@@ -710,10 +710,11 @@ where
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<I>,
+        _input: &I,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
-            testcase.add_metadata(errors.clone());
+            md.add_metadata(errors.clone());
         }
 
         Ok(())

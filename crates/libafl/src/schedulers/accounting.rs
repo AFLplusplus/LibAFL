@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use super::IndexesLenTimeMinimizerScheduler;
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     observers::CanTrack,
     schedulers::{
         Scheduler,
@@ -140,13 +140,8 @@ where
             self.inner.cull(state)?;
         }
         let mut id = self.inner.base_mut().next(state)?;
-        while {
-            !state
-                .corpus()
-                .get(id)?
-                .borrow()
-                .has_metadata::<IsFavoredMetadata>()
-        } && state.rand_mut().coinflip(self.skip_non_favored_prob)
+        while { !state.corpus().get(id)?.has_metadata::<IsFavoredMetadata>() }
+            && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
             id = self.inner.base_mut().next(state)?;
         }
@@ -199,9 +194,10 @@ where
                             equal_score = true;
                         }
 
-                        let mut old = state.corpus().get_from_all(*old_id)?.borrow_mut();
+                        let old = state.corpus().get_from_all(*old_id)?;
+                        let mut md = old.testcase_metadata_mut();
                         let must_remove = {
-                            let old_meta = old.metadata_map_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
+                            let old_meta = md.metadata_map_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
                                 Error::key_not_found(format!(
                                     "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{old_id}"
                                 ))
@@ -211,7 +207,7 @@ where
                         };
 
                         if must_remove {
-                            drop(old.metadata_map_mut().remove::<AccountingIndexesMetadata>());
+                            drop(md.metadata_map_mut().remove::<AccountingIndexesMetadata>());
                         }
                     }
                 }
@@ -239,7 +235,7 @@ where
         state
             .corpus()
             .get(id)?
-            .borrow_mut()
+            .testcase_metadata_mut()
             .metadata_map_mut()
             .insert(AccountingIndexesMetadata::with_tcref(
                 indexes,
@@ -269,12 +265,14 @@ where
         };
 
         for (_key, id) in &top_rated.map {
-            let mut entry = state.corpus().get(*id)?.borrow_mut();
+            let entry = state.corpus().get(*id)?;
             if entry.scheduled_count() > 0 {
                 continue;
             }
 
-            entry.add_metadata(IsFavoredMetadata {});
+            entry
+                .testcase_metadata_mut()
+                .add_metadata(IsFavoredMetadata {});
         }
 
         Ok(())

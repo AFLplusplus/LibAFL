@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand},
 };
@@ -68,7 +68,7 @@ impl<F> ProbabilitySamplingScheduler<F> {
         F: TestcaseScore<I, S>,
         S: HasCorpus<I> + HasMetadata + HasRand,
     {
-        let prob = F::compute(state, &mut *state.corpus().get(id)?.borrow_mut())?;
+        let prob = F::compute(state, id)?;
         debug_assert!(
             prob >= 0.0 && prob.is_finite(),
             "scheduler probability is {prob}; to work correctly it must be >= 0.0 and finite"
@@ -88,12 +88,7 @@ where
     F: TestcaseScore<I, S>,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
-    fn on_remove(
-        &mut self,
-        state: &mut S,
-        id: CorpusId,
-        _testcase: &Option<Testcase<I>>,
-    ) -> Result<(), Error> {
+    fn on_remove(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
             .get_mut::<ProbabilityMetadata>()
@@ -108,7 +103,7 @@ where
         &mut self,
         state: &mut S,
         id: CorpusId,
-        _prev: &Testcase<I>,
+        _prev: &<S::Corpus as Corpus<I>>::TestcaseMetadataCell,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
@@ -129,10 +124,11 @@ where
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         let current_id = *state.corpus().current();
+
         state
             .corpus()
             .get(id)?
-            .borrow_mut()
+            .testcase_metadata_mut()
             .set_parent_id_optional(current_id);
 
         if state.metadata_map().get::<ProbabilityMetadata>().is_none() {
@@ -190,7 +186,7 @@ mod tests {
 
     use crate::{
         Error,
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, CorpusId, InMemoryCorpus},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
@@ -206,7 +202,7 @@ mod tests {
     where
         S: HasCorpus<I>,
     {
-        fn compute(_state: &S, _: &mut Testcase<I>) -> Result<f64, Error> {
+        fn compute(_state: &S, _corpus_id: CorpusId) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }
@@ -233,11 +229,11 @@ mod tests {
         let mut objective = ConstFeedback::new(false);
 
         let mut corpus = InMemoryCorpus::new();
-        let t1 = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "1".into());
-        let t2 = Testcase::with_filename(BytesInput::new(vec![1_u8; 4]), "2".into());
+        // let t1 = Testcase::with_filename(, "1".into());
+        // let t2 = Testcase::with_filename(, "2".into());
 
-        let idx1 = corpus.add(t1).unwrap();
-        let idx2 = corpus.add(t2).unwrap();
+        let idx1 = corpus.add(BytesInput::new(vec![0_u8; 4])).unwrap();
+        let idx2 = corpus.add(BytesInput::new(vec![1_u8; 4])).unwrap();
 
         let mut state = StdState::new(
             rand,

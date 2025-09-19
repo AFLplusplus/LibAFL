@@ -13,7 +13,7 @@ use libafl_bolts::{Named, rands::Rand};
 use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, Testcase},
+    corpus::{CorpusId, HasCurrentCorpusId, Testcase, testcase::IsTestcaseMetadataCell},
     fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
@@ -23,7 +23,6 @@ use crate::{
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
 };
-
 // TODO multi mutators stage
 
 /// Action performed after the un-transformed input is executed (e.g., updating metadata)
@@ -47,7 +46,10 @@ pub trait MutatedTransform<I, S>: Sized {
     type Post: MutatedTransformPost<S>;
 
     /// Transform the provided testcase into this type
-    fn try_transform_from(base: &mut Testcase<I>, state: &S) -> Result<Self, Error>;
+    fn try_transform_from<M: IsTestcaseMetadataCell>(
+        base: &Testcase<I, M>,
+        state: &S,
+    ) -> Result<Self, Error>;
 
     /// Transform this instance back into the original input type
     fn try_transform_into(self, state: &S) -> Result<(I, Self::Post), Error>;
@@ -62,9 +64,11 @@ where
     type Post = ();
 
     #[inline]
-    fn try_transform_from(base: &mut Testcase<I>, state: &S) -> Result<Self, Error> {
-        state.corpus().load_input_into(base)?;
-        Ok(base.input().as_ref().unwrap().clone())
+    fn try_transform_from<M: IsTestcaseMetadataCell>(
+        base: &Testcase<I, M>,
+        _state: &S,
+    ) -> Result<Self, Error> {
+        Ok(base.input().as_ref().clone())
     }
 
     #[inline]
@@ -258,9 +262,9 @@ where
             .saturating_sub(self.execs_since_progress_start(state)?);
         */
         let num = self.iterations(state)?;
-        let mut testcase = state.current_testcase_mut()?;
+        let testcase = state.current_testcase()?;
 
-        let Ok(input) = I1::try_transform_from(&mut testcase, state) else {
+        let Ok(input) = I1::try_transform_from(&testcase, state) else {
             return Ok(());
         };
         drop(testcase);
@@ -324,8 +328,8 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let mut testcase = state.current_testcase_mut()?;
-        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
+        let testcase = state.current_testcase()?;
+        let Ok(input) = I::try_transform_from(&testcase, state) else {
             return Ok(());
         };
         drop(testcase);

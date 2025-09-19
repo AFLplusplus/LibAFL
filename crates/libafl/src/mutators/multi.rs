@@ -202,8 +202,8 @@ where
             }
         }
 
-        let mut other_testcase = state.corpus().get(id)?.borrow_mut();
-        let other = other_testcase.load_input(state.corpus())?;
+        let other_testcase = state.corpus().get(id)?;
+        let other = other_testcase.input();
         let other_len = other.len();
         if other_len == 0 {
             return Ok(MutationResult::Skipped);
@@ -237,9 +237,9 @@ where
                 NonZero::new_unchecked(min(other_size, size - target))
             });
 
-            let other_testcase = state.corpus().get(id)?.borrow_mut();
+            let other_testcase = state.corpus().get(id)?;
             // No need to load the input again, it'll still be cached.
-            let other = other_testcase.input().as_ref().unwrap();
+            let other = other_testcase.input();
 
             Ok(Self::crossover_insert(
                 part,
@@ -341,8 +341,8 @@ where
             }
         }
 
-        let mut other_testcase = state.corpus().get(id)?.borrow_mut();
-        let other = other_testcase.load_input(state.corpus())?;
+        let other_testcase = state.corpus().get(id)?;
+        let other = other_testcase.input();
 
         let other_len = other.len();
         if other_len == 0 {
@@ -376,9 +376,9 @@ where
                 NonZero::new_unchecked(min(other_size, size - target))
             });
 
-            let other_testcase = state.corpus().get(id)?.borrow_mut();
+            let other_testcase = state.corpus().get(id)?;
             // No need to load the input again, it'll still be cached.
-            let other = other_testcase.input().as_ref().unwrap();
+            let other = other_testcase.input();
 
             Ok(Self::crossover_replace(
                 part,

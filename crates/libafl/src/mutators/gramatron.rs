@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadata,
-    corpus::Corpus,
+    corpus::{Corpus, IsTestcaseMetadataCell},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
@@ -136,17 +136,18 @@ where
 
         let rand_num = state.rand_mut().next();
 
-        let mut other_testcase = state.corpus().get(id)?.borrow_mut();
+        let other_testcase = state.corpus().get(id)?;
+        let mut other_md = other_testcase.testcase_metadata_mut();
 
-        if !other_testcase.has_metadata::<GramatronIdxMapMetadata>() {
-            let meta = GramatronIdxMapMetadata::new(other_testcase.load_input(state.corpus())?);
-            other_testcase.add_metadata(meta);
+        if !other_md.has_metadata::<GramatronIdxMapMetadata>() {
+            let meta = GramatronIdxMapMetadata::new(other_testcase.input().as_ref());
+            other_md.add_metadata(meta);
         }
-        let meta = other_testcase
+        let meta = other_md
             .metadata_map()
             .get::<GramatronIdxMapMetadata>()
             .unwrap();
-        let other = other_testcase.input().as_ref().unwrap();
+        let other = other_testcase.input();
 
         meta.map.get(&input.terminals()[insert_at].state).map_or(
             Ok(MutationResult::Skipped),

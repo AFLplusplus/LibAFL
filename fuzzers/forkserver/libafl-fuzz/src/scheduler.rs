@@ -20,15 +20,10 @@ where
     W: Scheduler<I, S> + RemovableScheduler<I, S>,
     S: HasTestcase<I>,
 {
-    fn on_remove(
-        &mut self,
-        state: &mut S,
-        id: CorpusId,
-        testcase: &Option<Testcase<I>>,
-    ) -> Result<(), Error> {
+    fn on_remove(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         match self {
-            Self::Queue(queue, _) => queue.on_remove(state, id, testcase),
-            Self::Weighted(weighted, _) => weighted.on_remove(state, id, testcase),
+            Self::Queue(queue, _) => queue.on_remove(state, id),
+            Self::Weighted(weighted, _) => weighted.on_remove(state, id),
         }
     }
 

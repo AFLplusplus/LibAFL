@@ -22,12 +22,7 @@ where
     I: Input,
     S: HasCorpus<I>,
 {
-    fn on_remove(
-        &mut self,
-        _state: &mut S,
-        id: CorpusId,
-        _testcase: &Option<Testcase<I>>,
-    ) -> Result<(), Error> {
+    fn on_remove(&mut self, _state: &mut S, id: CorpusId) -> Result<(), Error> {
         self.all.remove(&id);
         Ok(())
     }

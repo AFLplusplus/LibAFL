@@ -1,4 +1,5 @@
 //! Stage that wraps another stage and tracks it's execution time in `State`
+
 use core::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::{Error, current_time};
@@ -7,6 +8,7 @@ use crate::{
     HasMetadata,
     stages::{Restartable, Stage},
 };
+
 /// Track an inner Stage's execution time
 #[derive(Debug)]
 pub struct TimeTrackingStageWrapper<T, S, ST> {

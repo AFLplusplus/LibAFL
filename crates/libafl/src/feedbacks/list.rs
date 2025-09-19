@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
     HasNamedMetadata,
+    corpus::testcase::TestcaseMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::ListObserver,
@@ -176,7 +177,8 @@ where
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        _testcase: &mut crate::corpus::Testcase<I>,
+        _input: &I,
+        _md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         self.append_list_observer_metadata(state);
         Ok(())

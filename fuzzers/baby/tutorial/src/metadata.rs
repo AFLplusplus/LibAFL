@@ -21,9 +21,12 @@ pub struct PacketLenTestcasePenalty {}
 
 impl<I, S> TestcasePenalty<I, S> for PacketLenTestcasePenalty
 where
-    S: HasMetadata,
+    S: HasCorpus<I> + HasMetadata,
 {
-    fn compute(_state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
+    fn compute(
+        _state: &S,
+        entry: &mut Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataRefMut<'_>>,
+    ) -> Result<f64, Error> {
         Ok(entry
             .metadata_map()
             .get::<PacketLenMetadata>()
@@ -61,11 +64,10 @@ impl<EM, OT, S> Feedback<EM, PacketData, OT, S> for PacketLenFeedback {
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<PacketData>,
+        _input: &PacketData,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        testcase
-            .metadata_map_mut()
-            .insert(PacketLenMetadata { length: self.len });
+        md.insert(PacketLenMetadata { length: self.len });
         Ok(())
     }
 }

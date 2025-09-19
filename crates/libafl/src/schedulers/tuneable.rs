@@ -101,7 +101,7 @@ impl TuneableScheduler {
     }
 }
 
-impl<I, S> RemovableScheduler<I, S> for TuneableScheduler {}
+impl<I, S> RemovableScheduler<I, S> for TuneableScheduler where S: HasCorpus<I> {}
 
 impl<I, S> Scheduler<I, S> for TuneableScheduler
 where
@@ -110,11 +110,7 @@ where
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
-        state
-            .corpus()
-            .get(id)?
-            .borrow_mut()
-            .set_parent_id_optional(current_id);
+        state.corpus().get(id)?.set_parent_id_optional(current_id);
 
         Ok(())
     }

@@ -35,11 +35,7 @@ impl<EM, I, TE, S, Z> TracingStage<EM, I, TE, S, Z>
 where
     TE: Executor<EM, I, S, Z> + HasObservers,
     TE::Observers: ObserversTuple<I, S>,
-    S: HasExecutions
-        + HasCorpus<I>
-        + HasNamedMetadata
-        + HasCurrentTestcase<I>
-        + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasCorpus<I> + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
 {
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
     /// own stage and you need to manage [`super::NestedStageRetryCountRestartHelper`] differently

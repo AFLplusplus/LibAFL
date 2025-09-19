@@ -538,7 +538,7 @@ mod tests {
         let _ = ctx.add_rule("A", b"a");
         ctx.initialize(101);
         let tree = ctx.generate_tree_from_rule(&mut rand, r3, 100);
-        cks.add_tree(tree, &ctx);
+        cks.add_tree(&tree, &ctx);
         for _ in 0..100 {
             let tree = ctx.generate_tree_from_rule(&mut rand, r1, 100);
             let mut mutator = Mutator::new(&ctx);

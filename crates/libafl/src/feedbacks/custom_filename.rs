@@ -89,7 +89,8 @@ where
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<I>,
+        _input: &I,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         *testcase.filename_mut() = Some(self.generator.set_name(state, testcase)?);
         Ok(())

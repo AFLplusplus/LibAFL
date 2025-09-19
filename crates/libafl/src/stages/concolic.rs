@@ -15,7 +15,7 @@ use libafl_bolts::{
 use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
-    corpus::HasCurrentCorpusId,
+    corpus::{HasCurrentCorpusId, IsTestcaseMetadataCell},
     executors::{Executor, HasObservers},
     observers::{ObserversTuple, concolic::ConcolicObserver},
     stages::{Restartable, RetryCountRestartHelper, Stage, TracingStage},
@@ -53,7 +53,7 @@ where
     TE::Observers: ObserversTuple<I, S>,
     S: HasExecutions
         + HasCorpus<I>
-        + HasNamedMetadata
+        + HasMetadata
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
@@ -70,7 +70,8 @@ where
         if let Some(observer) = self.inner.executor().observers().get(&self.observer_handle) {
             let metadata = observer.create_metadata_from_current_map();
             state
-                .current_testcase_mut()?
+                .current_testcase()?
+                .testcase_metadata_mut()
                 .metadata_map_mut()
                 .insert(metadata);
         }
@@ -393,9 +394,10 @@ where
             start_timer!(state);
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
         }
-        let testcase = state.current_testcase()?.clone();
+        let testcase = state.current_testcase()?;
+        let md = testcase.testcase_metadata();
 
-        let mutations = testcase.metadata::<ConcolicMetadata>().ok().map(|meta| {
+        let mutations = md.metadata::<ConcolicMetadata>().ok().map(|meta| {
             start_timer!(state);
             let mutations = { generate_mutations(meta.iter_messages()) };
             mark_feature_time!(state, PerfFeature::Mutate);

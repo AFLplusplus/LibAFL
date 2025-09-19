@@ -426,8 +426,8 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-        *input = *other_testcase.input().as_ref().unwrap();
+        let other_testcase = state.corpus().get_from_all(id)?;
+        *input = *other_testcase.input();
         Ok(MutationResult::Mutated)
     }
     #[inline]
@@ -475,9 +475,9 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-        let other_input = other_testcase.input().as_ref().unwrap();
-        let mapped_input = (self.input_mapper)(other_input).clone();
+        let other_testcase = state.corpus().get_from_all(id)?;
+        let other_input = other_testcase.input();
+        let mapped_input = (self.input_mapper)(other_input.as_ref()).clone();
         *input = mapped_input;
         Ok(MutationResult::Mutated)
     }
@@ -502,13 +502,13 @@ mod tests {
 
     use libafl_bolts::{
         rands::{Rand, XkcdRand},
-        tuples::IntoVec as _,
+        tuples::IntoVec,
     };
     use serde::{Deserialize, Serialize};
 
     use super::{Numeric, int_mutators};
     use crate::{
-        corpus::{Corpus as _, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus},
         inputs::value::I16Input,
         mutators::MutationResult,
         state::StdState,
@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn all_mutate_owned() {
         let mut corpus = InMemoryCorpus::new();
-        corpus.add(Testcase::new(42_i16.into())).unwrap();
+        corpus.add(42_i16.into()).unwrap();
         let mut state = StdState::new(
             XkcdRand::new(),
             corpus,

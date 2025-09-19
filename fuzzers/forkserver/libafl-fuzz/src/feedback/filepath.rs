@@ -90,7 +90,8 @@ where
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<I>,
+        _input: &I,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         (self.func)(state, testcase, &self.out_dir)?;
         Ok(())

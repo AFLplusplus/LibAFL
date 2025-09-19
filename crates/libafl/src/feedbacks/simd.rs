@@ -21,7 +21,7 @@ use super::{DifferentIsNovel, Feedback, HasObserverHandle, MapFeedback, StateIni
 use crate::state::HasClientPerfMonitor;
 use crate::{
     HasNamedMetadata,
-    corpus::Testcase,
+    corpus::testcase::TestcaseMetadata,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::MapFeedbackMetadata,
@@ -253,9 +253,10 @@ where
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<I>,
+        input: &I,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         self.map
-            .append_metadata(state, manager, observers, testcase)
+            .append_metadata(state, manager, observers, input, md)
     }
 }

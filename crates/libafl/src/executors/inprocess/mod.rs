@@ -15,8 +15,9 @@ use core::{
 use libafl_bolts::tuples::{RefIndexable, tuple_list};
 
 use crate::{
-    Error, HasMetadata,
-    corpus::{Corpus, Testcase},
+    Error,
+    common::HasMetadata,
+    corpus::{Corpus, IsTestcaseMetadataCell, testcase::TestcaseMetadata},
     events::{Event, EventFirer, EventRestarter, EventWithStats},
     executors::{
         Executor, ExitKind, HasObservers,
@@ -344,22 +345,25 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
         .expect("In run_observers_and_save_state objective failure.");
 
     if is_solution {
-        let mut new_testcase = Testcase::from(input.clone());
-        new_testcase.set_executions(*state.executions());
-        new_testcase.add_metadata(exitkind);
-        new_testcase.set_parent_id_optional(*state.corpus().current());
+        let mut testcase_md = TestcaseMetadata::builder()
+            .executions(*state.executions())
+            .parent_id(*state.corpus().current())
+            .build();
 
-        if let Ok(mut tc) = state.current_testcase_mut() {
-            tc.found_objective();
+        testcase_md.add_metadata(exitkind);
+
+        if let Ok(tc) = state.current_testcase() {
+            tc.testcase_metadata_mut().found_objective();
         }
 
         fuzzer
             .objective_mut()
-            .append_metadata(state, event_mgr, &*observers, &mut new_testcase)
+            .append_metadata(state, event_mgr, &*observers, input, &mut testcase_md)
             .expect("Failed adding metadata");
+
         state
             .solutions_mut()
-            .add(new_testcase)
+            .add_with_metadata(input.clone(), testcase_md)
             .expect("In run_observers_and_save_state solutions failure.");
 
         let event = Event::Objective {

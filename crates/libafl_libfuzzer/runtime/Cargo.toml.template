@@ -14,7 +14,7 @@ track_hit_feedbacks = [
 ]
 tui_monitor = ["libafl/tui_monitor"]
 
-[target.'cfg(not(windows))'.features]
+[target.'cfg(not(target_os = "windows"))'.features]
 ## Enable the `fork` feature on non-windows platforms
 default = ["fork", "tui_monitor"]
 

@@ -130,8 +130,9 @@ where
         start_timer!(state);
 
         let input = state
-            .corpus_mut()
-            .cloned_input_for_id(self.current_corpus_id.unwrap());
+            .corpus()
+            .get(self.current_corpus_id.unwrap())
+            .map(|tc| tc.input().as_ref().clone());
         let mut input = match input {
             Err(e) => return Some(Err(e)),
             Ok(input) => input,

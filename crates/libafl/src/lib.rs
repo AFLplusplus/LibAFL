@@ -113,7 +113,7 @@ mod tests {
     use crate::stages::ExecutionCountRestartHelperMetadata;
     use crate::{
         StdFuzzer,
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
@@ -138,8 +138,7 @@ mod tests {
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
-        let testcase = Testcase::new(vec![0; 4].into());
-        corpus.add(testcase).unwrap();
+        corpus.add(vec![0; 4].into()).unwrap();
 
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);

@@ -350,7 +350,7 @@ mod tests {
     use frida_gum::Gum;
     use libafl::{
         Fuzzer, StdFuzzer,
-        corpus::{Corpus, InMemoryCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         feedback_and_fast, feedback_or_fast,
@@ -463,8 +463,7 @@ mod tests {
                 let mut corpus = InMemoryCorpus::<BytesInput>::new();
 
                 //TODO - make sure we use the right one
-                let testcase = Testcase::new(vec![0; 4].into());
-                corpus.add(testcase).unwrap();
+                corpus.add(vec![0; 4].into()).unwrap();
 
                 let rand = StdRand::with_seed(0);
 
