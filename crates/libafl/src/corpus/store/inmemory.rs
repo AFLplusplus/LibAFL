@@ -63,13 +63,13 @@ where
         md: TestcaseMetadata,
     ) -> Result<(), Error> {
         if ENABLED {
-            Ok(self
-                .enabled_map
-                .add(id, Testcase::new(input, TMC::instantiate(md))))
+            self.enabled_map
+                .add(id, Testcase::new(input, TMC::instantiate(md)));
+            Ok(())
         } else {
-            Ok(self
-                .disabled_map
-                .add(id, Testcase::new(input, TMC::instantiate(md))))
+            self.disabled_map
+                .add(id, Testcase::new(input, TMC::instantiate(md)));
+            Ok(())
         }
     }
 

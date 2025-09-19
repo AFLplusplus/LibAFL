@@ -417,8 +417,6 @@ where
             self.write_plot_data(&plot_data)?;
         }
 
-        drop(testcase);
-
         // We construct this simple json by hand to squeeze out some extra speed.
         let json = format!(
             "{{\

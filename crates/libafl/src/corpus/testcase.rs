@@ -5,14 +5,12 @@
 use alloc::{borrow::Cow, vec::Vec};
 use alloc::{rc::Rc, string::String};
 use core::{
+    cell::{Ref, RefCell, RefMut},
     fmt::{Debug, Formatter},
     hash::Hasher,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
     time::Duration,
-};
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    marker::PhantomData,
 };
 
 use libafl_bolts::{
@@ -48,10 +46,10 @@ pub trait IsTestcaseMetadataCell {
         Self: 'a;
 
     /// Get a reference to the testcase metadata.
-    fn testcase_metadata<'a>(&'a self) -> Self::TestcaseMetadataRef<'a>;
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_>;
 
     /// Get a mutable reference to the testcase metadata.
-    fn testcase_metadata_mut<'a>(&'a self) -> Self::TestcaseMetadataRefMut<'a>;
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_>;
 
     /// Consume the cell, and get the inner testcase metadata.
     fn into_testcase_metadata(self) -> TestcaseMetadata;
@@ -78,7 +76,7 @@ pub struct NopTestcaseMetadataRef<'a>(PhantomData<&'a ()>);
 #[derive(Default, Clone, Copy, Debug)]
 pub struct NopTestcaseMetadataCell;
 
-impl<'a> Deref for NopTestcaseMetadataRef<'a> {
+impl Deref for NopTestcaseMetadataRef<'_> {
     type Target = TestcaseMetadata;
 
     fn deref(&self) -> &Self::Target {
@@ -86,7 +84,7 @@ impl<'a> Deref for NopTestcaseMetadataRef<'a> {
     }
 }
 
-impl<'a> DerefMut for NopTestcaseMetadataRef<'a> {
+impl DerefMut for NopTestcaseMetadataRef<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         panic!("Invalid testcase metadata ref mut")
     }
@@ -96,11 +94,11 @@ impl IsTestcaseMetadataCell for NopTestcaseMetadataCell {
     type TestcaseMetadataRef<'a> = NopTestcaseMetadataRef<'a>;
     type TestcaseMetadataRefMut<'a> = NopTestcaseMetadataRef<'a>;
 
-    fn testcase_metadata<'a>(&'a self) -> Self::TestcaseMetadataRef<'a> {
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_> {
         NopTestcaseMetadataRef::default()
     }
 
-    fn testcase_metadata_mut<'a>(&'a self) -> Self::TestcaseMetadataRefMut<'a> {
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_> {
         NopTestcaseMetadataRef::default()
     }
 
@@ -117,11 +115,11 @@ impl IsTestcaseMetadataCell for RefCell<TestcaseMetadata> {
     type TestcaseMetadataRef<'a> = Ref<'a, TestcaseMetadata>;
     type TestcaseMetadataRefMut<'a> = RefMut<'a, TestcaseMetadata>;
 
-    fn testcase_metadata<'a>(&'a self) -> Self::TestcaseMetadataRef<'a> {
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_> {
         self.borrow()
     }
 
-    fn testcase_metadata_mut<'a>(&'a self) -> Self::TestcaseMetadataRefMut<'a> {
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_> {
         self.borrow_mut()
     }
 
@@ -157,11 +155,11 @@ where
     // fn new(md: TestcaseMetadata) -> Self {
     //     Rc::new(T::new(md))
     // }
-    fn testcase_metadata<'a>(&'a self) -> Self::TestcaseMetadataRef<'a> {
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_> {
         self.deref().testcase_metadata()
     }
 
-    fn testcase_metadata_mut<'a>(&'a self) -> Self::TestcaseMetadataRefMut<'a> {
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_> {
         self.deref().testcase_metadata_mut()
     }
 
@@ -196,11 +194,11 @@ where
     where
         Self: 'a;
 
-    fn testcase_metadata<'a>(&'a self) -> Self::TestcaseMetadataRef<'a> {
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_> {
         self.metadata.testcase_metadata()
     }
 
-    fn testcase_metadata_mut<'a>(&'a self) -> Self::TestcaseMetadataRefMut<'a> {
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_> {
         self.metadata.testcase_metadata_mut()
     }
 
@@ -500,30 +498,35 @@ where
 impl TestcaseMetadata {
     /// Get the executions
     #[inline]
+    #[must_use]
     pub fn executions(&self) -> u64 {
         self.executions
     }
 
     /// Get the execution time of the testcase
     #[inline]
+    #[must_use]
     pub fn exec_time(&self) -> &Option<Duration> {
         &self.exec_time
     }
 
     /// Get the `scheduled_count`
     #[inline]
+    #[must_use]
     pub fn scheduled_count(&self) -> usize {
         self.scheduled_count
     }
 
     /// Get `disabled`
     #[inline]
+    #[must_use]
     pub fn disabled(&mut self) -> bool {
         self.disabled
     }
 
     /// Get the hit feedbacks
     #[inline]
+    #[must_use]
     #[cfg(feature = "track_hit_feedbacks")]
     pub fn hit_feedbacks(&self) -> &Vec<Cow<'static, str>> {
         &self.hit_feedbacks
@@ -531,6 +534,7 @@ impl TestcaseMetadata {
 
     /// Get the hit objectives
     #[inline]
+    #[must_use]
     #[cfg(feature = "track_hit_feedbacks")]
     pub fn hit_objectives(&self) -> &Vec<Cow<'static, str>> {
         &self.hit_objectives
@@ -543,12 +547,14 @@ impl TestcaseMetadata {
     }
 
     /// Gets how many objectives were found by mutating this testcase
+    #[must_use]
     pub fn objectives_found(&self) -> usize {
         self.objectives_found
     }
 
     /// Get the executions (mutable)
     #[inline]
+    #[must_use]
     pub fn executions_mut(&mut self) -> &mut u64 {
         &mut self.executions
     }
@@ -560,6 +566,7 @@ impl TestcaseMetadata {
     }
 
     /// Get a mutable reference to the execution time
+    #[must_use]
     pub fn exec_time_mut(&mut self) -> &mut Option<Duration> {
         &mut self.exec_time
     }
@@ -583,15 +590,17 @@ impl TestcaseMetadata {
     }
 
     /// Get the hit feedbacks (mutable)
-    #[inline]
     #[cfg(feature = "track_hit_feedbacks")]
+    #[inline]
+    #[must_use]
     pub fn hit_feedbacks_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
         &mut self.hit_feedbacks
     }
 
     /// Get the hit objectives (mutable)
-    #[inline]
     #[cfg(feature = "track_hit_feedbacks")]
+    #[inline]
+    #[must_use]
     pub fn hit_objectives_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
         &mut self.hit_objectives
     }

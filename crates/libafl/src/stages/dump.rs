@@ -205,11 +205,11 @@ where
             let input = testcase.input();
             let md = testcase.testcase_metadata();
 
-            let bytes = (self.to_bytes)(input.as_ref(), &*md, state);
+            let bytes = (self.to_bytes)(input.as_ref(), &md, state);
 
             let fname = self
                 .corpus_dir
-                .join((self.generate_filename)(input.as_ref(), &*md, &i));
+                .join((self.generate_filename)(input.as_ref(), &md, &i));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 
@@ -222,11 +222,11 @@ where
             let input = testcase.input();
             let md = testcase.testcase_metadata();
 
-            let bytes = (self.to_bytes)(input.as_ref(), &*md, state);
+            let bytes = (self.to_bytes)(input.as_ref(), &md, state);
 
             let fname = self
                 .solutions_dir
-                .join((self.generate_filename)(input.as_ref(), &*md, &i));
+                .join((self.generate_filename)(input.as_ref(), &md, &i));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 

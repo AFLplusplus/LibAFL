@@ -1,6 +1,6 @@
 //! Multiple map implementations for the in-memory store.
 
-use std::{collections::BTreeMap, vec::Vec};
+use alloc::{collections::BTreeMap, vec::Vec};
 
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ pub trait InMemoryCorpusMap<T> {
         self.count().is_zero()
     }
 
-    /// Store the testcase associated to corpus_id.
+    /// Store the testcase associated to `corpus_id`.
     fn add(&mut self, id: CorpusId, testcase: T);
 
     /// Get by id; considers only enabled testcases
@@ -45,6 +45,7 @@ pub trait InMemoryCorpusMap<T> {
     fn nth(&self, nth: usize) -> CorpusId;
 }
 
+/// A corpus map for testcases.
 pub trait InMemoryTestcaseMap<T>: InMemoryCorpusMap<T> {
     /// Replace the metadata of a given testcase
     fn replace_metadata(

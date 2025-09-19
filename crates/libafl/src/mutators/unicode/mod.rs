@@ -11,7 +11,7 @@ use libafl_bolts::{Error, HasLen, Named, rands::Rand};
 
 use crate::{
     HasMetadata, HasMetadataMut,
-    corpus::{Corpus, CorpusId, HasTestcase, IsTestcaseMetadataCell, Testcase},
+    corpus::{CorpusId, HasTestcase, IsTestcaseMetadataCell, Testcase},
     inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{MutationResult, Mutator, Tokens, rand_range},
     nonzero,
@@ -37,7 +37,7 @@ where
 
     fn try_transform_from<M: IsTestcaseMetadataCell>(
         base: &Testcase<BytesInput, M>,
-        state: &S,
+        _state: &S,
     ) -> Result<Self, Error> {
         let input = base.input().as_ref().clone();
         let metadata = base

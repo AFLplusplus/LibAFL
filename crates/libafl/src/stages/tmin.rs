@@ -191,7 +191,7 @@ where
         }
 
         start_timer!(state);
-        let transformed = I::try_transform_from(&mut state.current_testcase()?, state)?;
+        let transformed = I::try_transform_from(&state.current_testcase()?, state)?;
         let mut base = state.current_input_cloned()?;
         // potential post operation if base is replaced by a shorter input
         let mut base_post = None;

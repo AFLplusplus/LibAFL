@@ -411,7 +411,7 @@ mod tests {
         corpus.add(vec![b'a', b'b', b'c'].into()).unwrap();
         corpus.add(vec![b'd', b'e', b'f'].into()).unwrap();
 
-        let mut input = corpus.get(corpus.first().unwrap()).unwrap().input().clone();
+        let input = corpus.get(corpus.first().unwrap()).unwrap().input().clone();
 
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);
@@ -426,12 +426,13 @@ mod tests {
         .unwrap();
 
         let mut splice = SpliceMutator::new();
-        splice.mutate(&mut state, &mut input).unwrap();
+        let mut spliced_input = input.as_ref().clone();
+        splice.mutate(&mut state, &mut spliced_input).unwrap();
 
-        log::trace!("{:?}", input.mutator_bytes());
+        log::trace!("{:?}", spliced_input.mutator_bytes());
 
         // The pre-seeded rand should have spliced at position 2.
-        assert_eq!(input.mutator_bytes(), b"abf");
+        assert_eq!(spliced_input.mutator_bytes(), b"abf");
     }
 
     #[test]

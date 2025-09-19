@@ -5,8 +5,8 @@
 //!     - a **cache store** holding on the testcases with quick access.
 //!     - a **backing store** with more expensive access, used when the testcase cannot be found in the cache store.
 
-use alloc::{rc::Rc, vec::Vec};
-use std::{cell::RefCell, collections::VecDeque, marker::PhantomData};
+use alloc::{collections::VecDeque, rc::Rc, vec::Vec};
+use core::{cell::RefCell, marker::PhantomData};
 
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
@@ -138,11 +138,12 @@ where
     }
 }
 
-pub type StdIdentityCacheTestcaseMetadataCell<I, CS: RemovableStore<I>, FS: Store<I>> = Rc<
+/// The standard cell for testcase metadata in an identity cache.
+pub type StdIdentityCacheTestcaseMetadataCell<I, CS, FS> = Rc<
     CacheTestcaseMetadataCell<
-        CS::TestcaseMetadataCell,
+        <CS as Store<I>>::TestcaseMetadataCell,
         WritebackOnFlushPolicy,
-        FS::TestcaseMetadataCell,
+        <FS as Store<I>>::TestcaseMetadataCell,
     >,
 >;
 
@@ -196,11 +197,11 @@ where
     where
         Self: 'a;
 
-    fn testcase_metadata<'a>(&'a self) -> Self::TestcaseMetadataRef<'a> {
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_> {
         self.cache_cell.testcase_metadata()
     }
 
-    fn testcase_metadata_mut<'a>(&'a self) -> Self::TestcaseMetadataRefMut<'a> {
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_> {
         *self.write_access.borrow_mut() = true;
         self.cache_cell.testcase_metadata_mut()
     }
@@ -317,7 +318,7 @@ where
     }
 
     fn written(&self, id: CorpusId) {
-        self.cache_policy.dirty(id)
+        self.cache_policy.dirty(id);
     }
 }
 
@@ -327,6 +328,7 @@ where
     FS: Store<I>,
     I: Clone,
 {
+    #[expect(clippy::too_many_arguments)]
     fn get_inner<CAF, CGF, CRF, FGF>(
         &mut self,
         id: CorpusId,
@@ -354,7 +356,7 @@ where
             debug_assert!(self.cached_ids.len() < self.cache_max_len);
 
             // tescase is not cached, fetch it from fallback
-            let fb_tc = fallback_get_fn(&fallback_store, id)?.cloned();
+            let fb_tc = fallback_get_fn(fallback_store, id)?.cloned();
             cache_add_fn(cache_store, id, fb_tc)?;
 
             self.cached_ids.push_front(id);
@@ -397,9 +399,9 @@ where
                 let (input, md) = testcase.into_inner();
                 cache_store.add_shared::<ENABLED>(corpus_id, input, md.into_testcase_metadata())
             },
-            |cache_store, corpus_id| cache_store.get(corpus_id),
-            |cache_store, corpus_id| cache_store.remove(corpus_id),
-            |fallback_store, corpus_id| fallback_store.get_from::<ENABLED>(corpus_id),
+            Store::get,
+            RemovableStore::remove,
+            Store::get_from::<ENABLED>,
         )
     }
 

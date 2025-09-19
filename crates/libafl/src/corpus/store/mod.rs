@@ -37,7 +37,7 @@ pub trait Store<I> {
         self.count() == 0
     }
 
-    /// Store the testcase associated to corpus_id to the set.
+    /// Store the testcase associated to `corpus_id` to the set.
     fn add_shared<const ENABLED: bool>(
         &mut self,
         id: CorpusId,

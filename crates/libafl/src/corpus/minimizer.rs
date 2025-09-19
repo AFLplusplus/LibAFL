@@ -99,7 +99,7 @@ where
             let (weight, executions) = {
                 {
                     let tc = state.corpus().get(id)?;
-                    let md = tc.testcase_metadata();
+                    let mut md = tc.testcase_metadata_mut();
                     if md.scheduled_count() == 0 {
                         // Execute the input; we cannot rely on the metadata already being present.
                         let input = tc.input();
@@ -213,7 +213,7 @@ where
                     continue;
                 }
 
-                let removed = state.corpus().disable(id)?;
+                state.corpus_mut().disable(id)?;
 
                 // scheduler needs to know we've removed the input, or it will continue to try
                 // to use now-missing inputs

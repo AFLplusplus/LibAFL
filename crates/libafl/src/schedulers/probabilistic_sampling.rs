@@ -186,7 +186,7 @@ mod tests {
 
     use crate::{
         Error,
-        corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
+        corpus::{Corpus, CorpusId, InMemoryCorpus},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
@@ -229,11 +229,11 @@ mod tests {
         let mut objective = ConstFeedback::new(false);
 
         let mut corpus = InMemoryCorpus::new();
-        let t1 = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "1".into());
-        let t2 = Testcase::with_filename(BytesInput::new(vec![1_u8; 4]), "2".into());
+        // let t1 = Testcase::with_filename(, "1".into());
+        // let t2 = Testcase::with_filename(, "2".into());
 
-        let idx1 = corpus.add(t1).unwrap();
-        let idx2 = corpus.add(t2).unwrap();
+        let idx1 = corpus.add(BytesInput::new(vec![0_u8; 4])).unwrap();
+        let idx2 = corpus.add(BytesInput::new(vec![1_u8; 4])).unwrap();
 
         let mut state = StdState::new(
             rand,

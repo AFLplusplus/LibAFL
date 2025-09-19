@@ -2,9 +2,8 @@
 //!
 //! A [`SingleCorpus`] owns a single store, in which every testcase is added.
 
-use alloc::rc::Rc;
+use alloc::{rc::Rc, vec::Vec};
 use core::marker::PhantomData;
-use std::vec::Vec;
 
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};

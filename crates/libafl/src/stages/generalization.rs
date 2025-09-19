@@ -125,7 +125,7 @@ where
                 .clone()
                 .into_inner()
                 .into_iter()
-                .map(|x| Some(x))
+                .map(Some)
                 .collect();
 
             if payload.len() > MAX_GENERALIZED_LEN {

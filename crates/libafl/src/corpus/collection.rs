@@ -1,5 +1,8 @@
+//! A collection of various [`Corpus`].
+
 use alloc::{rc::Rc, string::String};
-use std::{cell::RefCell, path::PathBuf};
+use core::cell::RefCell;
+use std::path::PathBuf;
 
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
@@ -10,7 +13,7 @@ use crate::{
         SingleCorpus, Testcase, TestcaseMetadata,
         cache::StdIdentityCacheTestcaseMetadataCell,
         maps::{self, InMemoryCorpusMap, InMemoryTestcaseMap},
-        store::{OnDiskMetadataFormat, Store, ondisk::OnDiskTestcaseCell},
+        store::{OnDiskMetadataFormat, Store},
     },
     inputs::Input,
 };
@@ -27,9 +30,9 @@ type InnerStdInMemoryStore<I> =
     InMemoryStore<I, InnerStdInMemoryCorpusMap<I>, StdInMemoryTestcaseMetadataCell>;
 type InnerInMemoryCorpus<I> = SingleCorpus<I, InnerStdInMemoryStore<I>>;
 
-type StdOnDiskTestcaseMetadataCell<I> = Rc<OnDiskTestcaseCell<I>>;
-type StdOnDiskTestcase<I> = Testcase<I, StdOnDiskTestcaseMetadataCell<I>>;
-type InnerStdOnDiskCorpusMap<I> = StdInMemoryMap<StdOnDiskTestcase<I>>;
+//type StdOnDiskTestcaseMetadataCell<I> = Rc<OnDiskTestcaseCell<I>>;
+//type StdOnDiskTestcase<I> = Testcase<I, StdOnDiskTestcaseMetadataCell<I>>;
+//type InnerStdOnDiskCorpusMap<I> = StdInMemoryMap<StdOnDiskTestcase<I>>;
 type InnerStdOnDiskStore<I> = OnDiskStore<I, StdInMemoryMap<String>>;
 #[cfg(feature = "std")]
 type InnerOnDiskCorpus<I> = SingleCorpus<I, InnerStdOnDiskStore<I>>;
@@ -105,7 +108,7 @@ where
     }
 
     fn add(&mut self, id: CorpusId, testcase: Testcase<I, Rc<RefCell<TestcaseMetadata>>>) {
-        self.0.add(id, testcase)
+        self.0.add(id, testcase);
     }
 
     fn get(&self, id: CorpusId) -> Option<&Testcase<I, Rc<RefCell<TestcaseMetadata>>>> {
@@ -295,6 +298,8 @@ impl<I> Default for InMemoryCorpus<I> {
 }
 
 impl<I> InMemoryCorpus<I> {
+    /// Create a new [`InMemoryCorpus`].
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -379,12 +384,14 @@ impl<I> OnDiskCorpus<I>
 where
     I: Input,
 {
+    /// Create a new [`OnDiskCorpus`]
     pub fn new(root: PathBuf) -> Result<Self, Error> {
         Ok(OnDiskCorpus(InnerOnDiskCorpus::new(
             InnerStdOnDiskStore::new(root)?,
         )))
     }
 
+    /// Create a new [`OnDiskCorpus`] with a specific [`OnDiskMetadataFormat`]
     pub fn new_with_format(root: PathBuf, md_format: OnDiskMetadataFormat) -> Result<Self, Error> {
         Ok(OnDiskCorpus(InnerOnDiskCorpus::new(
             InnerStdOnDiskStore::new_with_format(root, md_format)?,

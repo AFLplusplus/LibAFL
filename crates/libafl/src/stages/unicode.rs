@@ -8,7 +8,8 @@ use libafl_bolts::{Error, impl_serdeany};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    HasMetadata,
+    HasMetadataMut,
+    corpus::IsTestcaseMetadataCell,
     inputs::{BytesInput, HasTargetBytes},
     stages::{Restartable, Stage},
     state::{HasCorpus, HasCurrentTestcase},
@@ -93,16 +94,18 @@ impl<I, S> UnicodeIdentificationStage<I, S> {
         S: HasCurrentTestcase<I>,
         I: HasTargetBytes,
     {
-        let mut tc = state.current_testcase_mut()?;
+        let tc = state.current_testcase()?;
+        let input = tc.input();
+
         if tc.has_metadata::<UnicodeIdentificationMetadata>() {
             return Ok(()); // skip recompute
         }
 
-        let input = tc.load_input(state.corpus())?;
-
         let bytes = input.target_bytes();
         let metadata = extract_metadata(&bytes);
-        tc.add_metadata(metadata);
+
+        let mut md = tc.testcase_metadata_mut();
+        md.add_metadata(metadata);
 
         Ok(())
     }

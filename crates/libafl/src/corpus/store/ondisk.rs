@@ -1,15 +1,14 @@
 //! An on-disk store
 
-use alloc::rc::Rc;
-use core::marker::PhantomData;
-use std::{
+use alloc::{rc::Rc, string::String, vec::Vec};
+use core::{
     cell::{Ref, RefCell, RefMut},
-    fs,
-    fs::OpenOptions,
+    marker::PhantomData,
+};
+use std::{
+    fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
-    string::String,
-    vec::Vec,
 };
 
 use libafl_bolts::{Error, compress::GzipCompressor};
@@ -109,6 +108,7 @@ impl OnDiskMetadataFormat {
 
 impl<I> OnDiskTestcaseCell<I> {
     /// Get a new [`OnDiskTestcaseCell`].
+    #[must_use]
     pub fn new(mgr: Rc<DiskMgr<I>>, id: String, testcase_md: TestcaseMetadata) -> Self {
         Self {
             mgr,
@@ -129,11 +129,11 @@ impl<I> IsTestcaseMetadataCell for OnDiskTestcaseCell<I> {
     where
         I: 'a;
 
-    fn testcase_metadata<'a>(&'a self) -> Ref<'a, TestcaseMetadata> {
+    fn testcase_metadata(&self) -> Ref<'_, TestcaseMetadata> {
         self.testcase_md.borrow()
     }
 
-    fn testcase_metadata_mut<'a>(&'a self) -> RefMut<'a, TestcaseMetadata> {
+    fn testcase_metadata_mut(&self) -> RefMut<'_, TestcaseMetadata> {
         *self.modified.borrow_mut() = true;
         self.testcase_md.borrow_mut()
     }
@@ -147,8 +147,7 @@ impl<I> IsTestcaseMetadataCell for OnDiskTestcaseCell<I> {
     }
 
     fn flush(&self) -> Result<(), Error> {
-        self.mgr
-            .save_metadata(&self.id, &*self.testcase_md.borrow())
+        self.mgr.save_metadata(&self.id, &self.testcase_md.borrow())
     }
 }
 
@@ -159,10 +158,12 @@ impl<I> Drop for OnDiskTestcaseCell<I> {
 }
 
 impl<I> DiskMgr<I> {
+    /// Create a new [`DiskMgr`]
     pub fn new(root_dir: PathBuf) -> Result<Self, Error> {
         Self::new_with_format(root_dir, OnDiskMetadataFormat::default())
     }
 
+    /// Create a new [`DiskMgr`], with a given [`OnDiskMetadataFormat`]
     pub fn new_with_format(
         root_dir: PathBuf,
         md_format: OnDiskMetadataFormat,
@@ -175,11 +176,11 @@ impl<I> DiskMgr<I> {
     }
 
     fn testcase_path(&self, testcase_id: &String) -> PathBuf {
-        self.root_dir.join(&testcase_id)
+        self.root_dir.join(testcase_id)
     }
 
     fn testcase_md_path(&self, testcase_id: &String) -> PathBuf {
-        self.root_dir.join(format!(".{}.metadata", testcase_id))
+        self.root_dir.join(format!(".{testcase_id}.metadata"))
     }
 
     /// The file is created if it does not exist, or reused if it's already there
@@ -189,9 +190,10 @@ impl<I> DiskMgr<I> {
         let mut testcase_md_f = OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .open(&testcase_md_path)?;
 
-        let testcase_md_ser = self.md_format.to_vec(&md)?;
+        let testcase_md_ser = self.md_format.to_vec(md)?;
         testcase_md_f.write_all(&testcase_md_ser)?;
 
         Ok(())
@@ -202,15 +204,15 @@ impl<I> DiskMgr<I>
 where
     I: Input,
 {
-    fn save_input(&self, input: Rc<I>) -> Result<String, Error> {
-        let testcase_id = Testcase::<I, OnDiskTestcaseCell<I>>::compute_id(input.as_ref());
+    fn save_input(&self, input: &I) -> Result<String, Error> {
+        let testcase_id = Testcase::<I, OnDiskTestcaseCell<I>>::compute_id(input);
         let testcase_path = self.testcase_path(&testcase_id);
-        input.as_ref().to_file(testcase_path.as_path())?;
+        input.to_file(testcase_path.as_path())?;
 
         Ok(testcase_id)
     }
 
-    fn save_testcase(&self, input: Rc<I>, md: &TestcaseMetadata) -> Result<String, Error> {
+    fn save_testcase(&self, input: &I, md: &TestcaseMetadata) -> Result<String, Error> {
         let id = self.save_input(input)?;
         self.save_metadata(&id, md)?;
         Ok(id)
@@ -222,8 +224,8 @@ where
         self: &Rc<Self>,
         testcase_id: &String,
     ) -> Result<Testcase<I, OnDiskTestcaseCell<I>>, Error> {
-        let testcase_path = self.testcase_path(testcase_id);
-        let testcase_md_path = self.testcase_md_path(testcase_id);
+        let testcase_path = self.as_ref().testcase_path(testcase_id);
+        let testcase_md_path = self.as_ref().testcase_md_path(testcase_id);
         let ser_fmt = self.md_format.clone();
 
         // let _lockfile = TestcaseLockfile::new(self, testcase_id)?;
@@ -242,10 +244,12 @@ impl<I, M> OnDiskStore<I, M>
 where
     M: Default,
 {
+    /// Create a new [`OnDiskStore`]
     pub fn new(root: PathBuf) -> Result<Self, Error> {
         Self::new_with_format(root, OnDiskMetadataFormat::default())
     }
 
+    /// Create a new [`OnDiskStore`], with a specified [`OnDiskMetadataFormat`].
     pub fn new_with_format(root: PathBuf, md_format: OnDiskMetadataFormat) -> Result<Self, Error> {
         let disk_mgr = Rc::new(DiskMgr::new_with_format(root, md_format)?);
 
@@ -288,7 +292,7 @@ where
         input: Rc<I>,
         md: TestcaseMetadata,
     ) -> Result<(), Error> {
-        let testcase_id = self.disk_mgr.save_testcase(input, &md)?;
+        let testcase_id = self.disk_mgr.save_testcase(input.as_ref(), &md)?;
 
         if ENABLED {
             self.enabled_map.add(id, testcase_id);
@@ -314,7 +318,7 @@ where
                 .ok_or_else(|| Error::key_not_found(format!("Index {id} not found")))?
         };
 
-        self.disk_mgr.load_testcase(&tc_id)
+        self.disk_mgr.load_testcase(tc_id)
     }
 
     fn disable(&mut self, id: CorpusId) -> Result<(), Error> {

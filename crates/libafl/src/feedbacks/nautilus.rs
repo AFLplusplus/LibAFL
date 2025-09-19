@@ -65,18 +65,15 @@ impl<'a> NautilusFeedback<'a> {
         &mut self,
         state: &mut S,
         input: &NautilusInput,
-        md: &mut TestcaseMetadata,
-    ) -> Result<(), Error>
-    where
+        _md: &mut TestcaseMetadata,
+    ) where
         S: HasCorpus<NautilusInput> + HasMetadataMut,
     {
         let meta = state
             .metadata_map_mut()
             .get_mut::<NautilusChunksMetadata>()
             .expect("NautilusChunksMetadata not in the state");
-        meta.cks.add_tree(input.tree, self.ctx);
-
-        Ok(())
+        meta.cks.add_tree(&input.tree, self.ctx);
     }
 }
 
@@ -112,7 +109,9 @@ where
         input: &NautilusInput,
         md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        self.append_nautilus_metadata_to_state(state, input, md)
+        self.append_nautilus_metadata_to_state(state, input, md);
+
+        Ok(())
     }
 
     #[cfg(feature = "track_hit_feedbacks")]

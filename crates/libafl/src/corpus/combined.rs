@@ -1,8 +1,7 @@
 //! A cached corpus, using a given [`Cache`] policy and two [`Store`]s.
 
-use alloc::rc::Rc;
+use alloc::{rc::Rc, vec::Vec};
 use core::{cell::RefCell, marker::PhantomData};
-use std::vec::Vec;
 
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};

@@ -105,7 +105,7 @@ mod tests {
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{QueueScheduler, Scheduler},
-        state::{HasCorpus, StdState},
+        state::StdState,
     };
 
     #[test]
@@ -116,7 +116,7 @@ mod tests {
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();
         // let t = Testcase::with_filename(), "fancyfile".into());
-        q.add(BytesInput::new(vec![0_u8; 4])).unwrap();
+        let added_id = q.add(BytesInput::new(vec![0_u8; 4])).unwrap();
 
         let objective_q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/objective/path"))
@@ -129,17 +129,18 @@ mod tests {
 
         let next_id =
             <QueueScheduler as Scheduler<BytesInput, _>>::next(&mut scheduler, &mut state).unwrap();
-        let filename = state
-            .corpus()
-            .get(next_id)
-            .unwrap()
-            .borrow()
-            .filename()
-            .as_ref()
-            .unwrap()
-            .clone();
+        // let filename = state
+        //     .corpus()
+        //     .get(next_id)
+        //     .unwrap()
+        //     .borrow()
+        //     .filename()
+        //     .as_ref()
+        //     .unwrap()
+        //     .clone();
 
-        assert_eq!(filename, "fancyfile");
+        // assert_eq!(filename, "fancyfile");
+        assert_eq!(added_id, next_id);
 
         fs::remove_dir_all("target/.test/fancy/path").unwrap();
     }
