@@ -14,7 +14,7 @@ use libafl_bolts::{
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, HasMetadata, HasMetadataMut, HasNamedMetadataMut,
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{HasCurrentCorpusId, IsTestcaseMetadataCell},
     executors::{Executor, HasObservers},
     observers::{ObserversTuple, concolic::ConcolicObserver},
@@ -53,7 +53,7 @@ where
     TE::Observers: ObserversTuple<I, S>,
     S: HasExecutions
         + HasCorpus<I>
-        + HasMetadataMut
+        + HasMetadata
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
@@ -81,7 +81,7 @@ where
 
 impl<EM, I, TE, S, Z> Restartable<S> for ConcolicTracingStage<'_, EM, I, TE, S, Z>
 where
-    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage
@@ -377,7 +377,7 @@ where
     S: HasExecutions
         + HasCorpus<I>
         + HasMetadata
-        + HasNamedMetadataMut
+        + HasNamedMetadata
         + HasCurrentTestcase<I>
         + MaybeHasClientPerfMonitor
         + HasCurrentCorpusId,
@@ -420,7 +420,7 @@ where
 #[cfg(feature = "concolic_mutation")]
 impl<I, S, Z> Restartable<S> for SimpleConcolicMutationalStage<I, Z>
 where
-    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

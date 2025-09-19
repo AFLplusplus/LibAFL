@@ -11,7 +11,7 @@ use hashbrown::HashMap;
 use libafl_bolts::{AsSlice, HasLen, Named, ownedref::OwnedRefMut};
 use serde::{Deserialize, Serialize};
 
-use crate::{Error, HasMetadataMut, executors::ExitKind, observers::Observer};
+use crate::{Error, HasMetadata, executors::ExitKind, observers::Observer};
 
 /// A bytes string for cmplog with up to 32 elements.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -253,7 +253,7 @@ where
 impl<CM, I, S> Observer<I, S> for StdCmpObserver<'_, CM>
 where
     CM: Serialize + CmpMap + HasLen,
-    S: HasMetadataMut,
+    S: HasMetadata,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;

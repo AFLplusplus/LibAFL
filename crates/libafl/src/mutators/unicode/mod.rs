@@ -10,7 +10,7 @@ use core::{
 use libafl_bolts::{Error, HasLen, Named, rands::Rand};
 
 use crate::{
-    HasMetadata, HasMetadataMut,
+    HasMetadata,
     corpus::{CorpusId, HasTestcase, IsTestcaseMetadataCell, Testcase},
     inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{MutationResult, Mutator, Tokens, rand_range},

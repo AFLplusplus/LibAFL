@@ -5,7 +5,7 @@ use core::{marker::PhantomData, time::Duration};
 use libafl_bolts::{Error, current_time};
 
 use crate::{
-    HasMetadataMut,
+    HasMetadata,
     stages::{Restartable, Stage},
 };
 
@@ -30,7 +30,7 @@ impl<T, S, ST> TimeTrackingStageWrapper<T, S, ST> {
 
 impl<T, E, M, Z, S, ST> Stage<E, M, S, Z> for TimeTrackingStageWrapper<T, S, ST>
 where
-    S: HasMetadataMut,
+    S: HasMetadata,
     ST: Stage<E, M, S, Z>,
     T: libafl_bolts::serdeany::SerdeAny + From<Duration>,
 {

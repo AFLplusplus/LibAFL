@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::HasQueueCycles;
 use crate::{
-    Error, HasMetadata, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     feedbacks::MapIndexesMetadata,
     observers::CanTrack,
@@ -84,7 +84,7 @@ where
     CS: RemovableScheduler<I, S> + Scheduler<I, S>,
     F: TestcasePenalty<I, S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadataMut + HasRand,
+    S: HasCorpus<I> + HasMetadata + HasRand,
 {
     /// Removes an entry from the corpus
     fn on_remove(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -190,7 +190,7 @@ where
     CS: Scheduler<I, S>,
     F: TestcasePenalty<I, S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadataMut + HasRand,
+    S: HasCorpus<I> + HasMetadata + HasRand,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -243,7 +243,7 @@ where
     pub fn update_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
         F: TestcasePenalty<I, S>,
-        S: HasCorpus<I> + HasMetadataMut,
+        S: HasCorpus<I> + HasMetadata,
     {
         // Create a new top rated meta if not existing
         if state.metadata_map().get::<TopRatedsMetadata>().is_none() {

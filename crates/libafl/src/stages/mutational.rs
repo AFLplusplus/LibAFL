@@ -12,7 +12,7 @@ use libafl_bolts::{Named, rands::Rand};
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, HasMetadata, HasNamedMetadata, HasNamedMetadataMut,
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{CorpusId, HasCurrentCorpusId, Testcase, testcase::IsTestcaseMetadataCell},
     fuzzer::Evaluator,
     inputs::Input,
@@ -173,7 +173,7 @@ where
 
 impl<E, EM, I1, I2, M, S, Z> Restartable<S> for StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
-    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         RetryCountRestartHelper::should_restart(state, &self.name, 3)
@@ -349,7 +349,7 @@ where
 
 impl<E, EM, I, M, S, Z> Restartable<S> for MultiMutationalStage<E, EM, I, M, S, Z>
 where
-    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

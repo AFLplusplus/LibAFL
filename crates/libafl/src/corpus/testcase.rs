@@ -21,7 +21,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use typed_builder::TypedBuilder;
 
 use crate::{
-    Error, HasMetadata, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId},
     inputs::Input,
     state::HasCorpus,
@@ -323,9 +323,7 @@ impl HasMetadata for TestcaseMetadata {
     fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
-}
 
-impl HasMetadataMut for TestcaseMetadata {
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }

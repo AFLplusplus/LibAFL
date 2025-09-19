@@ -19,7 +19,7 @@ use crate::feedbacks::premature_last_result_err;
 use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
-    HasNamedMetadataMut, HasScheduler,
+    HasScheduler,
     corpus::{Corpus, HasCurrentCorpusId, testcase::TestcaseMetadata},
     events::EventFirer,
     executors::{ExitKind, HasObservers},
@@ -96,7 +96,7 @@ where
 
 impl<E, EM, F, FF, I, M, S, Z> Restartable<S> for StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z>
 where
-    S: HasNamedMetadataMut + HasExecutions,
+    S: HasNamedMetadata + HasExecutions,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         self.restart_helper.should_restart(state, &self.name)

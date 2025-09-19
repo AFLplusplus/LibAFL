@@ -12,7 +12,7 @@ use libafl_bolts::{Named, impl_serdeany};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, Evaluator, HasMetadataMut,
+    Error, Evaluator, HasMetadata,
     corpus::{Corpus, CorpusId},
     stages::{Restartable, Stage},
     state::{HasCorpus, HasSolutions},
@@ -108,7 +108,7 @@ impl<I> ReplayStage<I> {
 
 impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for ReplayStage<I>
 where
-    S: HasCorpus<I> + HasSolutions<I> + HasMetadataMut,
+    S: HasCorpus<I> + HasSolutions<I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
     I: Clone,
 {
@@ -163,7 +163,7 @@ where
 
 impl<I, S> Restartable<S> for ReplayStage<I>
 where
-    S: HasMetadataMut,
+    S: HasMetadata,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         state.metadata_or_insert_with(ReplayRestarterMetadata::default);

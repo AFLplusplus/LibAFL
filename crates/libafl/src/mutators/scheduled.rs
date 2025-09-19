@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use super::MutationId;
 use crate::{
-    Error, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     mutators::{
         MutationResult, Mutator, MutatorsTuple,

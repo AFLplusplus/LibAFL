@@ -14,13 +14,7 @@ use std::{
 use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    Error, HasMetadataMut,
-    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, Testcase, TestcaseMetadata},
-    inputs::Input,
-    stages::{Restartable, Stage},
-    state::{HasCorpus, HasRand, HasSolutions},
-};
+use crate::{Error, corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, Testcase, TestcaseMetadata}, inputs::Input, stages::{Restartable, Stage}, state::{HasCorpus, HasRand, HasSolutions}, HasMetadata};
 
 /// Metadata used to store information about disk dump indexes for names
 #[cfg_attr(
@@ -49,7 +43,7 @@ impl<CB1, CB2, E, EM, I, S, P, Z> Stage<E, EM, S, Z> for DumpToDiskStage<CB1, CB
 where
     CB1: FnMut(&I, &TestcaseMetadata, &S) -> Vec<u8>,
     CB2: FnMut(&I, &TestcaseMetadata, &CorpusId) -> P,
-    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadataMut,
+    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
     P: AsRef<Path>,
 {
     #[inline]
@@ -100,7 +94,7 @@ impl<CB1, EM, I, S, Z>
         Z,
     >
 where
-    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadataMut,
+    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
     I: Input,
 {
     /// Create a new [`DumpToDiskStage`] with a default `generate_filename` function.
@@ -142,7 +136,7 @@ where
 
 impl<CB1, CB2, EM, I, S, Z> DumpToDiskStage<CB1, CB2, EM, I, S, Z>
 where
-    S: HasMetadataMut + HasSolutions<I>,
+    S: HasMetadata + HasSolutions<I>,
 {
     /// Create a new [`DumpToDiskStage`] with a custom `generate_filename` function.
     pub fn new_with_custom_filenames<A, B>(

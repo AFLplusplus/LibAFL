@@ -6,7 +6,7 @@ use libafl_bolts::{Error, Named};
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    HasMetadataMut,
+    HasMetadata,
     corpus::testcase::TestcaseMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
@@ -39,7 +39,7 @@ impl<S> StateInitializer<S> for CaptureTimeoutFeedback {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for CaptureTimeoutFeedback
 where
-    S: HasCorpus<I> + HasMetadataMut,
+    S: HasCorpus<I> + HasMetadata,
     I: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {
     #[inline]

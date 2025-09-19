@@ -26,7 +26,7 @@ use super::simd::SimdMapFeedback;
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
-    Error, HasMetadataMut, HasNamedMetadataMut,
+    Error, HasMetadata, HasNamedMetadata,
     corpus::testcase::TestcaseMetadata,
     events::{Event, EventFirer, EventWithStats},
     executors::ExitKind,
@@ -320,7 +320,7 @@ impl<C, N, O, R, S> StateInitializer<S> for MapFeedback<C, N, O, R>
 where
     O: MapObserver,
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
-    S: HasNamedMetadataMut,
+    S: HasNamedMetadata,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
@@ -339,7 +339,7 @@ where
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     OT: MatchName,
     R: Reducer<O::Entry>,
-    S: HasNamedMetadataMut + HasExecutions,
+    S: HasNamedMetadata + HasExecutions,
 {
     fn is_interesting(
         &mut self,
@@ -532,7 +532,7 @@ where
 {
     fn is_interesting_default<OT, S>(&mut self, state: &mut S, observers: &OT) -> bool
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
         OT: MatchName,
     {
         let mut interesting = false;

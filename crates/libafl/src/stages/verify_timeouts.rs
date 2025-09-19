@@ -10,7 +10,7 @@ use libafl_bolts::Error;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    Evaluator, HasMetadataMut,
+    Evaluator, HasMetadata,
     executors::{Executor, HasObservers, HasTimeout},
     inputs::BytesInput,
     observers::ObserversTuple,
@@ -84,7 +84,7 @@ where
     E::Observers: ObserversTuple<I, S>,
     E: Executor<EM, I, S, Z> + HasObservers + HasTimeout,
     Z: Evaluator<E, EM, I, S>,
-    S: HasMetadataMut,
+    S: HasMetadata,
     I: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {
     fn perform(

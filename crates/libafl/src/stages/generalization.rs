@@ -14,7 +14,7 @@ use libafl_bolts::{
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, HasMetadata, HasMetadataMut, HasNamedMetadata, HasNamedMetadataMut,
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, HasCurrentCorpusId, IsTestcaseMetadataCell},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
@@ -62,7 +62,7 @@ impl<C, EM, I, O, OT, S, Z> Named for GeneralizationStage<C, EM, I, O, OT, S, Z>
 
 impl<C, EM, I, O, OT, S, Z> Restartable<S> for GeneralizationStage<C, EM, I, O, OT, S, Z>
 where
-    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

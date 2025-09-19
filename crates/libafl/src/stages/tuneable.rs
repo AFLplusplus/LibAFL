@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, Evaluator, HasMetadata, HasNamedMetadata, HasNamedMetadataMut, mark_feature_time,
+    Error, Evaluator, HasMetadata, HasNamedMetadata, mark_feature_time,
     mutators::{MutationResult, Mutator},
     nonzero,
     stages::{
@@ -38,7 +38,7 @@ pub const STD_TUNEABLE_MUTATIONAL_STAGE_NAME: &str = "TuneableMutationalStage";
 /// Set the number of iterations to be used by this mutational stage by name
 pub fn set_iters_by_name<S>(state: &mut S, iters: u64, name: &str) -> Result<(), Error>
 where
-    S: HasNamedMetadataMut,
+    S: HasNamedMetadata,
 {
     let metadata = state
         .named_metadata_map_mut()
@@ -52,7 +52,7 @@ where
 /// Set the number of iterations to be used by this mutational stage with a default name
 pub fn set_iters_std<S>(state: &mut S, iters: u64) -> Result<(), Error>
 where
-    S: HasNamedMetadataMut,
+    S: HasNamedMetadata,
 {
     set_iters_by_name(state, iters, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
 }
@@ -84,7 +84,7 @@ pub fn set_seed_fuzz_time_by_name<S>(
     name: &str,
 ) -> Result<(), Error>
 where
-    S: HasNamedMetadataMut,
+    S: HasNamedMetadata,
 {
     let metadata = state
         .named_metadata_map_mut()
@@ -98,7 +98,7 @@ where
 /// Set the time for a single seed to be used by this mutational stage with a default name
 pub fn set_seed_fuzz_time_std<S>(state: &mut S, fuzz_time: Duration) -> Result<(), Error>
 where
-    S: HasNamedMetadataMut,
+    S: HasNamedMetadata,
 {
     set_seed_fuzz_time_by_name(state, fuzz_time, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
 }
@@ -126,7 +126,7 @@ where
 /// Reset this to a normal, randomized, stage by name
 pub fn reset_by_name<S>(state: &mut S, name: &str) -> Result<(), Error>
 where
-    S: HasNamedMetadataMut,
+    S: HasNamedMetadata,
 {
     state
         .named_metadata_map_mut()
@@ -141,7 +141,7 @@ where
 /// Reset this to a normal, randomized, stage with a default name
 pub fn reset_std<S>(state: &mut S) -> Result<(), Error>
 where
-    S: HasNamedMetadataMut,
+    S: HasNamedMetadata,
 {
     reset_by_name(state, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
 }
@@ -215,7 +215,7 @@ where
 
 impl<E, EM, I, M, S, Z> Restartable<S> for TuneableMutationalStage<E, EM, I, M, S, Z>
 where
-    S: HasNamedMetadataMut + HasExecutions,
+    S: HasNamedMetadata + HasExecutions,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         self.restart_helper.should_restart(state, &self.name)
@@ -309,7 +309,7 @@ where
     #[must_use]
     pub fn new(state: &mut S, mutator: M) -> Self
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         Self::transforming(state, mutator, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
@@ -317,7 +317,7 @@ where
     /// Crates a new tuneable mutational stage with the given name
     pub fn with_name(state: &mut S, mutator: M, name: &str) -> Self
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         Self::transforming(state, mutator, name)
     }
@@ -325,7 +325,7 @@ where
     /// Set the number of iterations to be used by this [`TuneableMutationalStage`]
     pub fn set_iters(&self, state: &mut S, iters: u64) -> Result<(), Error>
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         set_iters_by_name(state, iters, &self.name)
     }
@@ -333,7 +333,7 @@ where
     /// Set the number of iterations to be used by the std [`TuneableMutationalStage`]
     pub fn set_iters_std(state: &mut S, iters: u64) -> Result<(), Error>
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         set_iters_by_name(state, iters, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
@@ -341,7 +341,7 @@ where
     /// Set the number of iterations to be used by the [`TuneableMutationalStage`] with the given name
     pub fn set_iters_by_name(state: &mut S, iters: u64, name: &str) -> Result<(), Error>
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         set_iters_by_name(state, iters, name)
     }
@@ -370,7 +370,7 @@ where
     /// Set the time to mutate a single input in this [`TuneableMutationalStage`]
     pub fn set_seed_fuzz_time(&self, state: &mut S, fuzz_time: Duration) -> Result<(), Error>
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         set_seed_fuzz_time_by_name(state, fuzz_time, &self.name)
     }
@@ -378,7 +378,7 @@ where
     /// Set the time to mutate a single input in the std [`TuneableMutationalStage`]
     pub fn set_seed_fuzz_time_std(state: &mut S, fuzz_time: Duration) -> Result<(), Error>
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         set_seed_fuzz_time_by_name(state, fuzz_time, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
@@ -390,7 +390,7 @@ where
         name: &str,
     ) -> Result<(), Error>
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         set_seed_fuzz_time_by_name(state, fuzz_time, name)
     }
@@ -419,7 +419,7 @@ where
     /// Reset this to a normal, randomized, stage with
     pub fn reset(&self, state: &mut S) -> Result<(), Error>
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         reset_by_name(state, &self.name)
     }
@@ -427,7 +427,7 @@ where
     /// Reset the std stage to a normal, randomized, stage
     pub fn reset_std(state: &mut S) -> Result<(), Error>
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         reset_by_name(state, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
@@ -435,7 +435,7 @@ where
     /// Reset this to a normal, randomized, stage by name
     pub fn reset_by_name(state: &mut S, name: &str) -> Result<(), Error>
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
     {
         reset_by_name(state, name)
     }
@@ -474,7 +474,7 @@ impl<E, EM, I, M, S, Z> TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasRand + HasNamedMetadataMut,
+    S: HasRand + HasNamedMetadata,
 {
     /// Creates a new transforming mutational stage
     #[must_use]

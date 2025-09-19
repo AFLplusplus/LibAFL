@@ -15,7 +15,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasMetadataMut, HasNamedMetadata, HasNamedMetadataMut,
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{Event, EventConfig, EventFirer, EventWithStats, llmp::LlmpEventConverter},
     executors::{Executor, ExitKind, HasObservers},
@@ -80,7 +80,7 @@ where
     Z: Evaluator<E, EM, I, S>,
     S: HasCorpus<I>
         + HasRand
-        + HasMetadataMut
+        + HasMetadata
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
@@ -155,7 +155,7 @@ where
 
 impl<CB, E, EM, I, S, Z> Restartable<S> for SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
@@ -253,7 +253,7 @@ where
     ICB: InputConverter<From = DI, To = I>,
     S: HasExecutions
         + HasRand
-        + HasMetadataMut
+        + HasMetadata
         + HasSolutions<I>
         + HasCurrentTestcase<I>
         + Stoppable

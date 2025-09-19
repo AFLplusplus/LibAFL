@@ -14,7 +14,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasTestcase},
     random_corpus_id,
     schedulers::{
@@ -115,7 +115,7 @@ where
     #[must_use]
     pub fn new<S>(state: &mut S, observer: &C) -> Self
     where
-        S: HasMetadataMut,
+        S: HasMetadata,
     {
         Self::with_schedule(state, observer, None)
     }
@@ -124,7 +124,7 @@ where
     #[must_use]
     pub fn with_schedule<S>(state: &mut S, observer: &C, strat: Option<PowerSchedule>) -> Self
     where
-        S: HasMetadataMut,
+        S: HasMetadata,
     {
         let _ = state.metadata_or_insert_with(|| SchedulerMetadata::new(strat));
         let _ = state.metadata_or_insert_with(WeightedScheduleMetadata::new);
@@ -158,7 +158,7 @@ where
     pub fn create_alias_table<I, S>(&self, state: &mut S) -> Result<(), Error>
     where
         F: TestcaseScore<I, S>,
-        S: HasCorpus<I> + HasMetadataMut,
+        S: HasCorpus<I> + HasMetadata,
     {
         let n = state.corpus().count();
 
@@ -305,7 +305,7 @@ where
     C: AsRef<O> + Named,
     F: TestcaseScore<I, S>,
     O: Hash,
-    S: HasCorpus<I> + HasMetadataMut + HasRand + HasTestcase<I>,
+    S: HasCorpus<I> + HasMetadata + HasRand + HasTestcase<I>,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {

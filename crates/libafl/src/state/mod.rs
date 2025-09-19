@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::ClientPerfStats;
 use crate::{
-    Error, HasMetadata, HasMetadataMut, HasNamedMetadata, HasNamedMetadataMut,
+    Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     feedbacks::StateInitializer,
@@ -333,9 +333,7 @@ impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC> {
     fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
-}
 
-impl<C, I, R, SC> HasMetadataMut for StdState<C, I, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
@@ -349,9 +347,7 @@ impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC> {
     fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
         &self.named_metadata
     }
-}
 
-impl<C, I, R, SC> HasNamedMetadataMut for StdState<C, I, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
     fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
@@ -1279,9 +1275,7 @@ impl<I> HasMetadata for NopState<I> {
     fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
-}
 
-impl<I> HasMetadataMut for NopState<I> {
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
@@ -1291,9 +1285,7 @@ impl<I> HasNamedMetadata for NopState<I> {
     fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
         &self.named_metadata
     }
-}
 
-impl<I> HasNamedMetadataMut for NopState<I> {
     fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
         &mut self.named_metadata
     }

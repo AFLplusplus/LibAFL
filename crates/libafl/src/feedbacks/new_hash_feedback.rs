@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
-    Error, HasNamedMetadataMut,
+    Error, HasNamedMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     observers::ObserverWithHashField,
@@ -103,7 +103,7 @@ impl<O> NewHashFeedback<O>
 where
     O: ObserverWithHashField + Named,
 {
-    fn has_interesting_backtrace_hash_observation<OT, S: HasNamedMetadataMut>(
+    fn has_interesting_backtrace_hash_observation<OT, S: HasNamedMetadata>(
         &mut self,
         state: &mut S,
         observers: &OT,
@@ -137,7 +137,7 @@ where
 
 impl<O, S> StateInitializer<S> for NewHashFeedback<O>
 where
-    S: HasNamedMetadataMut,
+    S: HasNamedMetadata,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_named_metadata_checked(
@@ -152,7 +152,7 @@ impl<O, EM, I, OT, S> Feedback<EM, I, OT, S> for NewHashFeedback<O>
 where
     O: ObserverWithHashField + Named,
     OT: MatchName,
-    S: HasNamedMetadataMut,
+    S: HasNamedMetadata,
 {
     fn is_interesting(
         &mut self,

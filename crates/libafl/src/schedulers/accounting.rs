@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use super::IndexesLenTimeMinimizerScheduler;
 use crate::{
-    Error, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     observers::CanTrack,
     schedulers::{
@@ -113,7 +113,7 @@ pub struct CoverageAccountingScheduler<'a, CS, I, O> {
 impl<CS, I, O, S> Scheduler<I, S> for CoverageAccountingScheduler<'_, CS, I, O>
 where
     CS: Scheduler<I, S>,
-    S: HasCorpus<I> + HasMetadataMut + HasRand,
+    S: HasCorpus<I> + HasMetadata + HasRand,
     I: HasLen,
     O: CanTrack,
 {
@@ -170,7 +170,7 @@ where
     #[expect(clippy::cast_possible_wrap)]
     pub fn update_accounting_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
-        S: HasCorpus<I> + HasMetadataMut,
+        S: HasCorpus<I> + HasMetadata,
     {
         let mut indexes = vec![];
         let mut new_favoreds = vec![];
@@ -258,7 +258,7 @@ where
     /// Cull the `Corpus`
     pub fn accounting_cull<S>(&self, state: &S) -> Result<(), Error>
     where
-        S: HasCorpus<I> + HasMetadataMut,
+        S: HasCorpus<I> + HasMetadata,
     {
         let Some(top_rated) = state.metadata_map().get::<TopAccountingMetadata>() else {
             return Ok(());
@@ -284,7 +284,7 @@ where
     /// Provide the observer responsible for determining new indexes.
     pub fn new<S>(observer: &O, state: &mut S, base: CS, accounting_map: &'a [u32]) -> Self
     where
-        S: HasMetadataMut,
+        S: HasMetadata,
     {
         match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {
@@ -315,7 +315,7 @@ where
         accounting_map: &'a [u32],
     ) -> Self
     where
-        S: HasMetadataMut,
+        S: HasMetadata,
     {
         match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {

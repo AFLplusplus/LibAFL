@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
-    HasMetadataMut,
+    HasMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     state::HasCorpus,
@@ -56,7 +56,7 @@ impl Named for TransferredFeedback {
 
 impl<S> StateInitializer<S> for TransferredFeedback
 where
-    S: HasMetadataMut,
+    S: HasMetadata,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_metadata(TransferringMetadata { transferring: true });
@@ -66,7 +66,7 @@ where
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for TransferredFeedback
 where
-    S: HasCorpus<I> + HasMetadataMut,
+    S: HasCorpus<I> + HasMetadata,
 {
     fn is_interesting(
         &mut self,

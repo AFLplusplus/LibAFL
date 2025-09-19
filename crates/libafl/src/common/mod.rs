@@ -38,10 +38,7 @@ pub trait HasMetadata {
             .get::<M>()
             .ok_or_else(|| Error::key_not_found(format!("{} not found", type_name::<M>())))
     }
-}
 
-/// Trait for elements offering mutable metadata
-pub trait HasMetadataMut: HasMetadata {
     /// A map, storing all metadata (mutable)
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap;
 
@@ -120,10 +117,7 @@ pub trait HasNamedMetadata {
             .get::<M>(name)
             .ok_or_else(|| Error::key_not_found(format!("{} not found", type_name::<M>())))
     }
-}
 
-/// Trait for elements offering named metadata
-pub trait HasNamedMetadataMut: HasNamedMetadata {
     /// A map, storing all metadata (mutable)
     fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap;
 

@@ -11,7 +11,7 @@ use libafl_bolts::Named;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, HasNamedMetadata, HasNamedMetadataMut,
+    Error, HasNamedMetadata,
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     inputs::Input,
@@ -94,7 +94,7 @@ where
 
 impl<EM, I, TE, S, Z> Restartable<S> for TracingStage<EM, I, TE, S, Z>
 where
-    S: HasNamedMetadataMut + HasCurrentCorpusId,
+    S: HasNamedMetadata + HasCurrentCorpusId,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         RetryCountRestartHelper::no_retry(state, &self.name)

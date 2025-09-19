@@ -13,7 +13,7 @@ use libafl_bolts::{
 };
 
 use crate::{
-    Error, HasMetadataMut,
+    Error, HasMetadata,
     corpus::testcase::TestcaseMetadata,
     feedbacks::{Feedback, StateInitializer},
     observers::concolic::ConcolicObserver,

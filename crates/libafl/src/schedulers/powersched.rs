@@ -10,7 +10,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasTestcase},
     schedulers::{
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler, on_add_metadata_default,
@@ -306,7 +306,7 @@ impl<C, O> HasQueueCycles for PowerQueueScheduler<C, O> {
 
 impl<C, I, O, S> Scheduler<I, S> for PowerQueueScheduler<C, O>
 where
-    for<'a> S: HasCorpus<I> + HasMetadataMut + HasTestcase<I>,
+    for<'a> S: HasCorpus<I> + HasMetadata + HasTestcase<I>,
     O: Hash,
     C: AsRef<O>,
 {
@@ -369,7 +369,7 @@ where
     #[must_use]
     pub fn new<S>(state: &mut S, observer: &C, strat: PowerSchedule) -> Self
     where
-        S: HasMetadata + HasMetadataMut,
+        S: HasMetadata + HasMetadata,
     {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(strat)));

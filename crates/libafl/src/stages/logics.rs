@@ -310,7 +310,7 @@ mod test {
     #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
     use crate::stages::RetryCountRestartHelper;
     use crate::{
-        HasMetadataMut, NopFuzzer,
+        HasMetadata, NopFuzzer,
         events::NopEventManager,
         executors::nop::NopExecutor,
         stages::{
@@ -340,7 +340,7 @@ mod test {
         #[expect(clippy::unnecessary_wraps)]
         fn should_restart<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
         where
-            S: HasMetadataMut,
+            S: HasMetadata,
         {
             // check if we're resuming
             let _metadata = state.metadata_or_insert_with(|| Self { count: 0 });
@@ -349,7 +349,7 @@ mod test {
 
         fn clear_progress<S, ST>(state: &mut S, _stage: &ST) -> Result<(), Error>
         where
-            S: HasMetadataMut,
+            S: HasMetadata,
         {
             if state.remove_metadata::<Self>().is_none() {
                 return Err(Error::illegal_state(
@@ -362,7 +362,7 @@ mod test {
 
     impl<E, EM, S, Z> Stage<E, EM, S, Z> for ResumeSucceededStage<S>
     where
-        S: HasMetadataMut,
+        S: HasMetadata,
     {
         fn perform(
             &mut self,
@@ -384,7 +384,7 @@ mod test {
 
     impl<S> Restartable<S> for ResumeSucceededStage<S>
     where
-        S: HasMetadataMut,
+        S: HasMetadata,
     {
         fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
             TestProgress::should_restart(state, self)
@@ -397,7 +397,7 @@ mod test {
 
     impl<E, EM, S, Z> Stage<E, EM, S, Z> for ResumeFailedStage<S>
     where
-        S: HasMetadataMut,
+        S: HasMetadata,
     {
         fn perform(
             &mut self,
@@ -422,7 +422,7 @@ mod test {
 
     impl<S> Restartable<S> for ResumeFailedStage<S>
     where
-        S: HasMetadataMut,
+        S: HasMetadata,
     {
         fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
             TestProgress::should_restart(state, self)

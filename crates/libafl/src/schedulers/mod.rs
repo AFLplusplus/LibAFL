@@ -10,7 +10,7 @@ use libafl_bolts::{
 };
 
 use crate::{
-    Error, HasMetadata, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasTestcase, IsTestcaseMetadataCell, SchedulerTestcaseMetadata},
     random_corpus_id,
     state::{HasCorpus, HasRand},
@@ -72,7 +72,7 @@ pub fn on_add_metadata_default<CS, I, S>(
 ) -> Result<(), Error>
 where
     CS: AflScheduler,
-    S: HasCorpus<I> + HasTestcase<I> + HasMetadataMut,
+    S: HasCorpus<I> + HasTestcase<I> + HasMetadata,
 {
     let current_id = *state.corpus().current();
 
@@ -109,7 +109,7 @@ pub fn on_evaluation_metadata_default<CS, O, OT, S>(
 where
     CS: AflScheduler,
     CS::ObserverRef: AsRef<O>,
-    S: HasMetadataMut,
+    S: HasMetadata,
     O: Hash,
     OT: MatchName,
 {

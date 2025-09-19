@@ -8,7 +8,7 @@ use libafl_bolts::{Error, impl_serdeany};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    HasMetadataMut,
+    HasMetadata,
     corpus::IsTestcaseMetadataCell,
     inputs::{BytesInput, HasTargetBytes},
     stages::{Restartable, Stage},

@@ -9,7 +9,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadataMut,
+    Error, HasMetadata,
     corpus::testcase::TestcaseMetadata,
     feedbacks::{Feedback, StateInitializer},
     observers::{StdErrObserver, StdOutObserver},

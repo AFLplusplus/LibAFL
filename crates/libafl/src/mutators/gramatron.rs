@@ -12,7 +12,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{Corpus, IsTestcaseMetadataCell},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
@@ -119,7 +119,7 @@ pub struct GramatronSpliceMutator;
 
 impl<S> Mutator<GramatronInput, S> for GramatronSpliceMutator
 where
-    S: HasRand + HasCorpus<GramatronInput> + HasMetadataMut,
+    S: HasRand + HasCorpus<GramatronInput> + HasMetadata,
 {
     fn mutate(
         &mut self,

@@ -11,7 +11,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use libafl_bolts::{Error, compress::GzipCompressor};
+#[cfg(feature = "gzip")]
+use libafl_bolts::compress::GzipCompressor;
+use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
 use super::{InMemoryCorpusMap, Store};

@@ -11,7 +11,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    HasNamedMetadataMut,
+    HasNamedMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::{ObserversTuple, ValueObserver},
@@ -59,7 +59,7 @@ impl<T> Named for ValueBloomFeedback<'_, T> {
     }
 }
 
-impl<S: HasNamedMetadataMut, T> StateInitializer<S> for ValueBloomFeedback<'_, T> {
+impl<S: HasNamedMetadata, T> StateInitializer<S> for ValueBloomFeedback<'_, T> {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         let _ =
             state.named_metadata_or_insert_with::<ValueBloomFeedbackMetadata>(&self.name, || {
@@ -71,7 +71,7 @@ impl<S: HasNamedMetadataMut, T> StateInitializer<S> for ValueBloomFeedback<'_, T
     }
 }
 
-impl<EM, I, OT: ObserversTuple<I, S>, S: HasNamedMetadataMut, T: Hash> Feedback<EM, I, OT, S>
+impl<EM, I, OT: ObserversTuple<I, S>, S: HasNamedMetadata, T: Hash> Feedback<EM, I, OT, S>
     for ValueBloomFeedback<'_, T>
 {
     fn is_interesting(

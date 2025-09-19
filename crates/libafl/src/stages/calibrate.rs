@@ -13,7 +13,7 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasMetadataMut, HasNamedMetadataMut, HasScheduler,
+    Error, HasMetadata, HasNamedMetadata, HasScheduler,
     corpus::{Corpus, HasCurrentCorpusId, IsTestcaseMetadataCell, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
@@ -138,8 +138,8 @@ where
         Serialize + Deserialize<'de> + 'static + Default + Debug + Bounded,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<I>
-        + HasMetadataMut
-        + HasNamedMetadataMut
+        + HasMetadata
+        + HasNamedMetadata
         + HasExecutions
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId,
@@ -372,7 +372,7 @@ where
 
 impl<C, I, O, OT, S> Restartable<S> for CalibrationStage<C, I, O, OT, S>
 where
-    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Calibration stage disallow restarts

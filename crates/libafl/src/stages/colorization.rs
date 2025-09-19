@@ -14,7 +14,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasMetadataMut, HasNamedMetadata, HasNamedMetadataMut,
+    Error, HasMetadata, HasNamedMetadata,
     corpus::HasCurrentCorpusId,
     events::EventFirer,
     executors::{Executor, HasObservers},
@@ -78,7 +78,7 @@ impl<C, E, EM, I, O, S, Z> Stage<E, EM, S, Z> for ColorizationStage<C, E, EM, I,
 where
     EM: EventFirer<I, S>,
     E: HasObservers + Executor<EM, I, S, Z>,
-    S: HasCorpus<I> + HasMetadataMut + HasRand + HasNamedMetadata + HasCurrentCorpusId,
+    S: HasCorpus<I> + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
     E::Observers: ObserversTuple<I, S>,
     I: ResizableMutator<u8> + HasMutatorBytes + Clone,
     O: Hash,
@@ -101,7 +101,7 @@ where
 
 impl<C, E, EM, I, O, S, Z> Restartable<S> for ColorizationStage<C, E, EM, I, O, S, Z>
 where
-    S: HasMetadata + HasNamedMetadataMut + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage
@@ -161,7 +161,7 @@ where
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, I, S, Z>,
     E::Observers: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadataMut + HasRand + HasCurrentCorpusId + HasCurrentTestcase<I>,
+    S: HasCorpus<I> + HasMetadata + HasRand + HasCurrentCorpusId + HasCurrentTestcase<I>,
     I: ResizableMutator<u8> + HasMutatorBytes + Clone,
 {
     #[inline]

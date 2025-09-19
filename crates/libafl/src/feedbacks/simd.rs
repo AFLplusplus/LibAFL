@@ -20,7 +20,7 @@ use super::{DifferentIsNovel, Feedback, HasObserverHandle, MapFeedback, StateIni
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
 use crate::{
-    HasNamedMetadataMut,
+    HasNamedMetadata,
     corpus::testcase::TestcaseMetadata,
     events::EventFirer,
     executors::ExitKind,
@@ -49,7 +49,7 @@ where
 {
     fn is_interesting_u8_simd_optimized<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
     where
-        S: HasNamedMetadataMut,
+        S: HasNamedMetadata,
         OT: MatchName,
     {
         // TODO Replace with match_name_type when stable
@@ -155,7 +155,7 @@ impl<C, O, S, R, V> StateInitializer<S> for SimdMapFeedback<C, O, R, V>
 where
     O: MapObserver,
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
-    S: HasNamedMetadataMut,
+    S: HasNamedMetadata,
     R: SimdReducer<V>,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
@@ -192,7 +192,7 @@ where
     EM: EventFirer<I, S>,
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     OT: MatchName,
-    S: HasNamedMetadataMut + HasExecutions,
+    S: HasNamedMetadata + HasExecutions,
     R: SimdReducer<V>,
     V: VectorType + Copy + Eq,
     R::PrimitiveReducer: Reducer<u8>,

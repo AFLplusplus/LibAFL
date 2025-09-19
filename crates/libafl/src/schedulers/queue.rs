@@ -3,7 +3,7 @@
 use alloc::borrow::ToOwned;
 
 use crate::{
-    Error, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::HasCorpus,
@@ -20,7 +20,7 @@ impl<I, S> RemovableScheduler<I, S> for QueueScheduler where S: HasCorpus<I> {}
 
 impl<I, S> Scheduler<I, S> for QueueScheduler
 where
-    S: HasCorpus<I> + HasMetadataMut,
+    S: HasCorpus<I> + HasMetadata,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id

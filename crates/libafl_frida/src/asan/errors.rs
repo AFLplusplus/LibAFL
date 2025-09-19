@@ -13,7 +13,7 @@ use frida_gum::interceptor::Interceptor;
 use frida_gum::{Gum, Process};
 use libafl::{
     Error, HasMetadata,
-    corpus::{Testcase, TestcaseMetadata},
+    corpus::TestcaseMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,

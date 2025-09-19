@@ -9,7 +9,7 @@ use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadataMut,
+    Error, HasMetadata,
     corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     schedulers::{RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasRand},
@@ -66,7 +66,7 @@ impl<F> ProbabilitySamplingScheduler<F> {
     pub fn store_probability<I, S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
         F: TestcaseScore<I, S>,
-        S: HasCorpus<I> + HasMetadataMut + HasRand,
+        S: HasCorpus<I> + HasMetadata + HasRand,
     {
         let prob = F::compute(state, id)?;
         debug_assert!(
@@ -86,7 +86,7 @@ impl<F> ProbabilitySamplingScheduler<F> {
 impl<F, I, S> RemovableScheduler<I, S> for ProbabilitySamplingScheduler<F>
 where
     F: TestcaseScore<I, S>,
-    S: HasCorpus<I> + HasMetadataMut + HasRand,
+    S: HasCorpus<I> + HasMetadata + HasRand,
 {
     fn on_remove(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         let meta = state
@@ -120,7 +120,7 @@ where
 impl<F, I, S> Scheduler<I, S> for ProbabilitySamplingScheduler<F>
 where
     F: TestcaseScore<I, S>,
-    S: HasCorpus<I> + HasMetadataMut + HasRand,
+    S: HasCorpus<I> + HasMetadata + HasRand,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         let current_id = *state.corpus().current();
