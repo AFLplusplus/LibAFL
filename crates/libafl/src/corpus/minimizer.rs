@@ -29,16 +29,16 @@ use crate::{
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
-pub struct MapCorpusMinimizer<C, E, I, O, S, T, TS> {
+pub struct MapCorpusMinimizer<C, E, I, O, S, T, TP> {
     observer_handle: Handle<C>,
-    phantom: PhantomData<(E, I, O, S, T, TS)>,
+    phantom: PhantomData<(E, I, O, S, T, TP)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
 pub type StdCorpusMinimizer<C, E, I, O, S, T> =
     MapCorpusMinimizer<C, E, I, O, S, T, LenTimeMulTestcasePenalty>;
 
-impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
+impl<C, E, I, O, S, T, TP> MapCorpusMinimizer<C, E, I, O, S, T, TP>
 where
     C: Named,
 {
@@ -52,14 +52,14 @@ where
     }
 }
 
-impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
+impl<C, E, I, O, S, T, TP> MapCorpusMinimizer<C, E, I, O, S, T, TP>
 where
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
     I: Input,
     S: HasMetadata + HasCorpus<I> + HasExecutions,
     T: Copy + Hash + Eq,
-    TS: TestcasePenalty<I, S>,
+    TP: TestcasePenalty<I, S>,
 {
     /// Do the minimization
     #[expect(clippy::too_many_lines)]
@@ -121,7 +121,7 @@ where
 
                 let mut testcase = state.corpus().get(id)?.borrow_mut();
                 (
-                    TS::compute(state, &mut *testcase)?
+                    TP::compute(state, &mut *testcase)?
                         .to_u64()
                         .expect("Weight must be computable."),
                     *state.executions(),
