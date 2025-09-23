@@ -20,7 +20,7 @@ use crate::{
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
-    schedulers::{LenTimeMulTestcasePenalty, RemovableScheduler, Scheduler, TestcasePenalty},
+    schedulers::{LenTimeMulTestcasePenalty, RemovableScheduler, Scheduler, TestcasePenalty, TestcaseScore},
     stages::run_target_with_timing,
     state::{HasCorpus, HasExecutions},
 };
@@ -59,7 +59,7 @@ where
     I: Input,
     S: HasMetadata + HasCorpus<I> + HasExecutions,
     T: Copy + Hash + Eq,
-    TS: TestcasePenalty<I, S>,
+    TS: TestcaseScore<I, S>,
 {
     /// Do the minimization
     #[expect(clippy::too_many_lines)]
