@@ -293,6 +293,8 @@ regex-syntax = { version = "0.8.4", optional = true } # For nautilus
 
 fs2 = { workspace = true, optional = true } # used by OnDisk Corpus for file locking
 
+z3 = { workspace = true, optional = true } # for concolic mutation
+
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
 serial_test = { workspace = true, optional = true, default-features = false, features = [
   "logging",
@@ -314,7 +316,6 @@ mlua = { version = "0.10.3", features = [
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }                # For (*nix) libc
-z3 = { workspace = true, optional = true } # for concolic mutation
 
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true, features = [
