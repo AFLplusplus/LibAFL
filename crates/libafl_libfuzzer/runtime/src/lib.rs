@@ -284,7 +284,10 @@ macro_rules! fuzz_with {
                 dir
             };
 
-            let crash_corpus = ArtifactCorpus::new();
+            let corpus = LibfuzzerCorpus::new(&corpus_dir, 4096)
+                            .expect("Could not create libfuzzer corpus");
+            let crash_corpus = ArtifactCorpus::new(&corpus_dir)
+                            .expect("Could not create artifact corpus");
 
             // If not restarting, create a State from scratch
             let mut state = state.unwrap_or_else(|| {
@@ -292,7 +295,7 @@ macro_rules! fuzz_with {
                     // RNG
                     StdRand::new(),
                     // Corpus that will be evolved, we keep it in memory for performance
-                    LibfuzzerCorpus::new(corpus_dir.clone(), 4096),
+                    corpus,
                     // Corpus in which we store solutions (crashes in this example),
                     // on disk so the user can get them after stopping the fuzzer
                     crash_corpus,

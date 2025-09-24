@@ -9,7 +9,8 @@ use crate::Error;
 
 pub mod testcase;
 pub use testcase::{
-    HasTestcase, IsTestcaseMetadataCell, SchedulerTestcaseMetadata, Testcase, TestcaseMetadata,
+    HasTestcase, IsTestcaseMetadataCell, SchedulerTestcaseMetadata, Testcase,
+    TestcaseFilenameFormat, TestcaseMetadata,
 };
 
 pub mod cache;
@@ -33,7 +34,7 @@ pub mod nop;
 pub use nop::NopCorpus;
 
 pub mod store;
-pub use store::{InMemoryStore, OnDiskStore, maps};
+pub use store::{InMemoryStore, OnDiskStore, Store, maps};
 
 pub mod collection;
 pub use collection::{

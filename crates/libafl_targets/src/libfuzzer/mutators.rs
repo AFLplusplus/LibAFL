@@ -426,8 +426,8 @@ where
             }
         }
 
-        let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-        let other = other_testcase.load_input(state.corpus())?;
+        let other_testcase = state.corpus().get_from_all(id)?;
+        let other = other_testcase.input();
         let data2 = Vec::from(other.mutator_bytes());
         drop(other_testcase);
 

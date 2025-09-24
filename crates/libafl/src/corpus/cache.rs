@@ -158,11 +158,23 @@ pub struct IdentityCache<M> {
 }
 
 /// A `First In / First Out` cache policy.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FifoCache<CS, FS, I> {
     cached_ids: VecDeque<CorpusId>,
     cache_max_len: usize,
     phantom: PhantomData<(I, CS, FS)>,
+}
+
+impl<CS, FS, I> FifoCache<CS, FS, I> {
+    /// Create a new [`FifoCache`], with at most `cache_max_len` [`Testcase`]s loaded in memory.
+    #[must_use]
+    pub fn new(cache_max_len: usize) -> Self {
+        Self {
+            cached_ids: VecDeque::default(),
+            cache_max_len,
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<CC, CP, FC> CacheTestcaseMetadataCell<CC, CP, FC>

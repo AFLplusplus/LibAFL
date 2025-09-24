@@ -14,7 +14,13 @@ use std::{
 use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
-use crate::{Error, corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, Testcase, TestcaseMetadata}, inputs::Input, stages::{Restartable, Stage}, state::{HasCorpus, HasRand, HasSolutions}, HasMetadata};
+use crate::{
+    Error, HasMetadata,
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, Testcase, TestcaseMetadata},
+    inputs::Input,
+    stages::{Restartable, Stage},
+    state::{HasCorpus, HasRand, HasSolutions},
+};
 
 /// Metadata used to store information about disk dump indexes for names
 #[cfg_attr(

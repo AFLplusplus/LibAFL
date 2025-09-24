@@ -3,7 +3,10 @@
 
 #[cfg(feature = "track_hit_feedbacks")]
 use alloc::{borrow::Cow, vec::Vec};
-use alloc::{rc::Rc, string::String};
+use alloc::{
+    rc::Rc,
+    string::{String, ToString},
+};
 use core::{
     cell::{Ref, RefCell, RefMut},
     fmt::{Debug, Formatter},
@@ -222,12 +225,27 @@ pub trait HasTestcase<I>: HasCorpus<I> {
     ) -> Result<Testcase<I, <Self::Corpus as Corpus<I>>::TestcaseMetadataCell>, Error>;
 }
 
+/// Indicates how a [`Testcase`] should be named on-disk.
+#[derive(Default, Clone, Serialize, Deserialize, Debug)]
+pub enum TestcaseFilenameFormat {
+    /// Use the unique [`Testcase`] ID as a name.
+    #[default]
+    Id,
+    /// Use a prefix before the id
+    Prefix(String),
+    /// Use a custom name.
+    Custom(String),
+}
+
 /// The [`Testcase`] metadata.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, TypedBuilder)]
 pub struct TestcaseMetadata {
     /// Map of metadata associated with this [`Testcase`]
     #[builder(default)]
     metadata: SerdeAnyMap,
+    /// The filename format used to name the [`Testcase`] file on-disk.
+    #[builder(default)]
+    filename_format: TestcaseFilenameFormat,
     /// Time needed to execute the input
     #[builder(default)]
     exec_time: Option<Duration>,
@@ -398,6 +416,19 @@ impl<I, M> Testcase<I, M>
 where
     M: IsTestcaseMetadataCell,
 {
+    /// Get the filename
+    pub fn get_filename(&self) -> String {
+        let md = self.metadata.testcase_metadata();
+
+        match &md.filename_format {
+            TestcaseFilenameFormat::Id => self.id.clone(),
+            TestcaseFilenameFormat::Prefix(prefix) => {
+                format!("{}-{}", prefix, self.id)
+            }
+            TestcaseFilenameFormat::Custom(custom_name) => custom_name.clone(),
+        }
+    }
+
     /// Get the same testcase, with an owned [`TestcaseMetadata`].
     pub fn cloned(self) -> Testcase<I, RefCell<TestcaseMetadata>> {
         Testcase {
@@ -613,10 +644,25 @@ impl TestcaseMetadata {
         self.parent_id = parent_id;
     }
 
-    /// Adds one objectives to the `objectives_found` counter. Mostly called from crash handler or executor.
+    /// Adds one objective to the `objectives_found` counter. Mostly called from crash handler or executor.
     pub fn found_objective(&mut self) {
         let count = self.objectives_found.saturating_add(1);
         self.objectives_found = count;
+    }
+
+    /// Get the filename
+    #[must_use]
+    pub fn get_filename(&self, id: &str) -> String {
+        match &self.filename_format {
+            TestcaseFilenameFormat::Id => id.to_string(),
+            TestcaseFilenameFormat::Prefix(prefix) => format!("{prefix}-{id}"),
+            TestcaseFilenameFormat::Custom(custom_name) => custom_name.clone(),
+        }
+    }
+
+    /// Set the filename of the corpus input
+    pub fn set_filename(&mut self, filename: TestcaseFilenameFormat) {
+        self.filename_format = filename;
     }
 }
 

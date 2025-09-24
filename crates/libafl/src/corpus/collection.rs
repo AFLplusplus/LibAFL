@@ -2,7 +2,7 @@
 
 use alloc::{rc::Rc, string::String};
 use core::cell::RefCell;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
@@ -10,13 +10,15 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{
         CombinedCorpus, Corpus, CorpusId, FifoCache, IdentityCache, InMemoryStore, OnDiskStore,
-        SingleCorpus, Testcase, TestcaseMetadata,
+        SingleCorpus, Testcase, TestcaseFilenameFormat, TestcaseMetadata,
         cache::StdIdentityCacheTestcaseMetadataCell,
         maps::{self, InMemoryCorpusMap, InMemoryTestcaseMap},
-        store::{OnDiskMetadataFormat, Store},
+        store::{OnDiskMetadataFormat, Store, ondisk::OnDiskStoreBuilder},
     },
     inputs::Input,
 };
+
+const DEFAULT_CACHE_LEN: usize = 32;
 
 #[cfg(not(feature = "corpus_btreemap"))]
 type StdInMemoryMap<T> = maps::HashCorpusMap<T>;
@@ -69,7 +71,7 @@ pub struct StdInMemoryCorpusMap<I>(InnerStdInMemoryCorpusMap<I>);
 
 /// The standard fully in-memory store.
 #[repr(transparent)]
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct StdInMemoryStore<I>(InnerStdInMemoryStore<I>);
 
 /// The standard fully on-disk store.
@@ -88,11 +90,25 @@ pub struct InMemoryCorpus<I>(InnerInMemoryCorpus<I>);
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OnDiskCorpus<I>(InnerOnDiskCorpus<I>);
 
+/// The on-disk corpus builder
+#[cfg(feature = "std")]
+#[derive(Debug, Clone, Default)]
+pub struct OnDiskCorpusBuilder(OnDiskStoreBuilder);
+
 /// The standard corpus for storing on disk and in-memory with a cache.
 /// Useful for very large corpuses.
 #[repr(transparent)]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct CachedOnDiskCorpus<I: Input>(InnerCachedOnDiskCorpus<I>);
+
+/// The cached on-disk corpus builder
+#[cfg(feature = "std")]
+#[derive(Debug, Clone)]
+pub struct CachedOnDiskCorpusBuilder {
+    store_builder: OnDiskStoreBuilder,
+    cache_max_len: usize,
+}
 
 /// The standard corpus for storing on disk and in-memory.
 #[repr(transparent)]
@@ -380,22 +396,58 @@ where
 }
 
 #[cfg(feature = "std")]
+impl OnDiskCorpusBuilder {
+    /// Create a new [`OnDiskCorpusBuilder`].
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the root directory, where the testcases will be stored.
+    pub fn root_dir(&mut self, root: &Path) -> &mut Self {
+        self.0.root_dir(root);
+        self
+    }
+
+    /// Set the on-disk filename format
+    pub fn filename_format(&mut self, filename_format: TestcaseFilenameFormat) -> &mut Self {
+        self.0.filename_format(filename_format);
+        self
+    }
+
+    /// Set the metadata serialization format.
+    pub fn md_format(&mut self, md_format: OnDiskMetadataFormat) -> &mut Self {
+        self.0.md_format(md_format);
+        self
+    }
+
+    /// Build an [`OnDiskStore`].
+    /// The root directory must be set.
+    pub fn build<I>(&self) -> Result<OnDiskCorpus<I>, Error> {
+        Ok(OnDiskCorpus(SingleCorpus::new(self.0.build()?)))
+    }
+}
+
+#[cfg(feature = "std")]
 impl<I> OnDiskCorpus<I>
 where
     I: Input,
 {
     /// Create a new [`OnDiskCorpus`]
-    pub fn new(root: PathBuf) -> Result<Self, Error> {
+    pub fn new(
+        root: PathBuf,
+        filename_format: TestcaseFilenameFormat,
+        md_format: OnDiskMetadataFormat,
+    ) -> Result<Self, Error> {
         Ok(OnDiskCorpus(InnerOnDiskCorpus::new(
-            InnerStdOnDiskStore::new(root)?,
+            InnerStdOnDiskStore::new(root, filename_format, md_format)?,
         )))
     }
 
-    /// Create a new [`OnDiskCorpus`] with a specific [`OnDiskMetadataFormat`]
-    pub fn new_with_format(root: PathBuf, md_format: OnDiskMetadataFormat) -> Result<Self, Error> {
-        Ok(OnDiskCorpus(InnerOnDiskCorpus::new(
-            InnerStdOnDiskStore::new_with_format(root, md_format)?,
-        )))
+    /// Get a [`OnDiskCorpus`] builder.
+    #[must_use]
+    pub fn builder() -> OnDiskCorpusBuilder {
+        OnDiskCorpusBuilder::default()
     }
 }
 
@@ -616,5 +668,70 @@ impl<I: Input> Corpus<I> for CachedOnDiskCorpus<I> {
 
     fn nth_from_all(&self, nth: usize) -> CorpusId {
         self.0.nth_from_all(nth)
+    }
+}
+
+impl<I: Input> CachedOnDiskCorpus<I> {
+    /// Get a [`CachedOnDiskCorpus`] builder.
+    #[must_use]
+    pub fn builder() -> CachedOnDiskCorpusBuilder {
+        CachedOnDiskCorpusBuilder::new()
+    }
+
+    /// Get the fallback store
+    pub fn fallback_store(&self) -> &InnerStdOnDiskStore<I> {
+        self.0.fallback_store()
+    }
+}
+
+impl Default for CachedOnDiskCorpusBuilder {
+    fn default() -> Self {
+        Self {
+            store_builder: OnDiskStoreBuilder::new(),
+            cache_max_len: DEFAULT_CACHE_LEN,
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl CachedOnDiskCorpusBuilder {
+    /// Create a new [`CachedOnDiskCorpusBuilder`].
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the cache max length.
+    pub fn cache_max_len(&mut self, cache_max_len: usize) -> &mut Self {
+        self.cache_max_len = cache_max_len;
+        self
+    }
+
+    /// Set the root directory, where the testcases will be stored.
+    pub fn root_dir(&mut self, root: &Path) -> &mut Self {
+        self.store_builder.root_dir(root);
+        self
+    }
+
+    /// Set the on-disk filename format
+    pub fn filename_format(&mut self, filename_format: TestcaseFilenameFormat) -> &mut Self {
+        self.store_builder.filename_format(filename_format);
+        self
+    }
+
+    /// Set the metadata serialization format.
+    pub fn md_format(&mut self, md_format: OnDiskMetadataFormat) -> &mut Self {
+        self.store_builder.md_format(md_format);
+        self
+    }
+
+    /// Build an [`OnDiskStore`].
+    /// The root directory must be set.
+    pub fn build<I: Input>(&self) -> Result<CachedOnDiskCorpus<I>, Error> {
+        Ok(CachedOnDiskCorpus(CombinedCorpus::new(
+            FifoCache::new(self.cache_max_len),
+            InnerStdInMemoryStore::default(),
+            self.store_builder.build()?,
+        )))
     }
 }

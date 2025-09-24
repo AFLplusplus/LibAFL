@@ -14,7 +14,7 @@ pub mod inmemory;
 pub use inmemory::InMemoryStore;
 
 pub mod ondisk;
-pub use ondisk::{OnDiskMetadataFormat, OnDiskStore};
+pub use ondisk::{DiskMgr, OnDiskMetadataFormat, OnDiskStore};
 
 /// A store is responsible for storing and retrieving [`Testcase`]s, ordered by add time.
 pub trait Store<I> {

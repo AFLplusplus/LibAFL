@@ -113,14 +113,18 @@ mod tests {
         let rand = StdRand::with_seed(4);
         let mut scheduler: QueueScheduler = QueueScheduler::new();
 
-        let mut q =
-            OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();
+        let mut q = OnDiskCorpus::<BytesInput>::builder()
+            .root_dir(&PathBuf::from("target/.test/fancy/path"))
+            .build()
+            .unwrap();
+
         // let t = Testcase::with_filename(), "fancyfile".into());
         let added_id = q.add(BytesInput::new(vec![0_u8; 4])).unwrap();
 
-        let objective_q =
-            OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/objective/path"))
-                .unwrap();
+        let objective_q = OnDiskCorpus::<BytesInput>::builder()
+            .root_dir(&PathBuf::from("target/.test/fancy/objective/path"))
+            .build()
+            .unwrap();
 
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);

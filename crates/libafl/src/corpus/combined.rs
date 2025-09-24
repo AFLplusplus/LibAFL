@@ -11,7 +11,7 @@ use crate::corpus::testcase::TestcaseMetadata;
 
 /// A [`CombinedCorpus`] tries first to use the main store according to some policy.
 /// If it fails, it falls back to the secondary store.
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CombinedCorpus<C, CS, FS, I> {
     /// The cache store
     cache_store: RefCell<CS>,
@@ -26,6 +26,37 @@ pub struct CombinedCorpus<C, CS, FS, I> {
     /// The current ID
     current: Option<CorpusId>,
     phantom: PhantomData<I>,
+}
+
+impl<C, CS, FS, I> CombinedCorpus<C, CS, FS, I> {
+    /// Create a new [`CombinedCorpus`].
+    pub fn new(cache: C, cache_store: CS, fallback_store: FS) -> Self {
+        Self {
+            cache: Rc::new(RefCell::new(cache)),
+            cache_store: RefCell::new(cache_store),
+            fallback_store,
+            counter: CorpusCounter::default(),
+            keys: Vec::new(),
+            current: None,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Get the fallback store reference
+    pub fn fallback_store(&self) -> &FS {
+        &self.fallback_store
+    }
+}
+
+impl<C, CS, FS, I> Default for CombinedCorpus<C, CS, FS, I>
+where
+    C: Default,
+    CS: Default,
+    FS: Default,
+{
+    fn default() -> Self {
+        Self::new(C::default(), CS::default(), FS::default())
+    }
 }
 
 impl<C, CS, FS, I> Corpus<I> for CombinedCorpus<C, CS, FS, I>

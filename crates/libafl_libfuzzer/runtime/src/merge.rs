@@ -46,8 +46,6 @@ pub fn merge(
         ));
     }
 
-    let crash_corpus = ArtifactCorpus::new();
-
     let keep_observer = LibfuzzerKeepFeedback::new();
     let keep = keep_observer.keep();
 
@@ -142,11 +140,16 @@ pub fn merge(
             options.dirs().first().cloned().unwrap()
         };
 
+        let corpus = LibfuzzerCorpus::new(&corpus_dir, 4096)
+            .expect("Could not create libfuzzer corpus");
+        let crash_corpus = ArtifactCorpus::new(&corpus_dir)
+            .expect("Could not create artifact corpus");
+
         StdState::new(
             // RNG
             StdRand::new(),
             // Corpus that will be evolved, we keep it in memory for performance
-            LibfuzzerCorpus::new(corpus_dir, 4096),
+            corpus,
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             crash_corpus,
@@ -185,12 +188,11 @@ pub fn merge(
 
     // In case the corpus is empty (on first run) or crashed while loading, reset
     if state.must_load_initial_inputs() && !options.dirs().is_empty() {
-        let loaded_dirs = options
-            .dirs()
-            .iter()
-            .filter(|&dir| state.corpus().dir_path() != dir)
-            .cloned()
-            .collect::<Vec<_>>();
+        let loaded_dirs = options.dirs().to_vec();
+        // .iter()
+        // // .filter(|&dir| state.corpus().dir_path() != dir)
+        // .cloned()
+        // .collect::<Vec<_>>();
         // Load from disk
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &loaded_dirs)
@@ -208,40 +210,37 @@ pub fn merge(
         fuzzer.scheduler_mut().on_remove(&mut state, id)?;
     }
 
-    for id in fuzzer.scheduler().current().clone() {
-        let mut testcase = state.corpus().get(id)?;
-        let file_path = testcase
-            .file_path_mut()
-            .as_mut()
-            .expect("No file backing for corpus entry");
-        if let Some((base, _)) = file_path
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .rsplit_once('-')
-        {
-            let mut new_file_path = file_path.clone();
-            new_file_path.pop();
-            new_file_path.push(base);
-            if new_file_path.exists() {
-                drop(testcase);
-                state.corpus_mut().remove(id)?;
-                fuzzer.scheduler_mut().on_remove(&mut state, id)?;
-            } else {
-                // False-positive: file_path is used just below
-                rename(&file_path, &new_file_path)?;
-                *file_path = new_file_path;
-            }
-        }
-    }
+    // for id in fuzzer.scheduler().current().clone() {
+    //     let mut testcase = state.corpus().get(id)?;
+    //     let file_name = testcase
+    //         .get_filename()
+    //         .expect("No file backing for corpus entry");
+    //     if let Some((base, _)) = file_name
+    //         .to_str()
+    //         .unwrap()
+    //         .rsplit_once('-')
+    //     {
+    //         let mut new_file_path = file_path.clone();
+    //         new_file_path.pop();
+    //         new_file_path.push(base);
+    //         if new_file_path.exists() {
+    //             drop(testcase);
+    //             state.corpus_mut().remove(id)?;
+    //             fuzzer.scheduler_mut().on_remove(&mut state, id)?;
+    //         } else {
+    //             // False-positive: file_path is used just below
+    //             rename(&file_path, &new_file_path)?;
+    //             *file_path = new_file_path;
+    //         }
+    //     }
+    // }
 
     println!(
         "Minimization complete; reduced to {} inputs!",
         state.corpus().count()
     );
 
-    let corpus_dir = state.corpus().dir_path().clone();
+    let corpus_dir = state.corpus().dir_path().to_path_buf();
     if corpus_dir != options.dirs()[0] {
         let temp = temp_dir().join(format!(
             "libafl-merge-orig-{}{}",

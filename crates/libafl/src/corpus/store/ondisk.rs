@@ -11,15 +11,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use libafl_bolts::Error;
 #[cfg(feature = "gzip")]
 use libafl_bolts::compress::GzipCompressor;
-use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
 use super::{InMemoryCorpusMap, Store};
 use crate::{
     corpus::{
-        CorpusId, Testcase,
+        CorpusId, Testcase, TestcaseFilenameFormat,
         testcase::{IsTestcaseMetadataCell, TestcaseMetadata},
     },
     inputs::Input,
@@ -28,13 +28,27 @@ use crate::{
 /// An on-disk store
 ///
 /// The maps only store the unique ID associated to the added [`Testcase`]s.
+/// The inputs are added in the same directory.
+///
+/// This store does not support multiple concurrent management.
+/// In other words, multiple [`OnDiskStore`]s should not be instantiated concurrently with
+/// the same root directory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OnDiskStore<I, M> {
+    filename_format: TestcaseFilenameFormat,
     disk_mgr: Rc<DiskMgr<I>>,
     enabled_map: M,
     disabled_map: M,
     first: Option<CorpusId>,
     last: Option<CorpusId>,
+}
+
+/// A builder for [`OnDiskStore`]
+#[derive(Default, Debug, Clone)]
+pub struct OnDiskStoreBuilder {
+    pub(crate) root_dir: Option<PathBuf>,
+    pub(crate) filename_format: TestcaseFilenameFormat,
+    pub(crate) md_format: OnDiskMetadataFormat,
 }
 
 /// A Disk Manager, able to load and store [`Testcase`]s
@@ -177,8 +191,14 @@ impl<I> DiskMgr<I> {
         })
     }
 
-    fn testcase_path(&self, testcase_id: &String) -> PathBuf {
-        self.root_dir.join(testcase_id)
+    /// Get the root path of the disk manager.
+    #[must_use]
+    pub fn root_path(&self) -> &Path {
+        self.root_dir.as_path()
+    }
+
+    fn testcase_path(&self, id: &str, md: &TestcaseMetadata) -> PathBuf {
+        self.root_dir.join(md.get_filename(id))
     }
 
     fn testcase_md_path(&self, testcase_id: &String) -> PathBuf {
@@ -206,34 +226,36 @@ impl<I> DiskMgr<I>
 where
     I: Input,
 {
-    fn save_input(&self, input: &I) -> Result<String, Error> {
+    /// Save the input only to disk, according to metadata.
+    pub fn save_input(&self, input: &I, md: &TestcaseMetadata) -> Result<String, Error> {
         let testcase_id = Testcase::<I, OnDiskTestcaseCell<I>>::compute_id(input);
-        let testcase_path = self.testcase_path(&testcase_id);
+        let testcase_path = self.testcase_path(&testcase_id, md);
         input.to_file(testcase_path.as_path())?;
 
         Ok(testcase_id)
     }
 
-    fn save_testcase(&self, input: &I, md: &TestcaseMetadata) -> Result<String, Error> {
-        let id = self.save_input(input)?;
+    /// Save the input and the metadata on disk
+    pub fn save_testcase(&self, input: &I, md: &TestcaseMetadata) -> Result<String, Error> {
+        let id = self.save_input(input, md)?;
         self.save_metadata(&id, md)?;
         Ok(id)
     }
 
+    /// load a testcase from its ID
+    ///
     /// prerequisite: the testcase should not have been "removed" before.
     /// also, it should only happen if it has been saved before.
-    fn load_testcase(
+    pub fn load_testcase(
         self: &Rc<Self>,
         testcase_id: &String,
     ) -> Result<Testcase<I, OnDiskTestcaseCell<I>>, Error> {
-        let testcase_path = self.as_ref().testcase_path(testcase_id);
         let testcase_md_path = self.as_ref().testcase_md_path(testcase_id);
         let ser_fmt = self.md_format.clone();
-
-        // let _lockfile = TestcaseLockfile::new(self, testcase_id)?;
-
-        let input = I::from_file(testcase_path.as_path())?;
         let md = ser_fmt.from_file(testcase_md_path.as_path())?;
+
+        let testcase_path = self.as_ref().testcase_path(testcase_id, &md);
+        let input = I::from_file(testcase_path.as_path())?;
 
         Ok(Testcase::new(
             Rc::new(input),
@@ -242,20 +264,33 @@ where
     }
 }
 
+impl<I, M> OnDiskStore<I, M> {
+    /// Instantiate an [`OnDiskStoreBuilder`].
+    #[must_use]
+    pub fn builder() -> OnDiskStoreBuilder {
+        OnDiskStoreBuilder::default()
+    }
+
+    /// Get the disk manager of the store
+    pub fn disk_mgr(&self) -> &DiskMgr<I> {
+        self.disk_mgr.as_ref()
+    }
+}
+
 impl<I, M> OnDiskStore<I, M>
 where
     M: Default,
 {
     /// Create a new [`OnDiskStore`]
-    pub fn new(root: PathBuf) -> Result<Self, Error> {
-        Self::new_with_format(root, OnDiskMetadataFormat::default())
-    }
-
-    /// Create a new [`OnDiskStore`], with a specified [`OnDiskMetadataFormat`].
-    pub fn new_with_format(root: PathBuf, md_format: OnDiskMetadataFormat) -> Result<Self, Error> {
+    pub fn new(
+        root: PathBuf,
+        filename_format: TestcaseFilenameFormat,
+        md_format: OnDiskMetadataFormat,
+    ) -> Result<Self, Error> {
         let disk_mgr = Rc::new(DiskMgr::new_with_format(root, md_format)?);
 
         Ok(Self {
+            filename_format,
             disk_mgr,
             enabled_map: M::default(),
             disabled_map: M::default(),
@@ -367,5 +402,47 @@ where
         } else {
             self.enabled_map.nth(nth)
         }
+    }
+}
+
+impl OnDiskStoreBuilder {
+    /// Create a new builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the root directory, where the testcases will be stored.
+    pub fn root_dir(&mut self, root: &Path) -> &mut Self {
+        self.root_dir = Some(root.to_path_buf());
+        self
+    }
+
+    /// Set the on-disk filename format
+    pub fn filename_format(&mut self, filename_format: TestcaseFilenameFormat) -> &mut Self {
+        self.filename_format = filename_format;
+        self
+    }
+
+    /// Set the metadata serialization format.
+    pub fn md_format(&mut self, md_format: OnDiskMetadataFormat) -> &mut Self {
+        self.md_format = md_format;
+        self
+    }
+
+    /// Build an [`OnDiskStore`].
+    /// The root directory must be set.
+    pub fn build<I, M>(&self) -> Result<OnDiskStore<I, M>, Error>
+    where
+        M: Default,
+    {
+        OnDiskStore::new(
+            self.root_dir
+                .as_ref()
+                .ok_or_else(|| Error::illegal_argument("Root directory not set"))?
+                .clone(),
+            self.filename_format.clone(),
+            self.md_format.clone(),
+        )
     }
 }
