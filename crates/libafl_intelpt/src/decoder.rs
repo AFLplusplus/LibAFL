@@ -1,6 +1,6 @@
 use core::fmt::Debug;
 
-use libafl_bolts::{Error, hash_64_fast};
+use libafl_bolts::Error; //, hash_64_fast};
 use libipt::{
     block::BlockDecoder,
     enc_dec_builder::EncoderDecoderBuilder,
@@ -170,12 +170,20 @@ where
             Ok((b, s)) => {
                 self.status = s;
                 if b.ninsn() > 0 {
-                    let id = hash_64_fast(self.previous_block_end_ip) ^ hash_64_fast(b.ip());
-                    // SAFETY: the index is < map_len since the modulo operation is applied
-                    unsafe {
-                        let map_loc = self.map_ptr.add(id as usize % self.map_len);
-                        *map_loc = (*map_loc).saturating_add(&1u8.into());
+                    // let id = hash_64_fast(self.previous_block_end_ip) ^ hash_64_fast(b.ip());
+                    // // SAFETY: the index is < map_len since the modulo operation is applied
+                    // unsafe {
+                    //     let map_loc = self.map_ptr.add(id as usize % self.map_len);
+                    //     *map_loc = (*map_loc).saturating_add(&1u8.into());
+                    // }
+                    for id in b.ip()..=b.end_ip() {
+                        unsafe {
+                            let map_loc = self.map_ptr.add(id as usize % self.map_len);
+                            *map_loc = (*map_loc).saturating_add(&1u8.into());
+                        }
                     }
+                    // let log = format!("from: {:#x} to: {:#x}\n", self.previous_block_end_ip, b.ip());
+                    // self.log.write_all(log.as_bytes()).unwrap();
                     self.previous_block_end_ip = b.end_ip();
                 }
                 Ok(())
