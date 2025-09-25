@@ -5,17 +5,12 @@ use core::{
     cell::{Ref, RefCell, RefMut},
     marker::PhantomData,
 };
-use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{fs::{self, OpenOptions}, io, io::Write, path::{Path, PathBuf}};
 
 use libafl_bolts::Error;
 #[cfg(feature = "gzip")]
 use libafl_bolts::compress::GzipCompressor;
 use serde::{Deserialize, Serialize};
-
 use super::{InMemoryCorpusMap, Store};
 use crate::{
     corpus::{
@@ -184,6 +179,12 @@ impl<I> DiskMgr<I> {
         root_dir: PathBuf,
         md_format: OnDiskMetadataFormat,
     ) -> Result<Self, Error> {
+        match fs::create_dir_all(&root_dir) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e.into())
+        }
+
         Ok(Self {
             root_dir,
             md_format,

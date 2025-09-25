@@ -153,6 +153,7 @@ pub type StdIdentityCacheTestcaseMetadataCell<I, CS, FS> = Rc<
 /// forever.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IdentityCache<M> {
+    #[serde(skip)]
     cell_map: RefCell<M>,
     cache_policy: Rc<WritebackOnFlushPolicy>,
 }
@@ -334,50 +335,6 @@ where
     }
 }
 
-impl<CS, FS, I> FifoCache<CS, FS, I>
-where
-    CS: RemovableStore<I>,
-    FS: Store<I>,
-    I: Clone,
-{
-    #[expect(clippy::too_many_arguments)]
-    fn get_inner<CAF, CGF, CRF, FGF>(
-        &mut self,
-        id: CorpusId,
-        cache_store: &mut CS,
-        fallback_store: &FS,
-        cache_add_fn: CAF,
-        cache_get_fn: CGF,
-        cache_rm_fn: CRF,
-        fallback_get_fn: FGF,
-    ) -> Result<Testcase<I, CS::TestcaseMetadataCell>, Error>
-    where
-        CAF: FnOnce(&mut CS, CorpusId, Testcase<I, RefCell<TestcaseMetadata>>) -> Result<(), Error>,
-        CGF: FnOnce(&CS, CorpusId) -> Result<Testcase<I, CS::TestcaseMetadataCell>, Error>,
-        CRF: FnOnce(&mut CS, CorpusId) -> Result<Testcase<I, CS::TestcaseMetadataCell>, Error>,
-        FGF: FnOnce(&FS, CorpusId) -> Result<Testcase<I, FS::TestcaseMetadataCell>, Error>,
-    {
-        if self.cached_ids.contains(&id) {
-            cache_get_fn(cache_store, id)
-        } else {
-            if self.cached_ids.len() == self.cache_max_len {
-                let to_evict = self.cached_ids.pop_back().unwrap();
-                cache_rm_fn(cache_store, to_evict)?;
-            }
-
-            debug_assert!(self.cached_ids.len() < self.cache_max_len);
-
-            // tescase is not cached, fetch it from fallback
-            let fb_tc = fallback_get_fn(fallback_store, id)?.cloned();
-            cache_add_fn(cache_store, id, fb_tc)?;
-
-            self.cached_ids.push_front(id);
-
-            cache_get_fn(cache_store, id)
-        }
-    }
-}
-
 impl<CS, FS, I> Cache<CS, FS, I> for FifoCache<CS, FS, I>
 where
     CS: RemovableStore<I>,
@@ -403,18 +360,26 @@ where
         cache_store: &mut CS,
         fallback_store: &FS,
     ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
-        self.get_inner(
-            id,
-            cache_store,
-            fallback_store,
-            |cache_store, corpus_id, testcase| {
-                let (input, md) = testcase.into_inner();
-                cache_store.add_shared::<ENABLED>(corpus_id, input, md.into_testcase_metadata())
-            },
-            Store::get,
-            RemovableStore::remove,
-            Store::get_from::<ENABLED>,
-        )
+        if self.cached_ids.contains(&id) {
+            cache_store.get(id)
+        } else {
+            if self.cached_ids.len() == self.cache_max_len {
+                let to_evict = self.cached_ids.pop_back().unwrap();
+                cache_store.remove(to_evict)?;
+            }
+
+            debug_assert!(self.cached_ids.len() < self.cache_max_len);
+
+            // tescase is not cached, fetch it from fallback
+            let fb_tc = fallback_store.get_from::<ENABLED>(id)?.cloned();
+            let (input, md) = fb_tc.into_inner();
+
+            cache_store.add_shared::<ENABLED>(id, input, md.into_testcase_metadata())?;
+
+            self.cached_ids.push_front(id);
+
+            cache_store.get(id)
+        }
     }
 
     fn disable(

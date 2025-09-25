@@ -20,7 +20,7 @@ use libafl_bolts::{
     HasLen, hasher_std,
     serdeany::{SerdeAny, SerdeAnyMap},
 };
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -31,7 +31,7 @@ use crate::{
 };
 
 /// A testcase metadata cell that can be instantiated only from a [`TestcaseMetadata`].
-pub trait HasInstantiableTestcaseMetadata: IsTestcaseMetadataCell {
+pub trait IsInstantiableTestcaseMetadataCell: IsTestcaseMetadataCell {
     /// Instantiate a testcase metadata cell from a [`TestcaseMetadata`].
     fn instantiate(metadata: TestcaseMetadata) -> Self;
 }
@@ -135,7 +135,7 @@ impl IsTestcaseMetadataCell for RefCell<TestcaseMetadata> {
     }
 }
 
-impl HasInstantiableTestcaseMetadata for RefCell<TestcaseMetadata> {
+impl IsInstantiableTestcaseMetadataCell for RefCell<TestcaseMetadata> {
     fn instantiate(metadata: TestcaseMetadata) -> Self {
         RefCell::new(metadata)
     }
@@ -175,9 +175,9 @@ where
     }
 }
 
-impl<T> HasInstantiableTestcaseMetadata for Rc<T>
+impl<T> IsInstantiableTestcaseMetadataCell for Rc<T>
 where
-    T: HasInstantiableTestcaseMetadata + Clone,
+    T: IsInstantiableTestcaseMetadataCell + Clone,
 {
     fn instantiate(metadata: TestcaseMetadata) -> Self {
         Rc::new(T::instantiate(metadata))
@@ -274,6 +274,7 @@ pub struct TestcaseMetadata {
 }
 
 /// An entry in the [`Testcase`] Corpus
+#[derive(Serialize, Deserialize)]
 pub struct Testcase<I, M> {
     /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
     input: Rc<I>,
@@ -310,30 +311,6 @@ where
             .field("id", &self.id)
             .field("metadata", &*self.metadata.testcase_metadata())
             .finish()
-    }
-}
-
-impl<I, M> Serialize for Testcase<I, M>
-where
-    M: IsTestcaseMetadataCell,
-{
-    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        todo!()
-    }
-}
-
-impl<'de, I, M> Deserialize<'de> for Testcase<I, M>
-where
-    M: IsTestcaseMetadataCell,
-{
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        todo!()
     }
 }
 

@@ -10,7 +10,7 @@ use super::{InMemoryCorpusMap, RemovableStore, Store};
 use crate::{
     corpus::{
         CorpusId, Testcase,
-        testcase::{HasInstantiableTestcaseMetadata, TestcaseMetadata},
+        testcase::{IsInstantiableTestcaseMetadataCell, TestcaseMetadata},
     },
     inputs::Input,
 };
@@ -39,7 +39,7 @@ where
 impl<I, M, TMC> Store<I> for InMemoryStore<I, M, TMC>
 where
     M: InMemoryCorpusMap<Testcase<I, TMC>>,
-    TMC: HasInstantiableTestcaseMetadata + Clone,
+    TMC: IsInstantiableTestcaseMetadataCell + Clone,
     I: Input,
 {
     type TestcaseMetadataCell = TMC;
@@ -145,7 +145,7 @@ where
 impl<I, M, TMC> RemovableStore<I> for InMemoryStore<I, M, TMC>
 where
     M: InMemoryCorpusMap<Testcase<I, TMC>>,
-    TMC: HasInstantiableTestcaseMetadata + Clone,
+    TMC: IsInstantiableTestcaseMetadataCell + Clone,
     I: Input,
 {
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
