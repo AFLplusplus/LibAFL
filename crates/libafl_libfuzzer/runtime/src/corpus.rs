@@ -1,266 +1,113 @@
-use std::{
-    cell::RefCell,
-    collections::BTreeMap,
-    io::ErrorKind,
-    path::PathBuf,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::{cell::RefCell, path::Path, rc::Rc};
 
-use hashbrown::{HashMap, hash_map::Entry};
 use libafl::{
-    corpus::{
-        Corpus, CorpusId, Testcase,
-        inmemory::{TestcaseStorage, TestcaseStorageMap},
-    },
+    corpus::{CachedOnDiskCorpus, Corpus, CorpusId, Testcase, TestcaseMetadata, store::DiskMgr},
     inputs::Input,
 };
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
-/// A corpus which attempts to mimic the behaviour of libFuzzer.
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[repr(transparent)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct LibfuzzerCorpus<I>
-where
-    I: Input + Serialize,
-{
-    corpus_dir: PathBuf,
-    loaded_mapping: RefCell<HashMap<CorpusId, u64>>,
-    loaded_entries: RefCell<BTreeMap<u64, CorpusId>>,
-    mapping: TestcaseStorage<I>,
-    max_len: usize,
+pub struct LibfuzzerCorpus<I: Input>(CachedOnDiskCorpus<I>);
 
-    current: Option<CorpusId>,
-    next_recency: AtomicU64,
-}
-
-impl<I> LibfuzzerCorpus<I>
-where
-    I: Input + Serialize + for<'de> Deserialize<'de>,
-{
-    pub fn new(corpus_dir: PathBuf, max_len: usize) -> Self {
-        Self {
-            corpus_dir,
-            loaded_mapping: RefCell::new(HashMap::default()),
-            loaded_entries: RefCell::new(BTreeMap::default()),
-            mapping: TestcaseStorage::new(),
-            max_len,
-            current: None,
-            next_recency: AtomicU64::new(0),
-        }
+impl<I: Input> LibfuzzerCorpus<I> {
+    pub fn new(root_dir: &Path, cache_max_len: usize) -> Result<Self, Error> {
+        Ok(Self(
+            CachedOnDiskCorpus::<I>::builder()
+                .root_dir(root_dir)
+                .cache_max_len(cache_max_len)
+                .build()?,
+        ))
     }
 
-    pub fn dir_path(&self) -> &PathBuf {
-        &self.corpus_dir
-    }
-
-    /// Touch this index and maybe evict an entry if we have touched an input which was unloaded.
-    fn touch(&self, id: CorpusId, corpus: &TestcaseStorageMap<I>) -> Result<(), Error> {
-        let mut loaded_mapping = self.loaded_mapping.borrow_mut();
-        let mut loaded_entries = self.loaded_entries.borrow_mut();
-        match loaded_mapping.entry(id) {
-            Entry::Occupied(mut e) => {
-                let &old = e.get();
-                let new = self.next_recency.fetch_add(1, Ordering::Relaxed);
-                e.insert(new);
-                loaded_entries.remove(&old);
-                loaded_entries.insert(new, id);
-            }
-            Entry::Vacant(e) => {
-                // new entry! send it in
-                let new = self.next_recency.fetch_add(1, Ordering::Relaxed);
-                e.insert(new);
-                loaded_entries.insert(new, id);
-            }
-        }
-        if loaded_entries.len() > self.max_len {
-            let id = loaded_entries.pop_first().unwrap().1; // cannot panic
-            let cell = corpus.get(id).ok_or_else(|| {
-                Error::key_not_found(format!("Tried to evict non-existent entry {id}"))
-            })?;
-            let mut tc = cell.try_borrow_mut()?;
-            let _ = tc.input_mut().take();
-        }
-        Ok(())
-    }
-    #[inline]
-    fn _get<'a>(
-        &'a self,
-        id: CorpusId,
-        corpus: &'a TestcaseStorageMap<I>,
-    ) -> Result<&'a RefCell<Testcase<I>>, Error> {
-        self.touch(id, corpus)?;
-        corpus.map.get(&id).map(|item| &item.testcase).ok_or_else(|| Error::illegal_state("Nonexistent corpus entry {id} requested (present in loaded entries, but not the mapping?)"))
-    }
-
-    fn _add(
-        &mut self,
-        testcase: RefCell<Testcase<I>>,
-        is_disabled: bool,
-    ) -> Result<CorpusId, Error> {
-        let id = if is_disabled {
-            self.mapping.insert_disabled(testcase)
-        } else {
-            self.mapping.insert(testcase)
-        };
-        let corpus = if is_disabled {
-            &self.mapping.disabled
-        } else {
-            &self.mapping.enabled
-        };
-        let mut testcase = corpus.get(id).unwrap().borrow_mut();
-        match testcase.file_path() {
-            Some(path) if path.canonicalize()?.starts_with(&self.corpus_dir) => {
-                // if it's already in the correct dir, we retain it
-            }
-            _ => {
-                let input = testcase.input().as_ref().ok_or_else(|| {
-                    Error::empty(
-                        "The testcase, when added to the corpus, must have an input present!",
-                    )
-                })?;
-                let name = input.generate_name(Some(id));
-                let path = self.corpus_dir.join(&name);
-
-                match input.to_file(&path) {
-                    Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AlreadyExists => {
-                        // we do not care if the file already exists; in this case, we assume it is equal
-                    }
-                    res => res?,
-                }
-
-                // we DO NOT save metadata!
-
-                testcase.filename_mut().replace(name);
-                testcase.file_path_mut().replace(path);
-            }
-        }
-        self.touch(id, corpus)?;
-        Ok(id)
+    pub fn dir_path(&self) -> &Path {
+        self.0.fallback_store().disk_mgr().root_path()
     }
 }
 
-impl<I> Corpus<I> for LibfuzzerCorpus<I>
-where
-    I: Input + Serialize + for<'de> Deserialize<'de>,
-{
-    #[inline]
+impl<I: Input> Corpus<I> for LibfuzzerCorpus<I> {
+    type TestcaseMetadataCell = <CachedOnDiskCorpus<I> as Corpus<I>>::TestcaseMetadataCell;
+
     fn count(&self) -> usize {
-        self.mapping.enabled.map.len()
+        self.0.count()
     }
-    #[inline]
+
     fn count_disabled(&self) -> usize {
-        self.mapping.disabled.map.len()
+        self.0.count_disabled()
     }
-    #[inline]
+
     fn count_all(&self) -> usize {
-        self.count().saturating_add(self.count_disabled())
+        self.0.count_all()
     }
 
-    #[expect(clippy::used_underscore_items)]
-    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        self._add(RefCell::new(testcase), false)
-    }
-    #[expect(clippy::used_underscore_items)]
-    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        self._add(RefCell::new(testcase), true)
-    }
-
-    fn replace(&mut self, _id: CorpusId, _testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        unimplemented!("It is unsafe to use this corpus variant with replace!");
+    fn add_shared<const ENABLED: bool>(
+        &mut self,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<CorpusId, Error> {
+        self.0.add_shared::<ENABLED>(input, md)
     }
 
-    fn remove(&mut self, _id: CorpusId) -> Result<Testcase<I>, Error> {
-        unimplemented!("It is unsafe to use this corpus variant with replace!");
+    /// Get testcase by id
+    fn get_from<const ENABLED: bool>(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        self.0.get_from::<ENABLED>(id)
     }
 
-    #[expect(clippy::used_underscore_items)]
-    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        self._get(id, &self.mapping.enabled)
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        self.0.disable(id)
     }
 
-    #[expect(clippy::used_underscore_items)]
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        match self._get(id, &self.mapping.enabled) {
-            Ok(input) => Ok(input),
-            Err(Error::KeyNotFound(..)) => self._get(id, &self.mapping.disabled),
-            Err(e) => Err(e),
-        }
+    fn replace_metadata(
+        &mut self,
+        id: CorpusId,
+        md: TestcaseMetadata,
+    ) -> Result<Self::TestcaseMetadataCell, Error> {
+        self.0.replace_metadata(id, md)
     }
+
     fn current(&self) -> &Option<CorpusId> {
-        &self.current
+        self.0.current()
     }
 
     fn current_mut(&mut self) -> &mut Option<CorpusId> {
-        &mut self.current
+        self.0.current_mut()
     }
 
     fn next(&self, id: CorpusId) -> Option<CorpusId> {
-        self.mapping.enabled.next(id)
-    }
-    fn peek_free_id(&self) -> CorpusId {
-        self.mapping.peek_free_id()
+        self.0.next(id)
     }
 
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {
-        self.mapping.enabled.prev(id)
+        self.0.prev(id)
     }
 
     fn first(&self) -> Option<CorpusId> {
-        self.mapping.enabled.first()
+        self.0.first()
     }
 
     fn last(&self) -> Option<CorpusId> {
-        self.mapping.enabled.last()
+        self.0.last()
     }
 
-    /// Get the nth corpus id; considers both enabled and disabled testcases
-    #[inline]
+    fn nth(&self, nth: usize) -> CorpusId {
+        self.0.nth(nth)
+    }
+
     fn nth_from_all(&self, nth: usize) -> CorpusId {
-        let enabled_count = self.count();
-        if nth >= enabled_count {
-            return self.mapping.disabled.keys[nth.saturating_sub(enabled_count)];
-        }
-        self.mapping.enabled.keys[nth]
-    }
-
-    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        // we don't need to update the loaded testcases because it must have already been loaded
-        if testcase.input().is_none() {
-            let path = testcase.file_path().as_ref().ok_or_else(|| {
-                Error::empty("The testcase, when being saved, must have a file path!")
-            })?;
-            let input = I::from_file(path)?;
-            testcase.input_mut().replace(input);
-        }
-        Ok(())
-    }
-
-    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
-        let input = testcase.input().as_ref().ok_or_else(|| {
-            Error::empty("The testcase, when being saved, must have an input present!")
-        })?;
-        let path = testcase.file_path().as_ref().ok_or_else(|| {
-            Error::empty("The testcase, when being saved, must have a file path!")
-        })?;
-        match input.to_file(path) {
-            Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AlreadyExists => {
-                // we do not care if the file already exists; in this case, we assume it is equal
-                Ok(())
-            }
-            res => res,
-        }
+        self.0.nth_from_all(nth)
     }
 }
 
 /// A corpus which attempts to mimic the behaviour of libFuzzer's crash output.
 #[derive(Deserialize, Serialize, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct ArtifactCorpus<I>
-where
-    I: Input + Serialize,
-{
-    last: Option<RefCell<Testcase<I>>>,
+pub struct ArtifactCorpus<I> {
+    mgr: DiskMgr<I>,
+    last: Option<Testcase<I, RefCell<TestcaseMetadata>>>,
     count: usize,
 }
 
@@ -268,18 +115,21 @@ impl<I> ArtifactCorpus<I>
 where
     I: Input + Serialize + for<'de> Deserialize<'de>,
 {
-    pub fn new() -> Self {
-        Self {
+    pub fn new(root_dir: &Path) -> Result<Self, Error> {
+        Ok(Self {
+            mgr: DiskMgr::new(root_dir.to_path_buf())?,
             last: None,
             count: 0,
-        }
+        })
     }
 }
 
 impl<I> Corpus<I> for ArtifactCorpus<I>
 where
-    I: Input + Serialize + for<'de> Deserialize<'de>,
+    I: Input,
 {
+    type TestcaseMetadataCell = RefCell<TestcaseMetadata>;
+
     fn count(&self) -> usize {
         self.count
     }
@@ -294,62 +144,55 @@ where
         self.count() + self.count_disabled()
     }
 
-    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+    fn add_shared<const ENABLED: bool>(
+        &mut self,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<CorpusId, Error> {
+        if !ENABLED {
+            unimplemented!("ArtifactCorpus disregards disabled inputs")
+        }
+
         let idx = self.count;
         self.count += 1;
 
-        let input = testcase.input().as_ref().ok_or_else(|| {
-            Error::empty("The testcase, when added to the corpus, must have an input present!")
-        })?;
-        let path = testcase.file_path().as_ref().ok_or_else(|| {
-            Error::illegal_state("Should have set the path in the LibfuzzerCrashCauseFeedback.")
-        })?;
-        match input.to_file(path) {
-            Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AlreadyExists => {
-                // we do not care if the file already exists; in this case, we assume it is equal
-            }
-            res => res?,
-        }
+        self.mgr.save_input(input.as_ref(), &md)?;
+        let testcase = Testcase::new(input, RefCell::new(md));
 
         // we DO NOT save metadata!
-        self.last = Some(RefCell::new(testcase));
+        self.last = Some(testcase);
 
         Ok(CorpusId::from(idx))
     }
 
-    fn add_disabled(&mut self, _testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        unimplemented!("ArtifactCorpus disregards disabled inputs")
-    }
-
-    fn replace(&mut self, _id: CorpusId, _testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
-    }
-
-    fn remove(&mut self, _id: CorpusId) -> Result<Testcase<I>, Error> {
-        unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
-    }
-
-    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get_from<const ENABLED: bool>(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
         let maybe_last = if self
             .count
             .checked_sub(1)
             .map(CorpusId::from)
             .is_some_and(|last| last == id)
         {
-            self.last.as_ref()
+            self.last.clone()
         } else {
             None
         };
+
         maybe_last.ok_or_else(|| Error::illegal_argument("Can only get the last corpus ID."))
     }
 
-    fn peek_free_id(&self) -> CorpusId {
-        CorpusId::from(self.count)
+    fn disable(&mut self, _id: CorpusId) -> Result<(), Error> {
+        unimplemented!("ArtifactCorpus disregards disabled inputs")
     }
 
-    // This just calls Self::get as ArtifactCorpus disregards disabled entries
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        self.get(id)
+    fn replace_metadata(
+        &mut self,
+        _id: CorpusId,
+        _md: TestcaseMetadata,
+    ) -> Result<Self::TestcaseMetadataCell, Error> {
+        unimplemented!("ArtifactCorpus does not store metadata")
     }
 
     // This just calls Self::nth as ArtifactCorpus disregards disabled entries
@@ -379,13 +222,5 @@ where
 
     fn last(&self) -> Option<CorpusId> {
         self.count.checked_sub(1).map(CorpusId::from)
-    }
-
-    fn load_input_into(&self, _testcase: &mut Testcase<I>) -> Result<(), Error> {
-        unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
-    }
-
-    fn store_input_from(&self, _testcase: &Testcase<I>) -> Result<(), Error> {
-        unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
     }
 }

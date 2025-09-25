@@ -14,7 +14,9 @@ use serde::{Serialize, de::DeserializeOwned};
 use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
+    corpus::{
+        Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, IsTestcaseMetadataCell, TestcaseMetadata,
+    },
     events::{
         Event, EventConfig, EventFirer, EventReceiver, EventWithStats, ProgressReporter,
         SendExiting,
@@ -421,30 +423,34 @@ where
             ExecuteInputResult::Corpus => {
                 // Not a solution
                 // Add the input to the main corpus
-                let mut testcase = Testcase::from(input.clone());
+                let mut md = TestcaseMetadata::default();
+
                 #[cfg(feature = "track_hit_feedbacks")]
                 self.feedback_mut()
-                    .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
+                    .append_hit_feedbacks(md.hit_feedbacks_mut())?;
                 self.feedback_mut()
-                    .append_metadata(state, manager, observers, &mut testcase)?;
-                let id = state.corpus_mut().add(testcase)?;
+                    .append_metadata(state, manager, observers, input, &mut md)?;
+
+                let id = state.corpus_mut().add_with_metadata(input.clone(), md)?;
                 self.scheduler_mut().on_add(state, id)?;
 
                 Ok(Some(id))
             }
             ExecuteInputResult::Solution => {
                 // The input is a solution, add it to the respective corpus
-                let mut testcase = Testcase::from(input.clone());
-                testcase.set_parent_id_optional(*state.corpus().current());
-                if let Ok(mut tc) = state.current_testcase_mut() {
+                let mut md = TestcaseMetadata::default();
+
+                md.set_parent_id_optional(*state.corpus().current());
+
+                if let Ok(mut tc) = state.current_testcase() {
                     tc.found_objective();
                 }
                 #[cfg(feature = "track_hit_feedbacks")]
                 self.objective_mut()
-                    .append_hit_feedbacks(testcase.hit_objectives_mut())?;
+                    .append_hit_feedbacks(md.hit_objectives_mut())?;
                 self.objective_mut()
-                    .append_metadata(state, manager, observers, &mut testcase)?;
-                state.solutions_mut().add(testcase)?;
+                    .append_metadata(state, manager, observers, input, &mut md)?;
+                state.solutions_mut().add_with_metadata(input.clone(), md)?;
 
                 Ok(None)
             }
@@ -697,8 +703,9 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
-        let mut testcase = Testcase::from(input.clone());
-        testcase.set_executions(*state.executions());
+        let mut tc_md = TestcaseMetadata::builder()
+            .executions(*state.executions())
+            .build();
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
@@ -718,11 +725,18 @@ where
         if is_solution {
             #[cfg(feature = "track_hit_feedbacks")]
             self.objective_mut()
-                .append_hit_feedbacks(testcase.hit_objectives_mut())?;
-            self.objective_mut()
-                .append_metadata(state, manager, &*observers, &mut testcase)?;
+                .append_hit_feedbacks(tc_md.hit_objectives_mut())?;
+            self.objective_mut().append_metadata(
+                state,
+                manager,
+                &*observers,
+                &input,
+                &mut tc_md,
+            )?;
             // we don't care about solution id
-            let id = state.solutions_mut().add(testcase)?;
+            let id = state
+                .solutions_mut()
+                .add_with_metadata(input.clone(), tc_md.clone())?;
 
             manager.fire(
                 state,
@@ -756,11 +770,11 @@ where
 
         #[cfg(feature = "track_hit_feedbacks")]
         self.feedback_mut()
-            .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
+            .append_hit_feedbacks(tc_md.hit_feedbacks_mut())?;
         // Add the input to the main corpus
         self.feedback_mut()
-            .append_metadata(state, manager, &*observers, &mut testcase)?;
-        let id = state.corpus_mut().add(testcase)?;
+            .append_metadata(state, manager, &*observers, &input, &mut tc_md)?;
+        let id = state.corpus_mut().add_with_metadata(input.clone(), tc_md)?;
         self.scheduler_mut().on_add(state, id)?;
 
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
@@ -788,11 +802,15 @@ where
     }
 
     fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {
-        let mut testcase = Testcase::from(input.clone());
-        testcase.set_executions(*state.executions());
-        testcase.set_disabled(true);
+        let tc_md = TestcaseMetadata::builder()
+            .executions(*state.executions())
+            .disabled(true)
+            .build();
+
         // Add the disabled input to the main corpus
-        let id = state.corpus_mut().add_disabled(testcase)?;
+        let id = state
+            .corpus_mut()
+            .add_disabled_with_metadata(input.clone(), tc_md)?;
         Ok(id)
     }
 }
@@ -945,10 +963,12 @@ where
         state.introspection_stats_mut().mark_manager_time();
 
         {
-            if let Ok(mut testcase) = state.testcase_mut(id) {
-                let scheduled_count = testcase.scheduled_count();
+            if let Ok(testcase) = state.testcase(id) {
+                let mut md = testcase.testcase_metadata_mut();
+
+                let scheduled_count = md.scheduled_count();
                 // increase scheduled count, this was fuzz_level in afl
-                testcase.set_scheduled_count(scheduled_count + 1);
+                md.set_scheduled_count(scheduled_count + 1);
             }
         }
 

@@ -15,12 +15,10 @@ use libafl_bolts::{
 use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, HasMetadata, HasNamedMetadata,
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::{Corpus, HasCurrentCorpusId, IsTestcaseMetadataCell},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{
-        BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes, ResizableMutator,
-    },
+    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, ResizableMutator},
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
@@ -112,25 +110,29 @@ where
             start_timer!(state);
             {
                 let corpus = state.corpus();
-                let mut testcase = corpus.get(corpus_id)?.borrow_mut();
+                let testcase = corpus.get(corpus_id)?;
                 if testcase.scheduled_count() > 0 {
                     return Ok(());
                 }
-
-                corpus.load_input_into(&mut testcase)?;
             }
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-            let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
-            let input = entry.input_mut().as_mut().unwrap();
+            let entry = state.corpus().get(corpus_id)?;
+            let md = entry.testcase_metadata();
+            let input = entry.input();
 
-            let payload: Vec<_> = input.mutator_bytes().iter().map(|&x| Some(x)).collect();
+            let payload: Vec<_> = input
+                .as_ref()
+                .clone()
+                .into_inner()
+                .into_iter()
+                .map(Some)
+                .collect();
 
             if payload.len() > MAX_GENERALIZED_LEN {
                 return Ok(());
             }
 
-            let original = input.clone();
-            let meta = entry.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
+            let meta = md.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
                     Error::key_not_found(format!(
                         "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_id} (check the arguments of MapFeedback::new(...))"
                     ))
@@ -138,7 +140,7 @@ where
             if meta.as_slice().is_empty() {
                 return Ok(()); // don't generalise inputs which don't have novelties
             }
-            (payload, original, meta.as_slice().to_vec())
+            (payload, input.clone(), meta.as_slice().to_vec())
         };
 
         // Do not generalized unstable inputs
@@ -336,8 +338,11 @@ where
             assert!(meta.generalized().first() == Some(&GeneralizedItem::Gap));
             assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
 
-            let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
-            entry.metadata_map_mut().insert(meta);
+            let entry = state.corpus().get(corpus_id)?;
+            entry
+                .testcase_metadata_mut()
+                .metadata_map_mut()
+                .insert(meta);
         }
 
         Ok(())

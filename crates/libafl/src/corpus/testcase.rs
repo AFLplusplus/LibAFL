@@ -1,160 +1,566 @@
 //! The [`Testcase`] is a struct embedded in each [`Corpus`].
 //! It will contain a respective input, and metadata.
 
-use alloc::string::String;
 #[cfg(feature = "track_hit_feedbacks")]
 use alloc::{borrow::Cow, vec::Vec};
+use alloc::{
+    rc::Rc,
+    string::{String, ToString},
+};
 use core::{
-    cell::{Ref, RefMut},
+    cell::{Ref, RefCell, RefMut},
+    fmt::{Debug, Formatter},
+    hash::Hasher,
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
     time::Duration,
 };
-#[cfg(feature = "std")]
-use std::path::PathBuf;
 
-use libafl_bolts::{HasLen, serdeany::SerdeAnyMap};
+use libafl_bolts::{
+    HasLen, hasher_std,
+    serdeany::{SerdeAny, SerdeAnyMap},
+};
 use serde::{Deserialize, Serialize};
+use typed_builder::TypedBuilder;
 
-use super::Corpus;
-use crate::{Error, HasMetadata, corpus::CorpusId};
+use crate::{
+    Error, HasMetadata,
+    corpus::{Corpus, CorpusId},
+    inputs::Input,
+    state::HasCorpus,
+};
+
+/// A testcase metadata cell that can be instantiated only from a [`TestcaseMetadata`].
+pub trait IsInstantiableTestcaseMetadataCell: IsTestcaseMetadataCell {
+    /// Instantiate a testcase metadata cell from a [`TestcaseMetadata`].
+    fn instantiate(metadata: TestcaseMetadata) -> Self;
+}
+
+/// Trait implemented by possible [`TestcaseMetadata`] cells.
+pub trait IsTestcaseMetadataCell {
+    /// A reference to a testcase metadata.
+    type TestcaseMetadataRef<'a>: Deref<Target = TestcaseMetadata>
+    where
+        Self: 'a;
+
+    /// A mutable reference to a testcase metadata.
+    type TestcaseMetadataRefMut<'a>: DerefMut<Target = TestcaseMetadata>
+    where
+        Self: 'a;
+
+    /// Get a reference to the testcase metadata.
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_>;
+
+    /// Get a mutable reference to the testcase metadata.
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_>;
+
+    /// Consume the cell, and get the inner testcase metadata.
+    fn into_testcase_metadata(self) -> TestcaseMetadata;
+
+    /// Replace the inner testcase metadata with new metadata, returning the old metadata
+    fn replace_testcase_metadata(&self, testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        let mut tc_ref = self.testcase_metadata_mut();
+        let old_tc = tc_ref.clone();
+        *tc_ref = testcase_metadata;
+        old_tc
+    }
+
+    /// Propagate metadata cell changes
+    fn flush(&self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// A dummy (empty) [`TestcaseMetadata`] reference.
+#[derive(Default, Clone, Copy, Debug)]
+pub struct NopTestcaseMetadataRef<'a>(PhantomData<&'a ()>);
+
+/// A dummy (empty) [`TestcaseMetadata`] cell.
+#[derive(Default, Clone, Copy, Debug)]
+pub struct NopTestcaseMetadataCell;
+
+impl Deref for NopTestcaseMetadataRef<'_> {
+    type Target = TestcaseMetadata;
+
+    fn deref(&self) -> &Self::Target {
+        panic!("Invalid testcase metadata ref")
+    }
+}
+
+impl DerefMut for NopTestcaseMetadataRef<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        panic!("Invalid testcase metadata ref mut")
+    }
+}
+
+impl IsTestcaseMetadataCell for NopTestcaseMetadataCell {
+    type TestcaseMetadataRef<'a> = NopTestcaseMetadataRef<'a>;
+    type TestcaseMetadataRefMut<'a> = NopTestcaseMetadataRef<'a>;
+
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_> {
+        NopTestcaseMetadataRef::default()
+    }
+
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_> {
+        NopTestcaseMetadataRef::default()
+    }
+
+    fn into_testcase_metadata(self) -> TestcaseMetadata {
+        panic!("Invalid testcase metadata")
+    }
+
+    fn replace_testcase_metadata(&self, _testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        panic!("Invalid testcase metadata")
+    }
+}
+
+impl IsTestcaseMetadataCell for RefCell<TestcaseMetadata> {
+    type TestcaseMetadataRef<'a> = Ref<'a, TestcaseMetadata>;
+    type TestcaseMetadataRefMut<'a> = RefMut<'a, TestcaseMetadata>;
+
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_> {
+        self.borrow()
+    }
+
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_> {
+        self.borrow_mut()
+    }
+
+    fn into_testcase_metadata(self) -> TestcaseMetadata {
+        self.into_inner()
+    }
+
+    fn replace_testcase_metadata(&self, testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        RefCell::replace(self, testcase_metadata)
+    }
+}
+
+impl IsInstantiableTestcaseMetadataCell for RefCell<TestcaseMetadata> {
+    fn instantiate(metadata: TestcaseMetadata) -> Self {
+        RefCell::new(metadata)
+    }
+}
+
+impl<T> IsTestcaseMetadataCell for Rc<T>
+where
+    T: IsTestcaseMetadataCell + Clone,
+{
+    type TestcaseMetadataRef<'a>
+        = T::TestcaseMetadataRef<'a>
+    where
+        Self: 'a;
+
+    type TestcaseMetadataRefMut<'a>
+        = T::TestcaseMetadataRefMut<'a>
+    where
+        Self: 'a;
+
+    // fn new(md: TestcaseMetadata) -> Self {
+    //     Rc::new(T::new(md))
+    // }
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_> {
+        self.deref().testcase_metadata()
+    }
+
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_> {
+        self.deref().testcase_metadata_mut()
+    }
+
+    fn into_testcase_metadata(self) -> TestcaseMetadata {
+        self.deref().clone().into_testcase_metadata()
+    }
+
+    fn replace_testcase_metadata(&self, testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        T::replace_testcase_metadata(self, testcase_metadata)
+    }
+}
+
+impl<T> IsInstantiableTestcaseMetadataCell for Rc<T>
+where
+    T: IsInstantiableTestcaseMetadataCell + Clone,
+{
+    fn instantiate(metadata: TestcaseMetadata) -> Self {
+        Rc::new(T::instantiate(metadata))
+    }
+}
+
+impl<I, M> IsTestcaseMetadataCell for Testcase<I, M>
+where
+    M: IsTestcaseMetadataCell,
+{
+    type TestcaseMetadataRef<'a>
+        = M::TestcaseMetadataRef<'a>
+    where
+        Self: 'a;
+    type TestcaseMetadataRefMut<'a>
+        = M::TestcaseMetadataRefMut<'a>
+    where
+        Self: 'a;
+
+    fn testcase_metadata(&self) -> Self::TestcaseMetadataRef<'_> {
+        self.metadata.testcase_metadata()
+    }
+
+    fn testcase_metadata_mut(&self) -> Self::TestcaseMetadataRefMut<'_> {
+        self.metadata.testcase_metadata_mut()
+    }
+
+    fn into_testcase_metadata(self) -> TestcaseMetadata {
+        self.metadata.into_testcase_metadata()
+    }
+
+    fn replace_testcase_metadata(&self, testcase_metadata: TestcaseMetadata) -> TestcaseMetadata {
+        self.metadata.replace_testcase_metadata(testcase_metadata)
+    }
+}
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-pub trait HasTestcase<I> {
+pub trait HasTestcase<I>: HasCorpus<I> {
     /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<I>>, Error>;
-
-    /// Shorthand to receive a [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
-    /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<I>>, Error>;
+    fn testcase(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, <Self::Corpus as Corpus<I>>::TestcaseMetadataCell>, Error>;
 }
 
-/// An entry in the [`Testcase`] Corpus
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Testcase<I> {
-    /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
-    input: Option<I>,
-    /// The filename for this [`Testcase`]
-    filename: Option<String>,
-    /// Complete path to the [`Input`] on disk, if this [`Testcase`] is backed by a file in the filesystem
-    #[cfg(feature = "std")]
-    file_path: Option<PathBuf>,
+/// Indicates how a [`Testcase`] should be named on-disk.
+#[derive(Default, Clone, Serialize, Deserialize, Debug)]
+pub enum TestcaseFilenameFormat {
+    /// Use the unique [`Testcase`] ID as a name.
+    #[default]
+    Id,
+    /// Use a prefix before the id
+    Prefix(String),
+    /// Use a custom name.
+    Custom(String),
+}
+
+/// The [`Testcase`] metadata.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, TypedBuilder)]
+pub struct TestcaseMetadata {
     /// Map of metadata associated with this [`Testcase`]
+    #[builder(default)]
     metadata: SerdeAnyMap,
-    /// Complete path to the metadata [`SerdeAnyMap`] on disk, if this [`Testcase`] is backed by a file in the filesystem
-    #[cfg(feature = "std")]
-    metadata_path: Option<PathBuf>,
+    /// The filename format used to name the [`Testcase`] file on-disk.
+    #[builder(default)]
+    filename_format: TestcaseFilenameFormat,
     /// Time needed to execute the input
+    #[builder(default)]
     exec_time: Option<Duration>,
-    /// Cached len of the input, if any
-    cached_len: Option<usize>,
     /// Number of fuzzing iterations of this particular input updated in `perform_mutational`
+    #[builder(default = 0)]
     scheduled_count: usize,
     /// Number of executions done at discovery time
     executions: u64,
     /// Parent [`CorpusId`], if known
+    #[builder(default)]
     parent_id: Option<CorpusId>,
     /// If the testcase is "disabled"
+    #[builder(default = false)]
     disabled: bool,
     /// has found crash (or timeout) or not
+    #[builder(default = 0)]
     objectives_found: usize,
     /// Vector of `Feedback` names that deemed this `Testcase` as corpus worthy
     #[cfg(feature = "track_hit_feedbacks")]
+    #[builder(default)]
     hit_feedbacks: Vec<Cow<'static, str>>,
     /// Vector of `Feedback` names that deemed this `Testcase` as solution worthy
     #[cfg(feature = "track_hit_feedbacks")]
+    #[builder(default)]
     hit_objectives: Vec<Cow<'static, str>>,
 }
 
-impl<I> HasMetadata for Testcase<I> {
-    /// Get all the metadata into an [`hashbrown::HashMap`]
-    #[inline]
+/// An entry in the [`Testcase`] Corpus
+#[derive(Serialize, Deserialize)]
+pub struct Testcase<I, M> {
+    /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
+    input: Rc<I>,
+
+    /// The unique id for [`Testcase`].
+    /// It should uniquely identify the input.
+    id: String,
+
+    /// The metadata linked to the [`Testcase`]
+    pub(crate) metadata: M,
+}
+
+impl<I, M> Clone for Testcase<I, M>
+where
+    M: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            input: self.input.clone(),
+            id: self.id.clone(),
+            metadata: self.metadata.clone(),
+        }
+    }
+}
+
+impl<I, M> Debug for Testcase<I, M>
+where
+    I: Debug,
+    M: IsTestcaseMetadataCell,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Testcase")
+            .field("input", self.input.as_ref())
+            .field("id", &self.id)
+            .field("metadata", &*self.metadata.testcase_metadata())
+            .finish()
+    }
+}
+
+impl HasMetadata for TestcaseMetadata {
     fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
-    /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
-    #[inline]
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
 }
 
+impl<I, M> Testcase<I, M> {
+    /// Get the input
+    #[inline]
+    pub fn input(&self) -> Rc<I> {
+        self.input.clone()
+    }
+
+    /// Get the associated unique ID.
+    pub fn id(&self) -> &String {
+        &self.id
+    }
+
+    /// Decompose a [`Testcase`] into its inner input and metadata.
+    pub fn into_inner(self) -> (Rc<I>, M) {
+        (self.input, self.metadata)
+    }
+}
+
+impl<I, M> Testcase<I, M>
+where
+    I: HasLen,
+{
+    /// Get the input length
+    pub fn input_len(&self) -> usize {
+        self.input.len()
+    }
+}
+
+impl<I, M> Testcase<I, M>
+where
+    I: Input,
+    M: IsTestcaseMetadataCell,
+{
+    /// Create a new Testcase instance given an input
+    pub fn new(input: Rc<I>, metadata: M) -> Self {
+        let id = Self::compute_id(&input);
+
+        Self {
+            input,
+            id,
+            metadata,
+        }
+    }
+
+    /// Get the unique ID associated to an input.
+    pub fn compute_id(input: &I) -> String {
+        let mut hasher = hasher_std();
+        input.hash(&mut hasher);
+        let hash = hasher.finish();
+        format!("{hash:0>8x}")
+    }
+}
+
+impl<I, M> Testcase<I, M>
+where
+    M: IsTestcaseMetadataCell,
+    I: Clone,
+{
+    /// Clone the input embedded in the [`Testcase`].
+    pub fn cloned_input(&self) -> I {
+        self.input.as_ref().clone()
+    }
+}
+
 /// Impl of a testcase
-impl<I> Testcase<I> {
-    /// Returns this [`Testcase`] with a loaded `Input`]
-    pub fn load_input<C: Corpus<I>>(&mut self, corpus: &C) -> Result<&I, Error> {
-        corpus.load_input_into(self)?;
-        Ok(self.input.as_ref().unwrap())
+impl<I, M> Testcase<I, M>
+where
+    M: IsTestcaseMetadataCell,
+{
+    /// Get the filename
+    pub fn get_filename(&self) -> String {
+        let md = self.metadata.testcase_metadata();
+
+        match &md.filename_format {
+            TestcaseFilenameFormat::Id => self.id.clone(),
+            TestcaseFilenameFormat::Prefix(prefix) => {
+                format!("{}-{}", prefix, self.id)
+            }
+            TestcaseFilenameFormat::Custom(custom_name) => custom_name.clone(),
+        }
     }
 
-    /// Get the input, if available any
-    #[inline]
-    pub fn input(&self) -> &Option<I> {
-        &self.input
+    /// Get the same testcase, with an owned [`TestcaseMetadata`].
+    pub fn cloned(self) -> Testcase<I, RefCell<TestcaseMetadata>> {
+        Testcase {
+            input: self.input,
+            id: self.id,
+            metadata: RefCell::new(self.metadata.into_testcase_metadata()),
+        }
     }
 
-    /// Get the input, if any (mutable)
+    /// Test whether the metadata map contains a metadata
     #[inline]
-    pub fn input_mut(&mut self) -> &mut Option<I> {
-        // self.cached_len = None;
-        &mut self.input
-    }
-
-    /// Set the input
-    #[inline]
-    pub fn set_input(&mut self, input: I) {
-        self.input = Some(input);
-    }
-
-    /// Get the filename, if any
-    #[inline]
-    pub fn filename(&self) -> &Option<String> {
-        &self.filename
-    }
-
-    /// Get the filename, if any (mutable)
-    #[inline]
-    pub fn filename_mut(&mut self) -> &mut Option<String> {
-        &mut self.filename
-    }
-
-    /// Get the filename path, if any
-    #[inline]
-    #[cfg(feature = "std")]
-    pub fn file_path(&self) -> &Option<PathBuf> {
-        &self.file_path
-    }
-
-    /// Get the filename path, if any (mutable)
-    #[inline]
-    #[cfg(feature = "std")]
-    pub fn file_path_mut(&mut self) -> &mut Option<PathBuf> {
-        &mut self.file_path
-    }
-
-    /// Get the metadata path, if any
-    #[inline]
-    #[cfg(feature = "std")]
-    pub fn metadata_path(&self) -> &Option<PathBuf> {
-        &self.metadata_path
-    }
-
-    /// Get the metadata path, if any (mutable)
-    #[inline]
-    #[cfg(feature = "std")]
-    pub fn metadata_path_mut(&mut self) -> &mut Option<PathBuf> {
-        &mut self.metadata_path
+    pub fn has_metadata<MT>(&self) -> bool
+    where
+        MT: SerdeAny,
+    {
+        self.metadata.testcase_metadata().has_metadata::<MT>()
     }
 
     /// Get the executions
     #[inline]
-    pub fn executions(&self) -> &u64 {
-        &self.executions
+    pub fn executions(&self) -> u64 {
+        self.metadata.testcase_metadata().executions()
+    }
+
+    /// Get the `scheduled_count`
+    #[inline]
+    pub fn scheduled_count(&self) -> usize {
+        self.metadata.testcase_metadata().scheduled_count()
+    }
+
+    /// Get `disabled`
+    #[inline]
+    pub fn disabled(&mut self) -> bool {
+        self.metadata.testcase_metadata_mut().disabled()
+    }
+
+    /// Get the id of the parent, that this testcase was derived from
+    #[must_use]
+    pub fn parent_id(&self) -> Option<CorpusId> {
+        self.metadata.testcase_metadata().parent_id()
+    }
+
+    /// Gets how many objectives were found by mutating this testcase
+    pub fn objectives_found(&self) -> usize {
+        self.metadata.testcase_metadata().objectives_found()
+    }
+
+    /// Set the executions
+    #[inline]
+    pub fn set_executions(&mut self, executions: u64) {
+        self.metadata
+            .testcase_metadata_mut()
+            .set_executions(executions);
+    }
+
+    /// Sets the execution time of the current testcase
+    #[inline]
+    pub fn set_exec_time(&mut self, time: Duration) {
+        self.metadata.testcase_metadata_mut().set_exec_time(time);
+    }
+
+    /// Set the `scheduled_count`
+    #[inline]
+    pub fn set_scheduled_count(&mut self, scheduled_count: usize) {
+        self.metadata
+            .testcase_metadata_mut()
+            .set_scheduled_count(scheduled_count);
+    }
+
+    /// Set the testcase as disabled
+    #[inline]
+    pub fn set_disabled(&mut self, disabled: bool) {
+        self.metadata.testcase_metadata_mut().set_disabled(disabled);
+    }
+
+    /// Sets the id of the parent, that this testcase was derived from
+    pub fn set_parent_id(&mut self, parent_id: CorpusId) {
+        self.metadata
+            .testcase_metadata_mut()
+            .set_parent_id(parent_id);
+    }
+
+    /// Sets the id of the parent, that this testcase was derived from
+    pub fn set_parent_id_optional(&mut self, parent_id: Option<CorpusId>) {
+        self.metadata
+            .testcase_metadata_mut()
+            .set_parent_id_optional(parent_id);
+    }
+
+    /// Adds one objective to the `objectives_found` counter. Mostly called from crash handler or executor.
+    pub fn found_objective(&mut self) {
+        self.metadata.testcase_metadata_mut().found_objective();
+    }
+}
+
+impl TestcaseMetadata {
+    /// Get the executions
+    #[inline]
+    #[must_use]
+    pub fn executions(&self) -> u64 {
+        self.executions
+    }
+
+    /// Get the execution time of the testcase
+    #[inline]
+    #[must_use]
+    pub fn exec_time(&self) -> &Option<Duration> {
+        &self.exec_time
+    }
+
+    /// Get the `scheduled_count`
+    #[inline]
+    #[must_use]
+    pub fn scheduled_count(&self) -> usize {
+        self.scheduled_count
+    }
+
+    /// Get `disabled`
+    #[inline]
+    #[must_use]
+    pub fn disabled(&mut self) -> bool {
+        self.disabled
+    }
+
+    /// Get the hit feedbacks
+    #[inline]
+    #[must_use]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_feedbacks(&self) -> &Vec<Cow<'static, str>> {
+        &self.hit_feedbacks
+    }
+
+    /// Get the hit objectives
+    #[inline]
+    #[must_use]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_objectives(&self) -> &Vec<Cow<'static, str>> {
+        &self.hit_objectives
+    }
+
+    /// Get the id of the parent, that this testcase was derived from
+    #[must_use]
+    pub fn parent_id(&self) -> Option<CorpusId> {
+        self.parent_id
+    }
+
+    /// Gets how many objectives were found by mutating this testcase
+    #[must_use]
+    pub fn objectives_found(&self) -> usize {
+        self.objectives_found
     }
 
     /// Get the executions (mutable)
     #[inline]
+    #[must_use]
     pub fn executions_mut(&mut self) -> &mut u64 {
         &mut self.executions
     }
@@ -165,14 +571,8 @@ impl<I> Testcase<I> {
         self.executions = executions;
     }
 
-    /// Get the execution time of the testcase
-    #[inline]
-    pub fn exec_time(&self) -> &Option<Duration> {
-        &self.exec_time
-    }
-
-    /// Get the execution time of the testcase (mutable)
-    #[inline]
+    /// Get a mutable reference to the execution time
+    #[must_use]
     pub fn exec_time_mut(&mut self) -> &mut Option<Duration> {
         &mut self.exec_time
     }
@@ -183,22 +583,10 @@ impl<I> Testcase<I> {
         self.exec_time = Some(time);
     }
 
-    /// Get the `scheduled_count`
-    #[inline]
-    pub fn scheduled_count(&self) -> usize {
-        self.scheduled_count
-    }
-
     /// Set the `scheduled_count`
     #[inline]
     pub fn set_scheduled_count(&mut self, scheduled_count: usize) {
         self.scheduled_count = scheduled_count;
-    }
-
-    /// Get `disabled`
-    #[inline]
-    pub fn disabled(&mut self) -> bool {
-        self.disabled
     }
 
     /// Set the testcase as disabled
@@ -207,115 +595,20 @@ impl<I> Testcase<I> {
         self.disabled = disabled;
     }
 
-    /// Get the hit feedbacks
-    #[inline]
-    #[cfg(feature = "track_hit_feedbacks")]
-    pub fn hit_feedbacks(&self) -> &Vec<Cow<'static, str>> {
-        &self.hit_feedbacks
-    }
-
     /// Get the hit feedbacks (mutable)
-    #[inline]
     #[cfg(feature = "track_hit_feedbacks")]
+    #[inline]
+    #[must_use]
     pub fn hit_feedbacks_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
         &mut self.hit_feedbacks
     }
 
-    /// Get the hit objectives
-    #[inline]
-    #[cfg(feature = "track_hit_feedbacks")]
-    pub fn hit_objectives(&self) -> &Vec<Cow<'static, str>> {
-        &self.hit_objectives
-    }
-
     /// Get the hit objectives (mutable)
-    #[inline]
     #[cfg(feature = "track_hit_feedbacks")]
+    #[inline]
+    #[must_use]
     pub fn hit_objectives_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
         &mut self.hit_objectives
-    }
-
-    /// Create a new Testcase instance given an input
-    #[inline]
-    pub fn new(input: I) -> Self {
-        Self {
-            input: Some(input),
-            filename: None,
-            #[cfg(feature = "std")]
-            file_path: None,
-            metadata: SerdeAnyMap::default(),
-            #[cfg(feature = "std")]
-            metadata_path: None,
-            exec_time: None,
-            cached_len: None,
-            executions: 0,
-            scheduled_count: 0,
-            parent_id: None,
-            disabled: false,
-            objectives_found: 0,
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_feedbacks: Vec::new(),
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_objectives: Vec::new(),
-        }
-    }
-
-    /// Creates a testcase, attaching the id of the parent
-    /// that this [`Testcase`] was derived from on creation
-    pub fn with_parent_id(input: I, parent_id: CorpusId) -> Self {
-        Testcase {
-            input: Some(input),
-            filename: None,
-            #[cfg(feature = "std")]
-            file_path: None,
-            metadata: SerdeAnyMap::default(),
-            #[cfg(feature = "std")]
-            metadata_path: None,
-            exec_time: None,
-            cached_len: None,
-            executions: 0,
-            scheduled_count: 0,
-            parent_id: Some(parent_id),
-            disabled: false,
-            objectives_found: 0,
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_feedbacks: Vec::new(),
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_objectives: Vec::new(),
-        }
-    }
-
-    /// Create a new Testcase instance given an input and a `filename`
-    /// If locking is enabled, make sure that testcases with the same input have the same filename
-    /// to prevent ending up with duplicate testcases
-    #[inline]
-    pub fn with_filename(input: I, filename: String) -> Self {
-        Self {
-            input: Some(input),
-            filename: Some(filename),
-            #[cfg(feature = "std")]
-            file_path: None,
-            metadata: SerdeAnyMap::default(),
-            #[cfg(feature = "std")]
-            metadata_path: None,
-            exec_time: None,
-            cached_len: None,
-            executions: 0,
-            scheduled_count: 0,
-            parent_id: None,
-            disabled: false,
-            objectives_found: 0,
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_feedbacks: Vec::new(),
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_objectives: Vec::new(),
-        }
-    }
-
-    /// Get the id of the parent, that this testcase was derived from
-    #[must_use]
-    pub fn parent_id(&self) -> Option<CorpusId> {
-        self.parent_id
     }
 
     /// Sets the id of the parent, that this testcase was derived from
@@ -328,79 +621,25 @@ impl<I> Testcase<I> {
         self.parent_id = parent_id;
     }
 
-    /// Gets how many objectives were found by mutating this testcase
-    pub fn objectives_found(&self) -> usize {
-        self.objectives_found
-    }
-
-    /// Adds one objectives to the `objectives_found` counter. Mostly called from crash handler or executor.
+    /// Adds one objective to the `objectives_found` counter. Mostly called from crash handler or executor.
     pub fn found_objective(&mut self) {
-        self.objectives_found = self.objectives_found.saturating_add(1);
+        let count = self.objectives_found.saturating_add(1);
+        self.objectives_found = count;
     }
-}
 
-impl<I> Default for Testcase<I> {
-    /// Create a new default Testcase
-    #[inline]
-    fn default() -> Self {
-        Testcase {
-            input: None,
-            filename: None,
-            metadata: SerdeAnyMap::new(),
-            exec_time: None,
-            cached_len: None,
-            scheduled_count: 0,
-            parent_id: None,
-            #[cfg(feature = "std")]
-            file_path: None,
-            #[cfg(feature = "std")]
-            metadata_path: None,
-            disabled: false,
-            executions: 0,
-            objectives_found: 0,
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_feedbacks: Vec::new(),
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_objectives: Vec::new(),
+    /// Get the filename
+    #[must_use]
+    pub fn get_filename(&self, id: &str) -> String {
+        match &self.filename_format {
+            TestcaseFilenameFormat::Id => id.to_string(),
+            TestcaseFilenameFormat::Prefix(prefix) => format!("{prefix}-{id}"),
+            TestcaseFilenameFormat::Custom(custom_name) => custom_name.clone(),
         }
     }
-}
 
-/// Impl of a testcase when the input has len
-impl<I> Testcase<I>
-where
-    I: HasLen,
-{
-    /// Get the cached `len`. Will `Error::EmptyOptional` if `len` is not yet cached.
-    #[inline]
-    pub fn cached_len(&mut self) -> Option<usize> {
-        self.cached_len
-    }
-
-    /// Get the `len` or calculate it, if not yet calculated.
-    pub fn load_len<C: Corpus<I>>(&mut self, corpus: &C) -> Result<usize, Error> {
-        match &self.input {
-            Some(i) => {
-                let l = i.len();
-                self.cached_len = Some(l);
-                Ok(l)
-            }
-            None => {
-                if let Some(l) = self.cached_len {
-                    Ok(l)
-                } else {
-                    corpus.load_input_into(self)?;
-                    self.load_len(corpus)
-                }
-            }
-        }
-    }
-}
-
-/// Create a testcase from an input
-impl<I> From<I> for Testcase<I> {
-    fn from(input: I) -> Self {
-        Testcase::new(input)
+    /// Set the filename of the corpus input
+    pub fn set_filename(&mut self, filename: TestcaseFilenameFormat) {
+        self.filename_format = filename;
     }
 }
 
@@ -515,15 +754,3 @@ impl SchedulerTestcaseMetadata {
 }
 
 libafl_bolts::impl_serdeany!(SchedulerTestcaseMetadata);
-
-#[cfg(feature = "std")]
-impl<I> Drop for Testcase<I> {
-    fn drop(&mut self) {
-        if let Some(filename) = &self.filename {
-            let mut path = PathBuf::from(filename);
-            let lockname = format!(".{}.lafl_lock", path.file_name().unwrap().to_str().unwrap());
-            path.set_file_name(lockname);
-            let _ = std::fs::remove_file(path);
-        }
-    }
-}

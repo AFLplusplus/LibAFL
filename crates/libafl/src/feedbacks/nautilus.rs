@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Error, HasMetadata,
     common::nautilus::grammartec::{chunkstore::ChunkStore, context::Context},
-    corpus::{Corpus, Testcase},
+    corpus::TestcaseMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     generators::NautilusContext,
@@ -64,20 +64,16 @@ impl<'a> NautilusFeedback<'a> {
     fn append_nautilus_metadata_to_state<S>(
         &mut self,
         state: &mut S,
-        testcase: &mut Testcase<NautilusInput>,
-    ) -> Result<(), Error>
-    where
+        input: &NautilusInput,
+        _md: &mut TestcaseMetadata,
+    ) where
         S: HasCorpus<NautilusInput> + HasMetadata,
     {
-        state.corpus().load_input_into(testcase)?;
-        let input = testcase.input().as_ref().unwrap().clone();
         let meta = state
             .metadata_map_mut()
             .get_mut::<NautilusChunksMetadata>()
             .expect("NautilusChunksMetadata not in the state");
-        meta.cks.add_tree(input.tree, self.ctx);
-
-        Ok(())
+        meta.cks.add_tree(&input.tree, self.ctx);
     }
 }
 
@@ -110,9 +106,12 @@ where
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<NautilusInput>,
+        input: &NautilusInput,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
-        self.append_nautilus_metadata_to_state(state, testcase)
+        self.append_nautilus_metadata_to_state(state, input, md);
+
+        Ok(())
     }
 
     #[cfg(feature = "track_hit_feedbacks")]

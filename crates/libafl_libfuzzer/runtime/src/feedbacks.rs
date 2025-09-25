@@ -4,10 +4,10 @@ use std::borrow::Cow;
 
 use libafl::{
     Error, HasMetadata, alloc,
-    corpus::Testcase,
+    corpus::{TestcaseFilenameFormat, TestcaseMetadata},
     executors::ExitKind,
     feedbacks::{Feedback, MinMapFeedback, StateInitializer},
-    inputs::{BytesInput, Input},
+    inputs::BytesInput,
     state::HasCorpus,
 };
 use libafl_bolts::{Named, impl_serdeany, tuples::MatchNameRef};
@@ -99,17 +99,11 @@ impl Named for LibfuzzerCrashCauseFeedback {
 }
 
 impl LibfuzzerCrashCauseFeedback {
-    fn set_filename<I: Input>(&self, prefix: &str, testcase: &mut Testcase<I>) {
-        let base = if let Some(filename) = testcase.filename() {
-            filename.clone()
-        } else {
-            testcase.input().as_ref().unwrap().generate_name(None)
-        };
-        let file_path = self.artifact_prefix.dir().join(format!(
-            "{}{prefix}-{base}",
+    fn set_filename(&self, prefix: &str, md: &mut TestcaseMetadata) {
+        md.set_filename(TestcaseFilenameFormat::Prefix(format!(
+            "{}{prefix}",
             self.artifact_prefix.filename_prefix()
-        ));
-        *testcase.file_path_mut() = Some(file_path);
+        )));
     }
 }
 
@@ -140,30 +134,31 @@ where
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<BytesInput>,
+        _input: &BytesInput,
+        md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         match self.exit_kind {
             ExitKind::Crash | ExitKind::Oom if OomFeedback::oomed() => {
-                self.set_filename("oom", testcase);
-                testcase.add_metadata(LibfuzzerCrashCauseMetadata {
+                self.set_filename("oom", md);
+                md.add_metadata(LibfuzzerCrashCauseMetadata {
                     kind: ExitKind::Oom,
                 });
             }
             ExitKind::Crash => {
-                self.set_filename("crash", testcase);
-                testcase.add_metadata(LibfuzzerCrashCauseMetadata {
+                self.set_filename("crash", md);
+                md.add_metadata(LibfuzzerCrashCauseMetadata {
                     kind: ExitKind::Crash,
                 });
             }
             ExitKind::Timeout => {
-                self.set_filename("timeout", testcase);
-                testcase.add_metadata(LibfuzzerCrashCauseMetadata {
+                self.set_filename("timeout", md);
+                md.add_metadata(LibfuzzerCrashCauseMetadata {
                     kind: ExitKind::Timeout,
                 });
             }
             _ => {
-                self.set_filename("uncategorized", testcase);
-                testcase.add_metadata(LibfuzzerCrashCauseMetadata {
+                self.set_filename("uncategorized", md);
+                md.add_metadata(LibfuzzerCrashCauseMetadata {
                     kind: self.exit_kind,
                 });
             }

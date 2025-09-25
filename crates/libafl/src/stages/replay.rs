@@ -132,9 +132,8 @@ where
 
             log::info!("Replaying corpus: {id}");
             let input = {
-                let mut tc = state.corpus().get(id)?.borrow_mut();
-                let input = tc.load_input(state.corpus())?;
-                input.clone()
+                let tc = state.corpus().get(id)?;
+                tc.input().as_ref().clone()
             };
 
             fuzzer.evaluate_input(state, executor, manager, &input)?;
@@ -151,9 +150,8 @@ where
             }
             log::info!("Replaying solution: {id}");
             let input = {
-                let mut tc = state.solutions().get(id)?.borrow_mut();
-                let input = tc.load_input(state.corpus())?;
-                input.clone()
+                let tc = state.solutions().get(id)?;
+                tc.input().as_ref().clone()
             };
 
             fuzzer.evaluate_input(state, executor, manager, &input)?;

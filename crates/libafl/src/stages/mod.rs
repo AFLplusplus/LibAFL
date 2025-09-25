@@ -541,7 +541,7 @@ mod test {
     use libafl_bolts::{Error, Named};
 
     use crate::{
-        corpus::{Corpus, HasCurrentCorpusId, Testcase},
+        corpus::{Corpus, HasCurrentCorpusId},
         inputs::NopInput,
         stages::RetryCountRestartHelper,
         state::{HasCorpus, StdState},
@@ -569,7 +569,7 @@ mod test {
         let mut state = StdState::nop()?;
         let stage = StageWithOneTry;
 
-        let corpus_id = state.corpus_mut().add(Testcase::new(NopInput {}))?;
+        let corpus_id = state.corpus_mut().add(NopInput {})?;
 
         state.set_corpus_id(corpus_id)?;
 

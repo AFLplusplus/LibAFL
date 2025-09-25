@@ -1302,11 +1302,8 @@ where
         }
 
         let other_size = {
-            let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-            other_testcase
-                .load_input(state.corpus())?
-                .mutator_bytes()
-                .len()
+            let other_testcase = state.corpus().get_from_all(id)?;
+            other_testcase.input().len()
         };
 
         if other_size < 2 {
@@ -1321,9 +1318,9 @@ where
         });
         let target = state.rand_mut().below(nonzero_size);
 
-        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(id)?;
         // No need to load the input again, it'll still be cached.
-        let other = other_testcase.input().as_ref().unwrap();
+        let other = other_testcase.input();
 
         Ok(Self::crossover_insert(
             input,
@@ -1404,10 +1401,7 @@ where
             }
         }
 
-        let other_size = {
-            let mut testcase = state.corpus().get_from_all(id)?.borrow_mut();
-            testcase.load_input(state.corpus())?.mutator_bytes().len()
-        };
+        let other_size = state.corpus().get_from_all(id)?.input().len();
 
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
@@ -1425,9 +1419,9 @@ where
             NonZero::new(min(other_size, size - target)).unwrap_unchecked()
         });
 
-        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(id)?;
         // No need to load the input again, it'll still be cached.
-        let other = other_testcase.input().as_ref().unwrap();
+        let other = other_testcase.input();
 
         Ok(Self::crossover_replace(
             input,
@@ -1518,9 +1512,9 @@ where
         }
 
         let other_size = {
-            let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-            let other_input = other_testcase.load_input(state.corpus())?;
-            let input_mapped = (self.input_mapper)(other_input).map_to_option_bytes();
+            let other_testcase = state.corpus().get_from_all(id)?;
+            let other_input = other_testcase.input();
+            let input_mapped = (self.input_mapper)(other_input.as_ref()).map_to_option_bytes();
             input_mapped.map_or(0, <Vec<u8>>::len)
         };
 
@@ -1540,9 +1534,9 @@ where
             .rand_mut()
             .below(unsafe { NonZero::new(size).unwrap_unchecked() });
 
-        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(id)?;
         // No need to load the input again, it'll still be cached.
-        let other_input = &mut other_testcase.input().as_ref().unwrap();
+        let other_input = &mut other_testcase.input();
         let wrapped_mapped_other_input = (self.input_mapper)(other_input).map_to_option_bytes();
         if wrapped_mapped_other_input.is_none() {
             return Ok(MutationResult::Skipped);
@@ -1613,9 +1607,9 @@ where
         }
 
         let other_size = {
-            let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-            let other_input = other_testcase.load_input(state.corpus())?;
-            let input_mapped = (self.input_mapper)(other_input).map_to_option_bytes();
+            let other_testcase = state.corpus().get_from_all(id)?;
+            let other_input = other_testcase.input();
+            let input_mapped = (self.input_mapper)(other_input.as_ref()).map_to_option_bytes();
             input_mapped.map_or(0, <Vec<u8>>::len)
         };
 
@@ -1635,10 +1629,11 @@ where
             NonZero::new(min(other_size, size - target)).unwrap_unchecked()
         });
 
-        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(id)?;
         // No need to load the input again, it'll still be cached.
-        let other_input = &mut other_testcase.input().as_ref().unwrap();
-        let wrapped_mapped_other_input = (self.input_mapper)(other_input).map_to_option_bytes();
+        let other_input = &mut other_testcase.input();
+        let wrapped_mapped_other_input =
+            (self.input_mapper)(other_input.as_ref()).map_to_option_bytes();
         if wrapped_mapped_other_input.is_none() {
             return Ok(MutationResult::Skipped);
         }
@@ -1704,8 +1699,8 @@ where
         }
 
         let (first_diff, last_diff) = {
-            let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-            let other = other_testcase.load_input(state.corpus())?;
+            let other_testcase = state.corpus().get_from_all(id)?;
+            let other = other_testcase.input();
 
             let (f, l) = locate_diffs(input.mutator_bytes(), other.mutator_bytes());
 
@@ -1718,9 +1713,9 @@ where
 
         let split_at = state.rand_mut().between(first_diff, last_diff);
 
-        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
+        let other_testcase = state.corpus().get_from_all(id)?;
         // Input will already be loaded.
-        let other = other_testcase.input().as_ref().unwrap();
+        let other = other_testcase.input();
 
         input.splice(
             split_at..,
@@ -1872,9 +1867,7 @@ mod tests {
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);
 
-        corpus
-            .add(BytesInput::new(vec![0x42; 0x1337]).into())
-            .unwrap();
+        corpus.add(BytesInput::new(vec![0x42; 0x1337])).unwrap();
 
         StdState::new(
             rand,

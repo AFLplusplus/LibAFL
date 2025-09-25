@@ -13,7 +13,7 @@ use std::{
 use libafl::monitors::tui::TuiMonitor;
 use libafl::{
     Error, Fuzzer, HasMetadata,
-    corpus::Corpus,
+    corpus::{Corpus, IsTestcaseMetadataCell},
     events::{EventReceiver, ProgressReporter, SimpleEventManager},
     executors::ExitKind,
     monitors::MultiMonitor,
@@ -92,15 +92,20 @@ where
     ST: StagesTuple<E, EM, S, F>,
 {
     if let Some(solution) = state.solutions().last() {
-        let kind = state
+        let tc = state
             .solutions()
             .get(solution)
-            .expect("Last solution was not available")
-            .borrow()
+            .expect("Last solution was not available");
+
+        let md = tc.testcase_metadata();
+
+        let kind = md
             .metadata::<LibfuzzerCrashCauseMetadata>()
             .expect("Crash cause not attached to solution")
             .kind();
+
         let mut halt = false;
+
         match kind {
             ExitKind::Oom if !options.ignore_ooms() => halt = true,
             ExitKind::Crash if !options.ignore_crashes() => halt = true,

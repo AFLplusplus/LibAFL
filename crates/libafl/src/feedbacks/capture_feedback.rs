@@ -7,7 +7,7 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
     HasMetadata,
-    corpus::Testcase,
+    corpus::testcase::TestcaseMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     stages::verify_timeouts::TimeoutsToVerify,
@@ -64,7 +64,8 @@ where
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        _testcase: &mut Testcase<I>,
+        _input: &I,
+        _md: &mut TestcaseMetadata,
     ) -> Result<(), Error> {
         Ok(())
     }

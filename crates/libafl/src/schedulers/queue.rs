@@ -3,8 +3,8 @@
 use alloc::borrow::ToOwned;
 
 use crate::{
-    Error,
-    corpus::{Corpus, CorpusId},
+    Error, HasMetadata,
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::HasCorpus,
 };
@@ -16,20 +16,19 @@ pub struct QueueScheduler {
     runs_in_current_cycle: u64,
 }
 
-impl<I, S> RemovableScheduler<I, S> for QueueScheduler {}
+impl<I, S> RemovableScheduler<I, S> for QueueScheduler where S: HasCorpus<I> {}
 
 impl<I, S> Scheduler<I, S> for QueueScheduler
 where
-    S: HasCorpus<I>,
+    S: HasCorpus<I> + HasMetadata,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
-        state
-            .corpus()
-            .get(id)?
-            .borrow_mut()
-            .set_parent_id_optional(current_id);
+        let current_tc = state.corpus().get(id)?;
+        let mut current_md = current_tc.testcase_metadata_mut();
+
+        current_md.set_parent_id_optional(current_id);
 
         Ok(())
     }
@@ -102,11 +101,11 @@ mod tests {
     use libafl_bolts::rands::StdRand;
 
     use crate::{
-        corpus::{Corpus, OnDiskCorpus, Testcase},
+        corpus::{Corpus, OnDiskCorpus},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{QueueScheduler, Scheduler},
-        state::{HasCorpus, StdState},
+        state::StdState,
     };
 
     #[test]
@@ -114,14 +113,18 @@ mod tests {
         let rand = StdRand::with_seed(4);
         let mut scheduler: QueueScheduler = QueueScheduler::new();
 
-        let mut q =
-            OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();
-        let t = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "fancyfile".into());
-        q.add(t).unwrap();
+        let mut q = OnDiskCorpus::<BytesInput>::builder()
+            .root_dir(&PathBuf::from("target/.test/fancy/path"))
+            .build()
+            .unwrap();
 
-        let objective_q =
-            OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/objective/path"))
-                .unwrap();
+        // let t = Testcase::with_filename(), "fancyfile".into());
+        let added_id = q.add(BytesInput::new(vec![0_u8; 4])).unwrap();
+
+        let objective_q = OnDiskCorpus::<BytesInput>::builder()
+            .root_dir(&PathBuf::from("target/.test/fancy/objective/path"))
+            .build()
+            .unwrap();
 
         let mut feedback = ConstFeedback::new(false);
         let mut objective = ConstFeedback::new(false);
@@ -130,17 +133,18 @@ mod tests {
 
         let next_id =
             <QueueScheduler as Scheduler<BytesInput, _>>::next(&mut scheduler, &mut state).unwrap();
-        let filename = state
-            .corpus()
-            .get(next_id)
-            .unwrap()
-            .borrow()
-            .filename()
-            .as_ref()
-            .unwrap()
-            .clone();
+        // let filename = state
+        //     .corpus()
+        //     .get(next_id)
+        //     .unwrap()
+        //     .borrow()
+        //     .filename()
+        //     .as_ref()
+        //     .unwrap()
+        //     .clone();
 
-        assert_eq!(filename, "fancyfile");
+        // assert_eq!(filename, "fancyfile");
+        assert_eq!(added_id, next_id);
 
         fs::remove_dir_all("target/.test/fancy/path").unwrap();
     }

@@ -9,11 +9,11 @@ use libafl::executors::inprocess::InProcessExecutor;
 use libafl::executors::inprocess_fork::InProcessForkExecutor;
 use libafl::{
     Error, ExecutesInput, Fuzzer, StdFuzzer,
-    corpus::{Corpus, HasTestcase, InMemoryCorpus, Testcase},
+    corpus::{Corpus, HasTestcase, InMemoryCorpus},
     events::SimpleEventManager,
     executors::ExitKind,
     feedbacks::{CrashFeedback, TimeoutFeedback},
-    inputs::{BytesInput, HasMutatorBytes, HasTargetBytes},
+    inputs::{BytesInput, HasTargetBytes},
     mutators::{HavocScheduledMutator, Mutator, havoc_mutations_no_crossover},
     schedulers::QueueScheduler,
     stages::StdTMinMutationalStage,
@@ -92,7 +92,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     let exit_kind = fuzzer.execute_input(&mut state, &mut executor, &mut mgr, &input)?;
 
     let size = input.len();
-    let id = state.corpus_mut().add(Testcase::new(input))?;
+    let id = state.corpus_mut().add(input)?;
 
     match exit_kind {
         ExitKind::Crash => {
@@ -126,12 +126,10 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
         kind => unimplemented!("Unsupported exit kind for test minification: {:?}", kind),
     }
 
-    let mut testcase = state.testcase_mut(id)?;
-    let input = testcase
-        .load_input(state.corpus())?
-        .mutator_bytes()
-        .to_vec();
+    let testcase = state.testcase(id)?;
+    let input = testcase.input();
     drop(testcase);
+
     if input.len() >= size {
         eprintln!(
             "Unable to reduce {}",
@@ -144,7 +142,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
             options.artifact_prefix().filename_prefix(),
             options.dirs()[0].file_name().unwrap().to_str().unwrap()
         ));
-        write(&dest, input)?;
+        write(&dest, input.as_ref().as_ref())?;
         println!(
             "Wrote minimised input to {}",
             dest.file_name().unwrap().to_str().unwrap()

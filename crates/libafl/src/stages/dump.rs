@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell, Testcase, TestcaseMetadata},
     inputs::Input,
     stages::{Restartable, Stage},
     state::{HasCorpus, HasRand, HasSolutions},
@@ -47,8 +47,8 @@ pub struct DumpToDiskStage<CB1, CB2, EM, I, S, Z> {
 
 impl<CB1, CB2, E, EM, I, S, P, Z> Stage<E, EM, S, Z> for DumpToDiskStage<CB1, CB2, EM, I, S, Z>
 where
-    CB1: FnMut(&Testcase<I>, &S) -> Vec<u8>,
-    CB2: FnMut(&Testcase<I>, &CorpusId) -> P,
+    CB1: FnMut(&I, &TestcaseMetadata, &S) -> Vec<u8>,
+    CB2: FnMut(&I, &TestcaseMetadata, &CorpusId) -> P,
     S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
     P: AsRef<Path>,
 {
@@ -65,7 +65,16 @@ where
 }
 
 impl<CB1, EM, I, S, Z> Restartable<S>
-    for DumpToDiskStage<CB1, fn(&Testcase<I>, &CorpusId) -> String, EM, I, S, Z>
+    for DumpToDiskStage<
+        CB1,
+        fn(&Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>, &CorpusId) -> String,
+        EM,
+        I,
+        S,
+        Z,
+    >
+where
+    S: HasCorpus<I>,
 {
     #[inline]
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
@@ -81,9 +90,17 @@ impl<CB1, EM, I, S, Z> Restartable<S>
 }
 
 /// Implementation for `DumpToDiskStage` with a default `generate_filename` function.
-impl<CB1, EM, I, S, Z> DumpToDiskStage<CB1, fn(&Testcase<I>, &CorpusId) -> String, EM, I, S, Z>
+impl<CB1, EM, I, S, Z>
+    DumpToDiskStage<
+        CB1,
+        fn(&Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>, &CorpusId) -> String,
+        EM,
+        I,
+        S,
+        Z,
+    >
 where
-    S: HasSolutions<I> + HasRand + HasMetadata,
+    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
     I: Input,
 {
     /// Create a new [`DumpToDiskStage`] with a default `generate_filename` function.
@@ -102,14 +119,18 @@ where
 
     /// Default `generate_filename` function.
     #[expect(clippy::trivially_copy_pass_by_ref)]
-    fn generate_filename(testcase: &Testcase<I>, id: &CorpusId) -> String {
+    fn generate_filename(
+        testcase: &Testcase<I, <S::Corpus as Corpus<I>>::TestcaseMetadataCell>,
+        id: &CorpusId,
+    ) -> String {
+        // TODO: check that
         [
             Some(id.0.to_string()),
-            testcase.filename().clone(),
-            testcase
-                .input()
-                .as_ref()
-                .map(|t| t.generate_name(Some(*id))),
+            Some(testcase.id().clone()),
+            // testcase
+            //     .input()
+            //     .as_ref()
+            //     .map(|t| t.generate_name(Some(*id))),
         ]
         .iter()
         .flatten()
@@ -164,9 +185,9 @@ where
     #[inline]
     fn dump_state_to_disk<P: AsRef<Path>>(&mut self, state: &mut S) -> Result<(), Error>
     where
+        CB1: FnMut(&I, &TestcaseMetadata, &S) -> Vec<u8>,
+        CB2: FnMut(&I, &TestcaseMetadata, &CorpusId) -> P,
         S: HasCorpus<I>,
-        CB1: FnMut(&Testcase<I>, &S) -> Vec<u8>,
-        CB2: FnMut(&Testcase<I>, &CorpusId) -> P,
     {
         let (mut corpus_id, mut solutions_id) =
             if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
@@ -179,13 +200,16 @@ where
             };
 
         while let Some(i) = corpus_id {
-            let mut testcase = state.corpus().get(i)?.borrow_mut();
-            state.corpus().load_input_into(&mut testcase)?;
-            let bytes = (self.to_bytes)(&testcase, state);
+            let testcase = state.corpus().get(i)?;
+
+            let input = testcase.input();
+            let md = testcase.testcase_metadata();
+
+            let bytes = (self.to_bytes)(input.as_ref(), &md, state);
 
             let fname = self
                 .corpus_dir
-                .join((self.generate_filename)(&testcase, &i));
+                .join((self.generate_filename)(input.as_ref(), &md, &i));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 
@@ -193,13 +217,16 @@ where
         }
 
         while let Some(i) = solutions_id {
-            let mut testcase = state.solutions().get(i)?.borrow_mut();
-            state.solutions().load_input_into(&mut testcase)?;
-            let bytes = (self.to_bytes)(&testcase, state);
+            let testcase = state.solutions().get(i)?;
+
+            let input = testcase.input();
+            let md = testcase.testcase_metadata();
+
+            let bytes = (self.to_bytes)(input.as_ref(), &md, state);
 
             let fname = self
                 .solutions_dir
-                .join((self.generate_filename)(&testcase, &i));
+                .join((self.generate_filename)(input.as_ref(), &md, &i));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 

@@ -15,7 +15,7 @@ use libafl_bolts::{
 
 use crate::{
     Error, HasMetadata,
-    corpus::Corpus,
+    corpus::{Corpus, IsTestcaseMetadataCell},
     inputs::{GeneralizedInputMetadata, GeneralizedItem},
     mutators::{MutationResult, Mutator, token_mutations::Tokens},
     random_corpus_id,
@@ -41,8 +41,9 @@ where
             let rand1 = state.rand_mut().next();
             let rand2 = state.rand_mut().next();
 
-            let other_testcase = state.corpus().get(id)?.borrow();
+            let other_testcase = state.corpus().get(id)?;
             if let Some(other) = other_testcase
+                .testcase_metadata()
                 .metadata_map()
                 .get::<GeneralizedInputMetadata>()
             {
@@ -92,8 +93,9 @@ where
         }
     }
 
-    let other_testcase = state.corpus().get(id)?.borrow();
+    let other_testcase = state.corpus().get(id)?;
     match other_testcase
+        .testcase_metadata()
         .metadata_map()
         .get::<GeneralizedInputMetadata>()
     {

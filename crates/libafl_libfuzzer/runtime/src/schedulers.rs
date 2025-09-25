@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, marker::PhantomData};
 use hashbrown::HashMap;
 use libafl::{
     Error, HasMetadata,
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     feedbacks::MapNoveltiesMetadata,
     inputs::Input,
     schedulers::{RemovableScheduler, Scheduler},
@@ -22,12 +22,7 @@ where
     I: Input,
     S: HasCorpus<I>,
 {
-    fn on_remove(
-        &mut self,
-        _state: &mut S,
-        id: CorpusId,
-        _testcase: &Option<Testcase<I>>,
-    ) -> Result<(), Error> {
+    fn on_remove(&mut self, _state: &mut S, id: CorpusId) -> Result<(), Error> {
         self.all.remove(&id);
         Ok(())
     }
@@ -39,8 +34,9 @@ where
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         self.all.insert(id);
-        let testcase = state.corpus().get(id)?.borrow();
-        let meta = testcase.metadata::<MapNoveltiesMetadata>()?;
+        let testcase = state.corpus().get(id)?;
+        let md = testcase.testcase_metadata();
+        let meta = md.metadata::<MapNoveltiesMetadata>()?;
         for cov_ in &meta.list {
             self.mapping.insert(*cov_, id);
         }
@@ -77,7 +73,7 @@ impl<I, S> MergeScheduler<I, S> {
             .collect()
     }
 
-    pub fn current(&self) -> &BTreeSet<CorpusId> {
-        &self.all
-    }
+    // pub fn current(&self) -> &BTreeSet<CorpusId> {
+    //    &self.all
+    // }
 }

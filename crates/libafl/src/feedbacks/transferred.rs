@@ -12,6 +12,7 @@ use crate::{
     HasMetadata,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
+    state::HasCorpus,
 };
 
 /// Constant name of the [`TransferringMetadata`].
@@ -65,7 +66,7 @@ where
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for TransferredFeedback
 where
-    S: HasMetadata,
+    S: HasCorpus<I> + HasMetadata,
 {
     fn is_interesting(
         &mut self,

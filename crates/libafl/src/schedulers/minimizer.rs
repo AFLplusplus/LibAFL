@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::HasQueueCycles;
 use crate::{
     Error, HasMetadata,
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{Corpus, CorpusId, IsTestcaseMetadataCell},
     feedbacks::MapIndexesMetadata,
     observers::CanTrack,
     require_index_tracking,
@@ -86,25 +86,9 @@ where
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
-    /// Replaces the [`Testcase`] at the given [`CorpusId`]
-    fn on_replace(
-        &mut self,
-        state: &mut S,
-        id: CorpusId,
-        testcase: &Testcase<I>,
-    ) -> Result<(), Error> {
-        self.base.on_replace(state, id, testcase)?;
-        self.update_score(state, id)
-    }
-
     /// Removes an entry from the corpus
-    fn on_remove(
-        &mut self,
-        state: &mut S,
-        id: CorpusId,
-        testcase: &Option<Testcase<I>>,
-    ) -> Result<(), Error> {
-        self.base.on_remove(state, id, testcase)?;
+    fn on_remove(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
+        self.base.on_remove(state, id)?;
         let mut entries =
             if let Some(meta) = state.metadata_map_mut().get_mut::<TopRatedsMetadata>() {
                 meta.map
@@ -116,10 +100,12 @@ where
             };
         entries.sort_unstable(); // this should already be sorted, but just in case
         let mut map = HashMap::new();
-        for current_id in state.corpus().ids() {
-            let mut old = state.corpus().get(current_id)?.borrow_mut();
-            let factor = F::compute(state, &mut *old)?;
-            if let Some(old_map) = old.metadata_map_mut().get_mut::<M>() {
+        let ids: Vec<CorpusId> = state.corpus().ids().collect();
+        for current_id in ids {
+            let factor = F::compute(state, current_id)?;
+            let old = state.corpus().get(current_id)?;
+            let mut old_md = old.testcase_metadata_mut();
+            if let Some(old_map) = old_md.metadata_map_mut().get_mut::<M>() {
                 let mut e_iter = entries.iter();
                 let mut map_iter = old_map.as_iter(); // ASSERTION: guaranteed to be in order?
 
@@ -169,8 +155,9 @@ where
             meta.map.reserve(reserve);
 
             for (entry, (_, new_id)) in map_iter {
-                let mut new = state.corpus().get(*new_id)?.borrow_mut();
-                let new_meta = new.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
+                let new = state.corpus().get(*new_id)?;
+                let mut new_md = new.testcase_metadata_mut();
+                let new_meta = new_md.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
                     Error::key_not_found(format!(
                         "{} needed for MinimizerScheduler not found in testcase #{new_id}",
                         type_name::<M>()
@@ -184,6 +171,17 @@ where
             state.metadata_map_mut().insert_boxed(meta);
         }
         Ok(())
+    }
+
+    /// Replaces the [`Testcase`] at the given [`CorpusId`]
+    fn on_replace(
+        &mut self,
+        state: &mut S,
+        id: CorpusId,
+        prev: &<S::Corpus as Corpus<I>>::TestcaseMetadataCell,
+    ) -> Result<(), Error> {
+        self.base.on_replace(state, id, prev)?;
+        self.update_score(state, id)
     }
 }
 
@@ -216,7 +214,7 @@ where
             !state
                 .corpus()
                 .get(id)?
-                .borrow()
+                .testcase_metadata()
                 .has_metadata::<IsFavoredMetadata>()
         } && state.rand_mut().coinflip(self.skip_non_favored_prob)
         {
@@ -254,9 +252,10 @@ where
 
         let mut new_favoreds = vec![];
         {
-            let mut entry = state.corpus().get(id)?.borrow_mut();
-            let factor = F::compute(state, &mut *entry)?;
-            let meta = entry.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
+            let factor = F::compute(state, id)?;
+            let entry = state.corpus().get(id)?;
+            let mut entry_md = entry.testcase_metadata_mut();
+            let meta = entry_md.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
                 Error::key_not_found(format!(
                     "Metadata needed for MinimizerScheduler not found in testcase #{id}"
                 ))
@@ -268,13 +267,14 @@ where
                         new_favoreds.push(*elem); // always retain current; we'll drop it later otherwise
                         continue;
                     }
-                    let mut old = state.corpus().get(*old_id)?.borrow_mut();
-                    if factor > F::compute(state, &mut *old)? {
+                    if factor > F::compute(state, *old_id)? {
                         continue;
                     }
+                    let old = state.corpus().get(*old_id)?;
+                    let mut old_md = old.testcase_metadata_mut();
 
                     let must_remove = {
-                        let old_meta = old.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
+                        let old_meta = old_md.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
                             Error::key_not_found(format!(
                                 "{} needed for MinimizerScheduler not found in testcase #{old_id}",
                                 type_name::<M>()
@@ -285,7 +285,7 @@ where
                     };
 
                     if must_remove && self.remove_metadata {
-                        drop(old.metadata_map_mut().remove::<M>());
+                        drop(old_md.metadata_map_mut().remove::<M>());
                     }
                 }
 
@@ -300,7 +300,7 @@ where
                 state
                     .corpus()
                     .get(id)?
-                    .borrow_mut()
+                    .testcase_metadata_mut()
                     .metadata_map_mut()
                     .remove::<M>(),
             );
@@ -319,7 +319,7 @@ where
     }
 
     /// Cull the [`Corpus`] using the [`MinimizerScheduler`]
-    pub fn cull<S>(&self, state: &S) -> Result<(), Error>
+    pub fn cull<S>(&self, state: &mut S) -> Result<(), Error>
     where
         S: HasCorpus<I> + HasMetadata,
     {
@@ -331,8 +331,9 @@ where
 
         for (key, id) in &top_rated.map {
             if !acc.contains(key) {
-                let mut entry = state.corpus().get(*id)?.borrow_mut();
-                let meta = entry.metadata_map().get::<M>().ok_or_else(|| {
+                let entry = state.corpus().get(*id)?;
+                let mut md = entry.testcase_metadata_mut();
+                let meta = md.metadata_map().get::<M>().ok_or_else(|| {
                     Error::key_not_found(format!(
                         "{} needed for MinimizerScheduler not found in testcase #{id}",
                         type_name::<M>()
@@ -342,7 +343,7 @@ where
                     acc.insert(*elem);
                 }
 
-                entry.add_metadata(IsFavoredMetadata {});
+                md.add_metadata(IsFavoredMetadata {});
             }
         }
 

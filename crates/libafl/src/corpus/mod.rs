@@ -1,71 +1,68 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
-use core::{cell::RefCell, fmt, marker::PhantomData};
+use alloc::rc::Rc;
+use core::{fmt, marker::PhantomData};
 
 use serde::{Deserialize, Serialize};
 
 use crate::Error;
 
 pub mod testcase;
-pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
+pub use testcase::{
+    HasTestcase, IsTestcaseMetadataCell, SchedulerTestcaseMetadata, Testcase,
+    TestcaseFilenameFormat, TestcaseMetadata,
+};
 
-pub mod inmemory;
-pub use inmemory::InMemoryCorpus;
+pub mod cache;
+pub use cache::{Cache, FifoCache, IdentityCache};
 
-pub mod dynamic;
-pub use dynamic::DynamicCorpus;
+pub mod single;
+pub use single::SingleCorpus;
 
-#[cfg(feature = "std")]
-pub mod inmemory_ondisk;
-#[cfg(feature = "std")]
-pub use inmemory_ondisk::InMemoryOnDiskCorpus;
+// pub mod dynamic;
+// pub use dynamic::DynamicCorpus;
 
-#[cfg(feature = "std")]
-pub mod ondisk;
-#[cfg(feature = "std")]
-pub use ondisk::OnDiskCorpus;
-
-#[cfg(feature = "std")]
-pub mod cached;
-#[cfg(feature = "std")]
-pub use cached::CachedOnDiskCorpus;
+pub mod combined;
+pub use combined::CombinedCorpus;
 
 #[cfg(all(feature = "cmin", unix))]
 pub mod minimizer;
-
-pub mod nop;
 #[cfg(all(feature = "cmin", unix))]
 pub use minimizer::*;
+
+pub mod nop;
 pub use nop::NopCorpus;
+
+pub mod store;
+pub use store::{InMemoryStore, OnDiskStore, Store, maps};
+
+pub mod collection;
+pub use collection::{
+    CachedOnDiskCorpus, InMemoryCorpus, InMemoryOnDiskCorpus, OnDiskCorpus, StdInMemoryCorpusMap,
+    StdInMemoryStore, StdOnDiskStore,
+};
 
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct CorpusId(pub usize);
 
-impl fmt::Display for CorpusId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
+/// A counter for [`Corpus`] implementors.
+/// Useful to generate fresh [`CorpusId`]s.
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+pub struct CorpusCounter {
+    /// A fresh, progressive ID
+    /// It stores the next available ID.
+    current_id: usize,
 }
 
-impl From<usize> for CorpusId {
-    fn from(id: usize) -> Self {
-        Self(id)
-    }
-}
-
-impl From<u64> for CorpusId {
-    fn from(id: u64) -> Self {
-        Self(id as usize)
-    }
-}
-
-impl From<CorpusId> for usize {
-    /// Not that the `CorpusId` is not necessarily stable in the corpus (if we remove [`Testcase`]s, for example).
-    fn from(id: CorpusId) -> Self {
-        id.0
-    }
+/// [`Iterator`] over the ids of a [`Corpus`]
+#[derive(Debug)]
+pub struct CorpusIdIterator<'a, C, I> {
+    corpus: &'a C,
+    cur: Option<CorpusId>,
+    cur_back: Option<CorpusId>,
+    phantom: PhantomData<I>,
 }
 
 /// Utility macro to call `Corpus::random_id`; fetches only enabled [`Testcase`]`s`
@@ -107,6 +104,9 @@ macro_rules! random_corpus_id_with_disabled {
 
 /// Corpus with all current [`Testcase`]s, or solutions
 pub trait Corpus<I>: Sized {
+    /// A [`TestcaseMetadata`] cell.
+    type TestcaseMetadataCell: IsTestcaseMetadataCell;
+
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
 
@@ -122,22 +122,68 @@ pub trait Corpus<I>: Sized {
     }
 
     /// Add an enabled testcase to the corpus and return its index
-    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error>;
+    ///
+    /// The default [`TestcaseMetadata`] will be instantiated.
+    fn add(&mut self, input: I) -> Result<CorpusId, Error> {
+        self.add_shared::<true>(Rc::new(input), TestcaseMetadata::default())
+    }
+
+    /// Add an enabled testcase to the corpus and return its index
+    fn add_with_metadata(&mut self, input: I, md: TestcaseMetadata) -> Result<CorpusId, Error> {
+        self.add_shared::<true>(Rc::new(input), md)
+    }
 
     /// Add a disabled testcase to the corpus and return its index
-    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error>;
+    ///
+    /// The default [`TestcaseMetadata`] will be instantiated.
+    fn add_disabled(&mut self, input: I) -> Result<CorpusId, Error> {
+        self.add_shared::<false>(Rc::new(input), TestcaseMetadata::default())
+    }
 
-    /// Replaces the [`Testcase`] at the given idx, returning the existing.
-    fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error>;
+    /// Add a disabled testcase to the corpus and return its index
+    fn add_disabled_with_metadata(
+        &mut self,
+        input: I,
+        md: TestcaseMetadata,
+    ) -> Result<CorpusId, Error> {
+        self.add_shared::<false>(Rc::new(input), md)
+    }
 
-    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
-    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error>;
+    /// Add a testcase to the corpus, and returns its index.
+    /// The associated type tells whether the input should be added to the enabled or the disabled corpus.
+    ///
+    /// The input can be shared through [`Rc`].
+    fn add_shared<const ENABLED: bool>(
+        &mut self,
+        input: Rc<I>,
+        md: TestcaseMetadata,
+    ) -> Result<CorpusId, Error>;
 
-    /// Get by id; considers only enabled testcases
-    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error>;
+    /// Get testcase by id; considers only enabled testcases
+    fn get(&self, id: CorpusId) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        Self::get_from::<true>(self, id)
+    }
 
-    /// Get by id; considers both enabled and disabled testcases
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error>;
+    /// Get testcase by id, looking at the enabled and disabled stores.
+    fn get_from_all(&self, id: CorpusId) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
+        Self::get_from::<false>(self, id)
+    }
+
+    /// Get testcase by id
+    fn get_from<const ENABLED: bool>(
+        &self,
+        id: CorpusId,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error>;
+
+    /// Disable a corpus entry
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error>;
+
+    /// Replace a [`TestcaseMetadata`] by another one.
+    fn replace_metadata(
+        &mut self,
+        id: CorpusId,
+        md: TestcaseMetadata,
+    ) -> Result<Self::TestcaseMetadataCell, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<CorpusId>;
@@ -147,9 +193,6 @@ pub trait Corpus<I>: Sized {
 
     /// Get the next corpus id
     fn next(&self, id: CorpusId) -> Option<CorpusId>;
-
-    /// Peek the next free corpus id
-    fn peek_free_id(&self) -> CorpusId;
 
     /// Get the prev corpus id
     fn prev(&self, id: CorpusId) -> Option<CorpusId>;
@@ -179,23 +222,6 @@ pub trait Corpus<I>: Sized {
 
     /// Get the nth corpus id; considers both enabled and disabled testcases
     fn nth_from_all(&self, nth: usize) -> CorpusId;
-
-    /// Method to load the input for this [`Testcase`] from persistent storage,
-    /// if necessary, and if was not already loaded (`== Some(input)`).
-    /// After this call, `testcase.input()` must always return `Some(input)`.
-    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error>;
-
-    /// Method to store the input of this `Testcase` to persistent storage, if necessary.
-    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error>;
-
-    /// Loads the `Input` for a given [`CorpusId`] from the [`Corpus`], and returns the clone.
-    fn cloned_input_for_id(&self, id: CorpusId) -> Result<I, Error>
-    where
-        I: Clone,
-    {
-        let mut testcase = self.get(id)?.borrow_mut();
-        Ok(testcase.load_input(self)?.clone())
-    }
 }
 
 /// Marker trait for corpus implementations that actually support enable/disable functionality
@@ -219,13 +245,29 @@ pub trait HasCurrentCorpusId {
     fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error>;
 }
 
-/// [`Iterator`] over the ids of a [`Corpus`]
-#[derive(Debug)]
-pub struct CorpusIdIterator<'a, C, I> {
-    corpus: &'a C,
-    cur: Option<CorpusId>,
-    cur_back: Option<CorpusId>,
-    phantom: PhantomData<I>,
+impl fmt::Display for CorpusId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<usize> for CorpusId {
+    fn from(id: usize) -> Self {
+        Self(id)
+    }
+}
+
+impl From<u64> for CorpusId {
+    fn from(id: u64) -> Self {
+        Self(id as usize)
+    }
+}
+
+impl From<CorpusId> for usize {
+    /// Not that the `CorpusId` is not necessarily stable in the corpus (if we remove [`Testcase`]s, for example).
+    fn from(id: CorpusId) -> Self {
+        id.0
+    }
 }
 
 impl<C, I> Iterator for CorpusIdIterator<'_, C, I>
@@ -255,5 +297,13 @@ where
         } else {
             None
         }
+    }
+}
+
+impl CorpusCounter {
+    fn new_id(&mut self) -> CorpusId {
+        let old = self.current_id;
+        self.current_id += 1;
+        CorpusId(old)
     }
 }

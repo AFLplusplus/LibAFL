@@ -21,8 +21,8 @@ use libafl_bolts::Named;
 pub use mutational::StdMutationalPushStage;
 
 use crate::{
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasScheduler,
-    common::HasNamedMetadata,
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasNamedMetadata,
+    HasScheduler,
     corpus::{CorpusId, HasCurrentCorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},

@@ -49,7 +49,7 @@ impl ChunkStore {
         }
     }
 
-    pub fn add_tree(&mut self, tree: Tree, ctx: &Context) {
+    pub fn add_tree(&mut self, tree: &Tree, ctx: &Context) {
         let mut buffer = vec![];
         let id = self.trees.len();
         let mut contains_new_chunk = false;
@@ -76,8 +76,9 @@ impl ChunkStore {
                 contains_new_chunk = true;
             }
         }
+
         if contains_new_chunk {
-            self.trees.push(tree);
+            self.trees.push(tree.clone());
         }
     }
 
@@ -129,7 +130,7 @@ mod tests {
         let tree = ctx.generate_tree_from_rule(&mut rand, r1, random_size);
         fs::create_dir_all("/tmp/outputs/chunks").expect("40234068");
         let mut cks = ChunkStore::new("/tmp/".to_string());
-        cks.add_tree(tree, &ctx);
+        cks.add_tree(&tree, &ctx);
         // assert!(cks.seen_outputs.contains("a b c".as_bytes()));
         // assert!(cks.seen_outputs.contains("b c".as_bytes()));
         // assert!(cks.seen_outputs.contains("c".as_bytes()));
@@ -139,7 +140,7 @@ mod tests {
 
         let random_size = ctx.get_random_len_for_ruleid(&r2);
         let tree = ctx.generate_tree_from_rule(&mut rand, r2, random_size);
-        cks.add_tree(tree, &ctx);
+        cks.add_tree(&tree, &ctx);
         // assert_eq!(cks.seen_outputs.len(), 3);
         // assert_eq!(cks.nts_to_chunks[&ctx.nt_id("B")].len(), 1);
         let (tree_id, node_id) = cks.nts_to_chunks[&ctx.nt_id("B")][0];

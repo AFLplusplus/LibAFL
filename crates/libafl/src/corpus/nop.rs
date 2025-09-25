@@ -1,11 +1,16 @@
 //! The null corpus does not store any [`Testcase`]s.
-use core::{cell::RefCell, marker::PhantomData};
+
+use alloc::rc::Rc;
+use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     Error,
-    corpus::{Corpus, CorpusId, Testcase},
+    corpus::{
+        Corpus, CorpusId, Testcase,
+        testcase::{NopTestcaseMetadataCell, TestcaseMetadata},
+    },
 };
 
 /// A corpus which does not store any [`Testcase`]s.
@@ -16,6 +21,8 @@ pub struct NopCorpus<I> {
 }
 
 impl<I> Corpus<I> for NopCorpus<I> {
+    type TestcaseMetadataCell = NopTestcaseMetadataCell;
+
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -35,37 +42,22 @@ impl<I> Corpus<I> for NopCorpus<I> {
 
     /// Add an enabled testcase to the corpus and return its index
     #[inline]
-    fn add(&mut self, _testcase: Testcase<I>) -> Result<CorpusId, Error> {
+    fn add_shared<const ENABLED: bool>(
+        &mut self,
+        _input: Rc<I>,
+        _md: TestcaseMetadata,
+    ) -> Result<CorpusId, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
-    /// Add a disabled testcase to the corpus and return its index
-    #[inline]
-    fn add_disabled(&mut self, _testcase: Testcase<I>) -> Result<CorpusId, Error> {
+    fn get_from<const ENABLED: bool>(
+        &self,
+        _id: CorpusId,
+    ) -> Result<Testcase<I, Self::TestcaseMetadataCell>, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
-    /// Replaces the testcase with the given id
-    #[inline]
-    fn replace(&mut self, _id: CorpusId, _testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
-    }
-
-    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
-    #[inline]
-    fn remove(&mut self, _id: CorpusId) -> Result<Testcase<I>, Error> {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
-    }
-
-    /// Get by id; considers only enabled testcases
-    #[inline]
-    fn get(&self, _id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
-    }
-
-    /// Get by id; considers both enabled and disabled testcases
-    #[inline]
-    fn get_from_all(&self, _id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn disable(&mut self, _id: CorpusId) -> Result<(), Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
@@ -84,12 +76,6 @@ impl<I> Corpus<I> for NopCorpus<I> {
     #[inline]
     fn next(&self, _id: CorpusId) -> Option<CorpusId> {
         None
-    }
-
-    /// Peek the next free corpus id
-    #[inline]
-    fn peek_free_id(&self) -> CorpusId {
-        CorpusId::from(0_usize)
     }
 
     #[inline]
@@ -119,13 +105,11 @@ impl<I> Corpus<I> for NopCorpus<I> {
         CorpusId::from(0_usize)
     }
 
-    #[inline]
-    fn load_input_into(&self, _testcase: &mut Testcase<I>) -> Result<(), Error> {
-        Err(Error::unsupported("Unsupported by NopCorpus"))
-    }
-
-    #[inline]
-    fn store_input_from(&self, _testcase: &Testcase<I>) -> Result<(), Error> {
+    fn replace_metadata(
+        &mut self,
+        _id: CorpusId,
+        _md: TestcaseMetadata,
+    ) -> Result<Self::TestcaseMetadataCell, Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 }

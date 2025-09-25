@@ -280,7 +280,7 @@ where
                 last_id.map_or_else(|| state.corpus().first(), |id| state.corpus().next(id));
 
             while let Some(id) = cur_id {
-                let input = state.corpus().cloned_input_for_id(id)?;
+                let input = state.corpus().get(id)?.cloned_input();
 
                 self.client.fire(
                     state,

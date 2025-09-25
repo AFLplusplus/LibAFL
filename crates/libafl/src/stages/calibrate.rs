@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
-    corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
+    corpus::{Corpus, HasCurrentCorpusId, IsTestcaseMetadataCell, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{HasObserverHandle, map::MapFeedbackMetadata},
@@ -283,19 +283,21 @@ where
             psmeta.set_bitmap_size_log(psmeta.bitmap_size_log() + libm::log2(bitmap_size as f64));
             psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
-            let mut testcase = state.current_testcase_mut()?;
+            let testcase = state.current_testcase()?;
+            let mut tc_md = testcase.testcase_metadata_mut();
 
-            testcase.set_exec_time(total_time / (iter as u32));
-            // log::trace!("time: {:#?}", testcase.exec_time());
+            tc_md.set_exec_time(total_time / (iter as u32));
 
             // If the testcase doesn't have its own `SchedulerTestcaseMetadata`, create it.
-            let data = if let Ok(metadata) = testcase.metadata_mut::<SchedulerTestcaseMetadata>() {
+            let data = if let Ok(metadata) = tc_md.metadata_mut::<SchedulerTestcaseMetadata>() {
                 metadata
             } else {
-                let depth = match testcase.parent_id() {
+                let depth = match tc_md.parent_id() {
                     Some(parent_id) => {
-                        match (*state.corpus().get(parent_id)?)
-                            .borrow()
+                        match state
+                            .corpus()
+                            .get(parent_id)?
+                            .testcase_metadata()
                             .metadata_map()
                             .get::<SchedulerTestcaseMetadata>()
                         {
@@ -305,10 +307,8 @@ where
                     }
                     _ => 0,
                 };
-                testcase.add_metadata(SchedulerTestcaseMetadata::new(depth));
-                testcase
-                    .metadata_mut::<SchedulerTestcaseMetadata>()
-                    .unwrap()
+                tc_md.add_metadata(SchedulerTestcaseMetadata::new(depth));
+                tc_md.metadata_mut::<SchedulerTestcaseMetadata>().unwrap()
             };
 
             data.set_cycle_and_time((total_time, iter));

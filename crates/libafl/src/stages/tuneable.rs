@@ -251,8 +251,8 @@ where
         let iters = self.fixed_iters(state)?;
 
         start_timer!(state);
-        let mut testcase = state.current_testcase_mut()?;
-        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
+        let testcase = state.current_testcase()?;
+        let Ok(input) = I::try_transform_from(&testcase, state) else {
             return Ok(());
         };
         drop(testcase);
@@ -307,12 +307,18 @@ where
 
     /// Creates a new default tuneable mutational stage
     #[must_use]
-    pub fn new(state: &mut S, mutator: M) -> Self {
+    pub fn new(state: &mut S, mutator: M) -> Self
+    where
+        S: HasNamedMetadata,
+    {
         Self::transforming(state, mutator, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
     /// Crates a new tuneable mutational stage with the given name
-    pub fn with_name(state: &mut S, mutator: M, name: &str) -> Self {
+    pub fn with_name(state: &mut S, mutator: M, name: &str) -> Self
+    where
+        S: HasNamedMetadata,
+    {
         Self::transforming(state, mutator, name)
     }
 
@@ -325,7 +331,10 @@ where
     }
 
     /// Set the number of iterations to be used by the std [`TuneableMutationalStage`]
-    pub fn set_iters_std(state: &mut S, iters: u64) -> Result<(), Error> {
+    pub fn set_iters_std(state: &mut S, iters: u64) -> Result<(), Error>
+    where
+        S: HasNamedMetadata,
+    {
         set_iters_by_name(state, iters, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
@@ -367,7 +376,10 @@ where
     }
 
     /// Set the time to mutate a single input in the std [`TuneableMutationalStage`]
-    pub fn set_seed_fuzz_time_std(state: &mut S, fuzz_time: Duration) -> Result<(), Error> {
+    pub fn set_seed_fuzz_time_std(state: &mut S, fuzz_time: Duration) -> Result<(), Error>
+    where
+        S: HasNamedMetadata,
+    {
         set_seed_fuzz_time_by_name(state, fuzz_time, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 
@@ -413,7 +425,10 @@ where
     }
 
     /// Reset the std stage to a normal, randomized, stage
-    pub fn reset_std(state: &mut S) -> Result<(), Error> {
+    pub fn reset_std(state: &mut S) -> Result<(), Error>
+    where
+        S: HasNamedMetadata,
+    {
         reset_by_name(state, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
     }
 

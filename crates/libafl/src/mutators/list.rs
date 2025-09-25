@@ -179,8 +179,8 @@ where
         let other_idx_raw = state.rand_mut().next() as usize;
 
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
-        let mut testcase = state.corpus().get(id)?.borrow_mut();
-        let other = testcase.load_input(state.corpus())?;
+        let testcase = state.corpus().get(id)?;
+        let other = testcase.input();
 
         let other_len = other.len();
 
@@ -232,8 +232,8 @@ where
         let other_idx_raw = state.rand_mut().next() as usize;
 
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
-        let mut testcase = state.corpus().get(id)?.borrow_mut();
-        let other = testcase.load_input(state.corpus())?;
+        let testcase = state.corpus().get(id)?;
+        let other = testcase.input();
 
         let other_len = other.len();
 

@@ -4,7 +4,7 @@ use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
+use core::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{
@@ -20,7 +20,7 @@ use crate::monitors::stats::PerfFeature;
 use crate::{
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
     HasScheduler,
-    corpus::{Corpus, HasCurrentCorpusId, Testcase},
+    corpus::{Corpus, HasCurrentCorpusId, testcase::TestcaseMetadata},
     events::EventFirer,
     executors::{ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverHandle, StateInitializer},
@@ -191,7 +191,7 @@ where
         }
 
         start_timer!(state);
-        let transformed = I::try_transform_from(state.current_testcase_mut()?.borrow_mut(), state)?;
+        let transformed = I::try_transform_from(&state.current_testcase()?, state)?;
         let mut base = state.current_input_cloned()?;
         // potential post operation if base is replaced by a shorter input
         let mut base_post = None;
@@ -283,17 +283,26 @@ where
             fuzzer
                 .feedback_mut()
                 .is_interesting(state, manager, &base, &*observers, &exit_kind)?;
-            let mut testcase = Testcase::from(base);
-            testcase.set_executions(*state.executions());
-            testcase.set_parent_id(base_corpus_id);
 
-            fuzzer
-                .feedback_mut()
-                .append_metadata(state, manager, &*observers, &mut testcase)?;
-            let prev = state.corpus_mut().replace(base_corpus_id, testcase)?;
+            let mut tc_md = TestcaseMetadata::builder()
+                .executions(*state.executions())
+                .parent_id(Some(base_corpus_id))
+                .build();
+
+            fuzzer.feedback_mut().append_metadata(
+                state,
+                manager,
+                &*observers,
+                &base,
+                &mut tc_md,
+            )?;
+
+            let prev = state.corpus_mut().replace_metadata(base_corpus_id, tc_md)?;
+
             fuzzer
                 .scheduler_mut()
                 .on_replace(state, base_corpus_id, &prev)?;
+
             // perform the post operation for the new testcase, e.g. to update metadata.
             // base_post should be updated along with the base (and is no longer None)
             base_post
@@ -366,6 +375,7 @@ where
     M: Hash,
     C: AsRef<M>,
     OT: MatchName,
+    S: HasCorpus<I>,
 {
     fn is_interesting(
         &mut self,
