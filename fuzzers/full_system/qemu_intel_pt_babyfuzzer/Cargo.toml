@@ -1,0 +1,14 @@
+[package]
+name = "qemu_intel_pt_baby_fuzzer"
+version = "0.1.0"
+authors = ["Marco Cavenati <cavenatimarco+libafl@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+libafl = { path = "../../../crates/libafl", default-features = false }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_qemu = { path = "../../../crates/libafl_qemu", features = [
+  "intel_pt",
+], default-features = false }
+env_logger = "0.11.5"
+log = "0.4.28"

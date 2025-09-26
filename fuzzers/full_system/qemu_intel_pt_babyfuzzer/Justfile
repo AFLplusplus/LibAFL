@@ -1,0 +1,35 @@
+import "../../../just/libafl.just"
+
+FUZZER_NAME := "qemu_intel_pt_baby_fuzzer"
+
+[unix]
+default: run
+
+[unix]
+target_dir:
+    mkdir -p {{ TARGET_DIR }}
+
+[unix]
+build_target: target_dir
+    nasm -o {{ TARGET_DIR }}/boot.bin ./src/boot.s
+    qemu-img convert -O qcow2 {{ TARGET_DIR }}/boot.bin {{ TARGET_DIR }}/boot.qcow2
+
+[unix]
+build:
+    cargo build --profile {{ PROFILE }}
+
+[unix]
+setcap:
+    sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep {{ FUZZER }}
+
+[unix]
+run: build build_target setcap
+    RUST_LOG=debug {{ FUZZER }}
+
+[unix]
+test: build
+    echo "Build is successful."
+
+[unix]
+clean:
+    cargo clean
