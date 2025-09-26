@@ -1,7 +1,6 @@
 //! # linux
 //! The `LinuxHost` supports the established means of interacting with the QEMU
 //! emulator on Linux by means of issuing a bespoke syscall.
-use core::mem::transmute;
 
 use syscalls::{Errno, Sysno, syscall2, syscall3, syscall4};
 
@@ -83,6 +82,9 @@ impl LinuxHost {
     const SYSCALL_NO: u32 = 0xa2a4;
 
     pub fn sysno() -> Sysno {
-        unsafe { transmute(Self::SYSCALL_NO) }
+        let mut ret = Sysno::read;
+        let ptr = &mut ret as *mut Sysno as *mut u32;
+        unsafe { *ptr = Self::SYSCALL_NO };
+        ret
     }
 }
