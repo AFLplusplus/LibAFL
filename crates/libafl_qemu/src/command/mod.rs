@@ -29,7 +29,7 @@ use crate::{
     sync_exit::ExitArgs,
 };
 
-#[cfg(all(cpu_target = "x86_64", feature = "systemmode"))]
+#[cfg(feature = "nyx")]
 pub mod nyx;
 pub mod parser;
 
