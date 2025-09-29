@@ -197,8 +197,6 @@ jobs:
         with: { shared-key: "ubuntu" }
       - name: Install smoke test deps
         run: sudo ./crates/libafl_concolic/test/smoke_test_ubuntu_deps.sh
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
       - name: Run smoke test
         run: ./crates/libafl_concolic/test/smoke_test.sh
 
