@@ -1978,16 +1978,12 @@ impl AflppRedQueen {
     }
 }
 #[derive(Debug, Copy, Clone)]
+#[derive(Default)]
 enum TextType {
+    #[default]
     None,
     Ascii(usize),
     UTF8(usize),
-}
-
-impl Default for TextType {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl TextType {
