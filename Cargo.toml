@@ -93,7 +93,7 @@ libafl_jumper = { path = "./utils/libafl_jumper", version = "0.15.4", default-fe
 ahash = { version = "0.8.12", default-features = false } # The hash function already used in hashbrown
 arbitrary-int = "1.2.7" # arbitrary sized integers, useful in combination with bitfields (bitbybit crate)
 backtrace = { version = "0.3.74", default-features = false } # Used to get the stacktrace in StacktraceObserver
-bindgen = "0.72.0"
+bindgen = "0.72.1"
 bitbybit = "1.4.0" # bitfields, use this for bit fields and bit enums
 capstone = "0.13.0" # Disassembler used in libafl_unicorn to provide disassembly on crash
 clap = "4.5.45"
