@@ -197,6 +197,14 @@ jobs:
         with: { shared-key: "ubuntu" }
       - name: Install smoke test deps
         run: sudo ./crates/libafl_concolic/test/smoke_test_ubuntu_deps.sh
+      - name: Install LLVM
+        shell: bash
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20 all
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 200
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 200
       - name: Run smoke test
         run: ./crates/libafl_concolic/test/smoke_test.sh
 
