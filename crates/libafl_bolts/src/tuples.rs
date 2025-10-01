@@ -386,7 +386,7 @@ where
 
 #[cfg(feature = "alloc")]
 /// A named tuple
-pub trait NamedTuple: HasConstLen {
+pub trait NamedTuple {
     /// Gets the name of this tuple
     fn name(&self, index: usize) -> Option<&Cow<'static, str>>;
 
