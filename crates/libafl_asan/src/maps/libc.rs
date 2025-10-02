@@ -43,9 +43,15 @@ impl Function for FunctionRead {
 #[derive(Debug)]
 struct FunctionErrnoLocation;
 
+#[cfg(target_os = "linux")]
 impl Function for FunctionErrnoLocation {
     type Func = unsafe extern "C" fn() -> *mut c_int;
     const NAME: &'static CStr = c"__errno_location";
+}
+#[cfg(target_vendor = "apple")]
+impl Function for FunctionErrnoLocation {
+    type Func = unsafe extern "C" fn() -> *mut c_int;
+    const NAME: &'static CStr = c"__error";
 }
 
 static OPEN_ADDR: AtomicGuestAddr = AtomicGuestAddr::new();
@@ -88,8 +94,7 @@ impl<S: Symbols> LibcMapReader<S> {
         Ok(f)
     }
 
-    fn get_errno_location()
-    -> Result<<FunctionErrnoLocation as Function>::Func, LibcMapReaderError<S>> {
+    fn get_errno_location() -> Result<<FunctionErrnoLocation as Function>::Func, LibcMapReaderError<S>> {
         let addr = GET_ERRNO_LOCATION_ADDR.try_get_or_insert_with(|| {
             S::lookup(FunctionErrnoLocation::NAME)
                 .map_err(|e| LibcMapReaderError::FailedToFindSymbol(e))
@@ -123,7 +128,7 @@ impl<S: Symbols> MapReader for LibcMapReader<S> {
         };
         unsafe { asan_swap(true) };
         if fd < 0 {
-            let errno = Self::errno().unwrap();
+            let errno = Self::errno();
             return Err(LibcMapReaderError::FailedToOpen(errno));
         }
         Ok(LibcMapReader {
@@ -138,7 +143,7 @@ impl<S: Symbols> MapReader for LibcMapReader<S> {
         let ret = unsafe { fn_read(self.fd, buf.as_mut_ptr() as *mut c_char, buf.len()) };
         unsafe { asan_swap(true) };
         if ret < 0 {
-            let errno = Self::errno().unwrap();
+            let errno = Self::errno();
             return Err(LibcMapReaderError::FailedToRead(self.fd, errno));
         }
         Ok(ret as usize)
@@ -152,7 +157,7 @@ impl<S: Symbols> Drop for LibcMapReader<S> {
         let ret = unsafe { fn_close(self.fd) };
         unsafe { asan_swap(true) };
         if ret < 0 {
-            let errno = Self::errno().unwrap();
+            let errno = Self::errno();
             panic!("Failed to close: {}, Errno: {}", self.fd, errno);
         }
         trace!("Closed fd: {}", self.fd);

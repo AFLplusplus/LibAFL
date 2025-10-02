@@ -266,14 +266,14 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
     pub const HIGH_MEM_LIMIT: usize = L::HIGH_MEM_OFFSET + (L::HIGH_MEM_SIZE - 1);
 
     pub fn new() -> Result<GuestShadow<M, L>, GuestShadowError<M>> {
-        trace!(
+        println!(
             "Mapping low shadow: {:#x}-{:#x}",
             Self::LOW_SHADOW_OFFSET,
             Self::LOW_SHADOW_OFFSET + Self::LOW_SHADOW_SIZE
         );
         let lo = Self::map_shadow(Self::LOW_SHADOW_OFFSET, Self::LOW_SHADOW_SIZE)
             .map_err(|e| GuestShadowError::MmapError(e))?;
-        trace!(
+        println!(
             "Mapping high shadow: {:#x}-{:#x}",
             Self::HIGH_SHADOW_OFFSET,
             Self::HIGH_SHADOW_OFFSET + Self::HIGH_SHADOW_SIZE
@@ -288,9 +288,12 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
     }
 
     fn map_shadow(addr: GuestAddr, size: usize) -> Result<M, M::Error> {
+        println!("MapAt");
         let m = M::map_at(addr, size)?;
         M::huge_pages(addr, size)?;
+        println!("HugePages");
         M::dont_dump(addr, size)?;
+        println!("Don'tDump");
         Ok(m)
     }
 
@@ -353,8 +356,8 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
 
     pub fn get_shadow(&self, addr: GuestAddr, len: usize) -> Result<&[u8], GuestShadowError<M>> {
         trace!("get_shadow - addr: {addr:#x}, len: {len:#x}");
-        assert!(addr % Self::ALLOC_ALIGN_SIZE == 0);
-        assert!(len % Self::ALLOC_ALIGN_SIZE == 0);
+        assert!(addr.is_multiple_of(Self::ALLOC_ALIGN_SIZE));
+        assert!(len.is_multiple_of(Self::ALLOC_ALIGN_SIZE));
         let shadow_addr = (addr >> Self::ALLOC_ALIGN_POW) + Self::SHADOW_OFFSET;
         let shadow_len = len >> Self::ALLOC_ALIGN_POW;
         if Self::is_low_memory(addr, len) {
@@ -374,8 +377,8 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
         len: usize,
     ) -> Result<&mut [u8], GuestShadowError<M>> {
         trace!("get_shadow_mut - addr: {addr:#x}, len: {len:#x}");
-        assert!(addr % Self::ALLOC_ALIGN_SIZE == 0);
-        assert!(len % Self::ALLOC_ALIGN_SIZE == 0);
+        assert!(addr.is_multiple_of(Self::ALLOC_ALIGN_SIZE));
+        assert!(len.is_multiple_of(Self::ALLOC_ALIGN_SIZE));
         let shadow_addr = (addr >> Self::ALLOC_ALIGN_POW) + Self::SHADOW_OFFSET;
         let aligned_len = Self::align_up(len);
         let shadow_len = aligned_len >> Self::ALLOC_ALIGN_POW;
