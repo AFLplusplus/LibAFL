@@ -257,6 +257,7 @@ impl<I> TestcaseStorage<I> {
     #[cfg(not(feature = "corpus_btreemap"))]
     fn insert_inner(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
         let id = CorpusId::from(self.progressive_id);
+        testcase.borrow_mut().set_corpus_id(Some(id));
         self.progressive_id += 1;
         let corpus = if is_disabled {
             &mut self.disabled
