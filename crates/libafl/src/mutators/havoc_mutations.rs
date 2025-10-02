@@ -174,7 +174,7 @@ where
 /// Get the mutations that compose the Havoc mutator for state-aware-mapped input types
 ///
 /// Check the example fuzzer for details on how to use this.
-/// Check the docs of [`libafl::mutators::mapping::StateAwareMappingMutator`] for how mapping works internally.
+/// Check the docs of [`crate::mutators::mapping::StateAwareMappingMutator`] for how mapping works internally.
 #[must_use]
 pub fn state_aware_mapped_havoc_mutations<'a, F1, F2, IO1, IO2, II, O, S>(
     current_input_mapper: F1,
