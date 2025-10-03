@@ -488,10 +488,10 @@ jobs:
         shell: bash
         run: |
           wget https://launchpadlibrarian.net/580609635/libsqlite3-0_3.37.2-2_amd64.deb
-          dpkg -i libsqlite3-0_3.37.2-2_amd64.deb
+          sudo dpkg -i libsqlite3-0_3.37.2-2_amd64.deb
           
           wget https://launchpadlibrarian.net/580609626/libsqlite3-dev_3.37.2-2_amd64.deb
-          dpkg -i libsqlite3-dev_3.37.2-2_amd64.deb
+          sudo dpkg -i libsqlite3-dev_3.37.2-2_amd64.deb
           
           unset RUSTC && \
           ARCH=x86_64 \
