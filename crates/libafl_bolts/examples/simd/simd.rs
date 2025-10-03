@@ -88,7 +88,7 @@ impl SimplifyMapInput {
     }
 }
 
-type CovFuncPtr = fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
+type CovFuncPtr = unsafe fn(&[u8], &[u8], bool) -> (bool, Vec<usize>);
 
 struct CovInput {
     name: String,
@@ -137,17 +137,19 @@ impl CovInput {
         let mut outs = vec![];
         println!("warm up...");
         for _ in 0..16 {
-            (self.func)(&self.hist, &self.map, true);
+            unsafe {
+                (self.func)(&self.hist, &self.map, true);
+            }
         }
         clean_vectors(&mut self.hist);
         clean_vectors(&mut self.map);
         for _ in 0..self.rounds {
             random_bits(&mut self.map, &mut self.rng);
             let before = Utc::now();
-            let (interesting, novelties) = (self.func)(&self.hist, &self.map, true);
+            let (interesting, novelties) = unsafe { (self.func)(&self.hist, &self.map, true) };
             if self.validate {
                 let (canonical_interesting, canonical_novelties) =
-                    (self.naive)(&self.hist, &self.map, true);
+                    unsafe { (self.naive)(&self.hist, &self.map, true) };
 
                 assert!(
                     canonical_interesting == interesting && novelties == canonical_novelties,
