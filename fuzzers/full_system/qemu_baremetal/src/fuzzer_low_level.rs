@@ -135,12 +135,6 @@ pub fn fuzz() {
         let devices = qemu.list_devices();
         println!("Devices = {devices:?}");
 
-        // let saved_cpu_states: Vec<_> = (0..emu.num_cpus())
-        //     .map(|i| emu.cpu_from_index(i).save_state())
-        //     .collect();
-
-        // emu.save_snapshot("start", true);
-
         let snap = qemu.create_fast_snapshot(true);
 
         // The wrapped harness function, calling out to the LLVM-style harness
@@ -277,10 +271,6 @@ pub fn fuzz() {
     // The stats reporter for the broker
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    // let monitor = SimpleMonitor::new(|s| println!("{s}"));
-    // let mut mgr = SimpleEventManager::new(monitor);
-    // run_client(None, mgr, 0);
-
     // Build and run a Launcher
     match Launcher::builder()
         .shmem_provider(shmem_provider)
@@ -289,7 +279,6 @@ pub fn fuzz() {
         .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&cores)
-        // .stdout_file(Some("/dev/null"))
         .build()
         .launch()
     {

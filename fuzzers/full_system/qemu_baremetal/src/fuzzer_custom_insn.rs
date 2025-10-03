@@ -25,9 +25,11 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_qemu::{emu::Emulator, executor::QemuExecutor, modules::edges::StdEdgeCoverageModule};
+use libafl_qemu::{
+    emu::Emulator, executor::QemuExecutor, modules::edges::StdEdgeCoverageModule,
+    QemuSnapshotManager,
+};
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
-// use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot
 
 pub fn fuzz() {
     env_logger::init();
@@ -35,6 +37,7 @@ pub fn fuzz() {
     if let Ok(s) = env::var("FUZZ_SIZE") {
         str::parse::<usize>(&s).expect("FUZZ_SIZE was not a number");
     };
+
     // Hardcoded parameters
     let timeout = Duration::from_secs(3);
     let broker_port = 1337;
@@ -61,19 +64,24 @@ pub fn fuzz() {
             .map_observer(edges_observer.as_mut())
             .build()?);
 
-        let emu = Emulator::builder()
+        let mut emu = Emulator::builder()
             .qemu_parameters(args)
             .modules(modules)
+            .snapshot_manager(QemuSnapshotManager::default())
             .build()?;
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
 
+        unsafe {
+            emu.start().unwrap();
+        }
+
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |emulator: &mut Emulator<_, _, _, _, _, _, _>,
-                           state: &mut _,
+                           _state: &mut _,
                            input: &BytesInput| unsafe {
-            emulator.run(state, input).unwrap().try_into().unwrap()
+            emulator.run(input).unwrap().try_into().unwrap()
         };
 
         // Create an observation channel to keep track of the execution time
@@ -162,10 +170,6 @@ pub fn fuzz() {
     // The stats reporter for the broker
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    // let monitor = SimpleMonitor::new(|s| println!("{s}"));
-    // let mut mgr = SimpleEventManager::new(monitor);
-    // run_client(None, mgr, 0);
-
     // Build and run a Launcher
     match Launcher::builder()
         .shmem_provider(shmem_provider)
@@ -174,7 +178,6 @@ pub fn fuzz() {
         .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&cores)
-        // .stdout_file(Some("/dev/null"))
         .build()
         .launch()
     {

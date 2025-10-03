@@ -1,5 +1,6 @@
 import "../../../just/libafl-qemu.just"
 FUZZER_NAME := "qemu_baremetal"
+VHARNESS := BUILD_DIR / "vharness_out"
 
 KERNEL := TARGET_DIR / "example.elf"
 DUMMY_IMG := TARGET_DIR / "dummy.qcow2"
@@ -10,31 +11,33 @@ target_dir:
 image: target_dir
     qemu-img create -f qcow2 {{DUMMY_IMG}} 32M
 
-target flavor: image target_dir
+target flavor="low_level": image target_dir (build flavor)
     arm-none-eabi-gcc -ggdb -ffreestanding -nostartfiles -lgcc \
         -T example/mps2_m3.ld \
         -mcpu=cortex-m3 \
         -D "TARGET_{{ uppercase(flavor) }}" \
-        -I {{BUILD_DIR / "include"}} \
+        -I {{ VHARNESS  / "include" }} \
         example/main.c \
         example/startup.c \
+        {{ VHARNESS  / "src" / "calls.c" }} \
+        {{ VHARNESS  / "src" / "lqemu.c" }} \
         -o {{TARGET_DIR}}/example.elf
 
-build flavor="breakpoint": target_dir
+build flavor="low_level": target_dir
     cargo build \
         --profile {{PROFILE}} \
         --no-default-features \
         --features std,{{flavor}},{{ ARCH }}  \
         --target-dir {{TARGET_DIR}}
 
-build-multiarch flavor="breakpoint": target_dir
+build-multiarch flavor="low_level": target_dir
     cargo build \
         --profile {{PROFILE}} \
         --no-default-features \
         --features std,{{flavor}},{{ ARCH }} \
         --target-dir {{TARGET_DIR}}
 
-run flavor="breakpoint": (target flavor) (build flavor)
+run flavor="low_level": (target flavor) (build flavor)
     {{BUILD_DIR / "qemu_baremetal"}} \
         -icount shift=auto,align=off,sleep=off \
         -machine mps2-an385 \
@@ -46,14 +49,14 @@ run flavor="breakpoint": (target flavor) (build flavor)
         -snapshot \
         -S
 
-test_flavor flavor: (target flavor) (build flavor)
+test_flavor flavor="low_level": (target flavor) (build flavor)
     #!/bin/bash
     export KERNEL={{ KERNEL }}
     export TARGET_DIR={{ TARGET_DIR }}
 
     TMP_DIR=$(mktemp -d)
 
-    timeout 20s {{ FUZZER }} \
+    timeout 10s {{ FUZZER }} \
         -icount shift=auto,align=off,sleep=off \
         -machine mps2-an385 \
         -monitor null \
@@ -70,7 +73,7 @@ test_flavor flavor: (target flavor) (build flavor)
         echo "qemu_baremetal ${FEATURE}: Objective found."
     fi
 
-test: (test_flavor "low_level") (test_flavor "breakpoint") (test_flavor "sync_exit")
+test: (test_flavor "low_level") (test_flavor "breakpoint") (test_flavor "custom_insn")
 
 clean:
     cargo clean

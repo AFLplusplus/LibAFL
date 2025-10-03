@@ -14,7 +14,7 @@ use strum_macros::EnumIter;
 
 use crate::MmapPerms;
 #[cfg(target_os = "linux")]
-use crate::{GuestAddr, libafl_mapinfo};
+use crate::libafl_mapinfo;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Copy, Clone, EnumIter, PartialEq, Eq)]
 #[repr(i32)]
@@ -28,9 +28,9 @@ pub enum VerifyAccess {
 #[cfg(target_os = "linux")]
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct MapInfo {
-    start: GuestAddr,
-    end: GuestAddr,
-    offset: GuestAddr,
+    start: u64,
+    end: u64,
+    offset: u64,
     path: Option<String>,
     flags: i32,
     is_priv: i32,
@@ -80,17 +80,17 @@ impl Display for MapInfo {
 #[cfg_attr(feature = "python", pymethods)]
 impl MapInfo {
     #[must_use]
-    pub fn start(&self) -> GuestAddr {
+    pub fn start(&self) -> u64 {
         self.start
     }
 
     #[must_use]
-    pub fn end(&self) -> GuestAddr {
+    pub fn end(&self) -> u64 {
         self.end
     }
 
     #[must_use]
-    pub fn offset(&self) -> GuestAddr {
+    pub fn offset(&self) -> u64 {
         self.offset
     }
 
@@ -159,6 +159,7 @@ impl<'py> IntoPyObject<'py> for MmapPerms {
 
 #[cfg(target_os = "linux")]
 impl From<libafl_mapinfo> for MapInfo {
+    #[allow(clippy::unnecessary_cast)]
     fn from(map_info: libafl_mapinfo) -> Self {
         let path: Option<String> = if map_info.path.is_null() {
             None
@@ -175,9 +176,9 @@ impl From<libafl_mapinfo> for MapInfo {
         };
 
         MapInfo {
-            start: map_info.start,
-            end: map_info.end,
-            offset: map_info.offset,
+            start: map_info.start as u64,
+            end: map_info.end as u64,
+            offset: map_info.offset as u64,
             path,
             flags: map_info.flags,
             is_priv: map_info.is_priv,

@@ -457,7 +457,7 @@ jobs:
             # - full_system/qemu_linux_kernel
             # - full_system/qemu_linux_process
     runs-on: ubuntu-24.04
-    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    # container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
         # Get the name of the fuzzer so that we can use it as the key for a cache
         # of the built artefacts. The key cannot have any special characters.
@@ -487,6 +487,12 @@ jobs:
       - name: Test
         shell: bash
         run: |
+          wget https://launchpadlibrarian.net/580609635/libsqlite3-0_3.37.2-2_amd64.deb
+          sudo dpkg -i libsqlite3-0_3.37.2-2_amd64.deb
+          
+          wget https://launchpadlibrarian.net/580609626/libsqlite3-dev_3.37.2-2_amd64.deb
+          sudo dpkg -i libsqlite3-dev_3.37.2-2_amd64.deb
+          
           unset RUSTC && \
           ARCH=x86_64 \
           RUN_ON_CI=1 \
@@ -512,7 +518,7 @@ jobs:
             # - full_system/qemu_linux_kernel
             # - full_system/qemu_linux_process
     runs-on: ubuntu-24.04
-    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    # container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
         # Get the name of the fuzzer so that we can use it as the key for a cache
         # of the built artefacts. The key cannot have any special characters.
@@ -564,7 +570,7 @@ jobs:
         fuzzer:
             - full_system/qemu_baremetal
     runs-on: ubuntu-24.04
-    container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
+    # container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
         # Get the name of the fuzzer so that we can use it as the key for a cache
         # of the built artefacts. The key cannot have any special characters.
@@ -898,7 +904,7 @@ jobs:
       - name: Increase map sizes
         run: ./scripts/shmem_limits_macos.sh
       - name: Clippy
-        run: cargo clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
+        run: cargo clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test --exclude libvharness_sys --exclude libafl_qemu_sys --exclude libafl_qemu --exclude libafl_qemu_build
 
   ubuntu-cross-android-arm64:
     runs-on: ubuntu-24.04
