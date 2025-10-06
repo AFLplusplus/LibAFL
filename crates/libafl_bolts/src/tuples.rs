@@ -1299,8 +1299,7 @@ mod test {
             let (tuple, _handles) = get_tuple();
             #[expect(clippy::let_unit_value)]
             let recovered = tuple.get_all(tuple_list!());
-            #[expect(clippy::unit_cmp)]
-            // needs its own scope to make the clippy expect work
+            #[allow(clippy::unit_cmp)]
             {
                 assert_eq!(recovered, ());
             }
@@ -1346,8 +1345,7 @@ mod test {
             let mut tuple = get_tuple().0;
             #[expect(clippy::let_unit_value)]
             let recovered = tuple.get_all_mut(tuple_list!());
-            #[expect(clippy::unit_cmp)]
-            // needs its own scope to make the clippy expect work
+            #[allow(clippy::unit_cmp)]
             {
                 assert_eq!(recovered, tuple_list!());
             }

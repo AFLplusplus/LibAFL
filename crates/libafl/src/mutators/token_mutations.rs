@@ -1977,7 +1977,7 @@ impl AflppRedQueen {
         tokens.add_token(&v);
     }
 }
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Default, Debug, Copy, Clone)]
 enum TextType {
     #[default]
     None,
