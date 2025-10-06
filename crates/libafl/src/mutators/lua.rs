@@ -115,7 +115,7 @@ fn create_lua_fn<S: HasRand>(
                 timeouted_once_cb.set(false);
                 Ok(VmState::Continue)
             }
-        });
+        })?;
     }
 
     let func = mutator_lua_fn.to_string();
