@@ -36,7 +36,7 @@ pub const VERSION_MINOR: u64 = libvharness_sys::LQEMU_VERSION_MINOR as u64;
 
 #[cfg(feature = "usermode")]
 define_std_command_manager_bound!(
-    CommandManager,
+    LqemuCommandManager,
     HasTargetBytes,
     [
         StartCommand,
