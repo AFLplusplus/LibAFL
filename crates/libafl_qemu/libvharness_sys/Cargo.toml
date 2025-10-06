@@ -36,3 +36,6 @@ clippy = []
 [build-dependencies]
 cmake = "0.1.54"
 bindgen = "0.72.0"
+
+[lints]
+workspace = true
