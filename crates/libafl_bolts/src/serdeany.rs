@@ -121,9 +121,8 @@ pub mod serdeany_registry {
     use core::{any::TypeId, fmt};
 
     use hashbrown::{
-        HashMap,
+        DefaultHashBuilder, HashMap,
         hash_map::{Values, ValuesMut},
-        DefaultHashBuilder,
     };
     use serde::{Deserialize, Serialize, de};
 
@@ -698,12 +697,7 @@ pub mod serdeany_registry {
         fn entry<T>(
             &mut self,
             name: String,
-        ) -> hashbrown::hash_map::Entry<
-            '_,
-            String,
-            Box<dyn SerdeAny + 'static>,
-            DefaultHashBuilder,
-        >
+        ) -> hashbrown::hash_map::Entry<'_, String, Box<dyn SerdeAny + 'static>, DefaultHashBuilder>
         where
             T: crate::serdeany::SerdeAny,
         {

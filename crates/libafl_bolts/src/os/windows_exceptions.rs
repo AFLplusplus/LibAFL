@@ -12,7 +12,7 @@ use std::os::raw::{c_long, c_void};
 
 use num_enum::FromPrimitive;
 pub use windows::Win32::{
-    Foundation::{BOOL, NTSTATUS},
+    Foundation::NTSTATUS,
     System::{
         Console::{CTRL_BREAK_EVENT, CTRL_C_EVENT, PHANDLER_ROUTINE, SetConsoleCtrlHandler},
         Diagnostics::Debug::{
@@ -21,6 +21,7 @@ pub use windows::Win32::{
         Threading::{IsProcessorFeaturePresent, PROCESSOR_FEATURE_ID},
     },
 };
+pub use windows_core::BOOL;
 
 use crate::Error;
 
@@ -618,7 +619,7 @@ pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
     compiler_fence(Ordering::SeqCst);
 
     // Log the result of SetConsoleCtrlHandler
-    let result = unsafe { SetConsoleCtrlHandler(Some(Some(ctrl_handler)), true) };
+    let result = unsafe { SetConsoleCtrlHandler(Some(ctrl_handler), true) };
     match result {
         Ok(()) => {
             log::info!("SetConsoleCtrlHandler succeeded");
