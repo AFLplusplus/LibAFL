@@ -4,6 +4,7 @@
 #![expect(unused)]
 #![expect(clippy::all)]
 #![expect(clippy::pedantic)]
+#![expect(clippy::std_instead_of_core)]
 #![allow(unsafe_op_in_unsafe_fn)]
 #![allow(warnings)]
 

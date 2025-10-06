@@ -509,7 +509,7 @@ jobs:
       matrix:
         fuzzer:
             - full_system/qemu_baremetal
-            # - full_system/qemu_linux_kernel
+            - full_system/qemu_linux_kernel
             # - full_system/qemu_linux_process
     runs-on: ubuntu-24.04
     # container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
