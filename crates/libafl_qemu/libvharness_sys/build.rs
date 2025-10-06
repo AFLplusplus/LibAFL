@@ -146,7 +146,7 @@ fn main() {
     let vharness_out_dir = cmake::Config::new(&vharness_dir)
         .define(
             "CMAKE_TOOLCHAIN_FILE",
-            &toolchains_dir.join(format!("{cpu_target}-generic.cmake")),
+            toolchains_dir.join(format!("{cpu_target}-generic.cmake")),
         )
         .define("VHARNESS_API", &api)
         .define("VHARNESS_TESTS", "OFF")
