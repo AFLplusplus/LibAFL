@@ -16,18 +16,23 @@ pub mod lqemu;
 pub use lqemu::SetMapCommand;
 #[cfg(not(feature = "nyx"))]
 pub use lqemu::{
-    AddressAllowCommand, EndCommand, LoadCommand, LqprintfCommand, SaveCommand, StartCommand,
-    StdCommandManager, TestCommand, VersionCommand,
+    AddressAllowCommand, EndCommand, LoadCommand, LqemuCommandManager, LqprintfCommand,
+    SaveCommand, StartCommand, TestCommand, VersionCommand,
 };
 
 #[cfg(feature = "nyx")]
 pub mod nyx;
 #[cfg(feature = "nyx")]
 pub use nyx::{
-    AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand, PanicCommand,
-    PrintfCommand, RangeSubmitCommand, ReleaseCommand, SetAgentConfigCommand, StdCommandManager,
+    AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand, NyxCommandManager,
+    PanicCommand, PrintfCommand, RangeSubmitCommand, ReleaseCommand, SetAgentConfigCommand,
     SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
 };
+
+#[cfg(not(feature = "nyx"))]
+pub type StdCommandManager<S> = LqemuCommandManager<S>;
+#[cfg(feature = "nyx")]
+pub type StdCommandManager<S> = NyxCommandManager<S>;
 
 #[macro_export]
 macro_rules! define_std_command_manager_bound {

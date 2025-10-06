@@ -16,7 +16,7 @@ use super::{
 use crate::{
     GenericEmulatorDriver, GuestReg, InputLocation, InputSetter, IsSnapshotManager, Qemu,
     QemuMemoryChunk, Regs,
-    command::{CommandError, CommandManager, NativeCommandParser, StdCommandManager},
+    command::{CommandError, CommandManager, NativeCommandParser, lqemu::LqemuCommandManager},
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
     sync_exit::ExitArgs,
 };
@@ -30,7 +30,7 @@ pub struct StartPhysCommandParser;
 
 #[cfg(feature = "systemmode")]
 impl<C, ET, I, IS, S, SM>
-    NativeCommandParser<C, StdCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>
+    NativeCommandParser<C, LqemuCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for StartPhysCommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -64,7 +64,7 @@ where
 pub struct StartVirtCommandParser;
 
 impl<C, ET, I, IS, S, SM>
-    NativeCommandParser<C, StdCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>
+    NativeCommandParser<C, LqemuCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for StartVirtCommandParser
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -155,7 +155,7 @@ where
 pub struct EndCommandParser;
 
 impl<C, ET, I, IS, S, SM>
-    NativeCommandParser<C, StdCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>
+    NativeCommandParser<C, LqemuCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for EndCommandParser
 where
     ET: EmulatorModuleTuple<I, S>,

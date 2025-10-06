@@ -2,7 +2,7 @@ use std::{cell::OnceCell, cmp::min, ptr, slice::from_raw_parts};
 
 use libafl::inputs::HasTargetBytes;
 
-use crate::{EmulatorDriverError, GenericEmulatorDriver, InputLocation, InputSetter, Qemu};
+use crate::{EmulatorDriverError, InputLocation, InputSetter, Qemu};
 
 #[derive(Clone, Debug)]
 pub struct StdNyxInputSetter {

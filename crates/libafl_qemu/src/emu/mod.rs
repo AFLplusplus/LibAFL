@@ -11,16 +11,12 @@ use libafl::{
 };
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 
-#[cfg(not(feature = "nyx"))]
-use crate::command::StdCommandManager;
-#[cfg(feature = "nyx")]
-use crate::command::nyx::NyxCommandManager;
 #[cfg(doc)]
 use crate::modules::EmulatorModule;
 use crate::{
     Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuParams, QemuShutdownCause,
     breakpoint::{Breakpoint, BreakpointId},
-    command::{CommandError, CommandManager, NopCommandManager},
+    command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
     modules::EmulatorModuleTuple,
     sync_exit::CustomInsn,
 };
@@ -239,7 +235,6 @@ impl<C, I, S> Emulator<C, NopCommandManager, NopEmulatorDriver, (), I, S, NopSna
     }
 }
 
-#[cfg(not(feature = "nyx"))]
 impl<C, I, S> Emulator<C, StdCommandManager<S>, StdEmulatorDriver, (), I, S, StdSnapshotManager>
 where
     S: HasExecutions + Unpin,
@@ -250,27 +245,6 @@ where
         C,
         StdCommandManager<S>,
         StdEmulatorDriver,
-        (),
-        QemuConfigBuilder,
-        I,
-        S,
-        StdSnapshotManager,
-    > {
-        EmulatorBuilder::default()
-    }
-}
-
-#[cfg(feature = "nyx")]
-impl<C, I, S> Emulator<C, NyxCommandManager<S>, StdNyxEmulatorDriver, (), I, S, StdSnapshotManager>
-where
-    S: HasExecutions + Unpin,
-    I: HasTargetBytes,
-{
-    #[must_use]
-    pub fn builder() -> EmulatorBuilder<
-        C,
-        NyxCommandManager<S>,
-        StdNyxEmulatorDriver,
         (),
         QemuConfigBuilder,
         I,

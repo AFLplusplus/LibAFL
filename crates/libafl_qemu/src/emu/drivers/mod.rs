@@ -6,29 +6,33 @@ use std::collections::HashMap;
 use std::{cell::OnceCell, fmt::Debug};
 
 use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::ObserversTuple};
-use libafl_bolts::{
-    AsSlice,
-    os::{CTRL_C_EXIT, unix_signals::Signal},
-};
+use libafl_bolts::os::{CTRL_C_EXIT, unix_signals::Signal};
 
 #[cfg(feature = "systemmode")]
 use crate::PhysMemoryChunk;
 use crate::{
-    Emulator, EmulatorExitError, EmulatorExitResult, GuestReg, InputLocation, IsSnapshotManager,
-    Qemu, QemuError, QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError,
+    Emulator, EmulatorExitError, EmulatorExitResult, InputLocation, IsSnapshotManager, Qemu,
+    QemuError, QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError,
     SnapshotManagerError,
     command::{CommandError, CommandManager, IsCommand},
     modules::EmulatorModuleTuple,
 };
 
+#[cfg(not(feature = "nyx"))]
+pub mod lqemu;
+#[cfg(not(feature = "nyx"))]
+pub use lqemu::LqemuInputSetter;
+
 #[cfg(feature = "nyx")]
 pub mod nyx;
 #[cfg(feature = "nyx")]
-pub use nyx::{StdNyxEmulatorDriver, StdNyxInputSetter};
-#[cfg(feature = "nyx")]
-pub type StdEmulatorDriver = GenericEmulatorDriver<StdNyxInputSetter>;
+pub use nyx::StdNyxInputSetter;
 
 #[cfg(not(feature = "nyx"))]
+pub type StdInputSetter = LqemuInputSetter;
+#[cfg(feature = "nyx")]
+pub type StdInputSetter = StdNyxInputSetter;
+
 pub type StdEmulatorDriver = GenericEmulatorDriver<StdInputSetter>;
 
 #[derive(Debug, Clone)]
@@ -99,46 +103,6 @@ impl<I, S> InputSetter<I, S> for NopInputSetter {
 
     fn input_location(&self) -> Option<&InputLocation> {
         None
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct StdInputSetter {
-    input_location: OnceCell<InputLocation>,
-}
-
-impl<I, S> InputSetter<I, S> for StdInputSetter
-where
-    I: HasTargetBytes,
-{
-    fn write_input(
-        &mut self,
-        _qemu: Qemu,
-        _state: &mut S,
-        input: &I,
-    ) -> Result<(), EmulatorDriverError> {
-        if let Some(input_location) = self.input_location.get_mut() {
-            let ret_value = input_location.write(input.target_bytes().as_slice());
-
-            if let Some(reg) = input_location.ret_register() {
-                input_location
-                    .cpu()
-                    .write_reg(*reg, ret_value as GuestReg)
-                    .unwrap();
-            }
-        }
-
-        Ok(())
-    }
-
-    fn set_input_location(&mut self, location: InputLocation) -> Result<(), EmulatorDriverError> {
-        self.input_location
-            .set(location)
-            .or(Err(EmulatorDriverError::MultipleInputLocationDefinition))
-    }
-
-    fn input_location(&self) -> Option<&InputLocation> {
-        self.input_location.get()
     }
 }
 
@@ -355,10 +319,10 @@ pub struct GenericEmulatorDriver<IS> {
 }
 
 #[cfg(not(feature = "nyx"))]
-impl GenericEmulatorDriver<StdInputSetter> {
+impl GenericEmulatorDriver<LqemuInputSetter> {
     #[must_use]
-    pub fn builder() -> StdEmulatorDriverBuilder<StdInputSetter> {
-        StdEmulatorDriverBuilder::<StdInputSetter>::default()
+    pub fn builder() -> StdEmulatorDriverBuilder<LqemuInputSetter> {
+        StdEmulatorDriverBuilder::<LqemuInputSetter>::default()
     }
 }
 

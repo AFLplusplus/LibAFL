@@ -30,21 +30,21 @@ use libafl_bolts::{
     tuples::tuple_list,
 };
 #[cfg(feature = "nyx")]
-use libafl_qemu::{command::nyx::NyxCommandManager, NopSnapshotManager, StdNyxEmulatorDriver};
-#[cfg(not(feature = "nyx"))]
+use libafl_qemu::NopSnapshotManager;
 use libafl_qemu::{
     command::StdCommandManager,
-    modules::utils::filters::{HasAddressFilterTuple, LINUX_PROCESS_ADDRESS_RANGE},
-    FastSnapshotManager, StdEmulatorDriver,
-};
-use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::{
         cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule,
         EmulatorModuleTuple,
     },
-    QemuInitError,
+    QemuInitError, StdEmulatorDriver,
+};
+#[cfg(not(feature = "nyx"))]
+use libafl_qemu::{
+    modules::utils::filters::{HasAddressFilterTuple, LINUX_PROCESS_ADDRESS_RANGE},
+    FastSnapshotManager,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
@@ -53,7 +53,7 @@ fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     modules: ET,
 ) -> Result<
-    Emulator<C, NyxCommandManager<S>, StdNyxEmulatorDriver, ET, I, S, NopSnapshotManager>,
+    Emulator<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, NopSnapshotManager>,
     QemuInitError,
 >
 where
@@ -64,8 +64,8 @@ where
     Emulator::empty()
         .qemu_parameters(args)
         .modules(modules)
-        .driver(StdNyxEmulatorDriver::builder().build())
-        .command_manager(NyxCommandManager::default())
+        .driver(StdEmulatorDriver::builder().build())
+        .command_manager(StdCommandManager::default())
         .snapshot_manager(NopSnapshotManager::default())
         .build()
 }

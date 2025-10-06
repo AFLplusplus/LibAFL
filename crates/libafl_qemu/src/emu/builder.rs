@@ -14,8 +14,6 @@ use crate::{
     config::QemuConfigBuilder,
     modules::{EmulatorModule, EmulatorModuleTuple},
 };
-#[cfg(feature = "nyx")]
-use crate::{StdNyxEmulatorDriver, command::nyx::NyxCommandManager};
 
 /// An [`Emulator`] Builder.
 ///
@@ -90,7 +88,7 @@ where
     }
 }
 
-#[cfg(all(not(feature = "nyx"), feature = "systemmode"))]
+#[cfg(feature = "systemmode")]
 impl<C, I, S>
     EmulatorBuilder<
         C,

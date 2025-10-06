@@ -36,7 +36,7 @@ pub const VERSION_MINOR: u64 = libvharness_sys::LQEMU_VERSION_MINOR as u64;
 
 #[cfg(feature = "usermode")]
 define_std_command_manager_bound!(
-    StdCommandManager,
+    CommandManager,
     HasTargetBytes,
     [
         StartCommand,
@@ -62,7 +62,7 @@ define_std_command_manager_bound!(
 
 #[cfg(feature = "systemmode")]
 define_std_command_manager_bound!(
-    StdCommandManager,
+    LqemuCommandManager,
     HasTargetBytes,
     [
         StartCommand,
@@ -229,7 +229,7 @@ pub struct EndCommand {
 }
 
 impl<C, ET, I, IS, S, SM>
-    IsCommand<C, StdCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM> for EndCommand
+    IsCommand<C, LqemuCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM> for EndCommand
 where
     ET: EmulatorModuleTuple<I, S>,
     I: HasTargetBytes + Unpin,
@@ -242,7 +242,7 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<C, StdCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>,
+        emu: &mut Emulator<C, LqemuCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
