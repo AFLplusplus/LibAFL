@@ -125,19 +125,11 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     );
 
     // Map the data section in memory
-    emu.mem_map(
-        DATA_ADDRESS,
-        DATA_SIZE,
-        Prot::WRITE | Prot::READ,
-    )
-    .unwrap();
+    emu.mem_map(DATA_ADDRESS, DATA_SIZE, Prot::WRITE | Prot::READ)
+        .unwrap();
 
-    emu.mem_map(
-        STACK_ADDRESS,
-        STACK_SIZE,
-        Prot::WRITE | Prot::READ,
-    )
-    .unwrap();
+    emu.mem_map(STACK_ADDRESS, STACK_SIZE, Prot::WRITE | Prot::READ)
+        .unwrap();
 
     #[cfg(feature = "code_hook")]
     add_code_hook(&mut emu);
