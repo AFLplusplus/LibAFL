@@ -129,7 +129,7 @@ rustversion = { workspace = true }
 [dev-dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
 rand = "0.9.0"
-chrono = "0.4.40"
+chrono = "0.4.42"
 itertools = "0.14.0"
 
 [dependencies]
@@ -140,7 +140,8 @@ typeid = { workspace = true }
 tuple_list = { version = "0.1.3" }
 hashbrown = { workspace = true, features = [
   "serde",
-  "ahash",
+  "default-hasher",
+  "raw-entry",
 ], default-features = false, optional = true } # A faster hashmap, nostd compatible
 xxhash-rust = { version = "0.8.12", features = [
   "xxh3",
@@ -211,7 +212,7 @@ winapi = { version = "0.3", features = [
   "winbase",
   "winnt",
 ] }
-windows-result = "0.3.0"
+windows-result = "0.4.0"
 
 [target.'cfg(windows)'.build-dependencies]
 windows = { workspace = true }

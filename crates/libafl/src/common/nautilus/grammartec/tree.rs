@@ -7,7 +7,7 @@ use libafl_bolts::rands::Rand;
 #[cfg(feature = "nautilus_py")]
 use pyo3::{
     PyTypeInfo,
-    prelude::{PyObject, PyResult, Python},
+    prelude::{Py, PyAny, PyResult, Python},
     types::{PyAnyMethods, PyBytes, PyBytesMethods, PyString, PyStringMethods, PyTuple},
 };
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ enum UnparseStep<'dat> {
     Term(&'dat [u8]),
     Nonterm(NTermId),
     #[cfg(feature = "nautilus_py")]
-    Script(usize, PyObject),
+    Script(usize, Py<PyAny>),
     #[cfg(feature = "nautilus_py")]
     PushBuffer(),
 }
@@ -82,8 +82,8 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
     }
 
     #[cfg(feature = "nautilus_py")]
-    fn unwrap_script(&mut self, num: usize, expr: &PyObject) {
-        Python::with_gil(|py| {
+    fn unwrap_script(&mut self, num: usize, expr: &Py<PyAny>) {
+        Python::attach(|py| {
             self.script(py, num, expr)
                 .map_err(|e| e.print_and_set_sys_last_vars(py))
                 .unwrap();
@@ -91,7 +91,7 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
     }
 
     #[cfg(feature = "nautilus_py")]
-    fn script(&mut self, py: Python, num: usize, expr: &PyObject) -> PyResult<()> {
+    fn script(&mut self, py: Python, num: usize, expr: &Py<PyAny>) -> PyResult<()> {
         let bufs = self.buffers.split_off(self.buffers.len() - num);
         let bufs = bufs.into_iter().map(Cursor::into_inner).collect::<Vec<_>>();
         let byte_arrays = bufs.iter().map(|b| PyBytes::new(py, b));
@@ -141,7 +141,7 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
 
     #[cfg(feature = "nautilus_py")]
     fn next_script(&mut self, r: &ScriptRule) {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             self.stack.push(UnparseStep::Script(
                 r.nonterms.len(),
                 r.script.clone_ref(py),

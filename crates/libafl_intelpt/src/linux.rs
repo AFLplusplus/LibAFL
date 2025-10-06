@@ -805,7 +805,7 @@ fn current_cpu() -> Option<Cpu> {
 
 #[cfg(test)]
 mod test {
-    use arbitrary_int::Number;
+    use arbitrary_int::prelude::*;
 
     use super::*;
     #[test]
