@@ -79,7 +79,7 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
     // Provide disassembly at instant of crash
     let regions = emu.mem_regions().expect("Could not get memory regions");
     for region in regions {
-        if (region.perms & Prot::EXEC.0 != 0) && pc >= region.begin && pc <= region.end {
+        if Prot(region.perms) & Prot::EXEC == Prot::EXEC && pc >= region.begin && pc <= region.end {
             let mut begin = pc - 32;
             let mut end = pc + 32;
             if begin < region.begin {

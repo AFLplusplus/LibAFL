@@ -23,7 +23,7 @@ libafl_targets = { path = "../libafl_targets" }
 # External dependencies
 capstone = { workspace = true }
 log = { workspace = true }
-unicorn-engine = "2.1.1"
+unicorn-engine = "2.1.5"
 
 
 [lib]
