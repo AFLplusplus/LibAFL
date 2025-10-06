@@ -409,11 +409,24 @@ where
                 }
                 CStr::from_ptr(*c_array.offset(2)).to_string_lossy()
             };
-            if first_parameter == "-c"
-                && (second_parameter.to_lowercase().contains("';fuzz;'")
-                    || second_parameter.to_lowercase().contains("\";fuzz;\""))
-            {
-                panic!("Found command injection!");
+
+            if first_parameter == "-c" {
+                let to_check = if second_parameter == "--" {
+                    unsafe {
+                        if (*c_array.offset(3)).is_null() {
+                            return SyscallHookResult::Run;
+                        }
+                        CStr::from_ptr(*c_array.offset(3)).to_string_lossy()
+                    }
+                } else {
+                    second_parameter
+                };
+
+                if to_check.to_lowercase().contains("';fuzz;'")
+                    || to_check.to_lowercase().contains("\";fuzz;\"")
+                {
+                    panic!("Found command injection!");
+                }
             }
 
             //println!("PARAMETERS First {} Second {}", first_parameter, second_
