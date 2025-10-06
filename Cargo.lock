@@ -3247,6 +3247,7 @@ dependencies = [
  "uuid",
  "winapi",
  "windows 0.62.1",
+ "windows-core 0.62.1",
  "windows-result 0.4.0",
  "xxhash-rust",
 ]
