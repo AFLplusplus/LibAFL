@@ -3366,10 +3366,8 @@ name = "libafl_qemu"
 version = "0.15.4"
 dependencies = [
  "addr2line",
- "bindgen 0.72.1",
  "bytes-utils",
  "capstone",
- "cc",
  "document-features",
  "enum-map",
  "getset",
@@ -3380,7 +3378,6 @@ dependencies = [
  "libafl_bolts",
  "libafl_derive",
  "libafl_intelpt",
- "libafl_qemu_build",
  "libafl_qemu_sys",
  "libafl_targets",
  "libc",
@@ -3412,8 +3409,6 @@ dependencies = [
  "bindgen 0.72.1",
  "cc",
  "json",
- "pkg-config",
- "regex",
  "rustc_version 0.4.1",
  "rustversion",
  "shell-words",

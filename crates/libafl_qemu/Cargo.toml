@@ -154,11 +154,8 @@ libvharness_sys = { workspace = true }
 document-features = { workspace = true, optional = true }
 
 [build-dependencies]
-libafl_qemu_build = { workspace = true, default-features = true }
 pyo3-build-config = { workspace = true, optional = true }
 rustversion = { workspace = true }
-bindgen = { workspace = true }
-cc = { workspace = true }
 just = { workspace = true }
 
 [lib]
