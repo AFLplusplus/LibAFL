@@ -1305,14 +1305,14 @@ pub mod pybind {
     pub use super::usermode::pybind::*;
     use super::{GuestAddr, GuestUsize};
 
-    static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
+    static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, Py<PyAny>)> = vec![];
 
     extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
         let obj = unsafe {
             let hooks = &raw mut PY_GENERIC_HOOKS;
             &(&(*hooks))[idx as usize].1
         };
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             obj.call0(py).expect("Error in the hook");
         });
     }
@@ -1387,7 +1387,7 @@ pub mod pybind {
 
         /// # Safety
         /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
-        unsafe fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
+        unsafe fn set_hook(&self, addr: GuestAddr, hook: Py<PyAny>) {
             unsafe {
                 let hooks = &raw mut PY_GENERIC_HOOKS;
                 let idx = (*hooks).len();
