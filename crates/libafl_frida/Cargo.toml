@@ -86,7 +86,7 @@ num-traits = { workspace = true, default-features = true }
 ahash = { workspace = true, default-features = true }
 paste = { workspace = true }
 log = { workspace = true }
-mmap-rs = "0.6.1"
+mmap-rs = "0.7.0"
 yaxpeax-arch = "0.3.2"
 
 document-features = { workspace = true, optional = true } # Document all features of this crate (for `cargo doc`)
