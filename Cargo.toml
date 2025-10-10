@@ -21,6 +21,7 @@ members = [
   "crates/libafl_qemu/libafl_qemu_build",
   "crates/libafl_qemu/libafl_qemu_runner",
   "crates/libafl_qemu/libafl_qemu_sys",
+  "crates/libafl_qemu/libvharness_sys",
   "crates/libafl_sugar",
   "crates/libafl_concolic/test/dump_constraints",
   "crates/libafl_concolic/test/runtime_test",
@@ -79,6 +80,7 @@ libafl_tinyinst = { path = "./crates/libafl_tinyinst", version = "0.15.4", defau
 libafl_qemu = { path = "./crates/libafl_qemu", version = "0.15.4", default-features = false }
 libafl_qemu_build = { path = "./crates/libafl_qemu/libafl_qemu_build", version = "0.15.4", default-features = false }
 libafl_qemu_sys = { path = "./crates/libafl_qemu/libafl_qemu_sys", version = "0.15.4", default-features = false }
+libvharness_sys = { path = "./crates/libafl_qemu/libvharness_sys", version = "0.15.4", default-features = false }
 libafl_sugar = { path = "./crates/libafl_sugar", version = "0.15.4", default-features = false }
 dump_constraints = { path = "./crates/libafl_concolic/test/dump_constraints", version = "0.15.2", default-features = false }
 runtime_test = { path = "./crates/libafl_concolic/test/runtime_test", version = "0.15.2", default-features = false }
@@ -91,49 +93,49 @@ libafl_jumper = { path = "./utils/libafl_jumper", version = "0.15.4", default-fe
 
 # External deps
 ahash = { version = "0.8.12", default-features = false } # The hash function already used in hashbrown
-arbitrary-int = "1.2.7" # arbitrary sized integers, useful in combination with bitfields (bitbybit crate)
+arbitrary-int = "2.0.0" # arbitrary sized integers, useful in combination with bitfields (bitbybit crate)
 backtrace = { version = "0.3.74", default-features = false } # Used to get the stacktrace in StacktraceObserver
 bindgen = "0.72.1"
 bitbybit = "1.4.0" # bitfields, use this for bit fields and bit enums
 capstone = "0.13.0" # Disassembler used in libafl_unicorn to provide disassembly on crash
-clap = "4.5.45"
-cc = "1.1.21"
-cmake = "0.1.51"
-document-features = "0.2.10"
+clap = "4.5.48"
+cc = "1.2.40"
+cmake = "0.1.54"
+document-features = "0.2.11"
 fastbloom = { version = "0.14.0", default-features = false }
-hashbrown = { version = "0.14.5", default-features = false } # A faster hashmap, nostd compatible
+hashbrown = { version = "0.16.0", default-features = false } # A faster hashmap, nostd compatible
 just = "=1.40.0"
 libc = "0.2.159" # For (*nix) libc
 libipt = { version = "0.4.0", features = ["libipt_master"] }
-log = "0.4.22"
+log = "0.4.28"
 meminterval = "0.4.2"
 mimalloc = { version = "0.1.48", default-features = false }
 nix = { version = "0.30.1", default-features = false }
-num_enum = { version = "0.7.3", default-features = false }
+num_enum = { version = "0.7.4", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 paste = "1.0.15"
-postcard = { version = "1.0.10", features = [
+postcard = { version = "1.1.3", features = [
   "alloc",
 ], default-features = false } # no_std compatible serde serialization format
-pyo3 = { version = "0.24.1", features = ["auto-initialize"] }
-pyo3-build-config = "0.25.0"
-rangemap = "1.5.1"
-regex = "1.10.6"
+pyo3 = { version = "0.26.0", features = ["auto-initialize"] }
+pyo3-build-config = "0.26.0"
+rangemap = "1.6.0"
+regex = "1.11.3"
 rustversion = "1.0.22"
-serde = { version = "1.0.210", default-features = false } # serialization lib
+serde = { version = "1.0.228", default-features = false } # serialization lib
 serial_test = { version = "3.2.0", default-features = false }
-serde_json = { version = "1.0.128", default-features = false }
+serde_json = { version = "1.0.145", default-features = false }
 serde_yaml = { version = "0.9.34" } # For parsing the injections yaml file
 static_assertions = "1.1.0"
-strum = "0.27.0"
-strum_macros = "0.27.0"
-toml = "0.9.0" # For parsing the injections toml file
-typed-builder = "0.21.2" # Implement the builder pattern at compiletime
-typeid = "1.0.0" # Safe type_eq that doesn't rely on std specialization
-unicorn-engine = "2.0.1" # Used in libafl_unicorn
-uuid = { version = "1.18.0", features = ["serde", "v4"] }
+strum = "0.27.2"
+strum_macros = "0.27.2"
+toml = "0.9.7" # For parsing the injections toml file
+typed-builder = "0.22.0" # Implement the builder pattern at compiletime
+typeid = "1.0.3" # Safe type_eq that doesn't rely on std specialization
+uuid = { version = "1.18.1", features = ["serde", "v4"] }
 which = "8.0.0"
-windows = "0.59.0"
+windows = "0.62.1"
+windows-core = "0.62.1"
 z3 = { git = "https://github.com/prove-rs/z3.rs", rev = "z3-v0.18.2", default-features = false, features = [
   "bundled",
 ] }

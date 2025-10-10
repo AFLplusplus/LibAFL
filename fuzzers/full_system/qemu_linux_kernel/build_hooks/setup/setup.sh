@@ -8,5 +8,10 @@ echo "root:toor" | chpasswd
 
 cd /setup
 
+. ./api.sh
+
+find "/lib/modules/$LINUX_MODULES/build" -name "*.h" | grep stdarg
+find "/lib/modules/$LINUX_MODULES/build" -name "*.h" | grep stdout
+
 make clean
-make -j nyx
+make -j all
