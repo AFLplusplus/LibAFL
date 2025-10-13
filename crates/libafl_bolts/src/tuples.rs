@@ -440,10 +440,10 @@ where
 #[cfg(feature = "alloc")]
 pub trait MatchName {
     /// Match for a name and return the borrowed value
-    #[deprecated = "Use `.reference` and either `.get` (fallible access) or `[]` (infallible access) instead"]
+    #[deprecated = "Use `.handle` and either `.get` (fallible access) or `[]` (infallible access) instead"]
     fn match_name<T>(&self, name: &str) -> Option<&T>;
     /// Match for a name and return the mut borrowed value
-    #[deprecated = "Use `.reference` and either `.get` (fallible access) or `[]` (infallible access) instead"]
+    #[deprecated = "Use `.handle` and either `.get` (fallible access) or `[]` (infallible access) instead"]
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T>;
 }
 
