@@ -6,7 +6,7 @@ use libafl_bolts::{
 };
 
 use crate::mutators::{
-    mapping::{ToMappingMutator, ToOptionalMutator},
+    mapping::{ToMappingMutator, ToOptionalMutator, ToStateAwareMappingMutator},
     mutations::{
         BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator, ByteIncMutator,
         ByteInterestingMutator, ByteNegMutator, ByteRandMutator, BytesCopyMutator,
@@ -64,6 +64,12 @@ pub type HavocMutationsType =
 pub type MappedHavocMutationsType<F1, F2, I, O> = map_tuple_list_type!(
     merge_tuple_list_type!(HavocMutationsNoCrossoverType, MappedHavocCrossoverType<F2,I, O>),
     ToMappingMutator<F1>
+);
+
+/// Tuple type of the mutations that compose the Havoc mutator for state-aware-mapped input types
+pub type StateAwareMappedHavocMutationsType<F1, F2, I, O> = map_tuple_list_type!(
+    merge_tuple_list_type!(HavocMutationsNoCrossoverType, MappedHavocCrossoverType<F2,I, O>),
+    ToStateAwareMappingMutator<F1>
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator for mapped input types, for optional byte array input parts
@@ -163,6 +169,27 @@ where
     havoc_mutations_no_crossover()
         .merge(havoc_crossover_with_corpus_mapper(input_from_corpus_mapper))
         .map(ToMappingMutator::new(current_input_mapper))
+}
+
+/// Get the mutations that compose the Havoc mutator for state-aware-mapped input types
+///
+/// Check the example fuzzer for details on how to use this.
+/// Check the docs of [`crate::mutators::mapping::StateAwareMappingMutator`] for how mapping works internally.
+#[must_use]
+pub fn state_aware_mapped_havoc_mutations<'a, F1, F2, IO1, IO2, II, O, S>(
+    current_input_mapper: F1,
+    input_from_corpus_mapper: F2,
+) -> StateAwareMappedHavocMutationsType<F1, F2, IO1, O>
+where
+    F1: Clone + FnMut(&'a mut IO1, &'a mut S) -> (Option<&'a mut II>, &'a mut S),
+    F2: Clone + Fn(&IO2) -> &O,
+    II: 'a,
+    IO1: 'a,
+    S: 'a,
+{
+    havoc_mutations_no_crossover()
+        .merge(havoc_crossover_with_corpus_mapper(input_from_corpus_mapper))
+        .map(ToStateAwareMappingMutator::new(current_input_mapper))
 }
 
 /// Get the mutations that compose the Havoc mutator for mapped input types, for optional input parts

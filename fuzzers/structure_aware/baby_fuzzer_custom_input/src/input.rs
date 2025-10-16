@@ -23,7 +23,9 @@ use serde::{Deserialize, Serialize};
 pub struct CustomInput {
     pub byte_array: Vec<u8>,
     pub optional_byte_array: Option<Vec<u8>>,
+    pub sometimes_hidden_byte_array: Vec<u8>,
     pub num: i16,
+    pub sometimes_hidden_num: i16,
     pub boolean: bool,
 }
 
@@ -51,6 +53,23 @@ impl CustomInput {
         &self.optional_byte_array
     }
 
+    /// Sometimes returns a mutable reference to the sometimes-hidden byte array with logic depending on state
+    pub fn sometimes_hidden_byte_array_mut<'a, S: HasRand>(
+        &'a mut self,
+        state: &'a mut S,
+    ) -> (Option<&'a mut Vec<u8>>, &'a mut S) {
+        if state.rand_mut().coinflip(0.5) {
+            (Some(&mut self.sometimes_hidden_byte_array), state)
+        } else {
+            (None, state)
+        }
+    }
+
+    /// Returns an immutable reference to the sometimes hidden byte array
+    pub fn sometimes_hidden_byte_array(&self) -> &Vec<u8> {
+        &self.sometimes_hidden_byte_array
+    }
+
     /// Returns a mutable reference to the number
     pub fn num_mut(&mut self) -> &mut i16 {
         &mut self.num
@@ -59,6 +78,23 @@ impl CustomInput {
     /// Returns an immutable reference to the number
     pub fn num(&self) -> &i16 {
         &self.num
+    }
+
+    /// Sometimes returns a mutable reference to the sometimes-hidden number with logic depending on state
+    pub fn sometimes_hidden_num_mut<'a, S: HasRand>(
+        &'a mut self,
+        state: &'a mut S,
+    ) -> (Option<&'a mut i16>, &'a mut S) {
+        if state.rand_mut().coinflip(0.5) {
+            (Some(&mut self.sometimes_hidden_num), state)
+        } else {
+            (None, state)
+        }
+    }
+
+    /// Returns an immutable reference to the sometimes hidden number
+    pub fn sometimes_hidden_num(&self) -> &i16 {
+        &self.sometimes_hidden_num
     }
 }
 
@@ -88,13 +124,17 @@ where
             .rand_mut()
             .coinflip(0.5)
             .then(|| generator.generate(state).unwrap().target_bytes().into());
+        let sometimes_hidden_byte_array = generator.generate(state).unwrap().target_bytes().into();
         let boolean = state.rand_mut().coinflip(0.5);
         let num = state.rand_mut().next() as i16;
+        let sometimes_hidden_num = state.rand_mut().next() as i16;
 
         Ok(CustomInput {
             byte_array,
             optional_byte_array,
+            sometimes_hidden_byte_array,
             num,
+            sometimes_hidden_num,
             boolean,
         })
     }
