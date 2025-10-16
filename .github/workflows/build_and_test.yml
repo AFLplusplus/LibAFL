@@ -1,4 +1,6 @@
 name: build and test
+permissions:
+  contents: read
 
 on:
   push:
