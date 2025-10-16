@@ -1,7 +1,6 @@
 #[cfg(target_os = "linux")]
 use libc::__errno_location;
-
-#[cfg(target_vendor= "apple")]
+#[cfg(target_vendor = "apple")]
 use libc::__error;
 
 #[cfg(target_os = "linux")]
