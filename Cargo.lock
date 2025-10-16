@@ -3225,7 +3225,6 @@ dependencies = [
  "hostname",
  "itertools 0.14.0",
  "libafl_derive",
- "libafl_wide",
  "libc",
  "log",
  "mach2 0.5.0",
@@ -3245,6 +3244,7 @@ dependencies = [
  "typeid",
  "uds",
  "uuid",
+ "wide",
  "winapi",
  "windows 0.62.1",
  "windows-core 0.62.1",
@@ -3499,16 +3499,6 @@ dependencies = [
  "libafl_targets",
  "log",
  "unicorn-engine",
-]
-
-[[package]]
-name = "libafl_wide"
-version = "0.7.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2f28d525f6e361b6cd55c0da5347027860a902d638d15194c16dc2f39a5ba9f"
-dependencies = [
- "bytemuck",
- "safe_arch",
 ]
 
 [[package]]
@@ -6914,6 +6904,16 @@ dependencies = [
  "env_home",
  "rustix 1.1.2",
  "winsafe 0.0.19",
+]
+
+[[package]]
+name = "wide"
+version = "0.7.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce5da8ecb62bcd8ec8b7ea19f69a51275e91299be594ea5cc6ef7819e16cd03"
+dependencies = [
+ "bytemuck",
+ "safe_arch",
 ]
 
 [[package]]

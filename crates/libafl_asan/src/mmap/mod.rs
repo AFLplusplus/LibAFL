@@ -11,8 +11,8 @@ use crate::GuestAddr;
 #[cfg(feature = "libc")]
 pub mod libc;
 
-#[cfg(all(feature = "linux", target_os = "linux"))]
-pub mod linux;
+#[cfg(all(feature = "syscalls", unix))]
+pub mod unix;
 
 bitflags! {
     #[derive(PartialEq, Eq)]
