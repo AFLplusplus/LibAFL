@@ -227,7 +227,7 @@ rustversion = { workspace = true }
 tuple_list = { version = "0.1.3" }
 hashbrown = { workspace = true, features = [
   "serde",
-  "ahash",
+  "default-hasher",
 ], default-features = false } # A faster hashmap, nostd compatible
 num-traits = { workspace = true, default-features = false }
 serde = { workspace = true, features = ["alloc"] } # serialization lib
@@ -259,7 +259,7 @@ ratatui = { version = "0.29.0", default-features = false, features = [
 crossterm = { version = "0.29.0", optional = true }
 
 cadence = { version = "1.5.0", optional = true } # For the statsd monitor
-prometheus-client = { version = "0.23.0", optional = true } # For the prometheus monitor
+prometheus-client = { version = "0.24.0", optional = true } # For the prometheus monitor
 tide = { version = "0.16.0", optional = true }
 async-std = { version = "1.13.0", features = ["attributes"], optional = true }
 futures = { version = "0.3.30", optional = true }
@@ -293,6 +293,8 @@ regex-syntax = { version = "0.8.4", optional = true } # For nautilus
 
 fs2 = { workspace = true, optional = true } # used by OnDisk Corpus for file locking
 
+z3 = { workspace = true, optional = true } # for concolic mutation
+
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
 serial_test = { workspace = true, optional = true, default-features = false, features = [
   "logging",
@@ -306,15 +308,14 @@ num_enum = { workspace = true, optional = true }
 fastbloom = { workspace = true, optional = true }
 # For Lua Mutators
 # TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>
-mlua = { version = "0.10.3", features = [
+mlua = { version = "0.11.4", features = [
   "lua54",
   "vendored",
   "macros",
 ], optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = { workspace = true }                # For (*nix) libc
-z3 = { workspace = true, optional = true } # for concolic mutation
+libc = { workspace = true } # For (*nix) libc
 
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true, features = [

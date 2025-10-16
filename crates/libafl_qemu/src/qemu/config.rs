@@ -13,8 +13,26 @@ use typed_builder::TypedBuilder;
 #[derive(Debug, strum_macros::Display, Clone)]
 #[strum(prefix = "-accel ", serialize_all = "lowercase")]
 pub enum Accelerator {
-    Kvm,
+    #[strum(to_string = "kvm{0}")]
+    Kvm(KvmProperties),
     Tcg,
+}
+
+#[cfg(feature = "systemmode")]
+#[derive(Debug, Clone, Default, TypedBuilder)]
+pub struct KvmProperties {
+    #[builder(default, setter(strip_option))]
+    dirty_ring_size: Option<usize>,
+}
+
+#[cfg(feature = "systemmode")]
+impl Display for KvmProperties {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(s) = self.dirty_ring_size {
+            write!(f, ",dirty-ring-size={s}")?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, strum_macros::Display, Clone)]
@@ -47,6 +65,21 @@ pub enum DriveCache {
     Unsafe,
 }
 
+#[derive(Debug, Clone)]
+pub struct DriveRawOptions(pub String);
+
+impl Display for DriveRawOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl<R: AsRef<str>> From<R> for DriveRawOptions {
+    fn from(r: R) -> Self {
+        Self(r.as_ref().to_string())
+    }
+}
+
 #[derive(Debug, Clone, Default, TypedBuilder)]
 pub struct Drive {
     #[builder(default, setter(strip_option, into))]
@@ -57,6 +90,8 @@ pub struct Drive {
     interface: Option<DriveInterface>,
     #[builder(default, setter(strip_option))]
     cache: Option<DriveCache>,
+    #[builder(default, setter(strip_option, into))]
+    raw_options: Option<DriveRawOptions>,
 }
 
 impl Display for Drive {
@@ -84,6 +119,9 @@ impl Display for Drive {
         }
         if let Some(cache) = &self.cache {
             write!(f, "{}{cache}", separator())?;
+        }
+        if let Some(raw_options) = &self.raw_options {
+            write!(f, "{}{raw_options}", separator())?;
         }
 
         Ok(())
@@ -506,6 +544,8 @@ pub struct QemuConfig {
     #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option, into))]
     initrd: Option<InitRD>,
+    #[builder(default, setter(strip_option, into))]
+    raw_options: Option<String>,
     #[cfg(feature = "usermode")]
     #[builder(setter(into))]
     program: Program,
