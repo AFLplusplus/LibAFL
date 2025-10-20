@@ -30,7 +30,6 @@ use crate::{
     },
     qemu::{ArchExtras, Hook, SyscallHookResult},
 };
-
 #[cfg(cpu_target = "hexagon")]
 /// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.
 /// <https://github.com/qemu/qemu/blob/11be70677c70fdccd452a3233653949b79e97908/linux-user/hexagon/syscall_nr.h#L230>
@@ -294,7 +293,7 @@ where
                         &mut libs,
                         LibInfo {
                             name: path.clone(),
-                            off: region.start(),
+                            off: region.start() as GuestAddr,
                         },
                     );
                 }
@@ -410,11 +409,24 @@ where
                 }
                 CStr::from_ptr(*c_array.offset(2)).to_string_lossy()
             };
-            if first_parameter == "-c"
-                && (second_parameter.to_lowercase().contains("';fuzz;'")
-                    || second_parameter.to_lowercase().contains("\";fuzz;\""))
-            {
-                panic!("Found command injection!");
+
+            if first_parameter == "-c" {
+                let to_check = if second_parameter == "--" {
+                    unsafe {
+                        if (*c_array.offset(3)).is_null() {
+                            return SyscallHookResult::Run;
+                        }
+                        CStr::from_ptr(*c_array.offset(3)).to_string_lossy()
+                    }
+                } else {
+                    second_parameter
+                };
+
+                if to_check.to_lowercase().contains("';fuzz;'")
+                    || to_check.to_lowercase().contains("\";fuzz;\"")
+                {
+                    panic!("Found command injection!");
+                }
             }
 
             //println!("PARAMETERS First {} Second {}", first_parameter, second_

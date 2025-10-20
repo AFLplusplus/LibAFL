@@ -390,6 +390,7 @@ const fn fs_opt_get_mapsize(x: i32) -> i32 {
 }
 
 #[expect(clippy::fn_params_excessive_bools)]
+#[allow(unstable_name_collisions)]
 impl Forkserver {
     /// Create a new [`Forkserver`] that will kill child processes
     /// with the given `kill_signal`.

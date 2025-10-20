@@ -1,9 +1,54 @@
 use libafl_bolts::Error;
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
-use crate::{Emulator, GuestMaps, NopSnapshotManager, TargetSignalHandling};
+use crate::{CPU, Emulator, GuestMaps, NopSnapshotManager, Regs, TargetSignalHandling};
 
 pub type StdSnapshotManager = NopSnapshotManager;
+
+/// The fuzzing input location.
+///
+/// We store the memory location to which the input should be written,
+/// and the return register containing the number bytes effectively written.
+#[derive(Debug, Clone)]
+pub struct InputLocation {
+    location: Box<[u8]>,
+    ret_register: Option<Regs>,
+    cpu: CPU,
+}
+
+impl InputLocation {
+    #[must_use]
+    pub fn new(location: Box<[u8]>, ret_register: Option<Regs>, cpu: CPU) -> Self {
+        Self {
+            location,
+            ret_register,
+            cpu,
+        }
+    }
+
+    pub fn write(&mut self, input: &[u8]) -> usize {
+        if input.len() < self.location.len() {
+            self.location[..input.len()].copy_from_slice(input);
+            input.len()
+        } else if input.len() > self.location.len() {
+            self.location.copy_from_slice(&input[..self.location.len()]);
+            self.location.len()
+        } else {
+            self.location.copy_from_slice(input);
+            input.len()
+        }
+    }
+
+    #[must_use]
+    pub fn ret_register(&self) -> &Option<Regs> {
+        &self.ret_register
+    }
+
+    #[must_use]
+    pub fn cpu(&self) -> CPU {
+        self.cpu
+    }
+}
 
 impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
     /// This function gets the memory mappings from the emulator.

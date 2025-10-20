@@ -466,7 +466,7 @@ impl FridaInstrumentationHelperBuilder {
                         SkipRange::ModuleRelative { name, range } => {
                             if name.eq(&module.name()) {
                                 log::trace!("Skipping {name:?} {range:?}");
-                                let module_details = Module::load(gum, &name.to_string());
+                                let module_details = Module::load(gum, &name.clone());
                                 let lib_start = module_details.range().base_address().0 as u64;
                                 ranges.borrow_mut().remove(
                                     (lib_start + range.start as u64)

@@ -132,7 +132,7 @@ static void find_libc(void) {
     int      fields, dev_maj, dev_min, inode;
     uint64_t min, max, offset;
     char     flag_r, flag_w, flag_x, flag_p;
-    char     path[512] = "";
+    char     path[513] = "";
     fields = sscanf(line,
                     "%" PRIx64 "-%" PRIx64 " %c%c%c%c %" PRIx64
                     " %x:%x %d"

@@ -1,5 +1,10 @@
 use alloc::borrow::Cow;
-use core::{fmt::Debug, hash::Hash};
+use core::{
+    fmt::{Debug, LowerHex},
+    hash::Hash,
+};
+#[cfg(feature = "std")]
+use std::{fs::File, io::Write, path::Path};
 
 use hashbrown::HashSet;
 use libafl_bolts::{
@@ -59,10 +64,12 @@ impl<T> HasRefCnt for ListFeedbackMetadata<T> {
 }
 
 /// Consider interesting a testcase if the list in `ListObserver` is not empty.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ListFeedback<T> {
     observer_handle: Handle<ListObserver<T>>,
     novelty: HashSet<T>,
+    #[cfg(feature = "std")]
+    file: Option<File>,
 }
 
 libafl_bolts::impl_serdeany!(
@@ -72,7 +79,7 @@ libafl_bolts::impl_serdeany!(
 
 impl<T> ListFeedback<T>
 where
-    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + 'static + Copy,
+    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + 'static + Copy + LowerHex,
 {
     fn has_interesting_list_observer_feedback<OT, S>(
         &mut self,
@@ -99,6 +106,15 @@ where
         !self.novelty.is_empty()
     }
 
+    #[cfg(feature = "std")]
+    fn dump_coverage(&mut self) {
+        if let Some(mut file) = self.file.as_ref() {
+            for line in &self.novelty {
+                file.write_all(format!("0x{line:x}\n").as_bytes()).unwrap();
+            }
+        }
+    }
+
     fn append_list_observer_metadata<S: HasNamedMetadata>(&mut self, state: &mut S) {
         let history_set = state
             .named_metadata_map_mut()
@@ -108,6 +124,9 @@ where
         for v in &self.novelty {
             history_set.set.insert(*v);
         }
+
+        #[cfg(feature = "std")]
+        self.dump_coverage();
     }
 }
 
@@ -126,7 +145,15 @@ impl<EM, I, OT, S, T> Feedback<EM, I, OT, S> for ListFeedback<T>
 where
     OT: MatchName,
     S: HasNamedMetadata,
-    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
+    T: Debug
+        + Eq
+        + Hash
+        + for<'a> Deserialize<'a>
+        + Serialize
+        + Default
+        + Copy
+        + 'static
+        + LowerHex,
 {
     fn is_interesting(
         &mut self,
@@ -170,6 +197,21 @@ impl<T> ListFeedback<T> {
         Self {
             observer_handle: observer.handle(),
             novelty: HashSet::new(),
+            #[cfg(feature = "std")]
+            file: None,
+        }
+    }
+
+    /// Creates a new [`ListFeedback`], deciding if the given [`ListObserver`] value of a run is interesting.
+    /// Will dump newly observed addresses to `path`. If `path` exists, the file will be truncated.
+    #[cfg(feature = "std")]
+    pub fn with_coverage_dump<P: AsRef<Path>>(observer: &ListObserver<T>, path: P) -> Self {
+        let file = Some(File::create(path).unwrap());
+
+        Self {
+            observer_handle: observer.handle(),
+            novelty: HashSet::new(),
+            file,
         }
     }
 }
