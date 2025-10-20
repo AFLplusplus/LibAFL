@@ -72,10 +72,12 @@ use core::{
     cmp::max,
     fmt::Debug,
     hint,
-    mem::size_of,
+    mem::{offset_of, size_of},
     num::NonZeroUsize,
     ops::{BitAnd, BitOr, Not},
-    ptr, slice,
+    ptr,
+    ptr::write_unaligned,
+    slice,
     sync::atomic::{AtomicU16, Ordering, fence},
     time::Duration,
 };
@@ -3192,9 +3194,11 @@ where
                 .alloc_next(size_of::<LlmpClientExitInfo>())
                 .expect("Could not allocate a new message in shared map.");
             (*msg).tag = LLMP_TAG_CLIENT_EXIT;
-            let mut exitinfo =
-                ((*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo).read_unaligned();
-            exitinfo.client_id = client_id;
+            let client_id_offset = offset_of!(LlmpClientExitInfo, client_id);
+            write_unaligned(
+                (*msg).buf.as_mut_ptr().add(client_id_offset) as _,
+                client_id,
+            );
             sender.send(msg, true)
         }
     }
