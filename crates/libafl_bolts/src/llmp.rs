@@ -62,8 +62,6 @@ use alloc::boxed::Box;
 #[cfg(feature = "std")]
 use alloc::string::ToString;
 use alloc::{string::String, vec::Vec};
-#[cfg(feature = "std")]
-use core::net::SocketAddr;
 #[cfg(not(target_pointer_width = "64"))]
 use core::sync::atomic::AtomicU32;
 #[cfg(target_pointer_width = "64")]
@@ -72,15 +70,15 @@ use core::{
     cmp::max,
     fmt::Debug,
     hint,
-    mem::{offset_of, size_of},
+    mem::size_of,
     num::NonZeroUsize,
     ops::{BitAnd, BitOr, Not},
-    ptr,
-    ptr::write_unaligned,
-    slice,
+    ptr, slice,
     sync::atomic::{AtomicU16, Ordering, fence},
     time::Duration,
 };
+#[cfg(feature = "std")]
+use core::{mem::offset_of, net::SocketAddr, ptr::write_unaligned};
 #[cfg(feature = "std")]
 use std::{
     env,
