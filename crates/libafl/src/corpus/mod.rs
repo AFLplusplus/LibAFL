@@ -30,11 +30,11 @@ pub mod cached;
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
 
-#[cfg(all(feature = "cmin", unix))]
+#[cfg(feature = "cmin")]
 pub mod minimizer;
 
 pub mod nop;
-#[cfg(all(feature = "cmin", unix))]
+#[cfg(feature = "cmin")]
 pub use minimizer::*;
 pub use nop::NopCorpus;
 

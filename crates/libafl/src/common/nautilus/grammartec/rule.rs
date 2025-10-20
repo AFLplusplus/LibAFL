@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 
 use libafl_bolts::rands::Rand;
 #[cfg(feature = "nautilus_py")]
-use pyo3::prelude::{PyObject, Python};
+use pyo3::prelude::{Py, PyAny, Python};
 use regex_syntax::hir::Hir;
 use serde::{Deserialize, Serialize};
 
@@ -115,7 +115,7 @@ impl RegExpRule {
 pub struct ScriptRule {
     pub nonterm: NTermId,
     pub nonterms: Vec<NTermId>,
-    pub script: PyObject,
+    pub script: Py<PyAny>,
 }
 
 #[cfg(feature = "nautilus_py")]
@@ -155,7 +155,7 @@ impl PlainRule {
 #[cfg(feature = "nautilus_py")]
 impl Clone for ScriptRule {
     fn clone(&self) -> Self {
-        Python::with_gil(|py| ScriptRule {
+        Python::attach(|py| ScriptRule {
             nonterm: self.nonterm,
             nonterms: self.nonterms.clone(),
             script: self.script.clone_ref(py),
@@ -169,7 +169,7 @@ impl Rule {
         ctx: &mut Context,
         nonterm: &str,
         nterms: &[String],
-        script: PyObject,
+        script: Py<PyAny>,
     ) -> Self {
         Self::Script(ScriptRule {
             nonterm: ctx.aquire_nt_id(nonterm),

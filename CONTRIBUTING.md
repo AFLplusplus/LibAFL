@@ -29,6 +29,13 @@ Some of the parts in this list may be hard, don't be afraid to open a PR if you 
 Some of these checks can be performed automatically during commit using [pre-commit](https://pre-commit.com/).
 Once the package is installed, simply run `pre-commit install` to enable the hooks, the checks will run automatically before the commit becomes effective.
 
+### Adding dependencies
+
+Avoid adding additional crates dependencies if it can be avoided in general.
+Check if the dependency to add is not already present in the root `Cargo.toml` file or in other crates.
+If it is the case, use the dependency using `workspace = true` when adding the dependency.
+As a rule of thumb, if a given dependency is used more than once, it should be added in the root `Cargo.toml` file.
+
 ## LibAFL Code Rules
 
 Before making your pull requests, try to see if your code follows these rules.

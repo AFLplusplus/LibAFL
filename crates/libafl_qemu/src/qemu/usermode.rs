@@ -161,7 +161,7 @@ impl GuestMaps {
     }
 
     fn __next__(mut slf: PyRefMut<Self>) -> Option<Py<MapInfo>> {
-        Python::with_gil(|py| slf.next().map(|x| x.into_pyobject(py).unwrap().into()))
+        Python::attach(|py| slf.next().map(|x| x.into_pyobject(py).unwrap().into()))
     }
 }
 
@@ -473,7 +473,7 @@ impl Qemu {
 pub mod pybind {
     use libafl_qemu_sys::{GuestAddr, MmapPerms};
     use pyo3::{
-        Bound, FromPyObject, PyObject, PyResult, Python,
+        Bound, FromPyObject, Py, PyAny, PyResult, Python,
         exceptions::PyValueError,
         pyclass, pymethods,
         types::{PyAnyMethods, PyInt},
@@ -481,7 +481,7 @@ pub mod pybind {
 
     use crate::{pybind::Qemu, qemu::hooks};
 
-    static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
+    static mut PY_SYSCALL_HOOK: Option<Py<PyAny>> = None;
 
     #[pyclass]
     #[derive(FromPyObject)]
@@ -507,7 +507,7 @@ pub mod pybind {
             || hooks::SyscallHookResult::Run,
             |obj| {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let ret = obj.call1(py, args).expect("Error in the syscall hook");
                     let any = ret.bind(py);
                     if any.is_none() {
@@ -588,7 +588,7 @@ pub mod pybind {
 
         /// # Safety
         /// Accesses the global `PY_SYSCALL_HOOK` and may not be called concurrently.
-        unsafe fn set_syscall_hook(&self, hook: PyObject) {
+        unsafe fn set_syscall_hook(&self, hook: Py<PyAny>) {
             unsafe {
                 PY_SYSCALL_HOOK = Some(hook);
             }

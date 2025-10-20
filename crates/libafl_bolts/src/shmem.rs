@@ -674,7 +674,6 @@ pub mod unix_shmem {
 
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
-        #[cfg(target_vendor = "apple")]
         use alloc::string::ToString;
         use core::{
             ffi::CStr,
@@ -723,7 +722,11 @@ pub mod unix_shmem {
             /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 bytes from filename will be used.
             ///
             /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete them after fuzzing
-            pub fn new(map_size: usize, filename: impl AsRef<Path>) -> Result<Self, Error> {
+            pub fn new(
+                map_size: usize,
+                filename: impl AsRef<Path>,
+                use_fd_as_id: bool,
+            ) -> Result<Self, Error> {
                 let filename_bytes = filename.as_ref().as_os_str().as_encoded_bytes();
 
                 let mut filename_path: [u8; 20] = [0_u8; MAX_MMAP_FILENAME_LEN];
@@ -781,13 +784,11 @@ pub mod unix_shmem {
                         )));
                     }
 
-                    // Apple uses it for served shmem provider, which uses fd
-                    // Others will just use filename
-
-                    #[cfg(target_vendor = "apple")]
-                    let id = ShMemId::from_string(&format!("{shm_fd}"));
-                    #[cfg(not(target_vendor = "apple"))]
-                    let id = ShMemId::from_string(core::str::from_utf8(&filename_path)?);
+                    let id = if use_fd_as_id {
+                        ShMemId::from_string(&format!("{shm_fd}"))
+                    } else {
+                        ShMemId::from_string(core::str::from_utf8(&filename_path)?)
+                    };
 
                     Ok(Self {
                         filename_path: Some(filename_path),
@@ -800,14 +801,17 @@ pub mod unix_shmem {
             }
 
             #[allow(clippy::unnecessary_wraps)] // cfg dependent
-            fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+            fn shmem_from_id_and_size(
+                id: ShMemId,
+                map_size: usize,
+                use_fd_as_id: bool,
+            ) -> Result<Self, Error> {
                 // # Safety
                 // No user-provided potentially unsafe parameters.
                 // FFI Calls.
                 unsafe {
                     /* map the shared memory segment to the address space of the process */
-                    #[cfg(target_vendor = "apple")]
-                    let (map, shm_fd) = {
+                    let (map, shm_fd) = if use_fd_as_id {
                         let shm_fd: i32 = id.to_string().parse().unwrap();
                         let map = mmap(
                             ptr::null_mut(),
@@ -818,10 +822,7 @@ pub mod unix_shmem {
                             0,
                         );
                         (map, shm_fd)
-                    };
-
-                    #[cfg(not(target_vendor = "apple"))]
-                    let (map, shm_fd) = {
+                    } else {
                         let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
                         filename_path.copy_from_slice(&id.id);
 
@@ -968,7 +969,10 @@ pub mod unix_shmem {
         /// A [`ShMemProvider`] which uses [`shm_open`] and [`mmap`] to provide shared memory mappings.
         #[cfg(unix)]
         #[derive(Debug, Clone)]
-        pub struct MmapShMemProvider {}
+        pub struct MmapShMemProvider {
+            /// True if should use the FD as an id (good when sending FD over a socket, otherwise use the filename)
+            use_fd_as_id: bool,
+        }
 
         impl MmapShMemProvider {
             /// Create a [`MmapShMem`] with the specified size and id.
@@ -980,7 +984,15 @@ pub mod unix_shmem {
                 map_size: usize,
                 id: impl AsRef<Path>,
             ) -> Result<MmapShMem, Error> {
-                MmapShMem::new(map_size, id)
+                MmapShMem::new(map_size, id, self.use_fd_as_id)
+            }
+
+            /// Create a new [`MmapShMemProvider`] where filename is used as the shmem id.
+            #[must_use]
+            pub fn with_filename_as_id() -> Self {
+                Self {
+                    use_fd_as_id: false,
+                }
             }
         }
 
@@ -999,7 +1011,10 @@ pub mod unix_shmem {
             type ShMem = MmapShMem;
 
             fn new() -> Result<Self, Error> {
-                Ok(Self {})
+                // Apple uses it for served shmem provider, which uses fd
+                // Others will just use filename
+                let use_fd_as_id = cfg!(target_vendor = "apple");
+                Ok(Self { use_fd_as_id })
             }
 
             fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
@@ -1008,7 +1023,7 @@ pub mod unix_shmem {
                 let mut full_file_name = format!("libafl_{}_{}", process::id(), id);
                 // leave one byte space for the null byte.
                 full_file_name.truncate(MAX_MMAP_FILENAME_LEN - 1);
-                MmapShMem::new(map_size, full_file_name)
+                MmapShMem::new(map_size, full_file_name, self.use_fd_as_id)
             }
 
             fn shmem_from_id_and_size(
@@ -1016,7 +1031,7 @@ pub mod unix_shmem {
                 id: ShMemId,
                 size: usize,
             ) -> Result<Self::ShMem, Error> {
-                MmapShMem::shmem_from_id_and_size(id, size)
+                MmapShMem::shmem_from_id_and_size(id, size, self.use_fd_as_id)
             }
 
             fn release_shmem(&mut self, shmem: &mut Self::ShMem) {

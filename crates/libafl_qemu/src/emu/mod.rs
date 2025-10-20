@@ -14,8 +14,7 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 #[cfg(doc)]
 use crate::modules::EmulatorModule;
 use crate::{
-    CPU, Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk,
-    QemuParams, QemuShutdownCause, Regs,
+    Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuParams, QemuShutdownCause,
     breakpoint::{Breakpoint, BreakpointId},
     command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
     modules::EmulatorModuleTuple,
@@ -59,6 +58,7 @@ pub enum EmulatorExitResult<C> {
     CustomInsn(CustomInsn<C>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
     Crash,                     // Crash
     Timeout,                   // Timeout
+    FuzzingStarts,             // The emulator is ready to enter the fuzzing loop.
 }
 
 impl<C> Debug for EmulatorExitResult<C>
@@ -82,22 +82,19 @@ where
             EmulatorExitResult::Timeout => {
                 write!(f, "Timeout")
             }
+            EmulatorExitResult::FuzzingStarts => {
+                write!(f, "Fuzzing starts")
+            }
         }
     }
 }
+
 #[derive(Debug, Clone)]
 pub enum EmulatorExitError {
     UnknownKind,
     UnexpectedExit,
     CommandError(CommandError),
     BreakpointNotFound(GuestAddr),
-}
-
-#[derive(Debug, Clone)]
-pub struct InputLocation {
-    mem_chunk: QemuMemoryChunk,
-    cpu: CPU,
-    ret_register: Option<Regs>,
 }
 
 /// The high-level interface to [`Qemu`].
@@ -126,6 +123,7 @@ pub struct Emulator<C, CM, ED, ET, I, S, SM> {
     breakpoints_by_addr: RefCell<HashMap<GuestAddr, Breakpoint<C>>>, // TODO: change to RC here
     breakpoints_by_id: RefCell<HashMap<BreakpointId, Breakpoint<C>>>,
     qemu: Qemu,
+    started: bool,
 }
 
 impl<C> EmulatorDriverResult<C> {
@@ -179,27 +177,6 @@ impl From<SnapshotManagerCheckError> for EmulatorDriverError {
     }
 }
 
-impl InputLocation {
-    #[must_use]
-    pub fn new(mem_chunk: QemuMemoryChunk, cpu: CPU, ret_register: Option<Regs>) -> Self {
-        Self {
-            mem_chunk,
-            cpu,
-            ret_register,
-        }
-    }
-
-    #[must_use]
-    pub fn mem_chunk(&self) -> &QemuMemoryChunk {
-        &self.mem_chunk
-    }
-
-    #[must_use]
-    pub fn ret_register(&self) -> &Option<Regs> {
-        &self.ret_register
-    }
-}
-
 impl From<EmulatorExitError> for EmulatorDriverError {
     fn from(error: EmulatorExitError) -> Self {
         EmulatorDriverError::QemuExitReasonError(error)
@@ -228,6 +205,9 @@ where
             }
             EmulatorExitResult::Timeout => {
                 write!(f, "Timeout")
+            }
+            EmulatorExitResult::FuzzingStarts => {
+                write!(f, "Fuzzing starts")
             }
         }
     }
@@ -402,6 +382,7 @@ where
             breakpoints_by_addr: RefCell::new(HashMap::new()),
             breakpoints_by_id: RefCell::new(HashMap::new()),
             qemu,
+            started: false,
         };
 
         emulator.modules.post_qemu_init_all(qemu);
@@ -429,9 +410,12 @@ where
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run(
         &mut self,
-        state: &mut S,
         input: &I,
     ) -> Result<EmulatorDriverResult<C>, EmulatorDriverError> {
+        if !self.started {
+            return Err(EmulatorDriverError::NotStartedYet);
+        }
+
         loop {
             // Insert input if the location is already known
             ED::pre_qemu_exec(self, input);
@@ -442,10 +426,49 @@ where
             log::debug!("QEMU stopped.");
 
             // Handle QEMU exit
-            if let Some(exit_handler_result) =
-                ED::post_qemu_exec(self, state, &mut exit_reason, input)?
-            {
+            if let Some(exit_handler_result) = ED::post_qemu_exec(self, &mut exit_reason)? {
                 return Ok(exit_handler_result);
+            }
+        }
+    }
+
+    /// Start the emulator until a start even occurs
+    ///
+    /// # Safety
+    ///
+    /// This will make QEMU start. The calling thread will be running QEMU until an event stops it.
+    /// This is (at least) as unsafe as running QEMU.
+    pub unsafe fn start(&mut self) -> Result<(), EmulatorDriverError> {
+        loop {
+            let mut exit_result = unsafe { self.run_qemu() };
+
+            // Handle QEMU exit
+            if let Some(exit_handler_result) = ED::post_qemu_exec(self, &mut exit_result)? {
+                match exit_handler_result {
+                    EmulatorDriverResult::ReturnToClient(emulator_exit_result) => {
+                        match emulator_exit_result {
+                            EmulatorExitResult::QemuExit(qemu_shutdown_cause) => {
+                                panic!("QEMU shut down unexpectedly: {qemu_shutdown_cause:?}");
+                            }
+                            EmulatorExitResult::Breakpoint(_breakpoint) => {}
+                            EmulatorExitResult::CustomInsn(_custom_insn) => {}
+                            EmulatorExitResult::Crash => {
+                                panic!("Unexpected crash")
+                            }
+                            EmulatorExitResult::Timeout => {
+                                panic!("No timeout should happen in start phase")
+                            }
+                            EmulatorExitResult::FuzzingStarts => {
+                                self.started = true;
+                                return Ok(());
+                            }
+                        }
+                    }
+                    EmulatorDriverResult::ShutdownRequest => {}
+                    EmulatorDriverResult::EndOfRun(_exit_kind) => {
+                        return Err(EmulatorDriverError::EndBeforeStart);
+                    }
+                }
             }
         }
     }
