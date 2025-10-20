@@ -129,7 +129,7 @@ rustversion = { workspace = true }
 [dev-dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
 rand = "0.9.0"
-chrono = "0.4.40"
+chrono = "0.4.42"
 itertools = "0.14.0"
 
 [dependencies]
@@ -140,7 +140,8 @@ typeid = { workspace = true }
 tuple_list = { version = "0.1.3" }
 hashbrown = { workspace = true, features = [
   "serde",
-  "ahash",
+  "default-hasher",
+  "raw-entry",
 ], default-features = false, optional = true } # A faster hashmap, nostd compatible
 xxhash-rust = { version = "0.8.12", features = [
   "xxh3",
@@ -154,7 +155,7 @@ num_enum = { workspace = true, default-features = false }
 ahash = { workspace = true, optional = true } # The hash function already used in hashbrown
 backtrace = { workspace = true, default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
 
-ctor = { optional = true, version = "0.4.0" }
+ctor = { optional = true, version = "0.5.0" }
 miniz_oxide = { version = "0.8.0", optional = true }
 hostname = { version = "0.4.0", optional = true } # Is there really no gethostname in the stdlib?
 rand_core = { version = "0.9.0", optional = true }
@@ -177,8 +178,8 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
   "logging",
 ] }
 
-# optional stable simd, pin to a commit due to `u8x32` not released yet. Switch to `wide` as long as next release is out!
-wide = { version = "0.7.33", optional = true, package = "libafl_wide" }
+# optional stable simd
+wide = { version = "0.7.33", optional = true }
 rustversion = { workspace = true }
 
 # Document all features of this crate (for `cargo doc`)
@@ -202,6 +203,7 @@ windows = { workspace = true, features = [
   "Win32_System_SystemInformation",
   "Win32_System_Console",
 ] }
+windows-core = { workspace = true }
 once_cell = "1.10.0"
 winapi = { version = "0.3", features = [
   "fileapi",
@@ -211,13 +213,13 @@ winapi = { version = "0.3", features = [
   "winbase",
   "winnt",
 ] }
-windows-result = "0.3.0"
+windows-result = "0.4.1"
 
 [target.'cfg(windows)'.build-dependencies]
 windows = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
-mach2 = "0.4.2"
+mach2 = "0.5.0"
 
 #[profile.release]
 #lto = true

@@ -349,9 +349,14 @@ pub fn std_simplify_map(map: &mut [u8]) {
 }
 
 /// Coverage map insteresting implementation by u8x16. Slightly faster than nightly simd.
+///
+/// # Safety
+///
+/// The caller must ensure that `hist.len() >= map.len()` so all reads from `hist`
+/// performed by this function remain in-bounds.
 #[cfg(all(feature = "alloc", feature = "wide"))]
 #[must_use]
-pub fn covmap_is_interesting_simd<R, V>(
+pub unsafe fn covmap_is_interesting_simd<R, V>(
     hist: &[u8],
     map: &[u8],
     collect_novelties: bool,
@@ -360,6 +365,8 @@ where
     V: VectorType + Eq + Copy,
     R: SimdReducer<V>,
 {
+    debug_assert!(hist.len() >= map.len());
+
     let mut novelties = vec![];
     let mut interesting = false;
     let size = map.len();
@@ -422,9 +429,14 @@ where
 }
 
 /// Coverage map insteresting naive implementation. Do not use it unless you have strong reasons to do.
+///
+/// # Safety
+///
+/// The caller must ensure that `hist.len() >= map.len()` so all reads from `hist`
+/// performed by this function remain in-bounds.
 #[cfg(feature = "alloc")]
 #[must_use]
-pub fn covmap_is_interesting_naive<R>(
+pub unsafe fn covmap_is_interesting_naive<R>(
     hist: &[u8],
     map: &[u8],
     collect_novelties: bool,
@@ -432,6 +444,8 @@ pub fn covmap_is_interesting_naive<R>(
 where
     R: Reducer<u8>,
 {
+    debug_assert!(hist.len() >= map.len());
+
     let mut novelties = vec![];
     let mut interesting = false;
     let initial = 0;

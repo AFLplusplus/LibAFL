@@ -1,7 +1,7 @@
 use core::{marker::PhantomData, ops::IndexMut};
 use std::{
     io::{Read, Seek},
-    os::fd::{AsFd, AsRawFd},
+    os::fd::AsRawFd,
 };
 
 use libafl::{
@@ -75,17 +75,20 @@ where
 
         let size = u32::try_from(buffer.len())
             .map_err(|_| Error::unsupported("Inputs larger than 4GB are not supported"))?;
-        // Duplicate the file descriptor since QEMU(?) closes it and we
-        // want to keep |self.helper.nyx_stdout| open.
-        // # Safety
+
+        // `QemuProcess::set_hprintf_fd` assumes ownership of the passed file descriptor, so we
+        // duplicate `self.helper.nyx_stdout`'s fd here to prevent it from being closed by
+        // `QemuProcess`.
         //
-        let hprintf_fd = nix::unistd::dup(self.helper.nyx_stdout.as_fd())
-            .map_err(|e| Error::illegal_state(format!("Failed to duplicate Nyx stdout fd: {e}")))?;
+        // Note: we use libc directly since `nix::unistd::dup` returns an `OwnedFd` which would
+        // lead to a double close scenario when the `OwnedFd` is dropped and `set_hprintf_fd` is
+        // called later on.
+        //
+        // # Safety
+        let hprintf_fd = unsafe { nix::libc::dup(self.helper.nyx_stdout.as_raw_fd()) };
 
         self.helper.nyx_process.set_input(buffer, size);
-        self.helper
-            .nyx_process
-            .set_hprintf_fd(hprintf_fd.as_raw_fd());
+        self.helper.nyx_process.set_hprintf_fd(hprintf_fd);
 
         unsafe {
             if CMPLOG_ENABLED == 1 {
