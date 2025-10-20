@@ -10,7 +10,7 @@ use libafl_bolts::{
     tuples::{Handle, Handled},
 };
 use num_traits::ToPrimitive;
-use z3::{Config, Context, Optimize, ast::Bool};
+use z3::{Optimize, ast::Bool};
 
 use crate::{
     Error, HasMetadata, HasScheduler,
@@ -20,25 +20,25 @@ use crate::{
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
-    schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
+    schedulers::{LenTimeMulTestcasePenalty, RemovableScheduler, Scheduler, TestcasePenalty},
     stages::run_target_with_timing,
     state::{HasCorpus, HasExecutions},
 };
 
-/// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
+/// Minimizes a corpus according to coverage maps, weighting by the specified `TestcasePenalty`.
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
-pub struct MapCorpusMinimizer<C, E, I, O, S, T, TS> {
+pub struct MapCorpusMinimizer<C, E, I, O, S, T, TP> {
     observer_handle: Handle<C>,
-    phantom: PhantomData<(E, I, O, S, T, TS)>,
+    phantom: PhantomData<(E, I, O, S, T, TP)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
 pub type StdCorpusMinimizer<C, E, I, O, S, T> =
-    MapCorpusMinimizer<C, E, I, O, S, T, LenTimeMulTestcaseScore>;
+    MapCorpusMinimizer<C, E, I, O, S, T, LenTimeMulTestcasePenalty>;
 
-impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
+impl<C, E, I, O, S, T, TP> MapCorpusMinimizer<C, E, I, O, S, T, TP>
 where
     C: Named,
 {
@@ -52,14 +52,14 @@ where
     }
 }
 
-impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
+impl<C, E, I, O, S, T, TP> MapCorpusMinimizer<C, E, I, O, S, T, TP>
 where
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
     I: Input,
     S: HasMetadata + HasCorpus<I> + HasExecutions,
     T: Copy + Hash + Eq,
-    TS: TestcaseScore<I, S>,
+    TP: TestcasePenalty<I, S>,
 {
     /// Do the minimization
     #[expect(clippy::too_many_lines)]
@@ -80,9 +80,7 @@ where
         // don't delete this else it won't work after restart
         let current = *state.corpus().current();
 
-        let cfg = Config::default();
-        let ctx = Context::new(&cfg);
-        let opt = Optimize::new(&ctx);
+        let opt = Optimize::new();
 
         let mut seed_exprs = HashMap::new();
         let mut cov_map = HashMap::new();
@@ -123,7 +121,7 @@ where
 
                 let mut testcase = state.corpus().get(id)?.borrow_mut();
                 (
-                    TS::compute(state, &mut *testcase)?
+                    TP::compute(state, &mut *testcase)?
                         .to_u64()
                         .expect("Weight must be computable."),
                     *state.executions(),
@@ -147,7 +145,7 @@ where
                 ),
             )?;
 
-            let seed_expr = Bool::fresh_const(&ctx, "seed");
+            let seed_expr = Bool::fresh_const("seed");
             let observers = executor.observers();
             let obs = observers[&self.observer_handle].as_ref();
 

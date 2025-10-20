@@ -696,7 +696,7 @@ impl From<windows_result::Error> for Error {
 #[cfg(feature = "python")]
 impl From<pyo3::PyErr> for Error {
     fn from(err: pyo3::PyErr) -> Self {
-        pyo3::Python::with_gil(|py| {
+        pyo3::Python::attach(|py| {
             if err
                 .matches(
                     py,
@@ -1472,7 +1472,7 @@ pub mod pybind {
             match &mut $wrapper {
                 $(
                     $wrapper_type::$wrapper_option(py_wrapper) => {
-                        Python::with_gil(|py| -> PyResult<_> {
+                        Python::attach(|py| -> PyResult<_> {
                             let mut borrowed = py_wrapper.borrow_mut(py);
                             let $name = &mut borrowed.inner;
                             Ok($body)

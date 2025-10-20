@@ -62,8 +62,6 @@ use alloc::boxed::Box;
 #[cfg(feature = "std")]
 use alloc::string::ToString;
 use alloc::{string::String, vec::Vec};
-#[cfg(feature = "std")]
-use core::net::SocketAddr;
 #[cfg(not(target_pointer_width = "64"))]
 use core::sync::atomic::AtomicU32;
 #[cfg(target_pointer_width = "64")]
@@ -79,6 +77,8 @@ use core::{
     sync::atomic::{AtomicU16, Ordering, fence},
     time::Duration,
 };
+#[cfg(feature = "std")]
+use core::{mem::offset_of, net::SocketAddr, ptr::write_unaligned};
 #[cfg(feature = "std")]
 use std::{
     env,
@@ -3192,9 +3192,11 @@ where
                 .alloc_next(size_of::<LlmpClientExitInfo>())
                 .expect("Could not allocate a new message in shared map.");
             (*msg).tag = LLMP_TAG_CLIENT_EXIT;
-            let mut exitinfo =
-                ((*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo).read_unaligned();
-            exitinfo.client_id = client_id;
+            let client_id_offset = offset_of!(LlmpClientExitInfo, client_id);
+            write_unaligned(
+                (*msg).buf.as_mut_ptr().add(client_id_offset) as _,
+                client_id,
+            );
             sender.send(msg, true)
         }
     }

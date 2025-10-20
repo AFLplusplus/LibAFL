@@ -30,20 +30,21 @@ use libafl_bolts::{
     tuples::tuple_list,
 };
 #[cfg(feature = "nyx")]
-use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
-#[cfg(not(feature = "nyx"))]
+use libafl_qemu::NopSnapshotManager;
 use libafl_qemu::{
-    command::StdCommandManager, modules::utils::filters::LINUX_PROCESS_ADDRESS_RANGE,
-    StdEmulatorDriver,
-};
-use libafl_qemu::{
+    command::StdCommandManager,
     emu::Emulator,
     executor::QemuExecutor,
     modules::{
-        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
-        utils::filters::HasAddressFilterTuple, CmpLogModule, EmulatorModuleTuple,
+        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule,
+        EmulatorModuleTuple,
     },
-    FastSnapshotManager, NopSnapshotManager, QemuInitError,
+    QemuInitError, StdEmulatorDriver,
+};
+#[cfg(not(feature = "nyx"))]
+use libafl_qemu::{
+    modules::utils::filters::{HasAddressFilterTuple, LINUX_PROCESS_ADDRESS_RANGE},
+    FastSnapshotManager,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
@@ -52,7 +53,7 @@ fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     modules: ET,
 ) -> Result<
-    Emulator<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, NopSnapshotManager>,
+    Emulator<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, NopSnapshotManager>,
     QemuInitError,
 >
 where
@@ -63,8 +64,8 @@ where
     Emulator::empty()
         .qemu_parameters(args)
         .modules(modules)
-        .driver(NyxEmulatorDriver::builder().build())
-        .command_manager(NyxCommandManager::default())
+        .driver(StdEmulatorDriver::builder().build())
+        .command_manager(StdCommandManager::default())
         .snapshot_manager(NopSnapshotManager::default())
         .build()
 }
@@ -143,16 +144,20 @@ pub fn fuzz() {
             CmpLogModule::default(),
         );
 
-        let emu = get_emulator(args, modules)?;
+        let mut emu = get_emulator(args, modules)?;
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
 
+        unsafe {
+            emu.start().unwrap();
+        }
+
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |emulator: &mut Emulator<_, _, _, _, _, _, _>,
-                           state: &mut _,
+                           _state: &mut _,
                            input: &BytesInput| unsafe {
-            emulator.run(state, input).unwrap().try_into().unwrap()
+            emulator.run(input).unwrap().try_into().unwrap()
         };
 
         // Create an observation channel to keep track of the execution time

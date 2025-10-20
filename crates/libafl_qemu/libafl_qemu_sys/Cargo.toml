@@ -52,9 +52,8 @@ slirp = [
 ] # build qemu with host libslirp (for user networking)
 shared = ["libafl_qemu_build/shared"]
 
-clippy = [
-  "libafl_qemu_build/clippy",
-] # special feature for clippy, don't use in normal projects
+# special feature for clippy, don't use in normal projects
+clippy = ["libafl_qemu_build/clippy"]
 
 qemu_sanitizers = [
   "libafl_qemu_build/qemu_sanitizers",
