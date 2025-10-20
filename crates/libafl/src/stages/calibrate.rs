@@ -13,7 +13,7 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasScheduler,
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
@@ -77,6 +77,45 @@ impl Default for UnstableEntriesMetadata {
     }
 }
 
+/// Runs the target with pre and post execution hooks and returns the exit kind and duration.
+pub fn run_target_with_timing<E, EM, Z, S, OT, I>(
+    fuzzer: &mut Z,
+    executor: &mut E,
+    state: &mut S,
+    mgr: &mut EM,
+    input: &I,
+    had_errors: bool,
+) -> Result<(ExitKind, Duration, bool), Error>
+where
+    OT: ObserversTuple<I, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
+    EM: EventFirer<I, S>,
+    I: Input,
+    S: HasExecutions,
+{
+    executor.observers_mut().pre_exec_all(state, input)?;
+
+    let start = current_time();
+    let exit_kind = executor.run_target(fuzzer, state, mgr, input)?;
+    let mut has_errors = had_errors;
+    if exit_kind != ExitKind::Ok && !had_errors {
+        mgr.log(
+            state,
+            LogSeverity::Warn,
+            "Corpus entry errored on execution!".into(),
+        )?;
+
+        has_errors = true;
+    }
+    let duration = current_time() - start;
+
+    executor
+        .observers_mut()
+        .post_exec_all(state, input, &exit_kind)?;
+
+    Ok((exit_kind, duration, has_errors))
+}
+
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Debug, Clone)]
 pub struct CalibrationStage<C, I, O, OT, S> {
@@ -104,7 +143,7 @@ where
         + HasExecutions
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, I, S> + HasScheduler<I, S>,
     I: Input,
 {
     #[inline]
@@ -127,30 +166,11 @@ where
         }
 
         let mut iter = self.stage_max;
+
         // If we restarted after a timeout or crash, do less iterations.
         let input = state.current_input_cloned()?;
-
-        // Run once to get the initial calibration map
-        executor.observers_mut().pre_exec_all(state, &input)?;
-
-        let mut start = current_time();
-
-        let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
-        let mut total_time = if exit_kind == ExitKind::Ok {
-            current_time() - start
-        } else {
-            mgr.log(
-                state,
-                LogSeverity::Warn,
-                "Corpus entry errored on execution!".into(),
-            )?;
-            // assume one second as default time
-            Duration::from_secs(1)
-        };
-
-        executor
-            .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
+        let (_, mut total_time, _) =
+            run_target_with_timing(fuzzer, executor, state, mgr, &input, false)?;
 
         let observers = &executor.observers();
         let map_first = observers[&self.map_observer_handle].as_ref();
@@ -179,33 +199,11 @@ where
         let mut has_errors = false;
 
         while i < iter {
-            let input = state.current_input_cloned()?;
+            let (exit_kind, duration, has_errors_result) =
+                run_target_with_timing(fuzzer, executor, state, mgr, &input, has_errors)?;
+            has_errors = has_errors_result;
 
-            executor.observers_mut().pre_exec_all(state, &input)?;
-            start = current_time();
-
-            let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
-            if exit_kind != ExitKind::Ok {
-                if !has_errors {
-                    mgr.log(
-                        state,
-                        LogSeverity::Warn,
-                        "Corpus entry errored on execution!".into(),
-                    )?;
-
-                    has_errors = true;
-                }
-
-                if iter < CAL_STAGE_MAX {
-                    iter += 2;
-                }
-            }
-
-            total_time += current_time() - start;
-
-            executor
-                .observers_mut()
-                .post_exec_all(state, &input, &exit_kind)?;
+            total_time += duration;
 
             if self.track_stability && exit_kind != ExitKind::Timeout {
                 let map = &executor.observers()[&self.map_observer_handle]

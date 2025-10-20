@@ -86,7 +86,7 @@ num-traits = { workspace = true, default-features = true }
 ahash = { workspace = true, default-features = true }
 paste = { workspace = true }
 log = { workspace = true }
-mmap-rs = "0.6.1"
+mmap-rs = "0.7.0"
 yaxpeax-arch = "0.3.2"
 
 document-features = { workspace = true, optional = true } # Document all features of this crate (for `cargo doc`)
@@ -110,7 +110,7 @@ yaxpeax-x86 = "2.0.0"
 iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-winsafe = { version = "0.0.25", features = ["kernel"] }
+winsafe = { version = "0.0.26", features = ["kernel"] }
 winapi = { version = "0.3", features = [
   "processthreadsapi",
   "winnt",

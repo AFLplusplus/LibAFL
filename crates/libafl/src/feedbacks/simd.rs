@@ -70,8 +70,9 @@ where
 
         let history_map = map_state.history_map.as_slice();
 
-        let (interesting, novelties) =
-            covmap_is_interesting_simd::<R, V>(history_map, &map, self.map.novelties.is_some());
+        let (interesting, novelties) = unsafe {
+            covmap_is_interesting_simd::<R, V>(history_map, &map, self.map.novelties.is_some())
+        };
         if let Some(nov) = self.map.novelties.as_mut() {
             *nov = novelties;
         }

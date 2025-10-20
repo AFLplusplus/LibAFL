@@ -440,14 +440,14 @@ pub mod pybind {
 
         /// Run the fuzzer
         #[expect(clippy::needless_pass_by_value)]
-        pub fn run(&self, harness: PyObject) {
+        pub fn run(&self, harness: Py<PyAny>) {
             inprocess::InProcessBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
                 .broker_port(self.broker_port)
                 .cores(&self.cores)
                 .harness(|buf| {
-                    Python::with_gil(|py| -> PyResult<()> {
+                    Python::attach(|py| -> PyResult<()> {
                         let args = (PyBytes::new(py, buf),); // TODO avoid copy
                         harness.call1(py, args)?;
                         Ok(())

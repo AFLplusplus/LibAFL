@@ -8,7 +8,7 @@ use core::fmt::{self, Debug};
 use libafl_bolts::{
     Named,
     rands::{Rand, StdRand},
-    tuples::NamedTuple,
+    tuples::{HasConstLen, NamedTuple},
 };
 use serde::{Deserialize, Serialize};
 
@@ -502,7 +502,7 @@ impl<MT> StdMOptMutator<MT> {
     ) -> Result<Self, Error>
     where
         S: HasMetadata + HasRand,
-        MT: NamedTuple,
+        MT: NamedTuple + HasConstLen,
     {
         if !state.has_metadata::<MOpt>() {
             let rand_seed = state.rand_mut().next();

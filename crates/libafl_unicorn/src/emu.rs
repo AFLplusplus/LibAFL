@@ -5,7 +5,7 @@ use capstone::{
 pub use libafl_targets::{EDGES_MAP, EDGES_MAP_PTR};
 use unicorn_engine::{
     RegisterARM, RegisterARM64, RegisterRISCV, RegisterX86, Unicorn,
-    unicorn_const::{Arch, Permission},
+    unicorn_const::{Arch, Prot},
 };
 
 use crate::helper::get_stack_pointer;
@@ -79,7 +79,7 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
     // Provide disassembly at instant of crash
     let regions = emu.mem_regions().expect("Could not get memory regions");
     for region in regions {
-        if region.perms.contains(Permission::EXEC) && pc >= region.begin && pc <= region.end {
+        if Prot(region.perms) & Prot::EXEC == Prot::EXEC && pc >= region.begin && pc <= region.end {
             let mut begin = pc - 32;
             let mut end = pc + 32;
             if begin < region.begin {

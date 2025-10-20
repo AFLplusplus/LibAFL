@@ -1,5 +1,5 @@
 use std::{
-    env, ffi::CString, num::NonZero, os::unix::ffi::OsStrExt, path::PathBuf, slice, time::Duration,
+    env, ffi::CString, fs, num::NonZero, os::unix::ffi::OsStrExt, path::PathBuf, time::Duration,
 };
 
 use libafl::{
@@ -19,8 +19,9 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{core_affinity, rands::StdRand, tuples::tuple_list};
-use libafl_intelpt::{IntelPT, PAGE_SIZE};
+use libafl_bolts::{core_affinity, rands::StdRand, tuples::tuple_list, Error};
+use libafl_intelpt::{AddrFilter, AddrFilterType, AddrFilters, IntelPT, PAGE_SIZE};
+use object::{elf::PF_X, Object, ObjectSegment, SegmentFlags};
 
 // Coverage map
 const MAP_SIZE: usize = 4096;
@@ -29,7 +30,7 @@ static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
 #[allow(static_mut_refs)] // only a problem in nightly
 static mut MAP_PTR: *mut u8 = unsafe { MAP.as_mut_ptr() };
 
-pub fn main() {
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Let's set the default logging level to `warn`
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", "warn")
@@ -44,9 +45,31 @@ pub fn main() {
         .parent()
         .unwrap()
         .join("target_program");
+    let target_binary = fs::read(&target_path)?;
+    let target_parsed = object::File::parse(&*target_binary)?;
+
+    // Get the executable segment from the target program.
+    //
+    // Note: this simple example target has just one range of executable memory, in real world binaries
+    // there are likely multiple ranges.
+    let executable_segments = target_parsed.segments().filter(|s| match s.flags() {
+        SegmentFlags::Elf { p_flags } => (p_flags & PF_X) > 0,
+        _ => panic!("target binary is not an ELF file."),
+    });
+    let executable_segment =
+        executable_segments
+            .into_iter()
+            .next()
+            .ok_or(Error::illegal_argument(
+                "No executable segment found in target program",
+            ))?;
+    log::debug!(
+        "Executable segment: {executable_segment:x?} at binary file offset {:x?}",
+        executable_segment.file_range()
+    );
 
     // We'll run the target on cpu (aka core) 0
-    let cpu = core_affinity::get_core_ids().unwrap()[0];
+    let cpu = core_affinity::get_core_ids()?[0];
     log::debug!("Using core {} for fuzzing", cpu.0);
 
     // Create an observation channel using the map
@@ -72,8 +95,7 @@ pub fn main() {
         &mut feedback,
         // Same for objective feedbacks
         &mut objective,
-    )
-    .unwrap();
+    )?;
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
     let mon = SimpleMonitor::new(|s| println!("{s}"));
@@ -90,25 +112,28 @@ pub fn main() {
 
     // The target is a ET_DYN elf, it will be relocated by the loader with this offset.
     // see https://github.com/torvalds/linux/blob/c1e939a21eb111a6d6067b38e8e04b8809b64c4e/arch/x86/include/asm/elf.h#L234C1-L239C38
-    const DEFAULT_MAP_WINDOW: usize = (1 << 47) - PAGE_SIZE;
-    const ELF_ET_DYN_BASE: usize = (DEFAULT_MAP_WINDOW / 3 * 2) & !(PAGE_SIZE - 1);
+    const DEFAULT_MAP_WINDOW: u64 = (1 << 47) - PAGE_SIZE as u64;
+    const ELF_ET_DYN_BASE: u64 = (DEFAULT_MAP_WINDOW / 3 * 2) & !(PAGE_SIZE as u64 - 1);
 
     // Set the instruction pointer (IP) filter and memory image of our target.
-    // These information can be retrieved from `readelf -l` (for example)
-    let code_memory_addresses = ELF_ET_DYN_BASE + 0x15000..=ELF_ET_DYN_BASE + 0x14000 + 0x41000;
+    let actual_virtual_address = executable_segment.address() + ELF_ET_DYN_BASE;
+    let filters = AddrFilters::new(&[AddrFilter::new(
+        actual_virtual_address,
+        actual_virtual_address + executable_segment.size(),
+        AddrFilterType::FILTER,
+    )])?;
 
     let intel_pt = IntelPT::builder()
         .cpu(cpu.0)
         .inherit(true)
-        .ip_filters(slice::from_ref(&code_memory_addresses))
-        .build()
-        .unwrap();
+        .ip_filters(&filters)
+        .build()?;
 
     let sections = [SectionInfo {
         filename: target_path.to_string_lossy().to_string(),
-        offset: 0x14000,
-        size: (*code_memory_addresses.end() - *code_memory_addresses.start() + 1) as u64,
-        virtual_address: *code_memory_addresses.start() as u64,
+        offset: executable_segment.file_range().0,
+        size: executable_segment.size(),
+        virtual_address: actual_virtual_address,
     }];
 
     let hook = unsafe { IntelPTHook::builder().map_ptr(MAP_PTR).map_len(MAP_SIZE) }
@@ -152,4 +177,6 @@ pub fn main() {
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
+
+    Ok(())
 }

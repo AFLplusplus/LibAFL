@@ -127,7 +127,7 @@ pub enum QemuParams {
 pub struct QemuMemoryChunk {
     addr: GuestAddrKind,
     size: GuestReg,
-    cpu: Option<CPU>,
+    cpu: CPU,
 }
 
 #[derive(Debug, Clone)]
@@ -1143,7 +1143,12 @@ impl QemuMemoryChunk {
     }
 
     #[must_use]
-    pub fn phys(addr: GuestPhysAddr, size: GuestReg, cpu: Option<CPU>) -> Self {
+    pub fn cpu(&self) -> CPU {
+        self.cpu
+    }
+
+    #[must_use]
+    pub fn phys(addr: GuestPhysAddr, size: GuestReg, cpu: CPU) -> Self {
         Self {
             addr: GuestAddrKind::Physical(addr),
             size,
@@ -1156,7 +1161,7 @@ impl QemuMemoryChunk {
         Self {
             addr: GuestAddrKind::Virtual(addr),
             size,
-            cpu: Some(cpu),
+            cpu,
         }
     }
 
@@ -1201,13 +1206,50 @@ impl QemuMemoryChunk {
             }
             GuestAddrKind::Virtual(vaddr) => unsafe {
                 self.cpu
-                    .as_ref()
-                    .unwrap()
                     .read_mem_unchecked(vaddr.try_into().unwrap(), output_sliced);
             },
         }
 
         Ok(output_sliced.len().try_into().unwrap())
+    }
+
+    /// Interpret the VM memory chunk as a host slice.
+    ///
+    /// If the underlying memory cannot be represented as a slice
+    /// (for example, if the memory is fragmented in the host address space),
+    /// [`None`] is returned.
+    #[cfg(feature = "systemmode")]
+    pub fn to_phys_mem_chunk(&self, qemu: Qemu) -> Option<PhysMemoryChunk> {
+        match self.addr {
+            GuestAddrKind::Physical(paddr) => Some(PhysMemoryChunk::new(
+                paddr,
+                self.size as usize,
+                qemu,
+                self.cpu,
+            )),
+
+            GuestAddrKind::Virtual(start_vaddr) => {
+                let start_paddr = self.cpu.get_phys_addr(start_vaddr)?;
+                let page_size = qemu.target_page_size() as GuestVirtAddr;
+
+                for offset in (0..self.size as GuestVirtAddr).step_by(page_size) {
+                    let vaddr = start_vaddr + offset as GuestVirtAddr;
+                    let paddr = self.cpu.get_phys_addr(vaddr)?;
+
+                    if paddr != start_paddr + offset as GuestPhysAddr {
+                        // non contiguous memory
+                        return None;
+                    }
+                }
+
+                Some(PhysMemoryChunk::new(
+                    start_paddr,
+                    self.size as usize,
+                    qemu,
+                    self.cpu,
+                ))
+            }
+        }
     }
 
     pub fn read_vec(&self, qemu: Qemu) -> Result<Vec<u8>, QemuRWError> {
@@ -1247,8 +1289,6 @@ impl QemuMemoryChunk {
             }
             GuestAddrKind::Virtual(vaddr) => {
                 self.cpu
-                    .as_ref()
-                    .unwrap()
                     .write_mem(vaddr.try_into().unwrap(), input_sliced)?;
             }
         }
@@ -1265,14 +1305,14 @@ pub mod pybind {
     pub use super::usermode::pybind::*;
     use super::{GuestAddr, GuestUsize};
 
-    static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
+    static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, Py<PyAny>)> = vec![];
 
     extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
         let obj = unsafe {
             let hooks = &raw mut PY_GENERIC_HOOKS;
             &(&(*hooks))[idx as usize].1
         };
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             obj.call0(py).expect("Error in the hook");
         });
     }
@@ -1347,7 +1387,7 @@ pub mod pybind {
 
         /// # Safety
         /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
-        unsafe fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
+        unsafe fn set_hook(&self, addr: GuestAddr, hook: Py<PyAny>) {
             unsafe {
                 let hooks = &raw mut PY_GENERIC_HOOKS;
                 let idx = (*hooks).len();

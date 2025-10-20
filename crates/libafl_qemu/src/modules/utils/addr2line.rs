@@ -1,3 +1,4 @@
+#![allow(clippy::unnecessary_cast)]
 //! Utils for addr2line
 
 use std::{borrow::Cow, fmt::Write, fs};
@@ -43,7 +44,7 @@ pub fn is_pie(file: object::File<'_>) -> bool {
 }
 
 pub struct AddressResolver {
-    ranges: RangeMap<GuestAddr, usize>,
+    ranges: RangeMap<u64, usize>,
     images: Vec<(String, Vec<u8>)>,
     resolvers: Vec<Option<(Loader, bool)>>,
 }
@@ -68,7 +69,7 @@ impl AddressResolver {
 
         let mut resolvers = vec![];
         let mut images = vec![];
-        let mut ranges: RangeMap<GuestAddr, usize> = RangeMap::new();
+        let mut ranges: RangeMap<u64, usize> = RangeMap::new();
 
         for (path, rng) in regions {
             let data = fs::read(&path);
@@ -102,9 +103,13 @@ impl AddressResolver {
     pub fn resolve(&self, pc: GuestAddr) -> String {
         let resolve_addr = |addr: GuestAddr| -> String {
             let mut info = String::new();
-            if let Some((range, idx)) = self.ranges.get_key_value(&addr) {
+            if let Some((range, idx)) = self.ranges.get_key_value(&(addr as u64)) {
                 if let Some((ctx, is_pie)) = self.resolvers[*idx].as_ref() {
-                    let raddr = if *is_pie { addr - range.start } else { addr };
+                    let raddr = if *is_pie {
+                        addr - (range.start as GuestAddr)
+                    } else {
+                        addr
+                    };
                     let mut frames = ctx.find_frames(raddr.into()).unwrap().peekable();
                     let mut fname = None;
                     while let Some(frame) = frames.next().unwrap() {

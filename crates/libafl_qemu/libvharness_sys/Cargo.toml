@@ -1,0 +1,41 @@
+[package]
+name = "libvharness_sys"
+version.workspace = true
+edition = "2024"
+authors = ["Romain Malmain <rmalmain@pm.me>"]
+description = "libvharness Rust bindings"
+documentation = "https://docs.rs/libafl_qemu"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "README.md"
+license = "MIT"
+keywords = ["fuzzing", "qemu", "instrumentation"]
+categories = ["external-ffi-bindings", "embedded", "os", "no-std"]
+
+[features]
+# Special platforms
+linux = []
+linux-kernel = []
+
+# Use the Nyx API instead of the LibAFL API
+nyx = []
+
+# supported archs
+x86_64 = []
+i386 = []
+arm = []
+aarch64 = []
+mips = []
+ppc = []
+hexagon = []
+riscv32 = []
+riscv64 = []
+
+# special feature for clippy, don't use in normal projects
+clippy = []
+
+[build-dependencies]
+cmake = "0.1.54"
+bindgen = "0.72.0"
+
+[lints]
+workspace = true

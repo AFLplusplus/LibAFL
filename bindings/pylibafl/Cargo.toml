@@ -9,8 +9,8 @@ edition = "2024"
 categories = ["development-tools::testing", "emulators", "embedded", "os"]
 
 [dependencies]
-pyo3 = { version = "0.24.0", features = ["extension-module"] }
-pyo3-log = { version = "0.12.2" }
+pyo3 = { version = "0.26.0", features = ["extension-module"] }
+pyo3-log = { version = "0.13.1" }
 libafl_sugar = { path = "../../crates/libafl_sugar", version = "0.15.4", features = [
   "python",
 ] }
@@ -24,7 +24,7 @@ libafl_qemu = { path = "../../crates/libafl_qemu", version = "0.15.4", features 
 ] }
 
 [build-dependencies]
-pyo3-build-config = "0.24.0"
+pyo3-build-config = "0.26.0"
 
 [lib]
 name = "pylibafl"
