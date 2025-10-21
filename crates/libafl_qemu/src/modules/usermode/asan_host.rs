@@ -1,5 +1,6 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::needless_pass_by_value)] // default compiler complains about Option<&mut T> otherwise, and this is used extensively.
+#![allow(clippy::unnecessary_cast)]
 
 use core::{fmt, slice};
 use std::{
@@ -1202,7 +1203,7 @@ where
     if let Some(asan_mappings) = &h.asan_mappings
         && asan_mappings
             .iter()
-            .any(|m| m.start() <= pc && pc < m.end())
+            .any(|m| m.start() <= (pc as u64) && (pc as u64) < m.end())
     {
         return None;
     }
@@ -1298,7 +1299,7 @@ where
     if let Some(asan_mappings) = &h.asan_mappings
         && asan_mappings
             .iter()
-            .any(|m| m.start() <= pc && pc < m.end())
+            .any(|m| m.start() <= (pc as u64) && (pc as u64) < m.end())
     {
         return Some(0);
     }
