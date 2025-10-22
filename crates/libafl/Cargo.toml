@@ -289,7 +289,7 @@ const_format = "0.2.33"                                       # used for providi
 const_panic = { version = "0.2.9", default-features = false } # similarly, for formatting const panic output
 
 pyo3 = { workspace = true, optional = true }
-regex-syntax = { version = "0.8.4", optional = true } # For nautilus
+regex-syntax = { version = "0.8.8", optional = true } # For nautilus
 
 fs2 = { workspace = true, optional = true } # used by OnDisk Corpus for file locking
 
