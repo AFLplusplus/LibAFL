@@ -13,7 +13,7 @@ libafl = { version = "*" }
 For LibAFL, each crate has its self-contained purpose, and the user may not need to use all of them in their project.
 Following the naming convention of the folders in the project's root, they are:
 
-### [`libafl`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl)
+### [`libafl`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl)
 
 This is the main crate that contains all the components needed to build a fuzzer.
 
@@ -31,7 +31,7 @@ You can choose the features by using `features = ["feature1", "feature2", ...]` 
 Out of this list, by default, `std`, `derive`, and `rand_trait` are already set.
 You can choose to disable them by setting `default-features = false` in your `Cargo.toml`.
 
-### [`libafl_bolts`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_bolts)
+### [`libafl_bolts`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_bolts)
 
 The `libafl_bolts` crate is a minimal tool shed filled with useful low-level rust features, not necessarily related to fuzzers.
 In it, you'll find highlights like:
@@ -46,20 +46,20 @@ In it, you'll find highlights like:
 
 ... and much more.
 
-### [`libafl_sugar`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_sugar)
+### [`libafl_sugar`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_sugar)
 
 The sugar crate abstracts away most of the complexity of LibAFL's API.
 Instead of high flexibility, it aims to be high-level and easy-to-use.
 It is not as flexible as stitching your fuzzer together from each individual component, but allows you to build a fuzzer with minimal lines of code.
 To see it in action, take a look at the [`libfuzzer_stb_image_sugar` example fuzzer](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/inprocess/libfuzzer_stb_image_sugar).
 
-### [`libafl_derive`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_derive)
+### [`libafl_derive`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_derive)
 
 This a proc-macro crate paired with the `libafl` crate.
 
 At the moment, it just exposes the `derive(SerdeAny)` macro that can be used to define Metadata structs, see the section about [Metadata](../design/metadata.md) for details.
 
-### [`libafl_targets`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_targets)
+### [`libafl_targets`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_targets)
 
 This crate exposes code to interact with, and to instrument, targets.
 To enable and disable features at compile-time, the features are enabled and disabled using feature flags.
@@ -71,32 +71,32 @@ Currently, the supported flags are:
 - `libfuzzer` exposes a compatibility layer with libFuzzer style harnesses.
 - `value_profile` defines the SanitizerCoverage trace-cmp hooks to track the matching bits of each comparison in a map.
 
-### [`libafl_cc`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_cc)
+### [`libafl_cc`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_cc)
 
 This is a library that provides utils to wrap compilers and create source-level fuzzers.
 
 At the moment, only the Clang compiler is supported.
 To understand it deeper, look through the tutorials and examples.
 
-### [`libafl_frida`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_frida)
+### [`libafl_frida`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_frida)
 
 This library bridges LibAFL with Frida as instrumentation backend.
 With this crate, you can instrument targets on Linux/macOS/Windows/Android for coverage collection.
 Additionally, it supports CmpLog, and AddressSanitizer instrumentation and runtimes for aarch64.
 See further information, as well as usage instructions, [later in the book](../advanced_features/frida.md).
 
-### [`libafl_qemu`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_qemu)
+### [`libafl_qemu`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_qemu)
 
 This library bridges LibAFL with QEMU user-mode to fuzz ELF cross-platform binaries.
 
 It works on Linux and can collect edge coverage without collisions!
 It also supports a wide range of hooks and instrumentation options.
 
-### [`libafl_nyx`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_nyx)
+### [`libafl_nyx`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_nyx)
 
 [Nyx](https://nyx-fuzz.com/) is a KVM-based snapshot fuzzer. `libafl_nyx` adds these capabilities to LibAFL. There is a specific section explaining usage of libafl_nyx [later in the book](../advanced_features/nyx.md).
 
-### [`libafl_concolic`](https://github.com/AFLplusplus/LibAFL/tree/main/libafl_concolic)
+### [`libafl_concolic`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_concolic)
 
 Concolic fuzzing is the combination of fuzzing and a symbolic execution engine.
 This can reach greater depth than normal fuzzing, and is exposed in this crate.
