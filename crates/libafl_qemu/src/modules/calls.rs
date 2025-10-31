@@ -367,7 +367,7 @@ where
                 }
                 #[cfg(feature = "systemmode")]
                 {
-                    if let Err(err) = qemu.read_mem(pc, code) {
+                    if let Err(err) = qemu.read_mem(iaddr, code) {
                         // TODO handle faults
                         log::error!(
                             "gen_block_calls error 2: Failed to read mem at pc {pc:#x}: {err:?}"
