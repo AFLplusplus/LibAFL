@@ -31,7 +31,7 @@ where
     pub calling_func: String,
     /// Indexes of successor block.
     pub successor_basic_blocks: Vec<usize>,
-    /// ``prev_loc`` >> 1 ^ ``cur_loc`` of edges connecting [`CfgEdge.bottom_node_loc`]
+    /// ``prev_loc`` >> 1 ^ ``cur_loc`` of edges connecting [`CfgEdge::bottom_node_loc`]
     /// to successor blocks.
     pub successor_edges: Vec<usize>,
     /// Custom metadata.

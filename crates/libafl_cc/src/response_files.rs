@@ -5,10 +5,9 @@
 //! via files rather than command lines, which is useful for very long argument lists.
 //!
 //! # Example
-//! ```no_run
-//! // If args.rsp contains: -O2 -Wall "my file.c"
-//! // Then @args.rsp will be expanded to: ["-O2", "-Wall", "my file.c"]
-//! ```
+//!
+//! If `args.rsp` contains: `-O2 -Wall "my file.c"`
+//! Then `@args.rsp` will be expanded to: `["-O2", "-Wall", "my file.c"]`
 
 use std::fs;
 use std::io;

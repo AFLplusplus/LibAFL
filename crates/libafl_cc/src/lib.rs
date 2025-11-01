@@ -1,5 +1,6 @@
 //! Compiler Wrapper from `LibAFL`
 
+#![allow(rustdoc::invalid_rust_codeblocks)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
