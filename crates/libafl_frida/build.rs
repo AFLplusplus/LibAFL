@@ -80,7 +80,6 @@ fn main() {
         let compiler = cc::Build::new()
             .cpp(true)
             .opt_level(0)
-            .shared_flag(true)
             .get_compiler();
         let clangpp = compiler.path();
         let mut cmd = std::process::Command::new(clangpp);
