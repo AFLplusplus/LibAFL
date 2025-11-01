@@ -24,7 +24,6 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
-    unfulfilled_lint_expectations,
     unused_must_use,
     bad_style,
     dead_code,
