@@ -1,0 +1,472 @@
+Summary of failure
+
+The job failed while generating docs: rustdoc raised errors for invalid code blocks and, because -D warnings is enabled, that lint is treated as a hard error: "note: -D rustdoc::invalid-rust-codeblocks implied by -D warnings" -> "error: could not document libafl_cc"
+The log also contains a harmless warning: "libafl_cc@...: Failed to find llvm-config" (this is a warning, not the failure cause).
+Immediate CI fixes (fast, non-invasive)
+
+Allow the rustdoc lint in the doc jobs so CI can proceed while you fix the doc codeblocks:
+Modify the ubuntu-doc-build and ubuntu-doc-test jobs to set RUSTDOCFLAGS to allow the rustdoc lint.
+Change the Build Docs step (lines ~92-94 of .github/workflows/build_and_test.yml) to:
+
+name: Build Docs env: RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks run: cargo doc --all-features --no-deps
+And change the Test Docs step (lines ~102-103) to:
+
+name: Test Docs env: RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks run: cargo test --doc --all-features
+You can reference the workflow file here: https://github.com/AFLplusplus/LibAFL/blob/68efb51852776d5f61be62870a41841d0bdb24c0/.github/workflows/build_and_test.yml
+
+This is the least invasive fix and will unblock the CI quickly. It disables treating invalid rustdoc code blocks as errors for the doc CI runs only.
+
+Recommended long-term fixes (preferred) 2) Fix the invalid rustdoc code blocks in the libafl_cc crate (and any other crate triggering the lint).
+
+Reproduce locally:
+
+Run in the repo root: RUST_BACKTRACE=1 cargo doc --all-features --no-deps cargo test --doc --all-features
+Note which crate(s) produce the rustdoc errors and inspect the offending doc comments.
+Typical causes and fixes:
+
+Fenced code blocks marked as rust but containing non-rust or pseudo-code — either:
+Fix the code block so it is valid Rust; or
+If the example is intentionally non-compiling, mark it as no_run or ignore or non-rust:
+Rust
+
+
+/// ```rust,ignore
+/// // intentionally non-compiling example
+/// ```
+For snippets that are not Rust, remove the "rust" language tag or use plain fenced block (```).
+Ensure code fences use correct syntax markers and correct backticks.
+If the invalid code blocks are acceptable to be tolerated permanently in that crate, add crate-level allow attribute:
+In crates/libafl_cc/src/lib.rs (crate root), add at the top:
+#![allow(rustdoc::invalid_rust_codeblocks)]
+
+This localizes the change to the crate that caused the failure. Link to the crate (example path): https://github.com/AFLplusplus/LibAFL/blob/68efb51852776d5f61be62870a41841d0bdb24c0/crates/libafl_cc/src/lib.rs
+
+Why both approaches:
+
+The CI change (RUSTDOCFLAGS allow) lets the repo keep building while you audit and correct doc code blocks (fast unblock).
+Fixing the documentation or adding a crate-level attribute is the long-term, correct solution so docs are clean and reproducible on other environments.
+Notes about llvm-config warning
+
+The warning "Failed to find llvm-config" means libafl_cc won't build LLVM passes on that CI runner. If you need LLVM passes during doc/test, ensure the CI provides llvm-config and set LLVM_CONFIG or install the appropriate LLVM version (the workflow installs LLVM on macOS; for Ubuntu you may need llvm-${MAIN_LLVM_VERSION}-dev or a specific llvm-config in PATH). This warning did not cause the failure in this job, but you may want to address it separately if LLVM passes are required.
+Suggested quick patch (example commit)
+
+Option A (CI-only unblock): update .github/workflows/build_and_test.yml to add RUSTDOCFLAGS in both ubuntu-doc-build and ubuntu-doc-test steps.
+Option B (crate-level): add #![allow(rustdoc::invalid_rust_codeblocks)] to the top of crates/libafl_cc/src/lib.rs and run the doc/test locally to confirm.
+Commands to validate locally
+
+To reproduce the exact failure locally: RUSTDOCFLAGS= cargo doc --all-features --no-deps cargo test --doc --all-features
+
+To reproduce the proposed CI workaround locally: RUSTDOCFLAGS='-A rustdoc::invalid_rust_codeblocks' cargo doc --all-features --no-deps RUSTDOCFLAGS='-A rustdoc::invalid_rust_codeblocks' cargo test --doc --all-features
+
+If you want, I can prepare the exact patch diff for:
+
+the workflow change (two small edits), or
+the crate-level attribute in crates/libafl_cc. Which would you prefer?
+
+Summary of the failure
+
+The job failed while running cargo doc / rustdoc: cargo could not document crate libafl_cc because rustdoc raised an invalid-rust-codeblocks lint which was promoted to an error (the CI enforces -D warnings). The logs also show libafl_cc emitted "Failed to find llvm-config" which is a separate warning that likely comes from not having an llvm-config in PATH for the configured MAIN_LLVM_VERSION (18).
+Primary failure: rustdoc lint -> error: could not document libafl_cc (caused by -D warnings + invalid rust code blocks in docs).
+Secondary issue (helpful to fix): missing llvm-config (libafl_cc prints that and may also affect doc generation or build features).
+Concrete fixes (apply both recommended options)
+
+Fix CI so docs can be generated reliably
+Ensure llvm-config for MAIN_LLVM_VERSION is installed on the Ubuntu doc jobs and exported in the environment.
+Prevent rustdoc failure by allowing that specific rustdoc lint in CI (short term), or by fixing the invalid code blocks in the crate docs (long term).
+Edit .github/workflows/build_and_test.yml (ref: 68efb51852776d5f61be62870a41841d0bdb24c0)
+
+Replace/update the ubuntu-doc-build step (lines ~92–94) with this patch (or add the extra step(s) before Build Docs):
+
+YAML
+  ubuntu-doc-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: Swatinem/rust-cache@v2
+
+      # Install llvm so llvm-config-18 exists and export it for cargo builds/docs
+      - name: Install LLVM ${MAIN_LLVM_VERSION}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-${{ env.MAIN_LLVM_VERSION }} llvm-${{ env.MAIN_LLVM_VERSION }}-dev llvm-${{ env.MAIN_LLVM_VERSION }}-tools
+          # ensure llvm-config-<ver> is on PATH
+          sudo ln -sf /usr/bin/llvm-config-${{ env.MAIN_LLVM_VERSION }} /usr/bin/llvm-config-${{ env.MAIN_LLVM_VERSION }} || true
+
+      - name: Build Docs
+        env:
+          LLVM_CONFIG: llvm-config-${{ env.MAIN_LLVM_VERSION }}
+          # short-term: silence invalid-rust-codeblocks lint so doc job does not fail CI
+          RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks
+        run: cargo doc --all-features --no-deps
+Notes:
+
+Installing llvm-18 packages ensures llvm-config-18 is present and libafl_cc will not print the "Failed to find llvm-config" warning. Adjust package names if your distro provides different package naming.
+The RUSTDOCFLAGS env line is a pragmatic CI fix to prevent the rustdoc lint from failing the job. This addresses the immediate CI failure while keeping the doc generation step running.
+(Recommended) Fix crate documentation to remove invalid code blocks
+Long-term, clean up the rustdoc codeblocks that are invalid in crates/libafl_cc (and any other crates that cause rustdoc warnings). Two approaches: a) Fix the codeblocks so they are valid Rust or mark them with the appropriate fenced code attributes (e.g. ```rust, no_run, ignore) so rustdoc doesn't treat them as invalid. b) As a minimal code change for the crate, add an allow at crate level:
+Edit crates/libafl_cc/src/lib.rs (or the crate root) and add:
+
+Rust
+#![allow(rustdoc::invalid_rust_codeblocks)]
+or add the attr on particular modules/items:
+
+Rust
+#[allow(rustdoc::invalid_rust_codeblocks)]
+mod some_module {
+    // ...
+}
+Preferred: update the docblocks themselves (fix triple-backtick blocks, add language tags, add no_run/ignore when appropriate). That preserves doc quality and avoids hiding other problems.
+Propagate llvm-config env to other jobs that need it
+Where other jobs call cargo build/test/doc and expect llvm-config, set LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} (for example in ubuntu-doc-test, ubuntu-clippy, python-bindings, many others already use LLVM_CONFIG in inline commands). For example update ubuntu-doc-test Build Docs / Test Docs step:
+YAML
+- name: Test Docs
+  env:
+    LLVM_CONFIG: llvm-config-${{ env.MAIN_LLVM_VERSION }}
+    RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks
+  run: cargo test --doc --all-features
+Alternative: if you prefer not to set RUSTDOCFLAGS in CI, you can run cargo doc/test without treating warnings as errors. If some CI step sets -D warnings, remove that for doc jobs only. Example (less preferable than fixing docs):
+Run cargo doc with RUSTFLAGS to not promote warnings to errors, or temporarily unset CI-specific env that enforces -D warnings.
+But this is less explicit and may mask real problems; prefer the RUSTDOCFLAGS allow + fixing docblocks.
+Why this will resolve job 54246997229
+
+The job log shows the failing step is cargo doc failing for libafl_cc due to rustdoc invalid codeblock lint and also warns about missing llvm-config. Installing llvm-config removes the warning and supplying RUSTDOCFLAGS avoids promotion of the rustdoc warning to a CI failure. Fixing the crate docs removes the root cause so subsequent runs will pass without using RUSTDOCFLAGS.
+Example minimal commit (two small changes)
+
+Workflow change — add install step and RUSTDOCFLAGS in ubuntu-doc-build and ubuntu-doc-test.
+Crate change (preferred): add crate-level allow or fix docblocks in crates/libafl_cc.
+If you want, I can produce the exact git patch/PR text with the workflow YAML edit and a suggested libafl_cc change (lib.rs) so you can apply it.
+
+Root cause
+
+CI fails when documenting crate libafl_cc: rustdoc reports invalid code-blocks in documentation, and because the build enables deny-warnings (-D warnings) those warnings are elevated to errors: "note: -D rustdoc::invalid-rust-codeblocks implied by -D warnings" → "error: could not document libafl_cc".
+The llvm-config message is only a warning ("Failed to find llvm-config ...") and not the reason for failure.
+Immediate (fast) fix
+
+Disable the rustdoc error for invalid codeblocks for this crate until you fix the doc examples. Add a crate-level allow for rustdoc::invalid_rust_codeblocks in crates/libafl_cc/src/lib.rs.
+Patch to apply (insert as a crate attribute near the top of crates/libafl_cc/src/lib.rs; use this ref: 68efb51852776d5f61be62870a41841d0bdb24c0) Insert this line (for example after the existing #![cfg_attr(...)] attributes near the top):
+
+#![allow(rustdoc::invalid_rust_codeblocks)]
+
+Example — show context and where to insert:
+
+Open: https://github.com/AFLplusplus/LibAFL/blob/68efb51852776d5f61be62870a41841d0bdb24c0/crates/libafl_cc/src/lib.rs
+Add the single attribute (place it after the existing crate attributes at top):
+
+Rust
+
+
+#![cfg_attr(not(test), warn(
+    missing_debug_implementations,
+    missing_docs,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+))]
+#![cfg_attr(test, deny(
+    missing_debug_implementations,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+))]
+// add this line to stop rustdoc invalid-codeblock warnings from failing CI:
+#![allow(rustdoc::invalid_rust_codeblocks)]
+Notes about this fix
+
+This is a temporary/workaround to unblock CI quickly. It prevents rustdoc's invalid codeblock warnings from being promoted to errors for this crate while the real doc fixes are implemented.
+Do not leave it in place permanently without review: it silences true doc problems that should be fixed.
+Recommended long-term fix (preferred)
+
+Reproduce the rustdoc failure locally to find the offending docblocks:
+
+Run: cargo doc -p libafl_cc --no-deps --verbose
+Or run: cargo doc -p libafl_cc --no-deps 2>&1 | tee doc.log and inspect doc.log for the rustdoc error and file/line info.
+Fix the invalid doc codeblocks:
+
+If the fenced block is not Rust code, mark it explicitly as text:
+Code
+
+
+/// text /// some-not-rust-or-incomplete-example ///  ```
+
+If the block is a Rust example that should not be compiled/run, mark it no_run or ignore:
+Code
+
+
+/// rust,no_run /// // illustrative example ///  ```
+
+If the block is meant to compile, make the example valid Rust code (wrap in fn main() or add missing imports), or mark with compile_fail if it intentionally fails to compile.
+Re-run cargo doc and CI to ensure the crate documents cleanly with -D warnings enforced.
+Optional alternative fixes
+
+Remove -D warnings for rustdoc in CI (not recommended): change CI step to not deny warnings for documentation runs.
+If the llvm passes are required, install/configure llvm-config in CI (set LLVM_CONFIG env var). This is unrelated to the current failure but shown in the logs as a warning.
+Example commit message
+
+"ci: temporarily allow rustdoc::invalid_rust_codeblocks in libafl_cc to unblock CI; follow-up: fix doc codeblocks" Then follow up with commits that correct the doc blocks.
+If you want, I can:
+
+produce a small patch/PR for the temporary attribute insertion,
+or help locate and propose exact edits for the offending doc examples (I'll need the output of cargo doc or the crate files that include doc code blocks).
+
+Failure summary
+
+cargo doc failed while documenting the libafl_cc crate. rustdoc produced "invalid-rust-codeblocks" warnings which were promoted to errors by the CI (-D warnings), causing the job to exit non-zero.
+There is also a non-fatal warning earlier: "Failed to find llvm-config" (libafl_cc will skip LLVM passes). That is unrelated to the rustdoc error but may be addressed separately if LLVM passes are required.
+Job / workflow: .github/workflows/build_and_test.yml (ref: 68efb51852776d5f61be62870a41841d0bdb24c0) https://github.com/AFLplusplus/LibAFL/blob/68efb51852776d5f61be62870a41841d0bdb24c0/.github/workflows/build_and_test.yml
+Two practical fixes (recommended order)
+
+Fix the doc code blocks in libafl_cc (recommended)
+The correct long-term fix is to correct invalid code blocks in libafl_cc’s documentation so rustdoc doesn't emit these warnings.
+Common fixes:
+Mark examples with a language and execution intent:
+Use rust, rust,no_run, rust,ignore or text depending on whether the example should compile/run or is just illustrative.
+For examples that are intentionally non-compiling (or partial), use ignore or annotate with /// rust,ignore
+For compile-fail examples use ```rust,compile_fail
+Remove stray markup characters that break fenced blocks.
+Example change (in the crate root file for libafl_cc, e.g. crates/libafl_cc/src/lib.rs or lib.rs in that crate): Add at top of file (temporary while you fix doc blocks)
+Rust
+
+
+#![allow(rustdoc::invalid_rust_codeblocks)]
+This suppresses the specific rustdoc lint for the crate while you fix the broken blocks. Prefer fixing each code block properly rather than leaving this forever.
+CI-side short-term/workaround: stop turning rustdoc warnings into errors
+If you need a fast unblocking change (while doc fixes are landing), change the workflow so documentation warnings do not fail the job. Add RUSTDOCFLAGS or set cap-lints to allow for rustdoc warnings in the job that runs cargo doc.
+Example snippet to add to the workflow step that runs cargo doc (edit .github/workflows/build_and_test.yml). Using the job ref linked above: https://github.com/AFLplusplus/LibAFL/blob/68efb51852776d5f61be62870a41841d0bdb24c0/.github/workflows/build_and_test.yml Replace or update the cargo doc step with:
+YAML
+
+
+- name: Build docs
+  env:
+    RUSTDOCFLAGS: --cap-lints allow
+  run: cargo doc --no-deps --all
+Or set the env at the job level so it applies to all cargo doc invocations:
+YAML
+
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      RUSTDOCFLAGS: --cap-lints allow
+    steps:
+      ...
+This prevents rustdoc warnings (including invalid-rust-codeblocks) from being promoted to errors.
+Addressing llvm-config warning (optional)
+
+If you need LLVM passes for libafl_cc, ensure llvm-config is available on the runner. On Windows add a step before building:
+YAML
+
+
+- name: Install LLVM (Windows)
+  if: runner.os == 'Windows'
+  run: choco install llvm -y
+- name: Set LLVM_CONFIG
+  if: runner.os == 'Windows'
+  env:
+    LLVM_CONFIG: 'C:\Program Files\LLVM\bin\llvm-config.exe'
+On Linux/macOS use apt/brew to install llvm and export LLVM_CONFIG to the llvm-config binary.
+Recommended immediate action
+
+Patch the quickest CI workaround to unblock the run: set RUSTDOCFLAGS: --cap-lints allow in the workflow (short PR).
+In parallel, open a PR to fix the offending doc code blocks in crates/libafl_cc (inspect doc comments and mark blocks with the correct fence attributes or add #[allow(...)] as a very short-term stopgap). Remove any crate-level allow once documentation is fixed.
+If you want, I can:
+
+point to likely files in crates/libafl_cc to inspect for invalid doc blocks, or
+draft the exact workflow patch as a patch/PR diff for .github/workflows/build_and_test.yml (ref 68efb51852776d5f61be62870a41841d0bdb24c0).
+
+Root cause
+
+cargo doc / rustdoc is failing because rustdoc treats invalid code-blocks as errors: -D rustdoc::invalid-rust-codeblocks (this is implied by -D warnings). The failure happens in the docs build step (job ubuntu-doc-build) when documenting libafl_cc.
+There’s also a non-fatal warning from libafl_cc about missing llvm-config; that increases noise and may indicate LLVM_CONFIG isn’t visible to doc builds.
+Immediate, minimal fix (recommended)
+
+Tell rustdoc to ignore invalid-rust-codeblocks during CI doc runs by adding RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks to the ubuntu-doc-build and ubuntu-doc-test steps.
+Also export LLVM_CONFIG to point to the configured LLVM on the runner to silence the llvm-config warning (optional but helpful).
+Patch to apply Edit .github/workflows/build_and_test.yml (commit ref: 68efb51852776d5f61be62870a41841d0bdb24c0) and change the Build Docs and Test Docs steps to set RUSTDOCFLAGS and LLVM_CONFIG. Example change:
+
+Replace the existing ubuntu-doc-build step (lines ~92–94):
+
+name: Build Docs run: cargo doc --all-features --no-deps
+With:
+
+name: Build Docs env: RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks LLVM_CONFIG: llvm-config-${{ env.MAIN_LLVM_VERSION }} run: cargo doc --all-features --no-deps
+And replace the ubuntu-doc-test step (lines ~102–103):
+
+name: Test Docs run: cargo test --doc --all-features
+With:
+
+name: Test Docs env: RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks LLVM_CONFIG: llvm-config-${{ env.MAIN_LLVM_VERSION }} run: cargo test --doc --all-features
+One-file diff (for convenience)
+
+Diff
+*** Before ***
+- name: Build Docs
+-  run: cargo doc --all-features --no-deps
++ name: Build Docs
++  env:
++    RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks
++    LLVM_CONFIG: llvm-config-${{ env.MAIN_LLVM_VERSION }}
++  run: cargo doc --all-features --no-deps
+***
+- name: Test Docs
+-  run: cargo test --doc --all-features
++ name: Test Docs
++  env:
++    RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks
++    LLVM_CONFIG: llvm-config-${{ env.MAIN_LLVM_VERSION }}
++  run: cargo test --doc --all-features
+Why this is safe
+
+The change only relaxes documentation-codeblock failures in CI runs; it does not change production code or compilation behavior.
+It avoids failing the whole workflow on doc-code formatting issues (which often originate in third-party crates or in docs that intentionally contain non-compilable snippets).
+If you prefer stricter checks, you can selectively add #[allow(rustdoc::invalid_rust_codeblocks)] to the crate root(s) causing the errors (e.g., libafl_cc or its dependency crates) instead, but that requires changing code in crates.
+Optional follow-ups (if you want stricter, long-term fixes)
+
+Investigate and fix the invalid code blocks in the crate(s) that rustdoc flagged (run cargo test --doc locally).
+Ensure llvm-config is installed and available for doc builds or set LLVM_CONFIG globally earlier in the workflow so libafl_cc can find it. The ubuntu-prepare action can be adjusted to install the matching llvm toolchain or export LLVM_CONFIG.
+Reference (workflow file)
+
+.github/workflows/build_and_test.yml at ref 68efb51852776d5f61be62870a41841d0bdb24c0: https://github.com/AFLplusplus/LibAFL/blob/68efb51852776d5f61be62870a41841d0bdb24c0/.github/workflows/build_and_test.yml
+Applying the above change should stop job 54246997242 from failing on the rustdoc invalid-codeblock error.
+
+Root cause
+
+The job fails while documenting the libafl_cc crate: rustdoc reports an unresolved intra-doc link to CfgEdge.bottom_node_loc and cargo aborts documentation generation ("could not document libafl_cc").
+The log shows the unresolved name exactly: unresolved link to CfgEdge.bottom_node_loc. Rust intra-doc links expect Rust path syntax; using . instead of :: will produce this error. (You can see libafl_cc exported items in crates/libafl_cc/src/lib.rs at ref 68efb51852776d5f61be62870a41841d0bdb24c0.)
+Recommended fix (fast, minimal, safe)
+
+Replace the bad intra-doc link(s) that use . with the proper Rust path ::.
+Example change (edit the doc comments in crates/libafl_cc/src/cfg.rs or whichever file contains the docs):
+
+Current (causing the error)
+Rust
+
+
+/// See [`CfgEdge.bottom_node_loc`] for the location of the bottom node.
+Fix (use proper Rust path)
+Rust
+
+
+/// See [`CfgEdge::bottom_node_loc`] for the location of the bottom node.
+If the doc used a plain markdown link like [CfgEdge.bottom_node_loc] or backticks with dot, change it the same way.
+
+Patch example (git apply format)
+
+Diff
+
+
+*** Begin Patch
+*** Update File: crates/libafl_cc/src/cfg.rs
+@@
+-/// See [`CfgEdge.bottom_node_loc`] for the location of the bottom node.
++/// See [`CfgEdge::bottom_node_loc`] for the location of the bottom node.
+*** End Patch
+Why this works
+
+Intra-doc links are resolved by rustdoc using Rust path syntax (double-colon for associated functions/fields). Using dot causes rustdoc to look for an item literally named CfgEdge.bottom_node_loc, which does not exist.
+Additional checks you should run locally before pushing
+
+Reproduce the error locally and verify the fix:
+From repo root: cargo doc -p libafl_cc --no-deps
+Or to build docs for workspace: cargo doc --workspace --no-deps
+If the error persists, search for other occurrences:
+grep -R "CfgEdge.bottom_node_loc" -n crates || true
+Search for other Type.member style links and convert them.
+If the link points to a private field (alternate cause)
+
+If bottom_node_loc is a private field and the doc tries to link to it, rustdoc will still fail because intra-doc links must resolve to a visible item. Fix by one of:
+Make the field public if appropriate:
+Rust
+
+
+pub struct CfgEdge {
+    pub bottom_node_loc: Location,
+    ...
+}
+Or provide a documented public accessor:
+Rust
+
+
+impl CfgEdge {
+    /// Returns the bottom node location.
+    pub fn bottom_node_loc(&self) -> &Location { &self.bottom_node_loc }
+}
+Or change the doc text to not use an intra-doc link (use inline code: CfgEdge::bottom_node_loc).
+Temporary CI/diagnostic workaround (not recommended long-term)
+
+If you need to unblock CI quickly and accept hiding the underlying doc errors, you can allow rustdoc invalid codeblocks for the crate by adding at crate root:
+Rust
+
+
+#![allow(rustdoc::invalid_rust_codeblocks)]
+or set RUSTDOCFLAGS temporarily to be more permissive. This only masks the symptom; the proper fix is correcting or removing bad intra-doc links.
+Where to look in the repo
+
+The crate root that re-exports CfgEdge is here (to cross-check): https://github.com/AFLplusplus/LibAFL/blob/68efb51852776d5f61be62870a41841d0bdb24c0/crates/libafl_cc/src/lib.rs
+The offending docs are likely in crates/libafl_cc/src/cfg.rs (update that file as shown).
+After applying the fix
+
+Push the change and re-run the workflow. The rustdoc unresolved-link error should be gone and cargo doc should complete, allowing the job to succeed.
+If you want, I can:
+
+Provide an exact patch if you paste the snippet(s) of the doc comments that contain CfgEdge.bottom_node_loc.
+Search the repo/PR for other dot-style intra-doc links and produce a patch to fix them all.
+
+Summary — cause
+
+The job failed while generating docs (cargo doc --all-features --no-deps). rustdoc treated invalid doctest code blocks as errors (note: -D rustdoc::invalid-rust-codeblocks implied by -D warnings) and aborted while documenting the crate libafl_cc.
+There is also a benign warning that llvm-config was not found for libafl_cc ("Failed to find llvm-config…"). That warning does not by itself cause the failure, but it should be addressed to avoid related doc messages and to enable LLVM-pass docs if needed.
+Quick, low-risk fix (recommended to unblock CI)
+
+Tell cargo/rustdoc to ignore invalid rustdoc codeblocks when building docs in CI. Do this by setting RUSTDOCFLAGS to allow rustdoc::invalid_rust_codeblocks and ensure LLVM_CONFIG is set so libafl_cc does not emit the llvm-config warning.
+Patch to the workflow (.github/workflows/build_and_test.yml at ref 68efb51852776d5f61be62870a41841d0bdb24c0):
+
+Replace the existing Build Docs step (lines ~92–94) with something like this:
+YAML
+
+
+  ubuntu-doc-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: Swatinem/rust-cache@v2
+      # ---- doc check ----
+      - name: Build Docs
+        env:
+          LLVM_CONFIG: llvm-config-${{ env.MAIN_LLVM_VERSION }}
+          RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks
+        run: cargo doc --all-features --no-deps
+Why this works
+
+RUSTDOCFLAGS=-A rustdoc::invalid_rust_codeblocks disables the specific rustdoc lints that are failing CI while keeping other checks intact.
+LLVM_CONFIG ensures libafl_cc finds the llvm-config binary name expected in other jobs (they use llvm-config-${{env.MAIN_LLVM_VERSION}}). If ubuntu-prepare installs llvm-18 (as expected), this will point doc builds to llvm-config-18 and remove the "Failed to find llvm-config" message.
+Longer-term / proper fixes (recommended)
+
+Fix the invalid doc code blocks in the offending crate(s) so rustdoc won't produce invalid-codeblocks warnings. Options:
+Update fenced codeblocks that are not valid/doctests to include appropriate attributes: rust,no_run or text or ignore.
+Or add a crate-level allowance in the crate root for a more targeted tolerance:
+Example (add to the crate root, e.g. crates/libafl_cc/src/lib.rs):
+
+Rust
+
+
+#![allow(rustdoc::invalid_rust_codeblocks)]
+(Prefer cleaning up individual codeblocks; the crate-level allow is a stopgap.)
+
+Make sure ubuntu-prepare or the doc job actually installs the expected llvm package (llvm-18) so llvm-config-18 exists. If ubuntu-prepare already installs it, the LLVM_CONFIG env above is sufficient; otherwise modify ubuntu-prepare to install llvm-18 and add llvm-config-18 to PATH.
+How to reproduce locally
+
+From repo root (at ref 68efb51852776d5f61be62870a41841d0bdb24c0) run:
+Ensure llvm-config-18 is available or set LLVM_CONFIG in env.
+RUSTDOCFLAGS="-A rustdoc::invalid_rust_codeblocks" LLVM_CONFIG=llvm-config-18 cargo doc --all-features --no-deps
+Notes about related log lines
+
+The earlier "parse toolchain version" / "toolchain is a required input" messages in the logs come from action(s) used for toolchain setup on non-Linux runners. Those should be inspected if they start failing consistently (action input interface may have changed), but they are not the immediate cause of this doc failure.
+Suggested immediate next step
+
+Apply the workflow change above to unblock CI. While that change is running, open a follow-up PR to clean up the invalid doctest codeblocks in crates/libafl_cc (and any other crates that trigger rustdoc warnings) so docs can be built without suppressing rustdoc checks.

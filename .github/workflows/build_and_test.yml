@@ -90,6 +90,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Build Docs
+        env:
+          LLVM_CONFIG: llvm-config-${{ env.MAIN_LLVM_VERSION }}
+          RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks
         run: cargo doc --all-features --no-deps
 
   ubuntu-doc-test:
@@ -100,6 +103,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Test Docs
+        env:
+          LLVM_CONFIG: llvm-config-${{ env.MAIN_LLVM_VERSION }}
+          RUSTDOCFLAGS: -A rustdoc::invalid_rust_codeblocks
         run: cargo test --doc --all-features
 
   ubuntu-miri:
