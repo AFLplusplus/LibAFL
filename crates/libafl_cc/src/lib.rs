@@ -51,6 +51,8 @@ pub mod clang;
 pub use clang::{ClangWrapper, LLVMPasses};
 pub mod libtool;
 pub use libtool::LibtoolWrapper;
+pub mod response_files;
+pub use response_files::expand_response_file;
 
 /// `LibAFL` CC Error Type
 #[derive(Debug)]

@@ -4,7 +4,7 @@
 use core::str::FromStr;
 use std::{env, path::PathBuf};
 
-use crate::{Error, LIB_EXT, LIB_PREFIX, ToolWrapper};
+use crate::{Error, LIB_EXT, LIB_PREFIX, ToolWrapper, expand_response_file};
 
 /// Wrap Clang
 #[expect(clippy::struct_excessive_bools)]
@@ -108,7 +108,16 @@ impl ToolWrapper for LibtoolWrapper {
                         continue;
                     }
                 }
-                _ => (),
+                _ => {
+                    // Expand response files (arguments starting with @)
+                    if let Some(expanded_args) = expand_response_file(args[i].as_ref()) {
+                        for expanded_arg in expanded_args {
+                            new_args.push(expanded_arg);
+                        }
+                        i += 1;
+                        continue;
+                    }
+                }
             }
             new_args.push(args[i].as_ref().to_string());
             i += 1;

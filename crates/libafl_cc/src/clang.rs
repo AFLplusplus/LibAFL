@@ -3,7 +3,7 @@
 use core::{env, str::FromStr};
 use std::path::{Path, PathBuf};
 
-use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX, ToolWrapper};
+use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX, ToolWrapper, expand_response_file};
 
 /// The `OUT_DIR` for `LLVM` compiler passes
 pub const OUT_DIR: &str = env!("OUT_DIR");
@@ -230,7 +230,16 @@ impl ToolWrapper for ClangWrapper {
                     linking = false;
                     shared = true;
                 } // TODO dynamic list?
-                _ => (),
+                _ => {
+                    // Expand response files (arguments starting with @)
+                    if let Some(expanded_args) = expand_response_file(args[i].as_ref()) {
+                        for expanded_arg in expanded_args {
+                            new_args.push(expanded_arg);
+                        }
+                        i += 1;
+                        continue;
+                    }
+                }
             }
             new_args.push(args[i].as_ref().to_string());
             i += 1;
