@@ -1967,6 +1967,7 @@ mod tests {
         let mut provider = StdShMemProvider::new()?;
         let mut shmem = provider.new_shmem(1024)?;
         provider.release_shmem(&mut shmem);
+        drop(shmem);
         Ok(())
     }
 
@@ -1979,6 +1980,7 @@ mod tests {
         let mut provider = MmapShMemProvider::new()?;
         let mut shmem = provider.new_shmem(1024)?;
         provider.release_shmem(&mut shmem);
+        drop(shmem);
         Ok(())
     }
 }
