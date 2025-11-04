@@ -77,10 +77,7 @@ fn main() {
             output_str.as_str()
         );
     } else {
-        let compiler = cc::Build::new()
-            .cpp(true)
-            .opt_level(0)
-            .get_compiler();
+        let compiler = cc::Build::new().cpp(true).opt_level(0).get_compiler();
         let clangpp = compiler.path();
         let mut cmd = std::process::Command::new(clangpp);
         cmd.args(compiler.args())

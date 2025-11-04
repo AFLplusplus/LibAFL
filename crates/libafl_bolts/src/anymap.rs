@@ -2,8 +2,8 @@
 
 use core::{any::TypeId, mem::size_of, ptr::read_unaligned};
 
-/// Get a `type_id` from its previously unpacked `u128`.
-/// Opposite of [`unpack_type_id(id)`].
+/// Get a [`TypeId`] from its previously unpacked `u128`.
+/// Opposite of [`unpack_type_id`].
 ///
 /// # Note
 /// Probably not safe for future compilers, fine for now.
@@ -16,8 +16,8 @@ pub const fn pack_type_id(id: u128) -> TypeId {
     unsafe { *(&raw const id as *const TypeId) }
 }
 
-/// Unpack a `type_id` to an `u128`
-/// Opposite of [`pack_type_id(id)`].
+/// Unpack a [`TypeId`] to an `u128`
+/// Opposite of [`pack_type_id`].
 ///
 /// # Note
 /// Probably not safe for future compilers, fine for now.
