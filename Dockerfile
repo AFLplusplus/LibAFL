@@ -63,7 +63,6 @@ RUN apt-get update && \
     python3 \
     python3-pip \
     python3-venv \
-    software-properties-common \
     ca-certificates \
     wget
 RUN set -ex &&\
