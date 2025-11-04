@@ -1889,7 +1889,7 @@ mod tests {
 
     use crate::{
         AsSlice, AsSliceMut, Error,
-        shmem::{MmapShMemProvider, ShMemProvider, StdShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider},
     };
 
     #[test]
@@ -1965,6 +1965,8 @@ mod tests {
     #[cfg(unix)]
     #[cfg_attr(miri, ignore)]
     fn test_shmem_release() -> Result<(), Error> {
+        use crate::shmem::MmapShMemProvider;
+
         let mut provider = MmapShMemProvider::new()?;
         let mut shmem = provider.new_shmem(1024)?;
         provider.release_shmem(&mut shmem);
