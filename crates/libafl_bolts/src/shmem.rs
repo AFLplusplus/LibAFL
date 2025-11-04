@@ -676,7 +676,6 @@ pub mod unix_shmem {
     mod default {
         use alloc::string::ToString;
         use core::{
-            ffi::CStr,
             ops::{Deref, DerefMut},
             ptr, slice,
         };
@@ -1035,13 +1034,7 @@ pub mod unix_shmem {
             }
 
             fn release_shmem(&mut self, shmem: &mut Self::ShMem) {
-                let fd = CStr::from_bytes_until_nul(shmem.id().as_array())
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .parse()
-                    .unwrap();
-                unsafe { close(fd) };
+                unsafe { close(shmem.shm_fd) };
             }
         }
 
@@ -1896,7 +1889,7 @@ mod tests {
 
     use crate::{
         AsSlice, AsSliceMut, Error,
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::{MmapShMemProvider, ShMemProvider, StdShMemProvider},
     };
 
     #[test]
@@ -1965,6 +1958,16 @@ mod tests {
             Err(e) => panic!("{e}"),
         }
 
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    #[cfg_attr(miri, ignore)]
+    fn test_shmem_release() -> Result<(), Error> {
+        let mut provider = MmapShMemProvider::new()?;
+        let mut shmem = provider.new_shmem(1024)?;
+        provider.release_shmem(&mut shmem);
         Ok(())
     }
 }
