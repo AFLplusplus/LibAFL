@@ -1962,9 +1962,18 @@ mod tests {
     }
 
     #[test]
-    #[cfg(unix)]
     #[cfg_attr(miri, ignore)]
     fn test_shmem_release() -> Result<(), Error> {
+        let mut provider = StdShMemProvider::new()?;
+        let mut shmem = provider.new_shmem(1024)?;
+        provider.release_shmem(&mut shmem);
+        Ok(())
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    #[cfg(unix)]
+    fn test_mmap_shmem_release() -> Result<(), Error> {
         use crate::shmem::MmapShMemProvider;
 
         let mut provider = MmapShMemProvider::new()?;
