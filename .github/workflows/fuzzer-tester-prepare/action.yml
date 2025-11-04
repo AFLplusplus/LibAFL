@@ -32,9 +32,7 @@ runs:
       shell: bash
       run: sudo apt update && sudo apt install -y libgtk-3-dev pax-utils python3-msgpack python3-jinja2 libcapstone-dev
     - name: install just
-      uses: extractions/setup-just@v2
-      with:
-        just-version: '1.50.0'
+      uses: extractions/setup-just@v3
     - name: Add wasm target
       if: ${{ inputs.fuzzer-name == 'fuzz_anything/baby_fuzzer_wasm' }}
       shell: bash
