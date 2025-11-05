@@ -8,7 +8,7 @@ use core::{
 
 use libafl_bolts::tuples::RefIndexable;
 
-use super::HasTimeout;
+use super::{HasTimeout, SetTimeout};
 use crate::{
     Error,
     executors::{Executor, ExitKind, HasObservers},
@@ -97,12 +97,18 @@ where
     E: HasTimeout,
 {
     #[inline]
-    fn set_timeout(&mut self, timeout: Duration) {
-        self.executor.set_timeout(timeout);
-    }
-    #[inline]
     fn timeout(&self) -> Duration {
         self.executor.timeout()
+    }
+}
+
+impl<E, I, S, SOT> SetTimeout for ShadowExecutor<E, I, S, SOT>
+where
+    E: SetTimeout,
+{
+    #[inline]
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.executor.set_timeout(timeout);
     }
 }
 

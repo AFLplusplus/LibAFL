@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
     Evaluator, HasMetadata,
-    executors::{Executor, HasObservers, HasTimeout},
+    executors::{Executor, HasObservers, SetTimeout},
     inputs::BytesInput,
     observers::ObserversTuple,
     stages::{Restartable, Stage},
@@ -82,7 +82,7 @@ impl<I> TimeoutsToVerify<I> {
 impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for VerifyTimeoutsStage<E, I, S>
 where
     E::Observers: ObserversTuple<I, S>,
-    E: Executor<EM, I, S, Z> + HasObservers + HasTimeout,
+    E: Executor<EM, I, S, Z> + HasObservers + SetTimeout,
     Z: Evaluator<E, EM, I, S>,
     S: HasMetadata,
     I: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,

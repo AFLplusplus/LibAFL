@@ -137,11 +137,14 @@ pub trait Executor<EM, I, S, Z> {
     ) -> Result<ExitKind, Error>;
 }
 
-/// A trait that allows to get/set an `Executor`'s timeout thresold
+/// A trait that allows to get an `Executor`'s timeout threshold
 pub trait HasTimeout {
     /// Get a timeout
     fn timeout(&self) -> Duration;
+}
 
+/// A trait that allows to set an `Executor`'s timeout threshold
+pub trait SetTimeout {
     /// Set timeout
     fn set_timeout(&mut self, timeout: Duration);
 }
