@@ -199,7 +199,7 @@ nautilus_py = ["nautilus", "dep:pyo3"]
 lua_mutator = ["mlua"]
 
 ## Use the best SIMD implementation by our benchmark
-simd = ["libafl_bolts/simd"]
+simd = ["libafl_bolts/simd", "libafl_bolts/wide"]
 
 [[example]]
 name = "tui_mock"
@@ -223,6 +223,7 @@ libafl_core = { workspace = true }
 libafl_derive = { workspace = true, default-features = true, optional = true }
 libafl_intelpt = { workspace = true, default-features = true, optional = true }
 ll_mp = { workspace = true }
+tuple_list_ex = { workspace = true }
 
 ahash = { workspace = true } # The hash function already used in hashbrown
 arbitrary-int = { workspace = true }

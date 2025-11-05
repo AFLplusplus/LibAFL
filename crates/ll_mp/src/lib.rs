@@ -109,7 +109,7 @@ extern crate std;
 use alloc::boxed::Box;
 #[cfg(feature = "std")]
 use alloc::string::ToString;
-use alloc::{string::String, vec::Vec};
+use alloc::{string::String, vec, vec::Vec};
 #[cfg(not(target_pointer_width = "64"))]
 use core::sync::atomic::AtomicU32;
 #[cfg(target_pointer_width = "64")]

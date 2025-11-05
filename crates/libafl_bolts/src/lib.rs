@@ -101,6 +101,9 @@ pub use shmem_providers as shmem;
 #[cfg(feature = "std")]
 pub use target_args::*;
 
+#[cfg(feature = "simd")]
+pub mod simd;
+
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod bolts_prelude {

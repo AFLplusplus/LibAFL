@@ -67,13 +67,8 @@ use libafl_core::Named;
 use serde::{Deserialize, Serialize};
 pub use tuple_list::{TupleList, tuple_list, tuple_list_type};
 
-use crate::HasLen;
 #[cfg(feature = "alloc")]
-use crate::Named;
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
-use crate::hash_std;
-#[cfg(feature = "alloc")]
-use crate::tuples::seal::{InnerBorrowMut, StackedExtract};
+use crate::seal::StackedExtract;
 
 /// Returns if the type `T` is equal to `U`, ignoring lifetimes.
 #[must_use]
@@ -583,6 +578,17 @@ where
     fn get_all_mut(&mut self, _handles: ()) -> Self::GetAllMutResult<'_> {}
 }
 
+/// Returns a mutably borrowed element
+pub trait InnerBorrowMut {
+    /// The type we need borrowed
+    type Borrowed<'a>
+    where
+        Self: 'a;
+
+    /// Returns the borrow
+    fn inner_borrow_mut(&mut self) -> Self::Borrowed<'_>;
+}
+
 #[cfg(feature = "alloc")]
 mod seal {
     //! The logic in this section enables the [`super::GetAll::get_all_mut`] implementation.
@@ -631,20 +637,10 @@ mod seal {
     //! [Some(a), Some(c), None]
     //! ```
 
+    use libafl_core::Named;
     use tuple_list::tuple_list;
 
-    use crate::{
-        Named,
-        tuples::{Handle, Merge, type_eq},
-    };
-
-    pub trait InnerBorrowMut {
-        type Borrowed<'a>
-        where
-            Self: 'a;
-
-        fn inner_borrow_mut(&mut self) -> Self::Borrowed<'_>;
-    }
+    use crate::{Handle, InnerBorrowMut, Merge, type_eq};
 
     impl<Head, Tail> InnerBorrowMut for (Head, Tail)
     where
