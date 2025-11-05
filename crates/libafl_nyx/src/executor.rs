@@ -6,7 +6,7 @@ use std::{
 
 use libafl::{
     Error,
-    executors::{Executor, ExitKind, HasObservers, HasTimeout},
+    executors::{Executor, ExitKind, HasObservers, HasTimeout, SetTimeout},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdOutObserver},
     state::HasExecutions,
@@ -148,7 +148,9 @@ impl<S, OT> HasTimeout for NyxExecutor<S, OT> {
     fn timeout(&self) -> core::time::Duration {
         self.helper.timeout
     }
+}
 
+impl<S, OT> SetTimeout for NyxExecutor<S, OT> {
     fn set_timeout(&mut self, timeout: core::time::Duration) {
         let micros = 1000000;
         let mut timeout_secs = timeout.as_secs();

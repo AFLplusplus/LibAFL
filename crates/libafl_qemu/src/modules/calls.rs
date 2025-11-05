@@ -618,6 +618,24 @@ impl FullBacktraceCollector {
             }
         }
     }
+
+    pub fn backtrace_full() -> Option<Vec<&'static Vec<GuestAddr>>> {
+        // # Safety
+        // This accesses the global [`CALLSTACKS`] variable.
+        // However, the actual variable access is behind a `ThreadLocal` class.
+        let callstacks_ptr = &raw mut CALLSTACKS;
+        unsafe {
+            if let Some(c) = (*callstacks_ptr).as_mut() {
+                let mut res = Vec::new();
+                for tls in &mut *c {
+                    res.push(&*tls.get());
+                }
+                Some(res)
+            } else {
+                None
+            }
+        }
+    }
 }
 
 impl CallTraceCollector for FullBacktraceCollector {

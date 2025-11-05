@@ -2574,7 +2574,7 @@ impl AsanRuntime {
     #[cfg(target_arch = "aarch64")]
     #[must_use]
     #[inline]
-    #[expect(clippy::similar_names, clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub fn asan_is_interesting_instruction(
         decoder: InstDecoder,
         _address: u64,

@@ -46,7 +46,7 @@ use crate::observers::{
 };
 use crate::{
     Error,
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, SetTimeout},
     inputs::{Input, ToTargetBytes},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
@@ -1543,7 +1543,9 @@ impl<I, OT, S, SHM> HasTimeout for ForkserverExecutor<I, OT, S, SHM> {
     fn timeout(&self) -> Duration {
         self.timeout.into()
     }
+}
 
+impl<I, OT, S, SHM> SetTimeout for ForkserverExecutor<I, OT, S, SHM> {
     #[inline]
     fn set_timeout(&mut self, timeout: Duration) {
         self.timeout = TimeSpec::from_duration(timeout);

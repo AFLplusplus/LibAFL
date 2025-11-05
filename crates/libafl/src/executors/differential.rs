@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use super::HasTimeout;
 use crate::{
     Error,
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, SetTimeout},
     observers::{DifferentialObserversTuple, ObserversTuple},
 };
 
@@ -118,18 +118,24 @@ where
     B: HasTimeout,
 {
     #[inline]
-    fn set_timeout(&mut self, timeout: core::time::Duration) {
-        self.primary.set_timeout(timeout);
-        self.secondary.set_timeout(timeout);
-    }
-
-    #[inline]
     fn timeout(&self) -> core::time::Duration {
         assert!(
             self.primary.timeout() == self.secondary.timeout(),
             "Primary and Secondary Executors have different timeouts!"
         );
         self.primary.timeout()
+    }
+}
+
+impl<A, B, DOT, I, OTA, OTB, S> SetTimeout for DiffExecutor<A, B, DOT, I, OTA, OTB, S>
+where
+    A: SetTimeout,
+    B: SetTimeout,
+{
+    #[inline]
+    fn set_timeout(&mut self, timeout: core::time::Duration) {
+        self.primary.set_timeout(timeout);
+        self.secondary.set_timeout(timeout);
     }
 }
 

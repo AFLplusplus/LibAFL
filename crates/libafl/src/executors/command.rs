@@ -57,12 +57,12 @@ use typed_builder::TypedBuilder;
 
 #[cfg(all(target_family = "unix", feature = "fork"))]
 use super::forkserver::ConfigTarget;
-use super::{HasTimeout, StdChildArgs, StdChildArgsInner};
+use super::{StdChildArgs, StdChildArgsInner};
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
     Error,
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, HasTimeout, SetTimeout},
     inputs::{HasTargetBytes, ToTargetBytes},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::HasExecutions,
@@ -204,19 +204,26 @@ impl CommandConfigurator<Child> for StdCommandConfigurator {
             }
         }
     }
+}
 
-    fn exec_timeout(&self) -> Duration {
+impl HasTimeout for StdCommandConfigurator {
+    fn timeout(&self) -> Duration {
         self.timeout
     }
-    fn exec_timeout_mut(&mut self) -> &mut Duration {
-        &mut self.timeout
+}
+
+impl SetTimeout for StdCommandConfigurator {
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = timeout;
     }
 }
 
 /// Linux specific [`CommandConfigurator`] that leverages `ptrace`
 ///
-/// This configurator was primarly developed to be used in conjunction with
+/// This configurator was primarily developed to be used in conjunction with
 /// [`crate::executors::hooks::intel_pt::IntelPTHook`]
+///
+/// Use `PTraceCommandConfigurator::builder().timeout` to set an initial timeout
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
 pub struct PTraceCommandConfigurator {
@@ -300,14 +307,12 @@ impl CommandConfigurator<Pid> for PTraceCommandConfigurator {
             Err(e) => Err(Error::unknown(format!("Fork failed: {e}"))),
         }
     }
+}
 
-    fn exec_timeout(&self) -> Duration {
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+impl HasTimeout for PTraceCommandConfigurator {
+    fn timeout(&self) -> Duration {
         Duration::from_secs(u64::from(self.timeout))
-    }
-
-    /// Use [`PTraceCommandConfigurator::builder().timeout`] instead
-    fn exec_timeout_mut(&mut self) -> &mut Duration {
-        unimplemented!("Use [`PTraceCommandConfigurator::builder().timeout`] instead")
     }
 }
 
@@ -372,7 +377,7 @@ impl<C, HT, I, OT, S, T> CommandExecutor<C, HT, I, OT, S, T> {
 impl<HT, I, OT, S, T> CommandExecutor<Child, HT, I, OT, S, T>
 where
     S: HasExecutions,
-    T: CommandConfigurator<Child> + Debug,
+    T: CommandConfigurator<Child> + HasTimeout + Debug,
     OT: ObserversTuple<I, S>,
 {
     fn execute_input_with_command<TB: ToTargetBytes<I>>(
@@ -390,7 +395,7 @@ where
             .spawn_child(target_bytes_converter.to_target_bytes(input))?;
 
         let exit_kind = child
-            .wait_timeout(self.configurator.exec_timeout())
+            .wait_timeout(self.configurator.timeout())
             .expect("waiting on child failed")
             .map(|status| self.configurator.exit_kind_from_status(&status))
             .unwrap_or_else(|| {
@@ -431,7 +436,7 @@ where
 impl<EM, HT, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<Child, HT, I, OT, S, T>
 where
     S: HasExecutions,
-    T: CommandConfigurator<Child> + Debug,
+    T: CommandConfigurator<Child> + HasTimeout + Debug,
     OT: MatchName + ObserversTuple<I, S>,
     Z: ToTargetBytes<I>,
 {
@@ -449,16 +454,21 @@ where
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 impl<C, HT, I, OT, S, T> HasTimeout for CommandExecutor<C, HT, I, OT, S, T>
 where
-    T: CommandConfigurator<C>,
+    T: HasTimeout,
 {
     #[inline]
     fn timeout(&self) -> Duration {
-        self.configurator.exec_timeout()
+        self.configurator.timeout()
     }
+}
 
+impl<C, HT, I, OT, S, T> SetTimeout for CommandExecutor<C, HT, I, OT, S, T>
+where
+    T: SetTimeout,
+{
     #[inline]
     fn set_timeout(&mut self, timeout: Duration) {
-        *self.configurator.exec_timeout_mut() = timeout;
+        self.configurator.set_timeout(timeout);
     }
 }
 
@@ -742,7 +752,7 @@ impl CommandExecutorBuilder {
 /// use libafl::{
 ///     Error, HasTargetBytesConverter,
 ///     corpus::Corpus,
-///     executors::{Executor, command::CommandConfigurator},
+///     executors::{Executor, HasTimeout, command::CommandConfigurator},
 ///     inputs::{BytesInput, HasTargetBytes, Input, ToTargetBytes},
 ///     state::HasExecutions,
 /// };
@@ -763,12 +773,11 @@ impl CommandExecutorBuilder {
 ///         stdin.write_all(&target_bytes)?;
 ///         Ok(child)
 ///     }
+/// }
 ///
-///     fn exec_timeout(&self) -> Duration {
+/// impl HasTimeout for MyExecutor {
+///     fn timeout(&self) -> Duration {
 ///         Duration::from_secs(5)
-///     }
-///     fn exec_timeout_mut(&mut self) -> &mut Duration {
-///         todo!()
 ///     }
 /// }
 ///
@@ -792,11 +801,6 @@ pub trait CommandConfigurator<C>: Sized {
 
     /// Spawns a new process with the given configuration.
     fn spawn_child(&mut self, target_bytes: OwnedSlice<'_, u8>) -> Result<C, Error>;
-
-    /// Provides timeout duration for execution of the child process.
-    fn exec_timeout(&self) -> Duration;
-    /// Set the timeout duration for execution of the child process.
-    fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Maps the exit status of the child process to an `ExitKind`.
     #[cfg(unix)]
