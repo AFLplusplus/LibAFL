@@ -16,7 +16,7 @@ use libafl_bolts::{
 use super::{Executor, ExecutorsTuple, ExitKind, HasObservers, HasTimeout};
 use crate::{
     HasNamedMetadata,
-    observers::{MapObserver, classify_counts, init_count_class_16},
+    observers::{MapObserver, classify_counts},
 };
 
 /// The execution pattern of the [`SANDExecutor`]. The default value used in our paper is
@@ -75,9 +75,6 @@ where
         bitmap_size: usize,
         pattern: SANDExecutionPattern,
     ) -> Self {
-        if matches!(pattern, SANDExecutionPattern::UniqueTrace) {
-            init_count_class_16();
-        }
         Self {
             executor,
             sand_executors: sand_extra_executors,

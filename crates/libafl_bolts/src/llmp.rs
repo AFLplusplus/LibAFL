@@ -62,8 +62,6 @@ use alloc::boxed::Box;
 #[cfg(feature = "std")]
 use alloc::string::ToString;
 use alloc::{string::String, vec::Vec};
-#[cfg(feature = "std")]
-use core::net::SocketAddr;
 #[cfg(not(target_pointer_width = "64"))]
 use core::sync::atomic::AtomicU32;
 #[cfg(target_pointer_width = "64")]
@@ -79,6 +77,8 @@ use core::{
     sync::atomic::{AtomicU16, Ordering, fence},
     time::Duration,
 };
+#[cfg(feature = "std")]
+use core::{mem::offset_of, net::SocketAddr, ptr::write_unaligned};
 #[cfg(feature = "std")]
 use std::{
     env,
@@ -1326,7 +1326,7 @@ where
     }
 
     /// Create this client on an existing map from the given description.
-    /// Acquired with [`self.describe`].
+    /// Acquired with [`LlmpSender::describe`].
     pub fn on_existing_from_description(
         mut shmem_provider: SP,
         description: &LlmpDescription,
@@ -3005,7 +3005,7 @@ where
     }
 
     /// Registers a new client for the given sharedmap str and size.
-    /// Returns the id of the new client in [`broker.client_shmem`]
+    /// Returns the [`ClientId`] of the newly registered client.
     pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SHM>) -> ClientId {
         // Tell the client it may unmap its initial allocated shmem page now.
         // Since we now have a handle to it, it won't be umapped too early (only after we also unmap it)
@@ -3192,9 +3192,11 @@ where
                 .alloc_next(size_of::<LlmpClientExitInfo>())
                 .expect("Could not allocate a new message in shared map.");
             (*msg).tag = LLMP_TAG_CLIENT_EXIT;
-            let mut exitinfo =
-                ((*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo).read_unaligned();
-            exitinfo.client_id = client_id;
+            let client_id_offset = offset_of!(LlmpClientExitInfo, client_id);
+            write_unaligned(
+                (*msg).buf.as_mut_ptr().add(client_id_offset) as _,
+                client_id,
+            );
             sender.send(msg, true)
         }
     }
@@ -3612,7 +3614,7 @@ where
         })
     }
 
-    /// Recreate this client from a previous [`client.to_env()`]
+    /// Recreate this client from a previous [`LlmpClient::to_env`]
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self {
