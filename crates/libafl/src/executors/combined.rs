@@ -8,7 +8,7 @@ use libafl_bolts::tuples::RefIndexable;
 use super::HasTimeout;
 use crate::{
     Error,
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, SetTimeout},
 };
 
 /// A [`CombinedExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
@@ -57,18 +57,24 @@ where
     B: HasTimeout,
 {
     #[inline]
-    fn set_timeout(&mut self, timeout: Duration) {
-        self.primary.set_timeout(timeout);
-        self.secondary.set_timeout(timeout);
-    }
-
-    #[inline]
     fn timeout(&self) -> Duration {
         assert!(
             self.primary.timeout() == self.secondary.timeout(),
             "Primary and Secondary Executors have different timeouts!"
         );
         self.primary.timeout()
+    }
+}
+
+impl<A, B> SetTimeout for CombinedExecutor<A, B>
+where
+    A: SetTimeout,
+    B: SetTimeout,
+{
+    #[inline]
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.primary.set_timeout(timeout);
+        self.secondary.set_timeout(timeout);
     }
 }
 

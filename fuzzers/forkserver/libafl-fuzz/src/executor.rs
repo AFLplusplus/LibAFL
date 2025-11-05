@@ -6,7 +6,7 @@ use std::{
 };
 
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers, HasTimeout},
+    executors::{SetTimeout, Executor, ExitKind, HasObservers, SetTimeout, HasTimeout},
     state::HasCorpus,
     Error,
 };
@@ -310,13 +310,6 @@ where
     FSV: HasTimeout,
     NYX: HasTimeout,
 {
-    fn set_timeout(&mut self, timeout: std::time::Duration) {
-        match self {
-            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
-            #[cfg(feature = "nyx")]
-            Self::Nyx(nyx) => nyx.set_timeout(timeout),
-        }
-    }
     fn timeout(&self) -> std::time::Duration {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.timeout(),
@@ -325,6 +318,23 @@ where
         }
     }
 }
+
+#[cfg(feature = "nyx")]
+impl<FSV, I, OT, NYX> SetTimeout for SupportedExecutors<FSV, I, OT, NYX>
+where
+    FSV: SetTimeout,
+    NYX: SetTimeout,
+{
+    fn set_timeout(&mut self, timeout: std::time::Duration) {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
+            #[cfg(feature = "nyx")]
+            Self::Nyx(nyx) => nyx.set_timeout(timeout),
+        }
+    }
+}
+
+
 
 #[cfg(not(feature = "nyx"))]
 pub enum SupportedExecutors<FSV, I, OT, S> {
@@ -376,14 +386,21 @@ impl<FSV, I, OT, S> HasTimeout for SupportedExecutors<FSV, I, OT, S>
 where
     FSV: HasTimeout,
 {
-    fn set_timeout(&mut self, timeout: std::time::Duration) {
-        match self {
-            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
-        }
-    }
     fn timeout(&self) -> std::time::Duration {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.timeout(),
+        }
+    }
+}
+
+#[cfg(not(feature = "nyx"))]
+impl<FSV, I, OT, S> SetTimeout for SupportedExecutors<FSV, I, OT, S>
+where
+    FSV: SetTimeout,
+{
+    fn set_timeout(&mut self, timeout: std::time::Duration) {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
         }
     }
 }

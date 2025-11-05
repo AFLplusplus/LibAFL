@@ -16,6 +16,7 @@ use libafl_bolts::{
 use super::{Executor, ExecutorsTuple, ExitKind, HasObservers, HasTimeout};
 use crate::{
     HasNamedMetadata,
+    executors::SetTimeout,
     observers::{MapObserver, classify_counts},
 };
 
@@ -105,7 +106,12 @@ where
     fn timeout(&self) -> core::time::Duration {
         self.executor.timeout()
     }
+}
 
+impl<E, ET, C, O> SetTimeout for SANDExecutor<E, ET, C, O>
+where
+    E: SetTimeout,
+{
     fn set_timeout(&mut self, timeout: core::time::Duration) {
         self.executor.set_timeout(timeout);
     }
