@@ -240,6 +240,7 @@ impl ClientStats {
     /// We got a new information about objective corpus size for this client, insert them.
     pub fn update_objective_size(&mut self, objective_size: u64) {
         self.objective_size = objective_size;
+        self.last_objective_time = current_time();
         self.stats_status.basic_stats_updated = true;
     }
 

@@ -36,31 +36,21 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 ];
 
 /// Hitcounts class lookup for 16-byte values
-static mut COUNT_CLASS_LOOKUP_16: Vec<u16> = vec![];
-
-/// Initialize the 16-byte hitcounts map
-pub(crate) fn init_count_class_16() {
-    // # Safety
-    //
-    // Calling this from multiple threads may be racey and hence leak 65k mem or even create a broken lookup vec.
-    // We can live with that.
-    unsafe {
-        let count_class_lookup_16 = &raw mut COUNT_CLASS_LOOKUP_16;
-        let count_class_lookup_16 = &mut *count_class_lookup_16;
-
-        if !count_class_lookup_16.is_empty() {
-            return;
+static COUNT_CLASS_LOOKUP_16: [u16; 256 * 256] = {
+    let mut seq = [0u16; 256 * 256];
+    let mut lo_bits = 0;
+    let mut hi_bits = 0;
+    while lo_bits < 256 {
+        while hi_bits < 256 {
+            seq[hi_bits << 8 | lo_bits] =
+                (COUNT_CLASS_LOOKUP[hi_bits] as u16) << 8 | COUNT_CLASS_LOOKUP[lo_bits] as u16;
+            hi_bits += 1;
         }
-
-        *count_class_lookup_16 = vec![0; 65536];
-        for i in 0..256 {
-            for j in 0..256 {
-                count_class_lookup_16[(i << 8) + j] =
-                    (u16::from(COUNT_CLASS_LOOKUP[i]) << 8) | u16::from(COUNT_CLASS_LOOKUP[j]);
-            }
-        }
+        hi_bits = 0;
+        lo_bits += 1;
     }
-}
+    seq
+};
 
 /// AFL-style classify counts
 #[inline]
@@ -94,14 +84,10 @@ pub(crate) fn classify_counts(map: &mut [u8]) {
 
     let map16 =
         unsafe { slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt) };
-    let count_class_lookup_16 = &raw mut COUNT_CLASS_LOOKUP_16;
 
-    // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
-    #[expect(clippy::unused_enumerate_index)]
-    for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
+    for item in &mut map16[0..cnt] {
         unsafe {
-            let count_class_lookup_16 = &mut *count_class_lookup_16;
-            *item = *(*count_class_lookup_16).get_unchecked(*item as usize);
+            *item = *(COUNT_CLASS_LOOKUP_16).get_unchecked(*item as usize);
         }
     }
 }
@@ -158,7 +144,6 @@ where
 impl<M> HitcountsMapObserver<M> {
     /// Creates a new [`MapObserver`]
     pub fn new(base: M) -> Self {
-        init_count_class_16();
         Self { base }
     }
 }
@@ -375,7 +360,6 @@ where
 impl<M> HitcountsIterableMapObserver<M> {
     /// Creates a new [`MapObserver`]
     pub fn new(base: M) -> Self {
-        init_count_class_16();
         Self { base }
     }
 }

@@ -13,9 +13,11 @@
 #include "x509-parser.h"
 
 #if defined(USE_LQEMU)
-  #include "libafl_qemu.h"
+  #include "lqemu.h"
 #elif defined(USE_NYX)
   #include "nyx_api.h"
+#else
+  #error "No API specified"
 #endif
 
 #define PAYLOAD_MAX_SIZE 65536
@@ -95,10 +97,10 @@ static int harness_find_kallsyms_lookup(void) {
   unregister_kprobe(&kp0);
   unregister_kprobe(&kp1);
 
-#ifdef USE_NYX
-  hprintf("kallsyms_lookup_name address = 0x%lx\n", kallsyms_lookup_name_addr);
-#elif DEFINED(USE_LQEMU)
+#if defined(USE_LQEMU)
   lqprintf("kallsyms_lookup_name address = 0x%lx\n", kallsyms_lookup_name_addr);
+#elif defined(USE_NYX)
+  hprintf("kallsyms_lookup_name address = 0x%lx\n", kallsyms_lookup_name_addr);
 #endif
 
   if (kallsyms_lookup_name_addr == 0) { return -1; }
@@ -236,7 +238,9 @@ static int __init harness_init(void) {
   err = harness_find_kallsyms_lookup();
 
   if (err < 0) {
+#if defined(USE_NYX)
     habort("error while trying to find kallsyms");
+#endif
     return err;
   }
 

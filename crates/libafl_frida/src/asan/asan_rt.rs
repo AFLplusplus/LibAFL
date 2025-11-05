@@ -17,7 +17,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use backtrace::Backtrace;
 use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm};
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
@@ -35,14 +35,13 @@ use yaxpeax_arch::Arch;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder, Opcode, Operand, ShiftStyle, SizeCode};
 #[cfg(target_arch = "x86_64")]
-use yaxpeax_x86::{
-    amd64::{InstDecoder, Instruction, Opcode},
-    long_mode::DisplayStyle,
-};
+use yaxpeax_x86::amd64::{DisplayStyle, InstDecoder, Instruction, Opcode};
+#[cfg(target_arch = "x86")]
+use yaxpeax_x86::protected_mode::{DisplayStyle, InstDecoder, Instruction, Opcode};
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::utils::frida_to_cs;
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::utils::{AccessType, operand_details};
 #[cfg(target_arch = "aarch64")]
 use crate::utils::{instruction_width, writer_register};
@@ -143,7 +142,7 @@ impl Lock {
     }
 }
 
-#[cfg(any(target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple"))]
 use errno::{Errno, errno, set_errno};
 #[cfg(target_os = "windows")]
 use winapi::shared::minwindef::DWORD;
@@ -154,7 +153,7 @@ use winapi::um::errhandlingapi::{GetLastError, SetLastError};
 struct LastErrorGuard {
     #[cfg(target_os = "windows")]
     last_error: DWORD,
-    #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+    #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple"))]
     last_error: Errno,
 }
 
@@ -163,7 +162,7 @@ impl LastErrorGuard {
     fn new() -> Self {
         #[cfg(target_os = "windows")]
         let last_error = unsafe { GetLastError() };
-        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+        #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple"))]
         let last_error = errno();
 
         LastErrorGuard { last_error }
@@ -177,7 +176,7 @@ impl Drop for LastErrorGuard {
         unsafe {
             SetLastError(self.last_error);
         }
-        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+        #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple"))]
         set_errno(self.last_error);
     }
 }
@@ -228,6 +227,28 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "instrumented rip",
     "fault address",
     "actual rip",
+];
+
+/// The count of registers that need to be saved by the `ASan` runtime.
+///
+/// Eight general purpose registers are put in this order, `eax`, `ebx`, `ecx`, `edx`, `ebp`, `esp`, `esi`, `edi`, plus instrumented `eip`, accessed memory addr and true `eip`
+#[cfg(target_arch = "x86")]
+pub const ASAN_SAVE_REGISTER_COUNT: usize = 11;
+
+/// The registers that need to be saved by the `ASan` runtime, as names
+#[cfg(target_arch = "x86")]
+pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
+    "eax",
+    "ebx",
+    "ecx",
+    "edx",
+    "ebp",
+    "esp",
+    "esi",
+    "edi",
+    "instrumented eip",
+    "fault address",
+    "actual eip",
 ];
 
 /// The count of registers that need to be saved by the asan runtime
@@ -1126,7 +1147,7 @@ impl AsanRuntime {
         let cpp_libs = ["libc++.1.dylib", "libc++abi.dylib", "libsystem_c.dylib"];
         */
 
-        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+        #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple"))]
         macro_rules! hook_cpp {
            ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking c++ functions in {}", $libname);
@@ -1268,7 +1289,8 @@ impl AsanRuntime {
             }}
            }
         }
-        #[cfg(target_os = "linux")]
+        // FIXME: change or check libraries for FreeBSD
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         {
             hook_cpp!("libc++.so", libcpp);
             hook_cpp!("libc++.so.1", libcpp1);
@@ -1502,7 +1524,7 @@ impl AsanRuntime {
         }
     }
 
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     #[expect(clippy::cast_sign_loss)]
     #[expect(clippy::too_many_lines)]
     extern "system" fn handle_trap(&mut self) {
@@ -1512,14 +1534,27 @@ impl AsanRuntime {
 
         self.dump_registers();
 
+        #[cfg(target_arch = "x86_64")]
         let fault_address = self.regs[17];
+        #[cfg(target_arch = "x86")]
+        let fault_address = self.regs[9];
+        #[cfg(target_arch = "x86_64")]
         let actual_pc = self.regs[18];
+        #[cfg(target_arch = "x86")]
+        let actual_pc = self.regs[10];
 
         let decoder = InstDecoder::minimal();
 
+        #[cfg(target_arch = "x86_64")]
         let instructions: Vec<Instruction> = disas_count(
             &decoder,
             unsafe { core::slice::from_raw_parts(actual_pc as *mut u8, 24) },
+            3,
+        );
+        #[cfg(target_arch = "x86")]
+        let instructions: Vec<Instruction> = disas_count(
+            &decoder,
+            unsafe { core::slice::from_raw_parts(actual_pc as *mut u8, 12) },
             3,
         );
 
@@ -1827,14 +1862,14 @@ impl AsanRuntime {
             X86Register::R14d => Some((14, 32)),
             X86Register::R15d => Some((15, 32)),
             X86Register::Eip => Some((18, 32)),
-            X86Register::Rax => Some((0, 4)),
-            X86Register::Rcx => Some((2, 4)),
-            X86Register::Rdx => Some((3, 4)),
-            X86Register::Rbx => Some((1, 4)),
-            X86Register::Rsp => Some((5, 4)),
-            X86Register::Rbp => Some((4, 4)),
-            X86Register::Rsi => Some((6, 4)),
-            X86Register::Rdi => Some((7, 4)),
+            X86Register::Rax => Some((0, 64)),
+            X86Register::Rcx => Some((2, 64)),
+            X86Register::Rdx => Some((3, 64)),
+            X86Register::Rbx => Some((1, 64)),
+            X86Register::Rsp => Some((5, 64)),
+            X86Register::Rbp => Some((4, 64)),
+            X86Register::Rsi => Some((6, 64)),
+            X86Register::Rdi => Some((7, 64)),
             X86Register::R8 => Some((8, 64)),
             X86Register::R9 => Some((9, 64)),
             X86Register::R10 => Some((10, 64)),
@@ -1844,6 +1879,23 @@ impl AsanRuntime {
             X86Register::R14 => Some((14, 64)),
             X86Register::R15 => Some((15, 64)),
             X86Register::Rip => Some((18, 64)),
+            _ => None,
+        }
+    }
+
+    #[cfg(target_arch = "x86")]
+    #[expect(clippy::unused_self)]
+    fn register_idx(&self, reg: X86Register) -> Option<(u16, u16)> {
+        match reg {
+            X86Register::Eax => Some((0, 32)),
+            X86Register::Ebx => Some((1, 32)),
+            X86Register::Ecx => Some((2, 32)),
+            X86Register::Edx => Some((3, 32)),
+            X86Register::Ebp => Some((4, 32)),
+            X86Register::Esp => Some((5, 32)),
+            X86Register::Esi => Some((6, 32)),
+            X86Register::Edi => Some((7, 32)),
+            X86Register::Eip => Some((10, 32)),
             _ => None,
         }
     }
@@ -1873,6 +1925,27 @@ impl AsanRuntime {
         for i in 0..32 {
             log::info!("{:x}", unsafe {
                 ((self.regs[5] + i * 8) as *const u64).read()
+            });
+        }
+    }
+
+    #[cfg(target_arch = "x86")]
+    fn dump_registers(&self) {
+        log::info!("eax: {:x}", self.regs[0]);
+        log::info!("ebx: {:x}", self.regs[1]);
+        log::info!("ecx: {:x}", self.regs[2]);
+        log::info!("edx: {:x}", self.regs[3]);
+        log::info!("ebp: {:x}", self.regs[4]);
+        log::info!("esp: {:x}", self.regs[5]);
+        log::info!("esi: {:x}", self.regs[6]);
+        log::info!("edi: {:x}", self.regs[7]);
+        log::info!("instrumented eip: {:x}", self.regs[8]);
+        log::info!("fault address: {:x}", self.regs[9]);
+        log::info!("actual eip: {:x}", self.regs[10]);
+        log::info!("stack: ");
+        for i in 0..32 {
+            log::info!("{:x}", unsafe {
+                ((self.regs[5] + i * 4) as *const u32).read()
             });
         }
     }
@@ -1972,6 +2045,51 @@ impl AsanRuntime {
         ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //subtract 10 because we don't need the last nop
     }
 
+    // FIXME: later for x86
+    #[cfg(target_arch = "x86")]
+    fn generate_shadow_check_blob(&mut self, size: u32) -> Box<[u8]> {
+        let shadow_bit = self.allocator_mut().shadow_bit();
+        // Ecx, Eax, Edi, Edx, Esi are used, so we save them in emit_shadow_check
+        // at this point EDI contains the
+        let mask_shift = 32 - size;
+        macro_rules! shadow_check{
+            ($ops:ident, $bit:expr) => {dynasm!($ops
+                ;   .arch x86
+               // ; int3
+                ; mov     edx, 1
+                ; shl     edx, shadow_bit as i8 // edx = shadow_base
+                ; mov ecx, edi // copy address into ecx
+                ; and ecx, 7 // remainder
+                ; shr edi, 3 // start >> 3
+                ; add edi, edx // shadow_base + (start >> 3)
+                ; mov edx, [edi]  // load 4 shadow bytes. We load 4 just in case of an unaligned access
+                ; bswap edx  // bswap to get it into an acceptable form
+                ; shl edx, cl // this shifts by the unaligned access offset. why does x86 require cl...
+                ; mov edi, -1 // fill edi with all 1s
+                ; shl edi, mask_shift as i8 // edi now contains mask. this shl functionally creates a bitmask with the top `size` bits as 1s
+                ; and edx, edi // and it to see if the top bits are enabled in edx
+                ; cmp edx, edi // if the mask and the and'd value are the same, we're good
+                ; je      >done
+                ; lea     esi, [>done] // leap 10 bytes forward
+                ; nop // jmp takes 10 bytes at most so we want to allocate 10 bytes buffer (?)
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; done:
+            );};
+        }
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::x86::X86Relocation>::new(0);
+        shadow_check!(ops, bit);
+        let ops_vec = ops.finalize().unwrap();
+        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() // subtract 10 because we don't need the last nop
+    }
+
     #[cfg(target_arch = "aarch64")]
     fn generate_shadow_check_blob(&mut self, width: u32) -> Box<[u8]> {
         /*x0 contains the shadow address
@@ -2062,6 +2180,95 @@ impl AsanRuntime {
     // Five registers, Rdi, Rsi, Rdx, Rcx, Rax are saved in emit_shadow_check before entering this function
     // So we retrieve them after saving other registers
     #[cfg(target_arch = "x86_64")]
+    fn generate_instrumentation_blobs(&mut self) {
+        let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        dynasm!(ops_report
+            ; .arch x64
+            ; report:
+            ; mov rdi, [>self_regs_addr] // load self.regs into rdi
+            ; mov [rdi + 0x80], rsi // return address is loaded into rsi in generate_shadow_check_blob. rsi is the address of done
+            ; mov [rdi + 0x8], rbx
+            ; mov [rdi + 0x20], rbp
+            ; mov [rdi + 0x28], rsp
+            ; mov [rdi + 0x40], r8
+            ; mov [rdi + 0x48], r9
+            ; mov [rdi + 0x50], r10
+            ; mov [rdi + 0x58], r11
+            ; mov [rdi + 0x60], r12
+            ; mov [rdi + 0x68], r13
+            ; mov [rdi + 0x70], r14
+            ; mov [rdi + 0x78], r15
+            ; mov rax, [rsp + 0x10]
+            ; mov [rdi + 0x0], rax
+            ; mov rcx, [rsp + 0x18]
+            ; mov [rdi + 0x10], rcx
+            ; mov rdx, [rsp + 0x20]
+            ; mov [rdi + 0x18], rdx
+            ; mov rsi, [rsp + 0x28]
+            ; mov [rdi + 0x30], rsi
+
+            ; mov rsi, [rsp + 0x0]  // access_addr
+            ; mov [rdi + 0x88], rsi
+            ; mov rsi, [rsp + 0x8] // true_rip
+            ; mov [rdi + 0x90], rsi
+
+            ; mov rsi, rdi // we want to save rdi, but we have to copy the address of self.regs into another register
+            ; mov rdi, [rsp + 0x30]
+            ; mov [rsi + 0x38], rdi
+
+            ; mov rdi, [>self_addr]
+            ; mov rcx, [>self_addr]
+            ; mov rsi, [>trap_func]
+
+            // Align the rsp to 16bytes boundary
+            // This adds either -8 or -16 to the currrent rsp.
+            // rsp is restored later from self.regs
+            ; add rsp, -8
+            ; and rsp, -16
+
+            ; call rsi
+
+            ; mov rdi, [>self_regs_addr]
+            // restore rbx to r15
+            ; mov rbx, [rdi + 0x8]
+            ; mov rbp, [rdi + 0x20]
+            ; mov rsp, [rdi + 0x28]
+            ; mov r8, [rdi + 0x40]
+            ; mov r9, [rdi + 0x48]
+            ; mov r10, [rdi + 0x50]
+            ; mov r11, [rdi + 0x58]
+            ; mov r12, [rdi + 0x60]
+            ; mov r13, [rdi + 0x68]
+            ; mov r14, [rdi + 0x70]
+            ; mov r15, [rdi + 0x78]
+            ; mov rsi, [rdi + 0x80] // load back >done into rsi
+            ; jmp rsi
+
+            // Ignore eh_frame_cie for amd64
+            // See discussions https://github.com/AFLplusplus/LibAFL/pull/331
+            ;->accessed_address:
+            ; .i32 0x0
+            ; self_addr:
+            ; .i64 core::ptr::from_mut(self) as *mut c_void as i64
+            ; self_regs_addr:
+            ; .i64 &raw mut self.regs as i64
+            ; trap_func:
+            ; .i64 AsanRuntime::handle_trap as *mut c_void as i64
+        );
+        self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
+
+        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(1));
+        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(2));
+        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(4));
+        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(8));
+        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(16));
+    }
+
+    // FIXME: later for x86
+    // Save registers into self_regs_addr
+    // Five registers, Rdi, Rsi, Rdx, Rcx, Rax are saved in emit_shadow_check before entering this function
+    // So we retrieve them after saving other registers
+    #[cfg(target_arch = "x86")]
     fn generate_instrumentation_blobs(&mut self) {
         let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         dynasm!(ops_report
@@ -2367,7 +2574,7 @@ impl AsanRuntime {
     #[cfg(target_arch = "aarch64")]
     #[must_use]
     #[inline]
-    #[expect(clippy::similar_names, clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub fn asan_is_interesting_instruction(
         decoder: InstDecoder,
         _address: u64,
@@ -2465,6 +2672,72 @@ impl AsanRuntime {
 
     /// Checks if the current instruction is interesting for address sanitization.
     #[cfg(target_arch = "x86_64")]
+    #[inline]
+    #[must_use]
+    pub fn asan_is_interesting_instruction(
+        decoder: InstDecoder,
+        address: u64,
+        instr: &Insn,
+    ) -> Option<(u8, X86Register, X86Register, u8, i32)> {
+        let result = frida_to_cs(decoder, instr);
+
+        if let Err(e) = result {
+            log::error!("{e}");
+            return None;
+        }
+
+        let cs_instr = result.unwrap();
+
+        let mut operands = vec![];
+        for operand_idx in 0..cs_instr.operand_count() {
+            operands.push(cs_instr.operand(operand_idx));
+        }
+
+        // Ignore lea instruction
+        // put nop into the white-list so that instructions like
+        // like `nop dword [rax + rax]` does not get caught.
+        match cs_instr.opcode() {
+            Opcode::LEA | Opcode::NOP => return None,
+
+            _ => (),
+        }
+
+        // This is a TODO! In this case, both the src and the dst are mem operand
+        // so we would need to return two operadns?
+        if cs_instr.prefixes.rep_any() {
+            return None;
+        }
+
+        log::trace!("{:#x} {:#?} {:#?}", address, cs_instr, cs_instr.to_string());
+
+        for operand in operands {
+            if operand.is_memory() {
+                // log::trace!("{:#?}", operand);
+                // if we reach this point
+                // because in x64 there's no mem to mem inst, just return the first memory operand
+
+                if let Some((basereg, indexreg, scale, disp)) = operand_details(&operand) {
+                    // if the base register is rip, then it is a pc-relative access
+                    // and does not deal with dynamically allocated memory
+                    if basereg != X86Register::Rip {
+                        let memsz = cs_instr.mem_size().unwrap().bytes_size().unwrap(); // this won't fail if it is mem access inst
+
+                        // println!("{:#?} {:#?} {:#?}", cs_instr, cs_instr.to_string(), operand);
+                        // println!("{:#?}", (memsz, basereg, indexreg, scale, disp));
+                        log::trace!("ASAN Interesting operand {operand:#?}");
+                        log::trace!("{:#?}", (memsz, basereg, indexreg, scale, disp));
+                        return Some((memsz, basereg, indexreg, scale, disp));
+                    }
+                } // else {} // perhaps avx instructions?
+            }
+        }
+
+        None
+    }
+
+    // FIXME: later for x86
+    /// Checks if the current instruction is interesting for address sanitization.
+    #[cfg(target_arch = "x86")]
     #[inline]
     #[must_use]
     pub fn asan_is_interesting_instruction(
@@ -2711,6 +2984,191 @@ impl AsanRuntime {
         writer.put_pop_reg(X86Register::Rdi);
         writer.put_popfx();
         writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
+    }
+
+    // FIXME: later for x86
+    /// Emits a asan shadow byte check.
+    #[inline]
+    #[expect(clippy::too_many_lines)]
+    #[expect(clippy::too_many_arguments)]
+    #[cfg(target_arch = "x86")]
+    pub fn emit_shadow_check(
+        &mut self,
+        address: u64,
+        output: &StalkerOutput,
+        instruction_size: usize,
+        width: u8,
+        basereg: X86Register,
+        indexreg: X86Register,
+        scale: u8,
+        disp: i32,
+    ) {
+        let redzone_size = isize::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).unwrap();
+        let writer = output.writer();
+        let true_eip = address;
+
+        let basereg: Option<X86Register> = if basereg == X86Register::None {
+            None
+        } else {
+            Some(basereg)
+        };
+
+        let indexreg = if indexreg == X86Register::None {
+            None
+        } else {
+            Some(indexreg)
+        };
+
+        let scale = match scale {
+            2 => 1,
+            4 => 2,
+            8 => 3,
+            _ => 0,
+        };
+        if self.current_report_impl == 0
+            || !writer.can_branch_directly_to(self.current_report_impl)
+            || !writer.can_branch_directly_between(writer.pc() + 128, self.current_report_impl)
+        {
+            let after_report_impl = writer.code_offset() + 2;
+
+            writer.put_jmp_near_label(after_report_impl);
+
+            self.current_report_impl = writer.pc();
+            writer.put_bytes(self.blob_report());
+
+            writer.put_label(after_report_impl);
+        }
+        // if disp == 0x102 {
+        //     log::trace!("BREAKING!");
+        //     writer.put_bytes(&[0xcc]);
+        // }
+
+        /* Save registers that we'll use later in shadow_check_blob
+                                        | addr  | eip   |
+                                        | Ecx   | Eax   |
+                                        | Esi   | Edx   |
+            Old Esp - (redzone_size) -> | flags | Edi   |
+                                        |       |       |
+            Old Esp                  -> |       |       |
+        */
+        writer.put_lea_reg_reg_offset(X86Register::Esp, X86Register::Esp, -(redzone_size));
+        writer.put_pushfx();
+        writer.put_push_reg(X86Register::Edi);
+        writer.put_push_reg(X86Register::Esi);
+        writer.put_push_reg(X86Register::Edx);
+        writer.put_push_reg(X86Register::Ecx);
+        writer.put_push_reg(X86Register::Eax);
+        writer.put_push_reg(X86Register::Ebp);
+        /*
+        Things are a bit different when Rip is either base register or index register.
+        Suppose we have an instruction like
+        `bnd jmp qword ptr [rip + 0x2e4b5]`
+        We can't just emit code like
+        `mov edi, eip` to get EIP loaded into EDI,
+        because this EIP is NOT the orginal EIP (, which is usually within .text) anymore, rather it is pointing to the memory allocated by the frida stalker.
+        Please confer https://frida.re/docs/stalker/ for details.
+        */
+        // Init Edi
+        match basereg {
+            Some(reg) => match reg {
+                X86Register::Eip => {
+                    writer
+                        .put_mov_reg_address(X86Register::Edi, true_eip + instruction_size as u64);
+                }
+                X86Register::Esp => {
+                    // In this case esp clobbered
+                    writer.put_lea_reg_reg_offset(
+                        X86Register::Edi,
+                        X86Register::Esp,
+                        redzone_size + 0x4 * 6,
+                    );
+                }
+                _ => {
+                    writer.put_mov_reg_reg(X86Register::Edi, basereg.unwrap());
+                }
+            },
+            None => {
+                writer.put_xor_reg_reg(X86Register::Edi, X86Register::Edi);
+            }
+        }
+
+        match indexreg {
+            Some(reg) => match reg {
+                X86Register::Eip => {
+                    writer
+                        .put_mov_reg_address(X86Register::Esi, true_eip + instruction_size as u64);
+                }
+                X86Register::Edi => {
+                    // In this case edi is already clobbered, so we want it from the stack (we pushed edi onto stack before!)
+                    writer.put_mov_reg_reg_offset_ptr(X86Register::Esi, X86Register::Esp, 0x30);
+                }
+                X86Register::Esp => {
+                    // In this case esp is also clobbered
+                    writer.put_lea_reg_reg_offset(
+                        X86Register::Esi,
+                        X86Register::Esp,
+                        redzone_size + 0x4 * 6,
+                    );
+                }
+                _ => {
+                    writer.put_mov_reg_reg(X86Register::Esi, indexreg.unwrap());
+                }
+            },
+            None => {
+                writer.put_xor_reg_reg(X86Register::Esi, X86Register::Esi);
+            }
+        }
+
+        // Scale
+        if scale > 0 {
+            // if scale == 3 {
+            //     if let Some(X86Register::R8) = indexreg {
+            //         writer.put_bytes(&[0xcc]);
+            //     }
+            // }kernel
+            writer.put_shl_reg_u8(X86Register::Esi, scale);
+        }
+
+        // Finally set Edi to base + index * scale + disp
+        writer.put_add_reg_reg(X86Register::Edi, X86Register::Esi);
+        writer.put_lea_reg_reg_offset(X86Register::Edi, X86Register::Edi, disp as isize);
+
+        writer.put_mov_reg_address(X86Register::Esi, true_eip); // load true_eip into esi in case we need them in handle_trap
+        writer.put_push_reg(X86Register::Esi); // save true_eip
+        writer.put_push_reg(X86Register::Edi); // save accessed_address
+
+        let checked: bool = match width {
+            1 => writer.put_bytes(self.blob_check_mem_byte()),
+            2 => writer.put_bytes(self.blob_check_mem_halfword()),
+            4 => writer.put_bytes(self.blob_check_mem_dword()),
+            8 => writer.put_bytes(self.blob_check_mem_qword()),
+            16 => writer.put_bytes(self.blob_check_mem_16bytes()),
+            _ => false,
+        };
+
+        if checked {
+            writer.put_jmp_address(self.current_report_impl);
+            for _ in 0..10 {
+                // FIXME: later for x86
+                // shadow_check_blob's done will land somewhere in these nops
+                // on amd64 jump can takes 10 bytes at most, so that's why I put 10 bytes.
+                writer.put_nop();
+            }
+        } else {
+            log::trace!("Cannot check instructions for {width:?} bytes.");
+        }
+
+        writer.put_pop_reg(X86Register::Edi);
+        writer.put_pop_reg(X86Register::Esi);
+
+        writer.put_pop_reg(X86Register::Ebp);
+        writer.put_pop_reg(X86Register::Eax);
+        writer.put_pop_reg(X86Register::Ecx);
+        writer.put_pop_reg(X86Register::Edx);
+        writer.put_pop_reg(X86Register::Esi);
+        writer.put_pop_reg(X86Register::Edi);
+        writer.put_popfx();
+        writer.put_lea_reg_reg_offset(X86Register::Esp, X86Register::Esp, redzone_size);
     }
 
     /// Emit a shadow memory check into the instruction stream

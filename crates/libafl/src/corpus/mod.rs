@@ -12,6 +12,9 @@ pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
 
+pub mod dynamic;
+pub use dynamic::DynamicCorpus;
+
 #[cfg(feature = "std")]
 pub mod inmemory_ondisk;
 #[cfg(feature = "std")]
@@ -27,11 +30,11 @@ pub mod cached;
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
 
-#[cfg(all(feature = "cmin", unix))]
+#[cfg(feature = "cmin")]
 pub mod minimizer;
 
 pub mod nop;
-#[cfg(all(feature = "cmin", unix))]
+#[cfg(feature = "cmin")]
 pub use minimizer::*;
 pub use nop::NopCorpus;
 

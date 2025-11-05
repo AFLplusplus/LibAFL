@@ -6,7 +6,7 @@ use libafl_bolts::{
     rands::{Rand, RomuDuoJrRand},
 };
 #[cfg(feature = "nautilus_py")]
-use pyo3::prelude::PyObject;
+use pyo3::prelude::{Py, PyAny};
 
 use super::{
     newtypes::{NTermId, RuleId},
@@ -85,7 +85,7 @@ impl Context {
     }
 
     #[cfg(feature = "nautilus_py")]
-    pub fn add_script(&mut self, nt: &str, nts: &[String], script: PyObject) -> RuleId {
+    pub fn add_script(&mut self, nt: &str, nts: &[String], script: Py<PyAny>) -> RuleId {
         let rid = self.rules.len().into();
         let rule = Rule::from_script(self, nt, nts, script);
         let ntid = self.aquire_nt_id(nt);
@@ -123,7 +123,7 @@ impl Context {
         *self
             .names_to_nt_id
             .get(nt)
-            .expect(&("no such nonterminal: ".to_owned() + nt))
+            .unwrap_or_else(|| panic!("{}", ("no such nonterminal: ".to_owned() + nt)))
     }
 
     #[must_use]

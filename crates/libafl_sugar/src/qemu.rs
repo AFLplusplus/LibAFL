@@ -221,10 +221,10 @@ where
             });
 
             // Create a dictionary if not existing
-            if let Some(tokens_file) = &self.tokens_file {
-                if state.metadata_map().get::<Tokens>().is_none() {
-                    state.add_metadata(Tokens::from_file(tokens_file)?);
-                }
+            if let Some(tokens_file) = &self.tokens_file
+                && state.metadata_map().get::<Tokens>().is_none()
+            {
+                state.add_metadata(Tokens::from_file(tokens_file)?);
             }
 
             // A minimization+queue policy to get testcasess from the corpus
@@ -593,14 +593,14 @@ pub mod pybind {
 
         /// Run the fuzzer
         #[expect(clippy::needless_pass_by_value)]
-        pub fn run(&self, qemu: &Qemu, harness: PyObject) {
+        pub fn run(&self, qemu: &Qemu, harness: Py<PyAny>) {
             qemu::QemuBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
                 .broker_port(self.broker_port)
                 .cores(&self.cores)
                 .harness(|buf| {
-                    Python::with_gil(|py| -> PyResult<()> {
+                    Python::attach(|py| -> PyResult<()> {
                         let args = (PyBytes::new(py, buf),); // TODO avoid copy
                         harness.call1(py, args)?;
                         Ok(())

@@ -611,13 +611,12 @@ impl XkcdRand {
 pub mod pybind {
 
     /// Unwrap the mutable body of this wrapper
-    #[macro_export]
     macro_rules! unwrap_me_mut_body {
         ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}) => {
             match &mut $wrapper {
                 $(
                     $wrapper_type::$wrapper_option(py_wrapper) => {
-                        Python::with_gil(|py| -> PyResult<_> {
+                        Python::attach(|py| -> PyResult<_> {
                             let mut borrowed = py_wrapper.borrow_mut(py);
                             let $name = &mut borrowed.inner;
                             Ok($body)
@@ -652,9 +651,9 @@ pub mod pybind {
     #[pyclass(unsendable, name = "StdRand")]
     #[expect(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
-    /// Python class for [`StdRand`]
+    /// Python class for `StdRand`
     pub struct PythonStdRand {
-        /// Rust wrapped [`StdRand`] object
+        /// Rust wrapped `StdRand` object
         pub inner: StdRand,
     }
 

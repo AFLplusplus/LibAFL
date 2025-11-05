@@ -2,7 +2,7 @@
 //! of your corpus.
 
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
-use core::{hash::Hash, marker::PhantomData};
+use core::{hash::Hash, marker::PhantomData, time::Duration};
 
 use hashbrown::{HashMap, HashSet};
 use libafl_bolts::{
@@ -10,34 +10,35 @@ use libafl_bolts::{
     tuples::{Handle, Handled},
 };
 use num_traits::ToPrimitive;
-use z3::{Config, Context, Optimize, ast::Bool};
+use z3::{Optimize, ast::Bool};
 
 use crate::{
     Error, HasMetadata, HasScheduler,
     corpus::Corpus,
     events::{Event, EventFirer, EventWithStats, LogSeverity},
-    executors::{Executor, HasObservers},
+    executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
     monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
-    schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
+    schedulers::{LenTimeMulTestcasePenalty, RemovableScheduler, Scheduler, TestcasePenalty},
+    stages::run_target_with_timing,
     state::{HasCorpus, HasExecutions},
 };
 
-/// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
+/// Minimizes a corpus according to coverage maps, weighting by the specified `TestcasePenalty`.
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
-pub struct MapCorpusMinimizer<C, E, I, O, S, T, TS> {
+pub struct MapCorpusMinimizer<C, E, I, O, S, T, TP> {
     observer_handle: Handle<C>,
-    phantom: PhantomData<(E, I, O, S, T, TS)>,
+    phantom: PhantomData<(E, I, O, S, T, TP)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
 pub type StdCorpusMinimizer<C, E, I, O, S, T> =
-    MapCorpusMinimizer<C, E, I, O, S, T, LenTimeMulTestcaseScore>;
+    MapCorpusMinimizer<C, E, I, O, S, T, LenTimeMulTestcasePenalty>;
 
-impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
+impl<C, E, I, O, S, T, TP> MapCorpusMinimizer<C, E, I, O, S, T, TP>
 where
     C: Named,
 {
@@ -51,14 +52,14 @@ where
     }
 }
 
-impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
+impl<C, E, I, O, S, T, TP> MapCorpusMinimizer<C, E, I, O, S, T, TP>
 where
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
     I: Input,
     S: HasMetadata + HasCorpus<I> + HasExecutions,
     T: Copy + Hash + Eq,
-    TS: TestcaseScore<I, S>,
+    TP: TestcasePenalty<I, S>,
 {
     /// Do the minimization
     #[expect(clippy::too_many_lines)]
@@ -66,7 +67,7 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        manager: &mut EM,
+        mgr: &mut EM,
         state: &mut S,
     ) -> Result<(), Error>
     where
@@ -79,16 +80,14 @@ where
         // don't delete this else it won't work after restart
         let current = *state.corpus().current();
 
-        let cfg = Config::default();
-        let ctx = Context::new(&cfg);
-        let opt = Optimize::new(&ctx);
+        let opt = Optimize::new();
 
         let mut seed_exprs = HashMap::new();
         let mut cov_map = HashMap::new();
 
         let mut cur_id = state.corpus().first();
 
-        manager.log(
+        mgr.log(
             state,
             LogSeverity::Info,
             "Executing each input...".to_string(),
@@ -97,31 +96,41 @@ where
         let total = state.corpus().count() as u64;
         let mut curr = 0;
         while let Some(id) = cur_id {
-            let (weight, input) = {
+            let (weight, executions) = {
+                if state.corpus().get(id)?.borrow().scheduled_count() == 0 {
+                    // Execute the input; we cannot rely on the metadata already being present.
+
+                    let input = state
+                        .corpus()
+                        .get(id)?
+                        .borrow_mut()
+                        .load_input(state.corpus())?
+                        .clone();
+
+                    let (exit_kind, mut total_time, _) =
+                        run_target_with_timing(fuzzer, executor, state, mgr, &input, false)?;
+                    if exit_kind != ExitKind::Ok {
+                        total_time = Duration::from_secs(1);
+                    }
+                    state
+                        .corpus()
+                        .get(id)?
+                        .borrow_mut()
+                        .set_exec_time(total_time);
+                }
+
                 let mut testcase = state.corpus().get(id)?.borrow_mut();
-                let weight = TS::compute(state, &mut *testcase)?
-                    .to_u64()
-                    .expect("Weight must be computable.");
-                let input = testcase
-                    .input()
-                    .as_ref()
-                    .expect("Input must be available.")
-                    .clone();
-                (weight, input)
+                (
+                    TP::compute(state, &mut *testcase)?
+                        .to_u64()
+                        .expect("Weight must be computable."),
+                    *state.executions(),
+                )
             };
-
-            // Execute the input; we cannot rely on the metadata already being present.
-            executor.observers_mut().pre_exec_all(state, &input)?;
-            let kind = executor.run_target(fuzzer, state, manager, &input)?;
-            executor
-                .observers_mut()
-                .post_exec_all(state, &input, &kind)?;
-
-            let executions = *state.executions();
 
             curr += 1;
 
-            manager.fire(
+            mgr.fire(
                 state,
                 EventWithStats::with_current_time(
                     Event::UpdateUserStats {
@@ -136,7 +145,7 @@ where
                 ),
             )?;
 
-            let seed_expr = Bool::fresh_const(&ctx, "seed");
+            let seed_expr = Bool::fresh_const("seed");
             let observers = executor.observers();
             let obs = observers[&self.observer_handle].as_ref();
 
@@ -159,7 +168,7 @@ where
             cur_id = state.corpus().next(id);
         }
 
-        manager.log(
+        mgr.log(
             state,
             LogSeverity::Info,
             "Preparing Z3 assertions...".to_string(),
@@ -186,7 +195,7 @@ where
             opt.assert_soft(&!seed, *weight, None);
         }
 
-        manager.log(state, LogSeverity::Info, "Performing MaxSAT...".to_string())?;
+        mgr.log(state, LogSeverity::Info, "Performing MaxSAT...".to_string())?;
         // Perform the optimization!
         opt.check(&[]);
 

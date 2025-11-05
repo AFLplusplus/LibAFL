@@ -254,7 +254,8 @@ impl ConfigTarget for Command {
         }
     }
 
-    #[expect(trivial_numeric_casts)]
+    // libc::rlim_t is i64 in freebsd and trivial_numeric_casts check will failed
+    #[cfg_attr(not(target_os = "freebsd"), expect(trivial_numeric_casts))]
     fn setlimit(&mut self, memlimit: u64) -> &mut Self {
         if memlimit == 0 {
             return self;
@@ -389,6 +390,7 @@ const fn fs_opt_get_mapsize(x: i32) -> i32 {
 }
 
 #[expect(clippy::fn_params_excessive_bools)]
+#[allow(unstable_name_collisions)]
 impl Forkserver {
     /// Create a new [`Forkserver`] that will kill child processes
     /// with the given `kill_signal`.

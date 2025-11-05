@@ -137,7 +137,10 @@ pub fn peak_rss_mb_child_processes() -> Result<i64, Error> {
             Ok(rusage.assume_init())
         }
     }?;
-    Ok(rss.ru_maxrss >> 10)
+    let result = rss.ru_maxrss >> 10;
+    #[cfg(all(target_os = "freebsd", target_arch = "x86"))]
+    let result = result.into();
+    Ok(result)
 }
 
 /// "Safe" wrapper around dup2

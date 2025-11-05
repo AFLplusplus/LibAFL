@@ -11,7 +11,7 @@ pub struct RegexScript {
 
 impl RegexScript {
     pub fn new<R: Rand>(rand: &mut R) -> Self {
-        let len = if rand.next() % 256 == 0 {
+        let len = if rand.next().is_multiple_of(256) {
             rand.next() % 0xffff
         } else {
             let len = 1 << (rand.next() % 8);

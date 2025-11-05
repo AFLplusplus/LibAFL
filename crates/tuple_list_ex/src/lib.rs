@@ -67,6 +67,14 @@ use libafl_core::Named;
 use serde::{Deserialize, Serialize};
 pub use tuple_list::{TupleList, tuple_list, tuple_list_type};
 
+use crate::HasLen;
+#[cfg(feature = "alloc")]
+use crate::Named;
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+use crate::hash_std;
+#[cfg(feature = "alloc")]
+use crate::tuples::seal::{InnerBorrowMut, StackedExtract};
+
 /// Returns if the type `T` is equal to `U`, ignoring lifetimes.
 #[must_use]
 pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
@@ -203,7 +211,7 @@ pub trait ExtractFirstRefType {
 
 impl ExtractFirstRefType for () {
     fn take<'a, T: 'static>(self) -> (Option<&'a T>, Self) {
-        (None, ())
+        tuple_list!(None)
     }
 }
 
@@ -250,7 +258,7 @@ pub trait ExtractFirstRefMutType {
 
 impl ExtractFirstRefMutType for () {
     fn take<'a, T: 'static>(self) -> (Option<&'a mut T>, Self) {
-        (None, ())
+        tuple_list!(None)
     }
 }
 
@@ -351,7 +359,7 @@ where
 
 #[cfg(feature = "alloc")]
 /// A named tuple
-pub trait NamedTuple: HasConstLen {
+pub trait NamedTuple {
     /// Gets the name of this tuple
     fn name(&self, index: usize) -> Option<&Cow<'static, str>>;
 
@@ -396,10 +404,10 @@ where
 #[cfg(feature = "alloc")]
 pub trait MatchName {
     /// Match for a name and return the borrowed value
-    #[deprecated = "Use `.reference` and either `.get` (fallible access) or `[]` (infallible access) instead"]
+    #[deprecated = "Use `.handle` and either `.get` (fallible access) or `[]` (infallible access) instead"]
     fn match_name<T>(&self, name: &str) -> Option<&T>;
     /// Match for a name and return the mut borrowed value
-    #[deprecated = "Use `.reference` and either `.get` (fallible access) or `[]` (infallible access) instead"]
+    #[deprecated = "Use `.handle` and either `.get` (fallible access) or `[]` (infallible access) instead"]
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T>;
 }
 
@@ -513,6 +521,33 @@ pub trait MatchNameRef {
     fn get_mut<T>(&mut self, rf: &Handle<T>) -> Option<&mut T>;
 }
 
+/// Get multiple values using a tuple of handles
+///
+/// # Example
+/// ```ignore
+/// let tuple = tuple_list!(a, b, c);
+/// let handles = tuple_list!(&a_handle, &c_handle);
+/// let tuple_list!(a_ref, c_ref) = tuple.get_all(handles);
+/// ```
+#[cfg(feature = "alloc")]
+pub trait GetAll<HandleTuple> {
+    /// The result type of getting all values
+    type GetAllResult<'a>
+    where
+        Self: 'a;
+
+    /// The result type of getting all mutable values
+    type GetAllMutResult<'a>
+    where
+        Self: 'a;
+
+    /// Get all values from a tuple of handles, the order is preserved
+    fn get_all(&self, handles: HandleTuple) -> Self::GetAllResult<'_>;
+
+    /// Get all mutable values from a tuple of handles, the order is preserved
+    fn get_all_mut(&mut self, handles: HandleTuple) -> Self::GetAllMutResult<'_>;
+}
+
 #[cfg(feature = "alloc")]
 #[expect(deprecated)]
 impl<M> MatchNameRef for M
@@ -525,6 +560,209 @@ where
 
     fn get_mut<T>(&mut self, rf: &Handle<T>) -> Option<&mut T> {
         self.match_name_mut::<T>(&rf.name)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<Head, Tail> GetAll<()> for (Head, Tail)
+where
+    (Head, Tail): MatchNameRef,
+{
+    type GetAllResult<'a>
+        = ()
+    where
+        Self: 'a;
+
+    type GetAllMutResult<'a>
+        = ()
+    where
+        Self: 'a;
+
+    fn get_all(&self, _handles: ()) -> Self::GetAllResult<'_> {}
+
+    fn get_all_mut(&mut self, _handles: ()) -> Self::GetAllMutResult<'_> {}
+}
+
+#[cfg(feature = "alloc")]
+mod seal {
+    //! The logic in this section enables the [`super::GetAll::get_all_mut`] implementation.
+    //!
+    //! This works by treating tuple lists like queues; first, we convert a mutable ref to a tuple
+    //! list into a tuple list of mutable refs. With this, we then check each member of the tuple
+    //! list against the head of the handle list. If the head doesn't match, we append the head to
+    //! a list of already visited nodes. If the head matches, we extract the head and restart
+    //! traversal _without_ the head by merging the visited list with the tail of the current list.
+    //! If we ever hit the tail of the current list, we pop the top handle off and continue the
+    //! search from the start.
+    //!
+    //! Visualised, you can think of this something like this:
+    //!
+    //! ```text
+    //! handles:    [a, c, e]
+    //! tuple list: [a, b, c, d]
+    //! visited:    []
+    //!
+    //! 'a' matches 'a', so we stash 'a' continue with:
+    //! handles:    [c, e]
+    //! tuple list: [b, c, d]
+    //! visited:    []
+    //!
+    //! 'c' does not match 'b', so we push to the visited list and continue with:
+    //! handles:    [c, e]
+    //! tuple list: [c, d]
+    //! visited:    [b]
+    //!
+    //! 'c' matches; stash 'c', merge visited to list, and continue:
+    //! handles:    [e]
+    //! tuple list: [b, d]
+    //! visited:    []
+    //!
+    //! 'b' and 'd' do not match, so we make it to the base case:
+    //! handles:    [e]
+    //! tuple list: []
+    //! visited:    [b, d]
+    //!
+    //! We set the 'e' match to None, merge visited to list, then continue:
+    //! handles:    []
+    //! tuple list: [b, d]
+    //! visited:    []
+    //!
+    //! Handles is now empty, so we return () (list terminator) and end up with:
+    //! [Some(a), Some(c), None]
+    //! ```
+
+    use tuple_list::tuple_list;
+
+    use crate::{
+        Named,
+        tuples::{Handle, Merge, type_eq},
+    };
+
+    pub trait InnerBorrowMut {
+        type Borrowed<'a>
+        where
+            Self: 'a;
+
+        fn inner_borrow_mut(&mut self) -> Self::Borrowed<'_>;
+    }
+
+    impl<Head, Tail> InnerBorrowMut for (Head, Tail)
+    where
+        Tail: InnerBorrowMut,
+    {
+        type Borrowed<'a>
+            = (&'a mut Head, Tail::Borrowed<'a>)
+        where
+            Self: 'a;
+
+        fn inner_borrow_mut(&mut self) -> Self::Borrowed<'_> {
+            (&mut self.0, self.1.inner_borrow_mut())
+        }
+    }
+
+    impl InnerBorrowMut for () {
+        type Borrowed<'a>
+            = ()
+        where
+            Self: 'a;
+
+        fn inner_borrow_mut(&mut self) -> Self::Borrowed<'_> {}
+    }
+
+    pub trait StackedExtract<'a, Handles, Visited> {
+        type Result;
+
+        fn extract(self, handles: Handles, visited: Visited) -> Self::Result;
+    }
+
+    impl<'a, T, HTail, Visited> StackedExtract<'a, (&Handle<T>, HTail), Visited> for ()
+    where
+        Visited: StackedExtract<'a, HTail, ()>,
+        T: 'a,
+    {
+        type Result = (Option<&'a mut T>, Visited::Result);
+
+        fn extract(self, handles: (&Handle<T>, HTail), visited: Visited) -> Self::Result {
+            (None, visited.extract(handles.1, ()))
+        }
+    }
+
+    impl<U, Visited> StackedExtract<'_, (), Visited> for U {
+        type Result = ();
+
+        fn extract(self, _handles: (), _visited: Visited) -> Self::Result {}
+    }
+
+    impl<'a, T, HTail, Head, Tail, Visited> StackedExtract<'a, (&Handle<T>, HTail), Visited>
+        for (&'a mut Head, Tail)
+    where
+        Head: Named,
+        Tail: for<'b> StackedExtract<
+                'a,
+                (&'b Handle<T>, HTail),
+                <Visited as Merge<(&'a mut Head, ())>>::MergeResult,
+                Result = (
+                    Option<&'a mut T>,
+                    <<Visited as Merge<Tail>>::MergeResult as StackedExtract<'a, HTail, ()>>::Result,
+                ),
+            >,
+        Visited: Merge<(&'a mut Head, ())>,
+        Visited: Merge<Tail>,
+        <Visited as Merge<Tail>>::MergeResult: StackedExtract<'a, HTail, ()>,
+        T: 'a,
+    {
+        type Result = (
+            Option<&'a mut T>,
+            <<Visited as Merge<Tail>>::MergeResult as StackedExtract<'a, HTail, ()>>::Result,
+        );
+
+        fn extract(self, handles: (&Handle<T>, HTail), visited: Visited) -> Self::Result {
+            if type_eq::<Head, T>() && &handles.0.name == self.0.name() {
+                (
+                    unsafe { (core::ptr::from_mut(self.0) as *mut T).as_mut() },
+                    visited.merge(self.1).extract(handles.1, ()),
+                )
+            } else {
+                self.1.extract(handles, visited.merge(tuple_list!(self.0)))
+            }
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'b, Head, Tail, T, HandleTail> GetAll<(&'b Handle<T>, HandleTail)> for (Head, Tail)
+where
+    (Head, Tail): MatchNameRef + GetAll<HandleTail> + InnerBorrowMut,
+    for<'a> <(Head, Tail) as InnerBorrowMut>::Borrowed<'a>:
+        StackedExtract<'a, (&'b Handle<T>, HandleTail), ()>,
+    T: 'static,
+{
+    type GetAllResult<'a>
+        = (
+        Option<&'a T>,
+        <(Head, Tail) as GetAll<HandleTail>>::GetAllResult<'a>,
+    )
+    where
+        Self: 'a;
+
+    type GetAllMutResult<'a>
+        = <<(Head, Tail) as InnerBorrowMut>::Borrowed<'a> as StackedExtract<
+        'a,
+        (&'b Handle<T>, HandleTail),
+        (),
+    >>::Result
+    where
+        Self: 'a;
+
+    fn get_all(&self, handles: (&Handle<T>, HandleTail)) -> Self::GetAllResult<'_> {
+        let (head_handle, tail_handles) = handles;
+        let head_result = self.get(head_handle);
+        let tail_result = <(Head, Tail) as GetAll<HandleTail>>::get_all(self, tail_handles);
+        (head_result, tail_result)
+    }
+
+    fn get_all_mut(&mut self, handles: (&'b Handle<T>, HandleTail)) -> Self::GetAllMutResult<'_> {
+        self.inner_borrow_mut().extract(handles, ())
     }
 }
 
@@ -979,5 +1217,183 @@ mod test {
         tuple_for_each_mut!(f2, core::fmt::Display, t, |x| {
             log::info!("{x}");
         });
+    }
+
+    #[cfg(feature = "alloc")]
+    mod get_all {
+        use alloc::{
+            borrow::Cow,
+            string::{String, ToString as _},
+        };
+
+        use tuple_list::{tuple_list, tuple_list_type};
+
+        use crate::tuples::{GetAll as _, Handle, Handled as _, MatchNameRef, Named};
+
+        #[derive(Debug, PartialEq)]
+        struct MyHandled(String, Cow<'static, str>);
+        impl Named for MyHandled {
+            fn name(&self) -> &Cow<'static, str> {
+                &self.1
+            }
+        }
+
+        impl MyHandled {
+            fn new(name: &str) -> Self {
+                Self(name.to_string(), Cow::Owned(name.to_string()))
+            }
+        }
+
+        #[expect(clippy::type_complexity)]
+        fn get_tuple() -> (
+            tuple_list_type!(MyHandled, MyHandled, MyHandled),
+            (Handle<MyHandled>, Handle<MyHandled>, Handle<MyHandled>),
+        ) {
+            let a = MyHandled::new("a");
+            let a_handle = a.handle();
+            let b = MyHandled::new("b");
+            let b_handle = b.handle();
+            let c = MyHandled::new("c");
+            let c_handle = c.handle();
+            (tuple_list!(a, b, c), (a_handle, b_handle, c_handle))
+        }
+
+        #[test]
+        fn test_get_all_empty() {
+            let (tuple, _handles) = get_tuple();
+            #[expect(clippy::let_unit_value)]
+            let recovered = tuple.get_all(tuple_list!());
+            #[allow(clippy::unit_cmp)]
+            // needs its own scope to make the clippy expect work
+            {
+                assert_eq!(recovered, ());
+            }
+        }
+
+        #[test]
+        fn test_get_all_one() {
+            let (tuple, handles) = get_tuple();
+            let tuple_list!(a_rec) = tuple.get_all(tuple_list!(&handles.0));
+            assert_eq!(a_rec, Some(&tuple.0));
+        }
+
+        #[test]
+        fn test_get_all_two() {
+            let (tuple, handles) = get_tuple();
+            let tuple_list!(a_rec, b_rec) = tuple.get_all(tuple_list!(&handles.0, &handles.1));
+            assert_eq!(a_rec, Some(&tuple.0));
+            assert_eq!(b_rec, Some(&tuple.1.0));
+        }
+
+        #[test]
+        fn test_get_all_all() {
+            let (tuple, handles) = get_tuple();
+            let tuple_list!(a_rec, b_rec, c_rec) =
+                tuple.get_all(tuple_list!(&handles.0, &handles.1, &handles.2));
+            assert_eq!(a_rec, Some(&tuple.0));
+            assert_eq!(b_rec, Some(&tuple.1.0));
+            assert_eq!(c_rec, Some(&tuple.1.1.0));
+        }
+
+        #[test]
+        fn test_get_all_reverse() {
+            let (tuple, handles) = get_tuple();
+            let tuple_list!(c_rec, b_rec, a_rec) =
+                tuple.get_all(tuple_list!(&handles.2, &handles.1, &handles.0));
+            assert_eq!(c_rec, Some(&tuple.1.1.0));
+            assert_eq!(b_rec, Some(&tuple.1.0));
+            assert_eq!(a_rec, Some(&tuple.0));
+        }
+
+        #[test]
+        fn test_get_all_mut_empty() {
+            let mut tuple = get_tuple().0;
+            #[expect(clippy::let_unit_value)]
+            let recovered = tuple.get_all_mut(tuple_list!());
+            #[allow(clippy::unit_cmp)]
+            // needs its own scope to make the clippy expect work
+            {
+                assert_eq!(recovered, tuple_list!());
+            }
+        }
+
+        #[test]
+        fn test_get_all_mut_one() {
+            let (mut tuple, handles) = get_tuple();
+            let recovered = tuple.get_all_mut(tuple_list!(&handles.0));
+            let tuple_list!(a_rec) = recovered;
+            a_rec.unwrap().0.push_str("_modified_a");
+            assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
+        }
+
+        #[test]
+        fn test_get_all_mut_two() {
+            let (mut tuple, handles) = get_tuple();
+            let tuple_list!(a_rec, b_rec) = tuple.get_all_mut(tuple_list!(&handles.0, &handles.1));
+            a_rec.unwrap().0.push_str("_modified_a");
+            b_rec.unwrap().0.push_str("_modified_b");
+            assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
+            assert_eq!(tuple.get(&handles.1).unwrap().0, "b_modified_b");
+        }
+
+        #[test]
+        fn test_get_all_mut_all() {
+            let (mut tuple, handles) = get_tuple();
+            let tuple_list!(a_rec, b_rec, c_rec) =
+                tuple.get_all_mut(tuple_list!(&handles.0, &handles.1, &handles.2));
+            a_rec.unwrap().0.push_str("_modified_a");
+            b_rec.unwrap().0.push_str("_modified_b");
+            c_rec.unwrap().0.push_str("_modified_c");
+            assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
+            assert_eq!(tuple.get(&handles.1).unwrap().0, "b_modified_b");
+            assert_eq!(tuple.get(&handles.2).unwrap().0, "c_modified_c");
+        }
+
+        #[test]
+        fn test_get_all_mut_reverse() {
+            let (mut tuple, handles) = get_tuple();
+            let tuple_list!(c_rec, b_rec, a_rec) =
+                tuple.get_all_mut(tuple_list!(&handles.2, &handles.1, &handles.0));
+            c_rec.unwrap().0.push_str("_modified_c");
+            b_rec.unwrap().0.push_str("_modified_b");
+            a_rec.unwrap().0.push_str("_modified_a");
+            assert_eq!(tuple.get(&handles.0).unwrap().0, "a_modified_a");
+            assert_eq!(tuple.get(&handles.1).unwrap().0, "b_modified_b");
+            assert_eq!(tuple.get(&handles.2).unwrap().0, "c_modified_c");
+        }
+
+        #[test]
+        fn test_get_all_mut_unsafe() {
+            let (mut tuple, handles) = get_tuple();
+            let handle_1 = handles.0;
+            let handle_1_clone = handle_1.clone();
+
+            // pass the same handle twice, get two mutable references to the same value
+            // cannot pattern match to tuple_list, because it cannot deal with mut
+            let tuple_list!(rec_1, rec_1_clone) =
+                tuple.get_all_mut(tuple_list!(&handle_1, &handle_1_clone));
+            assert!(rec_1.is_some());
+            assert!(rec_1_clone.is_none());
+        }
+
+        #[test]
+        fn test_preserve_order() {
+            let a = MyHandled::new("a");
+            let a_handle = a.handle();
+            let b = MyHandled::new("a"); // note: same name
+            let b_handle = b.handle();
+
+            let mut tuple = tuple_list!(a, b);
+
+            // pass the same handle twice, get two mutable references to the same value
+            // cannot pattern match to tuple_list, because it cannot deal with mut
+            let tuple_list!(_rec_a, rec_b) = tuple.get_all_mut(tuple_list!(&a_handle, &b_handle));
+
+            rec_b.unwrap().0 = "b".to_string();
+
+            let tuple_list!(a, b) = tuple;
+            assert_eq!(a.0, "a");
+            assert_eq!(b.0, "b");
+        }
     }
 }

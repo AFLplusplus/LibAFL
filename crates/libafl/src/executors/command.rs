@@ -215,7 +215,7 @@ impl CommandConfigurator<Child> for StdCommandConfigurator {
 
 /// Linux specific [`CommandConfigurator`] that leverages `ptrace`
 ///
-/// This configurator was primarly developed to be used in conjunction with
+/// This configurator was primarily developed to be used in conjunction with
 /// [`crate::executors::hooks::intel_pt::IntelPTHook`]
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
@@ -236,6 +236,7 @@ pub struct PTraceCommandConfigurator {
 
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 impl CommandConfigurator<Pid> for PTraceCommandConfigurator {
+    #[allow(unreachable_code)]
     fn spawn_child(&mut self, target_bytes: OwnedSlice<'_, u8>) -> Result<Pid, Error> {
         use nix::{
             sys::{
@@ -304,7 +305,7 @@ impl CommandConfigurator<Pid> for PTraceCommandConfigurator {
         Duration::from_secs(u64::from(self.timeout))
     }
 
-    /// Use [`PTraceCommandConfigurator::builder().timeout`] instead
+    /// Use [`PTraceCommandConfigurator::builder()`](PTraceCommandConfigurator) instead
     fn exec_timeout_mut(&mut self) -> &mut Duration {
         unimplemented!("Use [`PTraceCommandConfigurator::builder().timeout`] instead")
     }

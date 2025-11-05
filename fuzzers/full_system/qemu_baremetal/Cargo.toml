@@ -1,6 +1,6 @@
 [package]
 name = "qemu_baremetal"
-version = "0.15.3"
+version = "0.15.4"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
@@ -18,7 +18,7 @@ i386 = ["libafl_qemu/i386"]
 low_level = [
 ] # The low-level way to interact with LibAFL QEMU, with direct calls to QEMU's functions
 breakpoint = [] # Uses the command system, with breakpoints
-sync_exit = [] # Uses the command system, with sync exit.
+custom_insn = [] # Uses the command system, with custom instructions.
 
 shared = ["libafl_qemu/shared"]
 

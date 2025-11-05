@@ -149,7 +149,7 @@ rustversion = { workspace = true }
 [dev-dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
 rand = "0.9.0"
-chrono = "0.4.40"
+chrono = "0.4.42"
 itertools = "0.14.0"
 
 [dependencies]
@@ -178,7 +178,8 @@ clap = { workspace = true, features = [
 erased-serde = { version = "0.4.5", default-features = false, optional = true } # erased serde
 hashbrown = { workspace = true, features = [
   "serde",
-  "ahash",
+  "default-hasher",
+  "raw-entry",
 ], default-features = false, optional = true } # A faster hashmap, nostd compatible
 hostname = { version = "0.4.0", optional = true } # Is there really no gethostname in the stdlib?
 log = { workspace = true }
@@ -235,13 +236,13 @@ winapi = { version = "0.3", features = [
   "winbase",
   "winnt",
 ] }
-windows-result = "0.3.0"
+windows-result = "0.4.1"
 
 [target.'cfg(windows)'.build-dependencies]
 windows = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
-mach2 = "0.4.2"
+mach2 = "0.5.0"
 
 #[profile.release]
 #lto = true

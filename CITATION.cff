@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: Please cite the following works when using this software.
+type: software
+authors:
+  - family-names: Fioraldi
+    given-names: Andrea
+  - family-names: Maier
+    given-names: Dominik Christian
+  - family-names: Zhang
+    given-names: Dongjia
+  - family-names: Balzarotti
+    given-names: Davide
+doi: 10.1145/3548606.3560602
+identifiers:
+  - type: doi
+    value: 10.1145/3548606.3560602
+  - type: url
+    value: http://dx.doi.org/10.1145/3548606.3560602
+title: LibAFL
+url: http://dx.doi.org/10.1145/3548606.3560602
+preferred-citation:
+  type: article
+  authors:
+  - family-names: Fioraldi
+    given-names: Andrea
+    orcid: https://orcid.org/0000-0002-0976-4395
+  - family-names: Maier
+    given-names: Dominik Christian
+    orcid: https://orcid.org/0000-0002-5588-5008
+  - family-names: Zhang
+    given-names: Dongjia
+    orcid: https://orcid.org/0000-0001-7468-743X
+  - family-names: Balzarotti
+    given-names: Davide
+    orcid: https://orcid.org/0000-0001-5957-6213
+  title: "LibAFL: A Framework to Build Modular and Reusable Fuzzers"
+  year: 2022
+  doi: 10.1145/3548606.3560602
+  url: https://doi.org/10.1145/3548606.3560602
+  publisher: "Association for Computing Machinery"
+  pages: 1051–1065

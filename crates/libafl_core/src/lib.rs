@@ -129,11 +129,14 @@ fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fm
     fmt::Result::Ok(())
 }
 
-/// Main error enum for `LibAFL`
+/// Main error struct for `LibAFL`
 #[derive(Debug)]
 pub enum Error {
     /// Serialization error
     Serialize(String, ErrorBacktrace),
+    /// Compression error
+    #[cfg(feature = "gzip")]
+    Compression(ErrorBacktrace),
     /// Optional val was supposed to be set, but isn't.
     EmptyOptional(String, ErrorBacktrace),
     /// Key not in Map
@@ -174,7 +177,14 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::Serialize(arg.into(), ErrorBacktrace::capture())
+        Error::Serialize(arg.into(), ErrorBacktrace::new())
+    }
+
+    #[cfg(feature = "gzip")]
+    /// Compression error
+    #[must_use]
+    pub fn compression() -> Self {
+        Error::Compression(ErrorBacktrace::new())
     }
 
     /// Optional val was supposed to be set, but isn't.
@@ -183,7 +193,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::EmptyOptional(arg.into(), ErrorBacktrace::capture())
+        Error::EmptyOptional(arg.into(), ErrorBacktrace::new())
     }
 
     /// The `Input` was invalid
@@ -192,7 +202,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::InvalidInput(reason.into(), ErrorBacktrace::capture())
+        Error::InvalidInput(reason.into(), ErrorBacktrace::new())
     }
 
     /// Key not in Map
@@ -201,7 +211,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::KeyNotFound(arg.into(), ErrorBacktrace::capture())
+        Error::KeyNotFound(arg.into(), ErrorBacktrace::new())
     }
 
     /// Key already exists in Map
@@ -210,7 +220,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::KeyExists(arg.into(), ErrorBacktrace::capture())
+        Error::KeyExists(arg.into(), ErrorBacktrace::new())
     }
 
     /// No elements in the current item
@@ -219,7 +229,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::Empty(arg.into(), ErrorBacktrace::capture())
+        Error::Empty(arg.into(), ErrorBacktrace::new())
     }
 
     /// End of iteration
@@ -228,7 +238,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::IteratorEnd(arg.into(), ErrorBacktrace::capture())
+        Error::IteratorEnd(arg.into(), ErrorBacktrace::new())
     }
 
     /// This is not supported (yet)
@@ -237,7 +247,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::NotImplemented(arg.into(), ErrorBacktrace::capture())
+        Error::NotImplemented(arg.into(), ErrorBacktrace::new())
     }
 
     /// You're holding it wrong
@@ -246,7 +256,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::IllegalState(arg.into(), ErrorBacktrace::capture())
+        Error::IllegalState(arg.into(), ErrorBacktrace::new())
     }
 
     /// The argument passed to this method or function is not valid
@@ -255,7 +265,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::IllegalArgument(arg.into(), ErrorBacktrace::capture())
+        Error::IllegalArgument(arg.into(), ErrorBacktrace::new())
     }
 
     /// Shutting down, not really an error.
@@ -270,7 +280,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::Unsupported(arg.into(), ErrorBacktrace::capture())
+        Error::Unsupported(arg.into(), ErrorBacktrace::new())
     }
 
     /// OS error with additional message
@@ -280,7 +290,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::OsError(err, msg.into(), ErrorBacktrace::capture())
+        Error::OsError(err, msg.into(), ErrorBacktrace::new())
     }
 
     /// OS error from [`io::Error::last_os_error`] with additional message
@@ -293,7 +303,7 @@ impl Error {
         Error::OsError(
             io::Error::last_os_error(),
             msg.into(),
-            ErrorBacktrace::capture(),
+            ErrorBacktrace::new(),
         )
     }
 
@@ -303,7 +313,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::Unknown(arg.into(), ErrorBacktrace::capture())
+        Error::Unknown(arg.into(), ErrorBacktrace::new())
     }
 
     /// Error with corpora
@@ -312,7 +322,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::InvalidCorpus(arg.into(), ErrorBacktrace::capture())
+        Error::InvalidCorpus(arg.into(), ErrorBacktrace::new())
     }
 
     /// Error specific to some runtime, like QEMU or Frida
@@ -321,7 +331,7 @@ impl Error {
     where
         S: Into<String>,
     {
-        Error::Runtime(arg.into(), ErrorBacktrace::capture())
+        Error::Runtime(arg.into(), ErrorBacktrace::new())
     }
 }
 
@@ -341,6 +351,11 @@ impl Display for Error {
         match self {
             Self::Serialize(s, b) => {
                 write!(f, "Error in Serialization: `{0}`", &s)?;
+                display_error_backtrace(f, b)
+            }
+            #[cfg(feature = "gzip")]
+            Self::Compression(b) => {
+                write!(f, "Error in decompression")?;
                 display_error_backtrace(f, b)
             }
             Self::EmptyOptional(s, b) => {
@@ -428,14 +443,14 @@ impl From<BorrowMutError> for Error {
 }
 
 /// Stringify the postcard serializer error
-#[cfg(all(feature = "alloc", feature = "postcard"))]
+#[cfg(feature = "alloc")]
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
         Self::serialize(format!("{err:?}"))
     }
 }
 
-#[cfg(all(unix, feature = "nix"))]
+#[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
         Self::unknown(format!("Unix error: {err:?}"))
@@ -466,8 +481,8 @@ impl From<Utf8Error> for Error {
 
 #[cfg(feature = "std")]
 impl From<VarError> for Error {
-    fn from(_err: VarError) -> Self {
-        Self::illegal_state(format!("Could not get env var: {_err:?}"))
+    fn from(err: VarError) -> Self {
+        Self::empty(format!("Could not get env var: {err:?}"))
     }
 }
 
@@ -492,6 +507,13 @@ impl From<TryFromSliceError> for Error {
     }
 }
 
+impl From<SetLoggerError> for Error {
+    #[allow(unused_variables)] // err is unused without std
+    fn from(err: SetLoggerError) -> Self {
+        Self::illegal_state(format!("Failed to register logger: {err:?}"))
+    }
+}
+
 #[cfg(windows)]
 impl From<windows_result::Error> for Error {
     #[allow(unused_variables)] // err is unused without std
@@ -503,7 +525,7 @@ impl From<windows_result::Error> for Error {
 #[cfg(feature = "python")]
 impl From<pyo3::PyErr> for Error {
     fn from(err: pyo3::PyErr) -> Self {
-        pyo3::Python::with_gil(|py| {
+        pyo3::Python::attach(|py| {
             if err
                 .matches(
                     py,
@@ -518,6 +540,7 @@ impl From<pyo3::PyErr> for Error {
         })
     }
 }
+
 
 /// Trait to convert into an Owned type
 pub trait IntoOwned {

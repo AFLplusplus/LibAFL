@@ -31,6 +31,8 @@ use yaxpeax_arch::Arch;
 use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder};
 #[cfg(target_arch = "x86_64")]
 use yaxpeax_x86::amd64::InstDecoder;
+#[cfg(target_arch = "x86")]
+use yaxpeax_x86::protected_mode::InstDecoder;
 
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
@@ -301,7 +303,7 @@ impl FridaInstrumentationHelperBuilder {
         callback: Option<F>,
     ) -> Self {
         let name = path
-            .file_name()
+            .file_stem()
             .and_then(|name| name.to_str())
             .unwrap_or_else(|| {
                 panic!(
@@ -309,16 +311,14 @@ impl FridaInstrumentationHelperBuilder {
                     path.display()
                 )
             });
-        let script_prefix = include_str!("script.js");
         let file_contents = read_to_string(path)
             .unwrap_or_else(|err| panic!("Failed to read script {}: {err:?}", path.display()));
-        let payload = script_prefix.to_string() + &file_contents;
         let gum = Gum::obtain();
         let backend = match backend {
             FridaScriptBackend::V8 => Backend::obtain_v8(&gum),
             FridaScriptBackend::QuickJS => Backend::obtain_qjs(&gum),
         };
-        Script::load(&backend, name, payload, callback).unwrap();
+        Script::load(&backend, name, file_contents, callback).unwrap();
         self
     }
 
@@ -466,7 +466,7 @@ impl FridaInstrumentationHelperBuilder {
                         SkipRange::ModuleRelative { name, range } => {
                             if name.eq(&module.name()) {
                                 log::trace!("Skipping {name:?} {range:?}");
-                                let module_details = Module::load(gum, &name.to_string());
+                                let module_details = Module::load(gum, &name.clone());
                                 let lib_start = module_details.range().base_address().0 as u64;
                                 ranges.borrow_mut().remove(
                                     (lib_start + range.start as u64)
@@ -639,7 +639,7 @@ where
         let ranges = Rc::clone(ranges);
         let runtimes = Rc::clone(runtimes);
 
-        #[cfg(target_arch = "x86_64")]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         let decoder = InstDecoder::default();
 
         #[cfg(target_arch = "aarch64")]
@@ -698,27 +698,27 @@ where
                     None
                 };
 
-                #[cfg(target_arch = "x86_64")]
-                if let Some(details) = res {
-                    if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
-                        let start = output.writer().pc();
-                        rt.emit_shadow_check(
-                            address,
-                            output,
-                            instr.bytes().len(),
-                            details.0,
-                            details.1,
-                            details.2,
-                            details.3,
-                            details.4,
-                        );
-                        log::trace!(
-                            "emitted shadow_check for {:x} at {:x}-{:x}",
-                            address,
-                            start,
-                            output.writer().pc()
-                        );
-                    }
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                if let Some(details) = res
+                    && let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>()
+                {
+                    let start = output.writer().pc();
+                    rt.emit_shadow_check(
+                        address,
+                        output,
+                        instr.bytes().len(),
+                        details.0,
+                        details.1,
+                        details.2,
+                        details.3,
+                        details.4,
+                    );
+                    log::trace!(
+                        "emitted shadow_check for {:x} at {:x}-{:x}",
+                        address,
+                        start,
+                        output.writer().pc()
+                    );
                 }
 
                 #[cfg(target_arch = "aarch64")]
@@ -740,21 +740,13 @@ where
                     feature = "cmplog",
                     any(target_arch = "aarch64", target_arch = "x86_64")
                 ))]
-                if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>() {
-                    if let Some((op1, op2, shift, special_case)) =
+                if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>()
+                    && let Some((op1, op2, shift, special_case)) =
                         CmpLogRuntime::cmplog_is_interesting_instruction(decoder, address, instr)
-                    //change this as well
-                    {
-                        //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                        rt.emit_comparison_handling(
-                            address,
-                            output,
-                            &op1,
-                            &op2,
-                            &shift,
-                            &special_case,
-                        );
-                    }
+                //change this as well
+                {
+                    //emit code that saves the relevant data in runtime(passes it to x0, x1)
+                    rt.emit_comparison_handling(address, output, &op1, &op2, &shift, &special_case);
                 }
 
                 if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
@@ -814,18 +806,21 @@ where
     fn workaround_gum_allocate_near() {
         unsafe {
             for _ in 0..512 {
+                let map_flags = MapFlags::MAP_PRIVATE;
+                #[cfg(not(target_os = "freebsd"))]
+                let map_flags = map_flags | MapFlags::MAP_NORESERVE;
                 mmap_anonymous(
                     None,
                     core::num::NonZeroUsize::new_unchecked(128 * 1024),
                     ProtFlags::PROT_NONE,
-                    MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                    map_flags,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
                 mmap_anonymous(
                     None,
                     core::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
                     ProtFlags::PROT_NONE,
-                    MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
+                    map_flags,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
             }

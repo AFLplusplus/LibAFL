@@ -50,6 +50,9 @@ impl NyxHelper {
             _ => NyxProcessRole::Child,
         });
         nyx_config.set_worker_id(settings.cpu_id);
+        if let Some(workdir_path) = settings.workdir_path {
+            nyx_config.set_workdir_path(workdir_path.to_string());
+        }
 
         let mut nyx_process = NyxProcess::new(&mut nyx_config, settings.cpu_id)
             .map_err(|e| Error::illegal_state(format!("Failed to create Nyx process: {e}")))?;

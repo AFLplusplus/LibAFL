@@ -94,7 +94,7 @@ impl From<i32> for MutationId {
 
 /// Result of the mutation.
 ///
-/// [`MutationResult::Skipped`] does not necessarily mean that the input changed,
+/// [`MutationResult::Mutated`] does not necessarily mean that the input changed,
 /// just that the mutator did something. For slow targets, consider using
 /// a fuzzer with a input filter
 /// or wrapping your mutator in a [`hash::MutationChecker`].

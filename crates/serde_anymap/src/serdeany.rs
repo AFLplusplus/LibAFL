@@ -118,10 +118,10 @@ pub mod serdeany_registry {
         boxed::Box,
         string::{String, ToString},
     };
-    use core::{any::TypeId, fmt, hash::BuildHasherDefault};
+    use core::{any::TypeId, fmt};
 
     use hashbrown::{
-        HashMap,
+        DefaultHashBuilder, HashMap,
         hash_map::{Values, ValuesMut},
     };
     use libafl_core::{Error, format};
@@ -371,7 +371,7 @@ pub mod serdeany_registry {
             '_,
             TypeRepr,
             Box<dyn SerdeAny + 'static>,
-            BuildHasherDefault<ahash::AHasher>,
+            DefaultHashBuilder,
         >
         where
             T: crate::serdeany::SerdeAny,
@@ -695,12 +695,7 @@ pub mod serdeany_registry {
         fn entry<T>(
             &mut self,
             name: String,
-        ) -> hashbrown::hash_map::Entry<
-            '_,
-            String,
-            Box<dyn SerdeAny + 'static>,
-            BuildHasherDefault<ahash::AHasher>,
-        >
+        ) -> hashbrown::hash_map::Entry<'_, String, Box<dyn SerdeAny + 'static>, DefaultHashBuilder>
         where
             T: crate::serdeany::SerdeAny,
         {
@@ -717,7 +712,7 @@ pub mod serdeany_registry {
             '_,
             String,
             Box<dyn SerdeAny + 'static>,
-            BuildHasherDefault<ahash::AHasher>,
+            DefaultHashBuilder,
         >
         where
             T: crate::serdeany::SerdeAny,
