@@ -125,10 +125,10 @@ use core::{
     sync::atomic::{AtomicU16, Ordering, fence},
     time::Duration,
 };
-#[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
-use std::backtrace::Backtrace;
 #[cfg(feature = "std")]
 use core::{mem::offset_of, net::SocketAddr, ptr::write_unaligned};
+#[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
+use std::backtrace::Backtrace;
 #[cfg(feature = "std")]
 use std::{
     env,

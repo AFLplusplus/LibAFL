@@ -115,7 +115,6 @@ build_and_test_fuzzers = { path = "./utils/build_and_test_fuzzers", version = "0
 construct_automata = { path = "./utils/gramatron/construct_automata", version = "0.15.2", default-features = false }
 deexit = { path = "./utils/deexit", version = "0.15.2", default-features = false }
 drcov_utils = { path = "./utils/drcov_utils", version = "0.15.2", default-features = false }
-construct_automata = { path = "./utils/gramatron/construct_automata", version = "0.15.2", default-features = false }
 libafl_benches = { path = "./utils/libafl_benches", version = "0.15.3", default-features = false }
 libafl_jumper = { path = "./utils/libafl_jumper", version = "0.15.3", default-features = false }
 
@@ -138,6 +137,7 @@ hashbrown = { version = "0.16.0", default-features = false } # A faster hashmap,
 just = "=1.40.0"
 libc = "0.2.177" # For (*nix) libc
 libipt = { version = "0.4.0", features = ["libipt_master"] }
+libvharness_sys = { path = "./crates/libafl_qemu/libvharness_sys", version = "0.15.4", default-features = false }
 log = "0.4.28"
 meminterval = "0.4.2"
 mimalloc = { version = "0.1.48", default-features = false }
@@ -154,7 +154,6 @@ rangemap = "1.6.0"
 regex = "1.12.2"
 rustversion = "1.0.22"
 serde = { version = "1.0.228", default-features = false } # serialization lib
-serial_test = { version = "3.2.0", default-features = false }
 serde_json = { version = "1.0.145", default-features = false }
 serde_yaml = { version = "0.9.34" } # For parsing the injections yaml file
 serial_test = { version = "3.2.0", default-features = false }
@@ -173,7 +172,6 @@ windows-core = "0.62.1"
 z3 = { git = "https://github.com/prove-rs/z3.rs", rev = "z3-v0.18.2", default-features = false, features = [
   "bundled",
 ] }
-fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
 
 [workspace.lints.rust]
 # Deny

@@ -107,7 +107,7 @@ tcp_manager = ["tokio", "std"]
 tcp_compression = ["tcp_manager", "libafl_bolts/gzip"]
 
 ## Enable multi-machine support
-multi_machine = ["tokio", "std", "enumflags2", "ahash/std", "send_wrapper"]
+multi_machine = ["tokio", "std", "enumflags2", "ahash/std"]
 
 ## Enables the `NaiveTokenizer` and `StacktraceObserver`
 regex = ["std", "dep:regex"]
@@ -246,16 +246,12 @@ futures = { version = "0.3.30", optional = true }
 hashbrown = { workspace = true, features = [
   "serde",
   "default-hasher",
+  "raw-entry",
 ], default-features = false } # A faster hashmap, nostd compatible
 libcasr = { version = "2.12.1", optional = true }
 libm = "0.2.8"
 log = { workspace = true }
 meminterval = { workspace = true, features = ["serde"] }
-mlua = { version = "0.10.3", features = [
-  "lua54",
-  "vendored",
-  "macros",
-], optional = true } # For Lua Mutators / TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>
 nix = { workspace = true, optional = true, features = [
   "signal",
   "ptrace",
@@ -270,10 +266,10 @@ pyo3 = { workspace = true, optional = true }
 ratatui = { version = "0.29.0", default-features = false, features = [
   'crossterm',
 ], optional = true } # Commandline rendering, for TUI Monitor
-crossterm = { version = "0.29.0", optional = true }
-
-cadence = { version = "1.5.0", optional = true } # For the statsd monitor
-prometheus-client = { version = "0.24.0", optional = true } # For the prometheus monitor
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, default-features = false, features = [
+  "alloc",
+], optional = true }
 tide = { version = "0.16.0", optional = true }
 tokio = { version = "1.40.0", optional = true, features = [
   "sync",
@@ -289,21 +285,8 @@ typed-builder = { workspace = true, optional = true } # Implement the builder pa
 uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
 wait-timeout = { version = "0.2.0", optional = true } # used by CommandExecutor to wait for child process
 
-libcasr = { version = "2.12.1", optional = true }
-
-bitvec = { version = "1.0.1", optional = true, features = [
-  "serde",
-] } # used for string range storage
-
-arrayvec = { version = "0.7.6", optional = true, default-features = false } # used for fixed-len collects
-
-const_format = "0.2.33"                                       # used for providing helpful compiler output
-const_panic = { version = "0.2.9", default-features = false } # similarly, for formatting const panic output
-
-pyo3 = { workspace = true, optional = true }
+regex = { workspace = true, optional = true }
 regex-syntax = { version = "0.8.4", optional = true } # For nautilus
-
-fs2 = { workspace = true, optional = true } # used by OnDisk Corpus for file locking
 
 z3 = { workspace = true, optional = true } # for concolic mutation
 
@@ -315,9 +298,6 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
 # Optional
-clap = { workspace = true, optional = true }
-num_enum = { workspace = true, optional = true }
-fastbloom = { workspace = true, optional = true }
 # For Lua Mutators
 # TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>
 mlua = { version = "0.11.4", features = [

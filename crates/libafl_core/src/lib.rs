@@ -541,7 +541,6 @@ impl From<pyo3::PyErr> for Error {
     }
 }
 
-
 /// Trait to convert into an Owned type
 pub trait IntoOwned {
     /// Returns if the current type is an owned type.

@@ -47,7 +47,7 @@ postcard = { workspace = true, optional = true } # no_std compatible serde seria
 serde = { workspace = true, features = ["derive"] }
 hashbrown = { workspace = true, features = [
   "serde",
-  "ahash",
+  "default-hasher",
 ], default-features = false, optional = true } # A faster hashmap, nostd compatible
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
