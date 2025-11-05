@@ -1326,7 +1326,7 @@ where
     }
 
     /// Create this client on an existing map from the given description.
-    /// Acquired with [`self.describe`].
+    /// Acquired with [`LlmpSender::describe`].
     pub fn on_existing_from_description(
         mut shmem_provider: SP,
         description: &LlmpDescription,
@@ -3005,7 +3005,7 @@ where
     }
 
     /// Registers a new client for the given sharedmap str and size.
-    /// Returns the id of the new client in [`broker.client_shmem`]
+    /// Returns the [`ClientId`] of the newly registered client.
     pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SHM>) -> ClientId {
         // Tell the client it may unmap its initial allocated shmem page now.
         // Since we now have a handle to it, it won't be umapped too early (only after we also unmap it)
@@ -3614,7 +3614,7 @@ where
         })
     }
 
-    /// Recreate this client from a previous [`client.to_env()`]
+    /// Recreate this client from a previous [`LlmpClient::to_env`]
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
         Ok(Self {
