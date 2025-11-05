@@ -12,7 +12,8 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{
-        command::CommandConfigurator, inprocess::InProcessExecutor, ExitKind, ShadowExecutor, HasTimeout,
+        command::CommandConfigurator, inprocess::InProcessExecutor, ExitKind, HasTimeout,
+        ShadowExecutor,
     },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},

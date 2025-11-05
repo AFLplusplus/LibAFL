@@ -6,7 +6,7 @@ use std::{
 };
 
 use libafl::{
-    executors::{SetTimeout, Executor, ExitKind, HasObservers, SetTimeout, HasTimeout},
+    executors::{Executor, ExitKind, HasObservers, HasTimeout, SetTimeout},
     state::HasCorpus,
     Error,
 };
@@ -333,8 +333,6 @@ where
         }
     }
 }
-
-
 
 #[cfg(not(feature = "nyx"))]
 pub enum SupportedExecutors<FSV, I, OT, S> {
