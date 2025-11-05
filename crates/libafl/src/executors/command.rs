@@ -305,7 +305,7 @@ impl CommandConfigurator<Pid> for PTraceCommandConfigurator {
         Duration::from_secs(u64::from(self.timeout))
     }
 
-    /// Use [`PTraceCommandConfigurator::builder().timeout`](PTraceCommandConfigurator::timeout) instead
+    /// Use [`PTraceCommandConfigurator::builder()`](PTraceCommandConfigurator) instead
     fn exec_timeout_mut(&mut self) -> &mut Duration {
         unimplemented!("Use [`PTraceCommandConfigurator::builder().timeout`] instead")
     }
