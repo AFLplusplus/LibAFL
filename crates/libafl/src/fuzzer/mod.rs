@@ -1,14 +1,14 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
-use alloc::{string::ToString, vec::Vec};
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 #[cfg(feature = "std")]
 use core::hash::Hash;
-use core::{fmt::Debug, time::Duration};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 #[cfg(feature = "std")]
 use fastbloom::BloomFilter;
 use libafl_bolts::{current_time, tuples::MatchName};
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
@@ -23,6 +23,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::{Input, NopToTargetBytes, ToTargetBytes},
     mark_feature_time,
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::StagesTuple,
@@ -591,17 +592,17 @@ where
 }
 
 /// A trait to determine if a input should be run or not
-pub trait InputFilter<I> {
+pub trait InputFilter<EM, I, S> {
     /// should run execution for this input or no
-    fn should_execute(&mut self, input: &I) -> bool;
+    fn should_execute(&mut self, input: &I, state: &mut S, manager: &mut EM) -> bool;
 }
 
 /// A pseudo-filter that will execute each input.
 #[derive(Debug, Copy, Clone)]
 pub struct NopInputFilter;
-impl<I> InputFilter<I> for NopInputFilter {
+impl<EM, I, S> InputFilter<EM, I, S> for NopInputFilter {
     #[inline]
-    fn should_execute(&mut self, _input: &I) -> bool {
+    fn should_execute(&mut self, _input: &I, _state: &mut S, _manager: &mut EM) -> bool {
         true
     }
 }
@@ -632,10 +633,65 @@ impl BloomInputFilter {
 }
 
 #[cfg(feature = "std")]
-impl<I: Hash> InputFilter<I> for BloomInputFilter {
+impl<EM, I: Hash, S> InputFilter<EM, I, S> for BloomInputFilter {
     #[inline]
-    fn should_execute(&mut self, input: &I) -> bool {
+    fn should_execute(&mut self, input: &I, _state: &mut S, _manager: &mut EM) -> bool {
         !self.bloom.insert(input)
+    }
+}
+
+/// Wrapper for input filters that report the ratios of skipped to executed inputs.
+#[derive(Debug)]
+pub struct ReportingInputFilter<F> {
+    inner: F,
+}
+
+impl<F> ReportingInputFilter<F> {
+    /// Create a new [`ReportingInputFilter`] around an existing input filter.
+    pub fn new(inner: F) -> Self {
+        Self { inner }
+    }
+}
+
+#[derive(Serialize, Deserialize, SerdeAny, Debug, Clone, Default)]
+struct ReportingInputFilterStats {
+    skipped: u64,
+    executed: u64,
+}
+
+impl<EM, F, I, S> InputFilter<EM, I, S> for ReportingInputFilter<F>
+where
+    F: InputFilter<EM, I, S>,
+    EM: EventFirer<I, S>,
+    S: HasMetadata + HasExecutions,
+{
+    #[inline]
+    fn should_execute(&mut self, input: &I, state: &mut S, manager: &mut EM) -> bool {
+        let result = self.inner.should_execute(input, state, manager);
+        let stats = state.metadata_or_insert_with(ReportingInputFilterStats::default);
+
+        stats.executed += 1;
+        if !result {
+            stats.skipped += 1;
+        }
+
+        let (executed, skipped) = (stats.executed, stats.skipped);
+        let _ = manager.fire(
+            state,
+            EventWithStats::with_current_time(
+                Event::UpdateUserStats {
+                    name: Cow::Borrowed("filtered_inputs"),
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(skipped, executed),
+                        AggregatorOps::Avg,
+                    ),
+                    phantom: PhantomData,
+                },
+                *state.executions(),
+            ),
+        );
+
+        result
     }
 }
 
@@ -654,7 +710,7 @@ where
         + HasLastFoundTime
         + HasExecutions,
     I: Input,
-    IF: InputFilter<I>,
+    IF: InputFilter<EM, I, S>,
 {
     fn evaluate_filtered(
         &mut self,
@@ -663,7 +719,7 @@ where
         manager: &mut EM,
         input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        if self.input_filter.should_execute(input) {
+        if self.input_filter.should_execute(input, state, manager) {
             self.evaluate_input(state, executor, manager, input)
         } else {
             Ok((ExecuteInputResult::None, None))

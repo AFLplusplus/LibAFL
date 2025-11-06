@@ -53,7 +53,6 @@ pub extern crate alloc;
 
 // Re-export derive(SerdeAny)
 #[cfg(feature = "derive")]
-#[expect(unused_imports)]
 #[macro_use]
 extern crate libafl_derive;
 #[cfg(feature = "derive")]
