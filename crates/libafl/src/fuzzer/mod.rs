@@ -1,17 +1,23 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
-use alloc::{borrow::Cow, string::ToString, vec::Vec};
 #[cfg(feature = "std")]
-use core::hash::Hash;
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use alloc::borrow::Cow;
+use alloc::{string::ToString, vec::Vec};
+use core::{fmt::Debug, time::Duration};
+#[cfg(feature = "std")]
+use core::{hash::Hash, marker::PhantomData};
 
 #[cfg(feature = "std")]
 use fastbloom::BloomFilter;
 use libafl_bolts::{current_time, tuples::MatchName};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+#[cfg(feature = "std")]
+use serde::Deserialize;
+use serde::{Serialize, de::DeserializeOwned};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
+#[cfg(feature = "std")]
+use crate::monitors::stats::{AggregatorOps, UserStats, UserStatsValue};
 use crate::{
     Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
@@ -23,7 +29,6 @@ use crate::{
     feedbacks::Feedback,
     inputs::{Input, NopToTargetBytes, ToTargetBytes},
     mark_feature_time,
-    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::StagesTuple,
@@ -594,7 +599,8 @@ where
 /// A trait to determine if a input should be run or not
 pub trait InputFilter<EM, I, S> {
     /// should run execution for this input or no
-    fn should_execute(&mut self, input: &I, state: &mut S, manager: &mut EM) -> bool;
+    fn should_execute(&mut self, input: &I, state: &mut S, manager: &mut EM)
+    -> Result<bool, Error>;
 }
 
 /// A pseudo-filter that will execute each input.
@@ -602,8 +608,13 @@ pub trait InputFilter<EM, I, S> {
 pub struct NopInputFilter;
 impl<EM, I, S> InputFilter<EM, I, S> for NopInputFilter {
     #[inline]
-    fn should_execute(&mut self, _input: &I, _state: &mut S, _manager: &mut EM) -> bool {
-        true
+    fn should_execute(
+        &mut self,
+        _input: &I,
+        _state: &mut S,
+        _manager: &mut EM,
+    ) -> Result<bool, Error> {
+        Ok(true)
     }
 }
 
@@ -635,17 +646,24 @@ impl BloomInputFilter {
 #[cfg(feature = "std")]
 impl<EM, I: Hash, S> InputFilter<EM, I, S> for BloomInputFilter {
     #[inline]
-    fn should_execute(&mut self, input: &I, _state: &mut S, _manager: &mut EM) -> bool {
-        !self.bloom.insert(input)
+    fn should_execute(
+        &mut self,
+        input: &I,
+        _state: &mut S,
+        _manager: &mut EM,
+    ) -> Result<bool, Error> {
+        Ok(!self.bloom.insert(input))
     }
 }
 
 /// Wrapper for input filters that report the ratios of skipped to executed inputs.
+#[cfg(feature = "std")]
 #[derive(Debug)]
 pub struct ReportingInputFilter<F> {
     inner: F,
 }
 
+#[cfg(feature = "std")]
 impl<F> ReportingInputFilter<F> {
     /// Create a new [`ReportingInputFilter`] around an existing input filter.
     pub fn new(inner: F) -> Self {
@@ -653,21 +671,27 @@ impl<F> ReportingInputFilter<F> {
     }
 }
 
-#[derive(Serialize, Deserialize, SerdeAny, Debug, Clone, Default)]
+#[cfg(feature = "std")]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, SerdeAny)]
 struct ReportingInputFilterStats {
     skipped: u64,
     executed: u64,
 }
 
+#[cfg(feature = "std")]
 impl<EM, F, I, S> InputFilter<EM, I, S> for ReportingInputFilter<F>
 where
     F: InputFilter<EM, I, S>,
     EM: EventFirer<I, S>,
     S: HasMetadata + HasExecutions,
 {
-    #[inline]
-    fn should_execute(&mut self, input: &I, state: &mut S, manager: &mut EM) -> bool {
-        let result = self.inner.should_execute(input, state, manager);
+    fn should_execute(
+        &mut self,
+        input: &I,
+        state: &mut S,
+        manager: &mut EM,
+    ) -> Result<bool, Error> {
+        let result = self.inner.should_execute(input, state, manager)?;
         let stats = state.metadata_or_insert_with(ReportingInputFilterStats::default);
 
         stats.executed += 1;
@@ -676,7 +700,7 @@ where
         }
 
         let (executed, skipped) = (stats.executed, stats.skipped);
-        let _ = manager.fire(
+        manager.fire(
             state,
             EventWithStats::with_current_time(
                 Event::UpdateUserStats {
@@ -689,9 +713,9 @@ where
                 },
                 *state.executions(),
             ),
-        );
+        )?;
 
-        result
+        Ok(result)
     }
 }
 
@@ -719,7 +743,7 @@ where
         manager: &mut EM,
         input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        if self.input_filter.should_execute(input, state, manager) {
+        if self.input_filter.should_execute(input, state, manager)? {
             self.evaluate_input(state, executor, manager, input)
         } else {
             Ok((ExecuteInputResult::None, None))
