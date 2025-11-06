@@ -10,7 +10,7 @@ use core::{hash::Hash, marker::PhantomData};
 #[cfg(feature = "std")]
 use fastbloom::BloomFilter;
 #[cfg(feature = "std")]
-use libafl_bolts::SerdeAny;
+use libafl_bolts::impl_serdeany;
 use libafl_bolts::{current_time, tuples::MatchName};
 #[cfg(feature = "std")]
 use serde::Deserialize;
@@ -674,7 +674,10 @@ impl<F> ReportingInputFilter<F> {
 }
 
 #[cfg(feature = "std")]
-#[derive(Clone, Debug, Default, Serialize, Deserialize, SerdeAny)]
+impl_serdeany!(ReportingInputFilterStats);
+
+#[cfg(feature = "std")]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct ReportingInputFilterStats {
     skipped: u64,
     executed: u64,
