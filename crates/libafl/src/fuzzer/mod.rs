@@ -663,16 +663,16 @@ impl<EM, I: Hash, S> InputFilter<EM, I, S> for BloomInputFilter {
 #[derive(Debug)]
 pub struct ReportingInputFilter<F> {
     inner: F,
-    reporting_frequency: u64,
+    reporting_interval: u64,
 }
 
 #[cfg(feature = "std")]
 impl<F> ReportingInputFilter<F> {
-    /// Create a new [`ReportingInputFilter`] around an existing input filter. It will report the ratio of skipped to executed inputs every `reporting_frequency` executions.
-    pub fn new(inner: F, reporting_frequency: u64) -> Self {
+    /// Create a new [`ReportingInputFilter`] around an existing input filter. It will report the ratio of skipped to executed inputs every `reporting_interval` executions.
+    pub fn new(inner: F, reporting_interval: u64) -> Self {
         Self {
             inner,
-            reporting_frequency,
+            reporting_interval,
         }
     }
 }
@@ -708,7 +708,7 @@ where
             stats.skipped += 1;
         }
 
-        if stats.attempted_executions % self.reporting_frequency == 0 {
+        if stats.attempted_executions % self.reporting_interval == 0 {
             let (executed, skipped) = (stats.attempted_executions, stats.skipped);
             manager.fire(
                 state,
