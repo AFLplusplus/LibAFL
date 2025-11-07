@@ -1436,7 +1436,7 @@ pub mod unix_shmem {
                     let fd = fd.into_raw_fd();
 
                     #[expect(clippy::cast_possible_wrap)]
-                    if ftruncate(fd, map_size as i64) == -1 {
+                    if ftruncate(fd, map_size as libc::off_t) == -1 {
                         close(fd);
                         return Err(Error::last_os_error(format!(
                             "Failed to ftruncate memfd to {map_size}"

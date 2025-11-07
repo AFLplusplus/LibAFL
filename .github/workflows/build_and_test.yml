@@ -715,6 +715,23 @@ jobs:
         run: cd fuzzers/fuzz_anything/baby_no_std && cargo run || test $? -ne 0 || exit 1
       - name: no_std tests
         run: cd ./crates/libafl && cargo test --no-default-features
+  
+  x86-i686-build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+      - name: add x86 i686 target
+        run: rustup target add i686-unknown-linux-gnu
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: x86-i686
+      - name: test
+        run: cargo test --target=i686-unknown-linux-gnu
+        
 
   nostd-clippy:
     runs-on: ubuntu-24.04
