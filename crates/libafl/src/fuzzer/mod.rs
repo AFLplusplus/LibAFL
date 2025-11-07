@@ -659,6 +659,12 @@ impl<EM, I: Hash, S> InputFilter<EM, I, S> for BloomInputFilter {
 }
 
 /// Wrapper for input filters that report the ratios of skipped to executed inputs.
+///
+/// The total execution count may be slightly different from what is reported by anything relying
+/// on the execution count in the state, because this wrapper only counts executions that are
+/// triggered by [`Evaluator::evaluate_filtered`]. Some parts of ``LibAFL`` may use lower-level calls,
+/// which are not counted by this wrapper. Notable examples are [`crate::stages::CalibrationStage`]
+/// and [`crate::state::StdState::generate_initial_inputs`].
 #[cfg(feature = "std")]
 #[derive(Debug)]
 pub struct ReportingInputFilter<F> {
