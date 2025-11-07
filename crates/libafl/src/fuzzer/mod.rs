@@ -684,7 +684,6 @@ impl_serdeany!(ReportingInputFilterStats);
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct ReportingInputFilterStats {
     skipped: u64,
-    attempted_executions: u64,
 }
 
 #[cfg(feature = "std")]
@@ -700,32 +699,36 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<bool, Error> {
-        let result = self.inner.should_execute(input, state, manager)?;
+        let actual_executions = *state.executions();
+        let should_execute = self.inner.should_execute(input, state, manager)?;
+
         let stats = state.metadata_or_insert_with(ReportingInputFilterStats::default);
 
-        stats.attempted_executions += 1;
-        if !result {
+        if !should_execute {
             stats.skipped += 1;
         }
 
-        if stats.attempted_executions % self.reporting_interval == 0 {
-            let (executed, skipped) = (stats.attempted_executions, stats.skipped);
+        let skipped = stats.skipped;
+        let attempted_executions = skipped + actual_executions;
+
+        if attempted_executions % self.reporting_interval == 0 {
             manager.fire(
                 state,
                 EventWithStats::with_current_time(
                     Event::UpdateUserStats {
                         name: Cow::Borrowed("filtered_inputs"),
                         value: UserStats::new(
-                            UserStatsValue::Ratio(skipped, executed),
+                            UserStatsValue::Ratio(skipped, attempted_executions),
                             AggregatorOps::Avg,
                         ),
                         phantom: PhantomData,
                     },
-                    *state.executions(),
+                    actual_executions,
                 ),
             )?;
         }
-        Ok(result)
+
+        Ok(should_execute)
     }
 }
 
