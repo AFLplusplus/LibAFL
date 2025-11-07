@@ -711,7 +711,7 @@ where
         let skipped = stats.skipped;
         let attempted_executions = skipped + actual_executions;
 
-        if attempted_executions % self.reporting_interval == 0 {
+        if attempted_executions.is_multiple_of(self.reporting_interval) {
             manager.fire(
                 state,
                 EventWithStats::with_current_time(
