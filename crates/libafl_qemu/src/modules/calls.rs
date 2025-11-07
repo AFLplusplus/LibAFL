@@ -370,7 +370,7 @@ where
                     if let Err(err) = qemu.read_mem(iaddr, code) {
                         // TODO handle faults
                         log::error!(
-                            "gen_block_calls error 2: Failed to read mem at pc {pc:#x}: {err:?}"
+                            "gen_block_calls error 2: Failed to read mem at pc {iaddr:#x}: {err:?}"
                         );
                         return None;
                     }
