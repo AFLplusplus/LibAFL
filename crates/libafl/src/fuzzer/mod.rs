@@ -663,13 +663,17 @@ impl<EM, I: Hash, S> InputFilter<EM, I, S> for BloomInputFilter {
 #[derive(Debug)]
 pub struct ReportingInputFilter<F> {
     inner: F,
+    reporting_frequency: u64,
 }
 
 #[cfg(feature = "std")]
 impl<F> ReportingInputFilter<F> {
-    /// Create a new [`ReportingInputFilter`] around an existing input filter.
-    pub fn new(inner: F) -> Self {
-        Self { inner }
+    /// Create a new [`ReportingInputFilter`] around an existing input filter. It will report the ratio of skipped to executed inputs every `reporting_frequency` executions.
+    pub fn new(inner: F, reporting_frequency: u64) -> Self {
+        Self {
+            inner,
+            reporting_frequency,
+        }
     }
 }
 
@@ -696,6 +700,7 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<bool, Error> {
+        let executions = *state.executions();
         let result = self.inner.should_execute(input, state, manager)?;
         let stats = state.metadata_or_insert_with(ReportingInputFilterStats::default);
 
@@ -704,22 +709,23 @@ where
             stats.skipped += 1;
         }
 
-        let (executed, skipped) = (stats.executed, stats.skipped);
-        manager.fire(
-            state,
-            EventWithStats::with_current_time(
-                Event::UpdateUserStats {
-                    name: Cow::Borrowed("filtered_inputs"),
-                    value: UserStats::new(
-                        UserStatsValue::Ratio(skipped, executed),
-                        AggregatorOps::Avg,
-                    ),
-                    phantom: PhantomData,
-                },
-                *state.executions(),
-            ),
-        )?;
-
+        if executions % self.reporting_frequency == 0 {
+            let (executed, skipped) = (stats.executed, stats.skipped);
+            manager.fire(
+                state,
+                EventWithStats::with_current_time(
+                    Event::UpdateUserStats {
+                        name: Cow::Borrowed("filtered_inputs"),
+                        value: UserStats::new(
+                            UserStatsValue::Ratio(skipped, executed),
+                            AggregatorOps::Avg,
+                        ),
+                        phantom: PhantomData,
+                    },
+                    *state.executions(),
+                ),
+            )?;
+        }
         Ok(result)
     }
 }

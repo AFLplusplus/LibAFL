@@ -137,7 +137,7 @@ pub fn main() {
     #[cfg(not(feature = "bloom_input_filter"))]
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
     #[cfg(feature = "bloom_input_filter")]
-    let filter = ReportingInputFilter::new(BloomInputFilter::new(10_000_000, 0.001));
+    let filter = ReportingInputFilter::new(BloomInputFilter::new(10_000_000, 0.001), 100_000);
     #[cfg(feature = "bloom_input_filter")]
     let mut fuzzer = StdFuzzer::builder()
         .input_filter(filter)
