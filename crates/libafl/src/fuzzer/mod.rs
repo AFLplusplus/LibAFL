@@ -684,7 +684,7 @@ impl_serdeany!(ReportingInputFilterStats);
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct ReportingInputFilterStats {
     skipped: u64,
-    executed: u64,
+    attempted_executions: u64,
 }
 
 #[cfg(feature = "std")]
@@ -700,17 +700,16 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<bool, Error> {
-        let executions = *state.executions();
         let result = self.inner.should_execute(input, state, manager)?;
         let stats = state.metadata_or_insert_with(ReportingInputFilterStats::default);
 
-        stats.executed += 1;
+        stats.attempted_executions += 1;
         if !result {
             stats.skipped += 1;
         }
 
-        if executions % self.reporting_frequency == 0 {
-            let (executed, skipped) = (stats.executed, stats.skipped);
+        if stats.attempted_executions % self.reporting_frequency == 0 {
+            let (executed, skipped) = (stats.attempted_executions, stats.skipped);
             manager.fire(
                 state,
                 EventWithStats::with_current_time(
