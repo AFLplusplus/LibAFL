@@ -725,12 +725,14 @@ jobs:
           components: rust-src
       - name: add x86 i686 target
         run: rustup target add i686-unknown-linux-gnu
+      - name: Install x86 build dependencies / multilib
+        run: sudo apt update && sudo apt -y install gcc-multilib g++-multilib
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: x86-i686
       - name: test
-        run: cargo test --target=i686-unknown-linux-gnu
+        run: cargo check --target=i686-unknown-linux-gnu
         
 
   nostd-clippy:

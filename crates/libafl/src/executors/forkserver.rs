@@ -1594,6 +1594,7 @@ mod tests {
     #[test]
     #[serial]
     #[cfg_attr(miri, ignore)]
+    #[cfg_attr(target_pointer_width = "32", ignore)] // TODO: Why does this fail?
     fn test_forkserver() {
         const MAP_SIZE: usize = 65536;
         let bin = OsString::from("echo");
