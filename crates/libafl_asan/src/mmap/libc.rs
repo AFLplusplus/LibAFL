@@ -13,7 +13,7 @@ use core::{
 
 #[cfg(target_os = "linux")]
 use libc::{MADV_DONTDUMP, MADV_HUGEPAGE};
-use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE, c_char, off_t, size_t};
+use libc::{PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE, off_t, size_t};
 use log::trace;
 use thiserror::Error;
 
