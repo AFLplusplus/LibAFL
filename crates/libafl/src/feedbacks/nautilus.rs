@@ -97,17 +97,6 @@ impl<EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusFeedback<'_>
 where
     S: HasMetadata + HasCorpus<NautilusInput>,
 {
-    fn is_interesting(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &NautilusInput,
-        _observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error> {
-        Ok(false)
-    }
-
     fn append_metadata(
         &mut self,
         state: &mut S,
@@ -149,17 +138,6 @@ impl<'a> NautilusUnparseToMetadataFeedback<'a> {
 impl<S> StateInitializer<S> for NautilusUnparseToMetadataFeedback<'_> {}
 
 impl<EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusUnparseToMetadataFeedback<'_> {
-    fn is_interesting(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &NautilusInput,
-        _observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error> {
-        Ok(false)
-    }
-
     fn append_metadata(
         &mut self,
         _state: &mut S,
