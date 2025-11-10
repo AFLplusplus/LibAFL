@@ -138,7 +138,8 @@ pub fn peak_rss_mb_child_processes() -> Result<i64, Error> {
         }
     }?;
     let result = rss.ru_maxrss >> 10;
-    #[cfg(all(target_os = "freebsd", target_arch = "x86"))]
+    // on 32 bit pointer size, we need to convert the result.
+    #[cfg(target_pointer_width = "32")]
     let result = result.into();
     Ok(result)
 }
