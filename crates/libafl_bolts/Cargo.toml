@@ -49,8 +49,6 @@ std = [
   "fast_rands/std",
   "hostname",
   "libafl_core/nix",
-  "libafl_core/nix",
-  "libafl_core/std",
   "libafl_core/std",
   "ll_mp/std",
   "minibsod",
@@ -73,8 +71,8 @@ alloc = [
   "ll_mp/alloc",
   "no_std_time/alloc",
   "postcard",
-  "serde/alloc",
   "serde_anymap",
+  "serde/alloc",
   "shmem_providers/alloc",
   "tuple_list_ex/alloc",
 ]
@@ -157,7 +155,7 @@ build_id2 = { workspace = true, optional = true }
 core_affinity2 = { workspace = true, optional = true }
 exceptional = { workspace = true }
 fast_rands = { workspace = true }
-libafl_core = { workspace = true }
+libafl_core = { workspace = true, features = ["serde"] }
 libafl_derive = { workspace = true, default-features = true, optional = true }
 ll_mp = { workspace = true }
 minibsod = { workspace = true, optional = true }
@@ -175,7 +173,7 @@ clap = { workspace = true, features = [
   "derive",
   "wrap_help",
 ], optional = true } # CLI parsing, for libafl_bolts::cli / the `cli` feature
-erased-serde = { version = "0.4.5", default-features = false, optional = true } # erased serde
+erased-serde = { workspace = true, default-features = false, optional = true } # erased serde
 hashbrown = { workspace = true, features = [
   "serde",
   "default-hasher",
@@ -195,7 +193,7 @@ postcard = { workspace = true, optional = true } # no_std compatible serde seria
 pyo3 = { workspace = true, optional = true, features = ["serde", "macros"] }
 serde = { workspace = true, default-features = false, features = [
   "derive",
-] } # serialization lib
+], optional = true } # serialization lib
 tuple_list = { workspace = true }
 xxhash-rust = { version = "0.8.12", features = [
   "xxh3",
@@ -207,11 +205,14 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
 ] }
 
 rustversion = { workspace = true }
-# optional stable simd, pin to a commit due to `u8x32` not released yet. Switch to `wide` as long as next release is out!
-wide = { version = "0.7.33", optional = true, package = "libafl_wide" }
+# optional stable simd
+wide = { version = "0.7.33", optional = true }
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
+
+[lints]
+workspace = true
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }                                            # For (*nix) libc
@@ -256,6 +257,3 @@ path = "./examples/simd/simd.rs"
 bench = true
 harness = false
 required-features = ["std", "simd"]
-
-[lints]
-workspace = true

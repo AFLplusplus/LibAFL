@@ -10,5 +10,5 @@ edition = "2024"
 [dependencies]
 petgraph = "0.6"
 clap = { version = "4.5", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0"

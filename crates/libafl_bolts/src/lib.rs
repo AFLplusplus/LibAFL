@@ -101,7 +101,6 @@ pub use shmem_providers as shmem;
 #[cfg(feature = "std")]
 pub use target_args::*;
 
-#[cfg(feature = "simd")]
 pub mod simd;
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
@@ -122,11 +121,11 @@ pub mod bolts_prelude {
     pub use super::fs::*;
     #[cfg(all(feature = "std", unix))]
     pub use super::minibsod::*;
+    pub use super::os::*;
     #[cfg(feature = "std")]
     pub use super::staterestore::*;
     #[cfg(feature = "alloc")]
     pub use super::{anymap::*, llmp::*, ownedref::*, rands::*, serdeany::*, shmem::*, tuples::*};
-    pub use super::{cpu::*, os::*};
 }
 
 #[cfg(all(unix, feature = "std"))]

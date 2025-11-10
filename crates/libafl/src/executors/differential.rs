@@ -14,7 +14,7 @@ use libafl_bolts::{
     ownedref::OwnedMutPtr,
     tuples::{MatchName, RefIndexable},
 };
-use serde::{Deserialize, Serialize};
+use serde::{self, Deserialize, Serialize};
 
 use super::HasTimeout;
 use crate::{

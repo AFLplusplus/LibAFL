@@ -39,7 +39,7 @@ libafl_targets = { workspace = true, default-features = true, features = [
 nix = { workspace = true, default-features = true, features = ["fs"] }
 typed-builder = { workspace = true }
 regex = "1.12.2"
-serde = { version = "1.0.210", default-features = false, features = [
+serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] } # serialization lib
 

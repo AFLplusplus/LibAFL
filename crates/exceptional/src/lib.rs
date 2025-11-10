@@ -53,6 +53,7 @@ extern crate std;
 #[doc(hidden)]
 pub extern crate alloc;
 
+#[cfg(unix)]
 pub mod unix_signals;
 
 #[cfg(all(windows, feature = "std"))]

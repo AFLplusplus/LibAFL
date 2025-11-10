@@ -47,9 +47,9 @@
 
 use core::{
     any::TypeId,
-    hash::{Hash, Hasher},
+    hash::{BuildHasher, Hash, Hasher},
 };
-use std::{env, fs::File, hash::BuildHasher, io, sync::OnceLock};
+use std::{env, fs::File, io, sync::OnceLock};
 
 use ahash::RandomState;
 use uuid::Uuid;
