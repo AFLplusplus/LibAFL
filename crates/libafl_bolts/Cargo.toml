@@ -85,7 +85,7 @@ derive = ["libafl_derive"]
 rand_trait = ["fast_rands/rand_trait"]
 
 ## Will build the `pyo3` bindings
-python = ["pyo3", "std", "libafl_core/python"]
+python = ["pyo3", "std", "libafl_core/python", "fast_rands/python"]
 
 ## Expose `libafl::prelude` for direct access to all types without additional `use` directives
 prelude = []

@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 /// Client performance statistics
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ClientPerfStats {
-    /// Starting counter (in clock cycles from `read_time_counter`)
+    /// Starting counter (in clock cycles from [`no_std_time::read_time_counter`])
     start_time: u64,
 
-    /// Current counter in the fuzzer (in clock cycles from `read_time_counter`
+    /// Current counter in the fuzzer (in clock cycles from [no_std_time::read_time_counter`])
     current_time: u64,
 
     /// Clock cycles spent in the scheduler
@@ -128,7 +128,7 @@ impl ClientPerfStats {
     /// the current clock counter
     #[must_use]
     pub fn new() -> Self {
-        let start_time = libafl_bolts::cpu::read_time_counter();
+        let start_time = no_std_time::read_time_counter();
 
         Self {
             start_time,
@@ -152,7 +152,7 @@ impl ClientPerfStats {
     /// Start a timer with the current time counter
     #[inline]
     pub fn start_timer(&mut self) {
-        self.timer_start = Some(libafl_bolts::cpu::read_time_counter());
+        self.timer_start = Some(no_std_time::read_time_counter());
     }
 
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
@@ -178,7 +178,7 @@ impl ClientPerfStats {
             }
             Some(timer_start) => {
                 // Calculate the elapsed time
-                let elapsed = libafl_bolts::cpu::read_time_counter() - timer_start;
+                let elapsed = no_std_time::read_time_counter() - timer_start;
 
                 // Reset the timer
                 self.timer_start = None;

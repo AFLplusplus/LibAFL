@@ -59,5 +59,9 @@ nix = { workspace = true, optional = true }
 pyo3 = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive", "alloc"], optional = true }
 
+[target.'cfg(windows)'.dependencies]
+windows-result = "0.4.1"
+
+
 [lints]
 workspace = true

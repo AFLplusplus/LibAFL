@@ -55,11 +55,12 @@ pub extern crate alloc;
 use core::time;
 
 pub mod time_counters;
-
 #[cfg(feature = "alloc")]
 use alloc::string::String;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
+
+pub use time_counters::read_time_counter;
 
 /// Format a `Duration` into a HMS string
 #[cfg(feature = "alloc")]

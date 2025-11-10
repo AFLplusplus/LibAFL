@@ -440,14 +440,14 @@ impl From<BorrowMutError> for Error {
 }
 
 /// Stringify the postcard serializer error
-#[cfg(feature = "alloc")]
+#[cfg(all(feature = "alloc", feature = "postcard"))]
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
         Self::serialize(format!("{err:?}"))
     }
 }
 
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(unix, feature = "std", feature = "nix"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
         Self::unknown(format!("Unix error: {err:?}"))
