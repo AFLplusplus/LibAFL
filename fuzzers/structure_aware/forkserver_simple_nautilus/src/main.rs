@@ -8,7 +8,8 @@ use libafl::{
     executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
     feedback_and_fast, feedback_or,
     feedbacks::{
-        CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback, TimeFeedback,
+        ConstFeedback, CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback,
+        NautilusUnparseToMetadataFeedback, TimeFeedback,
     },
     fuzzer::Fuzzer,
     generators::{NautilusContext, NautilusGenerator},
@@ -139,7 +140,12 @@ pub fn main() {
         CrashFeedback::new(),
         // Take it only if trigger new coverage over crashes
         // Uses `with_name` to create a different history from the `MaxMapFeedback` in `feedback` above
-        MaxMapFeedback::with_name("mapfeedback_metadata_objective", &edges_observer)
+        MaxMapFeedback::with_name("mapfeedback_metadata_objective", &edges_observer),
+        // Append the unparsed input to the metadata for crashes
+        feedback_or!(
+            NautilusUnparseToMetadataFeedback::new(&context), // this always returns false for is_interesting
+            ConstFeedback::new(true), // so we combine it with a const feedback to always return true
+        )
     );
 
     // create a State from scratch

@@ -1,7 +1,7 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
 use alloc::{borrow::Cow, string::String};
 use core::fmt::Debug;
-use std::fs::create_dir_all;
+use std::{fs::create_dir_all, string::ToString};
 
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
@@ -118,5 +118,61 @@ where
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, SerdeAny)]
+struct NautilusUnparseMetadata {
+    unparsed: String,
+}
+
+/// Add the unparsed input to the testcase metadata. Useful e.g. if you want to have the input be unparsed on any solution automatically.
+#[derive(Debug)]
+pub struct NautilusUnparseToMetadataFeedback<'a> {
+    context: &'a NautilusContext,
+}
+
+impl<'a> NautilusUnparseToMetadataFeedback<'a> {
+    /// Create a new [`NautilusUnparseToMetadataFeedback`]
+    #[must_use]
+    pub fn new(context: &'a NautilusContext) -> Self {
+        Self { context }
+    }
+}
+impl<S> StateInitializer<S> for NautilusUnparseToMetadataFeedback<'_> {}
+
+impl<EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusUnparseToMetadataFeedback<'_> {
+    fn is_interesting(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &NautilusInput,
+        _observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error> {
+        Ok(false)
+    }
+
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _observers: &OT,
+        testcase: &mut Testcase<NautilusInput>,
+    ) -> Result<(), Error> {
+        let input = testcase.input().as_ref().unwrap().clone();
+        let mut unparse_target = vec![];
+        input.unparse(self.context, &mut unparse_target);
+        let unparsed = String::from_utf8_lossy(&unparse_target).to_string();
+        testcase.metadata_or_insert_with(|| NautilusUnparseMetadata { unparsed });
+
+        Ok(())
+    }
+}
+
+impl Named for NautilusUnparseToMetadataFeedback<'_> {
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusUnparseToMetadataFeedback");
+        &NAME
     }
 }
