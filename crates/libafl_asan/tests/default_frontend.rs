@@ -6,7 +6,7 @@ mod tests {
             backend::dlmalloc::DlmallocBackend,
             frontend::{AllocatorFrontend, default::DefaultFrontend},
         },
-        mmap::linux::MmapRegion,
+        mmap::unix::MmapRegion,
         shadow::{
             Shadow,
             guest::{DefaultShadowLayout, GuestShadow},

@@ -11,7 +11,7 @@ use crate::allocator::backend::dlmalloc::DlmallocBackend;
     target_os = "linux",
     not(feature = "libc")
 ))]
-type Mmap = crate::mmap::linux::MmapRegion;
+type Mmap = crate::mmap::unix::MmapRegion;
 
 #[cfg(all(feature = "global_allocator", feature = "libc",))]
 type Mmap = crate::mmap::libc::LibcMmap<

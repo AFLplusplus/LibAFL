@@ -25,7 +25,7 @@ type TestSyms = crate::symbols::nop::NopSymbols;
 type TestSyms = crate::symbols::dlsym::DlSymSymbols<crate::symbols::dlsym::LookupTypeNext>;
 
 #[cfg(all(feature = "syscalls", target_os = "linux", not(feature = "libc")))]
-type TestMap = crate::mmap::linux::MmapRegion;
+type TestMap = crate::mmap::unix::MmapRegion;
 
 #[cfg(feature = "libc")]
 type TestMap = crate::mmap::libc::LibcMmap<TestSyms>;

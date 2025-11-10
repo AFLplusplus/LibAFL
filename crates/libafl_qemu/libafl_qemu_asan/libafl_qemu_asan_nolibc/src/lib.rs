@@ -12,7 +12,7 @@ use libafl_asan::{
     env::Env,
     file::linux::LinuxFileReader,
     logger::linux::LinuxLogger,
-    mmap::linux::MmapRegion,
+    mmap::unix::MmapRegion,
     shadow::{
         Shadow,
         guest::{DefaultShadowLayout, GuestShadow},
