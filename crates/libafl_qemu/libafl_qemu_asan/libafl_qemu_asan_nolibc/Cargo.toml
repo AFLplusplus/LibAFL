@@ -19,7 +19,7 @@ libafl_asan = { path = "../../../libafl_asan", default-features = false, feature
   "guest",
   "hooks",
   "host",
-  "linux",
+  "syscalls",
   "tracking",
 ] }
 log = { version = "0.4.22", default-features = false, features = [

@@ -11,7 +11,7 @@ use core::{
 
 use log::trace;
 #[cfg(target_os = "linux")]
-use rustix::{Advice, madvise};
+use rustix::mm::{Advice, madvise};
 use rustix::{
     io::Errno,
     mm::{MapFlags, MprotectFlags, ProtFlags, mmap_anonymous, mprotect, munmap},

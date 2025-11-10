@@ -266,14 +266,14 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
     pub const HIGH_MEM_LIMIT: usize = L::HIGH_MEM_OFFSET + (L::HIGH_MEM_SIZE - 1);
 
     pub fn new() -> Result<GuestShadow<M, L>, GuestShadowError<M>> {
-        println!(
+        trace!(
             "Mapping low shadow: {:#x}-{:#x}",
             Self::LOW_SHADOW_OFFSET,
             Self::LOW_SHADOW_OFFSET + Self::LOW_SHADOW_SIZE
         );
         let lo = Self::map_shadow(Self::LOW_SHADOW_OFFSET, Self::LOW_SHADOW_SIZE)
             .map_err(|e| GuestShadowError::MmapError(e))?;
-        println!(
+        trace!(
             "Mapping high shadow: {:#x}-{:#x}",
             Self::HIGH_SHADOW_OFFSET,
             Self::HIGH_SHADOW_OFFSET + Self::HIGH_SHADOW_SIZE
@@ -288,12 +288,9 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
     }
 
     fn map_shadow(addr: GuestAddr, size: usize) -> Result<M, M::Error> {
-        println!("MapAt");
         let m = M::map_at(addr, size)?;
         M::huge_pages(addr, size)?;
-        println!("HugePages");
         M::dont_dump(addr, size)?;
-        println!("Don'tDump");
         Ok(m)
     }
 
