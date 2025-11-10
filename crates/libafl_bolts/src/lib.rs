@@ -93,7 +93,9 @@ pub use fast_rands as rands;
 pub use libafl_core::{
     AsIter, AsIterMut, AsSlice, AsSliceMut, ClientId, Error, HasLen, HasRefCnt, Named, Truncate,
 };
-pub use no_std_time::{current_milliseconds, current_nanos, current_time, format_duration};
+#[cfg(feature = "alloc")]
+pub use no_std_time::format_duration;
+pub use no_std_time::{current_milliseconds, current_nanos, current_time};
 pub use ownedref::{self, subrange};
 #[cfg(feature = "alloc")]
 pub use serde_anymap::impl_serdeany;

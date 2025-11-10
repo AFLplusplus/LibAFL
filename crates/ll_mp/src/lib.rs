@@ -138,7 +138,7 @@ use std::{
     thread,
 };
 
-#[cfg(all(unix, not(miri)))]
+#[cfg(all(unix, feature = "alloc", not(miri)))]
 use exceptional::unix_signals::setup_signal_handler;
 #[cfg(unix)]
 use exceptional::unix_signals::{Signal, SignalHandler, siginfo_t, ucontext_t};
@@ -2461,7 +2461,7 @@ impl Brokers {
         self.llmp_brokers.push(broker);
     }
 
-    #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
+    #[cfg(any(all(unix, feature = "alloc", not(miri)), all(windows, feature = "std")))]
     fn setup_handlers() {
         #[cfg(all(unix, not(miri)))]
         if let Err(e) = unsafe { setup_signal_handler(&raw mut LLMP_SIGHANDLER_STATE) } {
@@ -2930,7 +2930,7 @@ where
         }
     }
 
-    #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
+    #[cfg(any(all(unix, feature = "alloc", not(miri)), all(windows, feature = "std")))]
     fn setup_handlers() {
         #[cfg(all(unix, not(miri)))]
         if let Err(e) = unsafe { setup_signal_handler(&raw mut LLMP_SIGHANDLER_STATE) } {

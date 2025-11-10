@@ -610,39 +610,6 @@ impl XkcdRand {
 /// `Rand` Python bindings
 pub mod pybind {
 
-    /// Unwrap the mutable body of this wrapper
-    macro_rules! unwrap_me_mut_body {
-        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}) => {
-            match &mut $wrapper {
-                $(
-                    $wrapper_type::$wrapper_option(py_wrapper) => {
-                        Python::attach(|py| -> PyResult<_> {
-                            let mut borrowed = py_wrapper.borrow_mut(py);
-                            let $name = &mut borrowed.inner;
-                            Ok($body)
-                        })
-                        .unwrap()
-                    }
-                )*
-            }
-        };
-        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}, { $($wrapper_optional:tt($pw:ident) => $code_block:block)* }) => {
-            match &mut $wrapper {
-                $(
-                    $wrapper_type::$wrapper_option(py_wrapper) => {
-                        Python::with_gil(|py| -> PyResult<_> {
-                            let mut borrowed = py_wrapper.borrow_mut(py);
-                            let $name = &mut borrowed.inner;
-                            Ok($body)
-                        })
-                        .unwrap()
-                    }
-                )*
-                $($wrapper_type::$wrapper_optional($pw) => { $code_block })*
-            }
-        };
-    }
-
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
@@ -723,6 +690,39 @@ pub mod pybind {
         m.add_class::<PythonStdRand>()?;
         m.add_class::<PythonRand>()?;
         Ok(())
+    }
+
+    /// Unwrap the mutable body of this wrapper
+    macro_rules! unwrap_me_mut_body {
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}) => {
+            match &mut $wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::attach(|py| -> PyResult<_> {
+                            let mut borrowed = py_wrapper.borrow_mut(py);
+                            let $name = &mut borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+            }
+        };
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}, { $($wrapper_optional:tt($pw:ident) => $code_block:block)* }) => {
+            match &mut $wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let mut borrowed = py_wrapper.borrow_mut(py);
+                            let $name = &mut borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+                $($wrapper_type::$wrapper_optional($pw) => { $code_block })*
+            }
+        };
     }
 }
 

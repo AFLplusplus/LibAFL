@@ -1207,11 +1207,11 @@ mod test {
         let mut t = tuple_list!(1, "a");
 
         tuple_for_each!(f1, core::fmt::Display, t, |x| {
-            log::info!("{x}");
+            println!("{x}");
         });
 
         tuple_for_each_mut!(f2, core::fmt::Display, t, |x| {
-            log::info!("{x}");
+            println!("{x}");
         });
     }
 
@@ -1224,7 +1224,7 @@ mod test {
 
         use tuple_list::{tuple_list, tuple_list_type};
 
-        use crate::tuples::{GetAll as _, Handle, Handled as _, MatchNameRef, Named};
+        use crate::{GetAll as _, Handle, Handled as _, MatchNameRef, Named};
 
         #[derive(Debug, PartialEq)]
         struct MyHandled(String, Cow<'static, str>);

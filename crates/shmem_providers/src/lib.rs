@@ -2024,7 +2024,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     #[cfg(unix)]
     fn test_mmap_shmem_release() -> Result<(), Error> {
-        use crate::shmem::MmapShMemProvider;
+        use crate::MmapShMemProvider;
 
         let mut provider = MmapShMemProvider::new()?;
         let mut shmem = provider.new_shmem(1024)?;

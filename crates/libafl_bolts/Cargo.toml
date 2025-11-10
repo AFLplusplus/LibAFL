@@ -46,6 +46,7 @@ std = [
   "backtrace",
   "build_id2",
   "core_affinity2",
+  "exceptional/std",
   "fast_rands/std",
   "hostname",
   "libafl_core/nix",

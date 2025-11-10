@@ -181,7 +181,7 @@ llmp_broker_timeouts = ["std"]
 llmp_bind_public = ["ll_mp/llmp_bind_public"]
 
 ## Enables llmp compression using GZip
-llmp_compression = ["ll_mp/llmp_compression"]
+llmp_compression = ["ll_mp/llmp_compression", "libafl_bolts/gzip"]
 
 ## Enables debug output for LLMP (also needs a `logger` installed)
 llmp_debug = ["std", "ll_mp/llmp_debug"]
