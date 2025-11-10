@@ -155,9 +155,20 @@ impl<EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusUnparseToMetadata
         Ok(false)
     }
 
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Result<bool, Error> {
-        Ok(false)
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _observers: &OT,
+        testcase: &mut Testcase<NautilusInput>,
+    ) -> Result<(), Error> {
+        let input = testcase.input().as_ref().unwrap().clone();
+        let mut unparse_target = vec![];
+        input.unparse(self.context, &mut unparse_target);
+        let unparsed = String::from_utf8_lossy(&unparse_target).to_string();
+        testcase.metadata_or_insert_with(|| NautilusUnparseMetadata { unparsed });
+
+        Ok(())
     }
 }
 
