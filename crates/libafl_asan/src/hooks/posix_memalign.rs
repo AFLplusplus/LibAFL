@@ -27,7 +27,7 @@ pub unsafe extern "C" fn posix_memalign(
             n != 0 && (n & (n - 1)) == 0
         }
 
-        if align % size_of::<GuestAddr>() != 0 {
+        if !align.is_multiple_of(size_of::<GuestAddr>()) {
             asan_panic(
                 c"posix_memalign - align is not a multiple of pointer size".as_ptr()
                     as *const c_char,
