@@ -1,6 +1,6 @@
 //! # linux
 //! This implementation of `Mmap` uses the `rustix` crate to make direct
-//! `syscalls` to allocate pages and therefore whilst Linux specific, does not
+//! `syscalls` to allocate pages and therefore whilst Unix specific, does not
 //! introduce a dependency on the `libc` library and is therefore suited for
 //! targets where `libc` is statically linked.
 use core::{
@@ -10,9 +10,11 @@ use core::{
 };
 
 use log::trace;
+#[cfg(target_os = "linux")]
+use rustix::mm::{Advice, madvise};
 use rustix::{
     io::Errno,
-    mm::{Advice, MapFlags, MprotectFlags, ProtFlags, madvise, mmap_anonymous, mprotect, munmap},
+    mm::{MapFlags, MprotectFlags, ProtFlags, mmap_anonymous, mprotect, munmap},
 };
 use thiserror::Error;
 
@@ -22,13 +24,13 @@ use crate::{
 };
 
 #[derive(Ord, PartialOrd, PartialEq, Eq, Debug)]
-pub struct LinuxMmap {
+pub struct MmapRegion {
     addr: GuestAddr,
     len: usize,
 }
 
-impl Mmap for LinuxMmap {
-    type Error = LinuxMapError;
+impl Mmap for MmapRegion {
+    type Error = MmapError;
     fn map(len: usize) -> Result<Self, Self::Error> {
         unsafe {
             let addr = mmap_anonymous(
@@ -37,25 +39,26 @@ impl Mmap for LinuxMmap {
                 ProtFlags::READ | ProtFlags::WRITE,
                 MapFlags::PRIVATE | MapFlags::NORESERVE,
             )
-            .map_err(|errno| LinuxMapError::FailedToMap(len, errno))?
+            .map_err(|errno| MmapError::FailedToMap(len, errno))?
                 as GuestAddr;
             trace!("Mapped: {:#x}-{:#x}", addr, addr + len);
             Ok(Self { addr, len })
         }
     }
 
-    fn map_at(addr: GuestAddr, len: usize) -> Result<LinuxMmap, LinuxMapError> {
+    fn map_at(addr: GuestAddr, len: usize) -> Result<MmapRegion, MmapError> {
+        let flags = MapFlags::PRIVATE | MapFlags::FIXED | MapFlags::NORESERVE;
+        #[cfg(target_os = "linux")]
+        let flags = flags | MapFlags::FIXED_NOREPLACE;
+
         unsafe {
             mmap_anonymous(
                 addr as *mut c_void,
                 len,
                 ProtFlags::READ | ProtFlags::WRITE,
-                MapFlags::PRIVATE
-                    | MapFlags::FIXED
-                    | MapFlags::FIXED_NOREPLACE
-                    | MapFlags::NORESERVE,
+                flags,
             )
-            .map_err(|errno| LinuxMapError::FailedToMapAt(addr, len, errno))?;
+            .map_err(|errno| MmapError::FailedToMapAt(addr, len, errno))?;
             trace!("Mapped: {:#x}-{:#x}", addr, addr + len);
         };
         Ok(Self { addr, len })
@@ -73,23 +76,29 @@ impl Mmap for LinuxMmap {
         trace!("protect - addr: {addr:#x}, len: {len:#x}, prot: {prot:#x}",);
         unsafe {
             mprotect(addr as *mut c_void, len, MprotectFlags::from(&prot))
-                .map_err(|errno| LinuxMapError::FailedToMprotect(addr, len, prot, errno))
+                .map_err(|errno| MmapError::FailedToMprotect(addr, len, prot, errno))
         }
     }
 
     fn huge_pages(addr: GuestAddr, len: usize) -> Result<(), Self::Error> {
         trace!("huge_pages - addr: {addr:#x}, len: {len:#x}");
+        #[cfg(not(target_os = "linux"))]
+        unimplemented!();
+        #[cfg(target_os = "linux")]
         unsafe {
             madvise(addr as *mut c_void, len, Advice::LinuxHugepage)
-                .map_err(|errno| LinuxMapError::FailedToMadviseHugePage(addr, len, errno))
+                .map_err(|errno| MmapError::FailedToMadviseHugePage(addr, len, errno))
         }
     }
 
     fn dont_dump(addr: GuestAddr, len: usize) -> Result<(), Self::Error> {
         trace!("dont_dump - addr: {addr:#x}, len: {len:#x}");
+        #[cfg(not(target_os = "linux"))]
+        unimplemented!();
+        #[cfg(target_os = "linux")]
         unsafe {
             madvise(addr as *mut c_void, len, Advice::LinuxDontDump)
-                .map_err(|errno| LinuxMapError::FailedToMadviseDontDump(addr, len, errno))
+                .map_err(|errno| MmapError::FailedToMadviseDontDump(addr, len, errno))
         }
     }
 }
@@ -110,7 +119,7 @@ impl From<&MmapProt> for MprotectFlags {
     }
 }
 
-impl Drop for LinuxMmap {
+impl Drop for MmapRegion {
     fn drop(&mut self) {
         unsafe {
             munmap(self.addr as *mut c_void, self.len).unwrap();
@@ -120,7 +129,7 @@ impl Drop for LinuxMmap {
 }
 
 #[derive(Error, Debug, PartialEq)]
-pub enum LinuxMapError {
+pub enum MmapError {
     #[error("Failed to map - len: {0}, errno: {1}")]
     FailedToMap(usize, Errno),
     #[error("Failed to map: {0}, len: {1}, errno: {2}")]
