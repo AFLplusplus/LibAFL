@@ -121,10 +121,12 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, SerdeAny)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct NautilusUnparseMetadata {
     unparsed: String,
 }
+
+libafl_bolts::impl_serdeany!(NautilusUnparseMetadata);
 
 /// Add the unparsed input to the testcase metadata. Useful e.g. if you want to have the input be unparsed on any solution automatically.
 ///
