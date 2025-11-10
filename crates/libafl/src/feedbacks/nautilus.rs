@@ -13,7 +13,6 @@ use crate::{
     Error, HasMetadata,
     common::nautilus::grammartec::{chunkstore::ChunkStore, context::Context},
     corpus::{Corpus, Testcase},
-    executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     generators::NautilusContext,
     inputs::NautilusInput,
