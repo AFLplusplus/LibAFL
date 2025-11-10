@@ -172,6 +172,11 @@ impl<EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusUnparseToMetadata
 
         Ok(())
     }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(false)
+    }
 }
 
 impl Named for NautilusUnparseToMetadataFeedback<'_> {
