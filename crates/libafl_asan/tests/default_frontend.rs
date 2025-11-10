@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "linux", target_os = "linux", feature = "dlmalloc"))]
+#[cfg(all(test, feature = "syscalls", target_os = "linux", feature = "dlmalloc"))]
 mod tests {
 
     use libafl_asan::{
@@ -6,7 +6,7 @@ mod tests {
             backend::dlmalloc::DlmallocBackend,
             frontend::{AllocatorFrontend, default::DefaultFrontend},
         },
-        mmap::linux::LinuxMmap,
+        mmap::unix::MmapRegion,
         shadow::{
             Shadow,
             guest::{DefaultShadowLayout, GuestShadow},
@@ -20,8 +20,8 @@ mod tests {
     static INIT_ONCE: Lazy<Mutex<DF>> = Lazy::new(|| {
         Mutex::new({
             env_logger::init();
-            let backend = DlmallocBackend::<LinuxMmap>::new(PAGE_SIZE);
-            let shadow = GuestShadow::<LinuxMmap, DefaultShadowLayout>::new().unwrap();
+            let backend = DlmallocBackend::<MmapRegion>::new(PAGE_SIZE);
+            let shadow = GuestShadow::<MmapRegion, DefaultShadowLayout>::new().unwrap();
             let tracking = GuestTracking::new().unwrap();
             DF::new(
                 backend,
@@ -35,8 +35,8 @@ mod tests {
     });
 
     type DF = DefaultFrontend<
-        DlmallocBackend<LinuxMmap>,
-        GuestShadow<LinuxMmap, DefaultShadowLayout>,
+        DlmallocBackend<MmapRegion>,
+        GuestShadow<MmapRegion, DefaultShadowLayout>,
         GuestTracking,
     >;
 

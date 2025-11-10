@@ -51,9 +51,16 @@ impl Function for FunctionMprotect {
 #[derive(Debug)]
 struct FunctionErrnoLocation;
 
+#[cfg(target_os = "linux")]
 impl Function for FunctionErrnoLocation {
     type Func = unsafe extern "C" fn() -> *mut c_int;
     const NAME: &'static CStr = c"__errno_location";
+}
+
+#[cfg(target_vendor = "apple")]
+impl Function for FunctionErrnoLocation {
+    type Func = unsafe extern "C" fn() -> *mut c_int;
+    const NAME: &'static CStr = c"__error";
 }
 
 #[derive(Debug)]

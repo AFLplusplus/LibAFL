@@ -18,7 +18,7 @@ pub unsafe extern "C" fn memalign(align: size_t, size: size_t) -> *mut c_void {
             n != 0 && (n & (n - 1)) == 0
         }
 
-        if align % size_of::<GuestAddr>() != 0 {
+        if !align.is_multiple_of(size_of::<GuestAddr>()) {
             asan_panic(
                 c"memalign - align is not a multiple of pointer size".as_ptr() as *const c_char,
             );

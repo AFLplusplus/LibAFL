@@ -4,20 +4,20 @@
 pub use crate::exit::libc::abort;
 #[cfg(feature = "libc")]
 pub use crate::exit::libc::exit;
-#[cfg(all(feature = "linux", target_os = "linux", not(feature = "libc")))]
+#[cfg(all(feature = "syscalls", target_os = "linux", not(feature = "libc")))]
 pub use crate::exit::linux::abort;
-#[cfg(all(feature = "linux", target_os = "linux", not(feature = "libc")))]
+#[cfg(all(feature = "syscalls", target_os = "linux", not(feature = "libc")))]
 pub use crate::exit::linux::exit;
 
 #[cfg(feature = "libc")]
 pub mod libc;
 
-#[cfg(all(feature = "linux", target_os = "linux"))]
+#[cfg(all(feature = "syscalls", target_os = "linux"))]
 pub mod linux;
 
 #[cfg(all(
     not(feature = "libc"),
-    not(all(feature = "linux", target_os = "linux"))
+    not(all(feature = "syscalls", target_os = "linux"))
 ))]
 pub fn abort() -> ! {
     loop {}
@@ -25,7 +25,7 @@ pub fn abort() -> ! {
 
 #[cfg(all(
     not(feature = "libc"),
-    not(all(feature = "linux", target_os = "linux"))
+    not(all(feature = "syscalls", target_os = "linux"))
 ))]
 pub fn exit(_status: core::ffi::c_int) -> ! {
     loop {}
