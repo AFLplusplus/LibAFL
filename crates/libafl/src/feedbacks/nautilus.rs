@@ -1,7 +1,10 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
-use alloc::{borrow::Cow, string::String};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+};
 use core::fmt::Debug;
-use std::{fs::create_dir_all, string::ToString};
+use std::fs::create_dir_all;
 
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
@@ -130,7 +133,7 @@ libafl_bolts::impl_serdeany!(NautilusUnparseMetadata);
 
 /// Add the unparsed input to the testcase metadata. Useful e.g. if you want to have the input be unparsed on any solution automatically.
 ///
-/// Returns a constant `false` for is_interesting.
+/// Returns a constant `false` for `is_interesting`.
 #[derive(Debug)]
 pub struct NautilusUnparseToMetadataFeedback<'a> {
     context: &'a NautilusContext,
