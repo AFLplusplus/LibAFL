@@ -7,7 +7,7 @@ mod tests {
     use libafl_asan::{
         GuestAddr,
         allocator::frontend::{AllocatorFrontend, default::DefaultFrontend},
-        mmap::{Mmap, linux::MmapRegion},
+        mmap::{Mmap, unix::MmapRegion},
         shadow::{
             Shadow,
             guest::{DefaultShadowLayout, GuestShadow},
