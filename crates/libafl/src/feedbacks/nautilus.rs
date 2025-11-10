@@ -127,6 +127,8 @@ struct NautilusUnparseMetadata {
 }
 
 /// Add the unparsed input to the testcase metadata. Useful e.g. if you want to have the input be unparsed on any solution automatically.
+///
+/// Returns a constant `false` for is_interesting.
 #[derive(Debug)]
 pub struct NautilusUnparseToMetadataFeedback<'a> {
     context: &'a NautilusContext,
