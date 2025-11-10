@@ -73,7 +73,7 @@ where
             .set_len(0)
             .map_err(|e| Error::illegal_state(format!("Failed to clear Nyx stdout: {e}")))?;
         self.helper.nyx_stdout.rewind()?;
-        
+
         let size = u32::try_from(buffer.len())
             .map_err(|_| Error::unsupported("Inputs larger than 4GB are not supported"))?;
 
