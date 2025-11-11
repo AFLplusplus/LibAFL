@@ -34,5 +34,17 @@ serde = { workspace = true, features = ["alloc", "derive"] }
 libafl_core = { workspace = true, features = ["alloc", "std"] }
 libc = { workspace = true }
 
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_Console",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_Kernel",
+  "Win32_System_Memory",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+] }
+
 [lints]
 workspace = true

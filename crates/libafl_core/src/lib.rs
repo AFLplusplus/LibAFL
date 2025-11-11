@@ -60,7 +60,11 @@ type String = &'static str;
 #[cfg(not(feature = "alloc"))]
 macro_rules! format {
     ($fmt:literal) => {{ $fmt }};
-    ($fmt:literal, $($arg:tt)*) => {{ $fmt }};
+    ($fmt:literal, $($arg:tt)*) => {{
+        // make sure the variables don't trigger unused-variable warnings
+        let _ = ($($arg)*);
+        $fmt
+    }};
 }
 /// Re-export of the "format" macro
 #[cfg(feature = "alloc")]

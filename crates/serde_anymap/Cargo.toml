@@ -47,10 +47,15 @@ ctor = { workspace = true, optional = true }
 erased-serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] }
-hashbrown = { workspace = true }
+hashbrown = { workspace = true, features = [
+  "default-hasher",
+  "raw-entry",
+  "alloc",
+  "serde",
+] }
 libafl_core = { workspace = true }
 postcard = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 static_assertions = { workspace = true }
 
 [lints]

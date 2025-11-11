@@ -1,8 +1,8 @@
-# MinBSOD: Create a dump of registers, stacktrace, and program state
+# `MiniBSOD`: Create a dump of registers, stacktrace, and program state
 
 <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
-The `minibsod` crate provides a cross-platform library to generate a "mini blue screen of death" (MinBSOD) on program crashes. It is designed to provide developers with a quick overview of the program's state at the time of a critical failure. This is particularly useful for debugging and triaging crashes in complex applications, such as fuzzing targets.
+The `minibsod` crate provides a cross-platform library to generate a "mini blue screen of death" (`MinBSOD`) on program crashes. It is designed to provide developers with a quick overview of the program's state at the time of a critical failure. This is particularly useful for debugging and triaging crashes in complex applications, such as fuzzing targets.
 
 `minibsod` is a part of the [LibAFL](https://github.com/AFLplusplus/LibAFL) project.
 

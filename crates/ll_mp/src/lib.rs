@@ -142,7 +142,7 @@ use std::{
 use exceptional::unix_signals::SignalHandler;
 #[cfg(all(unix, feature = "alloc", not(miri)))]
 use exceptional::unix_signals::setup_signal_handler;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "alloc"))]
 use exceptional::unix_signals::{Signal, siginfo_t, ucontext_t};
 #[cfg(all(windows, feature = "std"))]
 use exceptional::windows_exceptions::{CtrlHandler, setup_ctrl_handler};
@@ -2627,7 +2627,7 @@ where
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     /// On std, if you need to run code even if no update got sent, use `Self::loop_with_timeout` (needs the `std` feature).
     pub fn loop_forever(&mut self, sleep_time: Option<Duration>) {
-        #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
+        #[cfg(all(feature = "std", not(miri)))]
         Self::setup_handlers();
 
         while !self.inner.is_shutting_down() {
