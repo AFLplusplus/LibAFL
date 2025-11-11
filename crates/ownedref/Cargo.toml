@@ -30,7 +30,7 @@ document-features = ["dep:document-features"]
 std = ["alloc"]
 
 ## Enables all features that allocate in `no_std`
-alloc = []
+alloc = ["serde/alloc"]
 
 [build-dependencies]
 rustversion = { workspace = true }
