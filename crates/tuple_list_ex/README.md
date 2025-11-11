@@ -1,4 +1,4 @@
-# Tuple_List_Ex: Added functionality for tuple_lists
+# `Tuple_List_Ex`: Added functionality for `tuple_lists`
 
 <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
@@ -13,6 +13,7 @@ This crate provides a variety of traits that extend the functionality of `tuple_
 ### `MatchFirstType`
 
 Get the first element of a specific type from a tuple list.
+
 ```rust
 use tuple_list::tuple_list;
 use tuple_list_ex::MatchFirstType;
@@ -31,6 +32,7 @@ assert_eq!(first_f64, Some(&3.0));
 ### `Prepend`, `Append`, and `Merge`
 
 Modify tuple lists by adding elements or merging them.
+
 ```rust
 use tuple_list::tuple_list;
 use tuple_list_ex::{Prepend, Append, Merge};
@@ -54,6 +56,7 @@ assert_eq!(merged, (true, (1, ("hello", (4, (5, ()))))));
 ### `NamedTuple` and `MatchName`
 
 Access elements by name for tuples containing `Named` elements.
+
 ```rust
 # #[cfg(feature = "alloc")]
 # {
@@ -89,35 +92,35 @@ assert_eq!(second.unwrap().name(), "second");
 
 This crate has the following features:
 
-*   `std`: (Default) Enables features that require the standard library.
-*   `alloc`: (Default) Enables features that require allocation, like `IntoVec` and `NamedTuple`.
-*   `serde`: Enables `serde` support for `Handle`.
+* `std`: (Default) Enables features that require the standard library.
+* `alloc`: (Default) Enables features that require allocation, like `IntoVec` and `NamedTuple`.
+* `serde`: Enables `serde` support for `Handle`.
 
 ## Provided Traits and Functionality
 
 Here is a list of the traits and functionality provided by this crate:
 
-*   **`SplitBorrow`**: Borrows each member of the tuple, returning a new tuple of references.
-*   **`IntoVec`**: Converts a tuple list into a `Vec`.
-*   **`HasConstLen`**: Provides the length of the tuple list as a const `usize`.
-*   **`MatchFirstType`**: Gets the first element of a specific type.
-*   **`ExtractFirstRefType`** and **`ExtractFirstRefMutType`**: Takes the first element of a given type.
-*   **`SplitBorrowExtractFirstType`**: A combination of `SplitBorrow` and `ExtractFirstRefType`.
-*   **`MatchType`**: Applies a function to all elements of a specific type.
-*   **`NamedTuple`**: For tuples where each element has a name.
-*   **`MatchName`**: Finds an element by its name.
-*   **`Handled`**, **`Handle`**, **`MatchNameRef`**: A system for referencing tuple elements by a handle (name + type).
-*   **`GetAll`**: Retrieves multiple elements from a tuple list using a list of handles.
-*   **`RefIndexable`**: Allows indexing a tuple list with `[]` using handles.
-*   **`Prepend`**: Adds an element to the beginning of a tuple list.
-*   **`Append`**: Adds an element to the end of a tuple list.
-*   **`Merge`**: Merges two tuple lists.
-*   **`Map`**, **`MappingFunctor`**: Maps each element of a tuple list to a new type.
-*   **Macros**:
-    *   `tuple_for_each!`: Iterates over a tuple.
-    *   `tuple_for_each_mut!`: Iterates over a tuple with mutable access.
-    *   `map_tuple_list_type!`: Gets the resulting type of a map operation.
-    *   `merge_tuple_list_type!`: Gets the resulting type of a merge operation.
+* **`SplitBorrow`**: Borrows each member of the tuple, returning a new tuple of references.
+* **`IntoVec`**: Converts a tuple list into a `Vec`.
+* **`HasConstLen`**: Provides the length of the tuple list as a const `usize`.
+* **`MatchFirstType`**: Gets the first element of a specific type.
+* **`ExtractFirstRefType`** and **`ExtractFirstRefMutType`**: Takes the first element of a given type.
+* **`SplitBorrowExtractFirstType`**: A combination of `SplitBorrow` and `ExtractFirstRefType`.
+* **`MatchType`**: Applies a function to all elements of a specific type.
+* **`NamedTuple`**: For tuples where each element has a name.
+* **`MatchName`**: Finds an element by its name.
+* **`Handled`**, **`Handle`**, **`MatchNameRef`**: A system for referencing tuple elements by a handle (name + type).
+* **`GetAll`**: Retrieves multiple elements from a tuple list using a list of handles.
+* **`RefIndexable`**: Allows indexing a tuple list with `[]` using handles.
+* **`Prepend`**: Adds an element to the beginning of a tuple list.
+* **`Append`**: Adds an element to the end of a tuple list.
+* **`Merge`**: Merges two tuple lists.
+* **`Map`**, **`MappingFunctor`**: Maps each element of a tuple list to a new type.
+* **Macros**:
+  * `tuple_for_each!`: Iterates over a tuple.
+  * `tuple_for_each_mut!`: Iterates over a tuple with mutable access.
+  * `map_tuple_list_type!`: Gets the resulting type of a map operation.
+  * `merge_tuple_list_type!`: Gets the resulting type of a merge operation.
 
 ## The `LibAFL` Project
 

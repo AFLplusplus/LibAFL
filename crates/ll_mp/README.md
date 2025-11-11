@@ -1,4 +1,4 @@
-# LL_MP: Low Level Message Passing for fast IPC.
+# `LL_MP`: Low Level Message Passing for fast IPC
 
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 

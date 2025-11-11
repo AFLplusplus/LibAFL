@@ -4007,6 +4007,7 @@ dependencies = [
  "libc",
  "mach2 0.4.3",
  "rustversion",
+ "windows 0.62.1",
 ]
 
 [[package]]
