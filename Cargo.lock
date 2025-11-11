@@ -7506,7 +7506,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5cf46e09874bd7db314139c7319ab506d1db771111dc3bc66f05496207540d0"
 dependencies = [
  "bindgen 0.72.1",
- "cmake",
  "pkg-config",
 ]
 
