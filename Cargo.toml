@@ -136,9 +136,7 @@ uuid = { version = "1.18.1", features = ["serde", "v4"] }
 which = "8.0.0"
 windows = "0.62.1"
 windows-core = "0.62.1"
-z3 = { git = "https://github.com/prove-rs/z3.rs", rev = "z3-v0.18.2", default-features = false, features = [
-  "bundled",
-] }
+z3 = { version = "0.19.2", default-features = false }
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
 
 [workspace.lints.rust]
