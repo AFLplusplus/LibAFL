@@ -2,7 +2,7 @@
 //! (C) Alec Mocatta <alec@mocatta.net> under license MIT or Apache 2
 //!
 //! Maintained by the `LibAFL` team.
-#![doc = include_str!("../../../README.md")]
+#![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,

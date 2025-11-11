@@ -1,7 +1,7 @@
 /*!
 The tinyinst module for `LibAFL`.
 */
-
+#![doc = include_str!("../README.md")]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,

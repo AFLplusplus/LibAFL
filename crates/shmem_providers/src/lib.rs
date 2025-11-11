@@ -1,6 +1,6 @@
 //! A generic shared memory region to be used by any functions (queues or feedbacks
 //! too.)
-#![doc = include_str!("../../../README.md")]
+#![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]

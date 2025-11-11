@@ -56,7 +56,7 @@ For broker2broker communication, all messages are forwarded via network sockets.
 Check out the `llmp_test` example in ./examples, or build it with `cargo run --example llmp_test`.
 
 */
-#![doc = include_str!("../../../README.md")]
+#![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]

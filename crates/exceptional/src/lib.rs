@@ -1,7 +1,7 @@
 /*!
  * Everything for your exception and signal handling needs
  */
-#![doc = include_str!("../../../README.md")]
+#![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]

@@ -1,7 +1,7 @@
 /*!
  * `LibAFL_core` contains core traits used across all crates, including the [`Error`] enum and various traits.
  */
-#![doc = include_str!("../../../README.md")]
+#![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]
