@@ -1,4 +1,4 @@
-# Fast_Rands: Get (non-cryptographically secure!) Random Numbers Faster.
+# `Fast_Rands`: Get (non-cryptographically secure!) Random Numbers Faster.
 
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
@@ -24,7 +24,7 @@ let below_100 = rand.below(NonZeroUsize::new(100).unwrap());
 let between_50_and_100 = rand.between(50, 100);
 ```
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

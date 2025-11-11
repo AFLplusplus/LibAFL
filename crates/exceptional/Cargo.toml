@@ -27,7 +27,7 @@ document-features = ["dep:document-features"]
 #! ### General Features
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = ["nix", "libafl_core/std"]
+std = ["nix", "libafl_core/std", "alloc"]
 
 ## Enables all features that allocate in `no_std`
 alloc = ["libafl_core/alloc"]

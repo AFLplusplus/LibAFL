@@ -69,7 +69,7 @@ fn main() {
 
 On Windows, you would use a similar approach with `SetUnhandledExceptionFilter` to set up a top-level exception handler.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

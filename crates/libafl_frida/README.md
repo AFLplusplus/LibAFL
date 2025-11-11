@@ -4,7 +4,7 @@
 
 The `libafl_frida` crate offers binary-only instrumentation for `LibAFL` using the Frida dynamic instrumentation toolkit. It allows fuzzing closed-source binaries and applications on various platforms, including Android and iOS.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

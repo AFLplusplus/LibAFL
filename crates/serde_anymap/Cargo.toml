@@ -30,7 +30,7 @@ document-features = ["dep:document-features"]
 std = ["alloc", "libafl_core/std"]
 
 ## Enables all features that allocate in `no_std`
-alloc = ["erased-serde/alloc", "libafl_core/alloc"]
+alloc = ["erased-serde", "erased-serde/alloc", "libafl_core/alloc"]
 
 ## Create keys that are more stable between compilations
 stable_anymap = []
@@ -47,7 +47,7 @@ document-features = { workspace = true, optional = true }
 
 ahash = { workspace = true }
 ctor = { workspace = true, optional = true }
-erased-serde = { workspace = true, default-features = false }
+erased-serde = { workspace = true, default-features = false, optional = true }
 hashbrown = { workspace = true }
 libafl_core = { workspace = true }
 postcard = { workspace = true }

@@ -138,10 +138,12 @@ use std::{
     thread,
 };
 
+#[cfg(all(unix, feature = "alloc"))]
+use exceptional::unix_signals::SignalHandler;
 #[cfg(all(unix, feature = "alloc", not(miri)))]
 use exceptional::unix_signals::setup_signal_handler;
 #[cfg(unix)]
-use exceptional::unix_signals::{Signal, SignalHandler, siginfo_t, ucontext_t};
+use exceptional::unix_signals::{Signal, siginfo_t, ucontext_t};
 #[cfg(all(windows, feature = "std"))]
 use exceptional::windows_exceptions::{CtrlHandler, setup_ctrl_handler};
 #[cfg(feature = "std")]

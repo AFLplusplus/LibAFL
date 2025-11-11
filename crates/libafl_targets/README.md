@@ -4,7 +4,7 @@
 
 The `libafl_targets` crate provides target-specific code that can be injected into programs for `LibAFL` fuzzing. This includes various instrumentation techniques and helper functions to facilitate the fuzzing process.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

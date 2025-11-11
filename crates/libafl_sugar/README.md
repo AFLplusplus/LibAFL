@@ -4,7 +4,7 @@
 
 The `libafl_sugar` crate offers high-level, usable wrappers for `LibAFL`, simplifying common fuzzing tasks and providing a more ergonomic API for building fuzzers. It aims to reduce boilerplate and make `LibAFL` more accessible to new users, while still retaining the flexibility and power of the underlying framework.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

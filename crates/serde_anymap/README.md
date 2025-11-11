@@ -171,7 +171,7 @@ assert_eq!(deserialized.get::<UserData>("user1").unwrap().0, "Alice");
 - `serdeany_autoreg`: Enables automatic type registration at program startup. Highly recommended.
 - `stable_anymap`: Uses the type name (`&'static str`) as the key instead of `TypeId`. This makes the serialized output more stable across different compilations, but it can be slightly slower and may cause issues if you have types with the same name in different modules.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

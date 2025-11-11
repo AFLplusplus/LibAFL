@@ -133,7 +133,7 @@ fn main() {
 It is _not_ related to LLMs, nor to LLVM.
 Although it is probably more related to LLVM than LLMs.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

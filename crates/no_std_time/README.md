@@ -73,7 +73,7 @@ assert_eq!(formatted, "1h-1m-1s");
 - `std` (default): Enables functionality that depends on the standard library, such as getting the system time automatically.
 - `alloc` (default): Enables features that require heap allocation, such as `format_duration`.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

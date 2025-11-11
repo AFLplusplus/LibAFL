@@ -1,10 +1,10 @@
-# LibAFL_core: Minimal set of core functions shared between LibAFL crates
+# `LibAFL_core`: Minimal set of core functions shared between `LibAFL` crates
 
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
 The `libafl_core` crate has a range of useful functions shared across the [`LibAFL`](https://github.com/AFLplusplus/LibAFL) codebase.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

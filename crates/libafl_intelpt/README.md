@@ -7,7 +7,7 @@ At the moment only `Linux` hosts are supported.
 You can run `sudo -E cargo test intel_pt_check_availability -- --show-output` to check if your host has all the features
 used by this crate.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

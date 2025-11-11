@@ -28,6 +28,7 @@ document-features = ["dep:document-features"]
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
 std = [
+  "alloc",
   "libafl_core/std",
   "uds",
   "nix",

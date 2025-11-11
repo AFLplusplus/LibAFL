@@ -4,7 +4,7 @@
 
 The `libafl_unicorn` crate offers an interface to the Unicorn Engine, a lightweight, multi-platform, multi-architecture CPU emulator framework. It allows `LibAFL` to fuzz targets that require emulation, providing fine-grained control over the emulated environment, including memory, registers, and I/O. This enables fuzzing of firmware, embedded systems, and other scenarios where direct execution is not feasible or desirable.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

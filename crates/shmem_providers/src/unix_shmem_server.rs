@@ -39,6 +39,7 @@ use std::{
     thread,
 };
 
+#[cfg(feature = "alloc")]
 use hashbrown::HashMap;
 use nix::poll::PollTimeout;
 #[cfg(all(feature = "std", unix))]

@@ -4,7 +4,7 @@
 
 The `libafl_derive` crate offers derive macros, such as `#[derive(SerdeAny)]`.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

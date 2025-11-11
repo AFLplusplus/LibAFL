@@ -28,12 +28,12 @@ document-features = ["dep:document-features"]
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
 std = [
-  "libafl_core/std",
-  "shmem_providers/std",
   "alloc",
+  "hostname",
+  "libafl_core/std",
   "nix",
   "serial_test",
-  "hostname",
+  "shmem_providers/std",
 ]
 
 ## Enables all features that allocate in `no_std`

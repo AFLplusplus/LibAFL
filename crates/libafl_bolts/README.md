@@ -2,19 +2,19 @@
 
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
-The `libafl_bolts` crate exposes a lot of low-level features of LibAFL for projects that are unrelated to fuzzing, or just fuzzers completely different to LibAFL.
+The `libafl_bolts` crate is a toolshed combinding a lot of low-level features and crates LibAFL uses. It can be a good starting point for low-level projects, even those that are not specifically fuzzers.
 Some cross-platform things in bolts include (but are not limited to):
 
-* SerdeAnyMap: a map that stores and retrieves elements by type and is serializable and deserializable
-* ShMem: A cross-platform (Windows, Linux, Android, MacOS) shared memory implementation
-* LLMP: A fast, lock-free IPC mechanism via SharedMap
-* Core_affinity: A maintained version of `core_affinity` that can be used to get core information and bind processes to cores
-* Rands: Fast random number generators for fuzzing (like [RomuRand](https://www.romu-random.org/))
-* MiniBSOD: get and print information about the current process state including important registers.
-* Tuples: Haskel-like compile-time tuple lists
-* Os: OS specific stuff like signal handling, windows exception handling, pipes, and helpers for `fork`
+* `SerdeAnyMap`: a map that stores and retrieves elements by type and is serializable and deserializable
+* `ShMem`: A cross-platform (Windows, Linux, Android, MacOS) shared memory implementation
+* `LL_MP`: A fast, lock-free IPC mechanism via SharedMap
+* `Core_affinity`: A maintained version of `core_affinity` that can be used to get core information and bind processes to cores
+* `Rands`: Fast random number generators for fuzzing (like [RomuRand](https://www.romu-random.org/))
+* `MiniBSOD`: get and print information about the current process state including important registers.
+* `Tuples`: Haskel-like compile-time tuple lists
+* `Os`: OS specific stuff like signal handling, windows exception handling, pipes, and helpers for `fork`
 
-LibAFL_bolts is written and maintained by
+`LibAFL_bolts` is written and maintained by
 
 * [Andrea Fioraldi](https://twitter.com/andreafioraldi) <andrea@aflplus.plus>
 * [Dominik Maier](https://twitter.com/domenuk) <dominik@aflplus.plus>

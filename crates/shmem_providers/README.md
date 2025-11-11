@@ -31,7 +31,7 @@ The crate also includes advanced abstractions for complex scenarios:
 - **`ShMemService`**: A server-based provider for platforms that require a central process to manage shared memory lifecycles. This is particularly useful on macOS.
 - **`RcShMemProvider`**: A reference-counted wrapper that allows a provider to be safely shared across threads and handles the necessary setup and teardown logic across `fork()` calls in multi-process applications.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

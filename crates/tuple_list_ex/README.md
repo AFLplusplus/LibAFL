@@ -119,7 +119,7 @@ Here is a list of the traits and functionality provided by this crate:
     *   `map_tuple_list_type!`: Gets the resulting type of a map operation.
     *   `merge_tuple_list_type!`: Gets the resulting type of a merge operation.
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 

@@ -34,7 +34,7 @@ if local_build_id == remote_build_id {
 }
 ```
 
-## The LibAFL Project
+## The `LibAFL` Project
 
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 
