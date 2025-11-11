@@ -1229,7 +1229,9 @@ mod tests {
 
     use std::io::{BufWriter, stdout};
 
-    use crate::{minibsod::dump_registers, os::unix_signals::ucontext};
+    use exceptional::unix_signals::ucontext;
+
+    use crate::dump_registers;
 
     #[test]
     #[cfg_attr(miri, ignore)]

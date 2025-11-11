@@ -32,7 +32,7 @@ std = ["alloc"]
 alloc = []
 
 ## Stores the backtraces of all generated `Error`s. Good for debugging, but may come with a slight performance hit.
-errors_backtrace = ["dep:backtrace"]
+errors_backtrace = ["std", "dep:backtrace"]
 
 ## Enable python error conversion
 python = ["dep:pyo3"]

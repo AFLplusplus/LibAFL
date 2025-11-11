@@ -692,6 +692,7 @@ pub mod pybind {
         Ok(())
     }
 
+    #[macro_export]
     /// Unwrap the mutable body of this wrapper
     macro_rules! unwrap_me_mut_body {
         ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}) => {

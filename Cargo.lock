@@ -2094,9 +2094,12 @@ dependencies = [
  "document-features",
  "libafl_core",
  "libc",
+ "log",
  "nix 0.30.1",
  "num_enum",
  "rustversion",
+ "windows 0.62.1",
+ "windows-core 0.62.1",
 ]
 
 [[package]]

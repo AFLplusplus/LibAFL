@@ -10,6 +10,7 @@ use core::{
 };
 use std::os::raw::{c_long, c_void};
 
+use libafl_core::Error;
 use num_enum::FromPrimitive;
 pub use windows::Win32::{
     Foundation::NTSTATUS,
@@ -22,8 +23,6 @@ pub use windows::Win32::{
     },
 };
 pub use windows_core::BOOL;
-
-use crate::Error;
 
 /// The special exit code when the target exited through ctrl-c
 pub const CTRL_C_EXIT: i32 = -1073741510;

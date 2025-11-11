@@ -12,7 +12,7 @@ pub struct ClientPerfStats {
     /// Starting counter (in clock cycles from [`no_std_time::read_time_counter`])
     start_time: u64,
 
-    /// Current counter in the fuzzer (in clock cycles from [no_std_time::read_time_counter`])
+    /// Current counter in the fuzzer (in clock cycles from [`no_std_time::read_time_counter`])
     current_time: u64,
 
     /// Clock cycles spent in the scheduler
