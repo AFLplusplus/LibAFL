@@ -1,9 +1,9 @@
-# build_id2: a maintained way to uniquely represent the build of the current binary
+# `build_id2`: A maintained way to uniquely represent the build of the current binary
 
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
-The `build_id2` crate is a maintained and updated fork of build_id.
-With it, you can obtain a Uuid uniquely representing the build of the current binary.
+The `build_id2` crate is a maintained and updated fork of `build_id`.
+With it, you can obtain a `Uuid` uniquely representing the build of the current binary.
 
 This is intended to be used to check that different processes are indeed invocations of identically laid out binaries.
 
