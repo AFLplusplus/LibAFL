@@ -62,6 +62,7 @@ use core::{
     ops::{Deref, DerefMut, Index, IndexMut},
 };
 
+#[cfg(feature = "alloc")]
 use libafl_core::Named;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

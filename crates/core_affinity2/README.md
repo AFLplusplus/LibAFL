@@ -1,4 +1,4 @@
-# Core_Affinity2: Manage CPU affinities even harder
+# `Core_Affinity2`: Manage CPU affinities even harder
 
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
@@ -27,30 +27,28 @@ Here is an example of how to get the available core IDs and spawn a thread for e
 use std::thread;
 use core_affinity2::{get_core_ids, CoreId};
 
-fn main() {
-    // Get the available core IDs
-    if let Some(core_ids) = get_core_ids() {
-        let core_count = core_ids.len();
-        println!("Found {} cores:", core_count);
+// Get the available core IDs
+if let Some(core_ids) = get_core_ids() {
+    let core_count = core_ids.len();
+    println!("Found {} cores:", core_count);
 
-        let handles: Vec<_> = core_ids.into_iter().map(|id| {
-            thread::spawn(move || {
-                // Pin this thread to a single CPU core.
-                if id.set_affinity().is_ok() {
-                    println!("Thread {:?} is running on core {:?}", thread::current().id(), id);
-                    // Do some work here
-                } else {
-                    eprintln!("Could not pin thread to core {:?}", id);
-                }
-            })
-        }).collect();
+    let handles: Vec<_> = core_ids.into_iter().map(|id| {
+        thread::spawn(move || {
+            // Pin this thread to a single CPU core.
+            if id.set_affinity().is_ok() {
+                println!("Thread {:?} is running on core {:?}", thread::current().id(), id);
+                // Do some work here
+            } else {
+                eprintln!("Could not pin thread to core {:?}", id);
+            }
+        })
+    }).collect();
 
-        for handle in handles {
-            handle.join().unwrap();
-        }
-    } else {
-        println!("Could not get core IDs.");
+    for handle in handles {
+        handle.join().unwrap();
     }
+} else {
+    println!("Could not get core IDs.");
 }
 ```
 
@@ -75,7 +73,7 @@ assert_eq!(cores.ids, vec![0.into(), 2.into(), 3.into(), 4.into(), 7.into()]);
 
 - Linux
 - Windows
-- macOS (x86_64 and aarch64)
+- macOS (`x86_64` and `aarch64`)
 - FreeBSD
 - NetBSD
 - OpenBSD

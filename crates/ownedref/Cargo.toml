@@ -42,7 +42,7 @@ rustversion = { workspace = true }
 document-features = { workspace = true, optional = true }
 
 libafl_core = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true
