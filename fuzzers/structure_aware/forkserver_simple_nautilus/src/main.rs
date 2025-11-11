@@ -6,9 +6,9 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
-    feedback_and_fast, feedback_or,
+    feedback_and_fast, feedback_not,
     feedbacks::{
-        ConstFeedback, CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback,
+        CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback,
         NautilusUnparseToMetadataFeedback, TimeFeedback,
     },
     fuzzer::Fuzzer,
@@ -142,10 +142,8 @@ pub fn main() {
         // Uses `with_name` to create a different history from the `MaxMapFeedback` in `feedback` above
         MaxMapFeedback::with_name("mapfeedback_metadata_objective", &edges_observer),
         // Append the unparsed input to the metadata for crashes
-        feedback_or!(
-            NautilusUnparseToMetadataFeedback::new(&context), // this always returns false for is_interesting
-            ConstFeedback::new(true), // so we combine it with a const feedback to always return true
-        )
+        // this always returns false for is_interesting, so we invert it
+        feedback_not!(NautilusUnparseToMetadataFeedback::new(&context))
     );
 
     // create a State from scratch
