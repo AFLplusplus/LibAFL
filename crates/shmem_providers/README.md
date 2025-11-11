@@ -2,7 +2,7 @@
 
 <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
-`shmem_providers` is a crate that provides a unified, cross-platform API for creating and using shared memory. Shared memory is a key component for high-performance inter-process communication (IPC), which is essential for fuzzing with LibAFL. For example, it's used to share coverage maps, corpus inputs, or other data between the fuzzer process and the target application without expensive copies.
+`shmem_providers` is a crate that provides a unified, cross-platform API for creating and using shared memory. Shared memory is a key component for high-performance inter-process communication (IPC), which is essential for fuzzing with `LibAFL`. For example, it's used to share coverage maps, corpus inputs, or other data between the fuzzer process and the target application without expensive copies.
 
 This crate abstracts away the platform-specific details of shared memory implementation, allowing developers to write portable code that works across Windows, Linux, macOS, Android, and other Unix-like systems.
 

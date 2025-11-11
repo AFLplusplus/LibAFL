@@ -1,4 +1,4 @@
-# OwnedRef: Owned references for the masses
+# `OwnedRef`: Owned references for the masses
 
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
@@ -40,27 +40,25 @@ struct MyStruct<'a> {
     data: OwnedRef<'a, [u8]>,
 }
 
-fn main() {
-    // Create an instance with a borrowed reference.
-    let data = vec![1, 2, 3, 4];
-    let borrowed_struct = MyStruct { data: OwnedRef::Ref(data.as_slice()) };
+// Create an instance with a borrowed reference.
+let data = vec![1, 2, 3, 4];
+let borrowed_struct = MyStruct { data: OwnedRef::Ref(data.as_slice()) };
 
-    // You can access the data using `as_ref`.
-    assert_eq!(borrowed_struct.data.as_ref(), &[1, 2, 3, 4]);
+// You can access the data using `as_ref`.
+assert_eq!(borrowed_struct.data.as_ref(), &[1, 2, 3, 4]);
 
-    // Serialize the struct. This will copy the data.
-    let serialized = serde_json::to_string(&borrowed_struct).unwrap();
-    println!("Serialized: {}", serialized);
+// Serialize the struct. This will copy the data.
+let serialized = serde_json::to_string(&borrowed_struct).unwrap();
+println!("Serialized: {}", serialized);
 
-    // Deserialize the struct. This will create an owned value.
-    let deserialized_struct: MyStruct = serde_json::from_str(&serialized).unwrap();
-    assert_eq!(deserialized_struct.data.as_ref(), &[1, 2, 3, 4]);
+// Deserialize the struct. This will create an owned value.
+let deserialized_struct: MyStruct = serde_json::from_str(&serialized).unwrap();
+assert_eq!(deserialized_struct.data.as_ref(), &[1, 2, 3, 4]);
 
-    // The deserialized struct now owns the data.
-    match deserialized_struct.data {
-        OwnedRef::Owned(_) => println!("Data is owned."),
-        _ => panic!("Data should be owned after deserialization."),
-    }
+// The deserialized struct now owns the data.
+match deserialized_struct.data {
+    OwnedRef::Owned(_) => println!("Data is owned."),
+    _ => panic!("Data should be owned after deserialization."),
 }
 ```
 

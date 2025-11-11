@@ -1,4 +1,4 @@
-# Serde_AnyMap: A serializable map that stores and retrieves elements by type.
+# `Serde_AnyMap`: A serializable map that stores and retrieves elements by type.
 
 <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
@@ -128,16 +128,14 @@ If you cannot use `serdeany_autoreg`, you must register your types manually at t
 ```rust
 use serde_anymap::serdeany::RegistryBuilder;
 
-fn main() {
-    // This must be done before any deserialization happens.
-    // It is safe to call multiple times.
-    unsafe {
-        RegistryBuilder::register::<MyConfig>();
-        RegistryBuilder::register::<UserData>();
-    }
-    
-    // Your application logic...
+// This must be done before any deserialization happens.
+// It is safe to call multiple times.
+unsafe {
+    RegistryBuilder::register::<MyConfig>();
+    RegistryBuilder::register::<UserData>();
 }
+
+// Your application logic...
 ```
 
 ## `NamedSerdeAnyMap`
