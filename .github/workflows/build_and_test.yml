@@ -148,11 +148,6 @@ jobs:
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - name: Setup Z3
-        id: z3
-        uses: cda-tum/setup-z3@v1
-        with:
-          add_to_library_path: true
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
@@ -898,6 +893,11 @@ jobs:
       - common
     steps:
       - uses: dtolnay/rust-toolchain@stable
+      - name: Setup Z3
+        id: z3
+        uses: cda-tum/setup-z3@v1
+        with:
+          add_to_library_path: true
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - uses: Swatinem/rust-cache@v2
