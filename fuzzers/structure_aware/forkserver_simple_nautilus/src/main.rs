@@ -6,7 +6,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
-    feedback_and_fast, feedback_not,
+    feedback_and_fast, feedback_not, feedback_or,
     feedbacks::{
         CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback,
         NautilusUnparseToMetadataFeedback, TimeFeedback,
