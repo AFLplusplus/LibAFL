@@ -8,7 +8,7 @@ use libafl_asan::{
         backend::dlmalloc::DlmallocBackend,
         frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
-    mmap::linux::LinuxMmap,
+    mmap::unix::MmapRegion,
     shadow::{
         Shadow,
         guest::{DefaultShadowLayout, GuestShadow},
@@ -19,8 +19,8 @@ use libfuzzer_sys::fuzz_target;
 use log::info;
 
 type DF = DefaultFrontend<
-    DlmallocBackend<LinuxMmap>,
-    GuestShadow<LinuxMmap, DefaultShadowLayout>,
+    DlmallocBackend<MmapRegion>,
+    GuestShadow<MmapRegion, DefaultShadowLayout>,
     GuestTracking,
 >;
 
@@ -28,8 +28,8 @@ const PAGE_SIZE: usize = 4096;
 
 static INIT_ONCE: LazyLock<Mutex<DF>> = LazyLock::new(|| {
     env_logger::init();
-    let backend = DlmallocBackend::<LinuxMmap>::new(PAGE_SIZE);
-    let shadow = GuestShadow::<LinuxMmap, DefaultShadowLayout>::new().unwrap();
+    let backend = DlmallocBackend::<MmapRegion>::new(PAGE_SIZE);
+    let shadow = GuestShadow::<MmapRegion, DefaultShadowLayout>::new().unwrap();
     let tracking = GuestTracking::new().unwrap();
     let frontend = DF::new(
         backend,

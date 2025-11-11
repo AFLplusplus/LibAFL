@@ -1,13 +1,13 @@
 extern crate alloc;
 
-#[cfg(all(test, feature = "linux", target_os = "linux"))]
+#[cfg(all(test, feature = "syscalls", target_os = "linux"))]
 mod tests {
     use alloc::alloc::{GlobalAlloc, Layout};
 
     use libafl_asan::{
         GuestAddr,
         allocator::frontend::{AllocatorFrontend, default::DefaultFrontend},
-        mmap::{Mmap, linux::LinuxMmap},
+        mmap::{Mmap, unix::MmapRegion},
         shadow::{
             Shadow,
             guest::{DefaultShadowLayout, GuestShadow},
@@ -52,7 +52,7 @@ mod tests {
         Mutex::new({
             env_logger::init();
             let backend = MockBackend::new();
-            let shadow = GuestShadow::<LinuxMmap, DefaultShadowLayout>::new().unwrap();
+            let shadow = GuestShadow::<MmapRegion, DefaultShadowLayout>::new().unwrap();
             let tracking = GuestTracking::new().unwrap();
             DF::new(
                 backend,
@@ -65,10 +65,10 @@ mod tests {
         })
     });
 
-    static MAP: Lazy<LinuxMmap> = Lazy::new(|| LinuxMmap::map(MAX_ADDR).unwrap());
+    static MAP: Lazy<MmapRegion> = Lazy::new(|| MmapRegion::map(MAX_ADDR).unwrap());
 
     type DF =
-        DefaultFrontend<MockBackend, GuestShadow<LinuxMmap, DefaultShadowLayout>, GuestTracking>;
+        DefaultFrontend<MockBackend, GuestShadow<MmapRegion, DefaultShadowLayout>, GuestTracking>;
 
     fn frontend() -> MutexGuard<'static, DF> {
         INIT_ONCE.lock()

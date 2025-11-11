@@ -18,7 +18,7 @@ Following the naming convention of the folders in the project's root, they are:
 This is the main crate that contains all the components needed to build a fuzzer.
 
 This crate has a number of feature flags that enable and disable certain aspects of LibAFL.
-The features can be found in [LibAFL's `Cargo.toml`](https://github.com/AFLplusplus/LibAFL/blob/main/libafl/Cargo.toml) under "`[features]`", and are usually explained with comments there.
+The features can be found in [LibAFL's `Cargo.toml`](https://github.com/AFLplusplus/LibAFL/blob/main/crates/libafl/Cargo.toml) under "`[features]`", and are usually explained with comments there.
 Some features worthy of remark are:
 
 - `std` enables the parts of the code that use the Rust standard library. Without this flag, LibAFL is `no_std` compatible. This disables a range of features, but allows us to use LibAFL in embedded environments, read [the `no_std` section](../advanced_features/no_std.md) for further details.

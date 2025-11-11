@@ -9,7 +9,7 @@ use std::{
 use libafl_asan::{
     GuestAddr,
     allocator::frontend::{AllocatorFrontend, default::DefaultFrontend},
-    mmap::{Mmap, linux::LinuxMmap},
+    mmap::{Mmap, unix::MmapRegion},
     shadow::{
         Shadow,
         guest::{DefaultShadowLayout, GuestShadow},
@@ -52,14 +52,14 @@ unsafe impl GlobalAlloc for MockBackend {
 #[derive(Error, Debug, PartialEq)]
 pub enum MockBackendError {}
 
-type DF = DefaultFrontend<MockBackend, GuestShadow<LinuxMmap, DefaultShadowLayout>, GuestTracking>;
+type DF = DefaultFrontend<MockBackend, GuestShadow<MmapRegion, DefaultShadowLayout>, GuestTracking>;
 
-static MAP: LazyLock<LinuxMmap> = LazyLock::new(|| LinuxMmap::map(MAX_ADDR).unwrap());
+static MAP: LazyLock<MmapRegion> = LazyLock::new(|| MmapRegion::map(MAX_ADDR).unwrap());
 
 static INIT_ONCE: LazyLock<Mutex<DF>> = LazyLock::new(|| {
     env_logger::init();
     let backend = MockBackend::new();
-    let shadow = GuestShadow::<LinuxMmap, DefaultShadowLayout>::new().unwrap();
+    let shadow = GuestShadow::<MmapRegion, DefaultShadowLayout>::new().unwrap();
     let tracking = GuestTracking::new().unwrap();
     let frontend = DF::new(
         backend,
