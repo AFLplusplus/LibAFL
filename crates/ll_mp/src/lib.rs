@@ -2494,7 +2494,7 @@ impl Brokers {
     pub fn loop_with_timeouts(&mut self, timeout: Duration, sleep_time: Option<Duration>) {
         use no_std_time::current_milliseconds;
 
-        #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
+        #[cfg(any(all(unix, feature = "alloc", not(miri)), all(windows, feature = "std")))]
         Self::setup_handlers();
 
         let timeout = timeout.as_millis() as u64;
@@ -2627,7 +2627,7 @@ where
     /// 5 millis of sleep can't hurt to keep busywait not at 100%
     /// On std, if you need to run code even if no update got sent, use `Self::loop_with_timeout` (needs the `std` feature).
     pub fn loop_forever(&mut self, sleep_time: Option<Duration>) {
-        #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
+        #[cfg(any(all(unix, feature = "alloc", not(miri)), all(windows, feature = "std")))]
         Self::setup_handlers();
 
         while !self.inner.is_shutting_down() {
