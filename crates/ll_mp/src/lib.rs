@@ -2314,7 +2314,7 @@ pub struct LlmpShutdownSignalHandler {
     shutting_down: bool,
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "alloc"))]
 impl SignalHandler for LlmpShutdownSignalHandler {
     unsafe fn handle(
         &mut self,

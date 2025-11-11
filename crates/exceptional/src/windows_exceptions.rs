@@ -586,7 +586,7 @@ pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(
 }
 
 #[cfg(feature = "std")]
-pub(crate) trait CtrlHandler {
+pub trait CtrlHandler {
     /// Handle an exception
     fn handle(&mut self, ctrl_type: u32) -> bool;
 }
@@ -605,7 +605,7 @@ static mut CTRL_HANDLER: Option<CtrlHandlerHolder> = None;
 /// # Safety
 /// Same safety considerations as in `setup_exception_handler`
 #[cfg(feature = "std")]
-pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
+pub unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
     handler: *mut T,
 ) -> Result<(), Error> {
     unsafe {

@@ -75,23 +75,21 @@ struct DataContainer<'a> {
     slice: OwnedSlice<'a, u32>,
 }
 
-fn main() {
-    // With a borrowed slice
-    let original_data = vec![10, 20, 30];
-    let container_borrowed = DataContainer {
-        slice: OwnedSlice::from(original_data.as_slice()),
-    };
+// With a borrowed slice
+let original_data = vec![10, 20, 30];
+let container_borrowed = DataContainer {
+    slice: OwnedSlice::from(original_data.as_slice()),
+};
 
-    assert_eq!(container_borrowed.slice.as_ref(), &[10, 20, 30]);
+assert_eq!(container_borrowed.slice.as_ref(), &[10, 20, 30]);
 
-    let serialized = serde_json::to_string(&container_borrowed).unwrap();
-    println!("Serialized: {}", serialized);
+let serialized = serde_json::to_string(&container_borrowed).unwrap();
+println!("Serialized: {}", serialized);
 
-    // Deserialize into an owned version
-    let container_deserialized: DataContainer = serde_json::from_str(&serialized).unwrap();
-    assert_eq!(container_deserialized.slice.as_ref(), &[10, 20, 30]);
-    assert!(container_deserialized.slice.is_owned());
-}
+// Deserialize into an owned version
+let container_deserialized: DataContainer = serde_json::from_str(&serialized).unwrap();
+assert_eq!(container_deserialized.slice.as_ref(), &[10, 20, 30]);
+assert!(container_deserialized.slice.is_owned());
 ```
 
 ## The `LibAFL` Project
