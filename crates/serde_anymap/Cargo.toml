@@ -48,10 +48,9 @@ erased-serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] }
 hashbrown = { workspace = true, features = [
+  "serde",
   "default-hasher",
   "raw-entry",
-  "alloc",
-  "serde",
 ] }
 libafl_core = { workspace = true }
 postcard = { workspace = true }

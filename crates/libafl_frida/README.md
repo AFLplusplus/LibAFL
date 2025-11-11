@@ -1,4 +1,4 @@
-# LibAFL_frida: Binary-Only Frida Instrumentation for LibAFL
+# `LibAFL_frida`: Binary-Only `Frida` Instrumentation for `LibAFL`
 
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
