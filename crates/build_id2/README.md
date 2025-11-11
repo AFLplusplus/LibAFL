@@ -1,20 +1,42 @@
-# LibAFL_bolts: OS and Fuzzer Dev's Libary Collection.
+# build_id2: a maintained way to uniquely represent the build of the current binary
 
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
-The `libafl_bolts` crate exposes a lot of low-level features of LibAFL for projects that are unrelated to fuzzing, or just fuzzers completely different to LibAFL.
-Some cross-platform things in bolts include (but are not limited to):
+The `build_id2` crate is a maintained and updated fork of build_id.
+With it, you can obtain a Uuid uniquely representing the build of the current binary.
 
-* SerdeAnyMap: a map that stores and retrieves elements by type and is serializable and deserializable
-* ShMem: A cross-platform (Windows, Linux, Android, MacOS) shared memory implementation
-* LLMP: A fast, lock-free IPC mechanism via SharedMap
-* Core_affinity: A maintained version of `core_affinity` that can be used to get core information and bind processes to cores
-* Rands: Fast random number generators for fuzzing (like [RomuRand](https://www.romu-random.org/))
-* MiniBSOD: get and print information about the current process state including important registers.
-* Tuples: Haskel-like compile-time tuple lists
-* Os: OS specific stuff like signal handling, windows exception handling, pipes, and helpers for `fork`
+This is intended to be used to check that different processes are indeed invocations of identically laid out binaries.
 
-LibAFL_bolts is written and maintained by
+As such:
+
+* It is guaranteed to be identical within multiple invocations of the same binary.
+* It is guaranteed to be different across binaries with different code or data segments or layout.
+* Equality is unspecified if the binaries have identical code and data segments and layout but differ immaterially (e.g. if a timestamp is included in the binary at compile time).
+
+## Usage
+
+Add the following to your `Cargo.toml`:
+
+```toml
+[dependencies]
+build_id2 = "0.15.4"
+```
+
+Then, you can use the `get` function to get the build id:
+
+```rust
+# let remote_build_id = build_id2::get();
+let local_build_id = build_id2::get();
+if local_build_id == remote_build_id {
+    println!("We're running the same binary as remote!");
+} else {
+    println!("We're running a different binary to remote");
+}
+```
+
+## The LibAFL Project
+
+The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 
 * [Andrea Fioraldi](https://twitter.com/andreafioraldi) <andrea@aflplus.plus>
 * [Dominik Maier](https://twitter.com/domenuk) <dominik@aflplus.plus>
@@ -27,12 +49,13 @@ LibAFL_bolts is written and maintained by
 For bugs, feel free to open issues or contact us directly. Thank you for your support. <3
 
 Even though we will gladly assist you in finishing up your PR, try to
-- keep all the crates compiling with *stable* rust (hide the eventual non-stable code under [`cfg`s](https://github.com/AFLplusplus/LibAFL/blob/main/crates/libafl/build.rs#L26))
-- run `cargo nightly fmt` on your code before pushing
-- check the output of `cargo clippy --all` or `./clippy.sh`
-- run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
 
-Some of the parts in this list may be hard, don't be afraid to open a PR if you cannot fix them by yourself, so we can help.
+* keep all the crates compiling with *stable* rust (hide the eventual non-stable code under `cfg`s.)
+* run `cargo nightly fmt` on your code before pushing
+* check the output of `cargo clippy --all` or `./clippy.sh`
+* run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
+
+Some parts in this list may sound hard, but don't be afraid to open a PR if you cannot fix them by yourself. We will gladly assist.
 
 #### License
 

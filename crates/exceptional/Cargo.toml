@@ -63,7 +63,7 @@ windows = { workspace = true, features = [
   "Win32_System_Memory",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
-]}
+] }
 windows-core = { workspace = true }
 
 [lints]

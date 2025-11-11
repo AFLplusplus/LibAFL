@@ -1660,10 +1660,7 @@ pub mod win32_shmem {
         core::PCSTR,
     };
 
-    use crate::{
-        Error,
-        shmem::{ShMem, ShMemId, ShMemProvider},
-    };
+    use crate::{Error, ShMem, ShMemId, ShMemProvider};
 
     const INVALID_HANDLE_VALUE: *mut c_void = -1isize as *mut c_void;
 

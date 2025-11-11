@@ -5665,6 +5665,8 @@ dependencies = [
  "serde",
  "serial_test",
  "uds",
+ "uuid",
+ "windows 0.62.1",
 ]
 
 [[package]]

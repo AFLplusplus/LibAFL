@@ -27,7 +27,7 @@ document-features = ["dep:document-features"]
 #! ### General Features
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = ["libafl_core/std", "uds", "nix", "libafl_core/nix", "serial_test"]
+std = ["libafl_core/std", "uds", "nix", "libafl_core/nix", "serial_test", "uuid"]
 
 ## Enables all features that allocate in `no_std`
 alloc = ["libafl_core/alloc", "hashbrown", "postcard", "libafl_core/postcard"]
@@ -54,6 +54,7 @@ hashbrown = { workspace = true, features = [
 serial_test = { workspace = true, optional = true, default-features = false, features = [
   "logging",
 ] }
+uuid = { workspace = true, optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
@@ -63,6 +64,18 @@ nix = { workspace = true, optional = true, default-features = false, features = 
   "signal",
   "socket",
   "poll",
+] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_Console",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_Kernel",
+  "Win32_System_Memory",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
 ] }
 
 [lints]

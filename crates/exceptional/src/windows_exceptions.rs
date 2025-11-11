@@ -585,23 +585,26 @@ pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(
     Ok(())
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 pub(crate) trait CtrlHandler {
     /// Handle an exception
     fn handle(&mut self, ctrl_type: u32) -> bool;
 }
 
+#[cfg(feature = "std")]
 struct CtrlHandlerHolder {
     handler: UnsafeCell<*mut dyn CtrlHandler>,
 }
 
 /// Keep track of which handler is registered for which exception
+#[cfg(feature = "std")]
 static mut CTRL_HANDLER: Option<CtrlHandlerHolder> = None;
 
 /// Set `ConsoleCtrlHandler` to catch Ctrl-C
 ///
 /// # Safety
 /// Same safety considerations as in `setup_exception_handler`
+#[cfg(feature = "std")]
 pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
     handler: *mut T,
 ) -> Result<(), Error> {
@@ -629,6 +632,7 @@ pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
     }
 }
 
+#[cfg(feature = "std")]
 unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> BOOL {
     let handler = unsafe { ptr::read_volatile(&raw const (CTRL_HANDLER)) };
     match handler {

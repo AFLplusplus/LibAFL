@@ -1,5 +1,7 @@
+//! Helper functions for the unicorn emulator
 use unicorn_engine::{RegisterARM, RegisterARM64, RegisterRISCV, RegisterX86, unicorn_const::Arch};
 
+/// Returns the stack pointer for the current architecture
 pub fn get_stack_pointer(emu: &unicorn_engine::Unicorn<()>) -> u64 {
     match emu.get_arch() {
         Arch::ARM => emu.reg_read(RegisterARM::SP).unwrap(),
