@@ -22,7 +22,7 @@ serde_anymap = { version = "0.1.0", features = ["serdeany_autoreg"] }
 
 ### 2. Define Your Types and Implement `SerdeAny`
 
-To be stored in a `SerdeAnyMap`, your types must implement the `SerdeAny` trait. The easiest way to do this is using the `#[derive(SerdeAny)]` macro from the (`LibAFL_Derive`)[https://crates.io/crates/libafl_derive] crate or by using the `impl_serdeany!` macro on the type, instead. Your types must also derive `Serialize` and `Deserialize`.
+To be stored in a `SerdeAnyMap`, your types must implement the `SerdeAny` trait. The easiest way to do this is using the `#[derive(SerdeAny)]` macro from the [`LibAFL_Derive`](https://crates.io/crates/libafl_derive) crate or by using the `impl_serdeany!` macro on the type, instead. Your types must also derive `Serialize` and `Deserialize`.
 
 ```rust
 use serde::{Serialize, Deserialize};

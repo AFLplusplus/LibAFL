@@ -73,7 +73,7 @@ rustversion = { workspace = true }
 document-features = { workspace = true, optional = true }
 exceptional = { workspace = true }
 hostname = { version = "0.4.0", optional = true }                  # Is there really no gethostname in the stdlib?
-libafl_core = { workspace = true }
+libafl_core = { workspace = true, features = ["serde"] }
 log = { workspace = true }
 miniz_oxide = { version = "0.8.0", optional = true }
 nix = { workspace = true, features = ["socket"], optional = true }

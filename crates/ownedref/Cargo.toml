@@ -20,17 +20,11 @@ features = ["document-features"]
 all-features = true
 
 [features]
-default = ["std", "alloc"]
+default = []
 document-features = ["dep:document-features"]
 
 #! # Feature Flags
 #! ### General Features
-
-## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = ["alloc"]
-
-## Enables all features that allocate in `no_std`
-alloc = ["serde/alloc"]
 
 [build-dependencies]
 rustversion = { workspace = true }
@@ -42,7 +36,7 @@ rustversion = { workspace = true }
 document-features = { workspace = true, optional = true }
 
 libafl_core = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["alloc", "derive"] }
 
 [lints]
 workspace = true

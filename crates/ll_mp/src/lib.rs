@@ -303,8 +303,8 @@ pub struct MessageId(u64);
 pub struct MessageId(u32);
 
 /// This is for the server the broker will spawn.
-/// If an llmp connection is local - use sharedmaps
-/// or remote (broker2broker) - forwarded via tcp
+/// If an `llmp` connection is local - use sharedmaps
+/// or remote (`broker2broker`) - forwarded via tcp
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TcpRequest {
     /// We would like to be a local client.

@@ -12,7 +12,7 @@ This macro implements the `SerdeAny` trait for a type. This is necessary to stor
 
 **Usage:**
 
-```rust
+```rust,ignore
 use libafl_derive::SerdeAny;
 use serde::{Serialize, Deserialize};
 
