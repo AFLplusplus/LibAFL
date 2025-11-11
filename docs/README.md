@@ -2,7 +2,7 @@
 
 This project contains the out-of-source LibAFL documentation as a book.
 
-Here you can find tutorials, examples, and detailed explanations.
+Here you can find the [LibAFL tutorial](./src/tutorial/tutorial.md), examples, and detailed explanations.
 
 For the API documentation instead, run `cargo doc` in the LibAFl root folder.
 
