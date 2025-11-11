@@ -20,17 +20,18 @@ features = ["document-features"]
 all-features = true
 
 [features]
-default = ["std", "alloc", "stable_anymap"]
+default = ["std", "stable_anymap"]
 document-features = ["dep:document-features"]
 
 #! # Feature Flags
 #! ### General Features
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
-std = ["alloc", "libafl_core/std"]
-
-## Enables all features that allocate in `no_std`
-alloc = ["erased-serde", "erased-serde/alloc", "libafl_core/alloc"]
+std = [
+  "libafl_core/std",
+  "erased-serde/std",
+  "serde/std",
+]
 
 ## Create keys that are more stable between compilations
 stable_anymap = []
@@ -47,7 +48,9 @@ document-features = { workspace = true, optional = true }
 
 ahash = { workspace = true }
 ctor = { workspace = true, optional = true }
-erased-serde = { workspace = true, default-features = false, optional = true }
+erased-serde = { workspace = true, default-features = false, features = [
+  "alloc",
+] }
 hashbrown = { workspace = true }
 libafl_core = { workspace = true }
 postcard = { workspace = true }
