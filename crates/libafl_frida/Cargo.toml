@@ -73,7 +73,7 @@ frida-gum = { version = "0.17.0", features = [
   "script",
   "backtrace",
 ] }
-dynasmrt = "3.0.1"
+dynasmrt = "4.0.1"
 
 color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
 termcolor = "1.4.1"
@@ -96,7 +96,7 @@ serial_test = { workspace = true, default-features = false, features = [
   "logging",
 ] }
 clap = { workspace = true, features = ["derive"] }
-libloading = "0.8.5"
+libloading = "0.9.0"
 mimalloc = { workspace = true, default-features = false }
 
 [lints]
