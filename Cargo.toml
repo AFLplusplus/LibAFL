@@ -104,7 +104,7 @@ cmake = "0.1.54"
 document-features = "0.2.11"
 fastbloom = { version = "0.14.0", default-features = false }
 hashbrown = { version = "0.16.0", default-features = false } # A faster hashmap, nostd compatible
-just = "=1.43.0"
+just = "=1.40.0"
 libc = "0.2.177" # For (*nix) libc
 libipt = { version = "0.4.0", features = ["libipt_master"] }
 log = "0.4.28"
