@@ -274,7 +274,7 @@ where
                 // fuzz for provided time
                 let start_time = current_time();
                 for _ in 1.. {
-                    if current_time().checked_sub(start_time).unwrap() >= fuzz_time {
+                    if current_time().checked_sub(start_time).unwrap_or(fuzz_time) >= fuzz_time {
                         break;
                     }
 
