@@ -36,7 +36,7 @@ pub trait IsSnapshotManager: Clone + Debug {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QemuSnapshotCheckResult {
-    nb_page_inconsistencies: u64,
+    pub nb_page_inconsistencies: u64,
 }
 
 #[derive(Debug, Clone)]

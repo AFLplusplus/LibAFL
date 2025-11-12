@@ -12,7 +12,8 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{
-        command::CommandConfigurator, inprocess::InProcessExecutor, ExitKind, ShadowExecutor,
+        command::CommandConfigurator, inprocess::InProcessExecutor, ExitKind, HasTimeout,
+        ShadowExecutor,
     },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
@@ -261,12 +262,10 @@ impl CommandConfigurator<Child> for MyCommandConfigurator {
             .spawn()
             .expect("failed to start process"))
     }
+}
 
-    fn exec_timeout(&self) -> Duration {
+impl SetTimeout for MyCommandConfigurator {
+    fn timeout(&self) -> Duration {
         Duration::from_secs(5)
-    }
-
-    fn exec_timeout_mut(&mut self) -> &mut Duration {
-        todo!()
     }
 }

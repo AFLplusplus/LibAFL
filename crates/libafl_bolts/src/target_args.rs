@@ -24,7 +24,7 @@ pub enum InputLocation {
         input_file: Option<InputFile>,
     },
     /// Deliver the input via the specified [`InputFile`]
-    /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
+    /// You can use [`InputFile::create`] with [`crate::fs::INPUTFILE_STD`] to use a default filename.
     File {
         /// The file to write input to. The target should read input from this location.
         out_file: InputFile,
