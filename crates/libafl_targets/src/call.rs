@@ -1,5 +1,4 @@
-use core::marker::PhantomData;
-use std::cell::LazyCell;
+use core::{cell::LazyCell, marker::PhantomData};
 
 use hashbrown::HashMap;
 use libafl::executors::hooks::ExecutorHook;
