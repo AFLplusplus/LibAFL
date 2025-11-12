@@ -125,25 +125,19 @@ impl TimedStats {
 
     /// Change the window duration
     pub fn update_window(&mut self, window: Duration) {
+        let default_stat = TimedStat {
+            time: Duration::from_secs(0),
+            item: 0,
+        };
+
         self.window = window;
         while !self.series.is_empty()
             && self
                 .series
                 .back()
-                .unwrap_or(TimedStat {
-                    time: window,
-                    item: 0,
-                })
+                .unwrap_or(&default_stat)
                 .time
-                .checked_sub(
-                    self.series
-                        .front()
-                        .unwrap_or(TimedStat {
-                            time: Duration::from_secs(0),
-                            item: 0,
-                        })
-                        .time,
-                )
+                .checked_sub(self.series.front().unwrap_or(&default_stat).time)
                 .unwrap()
                 >= window
         {
