@@ -15,12 +15,32 @@ use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Error, HasMetadata,
+    Error,
+    common::HasMetadata,
     corpus::{Corpus, CorpusId, Testcase},
-    inputs::Input,
+    fuzzer::HasTargetBytesConverter,
+    inputs::{Input, ToTargetBytes},
     stages::{Restartable, Stage},
     state::{HasCorpus, HasRand, HasSolutions},
 };
+
+/// The default function to generate a filename for a testcase
+#[expect(clippy::trivially_copy_pass_by_ref)]
+pub fn generate_filename<I: Input>(testcase: &Testcase<I>, id: &CorpusId) -> String {
+    [
+        Some(id.0.to_string()),
+        testcase.filename().clone(),
+        testcase
+            .input()
+            .as_ref()
+            .map(|t| t.generate_name(Some(*id))),
+    ]
+    .iter()
+    .flatten()
+    .map(String::as_str)
+    .collect::<Vec<_>>()
+    .join("-")
+}
 
 /// Metadata used to store information about disk dump indexes for names
 #[cfg_attr(
@@ -94,28 +114,10 @@ where
     {
         Self::new_with_custom_filenames(
             to_bytes,
-            Self::generate_filename, // This is now of type `fn(&Testcase<EM::Input>, &CorpusId) -> String`
+            generate_filename, // This is now of type `fn(&Testcase<EM::Input>, &CorpusId) -> String`
             corpus_dir,
             solutions_dir,
         )
-    }
-
-    /// Default `generate_filename` function.
-    #[expect(clippy::trivially_copy_pass_by_ref)]
-    fn generate_filename(testcase: &Testcase<I>, id: &CorpusId) -> String {
-        [
-            Some(id.0.to_string()),
-            testcase.filename().clone(),
-            testcase
-                .input()
-                .as_ref()
-                .map(|t| t.generate_name(Some(*id))),
-        ]
-        .iter()
-        .flatten()
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        .join("-")
     }
 }
 
@@ -196,6 +198,165 @@ where
             let mut testcase = state.solutions().get(i)?.borrow_mut();
             state.solutions().load_input_into(&mut testcase)?;
             let bytes = (self.to_bytes)(&testcase, state);
+
+            let fname = self
+                .solutions_dir
+                .join((self.generate_filename)(&testcase, &i));
+            let mut f = File::create(fname)?;
+            drop(f.write_all(&bytes));
+
+            solutions_id = state.solutions().next(i);
+        }
+        Ok(())
+    }
+}
+
+/// A stage that dumps the corpus and the solutions to disk,
+/// using the fuzzer's [`crate::inputs::TargetBytesConverter`]
+#[derive(Debug)]
+pub struct DumpTargetBytesToDiskStage<CB, EM, I, S, Z> {
+    solutions_dir: PathBuf,
+    corpus_dir: PathBuf,
+    generate_filename: CB,
+    phantom: PhantomData<(EM, I, S, Z)>,
+}
+
+impl<CB, E, EM, I, S, P, Z> Stage<E, EM, S, Z> for DumpTargetBytesToDiskStage<CB, EM, I, S, Z>
+where
+    CB: FnMut(&Testcase<I>, &CorpusId) -> P,
+    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
+    P: AsRef<Path>,
+    Z: HasTargetBytesConverter,
+    Z::Converter: ToTargetBytes<I>,
+    I: Input,
+{
+    #[inline]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut S,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        self.dump_state_to_disk(fuzzer, state)
+    }
+}
+
+impl<EM, I, S, Z> Restartable<S>
+    for DumpTargetBytesToDiskStage<fn(&Testcase<I>, &CorpusId) -> String, EM, I, S, Z>
+{
+    #[inline]
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
+        // Not executing the target, so restart safety is not needed
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
+        // Not executing the target, so restart safety is not needed
+        Ok(())
+    }
+}
+
+/// Implementation for `DumpTargetBytesToDiskStage` with a default `generate_filename` function.
+impl<EM, I, S, Z> DumpTargetBytesToDiskStage<fn(&Testcase<I>, &CorpusId) -> String, EM, I, S, Z>
+where
+    S: HasSolutions<I> + HasRand + HasMetadata,
+    I: Input,
+{
+    /// Create a new [`DumpTargetBytesToDiskStage`] with a default `generate_filename` function.
+    pub fn new<A, B>(corpus_dir: A, solutions_dir: B) -> Result<Self, Error>
+    where
+        A: Into<PathBuf>,
+        B: Into<PathBuf>,
+    {
+        Self::new_with_custom_filenames(generate_filename, corpus_dir, solutions_dir)
+    }
+}
+
+impl<CB, EM, I, S, Z> DumpTargetBytesToDiskStage<CB, EM, I, S, Z>
+where
+    S: HasMetadata + HasSolutions<I>,
+    I: Input,
+{
+    /// Create a new [`DumpTargetBytesToDiskStage`] with a custom `generate_filename` function.
+    pub fn new_with_custom_filenames<A, B>(
+        generate_filename: CB,
+        corpus_dir: A,
+        solutions_dir: B,
+    ) -> Result<Self, Error>
+    where
+        A: Into<PathBuf>,
+        B: Into<PathBuf>,
+    {
+        let corpus_dir = corpus_dir.into();
+        if let Err(e) = fs::create_dir(&corpus_dir) {
+            if !corpus_dir.is_dir() {
+                return Err(Error::os_error(
+                    e,
+                    format!("Error creating directory {}", corpus_dir.display()),
+                ));
+            }
+        }
+        let solutions_dir = solutions_dir.into();
+        if let Err(e) = fs::create_dir(&solutions_dir) {
+            if !solutions_dir.is_dir() {
+                return Err(Error::os_error(
+                    e,
+                    format!("Error creating directory {}", solutions_dir.display()),
+                ));
+            }
+        }
+        Ok(Self {
+            generate_filename,
+            solutions_dir,
+            corpus_dir,
+            phantom: PhantomData,
+        })
+    }
+
+    #[inline]
+    fn dump_state_to_disk<P: AsRef<Path>>(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+    ) -> Result<(), Error>
+    where
+        S: HasCorpus<I>,
+        CB: FnMut(&Testcase<I>, &CorpusId) -> P,
+        Z: HasTargetBytesConverter,
+        Z::Converter: ToTargetBytes<I>,
+    {
+        let (mut corpus_id, mut solutions_id) =
+            if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
+                (
+                    meta.last_corpus.and_then(|x| state.corpus().next(x)),
+                    meta.last_solution.and_then(|x| state.solutions().next(x)),
+                )
+            } else {
+                (state.corpus().first(), state.solutions().first())
+            };
+
+        while let Some(i) = corpus_id {
+            let mut testcase = state.corpus().get(i)?.borrow_mut();
+            state.corpus().load_input_into(&mut testcase)?;
+            let input = testcase.input().as_ref().unwrap();
+            let bytes = fuzzer.to_target_bytes(input);
+
+            let fname = self
+                .corpus_dir
+                .join((self.generate_filename)(&testcase, &i));
+            let mut f = File::create(fname)?;
+            drop(f.write_all(&bytes));
+
+            corpus_id = state.corpus().next(i);
+        }
+
+        while let Some(i) = solutions_id {
+            let mut testcase = state.solutions().get(i)?.borrow_mut();
+            state.solutions().load_input_into(&mut testcase)?;
+            let input = testcase.input().as_ref().unwrap();
+            let bytes = fuzzer.to_target_bytes(input);
 
             let fname = self
                 .solutions_dir
