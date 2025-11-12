@@ -240,7 +240,9 @@ where
 }
 
 /// A stage that dumps the corpus and the solutions to disk,
-/// using the fuzzer's [`crate::inputs::TargetBytesConverter`]
+/// using the fuzzer's [`crate::fuzzer::HasTargetBytesConverter`] (if available).
+///
+/// Set the converter using the fuzzer builder's [`crate::fuzzer::StdFuzzerBuilder::target_bytes_converter`].
 #[derive(Debug)]
 pub struct DumpTargetBytesToDiskStage<CB, EM, I, S, Z> {
     solutions_dir: PathBuf,
