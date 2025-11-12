@@ -2091,6 +2091,7 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
+    #[allow(trivial_numeric_casts)]
     fn generate_shadow_check_blob(&mut self, width: u32) -> Box<[u8]> {
         /*x0 contains the shadow address
         x0 and x1 are saved by the asan_check
@@ -2133,6 +2134,7 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
+    #[allow(trivial_numeric_casts)]
     fn generate_shadow_check_large_blob(&mut self, width: u32) -> Box<[u8]> {
         //x0 contains the shadow address
         //x0 and x1 are saved by the asan_check
