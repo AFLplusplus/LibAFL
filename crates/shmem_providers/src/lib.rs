@@ -280,7 +280,7 @@ impl Display for ShMemId {
 
 /// A [`ShMem`] is an interface to shared maps.
 ///
-/// They are the backbone of [`crate::llmp`] for inter-process communication.
+/// They are the backbone of `llmp` for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
 pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
     /// Get the id of this shared memory mapping
@@ -332,7 +332,7 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
 
 /// A [`ShMemProvider`] provides access to shared maps.
 ///
-/// They are the backbone of [`crate::llmp`] for inter-process communication.
+/// They are the backbone of `llmp` for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
 pub trait ShMemProvider: Clone + Default + Debug {
     /// The actual shared map handed out by this [`ShMemProvider`].
