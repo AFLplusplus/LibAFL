@@ -175,8 +175,9 @@ where
         let ranges = helper.borrow_mut().ranges().clone();
         for module in frida_gum::Process::obtain(gum).enumerate_modules() {
             let range = module.range();
-            if (range.base_address().0 as usize) < Self::with_target_bytes_converter as usize
-                && (Self::with_target_bytes_converter as usize as u64)
+            if (range.base_address().0 as usize)
+                < Self::with_target_bytes_converter as *const () as usize
+                && (Self::with_target_bytes_converter as *const () as usize as u64)
                     < range.base_address().0 as u64 + range.size() as u64
             {
                 log::info!(

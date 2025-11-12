@@ -330,13 +330,17 @@ impl ClientStats {
     pub fn process_timing(&mut self) -> ProcessTiming {
         let client_start_time = self.start_time();
         let last_new_entry = if self.last_corpus_time() > self.start_time() {
-            current_time() - self.last_corpus_time()
+            current_time()
+                .checked_sub(self.last_corpus_time())
+                .unwrap_or_default()
         } else {
             Duration::default()
         };
 
         let last_saved_solution = if self.last_objective_time() > self.start_time() {
-            current_time() - self.last_objective_time()
+            current_time()
+                .checked_sub(self.last_objective_time())
+                .unwrap_or_default()
         } else {
             Duration::default()
         };
