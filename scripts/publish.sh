@@ -5,55 +5,69 @@ cd "$SCRIPT_DIR/.." || exit 1
 set -e
 
 pushd crates/libafl_derive
-cargo publish "$@"
+#cargo publish "$@"
 popd || exit 1
 
-sleep 20
+#sleep 20
 
 pushd crates/libafl_cc
-cargo publish "$@"
+#cargo publish "$@"
 popd || exit 1
 
-sleep 20
+#sleep 20
 
 pushd crates/libafl_bolts
-cargo publish "$@"
+#cargo publish "$@"
 popd || exit 1
 
-sleep 20
+#sleep 20
 
 pushd crates/libafl_intelpt
-cargo publish "$@"
+#cargo publish "$@"
 popd || exit 1
 
-sleep 20
+#sleep 20
 
 pushd crates/libafl
-cargo publish "$@"
+#cargo publish "$@"
 popd || exit 1
 
-sleep 20
+#sleep 20
 
 pushd crates/libafl_targets
-cargo publish "$@"
+#cargo publish "$@"
 popd || exit 1
 
-sleep 20
+#sleep 20
 
 pushd crates/libafl_frida
-cargo publish "$@"
+#cargo publish "$@"
 popd || exit 1
 
-sleep 20
+#sleep 20
 
 pushd crates/libafl_qemu
 
 pushd libafl_qemu_build
-cargo publish "$@"
+#cargo publish "$@"
 popd
 pushd libafl_qemu_sys
-cargo publish "$@"
+#cargo publish "$@"
 popd
+
+#sleep 20
+
+pushd libvharness_sys
+cargo publish "$@"
+popd || exit 1
+
+sleep 20
+
+pushd libvharness
+cargo publish "$@"
+popd || exit 1
+
+sleep 20
 
 cargo publish "$@"
 popd || exit 1
@@ -114,12 +128,6 @@ popd || exit 1
 sleep 20
 
 pushd crates/libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_nolibc
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_qemu/libvharness
 cargo publish "$@"
 popd || exit 1
 
