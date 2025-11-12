@@ -30,7 +30,7 @@ document-features = ["dep:document-features"]
 std = ["alloc"]
 
 ## Enables all features that allocate in `no_std`
-alloc = ["ownedref"]
+alloc = ["ownedref", "libafl_core/alloc"]
 
 ## Enables serde support for tuple lists
 serde = ["alloc", "dep:serde"]

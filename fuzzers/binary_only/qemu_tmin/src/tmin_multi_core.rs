@@ -194,7 +194,7 @@ pub fn fuzz() {
         let stdout_callback = |buf: &[u8]| {
             if let Ok(s) = from_utf8(buf) {
                 let msg = s.trim_end();
-                if msg.len() != 0 {
+                if !msg.is_empty() {
                     log::info!("{msg}");
                 }
             }

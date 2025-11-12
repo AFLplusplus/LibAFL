@@ -355,12 +355,7 @@ pub fn get_thread_id() -> u64 {
 #[cfg(target_os = "windows")]
 mod windows_logging {
     use core::ptr;
-    use std::cell::OnceCell;
-
-    use winapi::um::{
-        fileapi::WriteFile, handleapi::INVALID_HANDLE_VALUE, processenv::GetStdHandle,
-        winbase::STD_OUTPUT_HANDLE, winnt::HANDLE,
-    };
+    use std::sync::OnceLock;
 
     // Safe wrapper around HANDLE
     struct StdOutHandle(HANDLE);
@@ -369,7 +364,7 @@ mod windows_logging {
     unsafe impl Send for StdOutHandle {}
     unsafe impl Sync for StdOutHandle {}
 
-    static H_STDOUT: OnceCell<StdOutHandle> = OnceCell::new();
+    static H_STDOUT: OnceLock<StdOutHandle> = OnceLock::new();
 
     fn get_stdout_handle() -> HANDLE {
         H_STDOUT
