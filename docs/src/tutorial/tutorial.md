@@ -1,12 +1,12 @@
-# LibAFL Tutorial: Your First Structure-Aware Fuzzer
+# `LibAFL` Custom Input Tutorial: Your Own Structure-Aware Fuzzer
 
-Welcome to the LibAFL tutorial! In this guide, we'll walk you through building a structure-aware fuzzer for a simple C program. Structure-aware fuzzing is a powerful technique that can be much more effective than traditional fuzzing when the input format is well-defined.
+Welcome to the `LibAFL` custom inputs tutorial! In this guide, we'll walk you through building a structure-aware fuzzer for a simple C program using a third-party grammar mutator.
 
-We'll be using the `lain` crate for structure-aware mutations.
+We'll be using the `lain` crate for structure-aware mutations and hook it up to `LibAFL`. This could be done with any sort of mutator and input types, even if they are written in other programming languages.
 
 ## The Target
 
-Our target is a simple C program that processes packets. The code is in `fuzzers/baby/tutorial/target.c`:
+Our target is a simple C program that processes packets. The code can be found in [`fuzzers/baby/tutorial/target.c`](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/baby/tutorial/target.c):
 
 ```c
 #include <stdio.h>
@@ -82,10 +82,13 @@ The target defines a `LLVMFuzzerTestOneInput` function, which is the standard en
 
 ## The Input
 
-To fuzz this target effectively, we need to define the input structure in Rust. This is done in `fuzzers/baby/tutorial/src/input.rs`:
+To fuzz this target effectively, we need to define the input structure in Rust. This is done in [`fuzzers/baby/tutorial/src/input.rs`](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/baby/tutorial/src/input.rs):
 
 ```rust
-#![allow(unexpected_cfgs)] // deriving NewFuzzed etc. introduces these
+# extern crate lain;
+# extern crate libafl;
+# extern crate libafl_bolts;
+# extern crate serde;
 use std::hash::Hash;
 
 use lain::prelude::*;
@@ -168,14 +171,17 @@ The `HasTargetBytes` trait is implemented to serialize the `PacketData` struct i
 
 ## The Fuzzer
 
-Now let's look at the fuzzer itself in `fuzzers/baby/tutorial/src/lib.rs`.
+Now let's look at the fuzzer itself in [`fuzzers/baby/tutorial/src/lib.rs`](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/baby/tutorial/src/lib.rs).
 
 ### The `libafl_main` function
 
 The `libafl_main` function is the entry point of our fuzzer.
 
 ```rust
-#[cfg(not(test))]
+# extern crate libafl;
+# use std::path::PathBuf;
+# use libafl::Error;
+# fn fuzz(_corpus_dirs: &[PathBuf], _objective_dir: PathBuf, _broker_port: u16) -> Result<(), Error> { Ok(()) }
 #[no_mangle]
 pub extern "C" fn libafl_main() {
     // ...
@@ -197,6 +203,27 @@ The `fuzz` function contains the main fuzzer logic.
 #### The Harness
 
 ```rust
+# extern crate libafl;
+# extern crate libafl_bolts;
+# extern crate serde;
+#
+# use libafl::executors::ExitKind;
+# use libafl::inputs::HasTargetBytes;
+# use libafl_bolts::ownedref::OwnedSlice;
+# use libafl_bolts::AsSlice;
+#
+# // Dummy PacketData
+# #[derive(Debug)]
+# pub struct PacketData {}
+# impl HasTargetBytes for PacketData {
+#     fn target_bytes(&self) -> OwnedSlice<u8> {
+#         OwnedSlice::from(vec![])
+#     }
+# }
+#
+# // Dummy libfuzzer_test_one_input
+# unsafe fn libfuzzer_test_one_input(_buf: &[u8]) {}
+#
 let mut harness = |input: &PacketData| {
     let target = input.target_bytes();
     let buf = target.as_slice();
@@ -214,6 +241,31 @@ The harness is a closure that takes a `PacketData` input, serializes it, and pas
 #### Observers, Feedbacks, and Scheduler
 
 ```rust
+# use libafl::{
+#     feedback_or, feedback_or_fast,
+#     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback, Feedback},
+#     observers::{HitcountsMapObserver, TimeObserver, Observer, CanTrack},
+#     stages::calibrate::CalibrationStage,
+#     Error,
+# };
+# use libafl_bolts::{Named, MaybeOwned};
+# use libafl_targets::std_edges_map_observer;
+# use std::borrow::Cow;
+#
+# #[derive(Default, Debug)]
+# struct PacketLenFeedback;
+# impl PacketLenFeedback { fn new() -> Self { Self {} } }
+# impl<EM, I, OT, S> Feedback<EM, I, OT, S> for PacketLenFeedback {
+#     fn is_interesting(&mut self, _state: &mut S, _manager: &mut EM, _input: &I, _observers: &OT, _exit_kind: &libafl::executors::ExitKind) -> Result<bool, Error> { Ok(false) }
+# }
+# impl Named for PacketLenFeedback {
+#     fn name(&self) -> &Cow<'static, str> {
+#         static NAME: Cow<'static, str> = Cow::Borrowed("PacketLenFeedback");
+#         &NAME
+#     }
+# }
+#
+# fn dummy_func() {
 // Create an observation channel using the coverage map
 let edges_observer =
     HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
@@ -234,6 +286,7 @@ let mut feedback = feedback_or!(
 
 // A feedback to choose if an input is a solution or not
 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+# }
 ```
 
 We use a `HitcountsMapObserver` to get code coverage, and a `TimeObserver` to measure execution time. These are used by `MaxMapFeedback` and `TimeFeedback` respectively. We also have a custom `PacketLenFeedback` which we'll look at later.
@@ -241,11 +294,46 @@ We use a `HitcountsMapObserver` to get code coverage, and a `TimeObserver` to me
 `CrashFeedback` and `TimeoutFeedback` are used to identify crashing or timing-out inputs.
 
 ```rust
+# extern crate libafl;
+# extern crate libafl_bolts;
+# extern crate libafl_targets;
+# extern crate serde;
+# fn dummy() -> Result<(), libafl::Error> {
+# use libafl::{
+#     observers::{HitcountsMapObserver, CanTrack},
+#     schedulers::{powersched::PowerSchedule, PowerQueueScheduler},
+#     state::StdState,
+#     corpus::{InMemoryCorpus, OnDiskCorpus},
+#     feedbacks::MaxMapFeedback,
+#     Error,
+# };
+# use libafl_bolts::rands::StdRand;
+# use libafl_targets::std_edges_map_observer;
+#
+# struct PacketLenMinimizerScheduler;
+# impl PacketLenMinimizerScheduler {
+#     fn new<O, S>(_observer: &O, _scheduler: S) -> Self { Self }
+# }
+#
+# let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
+# let map_feedback = MaxMapFeedback::new(&edges_observer);
+# let mut feedback = (map_feedback,);
+# let mut objective = ();
+# let mut state = StdState::new(
+#     StdRand::new(),
+#     InMemoryCorpus::new(),
+#     OnDiskCorpus::new("./crashes")?,
+#     &mut feedback,
+#     &mut objective,
+# )?;
+#
 // A minimization+queue policy to get testcasess from the corpus
 let scheduler = PacketLenMinimizerScheduler::new(
     &edges_observer,
     PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()),
 );
+# Ok(())
+# }
 ```
 
 We use a `PowerQueueScheduler` to select the next input to fuzz. We wrap it in a custom `PacketLenMinimizerScheduler` to prioritize shorter inputs.
@@ -253,6 +341,54 @@ We use a `PowerQueueScheduler` to select the next input to fuzz. We wrap it in a
 #### The Mutator
 
 ```rust
+# fn dummy() {
+# use libafl::{
+#     stages::{power::StdPowerMutationalStage, Stage},
+#     mutators::{MutationResult, Mutator},
+#     state::HasRand,
+#     Error,
+# };
+# use libafl_bolts::{tuples::tuple_list, rands::StdRand};
+# use lain::prelude::{Mutatable, NewFuzzed, FuzzerObject, ToPrimitiveU32, BinarySerialize, VariableSizeObject, UnsafeEnum, Fixup, Rng};
+# use serde::{Deserialize, Serialize};
+# use std::vec::Vec;
+#
+# #[derive(Serialize, Deserialize, Debug, Default, Clone, NewFuzzed, Mutatable, VariableSizeObject, BinarySerialize)]
+# pub struct PacketData {
+#     pub typ: UnsafeEnum<PacketType, u32>,
+#     pub offset: u64,
+#     pub length: u64,
+#     #[lain(max = 10)]
+#     pub data: Vec<u8>,
+# }
+# impl Fixup for PacketData {
+#     fn fixup<R: Rng>(&mut self, _mutator: &mut lain::mutator::Mutator<R>) { self.length = self.data.len() as u64; }
+# }
+# #[derive(Serialize, Deserialize, Debug, Copy, Clone, FuzzerObject, ToPrimitiveU32, BinarySerialize, std::hash::Hash)]
+# #[repr(u32)]
+# #[derive(Default)]
+# pub enum PacketType { #[default] Read = 0x0, Write = 0x1, Reset = 0x2, }
+#
+# pub struct LainMutator;
+# impl LainMutator { fn new() -> Self { Self } }
+# impl<I, S> Mutator<I, S> for LainMutator where I: Mutatable, S: HasRand {
+#     fn mutate(&mut self, _state: &mut S, _input: &mut I) -> Result<MutationResult, Error> { Ok(MutationResult::Mutated) }
+# }
+#
+# struct DummyStage;
+# impl<S> Stage<S> for DummyStage {
+#     fn perform(
+#         &mut self,
+#         _fuzzer: &mut dyn libafl::fuzzer::HasCorpus<S>,
+#         _executor: &mut dyn libafl::executors::HasObservers<S>,
+#         _state: &mut S,
+#         _manager: &mut dyn libafl::events::EventManager<S>,
+#     ) -> Result<(), Error> {
+#         Ok(())
+#     }
+# }
+# let calibration = DummyStage;
+#
 // Setup a lain mutator with a mutational stage
 let mutator = LainMutator::new();
 
@@ -260,6 +396,7 @@ let power: StdPowerMutationalStage<_, _, PacketData, _, _, _> =
     StdPowerMutationalStage::new(mutator);
 
 let mut stages = tuple_list!(calibration, power);
+# }
 ```
 
 We use a custom `LainMutator` which is a wrapper around `lain`'s mutator. This is where the structure-aware magic happens. The `LainMutator` knows how to mutate the `PacketData` struct in a meaningful way.
@@ -271,6 +408,31 @@ We use a custom `LainMutator` which is a wrapper around `lain`'s mutator. This i
 These are defined in `fuzzers/baby/tutorial/src/metadata.rs`.
 
 ```rust
+# extern crate libafl_bolts;
+# extern crate serde;
+# use serde::{Deserialize, Serialize};
+# use libafl_bolts::SerdeAny;
+# use std::fmt::Debug;
+#
+# trait Feedback<EM, I, OT, S> {
+#     fn is_interesting(&mut self, state: &mut S, manager: &mut EM, input: &I, observers: &OT, exit_kind: &ExitKind) -> Result<bool, Error>;
+#     fn append_metadata(&mut self, state: &mut S, manager: &mut EM, observers: &OT, testcase: &mut Testcase<I>) -> Result<(), Error>;
+# }
+# #[derive(Debug)]
+# struct PacketData { length: u64 }
+# #[derive(Debug)]
+# struct PacketLenFeedback { len: u64 }
+# #[derive(Debug)]
+# struct ExitKind;
+# #[derive(Debug)]
+# struct Error;
+# #[derive(Debug)]
+# struct Testcase<I> { _phantom: std::marker::PhantomData<I> }
+# impl<I> Testcase<I> {
+#     fn metadata_map_mut(&mut self) -> &mut Self { self }
+#     fn insert<T: SerdeAny>(&mut self, _meta: T) {}
+# }
+#
 #[derive(Debug, SerdeAny, Serialize, Deserialize)]
 pub struct PacketLenMetadata {
     pub length: u64,
@@ -315,6 +477,50 @@ The `PacketLenFeedback` doesn't mark any input as interesting, but it attaches t
 This is defined in `fuzzers/baby/tutorial/src/mutator.rs`.
 
 ```rust
+# use std::fmt::Debug;
+#
+# mod lain {
+#     #[derive(Debug)]
+#     pub mod mutator { pub struct Mutator<R> { _phantom: std::marker::PhantomData<R> } }
+# }
+# impl<R> lain::mutator::Mutator<R> {
+#     pub fn rng_mut(&mut self) -> &mut Self { self }
+#     pub fn set_seed(&mut self, _seed: u64) {}
+# }
+#
+# trait Mutator<I, S> {
+#     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error>;
+# }
+# trait HasRand {
+#     fn rand_mut(&mut self) -> &mut Self;
+# }
+#
+# trait Rand {
+#     fn next(&mut self) -> u64;
+# }
+#
+# impl<T: Rand> HasRand for T {
+#     fn rand_mut(&mut self) -> &mut Self {
+#         self
+#     }
+# }
+#
+# impl Rand for () {
+#     fn next(&mut self) -> u64 { 0 }
+# }
+#
+# #[derive(Debug)]
+# struct StdRand;
+# #[derive(Debug)]
+# struct PacketData;
+# impl PacketData {
+#     fn mutate(&mut self, _m: &mut lain::mutator::Mutator<StdRand>, _s: Option<()>) {}
+# }
+# #[derive(Debug)]
+# enum MutationResult { Mutated }
+# #[derive(Debug)]
+# struct Error;
+#
 pub struct LainMutator {
     inner: lain::mutator::Mutator<StdRand>,
 }
@@ -375,18 +581,11 @@ Now, let's build and run our fuzzer.
 3. **Run the fuzzer**:
 
     ```sh
-    cargo fuzz run
+    cargo fuzz run --release
     ```
 
-    The fuzzer will start, and you should see output like this:
-
-    ```
-    ...
-    [2025-11-11T12:34:56Z INFO  libafl::events] New Testcase: 0, id: 0, exec_time: 10ms, op: Init
-    ...
-    ```
-
-    Eventually, the fuzzer will find the crash and save the crashing input in the `crashes` directory.
+    Eventually, after running for a short while, the fuzzer will find the crash and save the crashing input in the `crashes` directory.
+    The baby fuzzer won't restart afterwards. This will need a Restating event manager, such as [`LlmpRestartingEventManager`](https://docs.rs/libafl/latest/libafl/events/llmp/restarting/struct.LlmpRestartingEventManager.html).
 
 ## Conclusion
 
