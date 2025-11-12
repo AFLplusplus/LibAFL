@@ -55,6 +55,14 @@ pushd libafl_qemu_sys
 cargo publish "$@"
 popd
 
+sleep 20
+
+pushd libvharness_sys
+cargo publish "$@"
+popd || exit 1
+
+sleep 20
+
 cargo publish "$@"
 popd || exit 1
 
@@ -72,7 +80,7 @@ popd || exit 1
 
 sleep 20
 
-# init symcc submodule if not already done
+init symcc submodule if not already done
 if git submodule status | grep "^-">/dev/null ; then \
     echo "Initializing submodules"; \
     git submodule init; \
@@ -114,12 +122,6 @@ popd || exit 1
 sleep 20
 
 pushd crates/libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_nolibc
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_qemu/libvharness
 cargo publish "$@"
 popd || exit 1
 
