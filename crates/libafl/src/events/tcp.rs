@@ -594,7 +594,10 @@ where
 {
     fn should_send(&self) -> bool {
         if let Some(throttle) = self.throttle {
-            libafl_bolts::current_time() - self.last_sent > throttle
+            libafl_bolts::current_time()
+                .checked_sub(self.last_sent)
+                .unwrap_or(throttle)
+                >= throttle
         } else {
             true
         }
