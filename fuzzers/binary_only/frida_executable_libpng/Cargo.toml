@@ -1,6 +1,6 @@
 [package]
 name = "frida_executable_fuzzer"
-version = "0.15.4"
+version = "0.16.0"
 edition = "2021"
 
 [lib]
@@ -41,7 +41,7 @@ log = { version = "0.4.22", features = ["release_max_level_info"] }
 num-traits = "0.2.19"
 rangemap = "1.5.1"
 clap = { version = "4.5.18", features = ["derive"] }
-serde = "1.0.210"
+serde = "1.0.228"
 mimalloc = { version = "0.1.43", default-features = false }
 
 backtrace = "0.3.74"

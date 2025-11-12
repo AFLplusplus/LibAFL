@@ -1,6 +1,6 @@
 [package]
 name = "tutorial"
-version = "0.15.4"
+version = "0.16.0"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
@@ -32,7 +32,7 @@ libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "libfuzzer",
   "sancov_cmplog",
 ] }
-serde = { version = "1.0.210", default-features = false, features = [
+serde = { version = "1.0.228", default-features = false, features = [
   "alloc",
 ] } # serialization lib
 lain = { version = "0.5.6", features = [

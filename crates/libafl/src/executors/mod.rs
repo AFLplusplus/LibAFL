@@ -36,6 +36,7 @@ pub mod forkserver;
 pub mod inprocess;
 pub mod nop;
 /// SAND(<https://github.com/wtdcode/sand-aflpp>) implementation
+#[cfg(feature = "simd")]
 pub mod sand;
 
 /// The module for inproc fork executor

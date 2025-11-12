@@ -1,4 +1,5 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
+#![doc = include_str!("../README.md")]
 #![no_std]
 // For `std::simd`
 #![cfg_attr(nightly, feature(portable_simd))]

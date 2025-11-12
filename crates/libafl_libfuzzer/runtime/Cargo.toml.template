@@ -1,6 +1,6 @@
 [package]
 name = "libafl_libfuzzer_runtime"
-version = "0.15.4"
+version = "0.16.0"
 edition = "2024"
 publish = false
 
@@ -73,7 +73,7 @@ log = { version = "0.4.22", features = ["release_max_level_info"] }
 mimalloc = { version = "0.1.43", default-features = false }
 num-traits = { version = "0.2.19", default-features = true }
 rand = "0.8.5"
-serde = { version = "1.0.210", default-features = true, features = [
+serde = { version = "1.0.228", default-features = true, features = [
   "derive",
 ] } # serialization lib
 hashbrown = { version = "0.16.0", default-features = true, features = [

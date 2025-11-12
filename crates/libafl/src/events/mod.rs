@@ -519,7 +519,7 @@ where
     {
         state
             .introspection_stats_mut()
-            .set_current_time(libafl_bolts::cpu::read_time_counter());
+            .set_current_time(no_std_time::read_time_counter());
 
         // Send the current monitor over to the manager. This `.clone` shouldn't be
         // costly as `ClientPerfStats` impls `Copy` since it only contains `u64`s

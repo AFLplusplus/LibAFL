@@ -34,7 +34,6 @@ use libafl_bolts::{
     AsSliceMut, StdTargetArgs,
     core_affinity::Cores,
     nonzero,
-    ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{Merge, tuple_list},
@@ -271,8 +270,7 @@ impl ForkserverBytesCoverageSugar<'_> {
                 unsafe {
                     cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
                 }
-                let cmpmap =
-                    unsafe { OwnedRefMut::<AflppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
+                let cmpmap = unsafe { AflppCmpLogMap::from_shmem(&mut cmplog_shmem) };
 
                 let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
 

@@ -1,0 +1,75 @@
+# `LibAFL_Targets`: Runtime Components for Instrumented Fuzzing Targets
+
+<img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
+
+The `libafl_targets` crate provides the essential runtime components that are injected into a target program during its compilation for fuzzing with `LibAFL`.
+This crate contains the code that runs inside the fuzzed program, communicating with the `LibAFL` fuzzer to provide coverage information, comparison data, and other feedback.
+
+## Features
+
+`libafl_targets` is highly modular and uses a feature-based system to allow users to select the specific instrumentation and runtime components needed for their fuzzing campaign. This ensures that only the necessary code is included in the target, minimizing overhead.
+
+A non-exhaustive list of features includes:
+
+- **Coverage Tracking**: Different strategies for tracking code coverage are available:
+  - `sancov_pcguard`: Implements coverage tracking using `__sanitizer_cov_pc_guard`, which can be used for edge coverage (`sancov_pcguard_edges`) or hit count tracking (`sancov_pcguard_hitcounts`).
+  - `sancov_ngram`: Supports N-gram coverage to track sequences of executed basic blocks.
+  - `sancov_ctx`: Provides context-sensitive coverage.
+  - ...
+- **Comparison and Value Profiling**:
+  - `sancov_cmplog`: Instruments compare instructions and `memcmp`/`strcmp` calls to log interesting values, which can be used by the `CmpLog` feedback mechanism in `LibAFL` and solve comparisons during fuzzing.
+  - `sancov_value_profile`: Gathers information about values observed at compare sites.
+- **[`LibFuzzer`](https://llvm.org/docs/LibFuzzer.html) Compatibility Layer**:
+  - `libfuzzer`: A set of features to provide compatibility with the `LibFuzzer` fuzzing engine, allowing `LibAFL` to be used for `LibFuzzer` harnesses.
+- **Forkserver**:
+  - `forkserver`: Includes the client-side implementation of a forkserver, which can significantly speed up the fuzzing of programs that have a slow initialization phase.
+- **Dynamic Analysis**:
+  - `drcov`: Support for `drcov` output format (`DynamoRIO` code coverage) for coverage visualizations.
+- ...
+
+
+## The `LibAFL` Project
+
+The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
+
+- [Andrea Fioraldi](https://twitter.com/andreafioraldi) <andrea@aflplus.plus>
+- [Dominik Maier](https://twitter.com/domenuk) <dominik@aflplus.plus>
+- [s1341](https://twitter.com/srubenst1341) <github@shmarya.net>
+- [Dongjia Zhang](https://github.com/tokatoka) <toka@aflplus.plus>
+- [Addison Crump](https://github.com/addisoncrump) <me@addisoncrump.info>
+
+## Contributing
+
+For bugs, feel free to open issues or contact us directly. Thank you for your support. <3
+
+Even though we will gladly assist you in finishing up your PR, try to
+
+- keep all the crates compiling with *stable* rust (hide the eventual non-stable code under `cfg`s.)
+- run `cargo nightly fmt` on your code before pushing
+- check the output of `cargo clippy --all` or `./clippy.sh`
+- run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
+
+Some parts in this list may sound hard, but don't be afraid to open a PR if you cannot fix them by yourself. We will gladly assist.
+
+#### License
+
+<sup>
+Licensed under either of <a href="../LICENSE-APACHE">Apache License, Version
+2.0</a> or <a href="../LICENSE-MIT">MIT license</a> at your option.
+</sup>
+
+<br>
+
+<sub>
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
+be dual licensed as above, without any additional terms or conditions.
+</sub>
+
+<br>
+
+<sub>
+Dependencies under more restrictive licenses, such as GPL or AGPL, can be enabled
+using the respective feature in each crate when it is present, such as the
+'agpl' feature of the libafl crate.
+</sub>

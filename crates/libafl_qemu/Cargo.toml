@@ -115,6 +115,7 @@ clippy = ["libafl_qemu_sys/clippy", "libvharness_sys/clippy"]
 [dependencies]
 libafl = { workspace = true, features = ["std", "derive", "regex"] }
 libafl_bolts = { workspace = true, features = ["std", "derive"] }
+libafl_core = { workspace = true, features = ["std"] }
 libafl_targets = { workspace = true, default-features = true }
 libafl_qemu_sys = { workspace = true }
 libafl_derive = { workspace = true, default-features = true }

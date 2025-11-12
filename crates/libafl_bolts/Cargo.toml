@@ -27,14 +27,12 @@ all-features = true
 
 [features]
 default = [
-  "std",
-  "derive",
-  "llmp_compression",
-  "llmp_small_maps",
-  "rand_trait",
-  "gzip",
-  "serdeany_autoreg",
   "alloc",
+  "derive",
+  "gzip",
+  "rand_trait",
+  "serdeany_autoreg",
+  "std",
   "xxh3",
 ]
 document-features = ["dep:document-features"]
@@ -44,29 +42,51 @@ document-features = ["dep:document-features"]
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
 std = [
-  "hostname",
-  "nix",
-  "serde/std",
-  "uuid",
-  "backtrace",
-  "uds",
-  "serial_test",
   "alloc",
+  "backtrace",
+  "build_id2",
+  "core_affinity2",
+  "exceptional/std",
+  "fast_rands/std",
+  "hostname",
+  "libafl_core/nix",
+  "libafl_core/std",
+  "ll_mp/std",
+  "minibsod",
+  "nix",
+  "no_std_time/std",
+  "serde/std",
+  "serial_test",
+  "shmem_providers/std",
   "simd",
+  "uds",
 ]
 
 ## Enables all features that allocate in `no_std`
-alloc = ["serde/alloc", "hashbrown", "postcard", "erased-serde/alloc", "ahash"]
+alloc = [
+  "ahash",
+  "erased-serde/alloc",
+  "fast_rands/alloc",
+  "hashbrown",
+  "libafl_core/alloc",
+  "ll_mp/alloc",
+  "no_std_time/alloc",
+  "postcard",
+  "serde_anymap",
+  "serde/alloc",
+  "shmem_providers/alloc",
+  "tuple_list_ex/alloc",
+]
 
 ## Provide the `#[derive(SerdeAny)]` macro.
 derive = ["libafl_derive"]
 
 ## If set, libafl_bolt's `rand` implementations will implement `rand_core::CoreRng`
 ## and, inversely, all seedable `rand_core::RngCore` types can be used as Rng for LibAFL.
-rand_trait = ["rand_core"]
+rand_trait = ["fast_rands/rand_trait"]
 
 ## Will build the `pyo3` bindings
-python = ["pyo3", "std"]
+python = ["pyo3", "std", "libafl_core/python", "fast_rands/python"]
 
 ## Expose `libafl::prelude` for direct access to all types without additional `use` directives
 prelude = []
@@ -81,10 +101,10 @@ qemu_cli = ["cli"]
 frida_cli = ["cli"]
 
 ## Stores the backtraces of all generated `Error`s. Good for debugging, but may come with a slight performance hit.
-errors_backtrace = ["backtrace"]
+errors_backtrace = ["libafl_core/errors_backtrace"]
 
 ## Enables gzip compression in certain parts of the lib
-gzip = ["miniz_oxide", "alloc"]
+gzip = ["miniz_oxide", "alloc", "ll_mp/gzip"]
 
 ## Replaces `ahash` with the potentially faster [`xxh3`](https://github.com/Cyan4973/xxHash) in some parts of the lib.
 ## This yields a stable and fast hash, but may increase the resulting binary size slightly
@@ -98,25 +118,24 @@ xxh3 = ["xxhash-rust"]
 ## With this feature, stored state remains deserializable across multiple compilations of LibAFL.
 ## The rust doc specifically states that "multiple types may map to the same type name", so it could potentially lead to bugs.
 ## However, we make sure that no two types with the same name ever exist.
-stable_anymap = []
+stable_anymap = ["serde_anymap/stable_anymap"]
 
 ## Automatically register all `#[derive(SerdeAny)]` types at startup.
-serdeany_autoreg = ["ctor"]
-
+serdeany_autoreg = ["serde_anymap/serdeany_autoreg"]
 
 #! ### LLMP features
 
 ## If set, llmp will bind to 0.0.0.0, allowing cross-device communication. Binds to localhost by default.
-llmp_bind_public = ["alloc"]
+llmp_bind_public = ["ll_mp/llmp_bind_public"]
 
 ## Enables llmp compression using GZip
-llmp_compression = ["alloc", "gzip"]
+llmp_compression = ["ll_mp/llmp_compression"]
 
 ## Enables debug output for LLMP (also needs a `logger` installed)
-llmp_debug = ["alloc", "std"]
+llmp_debug = ["ll_mp/llmp_debug"]
 
 ## Reduces the initial map size for llmp
-llmp_small_maps = ["alloc"]
+llmp_small_maps = ["ll_mp/llmp_small_maps"]
 
 #! ### Stable SIMD features
 
@@ -133,11 +152,29 @@ chrono = "0.4.42"
 itertools = "0.14.0"
 
 [dependencies]
+build_id2 = { workspace = true, optional = true }
+core_affinity2 = { workspace = true, optional = true }
+exceptional = { workspace = true }
+fast_rands = { workspace = true }
+libafl_core = { workspace = true, features = ["serde"] }
 libafl_derive = { workspace = true, default-features = true, optional = true }
+ll_mp = { workspace = true }
+minibsod = { workspace = true, optional = true }
+no_std_time = { workspace = true }
+ownedref = { workspace = true }
+serde_anymap = { workspace = true, optional = true }
+shmem_providers = { workspace = true }
 static_assertions = { workspace = true }
+tuple_list_ex = { workspace = true, features = ["serde"] }
 typeid = { workspace = true }
 
-tuple_list = { version = "0.1.3" }
+ahash = { workspace = true, optional = true } # The hash function already used in hashbrown
+backtrace = { workspace = true, default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
+clap = { workspace = true, features = [
+  "derive",
+  "wrap_help",
+], optional = true } # CLI parsing, for libafl_bolts::cli / the `cli` feature
+erased-serde = { workspace = true, default-features = false, optional = true } # erased serde
 hashbrown = { workspace = true, features = [
   "serde",
   "default-hasher",
@@ -149,38 +186,30 @@ xxhash-rust = { version = "0.8.12", features = [
 serde = { workspace = true, default-features = false, features = [
   "derive",
 ] } # serialization lib
-erased-serde = { version = "0.4.5", default-features = false, optional = true } # erased serde
 postcard = { workspace = true, optional = true } # no_std compatible serde serialization format
 num_enum = { workspace = true, default-features = false }
-ahash = { workspace = true, optional = true } # The hash function already used in hashbrown
-backtrace = { workspace = true, default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
 
 ctor = { optional = true, version = "0.6.1" }
 miniz_oxide = { version = "0.8.0", optional = true }
 hostname = { version = "0.4.0", optional = true } # Is there really no gethostname in the stdlib?
-rand_core = { version = "0.9.0", optional = true }
+log = { workspace = true }
 nix = { workspace = true, optional = true, default-features = false, features = [
   "fs",
   "signal",
   "socket",
   "poll",
 ] }
-uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
-clap = { workspace = true, features = [
-  "derive",
-  "wrap_help",
-], optional = true } # CLI parsing, for libafl_bolts::cli / the `cli` feature
-log = { workspace = true }
 pyo3 = { workspace = true, optional = true, features = ["serde", "macros"] }
+tuple_list = { workspace = true }
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
 serial_test = { workspace = true, optional = true, default-features = false, features = [
   "logging",
 ] }
 
+rustversion = { workspace = true }
 # optional stable simd
 wide = { version = "0.7.33", optional = true }
-rustversion = { workspace = true }
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
@@ -195,16 +224,14 @@ uds = { version = "0.4.2", optional = true, default-features = false }
 [target.'cfg(windows)'.dependencies]
 windows = { workspace = true, features = [
   "Win32_Foundation",
-  "Win32_System_Threading",
+  "Win32_Security",
+  "Win32_System_Console",
   "Win32_System_Diagnostics_Debug",
   "Win32_System_Kernel",
   "Win32_System_Memory",
-  "Win32_Security",
   "Win32_System_SystemInformation",
-  "Win32_System_Console",
+  "Win32_System_Threading",
 ] }
-windows-core = { workspace = true }
-once_cell = "1.10.0"
 winapi = { version = "0.3", features = [
   "fileapi",
   "handleapi",
@@ -225,11 +252,6 @@ mach2 = "0.5.0"
 #lto = true
 #opt-level = 3
 #debug = true
-
-[[example]]
-name = "llmp_test"
-path = "./examples/llmp_test/main.rs"
-required-features = ["std"]
 
 
 [[example]]

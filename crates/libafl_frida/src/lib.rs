@@ -6,6 +6,7 @@ It can report coverage and, on supported architectures, even reports memory acce
 Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
 
 */
+#![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,

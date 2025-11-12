@@ -16,17 +16,14 @@ use core::{
 #[cfg(feature = "std")]
 use std::net::TcpStream;
 
+#[cfg(feature = "std")]
+use libafl_bolts::llmp::{TcpRequest, TcpResponse, recv_tcp_msg, send_tcp_msg};
 #[cfg(any(windows, not(feature = "fork")))]
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "fork", unix))]
 use libafl_bolts::os::{ForkResult, fork};
-#[cfg(feature = "std")]
-use libafl_bolts::{
-    IP_LOCALHOST,
-    llmp::{TcpRequest, TcpResponse, recv_tcp_msg, send_tcp_msg},
-};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
@@ -43,6 +40,8 @@ use libafl_bolts::{
     staterestore::StateRestorer,
     tuples::tuple_list,
 };
+#[cfg(feature = "std")]
+use libafl_core::IP_LOCALHOST;
 use serde::{Serialize, de::DeserializeOwned};
 use typed_builder::TypedBuilder;
 

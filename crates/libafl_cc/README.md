@@ -1,10 +1,8 @@
-# LibAFL CC
+# `LibAFL_CC`: The `LibAFL` compiler wrapper
 
-LibAFL CC provides the functionalities to write compiler wrappers for LibAFL, by providing to the user a set of compiler extensions useful for instrumentation.
+`LibAFL` CC probives a convenient compiler wrapper toolkit for `LibAFL` users.
 
-The online documentation for this crate is available [here](https://docs.rs/crate/libafl_cc/latest).
-
-Currently, we support LLVM version 11 up to 17, but other versions may work.
+It's advisable to use this crate together with a fairly recent `LLVM` version.
 To install LLVM, use the official [download page](https://releases.llvm.org/download.html).
 
 The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 up to LLVM 17.0.0)

@@ -4,11 +4,12 @@ use alloc::borrow::Cow;
 use core::marker::PhantomData;
 
 use libafl_bolts::{
-    Error, Named, map_tuple_list_type, merge_tuple_list_type,
+    Error, Named,
     rands::Rand,
     tuples::{Map as _, Merge},
 };
 use tuple_list::{tuple_list, tuple_list_type};
+use tuple_list_ex::{map_tuple_list_type, merge_tuple_list_type};
 
 use super::{MutationResult, Mutator, ToMappingMutator, ToStateAwareMappingMutator};
 use crate::{

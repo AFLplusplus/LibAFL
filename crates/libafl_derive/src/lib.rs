@@ -1,5 +1,5 @@
 //! Derives for `LibAFL`
-
+#![doc = include_str!("../README.md")]
 #![no_std]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
