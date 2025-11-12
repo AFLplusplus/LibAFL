@@ -36,7 +36,7 @@ libafl = { workspace = true, features = ["std", "serdeany_autoreg"] }
 libafl_bolts = { workspace = true, features = ["std", "serdeany_autoreg"] }
 
 unchecked_unwrap = "4.0.0"
-ctor = "0.5.0"
+ctor = "0.6.1"
 libc = { workspace = true }
 
 [build-dependencies]
