@@ -330,6 +330,8 @@ impl<'a, T> SubRangeMutSlice<'a, T> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::SliceReader;
 
     #[test]

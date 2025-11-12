@@ -19,7 +19,7 @@ use std::{
 pub use exceptional::unix_signals;
 #[cfg(unix)]
 pub use exceptional::unix_signals::CTRL_C_EXIT;
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 pub use exceptional::windows_exceptions;
 #[cfg(unix)]
 use libafl_core::format;
