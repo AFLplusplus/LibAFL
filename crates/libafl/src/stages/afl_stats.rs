@@ -361,7 +361,10 @@ where
             cur_item: corpus_idx.into(),
             pending_total: corpus_size - self.has_fuzzed_size,
             pending_favs: 0, // TODO
-            time_wo_finds: (current_time() - self.last_find).as_secs(),
+            time_wo_finds: current_time()
+                .checked_sub(self.last_find)
+                .unwrap_or_default()
+                .as_secs(),
             corpus_variable: 0,
             stability: self.calculate_stability(unstable_entries_in_map, filled_entries_in_map),
             #[expect(clippy::cast_precision_loss)]

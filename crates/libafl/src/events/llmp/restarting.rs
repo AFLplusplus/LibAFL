@@ -179,7 +179,10 @@ where
 
     fn should_send(&self) -> bool {
         if let Some(throttle) = self.throttle {
-            current_time() - self.last_sent > throttle
+            current_time()
+                .checked_sub(self.last_sent)
+                .unwrap_or(throttle)
+                >= throttle
         } else {
             true
         }

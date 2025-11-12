@@ -107,7 +107,7 @@ where
 
         has_errors = true;
     }
-    let duration = current_time() - start;
+    let duration = current_time().checked_sub(start)?;
 
     executor
         .observers_mut()

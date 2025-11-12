@@ -27,7 +27,7 @@ libafl = { path = "../../../crates/libafl", features = [
   "errors_backtrace",
 ] } #,  "llmp_small_maps", "llmp_debug"]}
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
-frida-gum = { version = "0.16.7", features = [
+frida-gum = { version = "0.17.0", features = [
   "auto-download",
   "event-sink",
   "invocation-listener",

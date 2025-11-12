@@ -96,7 +96,10 @@ impl TimedStats {
     pub fn add(&mut self, time: Duration, item: u64) {
         if self.series.is_empty() || self.series.back().unwrap().item != item {
             if self.series.front().is_some()
-                && time - self.series.front().unwrap().time > self.window
+                && time
+                    .checked_sub(self.series.front().unwrap().time)
+                    .unwrap_or(self.window)
+                    >= self.window
             {
                 self.series.pop_front();
             }
@@ -109,7 +112,10 @@ impl TimedStats {
         if self.series.is_empty() || self.series[self.series.len() - 1].item != item {
             let time = current_time();
             if self.series.front().is_some()
-                && time - self.series.front().unwrap().time > self.window
+                && time
+                    .checked_sub(self.series.front().unwrap().time)
+                    .unwrap_or(self.window)
+                    >= self.window
             {
                 self.series.pop_front();
             }
@@ -121,7 +127,14 @@ impl TimedStats {
     pub fn update_window(&mut self, window: Duration) {
         self.window = window;
         while !self.series.is_empty()
-            && self.series.back().unwrap().time - self.series.front().unwrap().time > window
+            && self
+                .series
+                .back()
+                .unwrap_or_default()
+                .time
+                .checked_sub(self.series.front().unwrap_or_default().time)
+                .unwrap()
+                > window
         {
             self.series.pop_front();
         }
