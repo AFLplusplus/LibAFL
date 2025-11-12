@@ -357,6 +357,11 @@ mod windows_logging {
     use core::ptr;
     use std::sync::OnceLock;
 
+    use winapi::um::{
+        fileapi::WriteFile, handleapi::INVALID_HANDLE_VALUE, processenv::GetStdHandle,
+        winbase::STD_OUTPUT_HANDLE, winnt::HANDLE,
+    };
+
     // Safe wrapper around HANDLE
     struct StdOutHandle(HANDLE);
 

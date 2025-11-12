@@ -1,8 +1,83 @@
-# LibAFL_Sugar: High-level usable wrappers for LibAFL
+# `LibAFL_Sugar`: High-level usable wrappers for `LibAFL`
 
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
 The `libafl_sugar` crate offers high-level, usable wrappers for `LibAFL`, simplifying common fuzzing tasks and providing a more ergonomic API for building fuzzers. It aims to reduce boilerplate and make `LibAFL` more accessible to new users, while still retaining the flexibility and power of the underlying framework.
+
+## Examples
+
+The following are some ways to write fuzzers with the sugar 🍭 crate.
+
+### In-process fuzzing
+
+```rust
+use libafl_sugar::inprocess::InProcessBytesCoverageSugar;
+use libafl_bolts::core_affinity::Cores;
+use std::path::PathBuf;
+
+let mut harness = |buf: &[u8]| {
+    if buf.len() > 0 && buf[0] == b'a' {
+        if buf.len() > 1 && buf[1] == b'b' {
+            if buf.len() > 2 && buf[2] == b'c' {
+                panic!("Three bytes found!");
+            }
+        }
+    }
+};
+
+InProcessBytesCoverageSugar::builder()
+    .input_dirs(&[PathBuf::from("./in")])
+    .output_dir(PathBuf::from("./out"))
+    .cores(&Cores::from_core_ids(vec![0]).unwrap())
+    .harness(&mut harness)
+    .build()
+    .run();
+```
+
+### Forkserver fuzzing
+
+```rust
+use libafl_sugar::forkserver::ForkserverBytesCoverageSugar;
+use libafl_bolts::core_affinity::Cores;
+use std::path::PathBuf;
+
+ForkserverBytesCoverageSugar::builder()
+    .input_dirs(&[PathBuf::from("./in")])
+    .output_dir(PathBuf::from("./out"))
+    .cores(&Cores::from_core_ids(vec![0]).unwrap())
+    .binary(PathBuf::from("./target"))
+    .arguments(&["@@"])
+    .build()
+    .run();
+```
+
+### QEMU fuzzing
+
+```rust
+use libafl_sugar::qemu::{QemuBytesCoverageSugar, QemuSugarParameter};
+use libafl_bolts::core_affinity::Cores;
+use std::path::PathBuf;
+
+let mut harness = |buf: &[u8]| {
+    if buf.len() > 0 && buf[0] == b'a' {
+        if buf.len() > 1 && buf[1] == b'b' {
+            if buf.len() > 2 && buf[2] == b'c' {
+                panic!("Three bytes found!");
+            }
+        }
+    }
+};
+
+let qemu_args = &["-d", "unimp,guest_errors", "-L", "."];
+
+QemuBytesCoverageSugar::builder()
+    .input_dirs(&[PathBuf::from("./in")])
+    .output_dir(PathBuf::from("./out"))
+    .cores(&Cores::from_core_ids(vec![0]).unwrap())
+    .harness(&mut harness)
+    .build()
+    .run(QemuSugarParameter::QemuCli(qemu_args));
+```
 
 ## The `LibAFL` Project
 
