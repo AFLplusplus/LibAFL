@@ -76,7 +76,7 @@ Currently, the supported flags are:
 This is a library that provides utils to wrap compilers and create source-level fuzzers.
 
 At the moment, only the Clang compiler is supported.
-To understand it deeper, look through the tutorials and examples.
+To understand it deeper, look through the [tutorial](../tutorial/tutorial.md) and examples.
 
 ### [`libafl_frida`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_frida)
 

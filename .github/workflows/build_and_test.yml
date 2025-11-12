@@ -59,13 +59,15 @@ jobs:
         run: ./scripts/check_for_blobs.sh
       - name: Build libafl debug
         run: cargo build -p libafl
+      - name: Build tutorial fuzzer
+        run: (cd fuzzers/baby/tutorial && cargo build)
       - name: Test the book (Linux)
         # TODO: fix books test fail with updated windows-rs
         if: runner.os == 'Linux'
-        run: cd docs && mdbook test -L ../target/debug/deps
+        run: cd docs && mdbook test -L ../fuzzers/baby/tutorial/debug/deps
       - name: Test the book (MacOS)
         if: runner.os == 'MacOS'
-        run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
+        run: cd docs && mdbook test -L ../fuzzers/baby/tutorial/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
       - name: Build individual libafl book examples (linux)
         if: runner.os == 'Linux'
         run: cd docs/listings/baby_fuzzer/ && just build-all

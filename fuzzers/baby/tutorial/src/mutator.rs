@@ -52,7 +52,6 @@ impl LainMutator {
 }
 
 impl Default for LainMutator {
-    #[must_use]
     fn default() -> Self {
         Self::new()
     }
