@@ -65,7 +65,7 @@ pub struct TuiMonitorConfig {
 }
 
 /// A single status entry for timings
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone)]
 pub struct TimedStat {
     /// The time
     pub time: Duration,
@@ -130,11 +130,22 @@ impl TimedStats {
             && self
                 .series
                 .back()
-                .unwrap_or_default()
+                .unwrap_or(TimedStat {
+                    time: window,
+                    item: 0,
+                })
                 .time
-                .checked_sub(self.series.front().unwrap_or_default().time)
+                .checked_sub(
+                    self.series
+                        .front()
+                        .unwrap_or(TimedStat {
+                            time: Duration::from_secs(0),
+                            item: 0,
+                        })
+                        .time,
+                )
                 .unwrap()
-                > window
+                >= window
         {
             self.series.pop_front();
         }

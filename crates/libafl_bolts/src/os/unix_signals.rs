@@ -486,7 +486,7 @@ pub unsafe fn setup_signal_handler<T: 'static + SignalHandler>(
         sigemptyset(&raw mut sa.sa_mask);
         sigaddset(&raw mut sa.sa_mask, SIGALRM);
         sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
-        sa.sa_sigaction = handle_signal as usize;
+        sa.sa_sigaction = handle_signal as *const () as usize;
         let signals = (*handler).signals();
         for sig in signals {
             write_volatile(
