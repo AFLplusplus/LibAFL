@@ -23,7 +23,7 @@ libafl_qemu = { version = "0.16.0", features = ["usermode", "x86_64"] }
 
 ## Cite
 
-If you use LibAFL QEMU for your academic work, consider citing the follwing paper:
+If you use `LibAFL_QEMU` for your academic work, consider citing the following paper:
 
 ```bibtex
 @InProceedings{libaflqemu:bar24,
