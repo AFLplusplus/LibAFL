@@ -2036,7 +2036,7 @@ pub struct LlmpSharedMap<SHM> {
 
 // TODO: May be obsolete
 /// The page struct, placed on a shared mem instance.
-/// A thin wrapper around a [`ShMem`] implementation, with special [`crate::llmp`] funcs
+/// A thin wrapper around a [`ShMem`] implementation, with `llmp`-specific functionality
 impl<SHM> LlmpSharedMap<SHM>
 where
     SHM: ShMem,
