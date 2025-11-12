@@ -25,7 +25,6 @@ use crate::{
 };
 
 /// The default function to generate a filename for a testcase
-#[expect(clippy::trivially_copy_pass_by_ref)]
 pub fn generate_filename<I: Input>(testcase: &Testcase<I>, id: &CorpusId) -> String {
     [
         Some(id.0.to_string()),
