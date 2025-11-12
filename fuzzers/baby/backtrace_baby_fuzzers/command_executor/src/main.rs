@@ -10,7 +10,7 @@ use std::{
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::command::CommandConfigurator,
+    executors::{command::CommandConfigurator, HasTimeout, SetTimeout},
     feedback_and,
     feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -107,12 +107,17 @@ pub fn main() {
             stdin.write_all(&target_bytes)?;
             Ok(child)
         }
+    }
 
-        fn exec_timeout(&self) -> Duration {
+    impl HasTimeout for MyExecutor {
+        fn timeout(&self) -> Duration {
             self.timeout
         }
-        fn exec_timeout_mut(&mut self) -> &mut Duration {
-            &mut self.timeout
+    }
+
+    impl SetTimeout for MyExecutor {
+        fn set_timeout(&mut self, timeout: Duration) {
+            self.timeout = timeout;
         }
     }
 

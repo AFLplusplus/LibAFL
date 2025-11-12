@@ -34,7 +34,7 @@ use libafl_bolts::{
 use {
     libafl::mutators::{
         havoc_mutations::{havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover},
-        mapping::{ToMappingMutator, ToOptionalMutator},
+        mapping::{ToMappingMutator, ToOptionalMutator, ToStateAwareMappingMutator},
         numeric::{int_mutators_no_crossover, mapped_int_mutators_crossover},
     },
     libafl_bolts::tuples::Map,
@@ -145,8 +145,18 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     #[cfg(feature = "simple_interface")]
-    let (mapped_mutators, optional_mapped_mutators, int_mutators) = {
+    let (
+        mapped_mutators,
+        optional_mapped_mutators,
+        sometimes_hidden_mapped_mutators,
+        int_mutators,
+        sometimes_hidden_int_mutators,
+    ) = {
         // Creating mutators that will operate on input.byte_array
+
+        use libafl::mutators::{
+            numeric::state_aware_mapped_int_mutators, state_aware_mapped_havoc_mutations,
+        };
         let mapped_mutators =
             mapped_havoc_mutations(CustomInput::byte_array_mut, CustomInput::byte_array);
 
@@ -156,12 +166,38 @@ pub fn main() {
             CustomInput::optional_byte_array,
         );
 
+        // Creating mutators that will operate on input.sometimes_hidden_byte_array
+        let sometimes_hidden_mapped_mutators = state_aware_mapped_havoc_mutations(
+            CustomInput::sometimes_hidden_byte_array_mut,
+            CustomInput::sometimes_hidden_byte_array,
+        );
+
+        // Creating mutators that will operate on input.num
         let int_mutators = mapped_int_mutators(CustomInput::num_mut, CustomInput::num);
-        (mapped_mutators, optional_mapped_mutators, int_mutators)
+
+        // Creating mutators that will operate on input.sometimes_hidden_num
+        let sometimes_hidden_int_mutators = state_aware_mapped_int_mutators(
+            CustomInput::sometimes_hidden_num_mut,
+            CustomInput::sometimes_hidden_num,
+        );
+
+        (
+            mapped_mutators,
+            optional_mapped_mutators,
+            sometimes_hidden_mapped_mutators,
+            int_mutators,
+            sometimes_hidden_int_mutators,
+        )
     };
 
     #[cfg(not(feature = "simple_interface"))]
-    let (mapped_mutators, optional_mapped_mutators, int_mutators) = {
+    let (
+        mapped_mutators,
+        optional_mapped_mutators,
+        sometimes_hidden_mapped_mutators,
+        int_mutators,
+        sometimes_hidden_int_mutators,
+    ) = {
         // Creating mutators that will operate on input.byte_array
         let mapped_mutators = havoc_mutations_no_crossover()
             .merge(havoc_crossover_with_corpus_mapper(CustomInput::byte_array))
@@ -175,11 +211,36 @@ pub fn main() {
             .map(ToOptionalMutator)
             .map(ToMappingMutator::new(CustomInput::optional_byte_array_mut));
 
+        // Creating mutators that will operate on input.sometimes_hidden_byte_array
+        let sometimes_hidden_mapped_mutators = havoc_mutations_no_crossover()
+            .merge(havoc_crossover_with_corpus_mapper(
+                CustomInput::sometimes_hidden_byte_array,
+            ))
+            .map(ToStateAwareMappingMutator::new(
+                CustomInput::sometimes_hidden_byte_array_mut,
+            ));
+
         // Creating mutators that will operate on input.num
         let int_mutators = int_mutators_no_crossover()
             .merge(mapped_int_mutators_crossover(CustomInput::num))
             .map(ToMappingMutator::new(CustomInput::num_mut));
-        (mapped_mutators, optional_mapped_mutators, int_mutators)
+
+        // Creating mutators that will operate on input.sometimes_hidden_num
+        let sometimes_hidden_int_mutators = int_mutators_no_crossover()
+            .merge(mapped_int_mutators_crossover(
+                CustomInput::sometimes_hidden_num,
+            ))
+            .map(ToStateAwareMappingMutator::new(
+                CustomInput::sometimes_hidden_num_mut,
+            ));
+
+        (
+            mapped_mutators,
+            optional_mapped_mutators,
+            sometimes_hidden_mapped_mutators,
+            int_mutators,
+            sometimes_hidden_int_mutators,
+        )
     };
 
     // Merging multiple lists of mutators that mutate a sub-part of the custom input
@@ -189,8 +250,12 @@ pub fn main() {
         .merge(mapped_mutators)
         // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
         .merge(optional_mapped_mutators)
+        // Then, mutators for the sometimes hidden byte array
+        .merge(sometimes_hidden_mapped_mutators)
         // Then, mutators for the number
         .merge(int_mutators)
+        // Then, mutators for the sometimes hidden number
+        .merge(sometimes_hidden_int_mutators)
         // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
         .prepend(ToggleOptionalByteArrayMutator::new(nonzero!(1)))
         // Finally, a custom mutator that toggles the boolean part of the input

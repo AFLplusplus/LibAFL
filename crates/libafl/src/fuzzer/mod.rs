@@ -1,17 +1,25 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
-use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "std")]
-use core::hash::Hash;
+use alloc::borrow::Cow;
+use alloc::{string::ToString, vec::Vec};
 use core::{fmt::Debug, time::Duration};
+#[cfg(feature = "std")]
+use core::{hash::Hash, marker::PhantomData};
 
 #[cfg(feature = "std")]
 use fastbloom::BloomFilter;
+#[cfg(feature = "std")]
+use libafl_bolts::impl_serdeany;
 use libafl_bolts::{current_time, tuples::MatchName};
+#[cfg(feature = "std")]
+use serde::Deserialize;
 use serde::{Serialize, de::DeserializeOwned};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
+#[cfg(feature = "std")]
+use crate::monitors::stats::{AggregatorOps, UserStats, UserStatsValue};
 use crate::{
     Error, HasMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
@@ -591,18 +599,24 @@ where
 }
 
 /// A trait to determine if a input should be run or not
-pub trait InputFilter<I> {
+pub trait InputFilter<EM, I, S> {
     /// should run execution for this input or no
-    fn should_execute(&mut self, input: &I) -> bool;
+    fn should_execute(&mut self, input: &I, state: &mut S, manager: &mut EM)
+    -> Result<bool, Error>;
 }
 
 /// A pseudo-filter that will execute each input.
 #[derive(Debug, Copy, Clone)]
 pub struct NopInputFilter;
-impl<I> InputFilter<I> for NopInputFilter {
+impl<EM, I, S> InputFilter<EM, I, S> for NopInputFilter {
     #[inline]
-    fn should_execute(&mut self, _input: &I) -> bool {
-        true
+    fn should_execute(
+        &mut self,
+        _input: &I,
+        _state: &mut S,
+        _manager: &mut EM,
+    ) -> Result<bool, Error> {
+        Ok(true)
     }
 }
 
@@ -632,10 +646,95 @@ impl BloomInputFilter {
 }
 
 #[cfg(feature = "std")]
-impl<I: Hash> InputFilter<I> for BloomInputFilter {
+impl<EM, I: Hash, S> InputFilter<EM, I, S> for BloomInputFilter {
     #[inline]
-    fn should_execute(&mut self, input: &I) -> bool {
-        !self.bloom.insert(input)
+    fn should_execute(
+        &mut self,
+        input: &I,
+        _state: &mut S,
+        _manager: &mut EM,
+    ) -> Result<bool, Error> {
+        Ok(!self.bloom.insert(input))
+    }
+}
+
+/// Wrapper for input filters that report the ratios of skipped to executed inputs.
+///
+/// The total execution count may be slightly different from what is reported by anything relying
+/// on the execution count in the state, because this wrapper only counts executions that are
+/// triggered by [`Evaluator::evaluate_filtered`]. Some parts of ``LibAFL`` may use lower-level calls,
+/// which are not counted by this wrapper. Notable examples are [`crate::stages::CalibrationStage`]
+/// and [`crate::state::StdState::generate_initial_inputs`].
+#[cfg(feature = "std")]
+#[derive(Debug)]
+pub struct ReportingInputFilter<F> {
+    inner: F,
+    reporting_interval: u64,
+}
+
+#[cfg(feature = "std")]
+impl<F> ReportingInputFilter<F> {
+    /// Create a new [`ReportingInputFilter`] around an existing input filter. It will report the ratio of skipped to executed inputs every `reporting_interval` executions.
+    pub fn new(inner: F, reporting_interval: u64) -> Self {
+        Self {
+            inner,
+            reporting_interval,
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl_serdeany!(ReportingInputFilterStats);
+
+#[cfg(feature = "std")]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+struct ReportingInputFilterStats {
+    skipped: u64,
+}
+
+#[cfg(feature = "std")]
+impl<EM, F, I, S> InputFilter<EM, I, S> for ReportingInputFilter<F>
+where
+    F: InputFilter<EM, I, S>,
+    EM: EventFirer<I, S>,
+    S: HasMetadata + HasExecutions,
+{
+    fn should_execute(
+        &mut self,
+        input: &I,
+        state: &mut S,
+        manager: &mut EM,
+    ) -> Result<bool, Error> {
+        let actual_executions = *state.executions();
+        let should_execute = self.inner.should_execute(input, state, manager)?;
+
+        let stats = state.metadata_or_insert_with(ReportingInputFilterStats::default);
+
+        if !should_execute {
+            stats.skipped += 1;
+        }
+
+        let skipped = stats.skipped;
+        let attempted_executions = skipped + actual_executions;
+
+        if attempted_executions.is_multiple_of(self.reporting_interval) {
+            manager.fire(
+                state,
+                EventWithStats::with_current_time(
+                    Event::UpdateUserStats {
+                        name: Cow::Borrowed("filtered_inputs"),
+                        value: UserStats::new(
+                            UserStatsValue::Ratio(skipped, attempted_executions),
+                            AggregatorOps::Avg,
+                        ),
+                        phantom: PhantomData,
+                    },
+                    actual_executions,
+                ),
+            )?;
+        }
+
+        Ok(should_execute)
     }
 }
 
@@ -654,7 +753,7 @@ where
         + HasLastFoundTime
         + HasExecutions,
     I: Input,
-    IF: InputFilter<I>,
+    IF: InputFilter<EM, I, S>,
 {
     fn evaluate_filtered(
         &mut self,
@@ -663,7 +762,7 @@ where
         manager: &mut EM,
         input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        if self.input_filter.should_execute(input) {
+        if self.input_filter.should_execute(input, state, manager)? {
             self.evaluate_input(state, executor, manager, input)
         } else {
             Ok((ExecuteInputResult::None, None))
