@@ -19,7 +19,7 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-build_id2 = "0.15.4"
+build_id2 = "0.16.0"
 ```
 
 Then, you can use the `get` function to get the build id:

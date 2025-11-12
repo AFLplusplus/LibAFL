@@ -16,7 +16,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-core_affinity2 = "0.15.4" # Replace with the latest version
+core_affinity2 = "0.16.0" # Replace with the latest version
 ```
 
 ### Example: Pinning threads to cores

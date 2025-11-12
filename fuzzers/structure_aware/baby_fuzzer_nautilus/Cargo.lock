@@ -58,7 +58,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "baby_fuzzer_nautilus"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "libafl",
  "libafl_bolts",
@@ -120,7 +120,7 @@ checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
 
 [[package]]
 name = "build_id2"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "ahash",
  "rustversion",
@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "core_affinity2"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "libafl_core",
  "libc",
@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "exceptional"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "libafl_core",
  "libc",
@@ -270,7 +270,7 @@ dependencies = [
 
 [[package]]
 name = "fast_rands"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "rand_core",
  "rustversion",
@@ -361,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "libafl"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "ahash",
  "arbitrary-int 2.0.0",
@@ -402,7 +402,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_bolts"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "ahash",
  "backtrace",
@@ -445,7 +445,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_core"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "backtrace",
  "nix",
@@ -457,7 +457,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_derive"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -478,7 +478,7 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "ll_mp"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "exceptional",
  "hostname",
@@ -555,7 +555,7 @@ dependencies = [
 
 [[package]]
 name = "minibsod"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "exceptional",
  "libc",
@@ -588,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "no_std_time"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "rustversion",
 ]
@@ -640,7 +640,7 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "ownedref"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "libafl_core",
  "rustversion",
@@ -810,7 +810,7 @@ dependencies = [
 
 [[package]]
 name = "serde_anymap"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "ahash",
  "ctor",
@@ -882,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "shmem_providers"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "fast_rands",
  "hashbrown",
@@ -956,7 +956,7 @@ checksum = "141fb9f71ee586d956d7d6e4d5a9ef8e946061188520140f7591b668841d502e"
 
 [[package]]
 name = "tuple_list_ex"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "libafl_core",
  "ownedref",
