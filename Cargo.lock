@@ -1062,15 +1062,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clap_complete"
-version = "4.5.60"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e602857739c5a4291dfa33b5a298aeac9006185229a700e5810a3ef7272d971"
-dependencies = [
- "clap",
-]
-
-[[package]]
 name = "clap_derive"
 version = "4.5.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3030,16 +3021,15 @@ checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
 name = "just"
-version = "1.40.0"
+version = "1.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecd0393c6da660eb7f6fee2b66c84cd2700013d830b17e5c207d77de9f8b690e"
+checksum = "d1b416428b34ea9c87701a1c22b820dbee801491e4b2ec88ad95c26ff115348d"
 dependencies = [
  "ansi_term",
  "blake3 1.8.2",
  "camino",
  "chrono",
  "clap",
- "clap_complete",
  "clap_mangen",
  "ctrlc",
  "derive-where",
@@ -3050,8 +3040,8 @@ dependencies = [
  "is_executable",
  "lexiclean",
  "libc",
+ "nix 0.30.1",
  "num_cpus",
- "once_cell",
  "percent-encoding",
  "rand 0.9.2",
  "regex",
