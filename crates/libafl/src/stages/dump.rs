@@ -42,6 +42,65 @@ pub fn generate_filename<I: Input>(testcase: &Testcase<I>, id: &CorpusId) -> Str
     .join("-")
 }
 
+/// The default function to create the directories if they don't exist
+fn create_dirs_if_needed<A, B>(corpus_dir: A, solutions_dir: B) -> Result<(PathBuf, PathBuf), Error>
+where
+    A: Into<PathBuf>,
+    B: Into<PathBuf>,
+{
+    let corpus_dir = corpus_dir.into();
+    if let Err(e) = fs::create_dir(&corpus_dir) {
+        if !corpus_dir.is_dir() {
+            return Err(Error::os_error(
+                e,
+                format!("Error creating directory {}", corpus_dir.display()),
+            ));
+        }
+    }
+    let solutions_dir = solutions_dir.into();
+    if let Err(e) = fs::create_dir(&solutions_dir) {
+        if !solutions_dir.is_dir() {
+            return Err(Error::os_error(
+                e,
+                format!("Error creating directory {}", solutions_dir.display()),
+            ));
+        }
+    }
+    Ok((corpus_dir, solutions_dir))
+}
+
+/// The default function to dump a corpus to disk
+fn dump_from_corpus<C, F, G, I, P>(
+    corpus: &C,
+    dir: &Path,
+    generate_filename: &mut G,
+    get_bytes: &mut F,
+    start_id: Option<CorpusId>,
+) -> Result<(), Error>
+where
+    C: Corpus<I>,
+    I: Input,
+    F: FnMut(&mut Testcase<I>) -> Result<Vec<u8>, Error>,
+    G: FnMut(&Testcase<I>, &CorpusId) -> P,
+    P: AsRef<Path>,
+{
+    let mut id = start_id.or_else(|| corpus.first());
+    while let Some(i) = id {
+        let testcase = corpus.get(i)?;
+        let fname = dir.join(generate_filename(&testcase.borrow(), &i));
+
+        let mut testcase = testcase.borrow_mut();
+        corpus.load_input_into(&mut testcase)?;
+        let bytes = get_bytes(&mut testcase)?;
+
+        let mut f = File::create(fname)?;
+        f.write_all(&bytes)?;
+
+        id = corpus.next(i);
+    }
+    Ok(())
+}
+
 /// Metadata used to store information about disk dump indexes for names
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
@@ -70,6 +129,7 @@ where
     CB1: FnMut(&Testcase<I>, &S) -> Vec<u8>,
     CB2: FnMut(&Testcase<I>, &CorpusId) -> P,
     S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
+    I: Input,
     P: AsRef<Path>,
 {
     #[inline]
@@ -80,7 +140,40 @@ where
         state: &mut S,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        self.dump_state_to_disk(state)
+        let (last_corpus, last_solution) =
+            if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
+                (
+                    meta.last_corpus.and_then(|x| state.corpus().next(x)),
+                    meta.last_solution.and_then(|x| state.solutions().next(x)),
+                )
+            } else {
+                (state.corpus().first(), state.solutions().first())
+            };
+
+        let mut get_bytes = |tc: &mut Testcase<I>| Ok((self.to_bytes)(tc, state));
+
+        dump_from_corpus(
+            state.corpus(),
+            &self.corpus_dir,
+            &mut self.generate_filename,
+            &mut get_bytes,
+            last_corpus,
+        )?;
+
+        dump_from_corpus(
+            state.solutions(),
+            &self.solutions_dir,
+            &mut self.generate_filename,
+            &mut get_bytes,
+            last_solution,
+        )?;
+
+        state.add_metadata(DumpToDiskMetadata {
+            last_corpus: state.corpus().last(),
+            last_solution: state.solutions().last(),
+        });
+
+        Ok(())
     }
 }
 
@@ -136,24 +229,7 @@ where
         A: Into<PathBuf>,
         B: Into<PathBuf>,
     {
-        let corpus_dir = corpus_dir.into();
-        if let Err(e) = fs::create_dir(&corpus_dir) {
-            if !corpus_dir.is_dir() {
-                return Err(Error::os_error(
-                    e,
-                    format!("Error creating directory {}", corpus_dir.display()),
-                ));
-            }
-        }
-        let solutions_dir = solutions_dir.into();
-        if let Err(e) = fs::create_dir(&solutions_dir) {
-            if !solutions_dir.is_dir() {
-                return Err(Error::os_error(
-                    e,
-                    format!("Error creating directory {}", solutions_dir.display()),
-                ));
-            }
-        }
+        let (corpus_dir, solutions_dir) = create_dirs_if_needed(corpus_dir, solutions_dir)?;
         Ok(Self {
             to_bytes,
             generate_filename,
@@ -161,53 +237,6 @@ where
             corpus_dir,
             phantom: PhantomData,
         })
-    }
-
-    #[inline]
-    fn dump_state_to_disk<P: AsRef<Path>>(&mut self, state: &mut S) -> Result<(), Error>
-    where
-        S: HasCorpus<I>,
-        CB1: FnMut(&Testcase<I>, &S) -> Vec<u8>,
-        CB2: FnMut(&Testcase<I>, &CorpusId) -> P,
-    {
-        let (mut corpus_id, mut solutions_id) =
-            if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
-                (
-                    meta.last_corpus.and_then(|x| state.corpus().next(x)),
-                    meta.last_solution.and_then(|x| state.solutions().next(x)),
-                )
-            } else {
-                (state.corpus().first(), state.solutions().first())
-            };
-
-        while let Some(i) = corpus_id {
-            let mut testcase = state.corpus().get(i)?.borrow_mut();
-            state.corpus().load_input_into(&mut testcase)?;
-            let bytes = (self.to_bytes)(&testcase, state);
-
-            let fname = self
-                .corpus_dir
-                .join((self.generate_filename)(&testcase, &i));
-            let mut f = File::create(fname)?;
-            drop(f.write_all(&bytes));
-
-            corpus_id = state.corpus().next(i);
-        }
-
-        while let Some(i) = solutions_id {
-            let mut testcase = state.solutions().get(i)?.borrow_mut();
-            state.solutions().load_input_into(&mut testcase)?;
-            let bytes = (self.to_bytes)(&testcase, state);
-
-            let fname = self
-                .solutions_dir
-                .join((self.generate_filename)(&testcase, &i));
-            let mut f = File::create(fname)?;
-            drop(f.write_all(&bytes));
-
-            solutions_id = state.solutions().next(i);
-        }
-        Ok(())
     }
 }
 
@@ -238,7 +267,43 @@ where
         state: &mut S,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        self.dump_state_to_disk(fuzzer, state)
+        let (last_corpus, last_solution) =
+            if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
+                (
+                    meta.last_corpus.and_then(|x| state.corpus().next(x)),
+                    meta.last_solution.and_then(|x| state.solutions().next(x)),
+                )
+            } else {
+                (state.corpus().first(), state.solutions().first())
+            };
+
+        let mut get_bytes = |tc: &mut Testcase<I>| {
+            let input = tc.input().as_ref().unwrap();
+            Ok(fuzzer.to_target_bytes(input).to_vec())
+        };
+
+        dump_from_corpus(
+            state.corpus(),
+            &self.corpus_dir,
+            &mut self.generate_filename,
+            &mut get_bytes,
+            last_corpus,
+        )?;
+
+        dump_from_corpus(
+            state.solutions(),
+            &self.solutions_dir,
+            &mut self.generate_filename,
+            &mut get_bytes,
+            last_solution,
+        )?;
+
+        state.add_metadata(DumpToDiskMetadata {
+            last_corpus: state.corpus().last(),
+            last_solution: state.solutions().last(),
+        });
+
+        Ok(())
     }
 }
 
@@ -289,89 +354,12 @@ where
         A: Into<PathBuf>,
         B: Into<PathBuf>,
     {
-        let corpus_dir = corpus_dir.into();
-        if let Err(e) = fs::create_dir(&corpus_dir) {
-            if !corpus_dir.is_dir() {
-                return Err(Error::os_error(
-                    e,
-                    format!("Error creating directory {}", corpus_dir.display()),
-                ));
-            }
-        }
-        let solutions_dir = solutions_dir.into();
-        if let Err(e) = fs::create_dir(&solutions_dir) {
-            if !solutions_dir.is_dir() {
-                return Err(Error::os_error(
-                    e,
-                    format!("Error creating directory {}", solutions_dir.display()),
-                ));
-            }
-        }
+        let (corpus_dir, solutions_dir) = create_dirs_if_needed(corpus_dir, solutions_dir)?;
         Ok(Self {
             generate_filename,
             solutions_dir,
             corpus_dir,
             phantom: PhantomData,
         })
-    }
-
-    #[inline]
-    fn dump_state_to_disk<P: AsRef<Path>>(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-    ) -> Result<(), Error>
-    where
-        S: HasCorpus<I>,
-        CB: FnMut(&Testcase<I>, &CorpusId) -> P,
-        Z: HasTargetBytesConverter,
-        Z::Converter: ToTargetBytes<I>,
-    {
-        let (mut corpus_id, mut solutions_id) =
-            if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
-                (
-                    meta.last_corpus.and_then(|x| state.corpus().next(x)),
-                    meta.last_solution.and_then(|x| state.solutions().next(x)),
-                )
-            } else {
-                (state.corpus().first(), state.solutions().first())
-            };
-
-        while let Some(i) = corpus_id {
-            let mut testcase = state.corpus().get(i)?.borrow_mut();
-            state.corpus().load_input_into(&mut testcase)?;
-            let input = testcase.input().as_ref().unwrap();
-            let bytes = fuzzer.to_target_bytes(input);
-
-            let fname = self
-                .corpus_dir
-                .join((self.generate_filename)(&testcase, &i));
-            let mut f = File::create(fname)?;
-            drop(f.write_all(&bytes));
-
-            corpus_id = state.corpus().next(i);
-        }
-
-        while let Some(i) = solutions_id {
-            let mut testcase = state.solutions().get(i)?.borrow_mut();
-            state.solutions().load_input_into(&mut testcase)?;
-            let input = testcase.input().as_ref().unwrap();
-            let bytes = fuzzer.to_target_bytes(input);
-
-            let fname = self
-                .solutions_dir
-                .join((self.generate_filename)(&testcase, &i));
-            let mut f = File::create(fname)?;
-            drop(f.write_all(&bytes));
-
-            solutions_id = state.solutions().next(i);
-        }
-
-        state.add_metadata(DumpToDiskMetadata {
-            last_corpus: state.corpus().last(),
-            last_solution: state.solutions().last(),
-        });
-
-        Ok(())
     }
 }
