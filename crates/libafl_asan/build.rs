@@ -1,5 +1,5 @@
 fn main() {
-    #[cfg(all(feature = "linux", not(target_os = "linux")))]
+    //#[cfg(all(feature = "syscalls", not(target_os = "linux")))]
     println!("cargo:warning=The feature `linux` can only be used on Linux!");
 
     println!("cargo:rerun-if-changed=cc/include/hooks.h");

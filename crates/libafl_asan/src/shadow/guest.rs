@@ -353,8 +353,8 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
 
     pub fn get_shadow(&self, addr: GuestAddr, len: usize) -> Result<&[u8], GuestShadowError<M>> {
         trace!("get_shadow - addr: {addr:#x}, len: {len:#x}");
-        assert!(addr % Self::ALLOC_ALIGN_SIZE == 0);
-        assert!(len % Self::ALLOC_ALIGN_SIZE == 0);
+        assert!(addr.is_multiple_of(Self::ALLOC_ALIGN_SIZE));
+        assert!(len.is_multiple_of(Self::ALLOC_ALIGN_SIZE));
         let shadow_addr = (addr >> Self::ALLOC_ALIGN_POW) + Self::SHADOW_OFFSET;
         let shadow_len = len >> Self::ALLOC_ALIGN_POW;
         if Self::is_low_memory(addr, len) {
@@ -374,8 +374,8 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
         len: usize,
     ) -> Result<&mut [u8], GuestShadowError<M>> {
         trace!("get_shadow_mut - addr: {addr:#x}, len: {len:#x}");
-        assert!(addr % Self::ALLOC_ALIGN_SIZE == 0);
-        assert!(len % Self::ALLOC_ALIGN_SIZE == 0);
+        assert!(addr.is_multiple_of(Self::ALLOC_ALIGN_SIZE));
+        assert!(len.is_multiple_of(Self::ALLOC_ALIGN_SIZE));
         let shadow_addr = (addr >> Self::ALLOC_ALIGN_POW) + Self::SHADOW_OFFSET;
         let aligned_len = Self::align_up(len);
         let shadow_len = aligned_len >> Self::ALLOC_ALIGN_POW;

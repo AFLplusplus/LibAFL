@@ -12,7 +12,7 @@ use libafl::{
     executors::{Executor, ExitKind, WithObservers},
     feedback_and_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::{BloomInputFilter, Fuzzer, ReportingInputFilter, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::HasTargetBytes,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
@@ -20,7 +20,6 @@ use libafl::{
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, AflStatsStage, CalibrationStage},
     state::{HasCorpus, HasExecutions, StdState},
-    BloomInputFilter,
 };
 use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -138,7 +137,7 @@ pub fn main() {
     #[cfg(not(feature = "bloom_input_filter"))]
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
     #[cfg(feature = "bloom_input_filter")]
-    let filter = BloomInputFilter::new(10_000_000, 0.001);
+    let filter = ReportingInputFilter::new(BloomInputFilter::new(10_000_000, 0.001), 100_000);
     #[cfg(feature = "bloom_input_filter")]
     let mut fuzzer = StdFuzzer::builder()
         .input_filter(filter)

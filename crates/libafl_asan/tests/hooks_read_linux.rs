@@ -1,7 +1,7 @@
 #[cfg(all(
     test,
     feature = "hooks",
-    feature = "linux",
+    feature = "syscalls",
     target_os = "linux",
     not(feature = "libc")
 ))]

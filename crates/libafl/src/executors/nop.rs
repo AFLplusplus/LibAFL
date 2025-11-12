@@ -5,6 +5,7 @@ use core::time::Duration;
 use libafl_bolts::tuples::RefIndexable;
 
 use super::{Executor, ExitKind, HasObservers, HasTimeout};
+use crate::executors::SetTimeout;
 
 /// [`NopExecutor`] is an executor that does nothing
 pub type NopExecutor = ConstantExecutor<()>;
@@ -64,7 +65,9 @@ impl<OT> HasTimeout for ConstantExecutor<OT> {
     fn timeout(&self) -> Duration {
         self.tm
     }
+}
 
+impl<OT> SetTimeout for ConstantExecutor<OT> {
     fn set_timeout(&mut self, timeout: Duration) {
         self.tm = timeout;
     }
