@@ -521,7 +521,7 @@ impl Default for FridaInstrumentationHelperBuilder {
                 let range = module.range();
                 let start = range.base_address().0 as usize;
                 let range = start..(start + range.size());
-                range.contains(&(Self::new as usize))
+                range.contains(&(Self::new as *const () as usize))
             }),
             skip_ranges: Vec::new(),
         }
