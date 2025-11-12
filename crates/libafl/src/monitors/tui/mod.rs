@@ -65,7 +65,7 @@ pub struct TuiMonitorConfig {
 }
 
 /// A single status entry for timings
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct TimedStat {
     /// The time
     pub time: Duration,
