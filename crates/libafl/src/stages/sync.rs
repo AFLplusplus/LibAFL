@@ -98,10 +98,10 @@ where
             .get::<SyncFromDiskMetadata>()
             .map(|m| m.last_time);
 
-        if let Some(last) = last {
-            if current_time().saturating_sub(last) < self.interval {
-                return Ok(());
-            }
+        if let Some(last) = last
+            && current_time().saturating_sub(last) < self.interval
+        {
+            return Ok(());
         }
 
         let new_max_time = current_time();

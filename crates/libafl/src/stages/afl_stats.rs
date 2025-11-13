@@ -499,10 +499,10 @@ where
     }
 
     fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<I>) {
-        if let Some(exec_time) = testcase.exec_time() {
-            if exec_time > &self.slowest_exec {
-                self.slowest_exec = *exec_time;
-            }
+        if let Some(exec_time) = testcase.exec_time()
+            && exec_time > &self.slowest_exec
+        {
+            self.slowest_exec = *exec_time;
         }
     }
 
@@ -511,10 +511,10 @@ where
     }
 
     fn maybe_update_max_depth(&mut self, testcase: &Testcase<I>) {
-        if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>() {
-            if metadata.depth() > self.max_depth {
-                self.max_depth = metadata.depth();
-            }
+        if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>()
+            && metadata.depth() > self.max_depth
+        {
+            self.max_depth = metadata.depth();
         }
     }
 

@@ -348,13 +348,13 @@ impl AsanBacktraceObserver {
     /// parse ASAN error output emited by the target command and compute the hash
     pub fn parse_asan_output(&mut self, output: &str) {
         let mut hash = 0;
-        if let Ok(st_vec) = AsanStacktrace::extract_stacktrace(output) {
-            if let Ok(mut stacktrace) = AsanStacktrace::parse_stacktrace(&st_vec) {
-                stacktrace.filter();
-                let mut s = DefaultHasher::new();
-                stacktrace.hash(&mut s);
-                hash = s.finish();
-            }
+        if let Ok(st_vec) = AsanStacktrace::extract_stacktrace(output)
+            && let Ok(mut stacktrace) = AsanStacktrace::parse_stacktrace(&st_vec)
+        {
+            stacktrace.filter();
+            let mut s = DefaultHasher::new();
+            stacktrace.hash(&mut s);
+            hash = s.finish();
         }
         self.update_hash(hash);
     }

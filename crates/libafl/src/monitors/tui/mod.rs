@@ -565,16 +565,16 @@ fn run_tui_thread<W: Write + Send + Sync + 'static>(
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
-            if event::poll(timeout)? {
-                if let Event::Key(key) = event::read()? {
-                    match key.code {
-                        KeyCode::Char(c) => ui.on_key(c),
-                        KeyCode::Left => ui.on_left(),
-                        //KeyCode::Up => ui.on_up(),
-                        KeyCode::Right => ui.on_right(),
-                        //KeyCode::Down => ui.on_down(),
-                        _ => {}
-                    }
+            if event::poll(timeout)?
+                && let Event::Key(key) = event::read()?
+            {
+                match key.code {
+                    KeyCode::Char(c) => ui.on_key(c),
+                    KeyCode::Left => ui.on_left(),
+                    //KeyCode::Up => ui.on_up(),
+                    KeyCode::Right => ui.on_right(),
+                    //KeyCode::Down => ui.on_down(),
+                    _ => {}
                 }
             }
             if last_tick.elapsed() >= tick_rate {

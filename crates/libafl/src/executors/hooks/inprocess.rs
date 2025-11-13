@@ -503,10 +503,10 @@ impl InProcessExecutorHandlerData {
                         bsod_info.ucontext.as_ref(),
                     );
 
-                    if let Ok(bsod) = bsod {
-                        if let Ok(r) = core::str::from_utf8(&bsod) {
-                            log::error!("{r}");
-                        }
+                    if let Ok(bsod) = bsod
+                        && let Ok(r) = core::str::from_utf8(&bsod)
+                    {
+                        log::error!("{r}");
                     }
                 }
 

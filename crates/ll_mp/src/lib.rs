@@ -2634,15 +2634,14 @@ where
             self.broker_once()
                 .expect("An error occurred when brokering. Exiting.");
 
-            if let Some(exit_after_count) = self.inner.exit_cleanly_after {
-                if !self.inner.has_clients()
-                    && (self.inner.num_clients_seen - self.inner.listeners.len())
-                        > exit_after_count.into()
-                {
-                    // No more clients connected, and the amount of clients we were waiting for was previously connected.
-                    // exit cleanly.
-                    break;
-                }
+            if let Some(exit_after_count) = self.inner.exit_cleanly_after
+                && !self.inner.has_clients()
+                && (self.inner.num_clients_seen - self.inner.listeners.len())
+                    > exit_after_count.into()
+            {
+                // No more clients connected, and the amount of clients we were waiting for was previously connected.
+                // exit cleanly.
+                break;
             }
 
             #[cfg(feature = "std")]
@@ -3383,13 +3382,11 @@ where
                             .expect("B2B: Error forwarding message. Exiting.");
                     }
                     Err(e) => {
-                        if let Error::OsError(e, ..) = e {
-                            if e.kind() == ErrorKind::UnexpectedEof {
-                                log::info!(
-                                    "Broker {peer_address} seems to have disconnected, exiting"
-                                );
-                                return;
-                            }
+                        if let Error::OsError(e, ..) = e
+                            && e.kind() == ErrorKind::UnexpectedEof
+                        {
+                            log::info!("Broker {peer_address} seems to have disconnected, exiting");
+                            return;
                         }
 
                         #[cfg(feature = "llmp_debug")]

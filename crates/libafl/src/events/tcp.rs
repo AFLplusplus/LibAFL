@@ -134,11 +134,11 @@ where
 
             loop {
                 let mut reached_max = false;
-                if let Some(max_clients) = exit_cleanly_after {
-                    if max_clients.get() <= recv_handles.len() {
-                        // we waited for all the clients we wanted to see attached. Now wait for them to close their tcp connections.
-                        reached_max = true;
-                    }
+                if let Some(max_clients) = exit_cleanly_after
+                    && max_clients.get() <= recv_handles.len()
+                {
+                    // we waited for all the clients we wanted to see attached. Now wait for them to close their tcp connections.
+                    reached_max = true;
                 }
 
                 // Asynchronously wait for an inbound socket.

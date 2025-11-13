@@ -367,28 +367,29 @@ impl ToolWrapper for ClangWrapper {
             // argument.
             for arg in &base_args {
                 let arg_as_path = PathBuf::from(arg);
-                if !arg.ends_with('.') && !arg.starts_with('-') {
-                    if let Some(extension) = arg_as_path.extension() {
-                        let extension = extension.to_str().unwrap();
-                        let extension_lowercase = extension.to_lowercase();
-                        match &extension_lowercase[..] {
-                            "c" | "cc" | "cxx" | "cpp" => {
-                                args.push("-o".to_string());
-                                args.push(if self.linking {
-                                    configuration
-                                        .replace_extension(&PathBuf::from("a.out"))
-                                        .into_os_string()
-                                        .into_string()
-                                        .unwrap()
-                                } else {
-                                    let mut result = configuration.replace_extension(&arg_as_path);
-                                    result.set_extension("o");
-                                    result.into_os_string().into_string().unwrap()
-                                });
-                                break;
-                            }
-                            _ => {}
+                if !arg.ends_with('.')
+                    && !arg.starts_with('-')
+                    && let Some(extension) = arg_as_path.extension()
+                {
+                    let extension = extension.to_str().unwrap();
+                    let extension_lowercase = extension.to_lowercase();
+                    match &extension_lowercase[..] {
+                        "c" | "cc" | "cxx" | "cpp" => {
+                            args.push("-o".to_string());
+                            args.push(if self.linking {
+                                configuration
+                                    .replace_extension(&PathBuf::from("a.out"))
+                                    .into_os_string()
+                                    .into_string()
+                                    .unwrap()
+                            } else {
+                                let mut result = configuration.replace_extension(&arg_as_path);
+                                result.set_extension("o");
+                                result.into_os_string().into_string().unwrap()
+                            });
+                            break;
                         }
+                        _ => {}
                     }
                 }
             }
