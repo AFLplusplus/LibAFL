@@ -6,6 +6,30 @@
 
 This crate abstracts away the platform-specific details of shared memory implementation, allowing developers to write portable code that works across Windows, Linux, macOS, Android, and other Unix-like systems.
 
+## Usage
+
+Here is a basic example of how to use `shmem_providers` to create and use a shared memory region. This example demonstrates the single-process case. For sharing between processes, the `ShMemId` would be passed to the other process, which would then use `shmem_from_id` to map the shared memory.
+
+```rust
+use shmem_providers::{ShMemProvider, StdShMemProvider};
+
+// Create a new shared memory provider.
+let mut provider = StdShMemProvider::new().unwrap();
+
+// Create a new shared memory region of 128 bytes.
+let mut shared_mem = provider.new_shmem(128).unwrap();
+
+// Write a message to the shared memory.
+let message = "Hello, shared memory!";
+shared_mem[..message.len()].copy_from_slice(message.as_bytes());
+println!("Wrote: '{}'", message);
+
+// Read the message back from shared memory.
+let read_message = std::str::from_utf8(&shared_mem[..message.len()]).unwrap();
+println!("Read:  '{}'", read_message);
+assert_eq!(message, read_message);
+```
+
 ## Core Abstractions
 
 The crate exposes two main traits:
