@@ -2,7 +2,7 @@
 name = "libafl_asan"
 description = "Address sanitizer library for LibAFL"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 keywords = ["fuzzing", "address", "sanitizer", "asan"]
 categories = [
   "development-tools::testing",
