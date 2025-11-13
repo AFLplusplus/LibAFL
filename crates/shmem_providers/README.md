@@ -4,7 +4,6 @@
 
 This crate abstracts away the platform-specific details of shared memory implementation, allowing developers to write portable code that works across `Windows`, `Linux`, `macOS`, `Android`, and other `Unix`-like systems.
 
-
 ## Usage
 
 Here is a basic example of how to use `shmem_providers` to create and use a shared memory region. This example demonstrates the single-process case. For sharing between processes, the `ShMemId` would be passed to the other process, which would then use `shmem_from_id` to map the shared memory.
