@@ -13,7 +13,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-  MAIN_LLVM_VERSION: 21
+  MAIN_LLVM_VERSION: 18
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -187,7 +187,7 @@ jobs:
       - name: Check each feature
         # Skipping `python` as it has to be built with the `maturin` tool
         # `sancov_pcguard_edges` is tested seperatelyc
-        run: LLVM_VERSION=21 CI_INSTANCES=21 cargo run --manifest-path ./utils/ci_splitter/Cargo.toml -- ${{ matrix.instance_idx }}
+        run: LLVM_VERSION=18 CI_INSTANCES=18 cargo run --manifest-path ./utils/ci_splitter/Cargo.toml -- ${{ matrix.instance_idx }}
 
 #  idk why bindgen generates a corrupted file only on CI.
 #  ubuntu-concolic:
@@ -222,7 +222,7 @@ jobs:
   cargo-fmt:
     runs-on: ubuntu-24.04
     env:
-      MAIN_LLVM_VERSION: 21
+      MAIN_LLVM_VERSION: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
