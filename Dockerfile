@@ -29,8 +29,8 @@ RUN rustup target add aarch64-unknown-linux-gnu
 RUN rustup target add i686-unknown-linux-gnu
 RUN rustup target add powerpc-unknown-linux-gnu
 
-# Install clang 18, common build tools
-ENV LLVM_VERSION=18
+# Install clang 21, common build tools
+ENV LLVM_VERSION=21
 ENV LLVM_CONFIG=llvm-config-${LLVM_VERSION}
 RUN dpkg --add-architecture i386
 RUN apt-get update && \
