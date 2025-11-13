@@ -25,7 +25,7 @@ name = "SymRuntime"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-symcc_runtime = { path = "../../symcc_runtime" }
+symcc_runtime = { path = "../../symcc_runtime", version = "0.16.0" }
 
 [lints]
 workspace = true
