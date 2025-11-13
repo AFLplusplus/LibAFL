@@ -103,7 +103,7 @@ mimalloc = { workspace = true, default-features = false }
 workspace = true
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-yaxpeax-arm = "0.3.0"
+yaxpeax-arm = "0.4.0"
 
 [target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
 yaxpeax-x86 = "2.0.0"
