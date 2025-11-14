@@ -75,20 +75,20 @@ where
 
         let rand1 = state.rand_mut().next();
 
-        if let Some(meta) = state.metadata_map().get::<Tokens>() {
-            if !meta.tokens().is_empty() {
-                let tok = choose(meta.tokens(), rand1).unwrap();
-                if items.last() != Some(&GeneralizedItem::Gap) {
-                    items.push(GeneralizedItem::Gap);
-                }
-                items.push(GeneralizedItem::Bytes(tok.clone()));
+        if let Some(meta) = state.metadata_map().get::<Tokens>()
+            && !meta.tokens().is_empty()
+        {
+            let tok = choose(meta.tokens(), rand1).unwrap();
+            if items.last() != Some(&GeneralizedItem::Gap) {
                 items.push(GeneralizedItem::Gap);
-
-                debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
-                debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
-
-                return Ok(MutationResult::Mutated);
             }
+            items.push(GeneralizedItem::Bytes(tok.clone()));
+            items.push(GeneralizedItem::Gap);
+
+            debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
+            debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
+
+            return Ok(MutationResult::Mutated);
         }
     }
 

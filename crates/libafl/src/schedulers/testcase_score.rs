@@ -234,21 +234,22 @@ where
             }
         }
 
-        if let Some(strat) = psmeta.strat() {
-            if *strat.base() != BaseSchedule::EXPLORE {
-                if factor > MAX_FACTOR {
-                    factor = MAX_FACTOR;
-                }
-
-                perf_score *= factor / POWER_BETA;
+        if let Some(strat) = psmeta.strat()
+            && *strat.base() != BaseSchedule::EXPLORE
+        {
+            if factor > MAX_FACTOR {
+                factor = MAX_FACTOR;
             }
+
+            perf_score *= factor / POWER_BETA;
         }
 
         // Lower bound if the strat is not COE.
-        if let Some(strat) = psmeta.strat() {
-            if *strat.base() == BaseSchedule::COE && perf_score < 1.0 {
-                perf_score = 1.0;
-            }
+        if let Some(strat) = psmeta.strat()
+            && *strat.base() == BaseSchedule::COE
+            && perf_score < 1.0
+        {
+            perf_score = 1.0;
         }
 
         // Upper bound

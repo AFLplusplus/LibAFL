@@ -188,10 +188,10 @@ impl CommandConfigurator<Child> for StdCommandConfigurator {
                         }
                     }
                     _ => {
-                        if let Err(err) = stdin.flush() {
-                            if err.kind() != std::io::ErrorKind::BrokenPipe {
-                                return Err(err.into());
-                            }
+                        if let Err(err) = stdin.flush()
+                            && err.kind() != std::io::ErrorKind::BrokenPipe
+                        {
+                            return Err(err.into());
                         }
                     }
                 }
@@ -411,20 +411,20 @@ where
         // Reason of not putting into state and pass by post_exec_all is that
         // - Save extra at least two hashmap lookups since we already know the handle
         // - Doesn't pose HasNamedMetadata bound on S (note we might have many stdout/stderr observers)
-        if let Some(mut stderr) = child.stderr {
-            if let Some(stderr_handle) = self.stderr_observer.clone() {
-                let mut buf = vec![];
-                stderr.read_to_end(&mut buf)?;
-                self.observers_mut().index_mut(&stderr_handle).observe(buf);
-            }
+        if let Some(mut stderr) = child.stderr
+            && let Some(stderr_handle) = self.stderr_observer.clone()
+        {
+            let mut buf = vec![];
+            stderr.read_to_end(&mut buf)?;
+            self.observers_mut().index_mut(&stderr_handle).observe(buf);
         }
 
-        if let Some(mut stdout) = child.stdout {
-            if let Some(stdout_handle) = self.stdout_observer.clone() {
-                let mut buf = vec![];
-                stdout.read_to_end(&mut buf)?;
-                self.observers_mut().index_mut(&stdout_handle).observe(buf);
-            }
+        if let Some(mut stdout) = child.stdout
+            && let Some(stdout_handle) = self.stdout_observer.clone()
+        {
+            let mut buf = vec![];
+            stdout.read_to_end(&mut buf)?;
+            self.observers_mut().index_mut(&stdout_handle).observe(buf);
         }
 
         self.observers_mut()

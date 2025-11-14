@@ -48,22 +48,22 @@ where
     B: Into<PathBuf>,
 {
     let corpus_dir = corpus_dir.into();
-    if let Err(e) = fs::create_dir(&corpus_dir) {
-        if !corpus_dir.is_dir() {
-            return Err(Error::os_error(
-                e,
-                format!("Error creating directory {}", corpus_dir.display()),
-            ));
-        }
+    if let Err(e) = fs::create_dir(&corpus_dir)
+        && !corpus_dir.is_dir()
+    {
+        return Err(Error::os_error(
+            e,
+            format!("Error creating directory {}", corpus_dir.display()),
+        ));
     }
     let solutions_dir = solutions_dir.into();
-    if let Err(e) = fs::create_dir(&solutions_dir) {
-        if !solutions_dir.is_dir() {
-            return Err(Error::os_error(
-                e,
-                format!("Error creating directory {}", solutions_dir.display()),
-            ));
-        }
+    if let Err(e) = fs::create_dir(&solutions_dir)
+        && !solutions_dir.is_dir()
+    {
+        return Err(Error::os_error(
+            e,
+            format!("Error creating directory {}", solutions_dir.display()),
+        ));
     }
     Ok((corpus_dir, solutions_dir))
 }

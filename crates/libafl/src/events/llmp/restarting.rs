@@ -528,11 +528,11 @@ where
     /// Save LLMP state and empty state in staterestorer
     pub fn intermediate_save(&mut self) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
-        if let Some(sr) = &mut self.staterestorer {
-            if self.save_state.oom_safe() {
-                sr.reset();
-                sr.save(&(None::<S>, &self.llmp.describe()?))?;
-            }
+        if let Some(sr) = &mut self.staterestorer
+            && self.save_state.oom_safe()
+        {
+            sr.reset();
+            sr.save(&(None::<S>, &self.llmp.describe()?))?;
         }
 
         Ok(())

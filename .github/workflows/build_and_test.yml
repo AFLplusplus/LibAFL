@@ -222,7 +222,7 @@ jobs:
   cargo-fmt:
     runs-on: ubuntu-24.04
     env:
-      MAIN_LLVM_VERSION: 20
+      MAIN_LLVM_VERSION: 21
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly

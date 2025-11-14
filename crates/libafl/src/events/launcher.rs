@@ -294,19 +294,17 @@ where
                                 index as u64 * self.launch_delay,
                             ));
 
-                            if !debug_output {
-                                if let Some(file) = &self.opened_stdout_file {
-                                    // # Safety
-                                    // We assume the file descriptors are valid here
-                                    unsafe {
-                                        dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                        match &self.opened_stderr_file {
-                                            Some(stderr) => {
-                                                dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                            }
-                                            _ => {
-                                                dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
-                                            }
+                            if !debug_output && let Some(file) = &self.opened_stdout_file {
+                                // # Safety
+                                // We assume the file descriptors are valid here
+                                unsafe {
+                                    dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                    match &self.opened_stderr_file {
+                                        Some(stderr) => {
+                                            dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
+                                        _ => {
+                                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
                                         }
                                     }
                                 }
@@ -761,19 +759,17 @@ where
                                 index as u64 * self.launch_delay,
                             ));
 
-                            if !debug_output {
-                                if let Some(file) = &self.opened_stdout_file {
-                                    // # Safety
-                                    // We assume the file descriptors are valid here
-                                    unsafe {
-                                        dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                        match &self.opened_stderr_file {
-                                            Some(stderr) => {
-                                                dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                            }
-                                            _ => {
-                                                dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
-                                            }
+                            if !debug_output && let Some(file) = &self.opened_stdout_file {
+                                // # Safety
+                                // We assume the file descriptors are valid here
+                                unsafe {
+                                    dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                    match &self.opened_stderr_file {
+                                        Some(stderr) => {
+                                            dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
+                                        _ => {
+                                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
                                         }
                                     }
                                 }

@@ -141,10 +141,10 @@ impl<I> TestcaseStorageMap<I> {
         let mut range = self
             .map
             .range((core::ops::Bound::Included(id), core::ops::Bound::Unbounded));
-        if let Some((this_id, _)) = range.next() {
-            if id != *this_id {
-                return None;
-            }
+        if let Some((this_id, _)) = range.next()
+            && id != *this_id
+        {
+            return None;
         }
         if let Some((next_id, _)) = range.next() {
             Some(*next_id)
@@ -171,10 +171,10 @@ impl<I> TestcaseStorageMap<I> {
         let mut range = self
             .map
             .range((core::ops::Bound::Unbounded, core::ops::Bound::Included(id)));
-        if let Some((this_id, _)) = range.next_back() {
-            if id != *this_id {
-                return None;
-            }
+        if let Some((this_id, _)) = range.next_back()
+            && id != *this_id
+        {
+            return None;
         }
         if let Some((prev_id, _)) = range.next_back() {
             Some(*prev_id)

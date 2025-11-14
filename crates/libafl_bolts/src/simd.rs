@@ -259,7 +259,7 @@ impl VectorType for wide::u8x16 {
     }
 
     fn as_slice(&self) -> &[u8] {
-        self.as_array_ref()
+        self.as_array()
     }
 }
 
@@ -300,7 +300,7 @@ impl VectorType for wide::u8x32 {
     }
 
     fn as_slice(&self) -> &[u8] {
-        self.as_array_ref()
+        self.as_array()
     }
 }
 
@@ -328,7 +328,7 @@ where
         let i = step * V::N;
         let mp = V::from_slice(&map[i..]);
 
-        let mask = mp.cmp_eq(V::ZERO);
+        let mask = mp.simd_eq(V::ZERO);
         let out = mask.blend(lhs, rhs);
         map[i..i + V::N].copy_from_slice(out.as_slice());
     }

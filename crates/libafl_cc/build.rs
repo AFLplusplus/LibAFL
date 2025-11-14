@@ -35,10 +35,10 @@ const LLVM_VERSION_MIN: u32 = 15;
     feature = "dump-cfg",
 ))]
 fn dll_extension<'a>() -> &'a str {
-    if let Ok(vendor) = env::var("CARGO_CFG_TARGET_VENDOR") {
-        if vendor == "apple" {
-            return "dylib";
-        }
+    if let Ok(vendor) = env::var("CARGO_CFG_TARGET_VENDOR")
+        && vendor == "apple"
+    {
+        return "dylib";
     }
     let family = env::var("CARGO_CFG_TARGET_FAMILY").unwrap_or_else(|_| "unknown".into());
     match family.as_str() {
@@ -149,10 +149,10 @@ fn find_llvm_version() -> Option<i32> {
     } else {
         exec_llvm_config(&["--version"])
     };
-    if let Some(major) = output.split('.').collect::<Vec<&str>>().first() {
-        if let Ok(res) = major.parse::<i32>() {
-            return Some(res);
-        }
+    if let Some(major) = output.split('.').collect::<Vec<&str>>().first()
+        && let Ok(res) = major.parse::<i32>()
+    {
+        return Some(res);
     }
     None
 }

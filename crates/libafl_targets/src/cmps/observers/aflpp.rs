@@ -229,20 +229,20 @@ pub fn add_to_aflpp_cmp_metadata(
                 let mut last: Option<CmpValues> = None;
                 for j in 0..execs {
                     if let Some(val) = cmp_map.values_of(i, j) {
-                        if let Some(l) = last.and_then(|x| x.to_u64_tuple()) {
-                            if let Some(v) = val.to_u64_tuple() {
-                                if l.0.wrapping_add(1) == v.0 {
-                                    increasing_v0 += 1;
-                                }
-                                if l.1.wrapping_add(1) == v.1 {
-                                    increasing_v1 += 1;
-                                }
-                                if l.0.wrapping_sub(1) == v.0 {
-                                    decreasing_v0 += 1;
-                                }
-                                if l.1.wrapping_sub(1) == v.1 {
-                                    decreasing_v1 += 1;
-                                }
+                        if let Some(l) = last.and_then(|x| x.to_u64_tuple())
+                            && let Some(v) = val.to_u64_tuple()
+                        {
+                            if l.0.wrapping_add(1) == v.0 {
+                                increasing_v0 += 1;
+                            }
+                            if l.1.wrapping_add(1) == v.1 {
+                                increasing_v1 += 1;
+                            }
+                            if l.0.wrapping_sub(1) == v.0 {
+                                decreasing_v0 += 1;
+                            }
+                            if l.1.wrapping_sub(1) == v.1 {
+                                decreasing_v1 += 1;
                             }
                         }
                         last = Some(val);

@@ -2,7 +2,7 @@
 name = "libafl_asan_fuzz"
 version.workspace = true
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 publish = false
 
 [package.metadata]

@@ -2,7 +2,7 @@
 name = "libafl_qemu_runner"
 description = "Tool for running targets using LibAFL's libafl_qemu library"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 keywords = ["fuzzing", "address", "sanitizer", "asan", "runner", "libafl_qemu"]
 categories = [
   "development-tools::testing",

@@ -455,16 +455,13 @@ where
             .node_descriptor
             .flags
             .intersects(NodePolicy::SendToParent)
+            && let Some(parent) = &mut self.parent
         {
-            if let Some(parent) = &mut self.parent {
-                log::debug!("Sending to parent...");
-                if let Err(e) = Self::write_msg(parent, msg).await {
-                    log::error!(
-                        "The parent disconnected. We won't try to communicate with it again."
-                    );
-                    log::error!("Error: {e:?}");
-                    self.parent.take();
-                }
+            log::debug!("Sending to parent...");
+            if let Err(e) = Self::write_msg(parent, msg).await {
+                log::error!("The parent disconnected. We won't try to communicate with it again.");
+                log::error!("Error: {e:?}");
+                self.parent.take();
             }
         }
 

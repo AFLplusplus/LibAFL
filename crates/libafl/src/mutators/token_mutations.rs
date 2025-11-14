@@ -1406,11 +1406,11 @@ where
                 }
 
                 for cmp_buf_idx in 0..input_len {
-                    if let Some(max_count) = max_count {
-                        if ret.len() >= max_count {
-                            // TODO: does this bias towards earlier mutations?
-                            break;
-                        }
+                    if let Some(max_count) = max_count
+                        && ret.len() >= max_count
+                    {
+                        // TODO: does this bias towards earlier mutations?
+                        break;
                     }
 
                     let taint_len = match taint.get(taint_idx) {
