@@ -73,7 +73,7 @@ function-logging = ["common", "std"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 [build-dependencies]
 bindgen = "0.72.1"
-cc = { version = "1.1.21", features = ["parallel"] }
+cc = { version = "1.2.46", features = ["parallel"] }
 rustversion = "1.0.22"
 
 [dependencies]
