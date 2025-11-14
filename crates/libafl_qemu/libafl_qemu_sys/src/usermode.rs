@@ -10,6 +10,8 @@ use libc::{c_char, strlen};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[cfg(feature = "python")]
 use pyo3::{Bound, IntoPyObject, Python, types::PyInt};
+#[cfg(all(feature = "python", target_os = "linux"))]
+use pyo3::{pyclass, pymethods};
 use strum_macros::EnumIter;
 
 use crate::MmapPerms;
