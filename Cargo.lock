@@ -3983,7 +3983,7 @@ dependencies = [
  "document-features",
  "exceptional",
  "libc",
- "mach2 0.4.3",
+ "mach2 0.5.0",
  "rustversion",
  "windows 0.62.2",
 ]
