@@ -12,15 +12,16 @@ fn main() {
     }
 
     let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+    let target_vendor = std::env::var("CARGO_CFG_TARGET_VENDOR").unwrap();
 
     // Force linking against libc++
-    #[cfg(not(target_vendor = "apple"))]
-    if target_family == "unix" {
-        println!("cargo:rustc-link-lib=dylib=c++");
+    if target_vendor != "apple" && target_family == "unix" {
+    println!("cargo:rustc-link-lib=dylib=c++");
     }
 
-    #[cfg(target_vendor = "apple")]
+    if target_vendor == "apple" {
     println!("cargo:rustc-link-lib=dylib=resolv");
+    }
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=test_harness.cpp");
