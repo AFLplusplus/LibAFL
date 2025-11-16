@@ -16,11 +16,11 @@ fn main() {
 
     // Force linking against libc++
     if target_vendor != "apple" && target_family == "unix" {
-    println!("cargo:rustc-link-lib=dylib=c++");
+        println!("cargo:rustc-link-lib=dylib=c++");
     }
 
     if target_vendor == "apple" {
-    println!("cargo:rustc-link-lib=dylib=resolv");
+        println!("cargo:rustc-link-lib=dylib=resolv");
     }
 
     println!("cargo:rerun-if-changed=build.rs");

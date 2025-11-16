@@ -16,14 +16,14 @@ use core::{
 use std::sync::{Mutex, MutexGuard};
 
 use backtrace::Backtrace;
-use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm};
+use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    Gum, Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
-    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput,
+    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
+    Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
@@ -41,13 +41,13 @@ use yaxpeax_x86::protected_mode::{DisplayStyle, InstDecoder, Instruction, Opcode
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::utils::frida_to_cs;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::utils::{AccessType, operand_details};
 #[cfg(target_arch = "aarch64")]
 use crate::utils::{instruction_width, writer_register};
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::utils::{operand_details, AccessType};
 use crate::{
     allocator::Allocator,
-    asan::errors::{ASAN_ERRORS, AsanError, AsanErrors, AsanReadWriteError},
+    asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::{FridaRuntime, SkipRange},
     utils::disas_count,
 };
@@ -142,8 +142,13 @@ impl Lock {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple",target_os = "android"))]
-use errno::{Errno, errno, set_errno};
+#[cfg(any(
+    target_os = "linux",
+    target_os = "freebsd",
+    target_vendor = "apple",
+    target_os = "android"
+))]
+use errno::{errno, set_errno, Errno};
 #[cfg(target_os = "windows")]
 use winapi::shared::minwindef::DWORD;
 /// We need to save and restore the last error in the hooks
@@ -153,7 +158,12 @@ use winapi::um::errhandlingapi::{GetLastError, SetLastError};
 struct LastErrorGuard {
     #[cfg(target_os = "windows")]
     last_error: DWORD,
-    #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple",target_os = "android"))]
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_vendor = "apple",
+        target_os = "android"
+    ))]
     last_error: Errno,
 }
 
@@ -162,7 +172,12 @@ impl LastErrorGuard {
     fn new() -> Self {
         #[cfg(target_os = "windows")]
         let last_error = unsafe { GetLastError() };
-        #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple",target_os = "android"))]
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "freebsd",
+            target_vendor = "apple",
+            target_os = "android"
+        ))]
         let last_error = errno();
 
         LastErrorGuard { last_error }
@@ -176,7 +191,12 @@ impl Drop for LastErrorGuard {
         unsafe {
             SetLastError(self.last_error);
         }
-        #[cfg(any(target_os = "linux", target_os = "freebsd", target_vendor = "apple",target_os = "android"))]
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "freebsd",
+            target_vendor = "apple",
+            target_os = "android"
+        ))]
         set_errno(self.last_error);
     }
 }
@@ -1147,7 +1167,12 @@ impl AsanRuntime {
         let cpp_libs = ["libc++.1.dylib", "libc++abi.dylib", "libsystem_c.dylib"];
         */
 
-        #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd", target_vendor = "apple"))]
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "android",
+            target_os = "freebsd",
+            target_vendor = "apple"
+        ))]
         macro_rules! hook_cpp {
            ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking c++ functions in {}", $libname);
@@ -1290,7 +1315,7 @@ impl AsanRuntime {
            }
         }
         // FIXME: change or check libraries for FreeBSD
-        #[cfg(any(target_os = "linux", target_os = "android",target_os = "freebsd"))]
+        #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))]
         {
             hook_cpp!("libc++.so", libcpp);
             hook_cpp!("libc++.so.1", libcpp1);
@@ -1734,9 +1759,9 @@ impl AsanRuntime {
         )[0];
 
         if insn.opcode == Opcode::MSR && insn.operands[0] == Operand::SystemReg(23056) { //the first operand is nzcv
-            //What case is this for??
-            /*insn = instructions.get(2).unwrap();
-            actual_pc = insn.address() as usize;*/
+             //What case is this for??
+             /*insn = instructions.get(2).unwrap();
+             actual_pc = insn.address() as usize;*/
         }
 
         let operands_len = insn
