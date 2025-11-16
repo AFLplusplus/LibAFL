@@ -16,14 +16,14 @@ use core::{
 use std::sync::{Mutex, MutexGuard};
 
 use backtrace::Backtrace;
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
-    Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
+    Gum, Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
+    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
@@ -41,13 +41,13 @@ use yaxpeax_x86::protected_mode::{DisplayStyle, InstDecoder, Instruction, Opcode
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::utils::frida_to_cs;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::utils::{AccessType, operand_details};
 #[cfg(target_arch = "aarch64")]
 use crate::utils::{instruction_width, writer_register};
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::utils::{operand_details, AccessType};
 use crate::{
     allocator::Allocator,
-    asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
+    asan::errors::{ASAN_ERRORS, AsanError, AsanErrors, AsanReadWriteError},
     helper::{FridaRuntime, SkipRange},
     utils::disas_count,
 };
@@ -148,7 +148,7 @@ impl Lock {
     target_vendor = "apple",
     target_os = "android"
 ))]
-use errno::{errno, set_errno, Errno};
+use errno::{Errno, errno, set_errno};
 #[cfg(target_os = "windows")]
 use winapi::shared::minwindef::DWORD;
 /// We need to save and restore the last error in the hooks
@@ -1759,9 +1759,9 @@ impl AsanRuntime {
         )[0];
 
         if insn.opcode == Opcode::MSR && insn.operands[0] == Operand::SystemReg(23056) { //the first operand is nzcv
-             //What case is this for??
-             /*insn = instructions.get(2).unwrap();
-             actual_pc = insn.address() as usize;*/
+            //What case is this for??
+            /*insn = instructions.get(2).unwrap();
+            actual_pc = insn.address() as usize;*/
         }
 
         let operands_len = insn
