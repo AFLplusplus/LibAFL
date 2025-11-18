@@ -87,7 +87,7 @@ You can run each example fuzzer with this following command, as long as the fuzz
 `LibAFL` is written and maintained by
 
 - [Andrea Fioraldi](https://twitter.com/andreafioraldi) <andrea@aflplus.plus>
-- [Dominik Maier](https://twitter.com/domenuk) <dominik@aflplus.plus>
+- [Dominik Maier](https://bsky.app/profile/dmnk.bsky.social) <dominik@aflplus.plus>
 - [s1341](https://twitter.com/srubenst1341) <github@shmarya.net>
 - [Dongjia Zhang](https://github.com/tokatoka) <toka@aflplus.plus>
 - [Addison Crump](https://github.com/addisoncrump) <me@addisoncrump.info>

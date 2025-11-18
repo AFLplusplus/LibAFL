@@ -1805,13 +1805,13 @@ dependencies = [
 
 [[package]]
 name = "dlmalloc"
-version = "0.2.11"
+version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06cdfe340b16dd990c54cce79743613fa09fbb16774f33a77c9fd196f8f3fa30"
+checksum = "6738d2e996274e499bc7b0d693c858b7720b9cd2543a0643a3087e6cb0a4fa16"
 dependencies = [
  "cfg-if 1.0.4",
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3275,7 +3275,7 @@ dependencies = [
  "libc",
  "ll_mp",
  "log",
- "mach2 0.5.0",
+ "mach2 0.6.0",
  "minibsod",
  "miniz_oxide",
  "nix 0.30.1",
@@ -3917,12 +3917,9 @@ dependencies = [
 
 [[package]]
 name = "mach2"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a1b95cd5421ec55b445b5ae102f5ea0e768de1f82bd3001e11f426c269c3aea"
-dependencies = [
- "libc",
-]
+checksum = "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
 
 [[package]]
 name = "memchr"
@@ -3983,7 +3980,7 @@ dependencies = [
  "document-features",
  "exceptional",
  "libc",
- "mach2 0.5.0",
+ "mach2 0.6.0",
  "rustversion",
  "windows 0.62.2",
 ]
@@ -5020,9 +5017,9 @@ dependencies = [
 
 [[package]]
 name = "rangemap"
-version = "1.6.0"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f93e7e49bb0bf967717f7bd674458b3d6b0c5f48ec7e3038166026a69fc22223"
+checksum = "acbbbbea733ec66275512d0b9694f34102e7d5406fdbe2ad8d21b28dce92887c"
 
 [[package]]
 name = "ratatui"
@@ -7675,9 +7672,9 @@ dependencies = [
 
 [[package]]
 name = "z3"
-version = "0.19.2"
+version = "0.19.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e256f09d9fe7af37d9d44c56b99d9ce6259fbc38dd2046a2a547c7238a186ed8"
+checksum = "ddf5208ec7feff31acf00fe1b7e28caa2e0793bb954e247efa8ebcb3c0cd8c73"
 dependencies = [
  "log",
  "num",
@@ -7686,9 +7683,9 @@ dependencies = [
 
 [[package]]
 name = "z3-sys"
-version = "0.10.0"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5cf46e09874bd7db314139c7319ab506d1db771111dc3bc66f05496207540d0"
+checksum = "1c8b6f6371f887a327524718087bf333e6a45db69f6dfe8319909b9111979128"
 dependencies = [
  "bindgen 0.72.1",
  "pkg-config",
