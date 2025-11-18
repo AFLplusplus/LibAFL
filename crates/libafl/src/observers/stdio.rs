@@ -87,89 +87,91 @@ use crate::{Error, observers::Observer};
 ///    }
 ///  }
 ///
-///  let input_text = "Hello, World!";
-///  let encoded_input_text = "SGVsbG8sIFdvcmxkIQo=";
+///  fn main() {
+///    let input_text = "Hello, World!";
+///    let encoded_input_text = "SGVsbG8sIFdvcmxkIQo=";
 ///
-///  let stdout_observer = StdOutObserver::new("stdout-observer".into()).unwrap();
-///  let stderr_observer = StdErrObserver::new("stderr-observer".into()).unwrap();
+///    let stdout_observer = StdOutObserver::new("stdout-observer".into()).unwrap();
+///    let stderr_observer = StdErrObserver::new("stderr-observer".into()).unwrap();
 ///
-///  let mut feedback = ExportStdXObserver {
-///      stdout_observer: stdout_observer.handle(),
-///      stderr_observer: stderr_observer.handle(),
-///  };
+///    let mut feedback = ExportStdXObserver {
+///        stdout_observer: stdout_observer.handle(),
+///        stderr_observer: stderr_observer.handle(),
+///    };
 ///
-///  let mut objective = ();
+///    let mut objective = ();
 ///
-///  let mut executor = CommandExecutor::builder()
-///      .program("base64")
-///      .arg("--decode")
-///      .stdout_observer(stdout_observer.handle())
-///      .stderr_observer(stderr_observer.handle())
-///      .build(tuple_list!(stdout_observer, stderr_observer))
-///      .unwrap();
+///    let mut executor = CommandExecutor::builder()
+///        .program("base64")
+///        .arg("--decode")
+///        .stdout_observer(stdout_observer.handle())
+///        .stderr_observer(stderr_observer.handle())
+///        .build(tuple_list!(stdout_observer, stderr_observer))
+///        .unwrap();
 ///
-///  let mut state = StdState::new(
-///      StdRand::with_seed(current_nanos()),
-///      InMemoryCorpus::new(),
-///      InMemoryCorpus::new(),
-///      &mut feedback,
-///      &mut objective,
-///  )
-///  .unwrap();
+///    let mut state = StdState::new(
+///        StdRand::with_seed(current_nanos()),
+///        InMemoryCorpus::new(),
+///        InMemoryCorpus::new(),
+///        &mut feedback,
+///        &mut objective,
+///    )
+///    .unwrap();
 ///
-///  let scheduler = QueueScheduler::new();
-///  let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-///  let mut manager = NopEventManager::new();
+///    let scheduler = QueueScheduler::new();
+///    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+///    let mut manager = NopEventManager::new();
 ///
-///  let mut stages = tuple_list!(StdMutationalStage::new(NopMutator::new(
-///      MutationResult::Mutated
-///  )));
+///    let mut stages = tuple_list!(StdMutationalStage::new(NopMutator::new(
+///        MutationResult::Mutated
+///    )));
 ///
-///  state
-///      .corpus_mut()
-///      .add(Testcase::new(BytesInput::from(
-///          encoded_input_text.as_bytes().to_vec(),
-///      )))
-///      .unwrap();
+///    state
+///        .corpus_mut()
+///        .add(Testcase::new(BytesInput::from(
+///            encoded_input_text.as_bytes().to_vec(),
+///        )))
+///        .unwrap();
 ///
-///  let corpus_id = fuzzer
-///      .fuzz_one(&mut stages, &mut executor, &mut state, &mut manager)
-///      .unwrap();
+///    let corpus_id = fuzzer
+///        .fuzz_one(&mut stages, &mut executor, &mut state, &mut manager)
+///        .unwrap();
 ///
-///  unsafe {
-///      assert!(
-///          input_text
-///              .as_bytes()
-///              .iter()
-///              .zip(
-///                  (&*(&raw const STDOUT))
-///                      .as_ref()
-///                      .unwrap()
-///                      .iter()
-///                      .filter(|e| **e != 10)
-///              ) // ignore newline chars
-///              .all(|(&a, &b)| a == b)
-///      );
-///      assert!((&*(&raw const STDERR)).as_ref().unwrap().is_empty());
-///  }
+///    unsafe {
+///        assert!(
+///            input_text
+///                .as_bytes()
+///                .iter()
+///                .zip(
+///                    (&*(&raw const STDOUT))
+///                        .as_ref()
+///                        .unwrap()
+///                        .iter()
+///                        .filter(|e| **e != 10)
+///                ) // ignore newline chars
+///                .all(|(&a, &b)| a == b)
+///        );
+///        assert!((&*(&raw const STDERR)).as_ref().unwrap().is_empty());
+///    }
 ///
-///  state
-///      .corpus()
-///      .get(corpus_id)
-///      .unwrap()
-///      .replace(Testcase::new(BytesInput::from(
-///          encoded_input_text.bytes().skip(1).collect::<Vec<u8>>(), // skip one char to make it invalid code
-///      )));
+///    state
+///        .corpus()
+///        .get(corpus_id)
+///        .unwrap()
+///        .replace(Testcase::new(BytesInput::from(
+///            encoded_input_text.bytes().skip(1).collect::<Vec<u8>>(), // skip one char to make it invalid code
+///        )));
 ///
-///  fuzzer
-///      .fuzz_one(&mut stages, &mut executor, &mut state, &mut manager)
-///      .unwrap();
+///    fuzzer
+///        .fuzz_one(&mut stages, &mut executor, &mut state, &mut manager)
+///        .unwrap();
 ///
-///  unsafe {
-///      let compare_vec: Vec<u8> = Vec::new();
-///      assert_eq!(compare_vec, *(&*(&raw const STDERR)).clone().unwrap());
-///      // stdout will still contain data, we're just checking that there is an error message
-///  }
+///    unsafe {
+///        let compare_vec: Vec<u8> = Vec::new();
+///        assert_eq!(compare_vec, *(&*(&raw const STDERR)).clone().unwrap());
+///        // stdout will still contain data, we're just checking that there is an error message
+///    }
+/// }
 /// ```
 ///
 #[derive(Debug, Serialize, Deserialize)]
