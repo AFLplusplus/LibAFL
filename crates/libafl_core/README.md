@@ -9,7 +9,7 @@ The `libafl_core` crate has a range of useful functions shared across the [`LibA
 The `LibAFL` project is part of [`AFLplusplus`](https://github.com/AFLplusplus) and maintained by
 
 * [Andrea Fioraldi](https://twitter.com/andreafioraldi) <andrea@aflplus.plus>
-* [Dominik Maier](https://twitter.com/domenuk) <dominik@aflplus.plus>
+* [Dominik Maier](https://bsky.app/profile/dmnk.bsky.social) <dominik@aflplus.plus>
 * [s1341](https://twitter.com/srubenst1341) <github@shmarya.net>
 * [Dongjia Zhang](https://github.com/tokatoka) <toka@aflplus.plus>
 * [Addison Crump](https://github.com/addisoncrump) <me@addisoncrump.info>
