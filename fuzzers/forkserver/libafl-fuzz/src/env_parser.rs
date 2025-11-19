@@ -137,11 +137,11 @@ fn parse_target_env(s: &str) -> Result<Option<HashMap<String, String>>, Error> {
     for vars in env_regex.captures_iter(s) {
         _ = target_env.insert(
             vars.get(1)
-                .ok_or(Error::illegal_argument("invalid AFL_TARGET_ENV format"))?
+                .ok_or_else(||Error::illegal_argument("invalid AFL_TARGET_ENV format"))?
                 .as_str()
                 .to_string(),
             vars.get(2)
-                .ok_or(Error::illegal_argument("invalid AFL_TARGET_ENV format"))?
+                .ok_or_else(||Error::illegal_argument("invalid AFL_TARGET_ENV format"))?
                 .as_str()
                 .to_string(),
         );

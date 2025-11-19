@@ -60,7 +60,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         executable_segments
             .into_iter()
             .next()
-            .ok_or(Error::illegal_argument(
+            .ok_or_else(||Error::illegal_argument(
                 "No executable segment found in target program",
             ))?;
     log::debug!(

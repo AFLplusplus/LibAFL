@@ -238,9 +238,11 @@ where
 
     /// Cycles the strategy of the scheduler; tries to mimic AFL++'s cycling formula
     fn cycle_schedule(&mut self, metadata: &mut SchedulerMetadata) -> Result<(), Error> {
-        let mut ps = metadata.strat().ok_or(Error::illegal_argument(
-            "No strategy specified when initializing scheduler; cannot cycle!",
-        ))?;
+        let mut ps = metadata.strat().ok_or_else(|| {
+            Error::illegal_argument(
+                "No strategy specified when initializing scheduler; cannot cycle!",
+            )
+        })?;
         let new_base = match ps.base() {
             BaseSchedule::EXPLORE => BaseSchedule::EXPLOIT,
             BaseSchedule::COE => BaseSchedule::LIN,

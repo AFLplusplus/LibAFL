@@ -36,9 +36,10 @@ impl NyxHelper {
     where
         P: AsRef<Path>,
     {
-        let share_dir_str = share_dir.as_ref().to_str().ok_or(Error::illegal_argument(
-            "`share_dir` contains invalid UTF-8",
-        ))?;
+        let share_dir_str = share_dir
+            .as_ref()
+            .to_str()
+            .ok_or_else(|| Error::illegal_argument("`share_dir` contains invalid UTF-8"))?;
 
         let mut nyx_config = NyxConfig::load(share_dir_str).map_err(|e| {
             Error::illegal_argument(format!("Failed to load Nyx config from share dir: {e}"))
