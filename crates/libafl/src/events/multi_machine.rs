@@ -228,9 +228,10 @@ where
                 compressor: GzipCompressor::new(),
             }));
 
-            let rt = Arc::new(
-                Runtime::new().map_err(|_| Error::unknown("Tokio runtime spawning failed"))?,
-            );
+            let rt =
+                Arc::new(Runtime::new().map_err(|err| {
+                    Error::unknown(format!("Tokio runtime spawning failed: {err})"))
+                })?);
 
             TcpMultiMachineState::init::<I>(&state.clone(), &rt.clone())?;
 

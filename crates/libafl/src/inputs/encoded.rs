@@ -162,8 +162,8 @@ impl Default for NaiveTokenizer {
 impl Tokenizer for NaiveTokenizer {
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error> {
         let mut tokens = vec![];
-        let string =
-            from_utf8(bytes).map_err(|_| Error::illegal_argument("Invalid UTF-8".to_owned()))?;
+        let string = from_utf8(bytes)
+            .map_err(|err| Error::illegal_argument(format!("Invalid UTF-8: {err:?}")))?;
         let string = self.comment_re.replace_all(string, "").to_string();
         let mut str_prev = 0;
         for str_match in self.string_re.find_iter(&string) {

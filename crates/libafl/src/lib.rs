@@ -180,7 +180,7 @@ mod tests {
         for i in 0..1000 {
             fuzzer
                 .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
-                .unwrap_or_else(|_| panic!("Error in iter {i}"));
+                .unwrap_or_else(|err| panic!("Error in iter {i}: {err:?}"));
             if cfg!(miri) {
                 break;
             }

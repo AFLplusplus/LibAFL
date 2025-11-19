@@ -268,40 +268,41 @@ pub fn store_generated_content_if_different(
     let mut must_rewrite_file = true;
 
     // Check if equivalent file already exists without relying on filesystem timestamp.
-    let mut file_to_check =
-        if let Ok(mut wrapper_file) = File::options().read(true).write(true).open(file_to_update) {
-            let existing_file_content = content_file_to_update.unwrap_or_else(|| {
-                let mut content = Vec::with_capacity(fresh_content.len());
-                wrapper_file.read_to_end(content.as_mut()).unwrap();
-                content
-            });
+    let mut file_to_check = if let Ok(mut wrapper_file) =
+        File::options().read(true).write(true).open(file_to_update)
+    {
+        let existing_file_content = content_file_to_update.unwrap_or_else(|| {
+            let mut content = Vec::with_capacity(fresh_content.len());
+            wrapper_file.read_to_end(content.as_mut()).unwrap();
+            content
+        });
 
-            if !force_regeneration {
-                let mut existing_wrapper_hasher = hash_map::DefaultHasher::new();
-                existing_wrapper_hasher.write(existing_file_content.as_ref());
+        if !force_regeneration {
+            let mut existing_wrapper_hasher = hash_map::DefaultHasher::new();
+            existing_wrapper_hasher.write(existing_file_content.as_ref());
 
-                let mut wrapper_h_hasher = hash_map::DefaultHasher::new();
-                wrapper_h_hasher.write(fresh_content);
+            let mut wrapper_h_hasher = hash_map::DefaultHasher::new();
+            wrapper_h_hasher.write(fresh_content);
 
-                // Check if wrappers are the same
-                if existing_wrapper_hasher.finish() == wrapper_h_hasher.finish() {
-                    must_rewrite_file = false;
-                }
+            // Check if wrappers are the same
+            if existing_wrapper_hasher.finish() == wrapper_h_hasher.finish() {
+                must_rewrite_file = false;
             }
+        }
 
-            // Reset file cursor if it's going to be rewritten
-            if must_rewrite_file {
-                wrapper_file.set_len(0).expect("Could not set file len");
-                wrapper_file
-                    .seek(SeekFrom::Start(0))
-                    .expect("Could not seek file to beginning");
-            }
-
+        // Reset file cursor if it's going to be rewritten
+        if must_rewrite_file {
+            wrapper_file.set_len(0).expect("Could not set file len");
             wrapper_file
-        } else {
-            File::create(file_to_update)
-                .unwrap_or_else(|_| panic!("Could not create {}", file_to_update.display()))
-        };
+                .seek(SeekFrom::Start(0))
+                .expect("Could not seek file to beginning");
+        }
+
+        wrapper_file
+    } else {
+        File::create(file_to_update)
+            .unwrap_or_else(|err| panic!("Could not create {}: {err:?}", file_to_update.display()))
+    };
 
     if must_rewrite_file {
         println!(
@@ -315,7 +316,9 @@ pub fn store_generated_content_if_different(
 
         file_to_check
             .write_all(fresh_content)
-            .unwrap_or_else(|_| panic!("Unable to write in {}", file_to_update.display()));
+            .unwrap_or_else(|err| {
+                panic!("Unable to write in {}: {err:?}", file_to_update.display())
+            });
     }
 }
 

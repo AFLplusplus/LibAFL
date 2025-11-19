@@ -127,13 +127,13 @@ impl RedqueenEvent {
         let rhs_s = captures.get(5).ok_or("Missing RHS field")?.as_str();
         let imm = captures.get(6).is_some_and(|_x| true);
 
-        let addr =
-            u64::from_str_radix(addr_s, 16).map_err(|_| format!("Invalid address: '{addr_s}'"))?;
+        let addr = u64::from_str_radix(addr_s, 16)
+            .map_err(|err| format!("Invalid address: '{addr_s}': {err:?}"))?;
         let bp_type = RedqueenBpType::new(type_s)
             .map_err(|e| format!("Invalid redqueen type: '{type_s}' - {e}"))?;
         let size = size_s
             .parse::<usize>()
-            .map_err(|_| format!("Invalid size: '{size_s}'"))?;
+            .map_err(|err| format!("Invalid size: '{size_s}: {err:?}'"))?;
         let lhs = hex_to_bytes(lhs_s).ok_or("Decoding LHS failed")?;
         let rhs = hex_to_bytes(rhs_s).ok_or("Decoding RHS failed")?;
 
@@ -190,12 +190,12 @@ impl TryInto<CmpValues> for RedqueenEvent {
                     u16::from_be_bytes(
                         self.rhs
                             .try_into()
-                            .map_err(|_| "Invalid RHS length for U16")?,
+                            .map_err(|err| "Invalid RHS length for U16: {err:?}")?,
                     ),
                     u16::from_be_bytes(
                         self.lhs
                             .try_into()
-                            .map_err(|_| "Invalid LHS length for U16")?,
+                            .map_err(|err| "Invalid LHS length for U16: {err:?}")?,
                     ),
                     self.imm,
                 ))),
@@ -203,12 +203,12 @@ impl TryInto<CmpValues> for RedqueenEvent {
                     u32::from_be_bytes(
                         self.rhs
                             .try_into()
-                            .map_err(|_| "Invalid RHS length for U32")?,
+                            .map_err(|err| "Invalid RHS length for U32: {err:?}")?,
                     ),
                     u32::from_be_bytes(
                         self.lhs
                             .try_into()
-                            .map_err(|_| "Invalid LHS length for U32")?,
+                            .map_err(|err| "Invalid LHS length for U32: {err:?}")?,
                     ),
                     self.imm,
                 ))),
@@ -216,12 +216,12 @@ impl TryInto<CmpValues> for RedqueenEvent {
                     u64::from_be_bytes(
                         self.rhs
                             .try_into()
-                            .map_err(|_| "Invalid RHS length for U64")?,
+                            .map_err(|err| "Invalid RHS length for U64: {err:?}")?,
                     ),
                     u64::from_be_bytes(
                         self.lhs
                             .try_into()
-                            .map_err(|_| "Invalid LHS length for U64")?,
+                            .map_err(|err| "Invalid LHS length for U64: {err:?}")?,
                     ),
                     self.imm,
                 ))),

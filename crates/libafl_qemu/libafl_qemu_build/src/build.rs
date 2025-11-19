@@ -20,7 +20,7 @@ pub struct BuildResult {
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
-        which(tool).unwrap_or_else(|_| panic!("Build tool {tool} not found"));
+        which(tool).unwrap_or_else(|err| panic!("Build tool {tool} not found: {err:?}"));
     }
 }
 

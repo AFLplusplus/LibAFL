@@ -679,8 +679,8 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
     {
         // we've been requested to just run some inputs. Do so.
         for input in options.dirs() {
-            let input = BytesInput::from_file(input).unwrap_or_else(|_| {
-                panic!("Couldn't load input {}", input.to_string_lossy().as_ref())
+            let input = BytesInput::from_file(input).unwrap_or_else(|err| {
+                panic!("Couldn't load input {}: {err:?}", input.to_string_lossy().as_ref())
             });
             unsafe {
                 libafl_targets::libfuzzer::libfuzzer_test_one_input(
