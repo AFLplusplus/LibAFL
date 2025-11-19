@@ -550,7 +550,11 @@ where
 
     fn check_interval(&mut self) -> bool {
         let cur = current_time();
-        if cur.saturating_sub(self.last_report_time) > self.stats_report_interval {
+        if cur
+            .checked_sub(self.last_report_time)
+            .unwrap_or(self.stats_report_interval)
+            >= self.stats_report_interval
+        {
             self.last_report_time = cur;
             return true;
         }
