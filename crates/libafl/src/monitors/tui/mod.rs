@@ -137,8 +137,8 @@ impl TimedStats {
                 .back()
                 .unwrap_or(&default_stat)
                 .time
-                .checked_sub(self.series.front().unwrap_or(&default_stat).time)
-                .unwrap()
+                .saturating_sub(self.series.front().unwrap_or(&default_stat).time)
+                .unwrap_or(window)
                 >= window
         {
             self.series.pop_front();
@@ -562,9 +562,7 @@ fn run_tui_thread<W: Write + Send + Sync + 'static>(
             }
             terminal.draw(|f| ui.draw(f, &context))?;
 
-            let timeout = tick_rate
-                .checked_sub(last_tick.elapsed())
-                .unwrap_or_else(|| Duration::from_secs(0));
+            let timeout = tick_rate.saturating_sub(last_tick.elapsed());
             if event::poll(timeout)?
                 && let Event::Key(key) = event::read()?
             {

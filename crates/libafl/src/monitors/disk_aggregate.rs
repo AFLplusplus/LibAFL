@@ -93,9 +93,7 @@ impl OnDiskJsonAggregateMonitor {
     {
         Self {
             json_path: json_path.into(),
-            last_update: current_time()
-                .checked_sub(update_interval)
-                .unwrap_or_default(),
+            last_update: current_time().saturating_sub(update_interval),
             update_interval,
         }
     }

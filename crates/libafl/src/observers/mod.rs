@@ -316,7 +316,8 @@ mod instant_serializer {
         D: Deserializer<'de>,
     {
         let duration = Duration::deserialize(deserializer)?;
-        let instant = Instant::now().checked_sub(duration).unwrap();
+        let now = Instant::now();
+        let instant = now.checked_sub(duration).unwrap_or(now);
         Ok(instant)
     }
 }
@@ -381,7 +382,7 @@ impl<I, S> Observer<I, S> for TimeObserver {
         _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        self.last_runtime = current_time().checked_sub(self.start_time);
+        self.last_runtime = current_time().saturating_sub(self.start_time);
         Ok(())
     }
 }

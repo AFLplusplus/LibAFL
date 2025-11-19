@@ -1971,8 +1971,7 @@ mod tests {
         assert!(counts.into_iter().all(|count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }));
         Ok(())
@@ -2021,8 +2020,7 @@ mod tests {
         assert!(counts.into_iter().all(|count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }));
         Ok(())
@@ -2067,16 +2065,14 @@ mod tests {
         assert!(counts.into_iter().all(|count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }));
         let average = insertions.iter().copied().sum::<usize>() / insertions.len();
         assert!(insertions.into_iter().all(|count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }));
         Ok(())
@@ -2124,16 +2120,14 @@ mod tests {
         assert!(counts.iter().all(|&count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }),);
         let average = insertions.iter().copied().sum::<usize>() / insertions.len();
         assert!(insertions.into_iter().all(|count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }));
         Ok(())
