@@ -556,7 +556,7 @@ pub mod pybind {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.qemu
                     .map_private(addr, size, p)
-                    .map_err(|_| PyValueError::new_err("Failed to mmap"))
+                    .map_err(|err| PyValueError::new_err(format!("Failed to mmap: {err:?}")))
             } else {
                 Err(PyValueError::new_err("Invalid perms"))
             }
@@ -566,7 +566,7 @@ pub mod pybind {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.qemu
                     .map_private(addr, size, p)
-                    .map_err(|_| PyValueError::new_err("Failed to mmap"))
+                    .map_err(|err| PyValueError::new_err(format!("Failed to mmap: {err:?}")))
             } else {
                 Err(PyValueError::new_err("Invalid perms"))
             }

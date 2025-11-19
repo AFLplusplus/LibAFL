@@ -170,7 +170,7 @@ impl ClientStatsManager {
 
         // Time-related data are always re-computed, since it is related with current time.
         let cur_time = current_time();
-        global_stats.run_time = cur_time.checked_sub(self.start_time).unwrap_or_default();
+        global_stats.run_time = cur_time.saturating_sub(self.start_time);
         global_stats.run_time_pretty = format_duration(&global_stats.run_time);
         global_stats.execs_per_sec = self
             .client_stats
@@ -199,14 +199,11 @@ impl ClientStatsManager {
                 new_objectives_time = stat.last_objective_time().max(new_objectives_time);
             }
             if new_path_time > self.start_time() {
-                total_process_timing.last_new_entry = current_time()
-                    .checked_sub(new_path_time)
-                    .unwrap_or_default();
+                total_process_timing.last_new_entry = current_time().saturating_sub(new_path_time);
             }
             if new_objectives_time > self.start_time() {
-                total_process_timing.last_saved_solution = current_time()
-                    .checked_sub(new_objectives_time)
-                    .unwrap_or_default();
+                total_process_timing.last_saved_solution =
+                    current_time().saturating_sub(new_objectives_time);
             }
         }
         total_process_timing

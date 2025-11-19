@@ -253,8 +253,7 @@ where
             .set(cur_client_clone.execs_per_sec(current_time()));
 
         let client_run_time = current_time()
-            .checked_sub(cur_client_clone.start_time())
-            .unwrap_or_default()
+            .saturating_sub(cur_client_clone.start_time())
             .as_secs();
         self.prometheus_client_stats
             .runtime

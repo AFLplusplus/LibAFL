@@ -74,8 +74,12 @@ where
             .map_err(|e| Error::illegal_state(format!("Failed to clear Nyx stdout: {e}")))?;
         self.helper.nyx_stdout.rewind()?;
 
-        let size = u32::try_from(buffer.len())
-            .map_err(|_| Error::unsupported("Inputs larger than 4GB are not supported"))?;
+        let size = u32::try_from(buffer.len()).map_err(|err| {
+            Error::unsupported(format!(
+                "Inputs larger than 4GB are not supported. Tried {} bytes ({err:?})",
+                buffer.len()
+            ))
+        })?;
 
         // `QemuProcess::set_hprintf_fd` assumes ownership of the passed file descriptor, so we
         // duplicate `self.helper.nyx_stdout`'s fd here to prevent it from being closed by

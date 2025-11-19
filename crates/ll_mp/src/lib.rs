@@ -3396,8 +3396,10 @@ where
             }
         });
 
-        let ret = recv.recv().map_err(|_| {
-            Error::unknown("Error launching background thread for b2b communcation".to_string())
+        let ret = recv.recv().map_err(|err| {
+            Error::unknown(format!(
+                "Error launching background thread for b2b communcation: {err:?}"
+            ))
         });
 
         #[cfg(feature = "llmp_debug")]

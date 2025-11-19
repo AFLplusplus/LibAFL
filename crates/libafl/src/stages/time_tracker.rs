@@ -42,11 +42,11 @@ where
         let before_run = current_time();
         self.inner.perform(fuzzer, executor, state, manager)?;
         let after_run = current_time();
-        self.count += after_run
-            .checked_sub(before_run)
-            .ok_or(Error::illegal_state(format!(
-                "The time seems to have jumped in TimetrackingStageWrapper! {before_run:?}"
-            )))?;
+        self.count += after_run.checked_sub(before_run).ok_or_else(|| {
+            Error::illegal_state(format!(
+                "The time seems to have jumped in TimeTrackingStageWrapper! {before_run:?}"
+            ))
+        })?;
 
         if let Ok(meta) = state.metadata_mut::<T>() {
             *meta = T::from(self.count);

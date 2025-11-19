@@ -84,9 +84,9 @@ pub fn set_solution_filepath(
 fn parse_time_line(line: &str) -> Result<u64, Error> {
     line.split(": ")
         .last()
-        .ok_or(Error::illegal_state("invalid stats file"))?
+        .ok_or_else(|| Error::illegal_state("invalid stats file"))?
         .parse()
-        .map_err(|_| Error::illegal_state("invalid stats file"))
+        .map_err(|err| Error::illegal_state("invalid stats file: {err:?}"))
 }
 
 pub fn check_autoresume(fuzzer_dir: &Path, auto_resume: bool) -> Result<Flock<File>, Error> {

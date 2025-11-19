@@ -107,11 +107,11 @@ where
 
         has_errors = true;
     }
-    let duration = current_time()
-        .checked_sub(start)
-        .ok_or(Error::illegal_state(format!(
-            "The time seems to have jumped in ClibrationStage! {start:?}"
-        )))?;
+    let duration = current_time().checked_sub(start).ok_or_else(|| {
+        Error::illegal_state(format!(
+            "The time seems to have jumped in CalibrationStage! {start:?}"
+        ))
+    })?;
 
     executor
         .observers_mut()

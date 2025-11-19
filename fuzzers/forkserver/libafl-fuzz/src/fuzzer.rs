@@ -392,15 +392,19 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         state.walk_initial_inputs(std::slice::from_ref(&opt.input_dir), |path: &PathBuf| {
             let mut filename = path
                 .file_name()
-                .ok_or(Error::illegal_state(format!(
-                    "file {} in input directory does not have a filename",
-                    path.display()
-                )))?
+                .ok_or_else(|| {
+                    Error::illegal_state(format!(
+                        "file {} in input directory does not have a filename",
+                        path.display()
+                    ))
+                })?
                 .to_str()
-                .ok_or(Error::illegal_state(format!(
-                    "file {} in input directory does not have a legal filename",
-                    path.display()
-                )))?
+                .ok_or_else(|| {
+                    Error::illegal_state(format!(
+                        "file {} in input directory does not have a legal filename",
+                        path.display()
+                    ))
+                })?
                 .to_string();
             filename = format!("id:{id:0>6},time:0,execs:0,orig:{filename}");
             let cpy_res = std::fs::copy(path, queue_dir.join(filename));

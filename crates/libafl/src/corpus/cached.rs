@@ -32,7 +32,7 @@ where
     fn cache_testcase_input<'a>(&'a self, testcase: &'a mut Testcase<I>) -> Result<(), Error> {
         let id = testcase
             .corpus_id()
-            .ok_or(Error::unknown("The testcase is not associated with an id"))?;
+            .ok_or_else(|| Error::unknown("The testcase is not associated with an id"))?;
         if testcase.input().is_none() {
             self.inner.load_input_into(testcase)?;
             let mut borrowed_num = 0;

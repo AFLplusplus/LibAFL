@@ -119,9 +119,9 @@ fn map_shared_memory_common<SHM: ShMemProvider>(
         )));
     };
     let map_size = if let Ok(map_size_str) = std::env::var(map_size_env_var) {
-        map_size_str
-            .parse()
-            .map_err(|_| Error::illegal_argument(format!("Invalid {map_size_env_var} value")))?
+        map_size_str.parse().map_err(|err| {
+            Error::illegal_argument(format!("Invalid {map_size_env_var} value: {err:?}"))
+        })?
     } else {
         map_size_default_fallback
     };

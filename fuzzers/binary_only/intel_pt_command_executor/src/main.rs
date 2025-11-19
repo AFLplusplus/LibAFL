@@ -56,13 +56,10 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         SegmentFlags::Elf { p_flags } => (p_flags & PF_X) > 0,
         _ => panic!("target binary is not an ELF file."),
     });
-    let executable_segment =
-        executable_segments
-            .into_iter()
-            .next()
-            .ok_or(Error::illegal_argument(
-                "No executable segment found in target program",
-            ))?;
+    let executable_segment = executable_segments
+        .into_iter()
+        .next()
+        .ok_or_else(|| Error::illegal_argument("No executable segment found in target program"))?;
     log::debug!(
         "Executable segment: {executable_segment:x?} at binary file offset {:x?}",
         executable_segment.file_range()
