@@ -36,12 +36,12 @@ pub mod inner;
 pub mod stateful;
 
 /// The process executor simply calls a target function, as mutable reference to a closure.
-pub type InProcessExecutor<'a, EM, H, I, OT, S, Z> =
-    GenericInProcessExecutor<EM, H, &'a mut H, (), I, OT, S, Z>;
+pub type InProcessExecutor<EM, H, I, OT, S, Z> =
+    GenericInProcessExecutor<EM, H, H, (), I, OT, S, Z>;
 
 /// The inprocess executor that allows hooks
-pub type HookableInProcessExecutor<'a, EM, H, HT, I, OT, S, Z> =
-    GenericInProcessExecutor<EM, H, &'a mut H, HT, I, OT, S, Z>;
+pub type HookableInProcessExecutor<EM, H, HT, I, OT, S, Z> =
+    GenericInProcessExecutor<EM, H, H, HT, I, OT, S, Z>;
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 pub type OwnedInProcessExecutor<EM, I, OT, S, Z> = GenericInProcessExecutor<
     EM,
@@ -124,7 +124,7 @@ impl<EM, H, HB, HT, I, OT, S, Z> HasObservers
     }
 }
 
-impl<'a, EM, H, I, OT, S, Z> InProcessExecutor<'a, EM, H, I, OT, S, Z>
+impl<EM, H, I, OT, S, Z> InProcessExecutor<EM, H, I, OT, S, Z>
 where
     H: FnMut(&I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
@@ -133,7 +133,7 @@ where
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn new<OF>(
-        harness_fn: &'a mut H,
+        harness_fn: H,
         observers: OT,
         fuzzer: &mut Z,
         state: &mut S,
@@ -164,7 +164,7 @@ where
     ///
     /// This may return an error on unix, if signal handler setup fails
     pub fn with_timeout<OF>(
-        harness_fn: &'a mut H,
+        harness_fn: H,
         observers: OT,
         fuzzer: &mut Z,
         state: &mut S,
@@ -262,24 +262,28 @@ where
 
     /// Retrieve the harness function.
     #[inline]
+    #[must_use]
     pub fn harness(&self) -> &H {
         self.harness_fn.borrow()
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
+    #[must_use]
     pub fn harness_mut(&mut self) -> &mut H {
         self.harness_fn.borrow_mut()
     }
 
     /// The inprocess handlers
     #[inline]
+    #[must_use]
     pub fn hooks(&self) -> &(InProcessHooks<I, S>, HT) {
         self.inner.hooks()
     }
 
     /// The inprocess handlers (mutable)
     #[inline]
+    #[must_use]
     pub fn hooks_mut(&mut self) -> &mut (InProcessHooks<I, S>, HT) {
         self.inner.hooks_mut()
     }
