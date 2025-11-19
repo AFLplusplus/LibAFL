@@ -190,12 +190,12 @@ impl TryInto<CmpValues> for RedqueenEvent {
                     u16::from_be_bytes(
                         self.rhs
                             .try_into()
-                            .map_err(|err| "Invalid RHS length for U16: {err:?}")?,
+                            .map_err(|err| format!("Invalid RHS length for U16: {err:?}"))?,
                     ),
                     u16::from_be_bytes(
                         self.lhs
                             .try_into()
-                            .map_err(|err| "Invalid LHS length for U16: {err:?}")?,
+                            .map_err(|err| format!("Invalid LHS length for U16: {err:?}"))?,
                     ),
                     self.imm,
                 ))),
@@ -203,12 +203,12 @@ impl TryInto<CmpValues> for RedqueenEvent {
                     u32::from_be_bytes(
                         self.rhs
                             .try_into()
-                            .map_err(|err| "Invalid RHS length for U32: {err:?}")?,
+                            .map_err(|err| format!("Invalid RHS length for U32: {err:?}"))?,
                     ),
                     u32::from_be_bytes(
                         self.lhs
                             .try_into()
-                            .map_err(|err| "Invalid LHS length for U32: {err:?}")?,
+                            .map_err(|err| format!("Invalid LHS length for U32: {err:?}"))?,
                     ),
                     self.imm,
                 ))),
@@ -216,19 +216,19 @@ impl TryInto<CmpValues> for RedqueenEvent {
                     u64::from_be_bytes(
                         self.rhs
                             .try_into()
-                            .map_err(|err| "Invalid RHS length for U64: {err:?}")?,
+                            .map_err(|err| format!("Invalid RHS length for U64: {err:?}"))?,
                     ),
                     u64::from_be_bytes(
                         self.lhs
                             .try_into()
-                            .map_err(|err| "Invalid LHS length for U64: {err:?}")?,
+                            .map_err(|err| format!("Invalid LHS length for U64: {err:?}"))?,
                     ),
                     self.imm,
                 ))),
-                _ => Err("Invalid size".to_string()),
+                other_size => Err(format!("Invalid size {other_size}")),
             },
             // TODO: Add encoding for `STR` and `SUB`
-            _ => Err("Redqueen type not implemented".to_string()),
+            other_type => Err(format!("Redqueen type {other_type:?} not implemented")),
         }
     }
 }
