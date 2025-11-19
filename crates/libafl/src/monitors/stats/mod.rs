@@ -203,8 +203,10 @@ impl ClientStats {
     /// We got new information about executions for this client, insert them.
     #[cfg(feature = "afl_exec_sec")]
     pub fn update_executions(&mut self, executions: u64, cur_time: Duration) {
-        let diff = cur_time.saturating_sub(self.last_window_time).as_secs();
-        if diff > CLIENT_STATS_TIME_WINDOW_SECS {
+        let diff = cur_time
+            .checked_sub(self.last_window_time)
+            .map_or(CLIENT_STATS_TIME_WINDOW_SECS, |d| d.as_secs());
+        if diff >= CLIENT_STATS_TIME_WINDOW_SECS {
             let _: f64 = self.execs_per_sec(cur_time);
             self.last_window_time = cur_time;
             self.last_window_executions = self.executions;

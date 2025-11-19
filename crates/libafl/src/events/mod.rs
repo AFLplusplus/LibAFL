@@ -482,7 +482,11 @@ where
     };
     let cur = current_time();
     // default to 0 here to avoid crashes on clock skew
-    if cur.saturating_sub(*last_report_time) > monitor_timeout {
+    if cur
+        .checked_sub(*last_report_time)
+        .unwrap_or(monitor_timeout)
+        >= monitor_timeout
+    {
         // report_progress sets a new `last_report_time` internally.
         reporter.report_progress(state)?;
     }
