@@ -382,7 +382,7 @@ impl<I, S> Observer<I, S> for TimeObserver {
         _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        self.last_runtime = current_time().saturating_sub(self.start_time);
+        self.last_runtime = Some(current_time().saturating_sub(self.start_time));
         Ok(())
     }
 }

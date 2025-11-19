@@ -604,7 +604,7 @@ mod tests {
         );
 
         GUM.set(Gum::obtain())
-            .unwrap_or_else(|err| panic!("Failed to initialize Gum: {err:?}"));
+            .unwrap_or_else(|_gum| panic!("Failed to initialize Gum."));
         let simulated_args = vec![
             "libafl_frida_test",
             "-A",

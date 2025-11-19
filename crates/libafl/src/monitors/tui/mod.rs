@@ -137,7 +137,7 @@ impl TimedStats {
                 .back()
                 .unwrap_or(&default_stat)
                 .time
-                .saturating_sub(self.series.front().unwrap_or(&default_stat).time)
+                .checked_sub(self.series.front().unwrap_or(&default_stat).time)
                 .unwrap_or(window)
                 >= window
         {
