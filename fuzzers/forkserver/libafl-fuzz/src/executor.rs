@@ -235,7 +235,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
     if !is_library {
         // finally, check the path for the binary
         return find_executable_in_path(&filename)
-            .ok_or_else(||Error::unknown(format!("cannot find {filename}")));
+            .ok_or_else(|| Error::unknown(format!("cannot find {filename}")));
     }
 
     Err(Error::unknown(format!("cannot find {filename}")))
