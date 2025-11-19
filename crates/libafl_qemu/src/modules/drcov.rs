@@ -3,7 +3,10 @@ use std::{
     cmp::{max, min},
     ops::Range,
 };
-use std::{path::PathBuf, sync::Mutex};
+use std::{
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
 use hashbrown::{HashMap, hash_map::Entry};
 use libafl::{HasMetadata, executors::ExitKind, observers::ObserversTuple};
@@ -55,7 +58,7 @@ libafl_bolts::impl_serdeany!(DrCovMetadata);
 pub struct DrCovModuleBuilder<F> {
     filter: Option<F>,
     module_mapping: Option<RangeMap<u64, (u16, String)>>,
-    filename: Option<PathBuf>,
+    path: Option<PathBuf>,
     full_trace: bool,
 }
 
@@ -66,7 +69,7 @@ where
     pub fn build(self) -> DrCovModule<F> {
         DrCovModule::new(
             self.filter.unwrap(),
-            self.filename.unwrap(),
+            self.path.unwrap(),
             self.module_mapping,
             self.full_trace,
         )
@@ -76,7 +79,7 @@ where
         DrCovModuleBuilder {
             filter: Some(filter),
             module_mapping: self.module_mapping,
-            filename: self.filename,
+            path: self.path,
             full_trace: self.full_trace,
         }
     }
@@ -86,17 +89,17 @@ where
         Self {
             filter: self.filter,
             module_mapping: Some(module_mapping),
-            filename: self.filename,
+            path: self.path,
             full_trace: self.full_trace,
         }
     }
 
     #[must_use]
-    pub fn filename(self, filename: PathBuf) -> Self {
+    pub fn path(self, path: PathBuf) -> Self {
         Self {
             filter: self.filter,
             module_mapping: self.module_mapping,
-            filename: Some(filename),
+            path: Some(path),
             full_trace: self.full_trace,
         }
     }
@@ -106,7 +109,7 @@ where
         Self {
             filter: self.filter,
             module_mapping: self.module_mapping,
-            filename: self.filename,
+            path: self.path,
             full_trace,
         }
     }
@@ -116,7 +119,7 @@ where
 pub struct DrCovModule<F> {
     filter: F,
     module_mapping: Option<RangeMap<u64, (u16, String)>>,
-    filename: PathBuf,
+    path: PathBuf,
     full_trace: bool,
     drcov_len: usize,
 }
@@ -376,7 +379,7 @@ impl DrCovModule<NopAddressFilter> {
             filter: Some(NopAddressFilter),
             module_mapping: None,
             full_trace: false,
-            filename: None,
+            path: None,
         }
     }
 }
@@ -385,7 +388,7 @@ impl<F> DrCovModule<F> {
     #[must_use]
     pub fn new(
         filter: F,
-        filename: PathBuf,
+        path: PathBuf,
         module_mapping: Option<RangeMap<u64, (u16, String)>>,
         full_trace: bool,
     ) -> Self {
@@ -399,10 +402,18 @@ impl<F> DrCovModule<F> {
         Self {
             filter,
             module_mapping,
-            filename,
+            path,
             full_trace,
             drcov_len: 0,
         }
+    }
+
+    pub fn set_path(&mut self, path: PathBuf) {
+        self.path = path;
+    }
+
+    pub fn path(&self) -> &Path {
+        self.path.as_path()
     }
 
     pub fn flush(&mut self) {
@@ -451,7 +462,7 @@ impl<F> DrCovModule<F> {
                 // Module mapping is already set. It's checked or filled when the module is first run.
                 unsafe {
                     DrCovWriter::new(self.module_mapping.as_ref().unwrap_unchecked())
-                        .write(&self.filename, &drcov_vec)
+                        .write(&self.path, &drcov_vec)
                         .expect("Failed to write coverage file");
                 }
             }
@@ -499,7 +510,7 @@ impl<F> DrCovModule<F> {
                 // Module mapping is already set. It's checked or filled when the module is first run.
                 unsafe {
                     DrCovWriter::new(self.module_mapping.as_ref().unwrap_unchecked())
-                        .write(&self.filename, &drcov_vec)
+                        .write(&self.path, &drcov_vec)
                         .expect("Failed to write coverage file");
                 }
             }
