@@ -18,8 +18,6 @@ use std::net::TcpStream;
 
 #[cfg(feature = "std")]
 use libafl_bolts::llmp::{TcpRequest, TcpResponse, recv_tcp_msg, send_tcp_msg};
-#[cfg(any(windows, not(feature = "fork")))]
-use libafl_bolts::os::startable_self;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "fork", unix))]
