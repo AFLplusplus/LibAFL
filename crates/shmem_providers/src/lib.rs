@@ -780,10 +780,10 @@ pub mod unix_shmem {
             /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete them after fuzzing
             pub fn new(
                 map_size: usize,
-                filename: impl AsRef<Path>,
+                path: impl AsRef<Path>,
                 use_fd_as_id: bool,
             ) -> Result<Self, Error> {
-                let filename_bytes = filename.as_ref().as_os_str().as_encoded_bytes();
+                let filename_bytes = path.as_ref().as_os_str().as_encoded_bytes();
 
                 let mut filename_path: [u8; 20] = [0_u8; MAX_MMAP_FILENAME_LEN];
                 // Keep room for the leading slash and trailing NULL.
@@ -1038,9 +1038,9 @@ pub mod unix_shmem {
             pub fn new_shmem_with_id(
                 &mut self,
                 map_size: usize,
-                id: impl AsRef<Path>,
+                id_path: impl AsRef<Path>,
             ) -> Result<MmapShMem, Error> {
-                MmapShMem::new(map_size, id, self.use_fd_as_id)
+                MmapShMem::new(map_size, id_path, self.use_fd_as_id)
             }
 
             /// Create a new [`MmapShMemProvider`] where filename is used as the shmem id.
