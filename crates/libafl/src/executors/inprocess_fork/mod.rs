@@ -39,16 +39,16 @@ pub mod stateful;
 ///
 /// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
-pub type InProcessForkExecutor<'a, EM, H, I, OT, S, SP, Z> =
-    GenericInProcessForkExecutor<'a, EM, H, (), I, OT, S, SP, Z>;
+pub type InProcessForkExecutor<EM, H, I, OT, S, SP, Z> =
+    GenericInProcessForkExecutor<EM, H, (), I, OT, S, SP, Z>;
 
-impl<'a, H, I, OT, S, SP, EM, Z> InProcessForkExecutor<'a, EM, H, I, OT, S, SP, Z>
+impl<H, I, OT, S, SP, EM, Z> InProcessForkExecutor<EM, H, I, OT, S, SP, Z>
 where
     OT: ObserversTuple<I, S>,
 {
     /// The constructor for `InProcessForkExecutor`
     pub fn new(
-        harness_fn: &'a mut H,
+        harness_fn: H,
         observers: OT,
         fuzzer: &mut Z,
         state: &mut S,
@@ -73,13 +73,12 @@ where
 ///
 /// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
-pub struct GenericInProcessForkExecutor<'a, EM, H, HT, I, OT, S, SP, Z> {
-    harness_fn: &'a mut H,
+pub struct GenericInProcessForkExecutor<EM, H, HT, I, OT, S, SP, Z> {
+    harness_fn: H,
     inner: GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>,
 }
 
-impl<H, HT, I, OT, S, SP, EM, Z> Debug
-    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OT, S, SP, Z>
+impl<H, HT, I, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutor<EM, H, HT, I, OT, S, SP, Z>
 where
     HT: Debug,
     OT: Debug,
@@ -103,7 +102,7 @@ where
 }
 
 impl<EM, H, HT, I, OT, S, SP, Z> Executor<EM, I, S, Z>
-    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OT, S, SP, Z>
+    for GenericInProcessForkExecutor<EM, H, HT, I, OT, S, SP, Z>
 where
     H: FnMut(&I) -> ExitKind + Sized,
     HT: ExecutorHooksTuple<I, S>,
@@ -141,7 +140,7 @@ where
     }
 }
 
-impl<'a, H, HT, I, OT, S, SP, EM, Z> GenericInProcessForkExecutor<'a, EM, H, HT, I, OT, S, SP, Z>
+impl<H, HT, I, OT, S, SP, EM, Z> GenericInProcessForkExecutor<EM, H, HT, I, OT, S, SP, Z>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -150,15 +149,14 @@ where
     #[expect(clippy::too_many_arguments)]
     pub fn with_hooks(
         userhooks: HT,
-        harness_fn: &'a mut H,
+        harness_fn: H,
         observers: OT,
         fuzzer: &mut Z,
         state: &mut S,
         event_mgr: &mut EM,
         timeout: Duration,
         shmem_provider: SP,
-    ) -> Result<Self, Error>
-where {
+    ) -> Result<Self, Error> {
         Ok(Self {
             harness_fn,
             inner: GenericInProcessForkExecutorInner::with_hooks(
@@ -175,19 +173,21 @@ where {
 
     /// Retrieve the harness function.
     #[inline]
+    #[must_use]
     pub fn harness(&self) -> &H {
-        self.harness_fn
+        &self.harness_fn
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
+    #[must_use]
     pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn
+        &mut self.harness_fn
     }
 }
 
 impl<H, HT, I, OT, S, SP, EM, Z> HasObservers
-    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OT, S, SP, Z>
+    for GenericInProcessForkExecutor<EM, H, HT, I, OT, S, SP, Z>
 {
     type Observers = OT;
     #[inline]

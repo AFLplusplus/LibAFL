@@ -24,10 +24,10 @@ use crate::{
 };
 
 /// The `StatefulInProcessForkExecutor` with no user hooks
-pub type StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SP, Z> =
-    StatefulGenericInProcessForkExecutor<'a, EM, ES, H, (), I, OT, S, SP, Z>;
+pub type StatefulInProcessForkExecutor<EM, ES, H, I, OT, S, SP, Z> =
+    StatefulGenericInProcessForkExecutor<EM, ES, H, (), I, OT, S, SP, Z>;
 
-impl<'a, H, I, OT, S, SP, EM, ES, Z> StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SP, Z>
+impl<H, I, OT, S, SP, EM, ES, Z> StatefulInProcessForkExecutor<EM, ES, H, I, OT, S, SP, Z>
 where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -35,7 +35,7 @@ where
     #[expect(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
     pub fn new(
-        harness_fn: &'a mut H,
+        harness_fn: H,
         exposed_executor_state: ES,
         observers: OT,
         fuzzer: &mut Z,
@@ -59,9 +59,9 @@ where
 }
 
 /// [`StatefulGenericInProcessForkExecutor`] is an executor that forks the current process before each execution. Harness can access some internal state.
-pub struct StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SP, Z> {
+pub struct StatefulGenericInProcessForkExecutor<EM, ES, H, HT, I, OT, S, SP, Z> {
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: &'a mut H,
+    harness_fn: H,
     /// The state used as argument of the harness
     pub exposed_executor_state: ES,
     /// Inner state of the executor
@@ -69,7 +69,7 @@ pub struct StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SP,
 }
 
 impl<H, HT, I, OT, S, SP, EM, ES, Z> Debug
-    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
+    for StatefulGenericInProcessForkExecutor<EM, ES, H, HT, I, OT, S, SP, Z>
 where
     HT: Debug,
     OT: Debug,
@@ -93,7 +93,7 @@ where
 }
 
 impl<EM, H, HT, I, OT, S, SP, Z, ES> Executor<EM, I, S, Z>
-    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
+    for StatefulGenericInProcessForkExecutor<EM, ES, H, HT, I, OT, S, SP, Z>
 where
     H: FnMut(&mut ES, &I) -> ExitKind + Sized,
     HT: ExecutorHooksTuple<I, S>,
@@ -134,8 +134,8 @@ where
     }
 }
 
-impl<'a, H, HT, I, OT, S, SP, EM, ES, Z>
-    StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SP, Z>
+impl<H, HT, I, OT, S, SP, EM, ES, Z>
+    StatefulGenericInProcessForkExecutor<EM, ES, H, HT, I, OT, S, SP, Z>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -144,7 +144,7 @@ where
     #[expect(clippy::too_many_arguments)]
     pub fn with_hooks(
         userhooks: HT,
-        harness_fn: &'a mut H,
+        harness_fn: H,
         exposed_executor_state: ES,
         observers: OT,
         fuzzer: &mut Z,
@@ -170,19 +170,21 @@ where
 
     /// Retrieve the harness function.
     #[inline]
+    #[must_use]
     pub fn harness(&self) -> &H {
-        self.harness_fn
+        &self.harness_fn
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
+    #[must_use]
     pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn
+        &mut self.harness_fn
     }
 }
 
 impl<H, HT, I, OT, S, SP, EM, ES, Z> HasObservers
-    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
+    for StatefulGenericInProcessForkExecutor<EM, ES, H, HT, I, OT, S, SP, Z>
 {
     type Observers = OT;
 
