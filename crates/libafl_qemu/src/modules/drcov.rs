@@ -95,11 +95,11 @@ where
     }
 
     #[must_use]
-    pub fn path(self, path: PathBuf) -> Self {
+    pub fn path<P: Into<PathBuf>>(self, path: P) -> Self {
         Self {
             filter: self.filter,
             module_mapping: self.module_mapping,
-            path: Some(path),
+            path: Some(path.into()),
             full_trace: self.full_trace,
         }
     }
@@ -386,9 +386,9 @@ impl DrCovModule<NopAddressFilter> {
 
 impl<F> DrCovModule<F> {
     #[must_use]
-    pub fn new(
+    pub fn new<P: Into<PathBuf>>(
         filter: F,
-        path: PathBuf,
+        path: P,
         module_mapping: Option<RangeMap<u64, (u16, String)>>,
         full_trace: bool,
     ) -> Self {
@@ -402,14 +402,14 @@ impl<F> DrCovModule<F> {
         Self {
             filter,
             module_mapping,
-            path,
+            path: path.into(),
             full_trace,
             drcov_len: 0,
         }
     }
 
-    pub fn set_path(&mut self, path: PathBuf) {
-        self.path = path;
+    pub fn set_path<P: Into<PathBuf>>(&mut self, path: P) {
+        self.path = path.into();
     }
 
     pub fn path(&self) -> &Path {
