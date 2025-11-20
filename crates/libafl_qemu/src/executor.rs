@@ -295,6 +295,13 @@ where
     ) -> &mut EmulatorInProcessExecutor<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
         &mut self.inner
     }
+
+    /// Retrieve the emulator, consuming the executor.
+    #[inline]
+    #[must_use]
+    pub fn into_emulator(self) -> Emulator<C, CM, ED, ET, I, S, SM> {
+        self.inner.into_state()
+    }
 }
 
 impl<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> Executor<EM, I, S, Z>
@@ -455,6 +462,13 @@ where
     #[must_use]
     pub fn emulator_mut(&mut self) -> &Emulator<C, CM, ED, ET, I, S, SM> {
         &mut self.inner.exposed_executor_state
+    }
+
+    /// Retrieve the emulator, consuming the executor.
+    #[inline]
+    #[must_use]
+    pub fn into_emulator(self) -> Emulator<C, CM, ED, ET, I, S, SM> {
+        self.inner.into_state()
     }
 }
 
