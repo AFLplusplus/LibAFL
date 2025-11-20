@@ -11,7 +11,7 @@ fn main() {
             out_dir
                 .ancestors()
                 .nth(3) // This is still a fallback, but at least we try CARGO_TARGET_DIR first
-                .map(|p| p.to_path_buf())
+                .map(std::path::Path::to_path_buf)
                 .expect("Failed to determine target directory from OUT_DIR")
         };
         println!("cargo:rerun-if-changed=build.rs");
