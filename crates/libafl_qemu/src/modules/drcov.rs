@@ -30,7 +30,7 @@ use crate::{
 /// Trace of `block_id`s met at runtime
 static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
 
-///Map of `pc` -> `block_id`
+/// Map of `pc` -> `block_id`
 static DRCOV_MAP: Mutex<Option<HashMap<GuestAddr, u64>>> = Mutex::new(None);
 
 /// Map of `pc` -> `block_len`
@@ -60,6 +60,7 @@ pub struct DrCovModuleBuilder<F> {
     module_mapping: Option<RangeMap<u64, (u16, String)>>,
     path: Option<PathBuf>,
     full_trace: bool,
+    clean_on_flush: bool,
 }
 
 impl<F> DrCovModuleBuilder<F>
@@ -72,6 +73,7 @@ where
             self.path.unwrap(),
             self.module_mapping,
             self.full_trace,
+            self.clean_on_flush,
         )
     }
 
@@ -81,6 +83,7 @@ where
             module_mapping: self.module_mapping,
             path: self.path,
             full_trace: self.full_trace,
+            clean_on_flush: self.clean_on_flush,
         }
     }
 
@@ -91,6 +94,7 @@ where
             module_mapping: Some(module_mapping),
             path: self.path,
             full_trace: self.full_trace,
+            clean_on_flush: self.clean_on_flush,
         }
     }
 
@@ -101,6 +105,7 @@ where
             module_mapping: self.module_mapping,
             path: Some(path.into()),
             full_trace: self.full_trace,
+            clean_on_flush: self.clean_on_flush,
         }
     }
 
@@ -111,6 +116,19 @@ where
             module_mapping: self.module_mapping,
             path: self.path,
             full_trace,
+            clean_on_flush: self.clean_on_flush,
+        }
+    }
+
+    /// Clean trace history of `block_id`s met at runtime every time after flushing to a file.
+    #[must_use]
+    pub fn clean_on_flush(self, clean_on_flush: bool) -> Self {
+        Self {
+            filter: self.filter,
+            module_mapping: self.module_mapping,
+            path: self.path,
+            full_trace: true,
+            clean_on_flush,
         }
     }
 }
@@ -121,6 +139,7 @@ pub struct DrCovModule<F> {
     module_mapping: Option<RangeMap<u64, (u16, String)>>,
     path: PathBuf,
     full_trace: bool,
+    clean_on_flush: bool,
     drcov_len: usize,
 }
 
@@ -379,6 +398,7 @@ impl DrCovModule<NopAddressFilter> {
             filter: Some(NopAddressFilter),
             module_mapping: None,
             full_trace: false,
+            clean_on_flush: false,
             path: None,
         }
     }
@@ -391,6 +411,7 @@ impl<F> DrCovModule<F> {
         path: P,
         module_mapping: Option<RangeMap<u64, (u16, String)>>,
         full_trace: bool,
+        clean_on_flush: bool,
     ) -> Self {
         if full_trace {
             *DRCOV_IDS.lock().unwrap() = Some(vec![]);
@@ -404,6 +425,7 @@ impl<F> DrCovModule<F> {
             module_mapping,
             path: path.into(),
             full_trace,
+            clean_on_flush,
             drcov_len: 0,
         }
     }
@@ -466,7 +488,11 @@ impl<F> DrCovModule<F> {
                         .expect("Failed to write coverage file");
                 }
             }
-            self.drcov_len = DRCOV_IDS.lock().unwrap().as_ref().unwrap().len();
+            if self.clean_on_flush {
+                *DRCOV_IDS.lock().unwrap() = Some(vec![]);
+            } else {
+                self.drcov_len = DRCOV_IDS.lock().unwrap().as_ref().unwrap().len();
+            }
         } else {
             if DRCOV_MAP.lock().unwrap().as_ref().unwrap().len() > self.drcov_len {
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
