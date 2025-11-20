@@ -54,7 +54,7 @@ injections = ["serde_yaml", "toml"]
 ## Python bindings support
 python = ["pyo3", "pyo3-build-config", "libafl_qemu_sys/python"]
 ## Fork support
-fork = ["libafl/fork"]
+fork = []
 
 #! ## The following architecture features are mutually exclusive.
 
