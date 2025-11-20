@@ -2,7 +2,7 @@ use core::{
     fmt,
     fmt::{Display, Formatter},
 };
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use getset::Getters;
 use libafl_derive;
