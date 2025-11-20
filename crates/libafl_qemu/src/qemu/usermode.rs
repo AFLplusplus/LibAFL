@@ -14,6 +14,8 @@ use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
 use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 
+#[cfg(doc)]
+use crate::modules::snapshot::SnapshotModule;
 use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
 
 /// Choose how QEMU target signals should be handled.

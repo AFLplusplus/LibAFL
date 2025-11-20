@@ -36,7 +36,7 @@ pub const PAGE_SIZE: usize = 4096;
 /// Returns `Ok(())` if Intel PT is available and has the features used by `LibAFL`, otherwise
 /// returns an `Err` containing a description of the reasons.
 ///
-/// If you use this with QEMU check out [`Self::availability_in_qemu()`] instead.
+/// If you use this with QEMU check out [`availability_in_qemu_kvm()`] instead.
 ///
 /// Due to the numerous factors that can affect `IntelPT` availability, this function was
 /// developed on a best-effort basis.
@@ -78,7 +78,7 @@ pub fn availability() -> Result<(), String> {
 /// Check if Intel PT is available on the current system and can be used in combination with
 /// QEMU.
 ///
-/// If you don't use this with QEMU check out [`IntelPT::availability()`] instead.
+/// If you don't use this with QEMU check out [`availability()`] instead.
 pub fn availability_in_qemu_kvm() -> Result<(), String> {
     let mut reasons = match availability() {
         Err(s) => vec![s],
