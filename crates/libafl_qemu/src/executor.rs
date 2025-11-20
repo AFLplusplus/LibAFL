@@ -221,6 +221,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuExecutor")
             .field("inner", &self.inner)
+            .field("first_exec", self.first_exec)
             .finish()
     }
 }
@@ -382,6 +383,7 @@ where
         f.debug_struct("QemuForkExecutor")
             .field("inner", &self.inner)
             .field("emulator", &self.inner.exposed_executor_state)
+            .field("first_exec", &self.first_exec)
             .finish()
     }
 }
