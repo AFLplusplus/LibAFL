@@ -30,19 +30,19 @@ use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 use crate::windows_hooks::initialize;
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
-pub struct FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, Z> {
-    base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
+pub struct FridaInProcessExecutor<'a, EM, H, I, OT, RT, S, Z> {
+    base: InProcessExecutor<EM, H, I, OT, S, Z>,
     /// `thread_id` for the Stalker
     thread_id: Option<u32>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker,
     /// User provided callback for instrumentation
-    helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
+    helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
     followed: bool,
-    phantom: PhantomData<&'b u8>,
+    phantom: PhantomData<&'a u8>,
 }
 
-impl<EM, H, I, OT, RT, S, Z> Debug for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, Z>
+impl<EM, H, I, OT, RT, S, Z> Debug for FridaInProcessExecutor<'_, EM, H, I, OT, RT, S, Z>
 where
     OT: Debug,
 {
@@ -56,7 +56,7 @@ where
 }
 
 impl<EM, H, I, OT, RT, S, Z> Executor<EM, I, S, Z>
-    for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, Z>
+    for FridaInProcessExecutor<'_, EM, H, I, OT, RT, S, Z>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
@@ -121,9 +121,7 @@ where
     }
 }
 
-impl<EM, H, I, OT, RT, S, Z> HasObservers
-    for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, Z>
-{
+impl<EM, H, I, OT, RT, S, Z> HasObservers for FridaInProcessExecutor<'_, EM, H, I, OT, RT, S, Z> {
     type Observers = OT;
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
@@ -136,15 +134,15 @@ impl<EM, H, I, OT, RT, S, Z> HasObservers
     }
 }
 
-impl<'a, 'b, EM, H, I, OT, RT, S, Z> FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, Z>
+impl<'a, EM, H, I, OT, RT, S, Z> FridaInProcessExecutor<'a, EM, H, I, OT, RT, S, Z>
 where
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
     pub fn new(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
-        helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
+        base: InProcessExecutor<EM, H, I, OT, S, Z>,
+        helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
     ) -> Self {
         FridaInProcessExecutor::with_target_bytes_converter(gum, base, helper, None)
     }
@@ -152,23 +150,23 @@ where
     /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`.
     pub fn on_thread(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
-        helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
+        base: InProcessExecutor<EM, H, I, OT, S, Z>,
+        helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
         thread_id: u32,
     ) -> Self {
         FridaInProcessExecutor::with_target_bytes_converter(gum, base, helper, Some(thread_id))
     }
 }
 
-impl<'a, 'b, EM, H, I, OT, RT, S, Z> FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, Z>
+impl<'a, EM, H, I, OT, RT, S, Z> FridaInProcessExecutor<'a, EM, H, I, OT, RT, S, Z>
 where
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
     pub fn with_target_bytes_converter(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
-        helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
+        base: InProcessExecutor<EM, H, I, OT, S, Z>,
+        helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
         thread_id: Option<u32>,
     ) -> Self {
         let mut stalker = Stalker::new(gum);
@@ -231,8 +229,8 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, EM, H, I, OT, RT, S, Z> HasInProcessHooks<I, S>
-    for FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, Z>
+impl<'a, EM, H, I, OT, RT, S, Z> HasInProcessHooks<I, S>
+    for FridaInProcessExecutor<'a, EM, H, I, OT, RT, S, Z>
 where
     H: FnMut(&I) -> ExitKind,
     S: HasSolutions<I> + HasCurrentTestcase<I> + HasExecutions,
