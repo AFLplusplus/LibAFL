@@ -60,7 +60,7 @@ pub struct DrCovModuleBuilder<F> {
     module_mapping: Option<RangeMap<u64, (u16, String)>>,
     path: Option<PathBuf>,
     full_trace: bool,
-    clean_ids: bool,
+    clean_on_flush: bool,
 }
 
 impl<F> DrCovModuleBuilder<F>
@@ -73,7 +73,7 @@ where
             self.path.unwrap(),
             self.module_mapping,
             self.full_trace,
-            self.clean_ids,
+            self.clean_on_flush,
         )
     }
 
@@ -83,7 +83,7 @@ where
             module_mapping: self.module_mapping,
             path: self.path,
             full_trace: self.full_trace,
-            clean_ids: self.clean_ids,
+            clean_on_flush: self.clean_on_flush,
         }
     }
 
@@ -94,7 +94,7 @@ where
             module_mapping: Some(module_mapping),
             path: self.path,
             full_trace: self.full_trace,
-            clean_ids: self.clean_ids,
+            clean_on_flush: self.clean_on_flush,
         }
     }
 
@@ -105,7 +105,7 @@ where
             module_mapping: self.module_mapping,
             path: Some(path.into()),
             full_trace: self.full_trace,
-            clean_ids: self.clean_ids,
+            clean_on_flush: self.clean_on_flush,
         }
     }
 
@@ -116,19 +116,19 @@ where
             module_mapping: self.module_mapping,
             path: self.path,
             full_trace,
-            clean_ids: self.clean_ids,
+            clean_on_flush: self.clean_on_flush,
         }
     }
 
     /// Clean trace history of `block_id`s met at runtime every time after flushing to a file.
     #[must_use]
-    pub fn clean_ids(self, clean_ids: bool) -> Self {
+    pub fn clean_on_flush(self, clean_on_flush: bool) -> Self {
         Self {
             filter: self.filter,
             module_mapping: self.module_mapping,
             path: self.path,
             full_trace: true,
-            clean_ids,
+            clean_on_flush,
         }
     }
 }
@@ -139,7 +139,7 @@ pub struct DrCovModule<F> {
     module_mapping: Option<RangeMap<u64, (u16, String)>>,
     path: PathBuf,
     full_trace: bool,
-    clean_ids: bool,
+    clean_on_flush: bool,
     drcov_len: usize,
 }
 
@@ -398,7 +398,7 @@ impl DrCovModule<NopAddressFilter> {
             filter: Some(NopAddressFilter),
             module_mapping: None,
             full_trace: false,
-            clean_ids: false,
+            clean_on_flush: false,
             path: None,
         }
     }
@@ -411,7 +411,7 @@ impl<F> DrCovModule<F> {
         path: P,
         module_mapping: Option<RangeMap<u64, (u16, String)>>,
         full_trace: bool,
-        clean_ids: bool,
+        clean_on_flush: bool,
     ) -> Self {
         if full_trace {
             *DRCOV_IDS.lock().unwrap() = Some(vec![]);
@@ -425,7 +425,7 @@ impl<F> DrCovModule<F> {
             module_mapping,
             path: path.into(),
             full_trace,
-            clean_ids,
+            clean_on_flush,
             drcov_len: 0,
         }
     }
@@ -488,7 +488,7 @@ impl<F> DrCovModule<F> {
                         .expect("Failed to write coverage file");
                 }
             }
-            if self.clean_ids {
+            if self.clean_on_flush {
                 *DRCOV_IDS.lock().unwrap() = Some(vec![]);
             } else {
                 self.drcov_len = DRCOV_IDS.lock().unwrap().as_ref().unwrap().len();
