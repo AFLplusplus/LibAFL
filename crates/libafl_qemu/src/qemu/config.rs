@@ -228,7 +228,7 @@ impl Display for Bios {
 }
 
 #[cfg(feature = "systemmode")]
-impl<P: Into<Path>> From<P> for Bios {
+impl<P: Into<PathBuf>> From<P> for Bios {
     fn from(path: P) -> Self {
         Self { path: path.into() }
     }
