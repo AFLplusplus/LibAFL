@@ -175,7 +175,8 @@ pub struct Launcher<'a, CF, MT, SP> {
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
     /// If this launcher should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
-    #[builder(default = cfg!(unix))]
+    #[cfg(unix)]
+    #[builder(default = true)]
     fork: bool,
 }
 

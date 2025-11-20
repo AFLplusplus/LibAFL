@@ -35,7 +35,7 @@ use libafl_bolts::{
     llmp::{
         Broker, LLMP_FLAG_FROM_MM, LlmpBroker, LlmpClient, LlmpClientDescription, LlmpConnection,
     },
-    os::CTRL_C_EXIT,
+    os::{CTRL_C_EXIT, startable_self},
     shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     staterestore::StateRestorer,
     tuples::tuple_list,
@@ -838,15 +838,10 @@ where
                 log::info!("Spawning next client (id {ctr})");
 
                 let child_status = {
-                    let mut use_fork = self.fork;
-                    #[cfg(not(all(unix, feature = "fork")))]
-                    if use_fork {
-                        log::warn!(
-                            "Fork is not supported on this platform, falling back to spawn."
-                        );
-                        use_fork = false;
-                    }
+                    #[cfg(unix)]
+                    let use_fork = self.fork;
 
+                    #[cfg(unix)]
                     if use_fork {
                         #[cfg(all(unix, feature = "fork"))]
                         {
