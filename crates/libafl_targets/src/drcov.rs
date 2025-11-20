@@ -272,8 +272,8 @@ fn parse_path(s: &str) -> PathBuf {
 
 impl DrCovReader {
     /// Parse a `drcov` file to memory.
-    pub fn read<P: AsRef<Path> + ?Sized>(file: &P) -> Result<Self, Error> {
-        let f = File::open(file)?;
+    pub fn read<P: AsRef<Path> + ?Sized>(path: &P) -> Result<Self, Error> {
+        let f = File::open(path.as_ref())?;
         let mut reader = BufReader::new(f);
 
         let mut header = String::new();

@@ -179,10 +179,10 @@ fn is_instrumented(mmap: &Mmap, shmem_env_var: &str) -> bool {
     mmap_has_substr(mmap, shmem_env_var)
 }
 
-fn find_executable_in_path<P: AsRef<Path>>(executable: &P) -> Option<PathBuf> {
+fn find_executable_in_path<P: AsRef<Path>>(executable_path: &P) -> Option<PathBuf> {
     std::env::var_os("PATH").and_then(|paths| {
         std::env::split_paths(&paths).find_map(|dir| {
-            let full_path = dir.join(executable);
+            let full_path = dir.join(executable_path);
             if full_path.is_file() {
                 Some(full_path)
             } else {

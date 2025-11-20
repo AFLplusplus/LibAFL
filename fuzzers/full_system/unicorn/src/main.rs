@@ -1,4 +1,10 @@
-use std::{env, fs::File, io::Read, path::PathBuf, ptr::NonNull};
+use std::{
+    env,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+    ptr::NonNull,
+};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -310,8 +316,13 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
         .expect("Error in the fuzzing loop");
 }
 
-fn unicorn_map_and_load_code(emu: &mut Unicorn<()>, address: u64, size: u64, path: &str) -> u64 {
-    let mut f = File::open(path).expect("Could not open file");
+fn unicorn_map_and_load_code<P: AsRef<Path>>(
+    emu: &mut Unicorn<()>,
+    address: u64,
+    size: u64,
+    path: P,
+) -> u64 {
+    let mut f = File::open(path.as_ref()).expect("Could not open file");
     let mut buffer = Vec::new();
 
     // read the whole file
