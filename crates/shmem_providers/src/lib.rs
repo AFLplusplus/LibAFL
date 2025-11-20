@@ -716,7 +716,7 @@ pub mod unix_shmem {
     pub use default::{MAX_MMAP_FILENAME_LEN, MmapShMem, MmapShMemProvider};
 
     #[cfg(doc)]
-    use crate::shmem::{ShMem, ShMemProvider};
+    use crate::ShMem;
 
     /// Shared memory provider for Android, allocating and forwarding maps over unix domain sockets.
     #[cfg(target_os = "android")]
@@ -747,6 +747,8 @@ pub mod unix_shmem {
             shmctl, shmdt, shmget,
         };
 
+        #[cfg(doc)]
+        use crate::ShMemDescription;
         use crate::{ShMem, ShMemId, ShMemProvider};
 
         /// The max number of bytes used when generating names for [`MmapShMem`]s.
@@ -933,8 +935,8 @@ pub mod unix_shmem {
             ///
             /// Only available on UNIX systems at the moment.
             ///
-            /// You likely want to pass the [`crate::shmem::ShMemDescription`] of the returned [`ShMem`]
-            /// and reopen the shared memory in the child process using [`crate::shmem::ShMemProvider::shmem_from_description`].
+            /// You likely want to pass the [`ShMemDescription`] of the returned [`ShMem`]
+            /// and reopen the shared memory in the child process using [`ShMemProvider::shmem_from_description`].
             ///
             /// # Errors
             ///
@@ -1333,7 +1335,7 @@ pub mod unix_shmem {
                 }
             }
 
-            /// Get a [`crate::shmem::unix_shmem::UnixShMem`] of the existing [`ShMem`] mapping identified by id.
+            /// Get a [`crate::unix_shmem::UnixShMem`] of the existing [`ShMem`] mapping identified by id.
             pub fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();

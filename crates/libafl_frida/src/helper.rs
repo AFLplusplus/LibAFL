@@ -294,7 +294,7 @@ impl FridaInstrumentationHelperBuilder {
 
     /// Load a script
     ///
-    /// See [`Script::new`] for details
+    /// See [`Script::load`] for details
     #[must_use]
     pub fn load_script<F: Fn(&str, &[u8])>(
         self,

@@ -1,6 +1,8 @@
 use libafl_bolts::Error;
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
+#[cfg(doc)]
+use crate::Qemu;
 use crate::{CPU, Emulator, GuestMaps, NopSnapshotManager, Regs, TargetSignalHandling};
 
 pub type StdSnapshotManager = NopSnapshotManager;
