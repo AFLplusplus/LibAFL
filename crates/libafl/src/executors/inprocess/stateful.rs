@@ -285,24 +285,28 @@ where
 
     /// Retrieve the harness function.
     #[inline]
+    #[must_use]
     pub fn harness(&self) -> &H {
         self.harness_fn.borrow()
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
+    #[must_use]
     pub fn harness_mut(&mut self) -> &mut H {
         self.harness_fn.borrow_mut()
     }
 
     /// The inprocess handlers
     #[inline]
+    #[must_use]
     pub fn hooks(&self) -> &(InProcessHooks<I, S>, HT) {
         self.inner.hooks()
     }
 
     /// The inprocess handlers (mutable)
     #[inline]
+    #[must_use]
     pub fn hooks_mut(&mut self) -> &mut (InProcessHooks<I, S>, HT) {
         self.inner.hooks_mut()
     }
