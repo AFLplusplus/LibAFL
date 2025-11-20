@@ -221,7 +221,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuExecutor")
             .field("inner", &self.inner)
-            .field("first_exec", self.first_exec)
+            .field("first_exec", &self.first_exec)
             .finish()
     }
 }
