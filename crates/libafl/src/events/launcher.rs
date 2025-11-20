@@ -12,13 +12,14 @@
 //! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
-use alloc::{
-    boxed::Box,
+use alloc::{boxed::Box, string::String};
+use core::{
+    fmt,
     fmt::{Debug, Formatter},
-    string::String,
 };
-use core::fmt;
-use std::{net::SocketAddr, num::NonZeroUsize, process::Stdio, time::Duration};
+#[cfg(unix)]
+use core::{num::NonZeroUsize, time::Duration};
+use std::{net::SocketAddr, process::Stdio};
 
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
@@ -39,8 +40,6 @@ use {
     },
     std::{fs::File, os::unix::io::AsRawFd},
 };
-#[cfg(not(unix))]
-use {libafl_bolts::os::startable_self, std::process::Stdio};
 
 #[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::{NodeDescriptor, TcpMultiMachineHooks};
@@ -232,15 +231,11 @@ where
         I: DeserializeOwned,
         S: DeserializeOwned + Serialize,
     {
+        #[cfg(unix)]
         let use_fork = self.fork;
-        #[cfg(not(unix))]
-        if use_fork {
-            log::warn!("Fork is not supported on this platform, falling back to spawn.");
-            use_fork = false;
-        }
 
+        #[cfg(unix)]
         if use_fork {
-            #[cfg(unix)]
             {
                 if self.cores.ids.is_empty() {
                     return Err(Error::illegal_argument(
@@ -295,25 +290,17 @@ where
                                         index as u64 * self.launch_delay,
                                     ));
 
-                                    if !debug_output {
-                                        if let Some(file) = &self.opened_stdout_file {
-                                            // # Safety
-                                            // We assume the file descriptors are valid here
-                                            unsafe {
-                                                dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                                match &self.opened_stderr_file {
-                                                    Some(stderr) => {
-                                                        dup2(
-                                                            stderr.as_raw_fd(),
-                                                            libc::STDERR_FILENO,
-                                                        )?;
-                                                    }
-                                                    _ => {
-                                                        dup2(
-                                                            file.as_raw_fd(),
-                                                            libc::STDERR_FILENO,
-                                                        )?;
-                                                    }
+                                    if !debug_output && let Some(file) = &self.opened_stdout_file {
+                                        // # Safety
+                                        // We assume the file descriptors are valid here
+                                        unsafe {
+                                            dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                            match &self.opened_stderr_file {
+                                                Some(stderr) => {
+                                                    dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                                }
+                                                _ => {
+                                                    dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
                                                 }
                                             }
                                         }
@@ -331,8 +318,9 @@ where
                                         })
                                         .configuration(self.configuration)
                                         .serialize_state(self.serialize_state)
-                                        .hooks(hooks)
-                                        .fork(self.fork);
+                                        .hooks(hooks);
+                                    #[cfg(unix)]
+                                    let builder = builder.fork(self.fork);
                                     let (state, mgr) = builder.build().launch()?;
 
                                     return (self.run_client.take().unwrap())(
@@ -769,19 +757,17 @@ where
                                 index as u64 * self.launch_delay,
                             ));
 
-                            if !debug_output {
-                                if let Some(file) = &self.opened_stdout_file {
-                                    // # Safety
-                                    // We assume the file descriptors are valid here
-                                    unsafe {
-                                        dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                        match &self.opened_stderr_file {
-                                            Some(stderr) => {
-                                                dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                            }
-                                            _ => {
-                                                dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
-                                            }
+                            if !debug_output && let Some(file) = &self.opened_stdout_file {
+                                // # Safety
+                                // We assume the file descriptors are valid here
+                                unsafe {
+                                    dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                    match &self.opened_stderr_file {
+                                        Some(stderr) => {
+                                            dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                        }
+                                        _ => {
+                                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
                                         }
                                     }
                                 }
