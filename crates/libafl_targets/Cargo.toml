@@ -62,7 +62,6 @@ forkserver = [
   "common",
   "nix",
   "libafl/std",
-  "libafl/fork",
 ] # Compile C code for forkserver support
 windows_asan = ["common"] # Compile C code for ASAN on Windows
 whole_archive = [] # use +whole-archive to ensure the presence of weak symbols
