@@ -2542,14 +2542,15 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
+checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash 0.2.0",
  "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -2901,7 +2902,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6717a8d2a5a929a1a2eb43a12812498ed141a0bcfb7e8f7844fbdbe4303bba9f"
 dependencies = [
  "equivalent",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
 ]
 
 [[package]]
@@ -3158,7 +3159,7 @@ dependencies = [
  "fastbloom",
  "fs2",
  "futures",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "libafl_bolts",
  "libafl_core",
  "libafl_derive",
@@ -3209,7 +3210,7 @@ dependencies = [
  "dlmalloc",
  "document-features",
  "env_logger",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "itertools 0.14.0",
  "libc",
  "log",
@@ -3267,7 +3268,7 @@ dependencies = [
  "erased-serde",
  "exceptional",
  "fast_rands",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "hostname",
  "itertools 0.14.0",
  "libafl_core",
@@ -3349,7 +3350,7 @@ dependencies = [
  "errno",
  "frida-gum",
  "frida-gum-sys",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "iced-x86",
  "libafl",
  "libafl_bolts",
@@ -3437,7 +3438,7 @@ dependencies = [
  "enum-map",
  "getset",
  "goblin",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "just",
  "libafl",
  "libafl_bolts",
@@ -3533,7 +3534,7 @@ dependencies = [
  "bindgen 0.72.1",
  "cc",
  "fast_rands",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "libafl",
  "libafl_bolts",
  "libafl_core",
@@ -5461,7 +5462,7 @@ dependencies = [
  "ctor",
  "document-features",
  "erased-serde",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "libafl_core",
  "postcard",
  "rustversion",
@@ -5655,7 +5656,7 @@ version = "0.16.0"
 dependencies = [
  "document-features",
  "fast_rands",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "libafl_core",
  "libc",
  "log",
