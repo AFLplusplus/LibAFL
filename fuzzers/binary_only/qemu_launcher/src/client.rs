@@ -134,7 +134,7 @@ impl Client<'_> {
                 if is_asan_host {
                     let modules = tuple_list!(
                         DrCovModule::builder()
-                            .filename(drcov.clone())
+                            .path(drcov.clone())
                             .full_trace(true)
                             .build(),
                         unsafe {
@@ -150,7 +150,7 @@ impl Client<'_> {
                 } else if is_asan_guest {
                     let modules = tuple_list!(
                         DrCovModule::builder()
-                            .filename(drcov.clone())
+                            .path(drcov.clone())
                             .full_trace(true)
                             .build(),
                         AsanGuestModule::new(&env, asan_filter),
@@ -159,7 +159,7 @@ impl Client<'_> {
                     instance_builder.build().run(args, modules, state)
                 } else {
                     let modules = tuple_list!(DrCovModule::builder()
-                        .filename(drcov.clone())
+                        .path(drcov.clone())
                         .full_trace(true)
                         .build(),);
 
