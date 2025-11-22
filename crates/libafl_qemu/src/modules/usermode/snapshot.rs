@@ -246,9 +246,7 @@ impl SnapshotModule {
 
             let mut addr = map.start();
             while addr < map.end() {
-                let zero = self.interval_filter.to_zero(addr);
-                let skip = self.interval_filter.to_skip(addr);
-                if let Some(range) = zero.or(skip) {
+                if let Some(range) = self.interval_filter.to_skip(addr) {
                     addr = range.end;
                     continue;
                 }
@@ -258,7 +256,7 @@ impl SnapshotModule {
                     private: map.is_priv(),
                     data: None,
                 };
-                if map.flags().readable() {
+                if map.flags().readable() && self.interval_filter.to_zero(addr).is_none() {
                     // TODO not just for R pages
                     unsafe {
                         info.data = Some(Box::new(core::mem::zeroed()));
@@ -481,7 +479,7 @@ impl SnapshotModule {
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
-                        if self.interval_filter.to_skip(*page as u64).is_some() {
+                        if self.interval_filter.to_zero(*page as u64).is_some() {
                             if !Self::modify_mapping(qemu, new_maps, *page) {
                                 return true; // Restore later
                             }
@@ -526,7 +524,7 @@ impl SnapshotModule {
                     }
                 }
 
-                if self.interval_filter.to_skip(*page as u64).is_some() {
+                if self.interval_filter.to_zero(*page as u64).is_some() {
                     unsafe { qemu.write_mem_unchecked(*page, &SNAPSHOT_PAGE_ZEROES) };
                 } else if let Some(info) = self.pages.get_mut(page) {
                     // TODO avoid duplicated memcpy
