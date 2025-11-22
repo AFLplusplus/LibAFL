@@ -242,7 +242,7 @@ impl SnapshotModule {
             unsafe { (*acc.get()).clear() };
         }
         for map in qemu.mappings() {
-            println!("mapping: {map:?}");
+            log::debug!("mapping: {map:}");
 
             let mut addr = map.start();
             while addr < map.end() {
