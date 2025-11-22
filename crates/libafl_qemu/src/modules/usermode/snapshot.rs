@@ -238,6 +238,9 @@ impl SnapshotModule {
         self.initial_brk = qemu.get_initial_brk();
         self.mmap_start = qemu.get_mmap_start();
         self.pages.clear();
+        for acc in &mut self.accesses {
+            unsafe { (*acc.get()).clear() };
+        }
         for map in qemu.mappings() {
             println!("mapping: {map:?}");
 
