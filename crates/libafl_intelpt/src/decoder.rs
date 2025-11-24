@@ -1,6 +1,6 @@
 use core::fmt::Debug;
 
-use libafl_bolts::Error; //, hash_64_fast};
+use libafl_bolts::{Error, hash_64_fast}; //, hash_64_fast};
 use libipt::{
     block::BlockDecoder,
     enc_dec_builder::EncoderDecoderBuilder,
@@ -17,7 +17,7 @@ use crate::error_from_pt_error;
 pub(crate) struct Decoder<'a, T> {
     decoder: BlockDecoder<'a>,
     status: Status,
-    previous_block_end_ip: u64,
+    previous_block_end_ip: Option<u64>,
     vmx_non_root: Option<bool>,
     exclude_hv: bool,
     trace_skip: u64,
@@ -51,7 +51,7 @@ where
         Ok(Self {
             decoder,
             status,
-            previous_block_end_ip: 0,
+            previous_block_end_ip: None,
             vmx_non_root: None,
             exclude_hv,
             trace_skip,
@@ -170,21 +170,24 @@ where
             Ok((b, s)) => {
                 self.status = s;
                 if b.ninsn() > 0 {
-                    // let id = hash_64_fast(self.previous_block_end_ip) ^ hash_64_fast(b.ip());
-                    // // SAFETY: the index is < map_len since the modulo operation is applied
-                    // unsafe {
-                    //     let map_loc = self.map_ptr.add(id as usize % self.map_len);
-                    //     *map_loc = (*map_loc).saturating_add(&1u8.into());
-                    // }
-                    for id in b.ip()..=b.end_ip() {
+                    if let Some(previous_block_end_ip) = self.previous_block_end_ip {
+                        let id = hash_64_fast(previous_block_end_ip) ^ hash_64_fast(b.ip());
+                        // SAFETY: the index is < map_len since the modulo operation is applied
                         unsafe {
                             let map_loc = self.map_ptr.add(id as usize % self.map_len);
                             *map_loc = (*map_loc).saturating_add(&1u8.into());
                         }
                     }
+                    // for id in b.ip()..=b.end_ip() {
+                    //     unsafe {
+                    //         let map_loc = self.map_ptr.add(id as usize % self.map_len);
+                    //         *map_loc = (*map_loc).saturating_add(&1u8.into());
+                    //     }
+                    // }
                     // let log = format!("from: {:#x} to: {:#x}\n", self.previous_block_end_ip, b.ip());
                     // self.log.write_all(log.as_bytes()).unwrap();
-                    self.previous_block_end_ip = b.end_ip();
+                    // todo: if control flow goes out of traced area set to None
+                    self.previous_block_end_ip = Some(b.end_ip());
                 }
                 Ok(())
             }
@@ -193,7 +196,7 @@ where
                     let offset = self.decoder.offset()?;
                     log::info!(
                         "PT error in block next {e:?} trace offset {offset:x} last decoded block end {:x}",
-                        self.previous_block_end_ip
+                        self.previous_block_end_ip.unwrap_or_default()
                     );
                 }
                 Err(e)
@@ -212,7 +215,7 @@ where
                     let offset = self.decoder.offset()?;
                     log::trace!(
                         "PT error in ignore block {e:?} trace offset {offset:x} last decoded block end {:x}",
-                        self.previous_block_end_ip
+                        self.previous_block_end_ip.unwrap_or_default()
                     );
                 }
                 Err(e)

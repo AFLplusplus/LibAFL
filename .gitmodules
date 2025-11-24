@@ -1,0 +1,6 @@
+[submodule "fuzzers/binary_only/intel_pt_libpng/libpng"]
+	path = fuzzers/binary_only/intel_pt_libpng/third_party/libpng
+	url = https://github.com/pnggroup/libpng.git
+[submodule "fuzzers/binary_only/intel_pt_libpng/third_party/abseil-cpp"]
+	path = fuzzers/binary_only/intel_pt_libpng/third_party/abseil-cpp
+	url = https://github.com/abseil/abseil-cpp.git
