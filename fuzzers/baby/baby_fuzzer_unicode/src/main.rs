@@ -17,13 +17,13 @@ use libafl::{
         HavocScheduledMutator, UnicodeCategoryRandMutator, UnicodeInput,
         UnicodeSubcategoryRandMutator,
     },
-    observers::StdMapObserver,
+    observers::ConstMapObserver,
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, UnicodeIdentificationStage},
     state::StdState,
     Evaluator,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{nonnull_raw_mut, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 const SIGNALS_LEN: usize = 64;
@@ -60,7 +60,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS_LEN) };
+    let observer = unsafe { ConstMapObserver::from_mut_ptr("signals", nonnull_raw_mut!(SIGNALS)) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);

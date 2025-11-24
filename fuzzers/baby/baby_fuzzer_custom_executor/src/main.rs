@@ -16,12 +16,14 @@ use libafl::{
     generators::RandPrintablesGenerator,
     inputs::HasTargetBytes,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
-    observers::StdMapObserver,
+    observers::ConstMapObserver,
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, AflStatsStage, CalibrationStage},
     state::{HasCorpus, HasExecutions, StdState},
 };
-use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{
+    current_nanos, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list, AsSlice,
+};
 /// Coverage map with explicit assignments due to the lack of instrumentation
 const SIGNALS_LEN: usize = 16;
 static mut SIGNALS: [u8; SIGNALS_LEN] = [0; SIGNALS_LEN];
@@ -77,7 +79,7 @@ where
 
 pub fn main() {
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS_LEN) };
+    let observer = unsafe { ConstMapObserver::from_mut_ptr("signals", nonnull_raw_mut!(SIGNALS)) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);

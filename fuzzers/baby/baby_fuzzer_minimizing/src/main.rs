@@ -34,7 +34,7 @@ pub fn main() -> Result<(), Error> {
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS_LEN) };
+    let observer = unsafe { ConstMapObserver::from_mut_ptr("signals", nonnull_raw_mut!(SIGNALS)) };
 
     let factory = ObserverEqualityFactory::new(&observer);
 
