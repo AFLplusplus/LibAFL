@@ -108,6 +108,7 @@ pub fn main() {
         };
 
         // create the base maps used to observe the different executors from two independent maps
+        // TODO: Replace with ConstMapObserver
         let mut first_map_observer =
             unsafe { StdMapObserver::from_mut_ptr("first-edges", first_edges.0, first_edges.1) };
         let mut second_map_observer =
@@ -146,6 +147,7 @@ pub fn main() {
         let edges_ptr: *mut u8 = &raw mut EDGES as _;
 
         // create the base maps used to observe the different executors by splitting a slice
+        // TODO: Replace with ConstMapObserver
         let mut first_map_observer =
             unsafe { StdMapObserver::from_mut_ptr("first-edges", edges_ptr, num_edges) };
         let mut second_map_observer = unsafe {
