@@ -15,18 +15,19 @@ use libafl::{
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
-    observers::StdMapObserver,
+    observers::ConstMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{
+    current_nanos, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list, AsSlice,
+};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
-static mut SIGNALS: [u8; 16] = [0; 16];
-// TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
-#[allow(static_mut_refs)] // only a problem in nightly
-static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+const SIGNALS_LEN: usize = 16;
+static mut SIGNALS: [u8; SIGNALS_LEN] = [0; SIGNALS_LEN];
+static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
@@ -64,9 +65,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    // TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
-    #[allow(static_mut_refs)] // only a problem in nightly
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let observer = unsafe { ConstMapObserver::from_mut_ptr("signals", nonnull_raw_mut!(SIGNALS)) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
