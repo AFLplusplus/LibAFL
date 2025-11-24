@@ -26,7 +26,6 @@ use libafl::{
 use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
-
 const SIGNALS_LEN: usize = 64;
 static mut SIGNALS: [u8; SIGNALS_LEN] = [0; SIGNALS_LEN];
 static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
