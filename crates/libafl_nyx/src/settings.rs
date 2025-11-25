@@ -5,6 +5,7 @@ use alloc::borrow::Cow;
 use typed_builder::TypedBuilder;
 
 const DEFAULT_INPUT_BUFFER_SIZE: usize = 1024 * 1024;
+const DEFAULT_AUX_BUFFER_SIZE: usize = 4096;
 const DEFAULT_TIMEOUT_SECS: u8 = 2;
 const DEFAULT_TIMEOUT_MICRO_SECS: u32 = 0;
 const DEFAULT_SNAP_MODE: bool = true;
@@ -45,7 +46,8 @@ pub struct NyxSettings {
     pub timeout_secs: u8,
 
     /// The output buffer size (in bytes) used to record the stdout/stderr messages
-    #[builder(default = 32768)]
+    /// Must be a multiple of 4KB!!!
+    #[builder(default = DEFAULT_AUX_BUFFER_SIZE)]
     pub aux_buffer_size: usize,
 
     /// Additional timeout in microseconds that gets added to
