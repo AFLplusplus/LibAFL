@@ -34,7 +34,7 @@ fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
-#[expect(clippy::manual_assert)]
+// #[expect(clippy::manual_assert)]
 pub fn main() {
     env_logger::init();
     // The closure that we want to fuzz
@@ -56,7 +56,8 @@ pub fn main() {
                     // https://github.com/googleprojectzero/winafl/blob/ea5f6b85572980bb2cf636910f622f36906940aa/winafl.c#L728
                     #[cfg(windows)]
                     unsafe {
-                        write_volatile(0 as *mut u32, 0);
+                        // Replace zero-ptr with the below function, suggested by Clippy
+                        write_volatile(std::ptr::null_mut::<u32>(), 0);
                     }
                 }
             }

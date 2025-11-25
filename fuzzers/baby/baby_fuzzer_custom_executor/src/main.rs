@@ -1,18 +1,17 @@
-#[cfg(windows)]
-use std::ptr::write_volatile;
 use std::{marker::PhantomData, path::PathBuf, ptr::write};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
+
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{Executor, ExitKind, WithObservers},
     feedback_and_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{BloomInputFilter, Fuzzer, ReportingInputFilter, StdFuzzer},
+    fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::HasTargetBytes,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
@@ -21,6 +20,9 @@ use libafl::{
     stages::{mutational::StdMutationalStage, AflStatsStage, CalibrationStage},
     state::{HasCorpus, HasExecutions, StdState},
 };
+
+#[cfg(feature = "bloom_input_filter")]
+use libafl::fuzzer::{BloomInputFilter, ReportingInputFilter};
 use libafl_bolts::{
     current_nanos, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list, AsSlice,
 };
