@@ -46,9 +46,9 @@ impl NyxHelper {
         })?;
         nyx_config.set_input_buffer_size(settings.input_buffer_size);
         if !nyx_config.set_aux_buffer_size(settings.aux_buffer_size) {
-            return Err(Error::illegal_argument(format!(
-                "aux_buffer_size must be multiple of 4KB"
-            )));
+            return Err(Error::illegal_argument(
+                "aux_buffer_size must be multiple of 4KB".to_string(),
+            ));
         }
         nyx_config.set_process_role(match settings.parent_cpu_id {
             None => NyxProcessRole::StandAlone,
