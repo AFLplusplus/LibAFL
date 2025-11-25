@@ -1,10 +1,11 @@
 use std::{marker::PhantomData, path::PathBuf, ptr::write};
 
+#[cfg(feature = "bloom_input_filter")]
+use libafl::fuzzer::{BloomInputFilter, ReportingInputFilter};
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
-
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -20,9 +21,6 @@ use libafl::{
     stages::{mutational::StdMutationalStage, AflStatsStage, CalibrationStage},
     state::{HasCorpus, HasExecutions, StdState},
 };
-
-#[cfg(feature = "bloom_input_filter")]
-use libafl::fuzzer::{BloomInputFilter, ReportingInputFilter};
 use libafl_bolts::{
     current_nanos, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list, AsSlice,
 };
