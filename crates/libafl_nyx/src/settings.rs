@@ -44,6 +44,10 @@ pub struct NyxSettings {
     #[builder(default = DEFAULT_TIMEOUT_SECS)]
     pub timeout_secs: u8,
 
+    /// The output buffer size (in bytes) used to record the stdout/stderr messages
+    #[builder(default = 32768)]
+    pub aux_buffer_size: usize,
+
     /// Additional timeout in microseconds that gets added to
     /// `timeout_secs`.
     #[builder(default = DEFAULT_TIMEOUT_MICRO_SECS)]
