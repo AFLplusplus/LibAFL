@@ -34,7 +34,6 @@ fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
-// #[expect(clippy::manual_assert)]
 pub fn main() {
     env_logger::init();
     // The closure that we want to fuzz
