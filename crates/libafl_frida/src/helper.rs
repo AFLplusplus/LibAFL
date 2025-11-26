@@ -93,24 +93,21 @@ where
     FR2: FridaRuntimeTuple + 'static,
 {
     fn init(
-        &mut self,
-        gum: &Gum,
-        ranges: &RangeMap<u64, (u16, String)>,
-        module_map: &Rc<ModuleMap>,
-    ) {
-        if (self.closure)().unwrap() {
-            self.if_runtimes.init_all(gum, ranges, module_map);
-        } else {
-            self.else_runtimes.init_all(gum, ranges, module_map);
-        }
-    }
+    &mut self,
+    gum: &Gum,
+    ranges: &RangeMap<u64, (u16, String)>,
+    module_map: &Rc<ModuleMap>,
+) {
+    // FIX: Always initialize BOTH runtime sets
+    self.if_runtimes.init_all(gum, ranges, module_map);
+    self.else_runtimes.init_all(gum, ranges, module_map);
+}
+
 
     fn deinit(&mut self, gum: &Gum) {
-        if (self.closure)().unwrap() {
-            self.if_runtimes.deinit_all(gum);
-        } else {
-            self.else_runtimes.deinit_all(gum);
-        }
+    // FIX: Always deinitialize BOTH runtime sets
+    self.if_runtimes.deinit_all(gum);
+    self.else_runtimes.deinit_all(gum);
     }
 
     fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
