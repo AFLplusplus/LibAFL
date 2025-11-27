@@ -382,6 +382,8 @@ jobs:
           # directory in the root of the workspace
           workspaces: |
             fuzzers/${{ matrix.fuzzer }}
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Test
         if: runner.os == 'Linux'
         shell: bash
