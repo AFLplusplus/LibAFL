@@ -5,17 +5,14 @@ fn main() {
         let target_dir = if let Ok(target_dir) = env::var("CARGO_TARGET_DIR") {
             PathBuf::from(target_dir)
         } else {
-            // OUT_DIR is usually $TARGET/{debug|release}/build/$PKG-$HASH/out
-            // We want $TARGET/{debug|release}
             let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
             out_dir
                 .ancestors()
-                .nth(3) // This is still a fallback, but at least we try CARGO_TARGET_DIR first
+                .nth(3)
                 .map(std::path::Path::to_path_buf)
                 .expect("Failed to determine target directory from OUT_DIR")
         };
         println!("cargo:rerun-if-changed=build.rs");
-        // let output = Command::new("./build_nyx_support.sh").output().expect("can't run ./build_nyx_support.sh");
         let status = Command::new("./build_nyx_support.sh")
             .arg(target_dir)
             .status()
