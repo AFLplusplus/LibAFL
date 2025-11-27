@@ -35,7 +35,6 @@ fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
-#[expect(clippy::manual_assert)]
 pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
@@ -53,7 +52,7 @@ pub fn main() {
 
             #[cfg(windows)]
             unsafe {
-                write_volatile(0 as *mut u32, 0);
+                write_volatile(std::ptr::null_mut::<u32>(), 0);
             }
         }
         ExitKind::Ok
