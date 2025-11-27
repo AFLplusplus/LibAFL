@@ -511,10 +511,10 @@ fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
 /// Will set `SO_REUSEPORT` on unix.
 #[cfg(feature = "std")]
 fn tcp_bind(port: u16) -> Result<TcpListener, Error> {
-    let listener = TcpListener::bind((_LLMP_BIND_ADDR, port))
-        .map_err(|err| { let err_msg = format!("Failed to bind to port {port}: {err}");
-            Error::os_error(err, err_msg)
-        })?;
+    let listener = TcpListener::bind((_LLMP_BIND_ADDR, port)).map_err(|err| {
+        let err_msg = format!("Failed to bind to port {port}: {err}");
+        Error::os_error(err, err_msg)
+    })?;
 
     #[cfg(unix)]
     #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
