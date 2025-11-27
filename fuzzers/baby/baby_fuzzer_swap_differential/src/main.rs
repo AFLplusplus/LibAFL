@@ -1,5 +1,3 @@
-#[cfg(windows)]
-use std::ptr::write_volatile;
 use std::{
     alloc::{alloc_zeroed, Layout},
     path::PathBuf,
@@ -108,6 +106,7 @@ pub fn main() {
         };
 
         // create the base maps used to observe the different executors from two independent maps
+        // TODO: Replace with ConstMapObserver
         let mut first_map_observer =
             unsafe { StdMapObserver::from_mut_ptr("first-edges", first_edges.0, first_edges.1) };
         let mut second_map_observer =
@@ -143,11 +142,10 @@ pub fn main() {
             EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), num_edges * 2);
         }
 
-        // TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
-        #[allow(static_mut_refs)] // only a problem on nightly
-        let edges_ptr = unsafe { EDGES.as_mut_ptr() };
+        let edges_ptr: *mut u8 = &raw mut EDGES as _;
 
         // create the base maps used to observe the different executors by splitting a slice
+        // TODO: Replace with ConstMapObserver
         let mut first_map_observer =
             unsafe { StdMapObserver::from_mut_ptr("first-edges", edges_ptr, num_edges) };
         let mut second_map_observer = unsafe {

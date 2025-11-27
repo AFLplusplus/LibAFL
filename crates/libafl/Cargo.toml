@@ -303,7 +303,7 @@ document-features = { workspace = true, optional = true }
 # Optional
 # For Lua Mutators
 # TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>
-mlua = { version = "0.11.4", features = [
+mlua = { version = "0.11.5", features = [
   "lua54",
   "vendored",
   "macros",

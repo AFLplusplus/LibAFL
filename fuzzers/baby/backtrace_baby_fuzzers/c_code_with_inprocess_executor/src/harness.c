@@ -9,7 +9,7 @@
 
 // uint8_t *array;
 uint8_t  array[MAP_SIZE];
-uint8_t *array_ptr = &array;
+uint8_t *array_ptr = array;
 
 int init() {
   for (int i = 0; i < MAP_SIZE; i++) {
