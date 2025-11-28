@@ -185,7 +185,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let replacement = format!("{zn_prefix}{NAMESPACE_LEN}{NAMESPACE}");
 
     // redefine all the rust-mangled symbols we can
-    // TODO this will break when v0 mangling is stabilised
     for line in BufReader::new(nm_child.stdout.take().unwrap()).lines() {
         let line = line.unwrap();
 
@@ -196,9 +195,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         let (_, symbol) = line.rsplit_once(' ').unwrap();
 
         if symbol.starts_with(rn_prefix) {
-            let (_prefix, renamed) = symbol.split_once("__rustc").unwrap();
-            let (size, renamed) = renamed.split_once('_').unwrap();
-            writeln!(redefinitions_file, "{symbol} {replacement}{size}{renamed}E").unwrap();
+            if let Some((_prefix, renamed)) = symbol.split_once("__rustc") {
+                let (size, renamed) = renamed.split_once('_').unwrap();
+                writeln!(redefinitions_file, "{symbol} {replacement}{size}{renamed}E").unwrap();
+            } else {
+                // v0 mangling: this uses the vendor-specific suffix model
+                writeln!(redefinitions_file, "{symbol} {symbol}${NAMESPACE}").unwrap();
+            }
         } else if symbol.starts_with(zn_prefix) {
             writeln!(
                 redefinitions_file,
