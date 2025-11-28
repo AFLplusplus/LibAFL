@@ -286,8 +286,9 @@ impl<I> TestcaseStorage<I> {
         id
     }
 
+    /// Insert a testcase with a specific `CorpusId`. Handle with care!
     #[cfg(not(feature = "corpus_btreemap"))]
-    fn insert_inner_with_id(
+    pub fn insert_inner_with_id(
         &mut self,
         testcase: RefCell<Testcase<I>>,
         is_disabled: bool,
@@ -325,8 +326,9 @@ impl<I> TestcaseStorage<I> {
         Ok(())
     }
 
+    /// Insert a testcase with a specific `CorpusId`. Handle with care!
     #[cfg(feature = "corpus_btreemap")]
-    fn insert_inner_with_id(
+    pub fn insert_inner_with_id(
         &mut self,
         testcase: RefCell<Testcase<I>>,
         is_disabled: bool,

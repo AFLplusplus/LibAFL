@@ -189,7 +189,7 @@ where
 
 impl<CS, F, I, M, O, S> Scheduler<I, S> for MinimizerScheduler<CS, F, I, M, O>
 where
-    CS: Scheduler<I, S>,
+    CS: Scheduler<I, S> + RemovableScheduler<I, S>,
     F: TestcasePenalty<I, S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -319,9 +319,12 @@ where
     }
 
     /// Cull the [`Corpus`] using the [`MinimizerScheduler`]
-    pub fn cull<S>(&self, state: &S) -> Result<(), Error>
+    pub fn cull<S>(&mut self, state: &mut S) -> Result<(), Error>
     where
-        S: HasCorpus<I> + HasMetadata,
+        S: HasCorpus<I> + HasMetadata + HasRand,
+        CS: RemovableScheduler<I, S>,
+        CS: Scheduler<I, S>,
+        F: TestcasePenalty<I, S>,
     {
         let Some(top_rated) = state.metadata_map().get::<TopRatedsMetadata>() else {
             return Ok(());
@@ -331,18 +334,34 @@ where
 
         for (key, id) in &top_rated.map {
             if !acc.contains(key) {
-                let mut entry = state.corpus().get(*id)?.borrow_mut();
-                let meta = entry.metadata_map().get::<M>().ok_or_else(|| {
-                    Error::key_not_found(format!(
-                        "{} needed for MinimizerScheduler not found in testcase #{id}",
-                        type_name::<M>()
-                    ))
-                })?;
-                for elem in meta.as_iter() {
-                    acc.insert(*elem);
-                }
+                let entry = state.corpus().get(*id);
+                match entry {
+                    Ok(entry) => {
+                        let mut entry = entry.borrow_mut();
+                        let meta = entry.metadata_map().get::<M>().ok_or_else(|| {
+                            Error::key_not_found(format!(
+                                "{} needed for MinimizerScheduler not found in testcase #{id}",
+                                type_name::<M>()
+                            ))
+                        })?;
+                        for elem in meta.as_iter() {
+                            acc.insert(*elem);
+                        }
 
-                entry.add_metadata(IsFavoredMetadata {});
+                        entry.add_metadata(IsFavoredMetadata {});
+                    }
+                    Err(Error::KeyNotFound(_, _)) => {
+                        // Fallback for disabled and removed testcases.
+                        log::info!(
+                            "Removing testcase #{id} from top rateds as it was no longer in the corpus!"
+                        );
+                        self.on_remove(state, *id, &None)?;
+                        return self.cull(state);
+                    }
+                    Err(err) => {
+                        return Err(err);
+                    }
+                }
             }
         }
 

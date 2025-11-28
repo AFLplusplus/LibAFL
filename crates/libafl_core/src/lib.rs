@@ -159,6 +159,8 @@ pub enum Error {
     IllegalArgument(String, ErrorBacktrace),
     /// The performed action is not supported on the current platform
     Unsupported(String, ErrorBacktrace),
+    /// Raise this from a stage to skip the remaining stages for a given input, not really an error.
+    SkipRemainingStages,
     /// Shutting down, not really an error.
     ShuttingDown,
     /// OS error, wrapping a [`io::Error`]
@@ -336,6 +338,12 @@ impl Error {
     {
         Error::Runtime(arg.into(), ErrorBacktrace::capture())
     }
+
+    /// Skip the remaining stages for this input
+    #[must_use]
+    pub fn skip_remaining_stages() -> Self {
+        Error::SkipRemainingStages
+    }
 }
 
 impl core::error::Error for Error {
@@ -422,6 +430,7 @@ impl Display for Error {
                 write!(f, "Encountered an invalid input: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
+            Self::SkipRemainingStages => write!(f, "Skip remaining stages"),
         }
     }
 }

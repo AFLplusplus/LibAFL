@@ -1,5 +1,4 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
-
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use core::sync::atomic::{Ordering, compiler_fence};
@@ -189,7 +188,6 @@ impl<I, MT, S> SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
-    S: Stoppable,
 {
     /// Creates a new [`SimpleEventManager`].
     pub fn new(monitor: MT) -> Self {
