@@ -75,6 +75,12 @@ impl<I> TestcaseStorageMap<I> {
     /// Remove a testcase given a [`CorpusId`]
     #[cfg(not(feature = "corpus_btreemap"))]
     pub fn remove(&mut self, id: CorpusId) -> Option<RefCell<Testcase<I>>> {
+        if self.first_id == Some(id) {
+            self.first_id = self.next(id);
+        }
+        if self.last_id == Some(id) {
+            self.last_id = self.prev(id);
+        }
         match self.map.remove(&id) {
             Some(item) => {
                 self.remove_key(id);
@@ -187,6 +193,14 @@ impl<I> TestcaseStorageMap<I> {
     #[cfg(not(feature = "corpus_btreemap"))]
     #[must_use]
     pub fn first(&self) -> Option<CorpusId> {
+        // assert that the first entry is indeed in the map
+        if let Some(first_id) = self.first_id {
+            assert!(
+                self.map.contains_key(&first_id),
+                "first_id {} is not in the map",
+                first_id
+            );
+        }
         self.first_id
     }
 
@@ -194,6 +208,14 @@ impl<I> TestcaseStorageMap<I> {
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
     pub fn first(&self) -> Option<CorpusId> {
+        // assert that the first entry is indeed in the map
+        if let Some(first_id) = self.first_id {
+            assert!(
+                self.map.contains_key(&first_id),
+                "first_id {} is not in the map",
+                first_id
+            );
+        }
         self.map.iter().next().map(|x| *x.0)
     }
 
