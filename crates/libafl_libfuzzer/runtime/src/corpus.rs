@@ -140,6 +140,31 @@ where
     }
 }
 
+impl<I> libafl::corpus::EnableDisableCorpus for LibfuzzerCorpus<I>
+where
+    I: Input + Serialize + for<'de> Deserialize<'de>,
+{
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        if let Some(testcase) = self.mapping.enabled.remove(id) {
+            self.mapping.insert_inner_with_id(testcase, true, id)
+        } else {
+            Err(Error::key_not_found(format!(
+                "Index {id} not found in enabled testcases"
+            )))
+        }
+    }
+
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
+        if let Some(testcase) = self.mapping.disabled.remove(id) {
+            self.mapping.insert_inner_with_id(testcase, false, id)
+        } else {
+            Err(Error::key_not_found(format!(
+                "Index {id} not found in disabled testcases"
+            )))
+        }
+    }
+}
+
 impl<I> Corpus<I> for LibfuzzerCorpus<I>
 where
     I: Input + Serialize + for<'de> Deserialize<'de>,
