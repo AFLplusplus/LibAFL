@@ -458,8 +458,12 @@ impl<C, I, O, OT, S> Named for CalibrationStage<C, I, O, OT, S> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(feature = "serdeany_autoreg"))]
+    use libafl_bolts::serdeany::RegistryBuilder;
     use libafl_bolts::{Error, rands::StdRand};
 
+    #[cfg(not(feature = "serdeany_autoreg"))]
+    use super::RetryCountRestartHelperMetadata;
     use crate::{
         corpus::{Corpus, HasCurrentCorpusId, InMemoryCorpus, Testcase},
         feedbacks::{MaxMapFeedback, StateInitializer},
@@ -471,6 +475,9 @@ mod tests {
 
     #[test]
     fn test_calibration_restart() -> Result<(), Error> {
+        #[cfg(not(feature = "serdeany_autoreg"))]
+        RegistryBuilder::register::<DisabledInCalibrationStageMetadata>();
+
         // Setup
         let mut state = StdState::new(
             StdRand::with_seed(0),

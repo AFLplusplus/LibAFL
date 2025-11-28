@@ -1,4 +1,4 @@
-///! A very simple event manager, that just supports log outputs, but no multiprocessing
+//! A very simple event manager, that just supports log outputs, but no multiprocessing
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use core::sync::atomic::{Ordering, compiler_fence};
