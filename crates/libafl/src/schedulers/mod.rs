@@ -78,10 +78,13 @@ where
     let current_id = *state.corpus().current();
 
     let mut depth = match current_id {
-        Some(parent_idx) => state
-            .testcase(parent_idx)?
-            .metadata::<SchedulerTestcaseMetadata>()?
-            .depth(),
+        Some(parent_idx) => state.corpus().get_from_all(parent_idx).map_or_else(
+            |_| {
+                log::warn!("Parent testcase with id {parent_idx} not found! Removed?");
+                Ok::<u64, Error>(0)
+            },
+            |v| Ok(v.borrow().metadata::<SchedulerTestcaseMetadata>()?.depth()),
+        )?,
         None => 0,
     };
 
