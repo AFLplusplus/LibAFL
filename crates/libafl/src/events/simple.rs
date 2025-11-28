@@ -79,7 +79,6 @@ impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
-    S: Stoppable,
 {
     fn should_send(&self) -> bool {
         true
@@ -189,7 +188,6 @@ impl<I, MT, S> SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
-    S: Stoppable,
 {
     /// Creates a new [`SimpleEventManager`].
     pub fn new(monitor: MT) -> Self {
