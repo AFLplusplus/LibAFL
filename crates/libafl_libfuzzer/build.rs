@@ -142,6 +142,35 @@ fn main() -> Result<(), Box<dyn Error>> {
         "Couldn't build runtime crate! Did you remember to use nightly? (`rustup default nightly` to install)"
     );
 
+    rename_symbols(&custom_lib_target);
+
+    #[cfg(feature = "embed-runtime")]
+    {
+        // NOTE: lib, .a are added always on unix-like systems as described in:
+        // https://gist.github.com/novafacing/1389cbb2f0a362d7eb103e67b4468e2b
+        println!(
+            "cargo:rustc-env=LIBAFL_LIBFUZZER_RUNTIME_PATH={}",
+            redefined_archive_path.display()
+        );
+    }
+
+    println!(
+        "cargo:rustc-link-search=native={}",
+        custom_lib_target.to_str().unwrap()
+    );
+    println!("cargo:rustc-link-lib=static=Fuzzer");
+
+    if cfg!(target_os = "macos") {
+        println!("cargo:rustc-link-lib=c++");
+    } else {
+        println!("cargo:rustc-link-lib=stdc++");
+    }
+    Ok(())
+}
+
+/// This function creates a copy of the libfuzzer runtime with all the symbols renamed to avoid
+/// a conflict with whatever we link to. It should be compatible with legacy and v0 mangling.
+fn rename_symbols(custom_lib_target: &Path) {
     let mut archive_path = custom_lib_target.join(std::env::var_os("TARGET").unwrap());
     archive_path.push("release");
 
@@ -270,27 +299,4 @@ fn main() -> Result<(), Box<dyn Error>> {
         objcopy_command.status().is_ok_and(|s| s.success()),
         "Couldn't rename allocators in the runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
     );
-
-    #[cfg(feature = "embed-runtime")]
-    {
-        // NOTE: lib, .a are added always on unix-like systems as described in:
-        // https://gist.github.com/novafacing/1389cbb2f0a362d7eb103e67b4468e2b
-        println!(
-            "cargo:rustc-env=LIBAFL_LIBFUZZER_RUNTIME_PATH={}",
-            redefined_archive_path.display()
-        );
-    }
-
-    println!(
-        "cargo:rustc-link-search=native={}",
-        custom_lib_target.to_str().unwrap()
-    );
-    println!("cargo:rustc-link-lib=static=Fuzzer");
-
-    if cfg!(target_os = "macos") {
-        println!("cargo:rustc-link-lib=c++");
-    } else {
-        println!("cargo:rustc-link-lib=stdc++");
-    }
-    Ok(())
 }
