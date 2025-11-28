@@ -84,7 +84,7 @@ where
     CS: RemovableScheduler<I, S> + Scheduler<I, S>,
     F: TestcasePenalty<I, S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<I> + HasMetadata,
 {
     /// Replaces the [`Testcase`] at the given [`CorpusId`]
     fn on_replace(
