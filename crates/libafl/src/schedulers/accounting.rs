@@ -16,7 +16,7 @@ use crate::{
     corpus::{Corpus, CorpusId},
     observers::CanTrack,
     schedulers::{
-        Scheduler,
+        RemovableScheduler, Scheduler,
         minimizer::{DEFAULT_SKIP_NON_FAVORED_PROB, IsFavoredMetadata, MinimizerScheduler},
     },
     state::{HasCorpus, HasRand},
@@ -112,7 +112,7 @@ pub struct CoverageAccountingScheduler<'a, CS, I, O> {
 
 impl<CS, I, O, S> Scheduler<I, S> for CoverageAccountingScheduler<'_, CS, I, O>
 where
-    CS: Scheduler<I, S>,
+    CS: Scheduler<I, S> + RemovableScheduler<I, S>,
     S: HasCorpus<I> + HasMetadata + HasRand,
     I: HasLen,
     O: CanTrack,
