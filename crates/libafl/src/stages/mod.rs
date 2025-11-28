@@ -215,8 +215,7 @@ where
 
         // Execute the remaining stages
         match self.1.perform_all(fuzzer, executor, state, manager) {
-            Ok(()) => Ok(()),
-            Err(Error::SkipRemainingStages) => Ok(()),
+            Ok(()) | Err(Error::SkipRemainingStages) => Ok(()),
             Err(e) => Err(e),
         }
     }
