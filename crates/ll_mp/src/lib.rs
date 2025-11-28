@@ -1612,13 +1612,13 @@ where
              * with 0... */
             (*ret).message_id = if last_msg.is_null() {
                 MessageId(1)
-            } else if (*page).current_msg_id.load(Ordering::Relaxed) == (*last_msg).message_id.0 {
+            } else if (*page).current_msg_id.load(Ordering::Acquire) == (*last_msg).message_id.0 {
                 MessageId((*last_msg).message_id.0 + 1)
             } else {
                 /* Oops, wrong usage! */
                 panic!(
                     "BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {:?})",
-                    &raw const (*page).current_msg_id,
+                    (*page).current_msg_id.load(Ordering::Relaxed),
                     (*last_msg).message_id
                 );
             };
