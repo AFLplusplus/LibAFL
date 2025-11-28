@@ -907,10 +907,11 @@ pub struct LlmpPage {
     pub receivers_left_count: AtomicU16,
     #[cfg(target_pointer_width = "64")]
     /// The current message ID
-    /// It also servers to know whether the next message can be read or not.
+    /// It also serves to know whether the next message can be read or not.
     pub current_msg_id: AtomicU64,
     #[cfg(not(target_pointer_width = "64"))]
     /// The current message ID
+    /// It also serves to know whether the next message can be read or not.
     pub current_msg_id: AtomicU32,
     /// How much space is available on this page in bytes
     pub size_total: usize,
