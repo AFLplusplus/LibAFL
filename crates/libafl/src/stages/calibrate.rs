@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
-    corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
+    corpus::{Corpus, EnableDisableCorpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{HasObserverHandle, map::MapFeedbackMetadata},
@@ -47,6 +47,11 @@ pub struct UnstableEntriesMetadata {
     filled_entries_count: usize,
 }
 impl_serdeany!(UnstableEntriesMetadata);
+
+/// Metadata to mark a testcase as disabled in the calibration stage due to crash or timeout.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DisabledInCalibrationStageMetadata;
+impl_serdeany!(DisabledInCalibrationStageMetadata);
 
 impl UnstableEntriesMetadata {
     #[must_use]
@@ -376,19 +381,31 @@ where
 
 impl<C, I, O, OT, S> Restartable<S> for CalibrationStage<C, I, O, OT, S>
 where
-    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId + HasCorpus<I> + HasCurrentTestcase<I>,
+    S::Corpus: EnableDisableCorpus,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Calibration stage disallow restarts
         // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
-        RetryCountRestartHelper::no_retry(state, &self.name)
-
-        // todo
-        // remove this guy from corpus queue
+        let retry = RetryCountRestartHelper::no_retry(state, &self.name)?;
+        if !retry {
+            let id = state
+                .current_corpus_id()?
+                .ok_or_else(|| Error::illegal_state("No current corpus id"))?;
+            log::info!("Disabling crashing/timeouting testcase {id} during calibration");
+            let insert_result = state
+                .current_testcase_mut()?
+                .try_add_metadata(DisabledInCalibrationStageMetadata);
+            if let Err(err) = insert_result {
+                log::warn!("Calibration stage called on already disabled testcase {id}: {err:?}.");
+            } else {
+                state.corpus_mut().disable(id)?;
+            }
+        }
+        Ok(retry)
     }
 
     fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        // TODO: Make sure this is the correct way / there may be a better way?
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
@@ -434,5 +451,53 @@ where
 impl<C, I, O, OT, S> Named for CalibrationStage<C, I, O, OT, S> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use libafl_bolts::{Error, rands::StdRand};
+
+    use crate::{
+        corpus::{Corpus, HasCurrentCorpusId, InMemoryCorpus, Testcase},
+        feedbacks::{MaxMapFeedback, StateInitializer},
+        inputs::NopInput,
+        observers::StdMapObserver,
+        stages::{CalibrationStage, Restartable},
+        state::{HasCorpus, StdState},
+    };
+
+    #[test]
+    fn test_calibration_restart() -> Result<(), Error> {
+        // Setup
+        let mut state = StdState::new(
+            StdRand::with_seed(0),
+            InMemoryCorpus::new(),
+            InMemoryCorpus::new(),
+            &mut (),
+            &mut (),
+        )?;
+
+        let input = NopInput {};
+        let testcase = Testcase::new(input);
+        let id = state.corpus_mut().add(testcase)?;
+        state.set_corpus_id(id)?;
+
+        let observer = StdMapObserver::owned("map", vec![0u8; 16]);
+        let mut feedback = MaxMapFeedback::new(&observer);
+        feedback.init_state(&mut state)?;
+        let mut stage: CalibrationStage<_, _, _, (), _> = CalibrationStage::new(&feedback);
+
+        // 1. First try (should restart)
+        assert!(stage.should_restart(&mut state)?);
+
+        // 2. Second call - should return false and disable testcase
+        assert!(!stage.should_restart(&mut state)?);
+
+        // Verify testcase is disabled
+        assert!(state.corpus().get(id).is_err()); // Should be error because it's disabled
+        assert!(state.corpus().get_from_all(id).is_ok()); // Should be ok
+
+        Ok(())
     }
 }
