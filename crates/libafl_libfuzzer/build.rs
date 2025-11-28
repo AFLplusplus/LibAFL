@@ -174,6 +174,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         "_RN"
     };
+    let r_prefix = if cfg!(target_os = "macos") {
+        // macOS symbols have an extra `_`
+        "__R"
+    } else {
+        "_R"
+    };
 
     let zn_prefix = if cfg!(target_os = "macos") {
         // macOS symbols have an extra `_`
@@ -209,6 +215,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 symbol.replacen(zn_prefix, &replacement, 1)
             )
             .unwrap();
+        } else if symbol.starts_with(r_prefix) {
+            // v0 mangling (not in namespace): this uses the vendor-specific suffix model
+            writeln!(redefinitions_file, "{symbol} {symbol}${NAMESPACE}").unwrap();
         }
     }
     redefinitions_file.flush().unwrap();
