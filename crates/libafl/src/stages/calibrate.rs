@@ -463,7 +463,7 @@ mod tests {
     use libafl_bolts::{Error, rands::StdRand};
 
     #[cfg(not(feature = "serdeany_autoreg"))]
-    use super::RetryCountRestartHelperMetadata;
+    use super::DisabledInCalibrationStageMetadata;
     use crate::{
         corpus::{Corpus, HasCurrentCorpusId, InMemoryCorpus, Testcase},
         feedbacks::{MaxMapFeedback, StateInitializer},
