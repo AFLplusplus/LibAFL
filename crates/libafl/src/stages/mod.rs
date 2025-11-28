@@ -177,7 +177,14 @@ where
 
                 let stage = &mut self.0;
 
-                stage.perform_restartable(fuzzer, executor, state, manager)?;
+                match stage.perform_restartable(fuzzer, executor, state, manager) {
+                    Ok(()) => {}
+                    Err(Error::SkipRemainingStages) => {
+                        state.clear_stage_id()?;
+                        return Ok(());
+                    }
+                    Err(e) => return Err(e),
+                }
 
                 state.clear_stage_id()?;
             }

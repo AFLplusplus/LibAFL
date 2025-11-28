@@ -149,7 +149,7 @@ where
             self.mapping.insert_inner_with_id(testcase, true, id)
         } else {
             Err(Error::key_not_found(format!(
-                "Index {id} not found in enabled testcases"
+                "Index {id} not found in enabled testcases. Couldn't disable."
             )))
         }
     }
@@ -159,7 +159,7 @@ where
             self.mapping.insert_inner_with_id(testcase, false, id)
         } else {
             Err(Error::key_not_found(format!(
-                "Index {id} not found in disabled testcases"
+                "Index {id} not found in disabled testcases. Couldn't enable."
             )))
         }
     }
