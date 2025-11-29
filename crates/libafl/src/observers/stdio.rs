@@ -315,14 +315,12 @@ where
         {
             let pos = file.stream_position()?;
 
-            if pos != 0 {
-                file.seek(SeekFrom::Start(0))?;
+            file.seek(SeekFrom::Start(0))?;
 
-                let mut buf = vec![0; pos as usize];
-                file.read_exact(&mut buf)?;
+            let mut buf = vec![0; pos as usize];
+            file.read_exact(&mut buf)?;
 
-                self.observe(buf);
-            }
+            self.observe(buf);
         }
         Ok(())
     }
