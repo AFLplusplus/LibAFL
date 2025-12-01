@@ -1,11 +1,14 @@
 #![cfg(feature = "std")]
-#![cfg(feature = "libipt")]
 #![cfg(target_os = "linux")]
 
 use core::arch::asm;
-use std::process;
+use std::{
+    fs::File,
+    io::{Read, Seek, SeekFrom},
+    process,
+};
 
-use libafl_intelpt::{Image, IntelPT, availability};
+use libafl_intelpt::{IntelPT, availability};
 use nix::{
     sys::{
         signal::{Signal, kill, raise},
@@ -14,6 +17,7 @@ use nix::{
     unistd::{ForkResult, fork},
 };
 use proc_maps::get_process_maps;
+use ptcov::PtImage;
 
 /// To run this test ensure that the executable has the required capabilities.
 /// This can be achieved with the script `./run_integration_tests_linux_with_caps.sh`
@@ -59,29 +63,22 @@ fn intel_pt_trace_fork() {
     waitpid(pid, None).expect("Failed to wait for the child process");
     pt.disable_tracing().expect("Failed to disable tracing");
 
-    let mut image = Image::new(Some("test_trace_pid")).unwrap();
-    for map in maps {
-        if map.is_exec() && map.filename().is_some() {
-            match image.add_file(
-                map.filename().unwrap().to_str().unwrap(),
-                map.offset as u64,
-                map.size() as u64,
-                None,
-                map.start() as u64,
-            ) {
-                Err(e) => println!("skipping mapping of {:?}: {:?}", map.filename().unwrap(), e),
-                Ok(()) => println!(
-                    "mapping for {:?} added successfully {:#x} - {:#x}",
-                    map.filename().unwrap(),
-                    map.start(),
-                    map.start() + map.size()
-                ),
-            }
-        }
-    }
+    let (_data, images) = maps
+        .iter()
+        .filter(|map| map.is_exec() && map.filename().is_some() && map.inode != 0)
+        .map(|map| {
+            println!("{:?}", map);
+            let mut file = File::open(map.filename().unwrap()).unwrap();
+            let mut data = vec![0; map.size()];
+            file.seek(SeekFrom::Start(map.offset as u64)).unwrap();
+            file.read_exact(&mut data).unwrap();
+            let image = PtImage::new(&data, map.start() as u64);
+            (data, image)
+        })
+        .collect::<(Vec<_>, Vec<_>)>();
 
     let mut map = vec![0u16; 0x10_00];
-    pt.decode_traces_into_map(&mut image, map.as_mut_ptr(), map.len())
+    pt.decode_traces_into_map(&images, map.as_mut_ptr(), map.len())
         .unwrap();
 
     let assembly_jump_id = map.iter().position(|count| *count >= 254);

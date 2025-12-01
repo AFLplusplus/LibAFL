@@ -1,8 +1,9 @@
 use core::fmt::Debug;
 
-pub use libafl_intelpt::SectionInfo;
-use libafl_intelpt::{Image, IntelPT};
-use num_traits::SaturatingAdd;
+use alloc::vec::Vec;
+use std::ops::AddAssign;
+pub use libafl_intelpt::PtImage;
+use libafl_intelpt::IntelPT;
 use serde::Serialize;
 use typed_builder::TypedBuilder;
 
@@ -13,12 +14,7 @@ use crate::executors::hooks::ExecutorHook;
 pub struct IntelPTHook<T> {
     #[builder(default = IntelPT::builder().build().unwrap())]
     intel_pt: IntelPT,
-    #[builder(setter(transform = |sections: &[SectionInfo]| {
-        let mut i = Image::new(None).unwrap();
-        i.add_files_cached(sections, None).unwrap();
-        i
-    }))]
-    image: Image,
+    image: Vec<PtImage>,
     map_ptr: *mut T,
     map_len: usize,
 }
@@ -26,7 +22,7 @@ pub struct IntelPTHook<T> {
 impl<I, S, T> ExecutorHook<I, S> for IntelPTHook<T>
 where
     S: Serialize,
-    T: SaturatingAdd + From<u8> + Debug,
+    T: AddAssign + From<u8> + Debug,
 {
     fn init(&mut self, _state: &mut S) {}
 
@@ -39,7 +35,7 @@ where
         pt.disable_tracing().unwrap();
 
         let _ = pt
-            .decode_traces_into_map(&mut self.image, self.map_ptr, self.map_len)
+            .decode_traces_into_map(&self.image, self.map_ptr, self.map_len)
             .inspect_err(|e| log::warn!("Intel PT trace decoding failed: {e}"));
         #[cfg(feature = "intel_pt_export_raw")]
         {
