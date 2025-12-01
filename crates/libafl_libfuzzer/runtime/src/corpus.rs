@@ -90,7 +90,7 @@ where
         corpus: &'a TestcaseStorageMap<I>,
     ) -> Result<&'a RefCell<Testcase<I>>, Error> {
         self.touch(id, corpus)?;
-        corpus.map.get(&id).map(|item| &item.testcase).ok_or_else(|| Error::illegal_state("Nonexistent corpus entry {id} requested (present in loaded entries, but not the mapping?)"))
+        corpus.map.get(&id).map(|item| &item.testcase).ok_or_else(|| Error::illegal_state(format!("Nonexistent corpus entry {id} requested (present in loaded entries, but not the mapping?)")))
     }
 
     fn _add(

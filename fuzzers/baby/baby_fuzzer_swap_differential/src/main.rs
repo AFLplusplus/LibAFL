@@ -1,5 +1,3 @@
-#[cfg(windows)]
-use std::ptr::write_volatile;
 use std::{
     alloc::{alloc_zeroed, Layout},
     path::PathBuf,

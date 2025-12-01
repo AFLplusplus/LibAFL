@@ -941,9 +941,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.47"
+version = "1.2.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd405d82c84ff7f35739f175f67d8b9fb7687a0e84ccdc78bd3568839827cf07"
+checksum = "c481bdbf0ed3b892f6f806287d72acd515b352a4ec27a208489b8c1bc839633a"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -2205,9 +2205,9 @@ checksum = "28dd6caf6059519a65843af8fe2a3ae298b14b80179855aeb4adc2c1934ee619"
 
 [[package]]
 name = "frida-build"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1130977e34153e6f9d12af60978e885ac05138f4099cda56e007fa503a277890"
+checksum = "d9b2bfd0477ee2547fc2d570093195c296a450d14af4e425b8fda3bec16ab45e"
 dependencies = [
  "reqwest",
  "tar",
@@ -2216,10 +2216,11 @@ dependencies = [
 
 [[package]]
 name = "frida-gum"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ffc9e7bc0924305e3b79ef5082db154f0d675c0a43b977c3180faf3e023f16d"
+checksum = "cd5efd85d460937270f47accc16c632b414e1b670d5172dbdafc837b9bcd589a"
 dependencies = [
+ "bitflags 2.10.0",
  "cstr_core",
  "frida-gum-sys",
  "libc",
@@ -2232,11 +2233,11 @@ dependencies = [
 
 [[package]]
 name = "frida-gum-sys"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "722f070f55fc4f826c1e8679e082600d9dd13e79e4873bd58338694a1217d168"
+checksum = "0d5f936b2f6290bede23c6424b69bff7b8adc949101aba7c57b95754d198e526"
 dependencies = [
- "bindgen 0.71.1",
+ "bindgen 0.72.1",
  "cc",
  "frida-build",
 ]

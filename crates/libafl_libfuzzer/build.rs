@@ -142,6 +142,34 @@ fn main() -> Result<(), Box<dyn Error>> {
         "Couldn't build runtime crate! Did you remember to use nightly? (`rustup default nightly` to install)"
     );
 
+    let redefined_archive_path = rename_symbols(&custom_lib_target);
+
+    if cfg!(feature = "embed-runtime") {
+        // NOTE: lib, .a are added always on unix-like systems as described in:
+        // https://gist.github.com/novafacing/1389cbb2f0a362d7eb103e67b4468e2b
+        println!(
+            "cargo:rustc-env=LIBAFL_LIBFUZZER_RUNTIME_PATH={}",
+            redefined_archive_path.display()
+        );
+    }
+
+    println!(
+        "cargo:rustc-link-search=native={}",
+        custom_lib_target.to_str().unwrap()
+    );
+    println!("cargo:rustc-link-lib=static=Fuzzer");
+
+    if cfg!(target_os = "macos") {
+        println!("cargo:rustc-link-lib=c++");
+    } else {
+        println!("cargo:rustc-link-lib=stdc++");
+    }
+    Ok(())
+}
+
+/// This function creates a copy of the libfuzzer runtime with all the symbols renamed to avoid
+/// a conflict with whatever we link to. It should be compatible with legacy and v0 mangling.
+fn rename_symbols(custom_lib_target: &Path) -> PathBuf {
     let mut archive_path = custom_lib_target.join(std::env::var_os("TARGET").unwrap());
     archive_path.push("release");
 
@@ -174,6 +202,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         "_RN"
     };
+    let r_prefix = if cfg!(target_os = "macos") {
+        // macOS symbols have an extra `_`
+        "__R"
+    } else {
+        "_R"
+    };
 
     let zn_prefix = if cfg!(target_os = "macos") {
         // macOS symbols have an extra `_`
@@ -185,7 +219,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let replacement = format!("{zn_prefix}{NAMESPACE_LEN}{NAMESPACE}");
 
     // redefine all the rust-mangled symbols we can
-    // TODO this will break when v0 mangling is stabilised
     for line in BufReader::new(nm_child.stdout.take().unwrap()).lines() {
         let line = line.unwrap();
 
@@ -196,9 +229,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         let (_, symbol) = line.rsplit_once(' ').unwrap();
 
         if symbol.starts_with(rn_prefix) {
-            let (_prefix, renamed) = symbol.split_once("__rustc").unwrap();
-            let (size, renamed) = renamed.split_once('_').unwrap();
-            writeln!(redefinitions_file, "{symbol} {replacement}{size}{renamed}E").unwrap();
+            if let Some((_prefix, renamed)) = symbol.split_once("__rustc") {
+                let (size, renamed) = renamed.split_once('_').unwrap();
+                writeln!(redefinitions_file, "{symbol} {replacement}{size}{renamed}E").unwrap();
+            } else {
+                // v0 mangling: this uses the vendor-specific suffix model
+                writeln!(redefinitions_file, "{symbol} {symbol}${NAMESPACE}").unwrap();
+            }
         } else if symbol.starts_with(zn_prefix) {
             writeln!(
                 redefinitions_file,
@@ -206,6 +243,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 symbol.replacen(zn_prefix, &replacement, 1)
             )
             .unwrap();
+        } else if symbol.starts_with(r_prefix) {
+            // v0 mangling (not in namespace): this uses the vendor-specific suffix model
+            writeln!(redefinitions_file, "{symbol} {symbol}${NAMESPACE}").unwrap();
         }
     }
     redefinitions_file.flush().unwrap();
@@ -258,27 +298,5 @@ fn main() -> Result<(), Box<dyn Error>> {
         objcopy_command.status().is_ok_and(|s| s.success()),
         "Couldn't rename allocators in the runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
     );
-
-    #[cfg(feature = "embed-runtime")]
-    {
-        // NOTE: lib, .a are added always on unix-like systems as described in:
-        // https://gist.github.com/novafacing/1389cbb2f0a362d7eb103e67b4468e2b
-        println!(
-            "cargo:rustc-env=LIBAFL_LIBFUZZER_RUNTIME_PATH={}",
-            redefined_archive_path.display()
-        );
-    }
-
-    println!(
-        "cargo:rustc-link-search=native={}",
-        custom_lib_target.to_str().unwrap()
-    );
-    println!("cargo:rustc-link-lib=static=Fuzzer");
-
-    if cfg!(target_os = "macos") {
-        println!("cargo:rustc-link-lib=c++");
-    } else {
-        println!("cargo:rustc-link-lib=stdc++");
-    }
-    Ok(())
+    redefined_archive_path
 }

@@ -1,7 +1,7 @@
-#[cfg(windows)]
-use std::ptr::write_volatile;
 use std::{marker::PhantomData, path::PathBuf, ptr::write};
 
+#[cfg(feature = "bloom_input_filter")]
+use libafl::fuzzer::{BloomInputFilter, ReportingInputFilter};
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
@@ -12,7 +12,7 @@ use libafl::{
     executors::{Executor, ExitKind, WithObservers},
     feedback_and_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{BloomInputFilter, Fuzzer, ReportingInputFilter, StdFuzzer},
+    fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::HasTargetBytes,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
