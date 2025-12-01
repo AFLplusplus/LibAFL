@@ -1,4 +1,5 @@
 //! Stage to compute and report AFL++ stats
+// TODO: Enhancement for displaying current testcase index in TUI - Issue #2757
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     fmt::{Debug, Display},
