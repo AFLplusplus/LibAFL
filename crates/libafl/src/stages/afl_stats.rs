@@ -586,6 +586,12 @@ where
     }
 }
 
+        /// Enable or disable reporting of current corpus index for TUI monitoring
+        pub fn with_corpus_idx_reporting(mut self, enabled: bool) -> Self {
+                        self.report_current_corpus_idx = enabled;
+                        self
+                    }
+
 impl Display for AFLPlotData<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{},", self.relative_time)?;
