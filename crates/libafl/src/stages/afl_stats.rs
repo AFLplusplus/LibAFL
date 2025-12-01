@@ -120,6 +120,10 @@ pub struct AflStatsStage<C, I, O> {
     /// The core we are bound to
     core_id: CoreId,
     phantom: PhantomData<(I, O)>,
+        /// Whether to report the current corpus index
+        report_current_corpus_idx: bool,
+        /// Track the last sent corpus index to avoid duplicate events
+        last_sent_corpus_idx: Option<usize>,
 }
 
 /// AFL++'s `fuzzer_stats`
@@ -436,6 +440,8 @@ where
                         UserStatsValue::String(Cow::Owned(json)),
                         AggregatorOps::None,
                     ),
+                                report_current_corpus_idx: false,
+                                last_sent_corpus_idx: None,
                     phantom: PhantomData,
                 },
                 *state.executions(),
