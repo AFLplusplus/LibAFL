@@ -191,7 +191,7 @@ num_enum = { workspace = true, default-features = false }
 
 ctor = { optional = true, version = "0.6.1" }
 miniz_oxide = { version = "0.8.0", optional = true }
-hostname = { version = "0.4.0", optional = true } # Is there really no gethostname in the stdlib?
+hostname = { version = "0.4.2", optional = true } # Is there really no gethostname in the stdlib?
 log = { workspace = true }
 nix = { workspace = true, optional = true, default-features = false, features = [
   "fs",
