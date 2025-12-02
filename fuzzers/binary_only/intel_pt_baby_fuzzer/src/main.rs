@@ -22,7 +22,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice, nonnull_raw_mut};
+use libafl_bolts::{current_nanos, nonnull_raw_mut, rands::StdRand, tuples::tuple_list, AsSlice};
 use proc_maps::get_process_maps;
 
 // Coverage map

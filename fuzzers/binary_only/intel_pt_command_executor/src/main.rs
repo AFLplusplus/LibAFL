@@ -19,7 +19,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{core_affinity, rands::StdRand, tuples::tuple_list, Error, nonnull_raw_mut};
+use libafl_bolts::{core_affinity, nonnull_raw_mut, rands::StdRand, tuples::tuple_list, Error};
 use libafl_intelpt::{AddrFilter, AddrFilterType, AddrFilters, IntelPT, PAGE_SIZE};
 use object::{elf::PF_X, Object, ObjectSegment, SegmentFlags};
 
