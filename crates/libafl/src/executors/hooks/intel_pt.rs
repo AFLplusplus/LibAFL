@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
-use core::fmt::Debug;
-use std::ops::AddAssign;
+use core::{fmt::Debug, ops::AddAssign};
 
 use libafl_intelpt::IntelPT;
 pub use libafl_intelpt::PtImage;

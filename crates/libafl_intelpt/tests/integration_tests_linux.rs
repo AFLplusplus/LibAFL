@@ -67,7 +67,7 @@ fn intel_pt_trace_fork() {
         .iter()
         .filter(|map| map.is_exec() && map.filename().is_some() && map.inode != 0)
         .map(|map| {
-            println!("{:?}", map);
+            println!("{map:?}");
             let mut file = File::open(map.filename().unwrap()).unwrap();
             let mut data = vec![0; map.size()];
             file.seek(SeekFrom::Start(map.offset as u64)).unwrap();
