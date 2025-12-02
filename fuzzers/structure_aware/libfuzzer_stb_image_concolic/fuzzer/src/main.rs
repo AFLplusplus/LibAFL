@@ -264,7 +264,7 @@ impl CommandConfigurator<Child> for MyCommandConfigurator {
     }
 }
 
-impl SetTimeout for MyCommandConfigurator {
+impl HasTimeout for MyCommandConfigurator {
     fn timeout(&self) -> Duration {
         Duration::from_secs(5)
     }
