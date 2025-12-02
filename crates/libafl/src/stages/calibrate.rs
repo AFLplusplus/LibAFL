@@ -400,6 +400,7 @@ where
                 log::warn!("Calibration stage called on already disabled testcase {id}: {err:?}.");
             } else {
                 state.corpus_mut().disable(id)?;
+                state.clear_corpus_id()?;
                 self.clear_progress(state)?;
                 return Err(Error::skip_remaining_stages());
             }
@@ -497,18 +498,15 @@ mod tests {
         feedback.init_state(&mut state)?;
         let mut stage: CalibrationStage<_, _, _, (), _> = CalibrationStage::new(&feedback);
 
-        // 1. First try (should restart)
         assert!(stage.should_restart(&mut state)?);
 
-        // 2. Second call - should return Error::SkipRemainingStages
         match stage.should_restart(&mut state) {
             Err(Error::SkipRemainingStages) => (),
             res => panic!("Expected SkipRemainingStages, got {:?}", res),
         }
 
-        // Verify testcase is disabled
-        assert!(state.corpus().get(id).is_err()); // Should be error because it's disabled
-        assert!(state.corpus().get_from_all(id).is_ok()); // Should be ok
+        assert!(state.corpus().get(id).is_err());
+        assert!(state.corpus().get_from_all(id).is_ok());
 
         Ok(())
     }

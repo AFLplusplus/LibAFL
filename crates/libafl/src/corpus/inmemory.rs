@@ -197,8 +197,7 @@ impl<I> TestcaseStorageMap<I> {
         if let Some(first_id) = self.first_id {
             assert!(
                 self.map.contains_key(&first_id),
-                "first_id {} is not in the map",
-                first_id
+                "first_id {first_id} is not in the map",
             );
         }
         self.first_id
@@ -737,6 +736,65 @@ mod tests {
 
         // Only the third testcase should remain
         assert!(corpus.get(ids[2]).is_ok());
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(not(feature = "corpus_btreemap"))]
+    fn test_corpus_linked_list_integrity() -> Result<(), Error> {
+        let (mut corpus, ids) = setup_corpus();
+        // ids: [0, 1, 2]
+        // Enabled: 0 -> 1 -> 2
+        // First: 0, Last: 2
+
+        assert_eq!(corpus.first(), Some(ids[0]));
+        assert_eq!(corpus.last(), Some(ids[2]));
+        assert_eq!(corpus.next(ids[0]), Some(ids[1]));
+        assert_eq!(corpus.next(ids[1]), Some(ids[2]));
+        assert_eq!(corpus.next(ids[2]), None);
+        assert_eq!(corpus.prev(ids[0]), None);
+        assert_eq!(corpus.prev(ids[1]), Some(ids[0]));
+        assert_eq!(corpus.prev(ids[2]), Some(ids[1]));
+
+        // Disable first (0)
+        corpus.disable(ids[0])?;
+        // Enabled: 1 -> 2
+        // Disabled: 0
+        assert_eq!(corpus.first(), Some(ids[1]));
+        assert_eq!(corpus.last(), Some(ids[2]));
+        assert_eq!(corpus.prev(ids[1]), None);
+        assert_eq!(corpus.next(ids[1]), Some(ids[2]));
+
+        // Disable last (2)
+        corpus.disable(ids[2])?;
+        // Enabled: 1
+        // Disabled: 0 -> 2
+        assert_eq!(corpus.first(), Some(ids[1]));
+        assert_eq!(corpus.last(), Some(ids[1]));
+        assert_eq!(corpus.prev(ids[1]), None);
+        assert_eq!(corpus.next(ids[1]), None);
+
+        // Disable remaining (1)
+        corpus.disable(ids[1])?;
+        // Enabled: (empty)
+        // Disabled: 0 -> 2 -> 1
+        assert_eq!(corpus.first(), None);
+        assert_eq!(corpus.last(), None);
+
+        // Enable 0
+        corpus.enable(ids[0])?;
+        // Enabled: 0
+        assert_eq!(corpus.first(), Some(ids[0]));
+        assert_eq!(corpus.last(), Some(ids[0]));
+
+        // Enable 1
+        corpus.enable(ids[1])?;
+        // Enabled: 0 -> 1
+        assert_eq!(corpus.first(), Some(ids[0]));
+        assert_eq!(corpus.last(), Some(ids[1]));
+        assert_eq!(corpus.next(ids[0]), Some(ids[1]));
+        assert_eq!(corpus.prev(ids[1]), Some(ids[0]));
 
         Ok(())
     }

@@ -1005,7 +1005,7 @@ mod tests {
     };
 
     #[test]
-    #[serial]
+    #[serial(inprocess)]
     #[cfg_attr(miri, ignore)]
     fn test_mgr_state_restore() {
         // # Safety

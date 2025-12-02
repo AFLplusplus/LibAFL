@@ -316,7 +316,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+    #[serial(inprocess)]
     fn test_targetbytes_fuzzer_builds() {
         const TRUE_VAL: bool = true;
 

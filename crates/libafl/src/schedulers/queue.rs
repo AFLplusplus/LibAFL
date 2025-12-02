@@ -4,7 +4,7 @@ use alloc::borrow::ToOwned;
 
 use crate::{
     Error,
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, Testcase},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::HasCorpus,
 };
@@ -16,7 +16,17 @@ pub struct QueueScheduler {
     runs_in_current_cycle: u64,
 }
 
-impl<I, S> RemovableScheduler<I, S> for QueueScheduler {}
+impl<I, S> RemovableScheduler<I, S> for QueueScheduler {
+    fn on_remove(
+        &mut self,
+        _state: &mut S,
+        _id: CorpusId,
+        _testcase: &Option<Testcase<I>>,
+    ) -> Result<(), Error> {
+        self.runs_in_current_cycle = self.runs_in_current_cycle.saturating_sub(1);
+        Ok(())
+    }
+}
 
 impl<I, S> Scheduler<I, S> for QueueScheduler
 where
@@ -50,7 +60,7 @@ where
                 .unwrap_or_else(|| state.corpus().first().unwrap());
 
             self.runs_in_current_cycle += 1;
-            // TODO deal with corpus_counts decreasing due to removals
+
             if self.runs_in_current_cycle >= state.corpus().count() as u64 {
                 self.queue_cycles += 1;
                 self.runs_in_current_cycle = 0;
@@ -102,10 +112,10 @@ mod tests {
     use libafl_bolts::rands::StdRand;
 
     use crate::{
-        corpus::{Corpus, OnDiskCorpus, Testcase},
+        corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
-        schedulers::{QueueScheduler, Scheduler},
+        schedulers::{QueueScheduler, RemovableScheduler, Scheduler},
         state::{HasCorpus, StdState},
     };
 
@@ -139,9 +149,54 @@ mod tests {
             .as_ref()
             .unwrap()
             .clone();
-
         assert_eq!(filename, "fancyfile");
 
         fs::remove_dir_all("target/.test/fancy/path").unwrap();
+    }
+
+    #[test]
+    fn test_queue_scheduler_removal() {
+        let rand = StdRand::with_seed(42);
+        let mut scheduler = QueueScheduler::new();
+
+        let mut q = InMemoryCorpus::<BytesInput>::new();
+        let t1 = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "t1".into());
+        let t2 = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "t2".into());
+        let t3 = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "t3".into());
+
+        let id1 = q.add(t1).unwrap();
+        let id2 = q.add(t2).unwrap();
+        let id3 = q.add(t3).unwrap();
+
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
+
+        let mut state = StdState::new(
+            rand,
+            q,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
+
+        let next_id = scheduler.next(&mut state).unwrap();
+        assert_eq!(next_id, id1);
+        assert_eq!(scheduler.runs_in_current_cycle, 1);
+
+        state.corpus_mut().remove(id1).unwrap();
+        scheduler
+            .on_remove(&mut state, id1, &None::<Testcase<BytesInput>>)
+            .unwrap();
+
+        let next_id = scheduler.next(&mut state).unwrap();
+        assert_eq!(next_id, id2);
+
+        assert_eq!(scheduler.queue_cycles, 0, "Cycle finished prematurely!");
+
+        let next_id = scheduler.next(&mut state).unwrap();
+        assert_eq!(next_id, id3);
+
+        assert_eq!(scheduler.queue_cycles, 1);
     }
 }
