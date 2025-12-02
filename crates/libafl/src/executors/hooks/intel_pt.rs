@@ -1,8 +1,7 @@
 use alloc::vec::Vec;
 use core::{fmt::Debug, ops::AddAssign};
 
-use libafl_intelpt::IntelPT;
-pub use libafl_intelpt::PtImage;
+pub use libafl_intelpt::{IntelPT, PAGE_SIZE, PtImage};
 use serde::Serialize;
 use typed_builder::TypedBuilder;
 
