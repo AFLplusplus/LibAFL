@@ -3457,7 +3457,7 @@ dependencies = [
  "object 0.38.0",
  "paste",
  "pyo3",
- "pyo3-build-config 0.27.1",
+ "pyo3-build-config 0.27.2",
  "rangemap",
  "rustversion",
  "serde",
@@ -3507,7 +3507,7 @@ dependencies = [
  "num_enum",
  "paste",
  "pyo3",
- "pyo3-build-config 0.27.1",
+ "pyo3-build-config 0.27.2",
  "rustversion",
  "strum 0.27.2",
  "strum_macros 0.27.2",
@@ -3524,7 +3524,7 @@ dependencies = [
  "libafl_targets",
  "log",
  "pyo3",
- "pyo3-build-config 0.27.1",
+ "pyo3-build-config 0.27.2",
  "typed-builder",
 ]
 
@@ -4805,9 +4805,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.27.1"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f77d387774f6f6eec64a004eac0ed525aab7fa1966d94b42f743797b3e395afb"
+checksum = "b455933107de8642b4487ed26d912c2d899dec6114884214a0b3bb3be9261ea6"
 dependencies = [
  "target-lexicon",
 ]
