@@ -1406,11 +1406,11 @@ where
                 }
 
                 for cmp_buf_idx in 0..input_len {
-                    if let Some(max_count) = max_count {
-                        if ret.len() >= max_count {
-                            // TODO: does this bias towards earlier mutations?
-                            break;
-                        }
+                    if let Some(max_count) = max_count
+                        && ret.len() >= max_count
+                    {
+                        // TODO: does this bias towards earlier mutations?
+                        break;
                     }
 
                     let taint_len = match taint.get(taint_idx) {
@@ -1977,17 +1977,12 @@ impl AflppRedQueen {
         tokens.add_token(&v);
     }
 }
-#[derive(Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 enum TextType {
+    #[default]
     None,
     Ascii(usize),
     UTF8(usize),
-}
-
-impl Default for TextType {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl TextType {

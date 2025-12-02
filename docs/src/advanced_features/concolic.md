@@ -102,7 +102,7 @@ SymCC ships with 2 runtimes:
 * A 'simple' runtime that attempts to negate and analytically solve any branch conditions it comes across using [Z3](https://github.com/Z3Prover/z3/wiki) and
 * A [QSym](https://github.com/sslab-gatech/qsym)-based runtime, which does a bit more filtering on the expressions and also solves them using Z3.
 
-The integration with LibAFL, however, requires you to **BYORT** (_bring your own runtime_) using the [`symcc_runtime`](https://docs.rs/symcc_runtime/0.1/symcc_runtime) crate.
+The integration with LibAFL, however, requires you to **BYORT** (_bring your own runtime_) using the [`symcc_runtime`](https://docs.rs/symcc_runtime) crate.
 This crate allows you to easily build a custom runtime out of the built-in building blocks or create entirely new runtimes with full flexibility.
 Check out the `symcc_runtime` docs for more information on how to build your own runtime.
 
@@ -130,7 +130,7 @@ For example, we need to have a runtime ready before we can do instrumentation wi
 
 Building a custom runtime can be done easily using the `symcc_runtime` crate.
 Note, that a custom runtime is a separate shared object file, which means that we need a separate crate for our runtime.
-Check out the [example hybrid fuzzer's runtime](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/structure_aware/libfuzzer_stb_image_concolic/runtime) and the [`symcc_runtime` docs](https://docs.rs/symcc_runtime/0.1/symcc_runtime) for inspiration.
+Check out the [example hybrid fuzzer's runtime](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/structure_aware/libfuzzer_stb_image_concolic/runtime) and the [`symcc_runtime` docs](https://docs.rs/symcc_runtime) for inspiration.
 
 ### Instrumentation
 
@@ -157,7 +157,7 @@ The [`symcc_libafl` crate](https://docs.rs/symcc_libafl) contains helper functio
 
 Make sure you satisfy the [build requirements](https://github.com/eurecom-s3/symcc#readme) of SymCC before attempting to build it.
 
-#### Using SymQEMU
+#### Using `SymQEMU`
 
 Build SymQEMU according to its [build instructions](https://github.com/eurecom-s3/symqemu#readme).
 By default, SymQEMU looks for the runtime in a sibling directory.
@@ -167,14 +167,14 @@ Since we don't have a runtime there, we need to explicitly set the `--symcc-buil
 
 No matter the instrumentation method, the interface between the fuzzer and the instrumented target should now be consistent.
 The only difference between using SymCC and SymQEMU should be the binary that represents the target:
-In the case of SymCC it will be the binary that was build with instrumentation and with SymQEMU it will be the emulator binary (eg. `x86_64-linux-user/symqemu-x86_64`), followed by your uninstrumented target binary and its arguments.
+In the case of SymCC it will be the binary that was build with instrumentation and with SymQEMU it will be the emulator binary (eg., `x86_64-linux-user/symqemu-x86_64`), followed by your uninstrumented target binary and its arguments.
 
 You can use the [`CommandExecutor`](https://docs.rs/libafl/latest/libafl/executors/command/struct.CommandExecutor.html) to execute your target ([example](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/structure_aware/libfuzzer_stb_image_concolic/fuzzer/src/main.rs#L244)).
 When configuring the command, make sure you pass the `SYMCC_INPUT_FILE` environment variable (set to the input file path), if your target reads input from a file (instead of standard input).
 
 #### Serialization and Solving
 
-While it is perfectly possible to build a custom runtime that also performs the solving step of hybrid fuzzing in the context of the target process, the intended use of the LibAFL concolic tracing support is to serialize the (filtered and pre-processed) branch conditions using the [`TracingRuntime`](https://docs.rs/symcc_runtime/0.1/symcc_runtime/tracing/struct.TracingRuntime.html).
+While it is perfectly possible to build a custom runtime that also performs the solving step of hybrid fuzzing in the context of the target process, the intended use of the `LibAFL` concolic tracing support is to serialize the (filtered and pre-processed) branch conditions using the [`TracingRuntime`](https://docs.rs/symcc_runtime/latest/symcc_runtime/tracing/struct.TracingRuntime.html).
 This serialized representation can be deserialized in the fuzzer process for solving using a [`ConcolicObserver`](https://docs.rs/libafl/latest/libafl/observers/concolic/struct.ConcolicObserver.html) wrapped in a [`ConcolicTracingStage`](https://docs.rs/libafl/latest/libafl/stages/concolic/struct.ConcolicTracingStage.html), which will attach a [`ConcolicMetadata`](https://docs.rs/libafl/latest/libafl/observers/concolic/struct.ConcolicMetadata.html) to every [`TestCase`](https://docs.rs/libafl/latest/libafl/corpus/testcase/struct.Testcase.html).
 
 The `ConcolicMetadata` can be used to replay the concolic trace and to solve the conditions using an SMT-Solver.

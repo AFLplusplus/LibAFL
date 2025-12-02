@@ -96,7 +96,10 @@ impl TimedStats {
     pub fn add(&mut self, time: Duration, item: u64) {
         if self.series.is_empty() || self.series.back().unwrap().item != item {
             if self.series.front().is_some()
-                && time - self.series.front().unwrap().time > self.window
+                && time
+                    .checked_sub(self.series.front().unwrap().time)
+                    .unwrap_or(self.window)
+                    >= self.window
             {
                 self.series.pop_front();
             }
@@ -109,7 +112,10 @@ impl TimedStats {
         if self.series.is_empty() || self.series[self.series.len() - 1].item != item {
             let time = current_time();
             if self.series.front().is_some()
-                && time - self.series.front().unwrap().time > self.window
+                && time
+                    .checked_sub(self.series.front().unwrap().time)
+                    .unwrap_or(self.window)
+                    >= self.window
             {
                 self.series.pop_front();
             }
@@ -119,9 +125,21 @@ impl TimedStats {
 
     /// Change the window duration
     pub fn update_window(&mut self, window: Duration) {
+        let default_stat = TimedStat {
+            time: Duration::from_secs(0),
+            item: 0,
+        };
+
         self.window = window;
         while !self.series.is_empty()
-            && self.series.back().unwrap().time - self.series.front().unwrap().time > window
+            && self
+                .series
+                .back()
+                .unwrap_or(&default_stat)
+                .time
+                .checked_sub(self.series.front().unwrap_or(&default_stat).time)
+                .unwrap_or(window)
+                >= window
         {
             self.series.pop_front();
         }
@@ -544,19 +562,17 @@ fn run_tui_thread<W: Write + Send + Sync + 'static>(
             }
             terminal.draw(|f| ui.draw(f, &context))?;
 
-            let timeout = tick_rate
-                .checked_sub(last_tick.elapsed())
-                .unwrap_or_else(|| Duration::from_secs(0));
-            if event::poll(timeout)? {
-                if let Event::Key(key) = event::read()? {
-                    match key.code {
-                        KeyCode::Char(c) => ui.on_key(c),
-                        KeyCode::Left => ui.on_left(),
-                        //KeyCode::Up => ui.on_up(),
-                        KeyCode::Right => ui.on_right(),
-                        //KeyCode::Down => ui.on_down(),
-                        _ => {}
-                    }
+            let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+            if event::poll(timeout)?
+                && let Event::Key(key) = event::read()?
+            {
+                match key.code {
+                    KeyCode::Char(c) => ui.on_key(c),
+                    KeyCode::Left => ui.on_left(),
+                    //KeyCode::Up => ui.on_up(),
+                    KeyCode::Right => ui.on_right(),
+                    //KeyCode::Down => ui.on_down(),
+                    _ => {}
                 }
             }
             if last_tick.elapsed() >= tick_rate {

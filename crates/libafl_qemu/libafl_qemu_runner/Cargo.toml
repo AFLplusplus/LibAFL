@@ -2,7 +2,7 @@
 name = "libafl_qemu_runner"
 description = "Tool for running targets using LibAFL's libafl_qemu library"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 keywords = ["fuzzing", "address", "sanitizer", "asan", "runner", "libafl_qemu"]
 categories = [
   "development-tools::testing",
@@ -62,7 +62,7 @@ vergen = { version = "9.0.1", features = ["build", "cargo", "rustc", "si"] }
 vergen-git2 = "1.0.1"
 
 [dependencies]
-clap = { version = "4.5.45", features = ["derive", "string"] }
+clap = { version = "4.5.52", features = ["derive", "string"] }
 env_logger = { version = "0.11.5" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 readonly = { version = "0.2.12" }

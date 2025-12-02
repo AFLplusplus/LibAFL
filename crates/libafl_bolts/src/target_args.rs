@@ -3,7 +3,7 @@
 use alloc::{borrow::ToOwned, vec::Vec};
 use std::{
     ffi::{OsStr, OsString},
-    path::Path,
+    path::PathBuf,
 };
 
 use crate::fs::{InputFile, get_unique_std_input_file};
@@ -24,7 +24,7 @@ pub enum InputLocation {
         input_file: Option<InputFile>,
     },
     /// Deliver the input via the specified [`InputFile`]
-    /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
+    /// You can use [`InputFile::create`] with [`crate::fs::INPUTFILE_STD`] to use a default filename.
     File {
         /// The file to write input to. The target should read input from this location.
         out_file: InputFile,
@@ -120,14 +120,14 @@ pub trait StdTargetArgs: Sized {
     /// Note: If you use this, you should ensure that there is only one instance using this
     /// file at any given time.
     #[must_use]
-    fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
-        let mut moved = self.arg(path.as_ref());
+    fn arg_input_file<P: Into<PathBuf>>(self, path: P) -> Self {
+        let path = path.into();
+        let mut moved = self.arg(&path);
         assert!(
             match &moved.inner().input_location {
-                InputLocation::File { out_file } => out_file.path.as_path() == path.as_ref(),
-                InputLocation::StdIn { input_file } => input_file
-                    .as_ref()
-                    .is_none_or(|of| of.path.as_path() == path.as_ref()),
+                InputLocation::File { out_file } => out_file.path == path,
+                InputLocation::StdIn { input_file } =>
+                    input_file.as_ref().is_none_or(|of| of.path == path),
                 InputLocation::Arg { argnum: _ } => false,
             },
             "Already specified an input file under a different name. This is not supported"

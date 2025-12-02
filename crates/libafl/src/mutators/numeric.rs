@@ -9,8 +9,9 @@ use libafl_bolts::{
     tuples::{Map as _, Merge},
 };
 use tuple_list::{tuple_list, tuple_list_type};
+use tuple_list_ex::{map_tuple_list_type, merge_tuple_list_type};
 
-use super::{MappingMutator, MutationResult, Mutator, ToMappingMutator};
+use super::{MutationResult, Mutator, ToMappingMutator, ToStateAwareMappingMutator};
 use crate::{
     corpus::Corpus,
     random_corpus_id_with_disabled,
@@ -80,14 +81,15 @@ pub fn int_mutators() -> IntMutatorsType {
 }
 
 /// Mapped mutators for integer-like inputs
-pub type MappedIntMutatorsType<F1, F2, I> = tuple_list_type!(
-    MappingMutator<BitFlipMutator,F1>,
-    MappingMutator<NegateMutator,F1>,
-    MappingMutator<IncMutator,F1>,
-    MappingMutator<DecMutator,F1>,
-    MappingMutator<TwosComplementMutator,F1>,
-    MappingMutator<RandMutator,F1>,
-    MappingMutator<MappedCrossoverMutator<F2, I>,F1>
+pub type MappedIntMutatorsType<F1, F2, I> = map_tuple_list_type!(
+    merge_tuple_list_type!(IntMutatorsNoCrossoverType, MappedIntMutatorsCrossoverType<F2, I>),
+    ToMappingMutator<F1>
+);
+
+/// State-aware Mapped mutators for integer-like inputs
+pub type StateAwareMappedIntMutatorsType<F1, F2, I> = map_tuple_list_type!(
+    merge_tuple_list_type!(IntMutatorsNoCrossoverType, MappedIntMutatorsCrossoverType<F2, I>),
+    ToStateAwareMappingMutator<F1>
 );
 
 /// Mapped mutators for integer-like inputs
@@ -104,6 +106,25 @@ where
         .merge(mapped_int_mutators_crossover(input_from_corpus_mapper))
         .map(ToMappingMutator::new(current_input_mapper))
 }
+
+/// State-awareMapped mutators for integer-like inputs
+///
+/// Modelled after the applicable mutators from [`super::havoc_mutations::havoc_mutations`]
+pub fn state_aware_mapped_int_mutators<'a, F1, F2, IO, II, S>(
+    current_input_mapper: F1,
+    input_from_corpus_mapper: F2,
+) -> StateAwareMappedIntMutatorsType<F1, F2, IO>
+where
+    F1: Clone + FnMut(&'a mut IO, &'a mut S) -> (Option<&'a mut II>, &'a mut S),
+    IO: 'a,
+    II: 'a,
+    S: 'a,
+{
+    int_mutators_no_crossover()
+        .merge(mapped_int_mutators_crossover(input_from_corpus_mapper))
+        .map(ToStateAwareMappingMutator::new(current_input_mapper))
+}
+
 /// Functionality required for Numeric Mutators (see [`int_mutators`])
 pub trait Numeric {
     /// Flip all bits of the number.

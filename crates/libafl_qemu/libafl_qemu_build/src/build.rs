@@ -11,7 +11,7 @@ use crate::cargo_add_rpath;
 
 pub const LIBAFL_QEMU_GIT_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 pub const LIBAFL_QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-pub const LIBAFL_QEMU_GIT_REV: &str = "0bea78a122b249cbffafdb130af04cc7331c9aee";
+pub const LIBAFL_QEMU_GIT_REV: &str = "a2180efeb068534ce2d4424b4bd97295b3d1c54a";
 
 pub struct BuildResult {
     pub qemu_path: PathBuf,
@@ -20,7 +20,7 @@ pub struct BuildResult {
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
-        which(tool).unwrap_or_else(|_| panic!("Build tool {tool} not found"));
+        which(tool).unwrap_or_else(|err| panic!("Build tool {tool} not found: {err:?}"));
     }
 }
 

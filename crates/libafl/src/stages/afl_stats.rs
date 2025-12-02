@@ -361,7 +361,7 @@ where
             cur_item: corpus_idx.into(),
             pending_total: corpus_size - self.has_fuzzed_size,
             pending_favs: 0, // TODO
-            time_wo_finds: (current_time() - self.last_find).as_secs(),
+            time_wo_finds: current_time().saturating_sub(self.last_find).as_secs(),
             corpus_variable: 0,
             stability: self.calculate_stability(unstable_entries_in_map, filled_entries_in_map),
             #[expect(clippy::cast_precision_loss)]
@@ -496,10 +496,10 @@ where
     }
 
     fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<I>) {
-        if let Some(exec_time) = testcase.exec_time() {
-            if exec_time > &self.slowest_exec {
-                self.slowest_exec = *exec_time;
-            }
+        if let Some(exec_time) = testcase.exec_time()
+            && exec_time > &self.slowest_exec
+        {
+            self.slowest_exec = *exec_time;
         }
     }
 
@@ -508,10 +508,10 @@ where
     }
 
     fn maybe_update_max_depth(&mut self, testcase: &Testcase<I>) {
-        if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>() {
-            if metadata.depth() > self.max_depth {
-                self.max_depth = metadata.depth();
-            }
+        if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>()
+            && metadata.depth() > self.max_depth
+        {
+            self.max_depth = metadata.depth();
         }
     }
 
@@ -550,7 +550,11 @@ where
 
     fn check_interval(&mut self) -> bool {
         let cur = current_time();
-        if cur.checked_sub(self.last_report_time).unwrap_or_default() > self.stats_report_interval {
+        if cur
+            .checked_sub(self.last_report_time)
+            .unwrap_or(self.stats_report_interval)
+            >= self.stats_report_interval
+        {
             self.last_report_time = cur;
             return true;
         }

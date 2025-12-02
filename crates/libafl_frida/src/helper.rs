@@ -294,7 +294,7 @@ impl FridaInstrumentationHelperBuilder {
 
     /// Load a script
     ///
-    /// See [`Script::new`] for details
+    /// See [`Script::load`] for details
     #[must_use]
     pub fn load_script<F: Fn(&str, &[u8])>(
         self,
@@ -521,7 +521,7 @@ impl Default for FridaInstrumentationHelperBuilder {
                 let range = module.range();
                 let start = range.base_address().0 as usize;
                 let range = start..(start + range.size());
-                range.contains(&(Self::new as usize))
+                range.contains(&(Self::new as *const () as usize))
             }),
             skip_ranges: Vec::new(),
         }

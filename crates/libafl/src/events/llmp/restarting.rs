@@ -16,17 +16,14 @@ use core::{
 #[cfg(feature = "std")]
 use std::net::TcpStream;
 
+#[cfg(feature = "std")]
+use libafl_bolts::llmp::{TcpRequest, TcpResponse, recv_tcp_msg, send_tcp_msg};
 #[cfg(any(windows, not(feature = "fork")))]
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "fork", unix))]
 use libafl_bolts::os::{ForkResult, fork};
-#[cfg(feature = "std")]
-use libafl_bolts::{
-    IP_LOCALHOST,
-    llmp::{TcpRequest, TcpResponse, recv_tcp_msg, send_tcp_msg},
-};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
@@ -43,6 +40,8 @@ use libafl_bolts::{
     staterestore::StateRestorer,
     tuples::tuple_list,
 };
+#[cfg(feature = "std")]
+use libafl_core::IP_LOCALHOST;
 use serde::{Serialize, de::DeserializeOwned};
 use typed_builder::TypedBuilder;
 
@@ -179,7 +178,10 @@ where
 
     fn should_send(&self) -> bool {
         if let Some(throttle) = self.throttle {
-            current_time() - self.last_sent > throttle
+            current_time()
+                .checked_sub(self.last_sent)
+                .unwrap_or(throttle)
+                >= throttle
         } else {
             true
         }
@@ -526,11 +528,11 @@ where
     /// Save LLMP state and empty state in staterestorer
     pub fn intermediate_save(&mut self) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
-        if let Some(sr) = &mut self.staterestorer {
-            if self.save_state.oom_safe() {
-                sr.reset();
-                sr.save(&(None::<S>, &self.llmp.describe()?))?;
-            }
+        if let Some(sr) = &mut self.staterestorer
+            && self.save_state.oom_safe()
+        {
+            sr.reset();
+            sr.save(&(None::<S>, &self.llmp.describe()?))?;
         }
 
         Ok(())

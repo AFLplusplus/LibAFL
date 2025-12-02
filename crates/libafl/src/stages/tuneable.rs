@@ -263,7 +263,7 @@ where
                 // perform n iterations or fuzz for provided time, whichever comes first
                 let start_time = current_time();
                 for _ in 1..=iters {
-                    if current_time() - start_time >= fuzz_time {
+                    if current_time().checked_sub(start_time).unwrap_or(fuzz_time) >= fuzz_time {
                         break;
                     }
 
@@ -274,7 +274,7 @@ where
                 // fuzz for provided time
                 let start_time = current_time();
                 for _ in 1.. {
-                    if current_time() - start_time >= fuzz_time {
+                    if current_time().checked_sub(start_time).unwrap_or(fuzz_time) >= fuzz_time {
                         break;
                     }
 

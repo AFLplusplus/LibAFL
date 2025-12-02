@@ -6,6 +6,7 @@ It can report coverage and, on supported architectures, even reports memory acce
 Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
 
 */
+#![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -541,7 +542,7 @@ mod tests {
                     log::info!("Starting fuzzing!");
                     fuzzer
                         .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
-                        .unwrap_or_else(|_| panic!("Error in fuzz_one"));
+                        .unwrap_or_else(|err| panic!("Error in fuzz_one: {err:?}"));
 
                     log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
                     if let Some(expected_error) = expected_error {
@@ -603,7 +604,7 @@ mod tests {
         );
 
         GUM.set(Gum::obtain())
-            .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
+            .unwrap_or_else(|_gum| panic!("Failed to initialize Gum."));
         let simulated_args = vec![
             "libafl_frida_test",
             "-A",

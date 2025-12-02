@@ -1,3 +1,4 @@
+//! Debugging utilities for the unicorn emulator
 use capstone::{
     Capstone,
     arch::{self, BuildsCapstone, BuildsCapstoneSyntax},
@@ -5,12 +6,13 @@ use capstone::{
 pub use libafl_targets::{EDGES_MAP, EDGES_MAP_PTR};
 use unicorn_engine::{
     RegisterARM, RegisterARM64, RegisterRISCV, RegisterX86, Unicorn,
-    unicorn_const::{Arch, Permission},
+    unicorn_const::{Arch, Prot},
 };
 
 use crate::helper::get_stack_pointer;
 // TODO: For some reason, the compiled program start by substracting 0x10 to SP
 
+/// Dumps the memory around the stack pointer
 pub fn memory_dump(emu: &Unicorn<()>, len: u64) {
     let sp = get_stack_pointer(emu);
     for i in 0..len {
@@ -33,8 +35,8 @@ pub fn memory_dump(emu: &Unicorn<()>, len: u64) {
     }
 }
 
-// Display some register values and disassemble the instructions around the program counter
-// address. The thumb_mode parameter is only taken into account when the architecture used is ARM.
+/// Display some register values and disassemble the instructions around the program counter
+/// address. The thumb_mode parameter is only taken into account when the architecture used is ARM.
 pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
     log::debug!("Status when crash happened:");
 
@@ -79,7 +81,7 @@ pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
     // Provide disassembly at instant of crash
     let regions = emu.mem_regions().expect("Could not get memory regions");
     for region in regions {
-        if region.perms.contains(Permission::EXEC) && pc >= region.begin && pc <= region.end {
+        if Prot(region.perms) & Prot::EXEC == Prot::EXEC && pc >= region.begin && pc <= region.end {
             let mut begin = pc - 32;
             let mut end = pc + 32;
             if begin < region.begin {

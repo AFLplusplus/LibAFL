@@ -375,10 +375,10 @@ where
 
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        if let Some(cur) = state.corpus().current() {
-            if id == *cur {
-                return Ok(MutationResult::Skipped);
-            }
+        if let Some(cur) = state.corpus().current()
+            && id == *cur
+        {
+            return Ok(MutationResult::Skipped);
         }
 
         let Some(nz) = NonZero::new(size) else {
@@ -466,10 +466,10 @@ where
 
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        if let Some(cur) = state.corpus().current() {
-            if id == *cur {
-                return Ok(MutationResult::Skipped);
-            }
+        if let Some(cur) = state.corpus().current()
+            && id == *cur
+        {
+            return Ok(MutationResult::Skipped);
         }
 
         let other_size = {

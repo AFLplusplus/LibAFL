@@ -1,124 +1,36 @@
 #!/bin/bash
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-cd "$SCRIPT_DIR/.." || exit 1
+set -euo pipefail
 
-set -e
+# Go to the repo root
+cd "$(dirname "$0")/.."
 
-pushd crates/libafl_derive
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_cc
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_bolts
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_intelpt
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_targets
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_frida
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_qemu
-
-pushd libafl_qemu_build
-cargo publish "$@"
-popd
-pushd libafl_qemu_sys
-cargo publish "$@"
-popd
-
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_sugar
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_concolic/symcc_libafl
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-# init symcc submodule if not already done
-if git submodule status | grep "^-">/dev/null ; then \
-    echo "Initializing submodules"; \
-    git submodule init; \
-    git submodule update; \
+DRY_RUN_FLAG=""
+if [[ "$*" == *"--dry-run"* ]]; then
+  DRY_RUN_FLAG="--dry-run"
 fi
 
-pushd crates/libafl_concolic/symcc_runtime
-cargo publish "$@" --allow-dirty
-popd || exit 1
+PACKAGES_TO_EXCLUDE=()
+mapfile -t PACKAGES_TO_EXCLUDE < <(
+  cargo metadata --no-deps --format-version 1 |
+  jq -r --arg root "$(pwd)" \
+    '.workspace_members as $members |
+    .packages[] |
+    select(.id | IN($members[])) |
+    select(.manifest_path | startswith($root + "/utils/")) |
+    .name
+  '
+)
 
-pushd crates/libafl_libfuzzer
-cargo publish "$@"
-popd || exit 1
+EXCLUDE_ARGS=()
+for PKG in "${PACKAGES_TO_EXCLUDE[@]}"; do
+    EXCLUDE_ARGS+=("--exclude" "$PKG")
+done
 
-sleep 20
+if [ ${#EXCLUDE_ARGS[@]} -gt 0 ]; then
+  echo "The following packages will be excluded from publishing:"
+  printf -- "- %s\n" "${PACKAGES_TO_EXCLUDE[@]}"
+  echo ""
+fi
 
-pushd crates/libafl_asan
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_asan/libafl_asan_libc
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_guest
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_host
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_qemu/libafl_qemu_asan/libafl_qemu_asan_nolibc
-cargo publish "$@"
-popd || exit 1
-
-sleep 20
-
-pushd crates/libafl_qemu/libafl_qemu_runner
-cargo publish "$@"
-popd || exit 1
+echo "Running: cargo publish --workspace ${DRY_RUN_FLAG} ${EXCLUDE_ARGS[*]}"
+cargo publish --workspace ${DRY_RUN_FLAG} "${EXCLUDE_ARGS[@]}"

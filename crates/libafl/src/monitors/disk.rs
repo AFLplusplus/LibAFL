@@ -30,7 +30,11 @@ impl Monitor for OnDiskTomlMonitor {
     ) -> Result<(), Error> {
         let cur_time = current_time();
 
-        if cur_time - self.last_update >= self.update_interval {
+        if cur_time
+            .checked_sub(self.last_update)
+            .unwrap_or(self.update_interval)
+            >= self.update_interval
+        {
             self.last_update = cur_time;
 
             let global_stats = client_stats_manager.global_stats();
@@ -123,7 +127,7 @@ impl OnDiskTomlMonitor {
     {
         Self {
             filename: filename.into(),
-            last_update: current_time() - update_interval,
+            last_update: current_time().saturating_sub(update_interval),
             update_interval,
         }
     }

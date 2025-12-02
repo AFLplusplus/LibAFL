@@ -106,13 +106,13 @@ pub trait Feedback<EM, I, OT, S>: StateInitializer<S> + Named {
         S: HasClientPerfMonitor,
     {
         // Start a timer for this feedback
-        let start_time = libafl_bolts::cpu::read_time_counter();
+        let start_time = no_std_time::read_time_counter();
 
         // Execute this feedback
         let ret = self.is_interesting(state, manager, input, observers, exit_kind);
 
         // Get the elapsed time for checking this feedback
-        let elapsed = libafl_bolts::cpu::read_time_counter() - start_time;
+        let elapsed = no_std_time::read_time_counter() - start_time;
 
         // Add this stat to the feedback metrics
         state

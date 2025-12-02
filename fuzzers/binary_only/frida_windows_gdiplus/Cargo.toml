@@ -1,6 +1,6 @@
 [package]
 name = "frida_windows_gdiplus"
-version = "0.15.4"
+version = "0.16.0"
 authors = ["Richard Johnson <richinseattle@gmail.com>"]
 edition = "2021"
 
@@ -23,7 +23,7 @@ libafl = { path = "../../../crates/libafl", features = [
   "errors_backtrace",
 ] } #,  "llmp_small_maps", "llmp_debug"]}
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
-frida-gum = { version = "0.16.7", features = [
+frida-gum = { version = "0.17.0", features = [
   "auto-download",
   "event-sink",
   "invocation-listener",

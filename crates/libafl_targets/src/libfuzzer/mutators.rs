@@ -6,8 +6,8 @@ use alloc::{
 };
 use core::{cell::RefCell, marker::PhantomData, ops::Deref};
 
+use fast_rands::Rand;
 use libafl::{
-    Error,
     corpus::{Corpus, CorpusId},
     inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{
@@ -16,7 +16,7 @@ use libafl::{
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
 };
-use libafl_bolts::{AsSlice, HasLen, Named, rands::Rand};
+use libafl_core::{AsSlice, Error, HasLen, Named};
 
 unsafe extern "C" {
     fn libafl_targets_has_libfuzzer_custom_mutator() -> bool;
@@ -68,10 +68,10 @@ thread_local! {
 #[unsafe(no_mangle)]
 pub extern "C" fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     MUTATOR.with(|mutator| {
-        if let Ok(mut mutator) = mutator.try_borrow_mut() {
-            if let Some(mutator) = &mut *mutator {
-                return mutator.mutate(data, size, max_size);
-            }
+        if let Ok(mut mutator) = mutator.try_borrow_mut()
+            && let Some(mutator) = &mut *mutator
+        {
+            return mutator.mutate(data, size, max_size);
         }
         unreachable!("Couldn't get mutator!");
     })
@@ -115,12 +115,12 @@ impl<'a, M, S> MutatorProxy<'a, M, S> {
         let state = Rc::downgrade(&self.state);
         WeakMutatorProxy {
             accessor: move |f: &mut dyn for<'b> FnMut(&'b mut S)| {
-                if let Some(state) = state.upgrade() {
-                    if let Ok(state) = state.try_borrow_mut() {
-                        let state_ref = unsafe { state.as_mut().unwrap_unchecked() };
-                        f(state_ref);
-                        return true;
-                    }
+                if let Some(state) = state.upgrade()
+                    && let Ok(state) = state.try_borrow_mut()
+                {
+                    let state_ref = unsafe { state.as_mut().unwrap_unchecked() };
+                    f(state_ref);
+                    return true;
                 }
                 false
             },
@@ -157,34 +157,34 @@ where
     fn mutate(&self, data: *mut u8, size: usize, max_size: usize) -> usize {
         let mut new_size = 0; // if access fails, the new len is zero
         (self.accessor)(&mut |state| {
-            if let Some(mutator) = self.mutator.upgrade() {
-                if let Ok(mut mutator) = mutator.try_borrow_mut() {
-                    let mut intermediary =
-                        BytesInput::from(unsafe { core::slice::from_raw_parts(data, size) });
-                    let old = state.max_size();
-                    state.set_max_size(max_size);
-                    let res = mutator.scheduled_mutate(state, &mut intermediary);
-                    state.set_max_size(old);
-                    let succeeded = res.is_ok();
+            if let Some(mutator) = self.mutator.upgrade()
+                && let Ok(mut mutator) = mutator.try_borrow_mut()
+            {
+                let mut intermediary =
+                    BytesInput::from(unsafe { core::slice::from_raw_parts(data, size) });
+                let old = state.max_size();
+                state.set_max_size(max_size);
+                let res = mutator.scheduled_mutate(state, &mut intermediary);
+                state.set_max_size(old);
+                let succeeded = res.is_ok();
 
-                    let mut result = self.result.deref().borrow_mut();
-                    *result = res;
-                    drop(result);
+                let mut result = self.result.deref().borrow_mut();
+                *result = res;
+                drop(result);
 
-                    if succeeded {
-                        let target = intermediary.mutator_bytes();
-                        if target.as_slice().len() > max_size {
-                            self.result
-                                .replace(Err(Error::illegal_state("Mutation result was too long!")))
-                                .ok();
-                        } else {
-                            let actual = unsafe { core::slice::from_raw_parts_mut(data, max_size) };
-                            actual[..target.as_slice().len()].copy_from_slice(target.as_slice());
-                            new_size = target.as_slice().len();
-                        }
+                if succeeded {
+                    let target = intermediary.mutator_bytes();
+                    if target.as_slice().len() > max_size {
+                        self.result
+                            .replace(Err(Error::illegal_state("Mutation result was too long!")))
+                            .ok();
+                    } else {
+                        let actual = unsafe { core::slice::from_raw_parts_mut(data, max_size) };
+                        actual[..target.as_slice().len()].copy_from_slice(target.as_slice());
+                        new_size = target.as_slice().len();
                     }
-                    return;
                 }
+                return;
             }
             self.result
                 .replace(Err(Error::illegal_state(
@@ -420,10 +420,10 @@ where
     ) -> Result<MutationResult, Error> {
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        if let Some(cur) = state.corpus().current() {
-            if id == *cur {
-                return Ok(MutationResult::Skipped);
-            }
+        if let Some(cur) = state.corpus().current()
+            && id == *cur
+        {
+            return Ok(MutationResult::Skipped);
         }
 
         let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();

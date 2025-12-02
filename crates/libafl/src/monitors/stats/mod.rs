@@ -205,8 +205,8 @@ impl ClientStats {
     pub fn update_executions(&mut self, executions: u64, cur_time: Duration) {
         let diff = cur_time
             .checked_sub(self.last_window_time)
-            .map_or(0, |d| d.as_secs());
-        if diff > CLIENT_STATS_TIME_WINDOW_SECS {
+            .map_or(CLIENT_STATS_TIME_WINDOW_SECS, |d| d.as_secs());
+        if diff >= CLIENT_STATS_TIME_WINDOW_SECS {
             let _: f64 = self.execs_per_sec(cur_time);
             self.last_window_time = cur_time;
             self.last_window_executions = self.executions;
@@ -240,6 +240,7 @@ impl ClientStats {
     /// We got a new information about objective corpus size for this client, insert them.
     pub fn update_objective_size(&mut self, objective_size: u64) {
         self.objective_size = objective_size;
+        self.last_objective_time = current_time();
         self.stats_status.basic_stats_updated = true;
     }
 
@@ -253,9 +254,7 @@ impl ClientStats {
             return 0.0;
         }
 
-        let elapsed = cur_time
-            .checked_sub(self.last_window_time)
-            .map_or(0.0, |d| d.as_secs_f64());
+        let elapsed = cur_time.saturating_sub(self.last_window_time).as_secs_f64();
         if elapsed as u64 == 0 {
             return self.last_execs_per_sec;
         }
@@ -285,9 +284,7 @@ impl ClientStats {
             return 0.0;
         }
 
-        let elapsed = cur_time
-            .checked_sub(self.last_window_time)
-            .map_or(0.0, |d| d.as_secs_f64());
+        let elapsed = cur_time.saturating_sub(self.last_window_time).as_secs_f64();
         if elapsed as u64 == 0 {
             return 0.0;
         }
@@ -329,13 +326,13 @@ impl ClientStats {
     pub fn process_timing(&mut self) -> ProcessTiming {
         let client_start_time = self.start_time();
         let last_new_entry = if self.last_corpus_time() > self.start_time() {
-            current_time() - self.last_corpus_time()
+            current_time().saturating_sub(self.last_corpus_time())
         } else {
             Duration::default()
         };
 
         let last_saved_solution = if self.last_objective_time() > self.start_time() {
-            current_time() - self.last_objective_time()
+            current_time().saturating_sub(self.last_objective_time())
         } else {
             Duration::default()
         };

@@ -60,10 +60,10 @@ static NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
 static PERF_EVENT_TYPE: LazyLock<Result<u32, String>> = LazyLock::new(|| {
     let path = format!("{PT_EVENT_PATH}/type");
     let s = fs::read_to_string(&path)
-        .map_err(|_| format!("Failed to read Intel PT perf event type from {path}"))?;
+        .map_err(|err| format!("Failed to read Intel PT perf event type from {path}: {err:?}"))?;
     s.trim()
         .parse::<u32>()
-        .map_err(|_| format!("Failed to parse Intel PT perf event type in {path}"))
+        .map_err(|err| format!("Failed to parse Intel PT perf event type in {path}: {err:?}"))
 });
 
 /// Intel PT mode of operation with KVM
@@ -792,7 +792,7 @@ fn current_cpu() -> Option<PtCpu> {
 
 #[cfg(test)]
 mod test {
-    use arbitrary_int::Number;
+    use arbitrary_int::prelude::*;
 
     use super::*;
     #[test]

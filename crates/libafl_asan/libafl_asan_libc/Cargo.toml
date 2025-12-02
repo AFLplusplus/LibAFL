@@ -1,8 +1,8 @@
 [package]
 name = "libafl_asan_libc"
-description = "Dummy libc library for use with LibAFL Asan library"
+description = "Dummy libc library for use with LibAFL ASan library"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 keywords = ["fuzzing", "address", "sanitizer", "asan", "libc"]
 categories = [
   "development-tools::testing",

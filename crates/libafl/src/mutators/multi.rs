@@ -137,69 +137,69 @@ where
 
         // We special-case crossover with self
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
-        if let Some(cur) = state.corpus().current() {
-            if id == *cur {
-                let len = input.len();
-                if len == 0 {
-                    return Ok(MutationResult::Skipped);
-                }
-                let choice = key_choice % len;
-                // Safety: len is checked above
-                let (key, part) = &input.parts()[choice];
-
-                let other_size = part.mutator_bytes().len();
-
-                if other_size < 2 {
-                    return Ok(MutationResult::Skipped);
-                }
-
-                let parts = input.with_key(key).count() - 1;
-
-                if parts == 0 {
-                    return Ok(MutationResult::Skipped);
-                }
-
-                let maybe_size = input
-                    .with_key(key)
-                    .filter(|&(p, _)| p != choice)
-                    .nth(part_choice % parts)
-                    .map(|(id, part)| (id, part.mutator_bytes().len()));
-
-                if let Some((part_idx, size)) = maybe_size {
-                    let Some(nz) = NonZero::new(size) else {
-                        return Ok(MutationResult::Skipped);
-                    };
-                    let target = state.rand_mut().below(nz);
-                    // # Safety
-                    // size is nonzero here (checked above), target is smaller than size
-                    // -> the subtraction result is greater than 0.
-                    // other_size is checked above to be larger than zero.
-                    let range = rand_range(state, other_size, unsafe {
-                        NonZero::new(min(other_size, size - target)).unwrap_unchecked()
-                    });
-
-                    let [part, chosen] = match part_idx.cmp(&choice) {
-                        Ordering::Less => input.parts_at_indices_mut([part_idx, choice]),
-                        Ordering::Equal => {
-                            unreachable!("choice should never equal the part idx!")
-                        }
-                        Ordering::Greater => {
-                            let [chosen, part] = input.parts_at_indices_mut([choice, part_idx]);
-                            [part, chosen]
-                        }
-                    };
-
-                    return Ok(Self::crossover_insert(
-                        &mut part.1,
-                        size,
-                        target,
-                        range,
-                        chosen.1.mutator_bytes(),
-                    ));
-                }
-
+        if let Some(cur) = state.corpus().current()
+            && id == *cur
+        {
+            let len = input.len();
+            if len == 0 {
                 return Ok(MutationResult::Skipped);
             }
+            let choice = key_choice % len;
+            // Safety: len is checked above
+            let (key, part) = &input.parts()[choice];
+
+            let other_size = part.mutator_bytes().len();
+
+            if other_size < 2 {
+                return Ok(MutationResult::Skipped);
+            }
+
+            let parts = input.with_key(key).count() - 1;
+
+            if parts == 0 {
+                return Ok(MutationResult::Skipped);
+            }
+
+            let maybe_size = input
+                .with_key(key)
+                .filter(|&(p, _)| p != choice)
+                .nth(part_choice % parts)
+                .map(|(id, part)| (id, part.mutator_bytes().len()));
+
+            if let Some((part_idx, size)) = maybe_size {
+                let Some(nz) = NonZero::new(size) else {
+                    return Ok(MutationResult::Skipped);
+                };
+                let target = state.rand_mut().below(nz);
+                // # Safety
+                // size is nonzero here (checked above), target is smaller than size
+                // -> the subtraction result is greater than 0.
+                // other_size is checked above to be larger than zero.
+                let range = rand_range(state, other_size, unsafe {
+                    NonZero::new(min(other_size, size - target)).unwrap_unchecked()
+                });
+
+                let [part, chosen] = match part_idx.cmp(&choice) {
+                    Ordering::Less => input.parts_at_indices_mut([part_idx, choice]),
+                    Ordering::Equal => {
+                        unreachable!("choice should never equal the part idx!")
+                    }
+                    Ordering::Greater => {
+                        let [chosen, part] = input.parts_at_indices_mut([choice, part_idx]);
+                        [part, chosen]
+                    }
+                };
+
+                return Ok(Self::crossover_insert(
+                    &mut part.1,
+                    size,
+                    target,
+                    range,
+                    chosen.1.mutator_bytes(),
+                ));
+            }
+
+            return Ok(MutationResult::Skipped);
         }
 
         let mut other_testcase = state.corpus().get(id)?.borrow_mut();
@@ -278,67 +278,67 @@ where
 
         // We special-case crossover with self
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
-        if let Some(cur) = state.corpus().current() {
-            if id == *cur {
-                let len = input.len();
-                if len == 0 {
-                    return Ok(MutationResult::Skipped);
-                }
-                let choice = key_choice % len;
-                // Safety: len is checked above
-                let (key, part) = &input.parts()[choice];
-
-                let other_size = part.mutator_bytes().len();
-                if other_size < 2 {
-                    return Ok(MutationResult::Skipped);
-                }
-
-                let parts = input.with_key(key).count() - 1;
-
-                if parts == 0 {
-                    return Ok(MutationResult::Skipped);
-                }
-
-                let maybe_size = input
-                    .with_key(key)
-                    .filter(|&(p, _)| p != choice)
-                    .nth(part_choice % parts)
-                    .map(|(id, part)| (id, part.mutator_bytes().len()));
-
-                if let Some((part_idx, size)) = maybe_size {
-                    let Some(nz) = NonZero::new(size) else {
-                        return Ok(MutationResult::Skipped);
-                    };
-
-                    let target = state.rand_mut().below(nz);
-                    // # Safety
-                    // other_size is checked above.
-                    // size is larger than than target and larger than 1. The subtraction result will always be positive.
-                    let range = rand_range(state, other_size, unsafe {
-                        NonZero::new_unchecked(min(other_size, size - target))
-                    });
-
-                    let [part, chosen] = match part_idx.cmp(&choice) {
-                        Ordering::Less => input.parts_at_indices_mut([part_idx, choice]),
-                        Ordering::Equal => {
-                            unreachable!("choice should never equal the part idx!")
-                        }
-                        Ordering::Greater => {
-                            let [chosen, part] = input.parts_at_indices_mut([choice, part_idx]);
-                            [part, chosen]
-                        }
-                    };
-
-                    return Ok(Self::crossover_replace(
-                        &mut part.1,
-                        target,
-                        range,
-                        chosen.1.mutator_bytes(),
-                    ));
-                }
-
+        if let Some(cur) = state.corpus().current()
+            && id == *cur
+        {
+            let len = input.len();
+            if len == 0 {
                 return Ok(MutationResult::Skipped);
             }
+            let choice = key_choice % len;
+            // Safety: len is checked above
+            let (key, part) = &input.parts()[choice];
+
+            let other_size = part.mutator_bytes().len();
+            if other_size < 2 {
+                return Ok(MutationResult::Skipped);
+            }
+
+            let parts = input.with_key(key).count() - 1;
+
+            if parts == 0 {
+                return Ok(MutationResult::Skipped);
+            }
+
+            let maybe_size = input
+                .with_key(key)
+                .filter(|&(p, _)| p != choice)
+                .nth(part_choice % parts)
+                .map(|(id, part)| (id, part.mutator_bytes().len()));
+
+            if let Some((part_idx, size)) = maybe_size {
+                let Some(nz) = NonZero::new(size) else {
+                    return Ok(MutationResult::Skipped);
+                };
+
+                let target = state.rand_mut().below(nz);
+                // # Safety
+                // other_size is checked above.
+                // size is larger than than target and larger than 1. The subtraction result will always be positive.
+                let range = rand_range(state, other_size, unsafe {
+                    NonZero::new_unchecked(min(other_size, size - target))
+                });
+
+                let [part, chosen] = match part_idx.cmp(&choice) {
+                    Ordering::Less => input.parts_at_indices_mut([part_idx, choice]),
+                    Ordering::Equal => {
+                        unreachable!("choice should never equal the part idx!")
+                    }
+                    Ordering::Greater => {
+                        let [chosen, part] = input.parts_at_indices_mut([choice, part_idx]);
+                        [part, chosen]
+                    }
+                };
+
+                return Ok(Self::crossover_replace(
+                    &mut part.1,
+                    target,
+                    range,
+                    chosen.1.mutator_bytes(),
+                ));
+            }
+
+            return Ok(MutationResult::Skipped);
         }
 
         let mut other_testcase = state.corpus().get(id)?.borrow_mut();

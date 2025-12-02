@@ -27,8 +27,8 @@ use crate::{
 
 /// The process executor simply calls a target function, as mutable reference to a closure
 /// The internal state of the executor is made available to the harness.
-pub type StatefulInProcessExecutor<'a, EM, ES, H, I, OT, S, Z> =
-    StatefulGenericInProcessExecutor<EM, ES, H, &'a mut H, (), I, OT, S, Z>;
+pub type StatefulInProcessExecutor<EM, ES, H, I, OT, S, Z> =
+    StatefulGenericInProcessExecutor<EM, ES, H, H, (), I, OT, S, Z>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 /// The internal state of the executor is made available to the harness.
@@ -123,7 +123,7 @@ where
     }
 }
 
-impl<'a, EM, ES, H, I, OT, S, Z> StatefulInProcessExecutor<'a, EM, ES, H, I, OT, S, Z>
+impl<EM, ES, H, I, OT, S, Z> StatefulInProcessExecutor<EM, ES, H, I, OT, S, Z>
 where
     H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
@@ -132,7 +132,7 @@ where
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn new<OF>(
-        harness_fn: &'a mut H,
+        harness_fn: H,
         exposed_executor_state: ES,
         observers: OT,
         fuzzer: &mut Z,
@@ -165,7 +165,7 @@ where
     ///
     /// This may return an error on unix, if signal handler setup fails
     pub fn with_timeout<OF>(
-        harness_fn: &'a mut H,
+        harness_fn: H,
         exposed_executor_state: ES,
         observers: OT,
         fuzzer: &mut Z,

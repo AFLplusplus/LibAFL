@@ -2,7 +2,7 @@
 name = "libafl_asan_fuzz"
 version.workspace = true
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 publish = false
 
 [package.metadata]
@@ -15,14 +15,14 @@ libafl_asan = { path = "../", default-features = false, features = [
   "guest",
   "host",
   "libc",
-  "linux",
+  "syscalls",
   "test",
   "tracking",
 ] }
 env_logger = { version = "0.11.6" }
 libfuzzer-sys = { version = "0.4" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
-mockall = { version = "0.13.1" }
+mockall = { version = "0.14.0" }
 thiserror = { version = "2.0.16" }
 
 [[bin]]

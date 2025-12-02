@@ -12,15 +12,16 @@ fn main() {
     }
 
     let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+    let target_vendor = std::env::var("CARGO_CFG_TARGET_VENDOR").unwrap();
 
     // Force linking against libc++
-    #[cfg(not(target_vendor = "apple"))]
-    if target_family == "unix" {
+    if target_vendor != "apple" && target_family == "unix" {
         println!("cargo:rustc-link-lib=dylib=c++");
     }
 
-    #[cfg(target_vendor = "apple")]
-    println!("cargo:rustc-link-lib=dylib=resolv");
+    if target_vendor == "apple" {
+        println!("cargo:rustc-link-lib=dylib=resolv");
+    }
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=test_harness.cpp");
@@ -77,11 +78,7 @@ fn main() {
             output_str.as_str()
         );
     } else {
-        let compiler = cc::Build::new()
-            .cpp(true)
-            .opt_level(0)
-            .shared_flag(true)
-            .get_compiler();
+        let compiler = cc::Build::new().cpp(true).opt_level(0).get_compiler();
         let clangpp = compiler.path();
         let mut cmd = std::process::Command::new(clangpp);
         cmd.args(compiler.args())

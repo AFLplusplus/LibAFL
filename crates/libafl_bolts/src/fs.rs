@@ -1,6 +1,6 @@
 //! `LibAFL` functionality for filesystem interaction
 
-use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
+use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
@@ -44,23 +44,21 @@ pub fn write_file_atomic<P>(path: P, bytes: &[u8]) -> Result<(), Error>
 where
     P: AsRef<Path>,
 {
-    fn inner(path: &Path, bytes: &[u8]) -> Result<(), Error> {
-        let mut tmpfile_name = path.to_path_buf();
-        tmpfile_name.set_file_name(format!(
-            ".{}.tmp",
-            tmpfile_name.file_name().unwrap().to_string_lossy()
-        ));
+    let path = path.as_ref();
+    let mut tmpfile_name = path.to_path_buf();
+    tmpfile_name.set_file_name(format!(
+        ".{}.tmp",
+        tmpfile_name.file_name().unwrap().to_string_lossy()
+    ));
 
-        let mut tmpfile = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmpfile_name)?;
+    let mut tmpfile = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmpfile_name)?;
 
-        tmpfile.write_all(bytes)?;
-        fs::rename(&tmpfile_name, path)?;
-        Ok(())
-    }
-    inner(path.as_ref(), bytes)
+    tmpfile.write_all(bytes)?;
+    fs::rename(&tmpfile_name, path)?;
+    Ok(())
 }
 
 /// An [`InputFile`] to write fuzzer input to.
@@ -99,8 +97,9 @@ impl InputFile {
     /// Creates a new [`InputFile`], or truncates if it already exists
     pub fn create<P>(filename: P) -> Result<Self, Error>
     where
-        P: AsRef<Path>,
+        P: Into<PathBuf>,
     {
+        let filename = filename.into();
         let f = OpenOptions::new()
             .create(true)
             .read(true)
@@ -108,7 +107,7 @@ impl InputFile {
             .truncate(true)
             .open(&filename)?;
         Ok(Self {
-            path: filename.as_ref().to_owned(),
+            path: filename,
             file: f,
             rc: Arc::new(()),
         })
@@ -145,11 +144,11 @@ impl InputFile {
 /// This method works recursively.
 /// If `last` is `None`, it'll load all file.
 pub fn find_new_files_rec<P: AsRef<Path>>(
-    dir: P,
+    dir_path: P,
     last_check: &Option<Duration>,
 ) -> Result<Vec<PathBuf>, Error> {
     let mut new_files = Vec::<PathBuf>::new();
-    for entry in fs::read_dir(dir)? {
+    for entry in fs::read_dir(dir_path)? {
         let entry = entry?;
         let path = entry.path();
         let attributes = fs::metadata(&path);
@@ -162,10 +161,10 @@ pub fn find_new_files_rec<P: AsRef<Path>>(
 
         if attr.is_file() && attr.len() > 0 {
             if let Ok(time) = attr.modified() {
-                if let Some(last_check) = last_check {
-                    if time.duration_since(SystemTime::UNIX_EPOCH).unwrap() < *last_check {
-                        continue;
-                    }
+                if let Some(last_check) = last_check
+                    && time.duration_since(SystemTime::UNIX_EPOCH).unwrap() < *last_check
+                {
+                    continue;
                 }
                 new_files.push(path.clone());
             }

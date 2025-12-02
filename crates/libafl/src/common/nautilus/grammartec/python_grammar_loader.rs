@@ -39,7 +39,7 @@ impl PyContext {
     }
 
     #[expect(clippy::needless_pass_by_value)]
-    fn script(&mut self, nt: &str, nts: Vec<String>, script: PyObject) {
+    fn script(&mut self, nt: &str, nts: Vec<String>, script: Py<PyAny>) {
         self.ctx.add_script(nt, &nts, script);
     }
 
@@ -58,7 +58,7 @@ fn loader(py: Python, grammar: &str) -> PyResult<Context> {
 /// Create a `NautilusContext` from a python grammar file
 #[must_use]
 pub fn load_python_grammar(grammar: &str) -> Context {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         loader(py, grammar)
             .map_err(|e| e.print_and_set_sys_last_vars(py))
             .expect("failed to parse python grammar")

@@ -6,7 +6,7 @@ use std::{
 };
 
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers, HasTimeout},
+    executors::{Executor, ExitKind, HasObservers, HasTimeout, SetTimeout},
     state::HasCorpus,
     Error,
 };
@@ -179,10 +179,10 @@ fn is_instrumented(mmap: &Mmap, shmem_env_var: &str) -> bool {
     mmap_has_substr(mmap, shmem_env_var)
 }
 
-fn find_executable_in_path<P: AsRef<Path>>(executable: &P) -> Option<PathBuf> {
+fn find_executable_in_path<P: AsRef<Path>>(executable_path: &P) -> Option<PathBuf> {
     std::env::var_os("PATH").and_then(|paths| {
         std::env::split_paths(&paths).find_map(|dir| {
-            let full_path = dir.join(executable);
+            let full_path = dir.join(executable_path);
             if full_path.is_file() {
                 Some(full_path)
             } else {
@@ -235,7 +235,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
     if !is_library {
         // finally, check the path for the binary
         return find_executable_in_path(&filename)
-            .ok_or(Error::unknown(format!("cannot find {filename}")));
+            .ok_or_else(|| Error::unknown(format!("cannot find {filename}")));
     }
 
     Err(Error::unknown(format!("cannot find {filename}")))
@@ -310,18 +310,26 @@ where
     FSV: HasTimeout,
     NYX: HasTimeout,
 {
-    fn set_timeout(&mut self, timeout: std::time::Duration) {
-        match self {
-            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
-            #[cfg(feature = "nyx")]
-            Self::Nyx(nyx) => nyx.set_timeout(timeout),
-        }
-    }
     fn timeout(&self) -> std::time::Duration {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.timeout(),
             #[cfg(feature = "nyx")]
             Self::Nyx(nyx) => nyx.timeout(),
+        }
+    }
+}
+
+#[cfg(feature = "nyx")]
+impl<FSV, I, OT, NYX> SetTimeout for SupportedExecutors<FSV, I, OT, NYX>
+where
+    FSV: SetTimeout,
+    NYX: SetTimeout,
+{
+    fn set_timeout(&mut self, timeout: std::time::Duration) {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
+            #[cfg(feature = "nyx")]
+            Self::Nyx(nyx) => nyx.set_timeout(timeout),
         }
     }
 }
@@ -376,14 +384,21 @@ impl<FSV, I, OT, S> HasTimeout for SupportedExecutors<FSV, I, OT, S>
 where
     FSV: HasTimeout,
 {
-    fn set_timeout(&mut self, timeout: std::time::Duration) {
-        match self {
-            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
-        }
-    }
     fn timeout(&self) -> std::time::Duration {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.timeout(),
+        }
+    }
+}
+
+#[cfg(not(feature = "nyx"))]
+impl<FSV, I, OT, S> SetTimeout for SupportedExecutors<FSV, I, OT, S>
+where
+    FSV: SetTimeout,
+{
+    fn set_timeout(&mut self, timeout: std::time::Duration) {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
         }
     }
 }

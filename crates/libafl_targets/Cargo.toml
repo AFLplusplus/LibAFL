@@ -5,11 +5,11 @@ authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Common code for target instrumentation that can be used combined with LibAFL"
 documentation = "https://docs.rs/libafl_targets"
 repository = "https://github.com/AFLplusplus/LibAFL/"
-readme = "../../README.md"
+readme = "./README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing"]
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -69,20 +69,23 @@ whole_archive = [] # use +whole-archive to ensure the presence of weak symbols
 cmplog_extended_instrumentation = [
   "cmplog", # without `cmplog`, extended instrumentation won't compile
 ] # support for aflpp cmplog map, we will remove this once aflpp and libafl cmplog shares the same LLVM passes.
-function-logging = ["common"]
+function-logging = ["common", "std"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 [build-dependencies]
-bindgen = "0.72.0"
-cc = { version = "1.1.21", features = ["parallel"] }
+bindgen = "0.72.1"
+cc = { version = "1.2.48", features = ["parallel"] }
 rustversion = "1.0.22"
 
 [dependencies]
 libafl = { workspace = true, features = [], default-features = false }
 libafl_bolts = { workspace = true, features = [] }
+libafl_core = { workspace = true, features = [] }
+fast_rands = { workspace = true }
+ownedref = { workspace = true }
+shmem_providers = { workspace = true }
 libc = { workspace = true }
 nix = { workspace = true, optional = true }
 hashbrown = { workspace = true, default-features = true }
-once_cell = "1.19.0"
 log = { workspace = true }
 rustversion = { workspace = true }
 

@@ -2,7 +2,7 @@
 name = "runtime_test"
 version.workspace = true
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 description = "Runtime test of LibAFL fuzzing with symbolic execution"
 documentation = "https://docs.rs/libafl"
@@ -25,7 +25,7 @@ name = "SymRuntime"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-symcc_runtime = { path = "../../symcc_runtime" }
+symcc_runtime = { path = "../../symcc_runtime", version = "0.16.0" }
 
 [lints]
 workspace = true

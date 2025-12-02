@@ -43,11 +43,11 @@ impl StdOutToMetadataFeedback {
     {
         let observer = observers
             .get(&self.o_ref)
-            .ok_or(Error::illegal_state("StdOutObserver is missing"))?;
+            .ok_or_else(|| Error::illegal_state("StdOutObserver is missing"))?;
         let buffer = observer
             .output
             .as_ref()
-            .ok_or(Error::illegal_state("StdOutObserver has no stdout"))?;
+            .ok_or_else(|| Error::illegal_state("StdOutObserver has no stdout"))?;
         let stdout = String::from_utf8_lossy(buffer).into_owned();
 
         testcase
@@ -136,11 +136,11 @@ where
     ) -> Result<(), Error> {
         let observer = observers
             .get(&self.o_ref)
-            .ok_or(Error::illegal_state("StdErrObserver is missing"))?;
+            .ok_or_else(|| Error::illegal_state("StdErrObserver is missing"))?;
         let buffer = observer
             .output
             .as_ref()
-            .ok_or(Error::illegal_state("StdErrObserver has no stderr"))?;
+            .ok_or_else(|| Error::illegal_state("StdErrObserver has no stderr"))?;
         let stderr = String::from_utf8_lossy(buffer).into_owned();
 
         testcase

@@ -84,13 +84,12 @@ impl Mutator {
         let mut i = start_index;
         while i < tree.size() {
             let n = NodeId::from(i);
-            if let Some(parent) = Mutator::find_parent_with_nt(tree, n, ctx) {
-                if let Some(t) =
+            if let Some(parent) = Mutator::find_parent_with_nt(tree, n, ctx)
+                && let Some(t) =
                     Mutator::test_and_convert(tree, parent, tree, n, ctx, bits, tester)?
-                {
-                    let _ = mem::replace(tree, t);
-                    i = parent.into();
-                }
+            {
+                let _ = mem::replace(tree, t);
+                i = parent.into();
             }
             i += 1;
             if i == end_index {

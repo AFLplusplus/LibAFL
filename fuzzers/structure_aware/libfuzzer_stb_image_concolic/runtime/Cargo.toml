@@ -1,6 +1,6 @@
 [package]
 name = "example_runtime"
-version = "0.15.4"
+version = "0.16.0"
 edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 
@@ -21,4 +21,4 @@ panic = "abort"
 
 [dependencies]
 log = { version = "0.4.22", features = ["release_max_level_info"] }
-symcc_runtime = { path = "../../../../crates/libafl_concolic/symcc_runtime" }
+symcc_runtime = { path = "../../../../crates/libafl_concolic/symcc_runtime", version = "0.16.0" }

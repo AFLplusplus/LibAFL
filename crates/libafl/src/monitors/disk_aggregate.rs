@@ -38,7 +38,11 @@ impl Monitor for OnDiskJsonAggregateMonitor {
     ) -> Result<(), Error> {
         // Write JSON stats if update interval has elapsed
         let cur_time = current_time();
-        if cur_time - self.last_update >= self.update_interval {
+        if cur_time
+            .checked_sub(self.last_update)
+            .unwrap_or(self.update_interval)
+            >= self.update_interval
+        {
             self.last_update = cur_time;
 
             let file = OpenOptions::new()
@@ -89,7 +93,7 @@ impl OnDiskJsonAggregateMonitor {
     {
         Self {
             json_path: json_path.into(),
-            last_update: current_time() - update_interval,
+            last_update: current_time().saturating_sub(update_interval),
             update_interval,
         }
     }

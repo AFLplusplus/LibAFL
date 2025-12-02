@@ -134,11 +134,11 @@ where
 
             loop {
                 let mut reached_max = false;
-                if let Some(max_clients) = exit_cleanly_after {
-                    if max_clients.get() <= recv_handles.len() {
-                        // we waited for all the clients we wanted to see attached. Now wait for them to close their tcp connections.
-                        reached_max = true;
-                    }
+                if let Some(max_clients) = exit_cleanly_after
+                    && max_clients.get() <= recv_handles.len()
+                {
+                    // we waited for all the clients we wanted to see attached. Now wait for them to close their tcp connections.
+                    reached_max = true;
                 }
 
                 // Asynchronously wait for an inbound socket.
@@ -594,7 +594,10 @@ where
 {
     fn should_send(&self) -> bool {
         if let Some(throttle) = self.throttle {
-            libafl_bolts::current_time() - self.last_sent > throttle
+            libafl_bolts::current_time()
+                .checked_sub(self.last_sent)
+                .unwrap_or(throttle)
+                >= throttle
         } else {
             true
         }

@@ -1,5 +1,5 @@
 //! Derives for `LibAFL`
-
+#![doc = include_str!("../README.md")]
 #![no_std]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -101,20 +101,20 @@ pub fn libafl_serdeany_derive(input: TokenStream) -> TokenStream {
 pub fn libafl_display(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input as DeriveInput);
 
-    if let Struct(s) = data {
-        if let Named(fields) = s.fields {
-            let fields_fmt = fields.named.iter().map(libafl_display_field_by_type);
+    if let Struct(s) = data
+        && let Named(fields) = s.fields
+    {
+        let fields_fmt = fields.named.iter().map(libafl_display_field_by_type);
 
-            return quote! {
-                impl core::fmt::Display for #ident {
-                    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                        #(#fields_fmt)*
-                        Ok(())
-                    }
+        return quote! {
+            impl core::fmt::Display for #ident {
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                    #(#fields_fmt)*
+                    Ok(())
                 }
             }
-            .into();
         }
+        .into();
     }
     panic!("Only structs are supported");
 }
@@ -122,22 +122,23 @@ pub fn libafl_display(input: TokenStream) -> TokenStream {
 fn libafl_display_field_by_type(it: &Field) -> proc_macro2::TokenStream {
     let fmt = " {}";
     let ident = &it.ident;
-    if let Type::Path(type_path) = &it.ty {
-        if type_path.qself.is_none() && type_path.path.segments.len() == 1 {
-            let segment = &type_path.path.segments[0];
-            if segment.ident == "Option" {
-                return quote! {
-                    if let Some(opt) = &self.#ident {
-                        write!(f, #fmt, opt)?;
-                    }
-                };
-            } else if segment.ident == "Vec" {
-                return quote! {
-                    for e in &self.#ident {
-                        write!(f, #fmt, e)?;
-                    }
-                };
-            }
+    if let Type::Path(type_path) = &it.ty
+        && type_path.qself.is_none()
+        && type_path.path.segments.len() == 1
+    {
+        let segment = &type_path.path.segments[0];
+        if segment.ident == "Option" {
+            return quote! {
+                if let Some(opt) = &self.#ident {
+                    write!(f, #fmt, opt)?;
+                }
+            };
+        } else if segment.ident == "Vec" {
+            return quote! {
+                for e in &self.#ident {
+                    write!(f, #fmt, e)?;
+                }
+            };
         }
     }
     quote! {

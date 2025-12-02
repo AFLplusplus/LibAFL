@@ -1,10 +1,10 @@
 use core::fmt::Debug;
 
 use alloc::vec::Vec;
-use std::ops::AddAssign;
-pub use libafl_intelpt::PtImage;
 use libafl_intelpt::IntelPT;
+pub use libafl_intelpt::PtImage;
 use serde::Serialize;
+use std::ops::AddAssign;
 use typed_builder::TypedBuilder;
 
 use crate::executors::hooks::ExecutorHook;

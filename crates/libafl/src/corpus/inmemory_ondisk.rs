@@ -458,15 +458,13 @@ impl<I> InMemoryOnDiskCorpus<I> {
         // Only try to write the data if the counter is 1.
         // Otherwise we already have a file with this name, and
         // we can assume the data has already been written.
-        if ctr == 1 {
-            if let Err(err) = self.store_input_from(testcase) {
-                if self.locking {
-                    return Err(err);
-                }
-                log::error!(
-                    "An error occurred when trying to write a testcase without locking: {err}"
-                );
+        if ctr == 1
+            && let Err(err) = self.store_input_from(testcase)
+        {
+            if self.locking {
+                return Err(err);
             }
+            log::error!("An error occurred when trying to write a testcase without locking: {err}");
         }
         Ok(())
     }

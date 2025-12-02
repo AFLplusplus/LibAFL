@@ -30,7 +30,7 @@ mod tests {
     #[test]
     fn test_poison_example1() {
         let mut shadow = get_shadow();
-        // poison - start: 0x7fff2bffff00, len: 0x100, pioson: AsanUser
+        // poison - start: 0x7fff2bffff00, len: 0x100, poison: AsanUser
         // is_poison - start: 0x7fff2bfffc01, len: 0x300
         assert_eq!(
             shadow.poison(0x7fff2bffff00, 0x100, PoisonType::AsanUser),
@@ -42,7 +42,7 @@ mod tests {
     #[test]
     fn test_poison_example2() {
         let mut shadow = get_shadow();
-        // poison - start: 0x7dff13ffffff, len: 0x3b9, pioson: AsanUser
+        // poison - start: 0x7dff13ffffff, len: 0x3b9, poison: AsanUser
         // is_poison - start: 0x7dff14000302, len: 0x2
         assert_eq!(
             shadow.poison(0x7dff13ffffff, 0x3b9, PoisonType::AsanUser),
@@ -54,7 +54,7 @@ mod tests {
     #[test]
     fn test_poison_example3() {
         let mut shadow = get_shadow();
-        // poison - start: 0x7fffffffff00, len: 0x100, pioson: AsanUser
+        // poison - start: 0x7fffffffff00, len: 0x100, poison: AsanUser
         // is_poison - start: 0x7fffffffff00, len: 0xff
         assert_eq!(
             shadow.poison(0x7fffffffff00, 0x100, PoisonType::AsanUser),

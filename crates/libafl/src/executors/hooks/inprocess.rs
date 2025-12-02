@@ -154,7 +154,7 @@ impl<I, S> HasTimeout for InProcessHooks<I, S> {
                         null_mut(),
                     );
                 }
-                let elapsed = cur_time - self.timer().tmout_start_time;
+                let elapsed = cur_time.saturating_sub(self.timer().tmout_start_time);
                 // set timer the next exec
                 if self.timer().executions > 0 {
                     self.timer_mut().avg_exec_time = elapsed / self.timer().executions;
@@ -165,7 +165,7 @@ impl<I, S> HasTimeout for InProcessHooks<I, S> {
                 return true;
             }
 
-            let elapsed_run = cur_time - self.timer_mut().start_time;
+            let elapsed_run = cur_time.saturating_sub(self.timer_mut().start_time);
             if elapsed_run < self.timer_mut().exec_tmout {
                 // fp, reset timeout
                 unsafe {
@@ -177,7 +177,7 @@ impl<I, S> HasTimeout for InProcessHooks<I, S> {
                     );
                 }
                 if self.timer().executions > 0 {
-                    let elapsed = cur_time - self.timer_mut().tmout_start_time;
+                    let elapsed = cur_time.saturating_sub(self.timer_mut().tmout_start_time);
                     self.timer_mut().avg_exec_time = elapsed / self.timer().executions;
                     self.timer_mut().executions = 0; // It will be 1 when the exec finish
                 }
@@ -503,10 +503,10 @@ impl InProcessExecutorHandlerData {
                         bsod_info.ucontext.as_ref(),
                     );
 
-                    if let Ok(bsod) = bsod {
-                        if let Ok(r) = core::str::from_utf8(&bsod) {
-                            log::error!("{r}");
-                        }
+                    if let Ok(bsod) = bsod
+                        && let Ok(r) = core::str::from_utf8(&bsod)
+                    {
+                        log::error!("{r}");
                     }
                 }
 

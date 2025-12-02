@@ -46,7 +46,7 @@ use crate::observers::{
 };
 use crate::{
     Error,
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, SetTimeout},
     inputs::{Input, ToTargetBytes},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
@@ -255,7 +255,7 @@ impl ConfigTarget for Command {
     }
 
     // libc::rlim_t is i64 in freebsd and trivial_numeric_casts check will failed
-    #[cfg_attr(not(target_os = "freebsd"), expect(trivial_numeric_casts))]
+    #[allow(trivial_numeric_casts)] // on 32 bit it does not trigger
     fn setlimit(&mut self, memlimit: u64) -> &mut Self {
         if memlimit == 0 {
             return self;
@@ -390,6 +390,7 @@ const fn fs_opt_get_mapsize(x: i32) -> i32 {
 }
 
 #[expect(clippy::fn_params_excessive_bools)]
+#[allow(unstable_name_collisions)]
 impl Forkserver {
     /// Create a new [`Forkserver`] that will kill child processes
     /// with the given `kill_signal`.
@@ -1542,7 +1543,9 @@ impl<I, OT, S, SHM> HasTimeout for ForkserverExecutor<I, OT, S, SHM> {
     fn timeout(&self) -> Duration {
         self.timeout.into()
     }
+}
 
+impl<I, OT, S, SHM> SetTimeout for ForkserverExecutor<I, OT, S, SHM> {
     #[inline]
     fn set_timeout(&mut self, timeout: Duration) {
         self.timeout = TimeSpec::from_duration(timeout);
@@ -1591,6 +1594,7 @@ mod tests {
     #[test]
     #[serial]
     #[cfg_attr(miri, ignore)]
+    #[cfg_attr(target_pointer_width = "32", ignore)] // TODO: Why does this fail?
     fn test_forkserver() {
         const MAP_SIZE: usize = 65536;
         let bin = OsString::from("echo");

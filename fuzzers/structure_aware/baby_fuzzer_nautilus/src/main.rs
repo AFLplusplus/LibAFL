@@ -10,7 +10,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
-    inputs::NautilusInput,
+    inputs::{NautilusBytesConverter, NautilusInput},
     monitors::SimpleMonitor,
     mutators::{
         HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
@@ -18,7 +18,7 @@ use libafl::{
     },
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
+    stages::{mutational::StdMutationalStage, DumpTargetBytesToDiskStage},
     state::StdState,
     HasMetadata,
 };
@@ -37,12 +37,12 @@ fn signals_set(idx: usize) {
 */
 
 pub fn main() {
-    let context = NautilusContext::from_file(15, "grammar.json").unwrap();
+    let ctx = NautilusContext::from_file(15, "grammar.json").unwrap();
     let mut bytes = vec![];
 
     // The closure that we want to fuzz
     let mut harness = |input: &NautilusInput| {
-        input.unparse(&context, &mut bytes);
+        input.unparse(&ctx, &mut bytes);
         unsafe {
             println!(">>> {}", std::str::from_utf8_unchecked(&bytes));
         }
@@ -55,10 +55,7 @@ pub fn main() {
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input
-    let mut feedback = feedback_or!(
-        MaxMapFeedback::new(&observer),
-        NautilusFeedback::new(&context)
-    );
+    let mut feedback = feedback_or!(MaxMapFeedback::new(&observer), NautilusFeedback::new(&ctx));
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -95,7 +92,12 @@ pub fn main() {
     let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::builder()
+        .scheduler(scheduler)
+        .feedback(feedback)
+        .objective(objective)
+        .target_bytes_converter(NautilusBytesConverter::new(&ctx))
+        .build();
 
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
@@ -107,7 +109,7 @@ pub fn main() {
     )
     .expect("Failed to create the Executor");
 
-    let mut generator = NautilusGenerator::new(&context);
+    let mut generator = NautilusGenerator::new(&ctx);
 
     // Use this code to profile the generator performance
     /*
@@ -148,20 +150,23 @@ pub fn main() {
     // Setup a mutational stage with a basic bytes mutator
     let mutator = HavocScheduledMutator::with_max_stack_pow(
         tuple_list!(
-            NautilusRandomMutator::new(&context),
-            NautilusRandomMutator::new(&context),
-            NautilusRandomMutator::new(&context),
-            NautilusRandomMutator::new(&context),
-            NautilusRandomMutator::new(&context),
-            NautilusRandomMutator::new(&context),
-            NautilusRecursionMutator::new(&context),
-            NautilusSpliceMutator::new(&context),
-            NautilusSpliceMutator::new(&context),
-            NautilusSpliceMutator::new(&context),
+            NautilusRandomMutator::new(&ctx),
+            NautilusRandomMutator::new(&ctx),
+            NautilusRandomMutator::new(&ctx),
+            NautilusRandomMutator::new(&ctx),
+            NautilusRandomMutator::new(&ctx),
+            NautilusRandomMutator::new(&ctx),
+            NautilusRecursionMutator::new(&ctx),
+            NautilusSpliceMutator::new(&ctx),
+            NautilusSpliceMutator::new(&ctx),
+            NautilusSpliceMutator::new(&ctx),
         ),
         2,
     );
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let mut stages = tuple_list!(
+        DumpTargetBytesToDiskStage::new("./corpus_bytes", "./solution_bytes").unwrap(),
+        StdMutationalStage::new(mutator)
+    );
 
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)

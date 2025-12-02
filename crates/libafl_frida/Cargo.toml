@@ -5,7 +5,7 @@ authors = ["s1341 <github@shmarya.net>"]
 description = "Frida backend library for LibAFL"
 documentation = "https://docs.rs/libafl_frida"
 repository = "https://github.com/AFLplusplus/LibAFL/"
-readme = "../../README.md"
+readme = "./README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "frida", "instrumentation"]
 edition = "2024"
@@ -62,18 +62,18 @@ nix = { workspace = true, default-features = true, features = ["mman"] }
 libc = { workspace = true }
 hashbrown = { workspace = true, default-features = true }
 rangemap = { workspace = true }
-frida-gum-sys = { version = "0.16.7", features = [
+frida-gum-sys = { version = "0.17.1", features = [
   "event-sink",
   "invocation-listener",
 ] }
-frida-gum = { version = "0.16.7", features = [
+frida-gum = { version = "0.17.1", features = [
   "event-sink",
   "invocation-listener",
   "module-names",
   "script",
   "backtrace",
 ] }
-dynasmrt = "3.0.1"
+dynasmrt = "4.0.1"
 
 color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
 termcolor = "1.4.1"
@@ -86,7 +86,7 @@ num-traits = { workspace = true, default-features = true }
 ahash = { workspace = true, default-features = true }
 paste = { workspace = true }
 log = { workspace = true }
-mmap-rs = "0.6.1"
+mmap-rs = "0.7.0"
 yaxpeax-arch = "0.3.2"
 
 document-features = { workspace = true, optional = true } # Document all features of this crate (for `cargo doc`)
@@ -96,21 +96,21 @@ serial_test = { workspace = true, default-features = false, features = [
   "logging",
 ] }
 clap = { workspace = true, features = ["derive"] }
-libloading = "0.8.5"
+libloading = "0.9.0"
 mimalloc = { workspace = true, default-features = false }
 
 [lints]
 workspace = true
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-yaxpeax-arm = "0.3.0"
+yaxpeax-arm = "0.4.0"
 
 [target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
 yaxpeax-x86 = "2.0.0"
 iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-winsafe = { version = "0.0.25", features = ["kernel"] }
+winsafe = { version = "0.0.26", features = ["kernel"] }
 winapi = { version = "0.3", features = [
   "processthreadsapi",
   "winnt",

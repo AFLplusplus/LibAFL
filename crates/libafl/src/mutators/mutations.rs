@@ -308,7 +308,7 @@ where
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.mutator_bytes_mut()).unwrap();
-            *byte = (!(*byte)).wrapping_add(1);
+            *byte = byte.wrapping_neg();
             Ok(MutationResult::Mutated)
         }
     }
@@ -1295,10 +1295,10 @@ where
 
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        if let Some(cur) = state.corpus().current() {
-            if id == *cur {
-                return Ok(MutationResult::Skipped);
-            }
+        if let Some(cur) = state.corpus().current()
+            && id == *cur
+        {
+            return Ok(MutationResult::Skipped);
         }
 
         let other_size = {
@@ -1398,10 +1398,10 @@ where
 
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        if let Some(cur) = state.corpus().current() {
-            if id == *cur {
-                return Ok(MutationResult::Skipped);
-            }
+        if let Some(cur) = state.corpus().current()
+            && id == *cur
+        {
+            return Ok(MutationResult::Skipped);
         }
 
         let other_size = {
@@ -1511,10 +1511,10 @@ where
 
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        if let Some(cur) = state.corpus().current() {
-            if id == *cur {
-                return Ok(MutationResult::Skipped);
-            }
+        if let Some(cur) = state.corpus().current()
+            && id == *cur
+        {
+            return Ok(MutationResult::Skipped);
         }
 
         let other_size = {
@@ -1606,10 +1606,10 @@ where
 
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        if let Some(cur) = state.corpus().current() {
-            if id == *cur {
-                return Ok(MutationResult::Skipped);
-            }
+        if let Some(cur) = state.corpus().current()
+            && id == *cur
+        {
+            return Ok(MutationResult::Skipped);
         }
 
         let other_size = {
@@ -1697,10 +1697,10 @@ where
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
-        if let Some(cur) = state.corpus().current() {
-            if id == *cur {
-                return Ok(MutationResult::Skipped);
-            }
+        if let Some(cur) = state.corpus().current()
+            && id == *cur
+        {
+            return Ok(MutationResult::Skipped);
         }
 
         let (first_diff, last_diff) = {
@@ -1971,8 +1971,7 @@ mod tests {
         assert!(counts.into_iter().all(|count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }));
         Ok(())
@@ -2021,8 +2020,7 @@ mod tests {
         assert!(counts.into_iter().all(|count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }));
         Ok(())
@@ -2067,16 +2065,14 @@ mod tests {
         assert!(counts.into_iter().all(|count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }));
         let average = insertions.iter().copied().sum::<usize>() / insertions.len();
         assert!(insertions.into_iter().all(|count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }));
         Ok(())
@@ -2124,16 +2120,14 @@ mod tests {
         assert!(counts.iter().all(|&count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }),);
         let average = insertions.iter().copied().sum::<usize>() / insertions.len();
         assert!(insertions.into_iter().all(|count| {
             count
                 .checked_sub(average)
-                .or_else(|| average.checked_sub(count))
-                .unwrap()
+                .unwrap_or_else(|| average.saturating_sub(count))
                 < 500
         }));
         Ok(())

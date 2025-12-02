@@ -34,7 +34,6 @@ use libafl_bolts::{
     AsSliceMut, StdTargetArgs,
     core_affinity::Cores,
     nonzero,
-    ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{Merge, tuple_list},
@@ -255,8 +254,11 @@ impl ForkserverBytesCoverageSugar<'_> {
                     // Load from disk
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, self.input_dirs)
-                        .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
+                        .unwrap_or_else(|err| {
+                            panic!(
+                                "Failed to load initial corpus at {:?}: {err:?}",
+                                &self.input_dirs
+                            );
                         });
                     log::info!("We imported {} inputs from disk.", state.corpus().count());
                 }
@@ -271,8 +273,7 @@ impl ForkserverBytesCoverageSugar<'_> {
                 unsafe {
                     cmplog_shmem.write_to_env(SHM_CMPLOG_ENV_VAR).unwrap();
                 }
-                let cmpmap =
-                    unsafe { OwnedRefMut::<AflppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
+                let cmpmap = unsafe { AflppCmpLogMap::from_shmem(&mut cmplog_shmem) };
 
                 let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
 

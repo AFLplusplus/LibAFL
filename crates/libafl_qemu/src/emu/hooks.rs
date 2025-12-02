@@ -780,7 +780,7 @@ where
     }
 
     /// # Safety
-    /// This can call through to a potentialy unsafe [`backdoor_function`]
+    /// This can call through to a potentialy unsafe [`Self::backdoor_function`]
     pub unsafe fn backdoor(&mut self, hook: BackdoorHook<ET, I, S>) -> Option<BackdoorHookId> {
         match hook {
             Hook::Function(f) => Some(self.backdoor_function(f)),

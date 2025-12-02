@@ -2,7 +2,7 @@ use core::{
     fmt,
     fmt::{Display, Formatter},
 };
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use getset::Getters;
 use libafl_derive;
@@ -228,11 +228,9 @@ impl Display for Bios {
 }
 
 #[cfg(feature = "systemmode")]
-impl<R: AsRef<Path>> From<R> for Bios {
-    fn from(path: R) -> Self {
-        Self {
-            path: path.as_ref().to_path_buf(),
-        }
+impl<P: Into<PathBuf>> From<P> for Bios {
+    fn from(path: P) -> Self {
+        Self { path: path.into() }
     }
 }
 
@@ -250,11 +248,9 @@ impl Display for Kernel {
 }
 
 #[cfg(feature = "systemmode")]
-impl<R: AsRef<Path>> From<R> for Kernel {
-    fn from(path: R) -> Self {
-        Self {
-            path: path.as_ref().to_path_buf(),
-        }
+impl<P: Into<PathBuf>> From<P> for Kernel {
+    fn from(path: P) -> Self {
+        Self { path: path.into() }
     }
 }
 
@@ -294,11 +290,9 @@ impl Display for InitRD {
 }
 
 #[cfg(feature = "systemmode")]
-impl<R: AsRef<Path>> From<R> for InitRD {
-    fn from(path: R) -> Self {
-        Self {
-            path: path.as_ref().to_path_buf(),
-        }
+impl<P: Into<PathBuf>> From<P> for InitRD {
+    fn from(path: P) -> Self {
+        Self { path: path.into() }
     }
 }
 
@@ -313,11 +307,9 @@ impl Display for LoadVM {
     }
 }
 
-impl<R: AsRef<Path>> From<R> for LoadVM {
-    fn from(path: R) -> Self {
-        Self {
-            path: path.as_ref().to_path_buf(),
-        }
+impl<P: Into<PathBuf>> From<P> for LoadVM {
+    fn from(path: P) -> Self {
+        Self { path: path.into() }
     }
 }
 
@@ -492,11 +484,9 @@ impl Display for Program {
 }
 
 #[cfg(feature = "usermode")]
-impl<R: AsRef<Path>> From<R> for Program {
-    fn from(path: R) -> Self {
-        Self {
-            path: path.as_ref().to_path_buf(),
-        }
+impl<P: Into<PathBuf>> From<P> for Program {
+    fn from(path: P) -> Self {
+        Self { path: path.into() }
     }
 }
 

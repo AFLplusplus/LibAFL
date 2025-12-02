@@ -319,7 +319,7 @@ impl TuiUi {
         let start = stats.series.front().unwrap().time;
         let end = stats.series.back().unwrap().time;
         let min_lbl_x = format_duration(&start);
-        let med_lbl_x = format_duration(&((end - start) / 2));
+        let med_lbl_x = format_duration(&(end.saturating_sub(start) / 2));
         let max_lbl_x = format_duration(&end);
 
         let x_labels = vec![
@@ -329,7 +329,7 @@ impl TuiUi {
         ];
 
         let max_x = u64::from(area.width);
-        let window = end - start;
+        let window = end.saturating_sub(start);
         let time_unit = if max_x > window.as_secs() {
             0 // millis / 10
         } else if max_x > window.as_secs() * 60 {
@@ -538,7 +538,9 @@ impl TuiUi {
         let items = vec![
             Row::new(vec![
                 Cell::from(Span::raw("run time")),
-                Cell::from(Span::raw(format_duration(&(current_time() - tup.0)))),
+                Cell::from(Span::raw(format_duration(
+                    &current_time().saturating_sub(tup.0),
+                ))),
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("exec speed")),

@@ -548,7 +548,11 @@ impl CmpLogRuntime {
         let block = InstructionBlock::new(&insts, 0);
         let block = BlockEncoder::encode(64, block, DecoderOptions::NONE).unwrap();
         writer.put_bytes(block.code_buffer.as_slice());
-        writer.put_call_address((CmpLogRuntime::populate_lists as usize).try_into().unwrap());
+        writer.put_call_address(
+            (CmpLogRuntime::populate_lists as *const () as usize)
+                .try_into()
+                .unwrap(),
+        );
 
         writer.put_bytes(&self.restore_registers.clone().unwrap());
     }

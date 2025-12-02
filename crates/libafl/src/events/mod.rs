@@ -482,7 +482,11 @@ where
     };
     let cur = current_time();
     // default to 0 here to avoid crashes on clock skew
-    if cur.checked_sub(*last_report_time).unwrap_or_default() > monitor_timeout {
+    if cur
+        .checked_sub(*last_report_time)
+        .unwrap_or(monitor_timeout)
+        >= monitor_timeout
+    {
         // report_progress sets a new `last_report_time` internally.
         reporter.report_progress(state)?;
     }
@@ -519,7 +523,7 @@ where
     {
         state
             .introspection_stats_mut()
-            .set_current_time(libafl_bolts::cpu::read_time_counter());
+            .set_current_time(no_std_time::read_time_counter());
 
         // Send the current monitor over to the manager. This `.clone` shouldn't be
         // costly as `ClientPerfStats` impls `Copy` since it only contains `u64`s

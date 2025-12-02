@@ -101,7 +101,8 @@ impl NautilusContext {
             #[cfg(not(feature = "nautilus_py"))]
             {
                 return Err(Error::illegal_argument(format!(
-                    "Feature `nautilus_py` is required to load grammar from {grammar_file:?}"
+                    "Feature `nautilus_py` is required to load grammar from {}",
+                    grammar_file.display()
                 )));
             }
         }

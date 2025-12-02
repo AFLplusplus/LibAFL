@@ -1,4 +1,5 @@
 //! Sugar API to simplify the life of users of `LibAFL` that just want to fuzz.
+#![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![cfg_attr(not(test), warn(

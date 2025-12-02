@@ -1,4 +1,10 @@
-use std::{env, fs::File, io::Read, path::PathBuf, ptr::NonNull};
+use std::{
+    env,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+    ptr::NonNull,
+};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -36,7 +42,7 @@ use libafl_unicorn::{
 use unicorn_engine::{unicorn_const::MemType, HookType};
 use unicorn_engine::{
     unicorn_const::{Arch, SECOND_SCALE},
-    Mode, Permission, RegisterARM, RegisterARM64, RegisterRISCV, RegisterX86, Unicorn,
+    Mode, Prot, RegisterARM, RegisterARM64, RegisterRISCV, RegisterX86, Unicorn,
 };
 
 pub const CODE_ADDRESS: u64 = 0x9000;
@@ -114,7 +120,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     unicorn_map_and_load_code(
         &mut emu,
         CODE_ADDRESS,
-        CODE_SIZE as usize,
+        CODE_SIZE,
         match arch {
             Arch::ARM => "bin/foo_arm.bin",
             Arch::ARM64 => "bin/foo_arm64.bin",
@@ -125,19 +131,11 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     );
 
     // Map the data section in memory
-    emu.mem_map(
-        DATA_ADDRESS,
-        DATA_SIZE as usize,
-        Permission::WRITE | Permission::READ,
-    )
-    .unwrap();
+    emu.mem_map(DATA_ADDRESS, DATA_SIZE, Prot::WRITE | Prot::READ)
+        .unwrap();
 
-    emu.mem_map(
-        STACK_ADDRESS,
-        STACK_SIZE as usize,
-        Permission::WRITE | Permission::READ,
-    )
-    .unwrap();
+    emu.mem_map(STACK_ADDRESS, STACK_SIZE, Prot::WRITE | Prot::READ)
+        .unwrap();
 
     #[cfg(feature = "code_hook")]
     add_code_hook(&mut emu);
@@ -318,15 +316,20 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
         .expect("Error in the fuzzing loop");
 }
 
-fn unicorn_map_and_load_code(emu: &mut Unicorn<()>, address: u64, size: usize, path: &str) -> u64 {
-    let mut f = File::open(path).expect("Could not open file");
+fn unicorn_map_and_load_code<P: AsRef<Path>>(
+    emu: &mut Unicorn<()>,
+    address: u64,
+    size: u64,
+    path: P,
+) -> u64 {
+    let mut f = File::open(path.as_ref()).expect("Could not open file");
     let mut buffer = Vec::new();
 
     // read the whole file
     f.read_to_end(&mut buffer).expect("Could not read file");
 
     // Define memory regions
-    emu.mem_map(address, address as usize + size, Permission::EXEC)
+    emu.mem_map(address, address + size, Prot::EXEC)
         .expect("failed to map code page");
 
     // Write memory
