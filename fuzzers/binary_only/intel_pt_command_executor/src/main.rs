@@ -14,12 +14,12 @@ use libafl::{
     generators::RandPrintablesGenerator,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
-    observers::StdMapObserver,
+    observers::ConstMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{core_affinity, rands::StdRand, tuples::tuple_list, Error};
+use libafl_bolts::{core_affinity, rands::StdRand, tuples::tuple_list, Error, nonnull_raw_mut};
 use libafl_intelpt::{AddrFilter, AddrFilterType, AddrFilters, IntelPT, PAGE_SIZE};
 use object::{elf::PF_X, Object, ObjectSegment, SegmentFlags};
 
@@ -68,7 +68,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::debug!("Using core {} for fuzzing", cpu.0);
 
     // Create an observation channel using the map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", MAP_PTR, MAP_SIZE) };
+    let observer = unsafe { ConstMapObserver::from_mut_ptr("signals", nonnull_raw_mut!(MAP)) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
