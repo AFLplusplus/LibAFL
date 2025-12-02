@@ -165,7 +165,7 @@ tuple_list = { version = "0.1.3" }
 typed-builder = "0.23.2" # Implement the builder pattern at compiletime
 typeid = "1.0.3" # Safe type_eq that doesn't rely on std specialization
 unicorn-engine = "2.0.1" # Used in libafl_unicorn
-uuid = { version = "1.18.1", features = ["serde", "v4"] }
+uuid = { version = "1.19.0", features = ["serde", "v4"] }
 which = "8.0.0"
 windows = "0.62.1"
 windows-core = "0.62.1"
