@@ -28,7 +28,7 @@ use proc_maps::get_process_maps;
 // Coverage map
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
-static mut MAP_PTR: *mut u8 =  &raw mut MAP as _;
+static mut MAP_PTR: *mut u8 = &raw mut MAP as _;
 
 pub fn main() {
     // The closure that we want to fuzz
