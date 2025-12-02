@@ -389,3 +389,51 @@ where
 
 /// The standard corpus weight, same as in `AFL++`
 pub type StdWeightedScheduler<C, O> = WeightedScheduler<C, CorpusWeightTestcaseScore, O>;
+
+#[cfg(test)]
+mod tests {
+    use core::time::Duration;
+
+    use libafl_bolts::rands::StdRand;
+
+    use crate::{
+        corpus::{Corpus, EnableDisableCorpus, InMemoryCorpus, Testcase},
+        inputs::NopInput,
+        observers::StdMapObserver,
+        schedulers::{Scheduler, StdWeightedScheduler},
+        state::{HasCorpus, StdState},
+    };
+
+    #[test]
+    fn test_weighted_scheduler_testcase_removal() {
+        let mut corpus = InMemoryCorpus::new();
+        let mut testcase1 = Testcase::new(NopInput {});
+        testcase1.set_exec_time(Duration::from_millis(1)); // High weight
+        let idx1 = corpus.add(testcase1).unwrap();
+
+        let mut testcase2 = Testcase::new(NopInput {});
+        testcase2.set_exec_time(Duration::from_millis(1000)); // Low weight
+        let idx2 = corpus.add(testcase2).unwrap();
+
+        let observer = StdMapObserver::owned("map", vec![0u8; 16]);
+        let mut state = StdState::new(
+            StdRand::with_seed(0),
+            corpus,
+            InMemoryCorpus::new(),
+            &mut (),
+            &mut (),
+        )
+        .unwrap();
+
+        let mut scheduler = StdWeightedScheduler::new(&mut state, &observer);
+        scheduler.on_add(&mut state, idx1).unwrap();
+        scheduler.on_add(&mut state, idx2).unwrap();
+
+        *state.corpus_mut().current_mut() = Some(idx1);
+
+        state.corpus_mut().disable(idx1).unwrap();
+        *state.corpus_mut().current_mut() = None;
+
+        assert_eq!(scheduler.next(&mut state).unwrap(), idx2);
+    }
+}

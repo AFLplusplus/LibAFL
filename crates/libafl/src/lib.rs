@@ -108,6 +108,7 @@ mod tests {
         rands::{RomuDuoJrRand, StdRand},
         tuples::tuple_list,
     };
+    use serial_test::serial;
 
     #[cfg(miri)]
     use crate::stages::ExecutionCountRestartHelperMetadata;
@@ -127,6 +128,7 @@ mod tests {
     };
 
     #[test]
+    #[serial(inprocess)]
     fn test_fuzzer() {
         // # Safety
         // No concurrency per testcase

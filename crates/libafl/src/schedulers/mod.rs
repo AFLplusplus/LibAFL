@@ -141,7 +141,17 @@ where
     let current_id = *state.corpus().current();
 
     if let Some(id) = current_id {
-        let mut testcase = state.testcase_mut(id)?;
+        let Ok(testcase) = state.corpus().get_from_all(id) else {
+            log::info!("Current testcase with id {id} not found! Removed?");
+            return Ok(());
+        };
+        let mut testcase = testcase.borrow_mut();
+
+        if testcase.disabled() {
+            log::info!("Current testcase with id {id} is disabled!");
+            return Ok(());
+        }
+
         let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
 
         if tcmeta.handicap() >= 4 {
