@@ -917,6 +917,7 @@ jobs:
       - name: Install deps
         run: brew install z3 gtk+3 python llvm@${{env.MAIN_LLVM_VERSION}}
       - name: Install cxxbridge
+        # Needs to match version in tinyinst-rs
         run: cargo install cxxbridge-cmd@=1.0.190
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
