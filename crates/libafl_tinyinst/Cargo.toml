@@ -29,8 +29,7 @@ libafl_bolts = { workspace = true, default-features = true, features = [
   "std",
   "libafl_derive",
 ] }
-tinyinst = { git = "https://github.com/AFLplusplus/tinyinst-rs" }
-# tinyinst-rs = { path = "../../tinyinst-rs" }
+tinyinst = { workspace = true }
 log = { workspace = true }
 
 [build-dependencies]
