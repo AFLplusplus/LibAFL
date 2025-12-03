@@ -869,7 +869,8 @@ jobs:
       - name: Prepare
         uses: ./.github/workflows/windows-tester-prepare
       - name: install cxx bridge
-        run: cargo install cxxbridge-cmd
+        # Needs to match version in tinyinst-rs
+        run: cargo install cxxbridge-cmd@=1.0.190
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -916,7 +917,7 @@ jobs:
       - name: Install deps
         run: brew install z3 gtk+3 python llvm@${{env.MAIN_LLVM_VERSION}}
       - name: Install cxxbridge
-        run: cargo install cxxbridge-cmd
+        run: cargo install cxxbridge-cmd@=1.0.190
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: MacOS Build
