@@ -98,10 +98,10 @@ where
     #[inline]
     fn post_exec(
         &mut self,
-        _state: &mut S,
-        _new_corpus_id: Option<crate::corpus::CorpusId>,
+        state: &mut S,
+        new_corpus_id: Option<crate::corpus::CorpusId>,
     ) -> Result<(), Error> {
-        Ok(())
+        self.mutations.post_exec_all(state, new_corpus_id)
     }
 }
 

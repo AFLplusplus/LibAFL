@@ -380,7 +380,9 @@ where
     }
 
     #[expect(clippy::cast_precision_loss)]
-    fn post_exec(&mut self, state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        self.mutations.post_exec_all(state, new_corpus_id)?;
+
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();
 

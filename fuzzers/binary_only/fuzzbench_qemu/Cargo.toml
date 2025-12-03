@@ -34,3 +34,5 @@ libafl_targets = { path = "../../../crates/libafl_targets", version = "0.16.0" }
 env_logger = "0.11.5"
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 clap = { version = "4.5.18", features = ["default"] }
+mimalloc = "0.1.48"
+scudo = "0.1.3"

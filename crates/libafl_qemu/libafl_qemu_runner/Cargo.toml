@@ -64,7 +64,7 @@ vergen-git2 = "1.0.1"
 [dependencies]
 clap = { version = "4.5.52", features = ["derive", "string"] }
 env_logger = { version = "0.11.5" }
-log = { version = "0.4.22", features = ["release_max_level_info"] }
+log = { version = "0.4.29", features = ["release_max_level_info"] }
 readonly = { version = "0.2.12" }
 libafl_bolts = { path = "../../libafl_bolts" }
 libafl_qemu = { path = "../" }
