@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use core::{fmt::Debug, ops::AddAssign};
 
 pub use libafl_intelpt::{IntelPT, PAGE_SIZE, PtImage};
@@ -10,9 +9,7 @@ use crate::executors::hooks::ExecutorHook;
 /// Hook to enable Intel Processor Trace (PT) tracing
 #[derive(Debug, TypedBuilder)]
 pub struct IntelPTHook<T> {
-    #[builder(default = IntelPT::builder().build().unwrap())]
     intel_pt: IntelPT,
-    image: Vec<PtImage>,
     map_ptr: *mut T,
     map_len: usize,
 }
@@ -33,7 +30,7 @@ where
         pt.disable_tracing().unwrap();
 
         let _ = pt
-            .decode_traces_into_map(&self.image, self.map_ptr, self.map_len)
+            .decode_traces_into_map(self.map_ptr, self.map_len)
             .inspect_err(|e| log::warn!("Intel PT trace decoding failed: {e}"));
         #[cfg(feature = "intel_pt_export_raw")]
         {

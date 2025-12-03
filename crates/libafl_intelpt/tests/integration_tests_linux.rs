@@ -52,33 +52,32 @@ fn intel_pt_trace_fork() {
         Err(e) => panic!("Fork failed {e}"),
     };
 
-    let pt_builder = IntelPT::builder().pid(Some(pid.as_raw()));
+    waitpid(pid, Some(WaitPidFlag::WUNTRACED)).expect("Failed to wait for the child process");
+    let maps = get_process_maps(pid.into()).unwrap();
+
+    let images = maps
+        .iter()
+        .filter(|map| map.is_exec() && map.filename().is_some() && map.inode != 0)
+        .map(|map| {
+            let mut file = File::open(map.filename().unwrap()).unwrap();
+            let mut data = vec![0; map.size()];
+            file.seek(SeekFrom::Start(map.offset as u64)).unwrap();
+            file.read_exact(&mut data).unwrap();
+            PtImage::new(data, map.start() as u64)
+        })
+        .collect::<Vec<_>>();
+
+    let pt_builder = IntelPT::builder().pid(Some(pid.as_raw())).images(images);
     let mut pt = pt_builder.build().expect("Failed to create IntelPT");
     pt.enable_tracing().expect("Failed to enable tracing");
 
-    waitpid(pid, Some(WaitPidFlag::WUNTRACED)).expect("Failed to wait for the child process");
-    let maps = get_process_maps(pid.into()).unwrap();
     kill(pid, Signal::SIGCONT).expect("Failed to continue the process");
 
     waitpid(pid, None).expect("Failed to wait for the child process");
     pt.disable_tracing().expect("Failed to disable tracing");
 
-    let (_data, images) = maps
-        .iter()
-        .filter(|map| map.is_exec() && map.filename().is_some() && map.inode != 0)
-        .map(|map| {
-            println!("{map:?}");
-            let mut file = File::open(map.filename().unwrap()).unwrap();
-            let mut data = vec![0; map.size()];
-            file.seek(SeekFrom::Start(map.offset as u64)).unwrap();
-            file.read_exact(&mut data).unwrap();
-            let image = PtImage::new(&data, map.start() as u64);
-            (data, image)
-        })
-        .collect::<(Vec<_>, Vec<_>)>();
-
     let mut map = vec![0u16; 0x10_00];
-    pt.decode_traces_into_map(&images, map.as_mut_ptr(), map.len())
+    pt.decode_traces_into_map(map.as_mut_ptr(), map.len())
         .unwrap();
 
     let assembly_jump_id = map.iter().position(|count| *count >= 254);

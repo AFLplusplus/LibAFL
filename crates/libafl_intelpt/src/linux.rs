@@ -90,7 +90,7 @@ pub struct IntelPT {
     aux_head: *mut u64,
     aux_tail: *mut u64,
     previous_decode_head: u64,
-    exclude_hv: bool,
+    ptcov_decoder: PtCoverageDecoder,
     #[cfg(feature = "export_raw")]
     last_decode_trace: Vec<u8>,
 }
@@ -186,7 +186,7 @@ impl IntelPT {
     /// This function consumes the traces.
     pub fn decode_traces_into_map<T>(
         &mut self,
-        images: &[PtImage],
+        // images: &[PtImage], todo: introduce support for JIT/ self modifying code ecc
         map_ptr: *mut T,
         map_len: usize,
     ) -> Result<(), Error>
@@ -212,7 +212,6 @@ impl IntelPT {
                 size or refining the IP filters."
             );
         }
-        let skip = (self.previous_decode_head - tail) as usize;
 
         let head_wrap = wrap_aux_pointer(head, self.perf_aux_buffer_size);
         let tail_wrap = wrap_aux_pointer(tail, self.perf_aux_buffer_size);
@@ -242,33 +241,13 @@ impl IntelPT {
             }
         }
 
-        // let decoder = Decoder::new(
-        //     self.decoder_builder.clone(),
-        //     self.exclude_hv,
-        //     image,
-        //     data_ptr,
-        //     len,
-        //     skip,
-        //     map_ptr,
-        //     map_len,
-        // )?;
-
-        let mut decoder = PtCoverageDecoderBuilder::default()
-            .cpu(current_cpu())
-            .ignore_coverage_until(skip)
-            .filter_vmx_non_root(self.exclude_hv)
-            .build(
-                unsafe { &*slice_from_raw_parts(data_ptr, len) },
-                images,
-                unsafe { &mut *slice_from_raw_parts_mut(map_ptr, map_len) },
-            )
-            .unwrap();
-        decoder.coverage().unwrap();
-        let offset = decoder.pkt_dec_last_sync_pos();
+        let pt_trace = unsafe { &*slice_from_raw_parts(data_ptr, len) };
+        let coverage = unsafe { &mut *slice_from_raw_parts_mut(map_ptr, map_len) };
+        self.ptcov_decoder.coverage(pt_trace, coverage).unwrap();
 
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
         // might not contain a PSB packet.
-        unsafe { self.aux_tail.write_volatile(tail + offset as u64) };
+        unsafe { self.aux_tail.write_volatile(head) };
         self.previous_decode_head = head;
         Ok(())
     }
@@ -351,6 +330,7 @@ pub struct IntelPTBuilder {
     perf_buffer_size: usize,
     perf_aux_buffer_size: usize,
     ip_filters: Vec<RangeInclusive<u64>>,
+    images: Vec<PtImage>,
 }
 
 impl Default for IntelPTBuilder {
@@ -369,6 +349,7 @@ impl Default for IntelPTBuilder {
     ///     .unwrap()
     ///     .perf_aux_buffer_size(16 * 1024 * 1024)
     ///     .unwrap()
+    ///     .images(Vec::new())
     ///     .ip_filters(Default::default());
     /// assert_eq!(builder, IntelPTBuilder::default());
     /// ```
@@ -382,13 +363,14 @@ impl Default for IntelPTBuilder {
             perf_buffer_size: 128 * PAGE_SIZE + PAGE_SIZE,
             perf_aux_buffer_size: 16 * 1024 * 1024,
             ip_filters: Vec::new(),
+            images: Vec::new(),
         }
     }
 }
 
 impl IntelPTBuilder {
     /// Build the [`IntelPT`] struct
-    pub fn build(&self) -> Result<IntelPT, Error> {
+    pub fn build(self) -> Result<IntelPT, Error> {
         self.check_config();
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
         perf_event_attr.set_exclude_kernel(self.exclude_kernel.into());
@@ -444,13 +426,12 @@ impl IntelPTBuilder {
         let aux_head = unsafe { &raw mut (*buff_metadata).aux_head };
         let aux_tail = unsafe { &raw mut (*buff_metadata).aux_tail };
 
-        // let mut decoder_builder = EncoderDecoderBuilder::new()
-        //     .set_end_on_call(true)
-        //     .set_end_on_jump(true)
-        //     .filter(self.ip_filters);
-        // if let Some(cpu) = current_cpu() {
-        //     decoder_builder = decoder_builder.cpu(cpu);
-        // }
+        let ptcov_decoder = PtCoverageDecoderBuilder::new()
+            .cpu(current_cpu())
+            .filter_vmx_non_root(self.exclude_hv)
+            .images(self.images)
+            .build()
+            .unwrap();
 
         let mut intel_pt = IntelPT {
             fd,
@@ -461,8 +442,7 @@ impl IntelPTBuilder {
             aux_head,
             aux_tail,
             previous_decode_head: 0,
-            // decoder_builder,
-            exclude_hv: self.exclude_hv,
+            ptcov_decoder,
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
         };
@@ -483,7 +463,7 @@ impl IntelPTBuilder {
 
     #[must_use]
     /// Set the process to be traced via its `PID`. Set to `None` to trace the current process.
-    pub fn pid(mut self, pid: Option<i32>) -> Self {
+    pub const fn pid(mut self, pid: Option<i32>) -> Self {
         self.pid = pid;
         self
     }
@@ -567,6 +547,11 @@ impl IntelPTBuilder {
         self.ip_filters = filters;
         self
     }
+
+    pub fn images(mut self, images: Vec<PtImage>) -> Self {
+        self.images = images;
+        self
+    }
 }
 
 /// Perf event config for `IntelPT`
@@ -586,13 +571,6 @@ struct PtConfig {
 pub fn nr_addr_filters() -> Result<u32, String> {
     NR_ADDR_FILTERS.clone()
 }
-
-// /// Convert [`PtError`] into [`Error`]
-// #[inline]
-// #[must_use]
-// pub fn error_from_pt_error(err: PtError) -> Error {
-//     Error::unknown(err.to_string())
-// }
 
 pub(crate) fn availability_in_linux() -> Result<(), String> {
     let mut reasons = Vec::new();

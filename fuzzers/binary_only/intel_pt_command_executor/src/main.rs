@@ -123,22 +123,21 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let actual_virtual_address = executable_segment.address() + ELF_ET_DYN_BASE;
     let filters = vec![actual_virtual_address..=actual_virtual_address + executable_segment.size()];
 
+    let mut file = File::open(&target_path)?;
+    let mut data = vec![0; executable_segment.size() as usize];
+    file.seek(SeekFrom::Start(executable_segment.file_range().0))?;
+    file.read_exact(&mut data)?;
+    let images = vec![PtImage::new(data, actual_virtual_address)];
+
     let intel_pt = IntelPT::builder()
         .cpu(cpu.0)
         .inherit(true)
         .ip_filters(filters)
+        .images(images)
         .build()?;
-
-    let mut file = File::open(&target_path)?;
-    let mut data = vec![0; executable_segment.size() as usize];
-    file.seek(SeekFrom::Start(executable_segment.file_range().0))
-        .unwrap();
-    file.read_exact(&mut data)?;
-    let sections = vec![PtImage::new(&data, actual_virtual_address)];
 
     let hook = unsafe { IntelPTHook::builder().map_ptr(MAP_PTR).map_len(MAP_SIZE) }
         .intel_pt(intel_pt)
-        .image(sections)
         .build();
 
     let target_cstring = CString::from(
