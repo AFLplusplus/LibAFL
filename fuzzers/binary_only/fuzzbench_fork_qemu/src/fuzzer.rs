@@ -59,6 +59,14 @@ use libafl_qemu::{
 };
 use libafl_targets::{CMPLOG_MAP_PTR, EDGES_MAP_DEFAULT_SIZE};
 
+#[cfg(all(not(miri), debug_assertions))]
+#[global_allocator]
+static GLOBAL: scudo::GlobalScudoAllocator = scudo::GlobalScudoAllocator;
+
+#[cfg(all(not(miri), not(debug_assertions)))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 /// The fuzzer main
 pub fn main() {
     // Registry the metadata types used in this fuzzer
@@ -392,7 +400,12 @@ fn fuzz(
 
     if state.must_load_initial_inputs() {
         state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
+            .load_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut mgr,
+                std::slice::from_ref(&seed_dir),
+            )
             .unwrap_or_else(|_| {
                 println!("Failed to load initial corpus at {:?}", &seed_dir);
                 process::exit(0);

@@ -1,6 +1,15 @@
 #!/bin/bash
 
+if [ -z "$1" ]; then
+    echo "Usage: $0 <target-directory>"
+    exit 1
+fi
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+TARGET_DIR="$1"
+mkdir -p "$TARGET_DIR"
+cd "$TARGET_DIR" || exit 1
 
 echo "================================================="
 echo "           Nyx build script"
@@ -44,8 +53,8 @@ echo "[*] Checking QEMU-Nyx ..."
 if [ ! -f "QEMU-Nyx/x86_64-softmmu/qemu-system-x86_64" ]; then
     cd QEMU-Nyx/ || return
     # We need to copy our custom `Makefile.libxdc` after `git submodule update`, otherwise we get a git error.
-    sed -i "s,git submodule update libxdc$,git submodule update libxdc \&\& cp ../Makefile.libxdc ./libxdc/Makefile || exit 1," compile_qemu_nyx.sh
-    ./compile_qemu_nyx.sh lto || exit 1
+    sed -i "s,git submodule update libxdc$,git submodule update libxdc \&\& cp $SCRIPT_DIR/Makefile.libxdc ./libxdc/Makefile || exit 1," compile_qemu_nyx.sh
+    ./compile_qemu_nyx.sh lto
     cd ..
 fi
 

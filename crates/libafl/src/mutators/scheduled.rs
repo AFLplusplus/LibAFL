@@ -119,8 +119,8 @@ where
         self.scheduled_mutate(state, input)
     }
     #[inline]
-    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
-        Ok(())
+    fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        self.mutations.post_exec_all(state, new_corpus_id)
     }
 }
 
@@ -201,8 +201,8 @@ where
         self.scheduled_mutate(state, input)
     }
     #[inline]
-    fn post_exec(&mut self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
-        Ok(())
+    fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        self.mutations.post_exec_all(state, new_corpus_id)
     }
 }
 
@@ -305,6 +305,8 @@ where
     }
 
     fn post_exec(&mut self, state: &mut S, corpus_id: Option<CorpusId>) -> Result<(), Error> {
+        self.scheduled.post_exec(state, corpus_id)?;
+
         if let Some(id) = corpus_id {
             let mut testcase = (*state.corpus_mut().get(id)?).borrow_mut();
             let mut log = Vec::<Cow<'static, str>>::new();

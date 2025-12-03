@@ -2,7 +2,7 @@
 This is a fuzzer example to show how libafl_tinyinst works.
 
 ## How to build
-1. Install cxxbridge-cmd with `cargo install cxxbridge-cmd`
+1. Install cxxbridge-cmd@=1.0.190 (needs to match version in tinyinst-rs) with `cargo install cxxbridge-cmd@=1.0.190`
 2. Build the harness with `cl test\test.cpp -o test.exe`
 3. Build the fuzzer with `cargo build --release`. The fuzzer is `target\release\tinyinst_simple.exe`
 
