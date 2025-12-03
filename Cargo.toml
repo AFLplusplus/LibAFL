@@ -138,7 +138,7 @@ just = "1.43.1"
 libc = "0.2.177" # For (*nix) libc
 libipt = { version = "0.4.0", features = ["libipt_master"] }
 libvharness_sys = { path = "./crates/libafl_qemu/libvharness_sys", version = "0.16.0", default-features = false }
-log = "0.4.28"
+log = "0.4.29"
 meminterval = "0.4.2"
 mimalloc = { version = "0.1.48", default-features = false }
 nix = { version = "0.30.1", default-features = false }
