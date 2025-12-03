@@ -252,7 +252,7 @@ unsafe fn fuzz(
                 let coverage = CoverageRuntime::new();
                 let cmplog = CmpLogRuntime::new();
 
-                let mut frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
                     &gum,
                     options,
                     tuple_list!(coverage, cmplog),
@@ -397,7 +397,7 @@ unsafe fn fuzz(
 
                 let coverage = CoverageRuntime::new();
 
-                let mut frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
                     &gum,
                     options,
                     tuple_list!(coverage),
