@@ -26,7 +26,8 @@ runs:
     - name: Add toolchain
       if: ${{ inputs.fuzzer-name == 'binary_only/tinyinst_simple' }}
       shell: bash
-      run: cargo install cxxbridge-cmd
+      # Needs to match version in tinyinst-rs
+      run: cargo install cxxbridge-cmd@=1.0.190
     - name: Add nyx deps
       if: ${{ inputs.fuzzer-name == 'full_system/nyx_launcher' || inputs.fuzzer-name == 'full_system/nyx_libxml2_standalone' || inputs.fuzzer-name == 'full_system/nyx_libxml2_parallel' }}
       shell: bash
