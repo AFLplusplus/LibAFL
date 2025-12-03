@@ -244,7 +244,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         let mut stages = tuple_list!(
             IfElseStage::new(
-                |_, _, _, _| Ok(is_cmplog(&options, &client_description)),
+                |_, _, _, _| Ok(is_cmplog(options, &client_description)),
                 tuple_list!(tracing, i2s),
                 tuple_list!()
             ),
