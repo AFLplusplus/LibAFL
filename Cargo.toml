@@ -135,7 +135,7 @@ fastbloom = { version = "0.14.0", default-features = false }
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
 hashbrown = { version = "0.16.1", default-features = false } # A faster hashmap, nostd compatible
 just = "1.43.1"
-libc = "0.2.177" # For (*nix) libc
+libc = "0.2.178" # For (*nix) libc
 libipt = { version = "0.4.0", features = ["libipt_master"] }
 libvharness_sys = { path = "./crates/libafl_qemu/libvharness_sys", version = "0.16.0", default-features = false }
 log = "0.4.28"
