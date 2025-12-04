@@ -30,14 +30,14 @@ This directory contains the various crates that make up the LibAFL ecosystem. He
 - **[build_id2](./build_id2)**: Updated and maintained build id library.
 - **[core_affinity2](./core_affinity2)**: Core Affinity crate to bind to cores, cross platform.
 - **[exceptional](./exceptional)**: Everything for your exception and signal handling needs.
-- **[fast_rands](./fast_rands)**: Non-cryptographically, but quite fast, RNG implementations.
+- **[fast_rands](./fast_rands)**: Non-cryptographically, but fast, RNG implementations.
 - **[libafl_asan](./libafl_asan)**: Address sanitizer library for LibAFL.
-- **[libafl_core](./libafl_core)**: A platform-independent shared memory library for Rust.
+- **[libafl_core](./libafl_core)**: Minimal set of core functions shared between almost all `LibAFL` crates.
 - **[libafl_derive](./libafl_derive)**: Derive proc-macro crate for LibAFL.
 - **[ll_mp](./ll_mp)**: A library for low level message passing.
 - **[minibsod](./minibsod)**: A library to dump current register states, etc., on crash.
-- **[no_std_time](./no_std_time)**: Time measurments that work in no_std environments.
-- **[ownedref](./ownedref)**: Library to pass around references that will be owned types on deserialization.
+- **[no_std_time](./no_std_time)**: Time measurments that works in `no_std` environments.
+- **[ownedref](./ownedref)**: References that will be owned types on deserialization.
 - **[serde_anymap](./serde_anymap)**: A map that can retrieve values by type - and is SerDe serializable.
 - **[shmem_providers](./shmem_providers)**: Platform independent shared memory providers for Windows, Linux, Android, iOS, ...
 - **[tuple_list_ex](./tuple_list_ex)**: Useful Haskel-like extensions for the tuple_list crate.
