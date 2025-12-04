@@ -55,6 +55,11 @@ use libafl_bolts::{
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
+#[cfg(feature = "dump_cov")]
+use libafl_targets::sancov_pcguard::{
+    dump_covered_lines, libafl_targets_disable_coverage_collection,
+    libafl_targets_enable_coverage_collection,
+};
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
@@ -62,12 +67,16 @@ use libafl_targets::{
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
 #[expect(clippy::too_many_lines)]
-pub extern "C" fn libafl_main() {
+pub extern "C" fn libafl_main(
+    _argc: core::ffi::c_int,
+    _argv: *const *const core::ffi::c_char,
+) -> core::ffi::c_int {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
 
-    let res = match Command::new(env!("CARGO_PKG_NAME"))
+    #[allow(unused_mut)]
+    let mut cmd = Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer for Fuzzbench")
@@ -102,10 +111,19 @@ pub extern "C" fn libafl_main() {
                 .long("timeout")
                 .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1200"),
-        )
-        .arg(Arg::new("remaining"))
-        .try_get_matches()
+        );
+
+    #[cfg(feature = "dump_cov")]
     {
+        cmd = cmd.arg(
+            Arg::new("dump_cov")
+                .long("dump-cov")
+                .help("Dump the coverage for the given input")
+                .action(clap::ArgAction::SetTrue),
+        );
+    }
+
+    let res = match cmd.arg(Arg::new("remaining")).try_get_matches() {
         Ok(res) => res,
         Err(err) => {
             println!(
@@ -115,7 +133,7 @@ pub extern "C" fn libafl_main() {
                     .to_string_lossy(),
                 err,
             );
-            return;
+            return 1;
         }
     };
 
@@ -127,8 +145,12 @@ pub extern "C" fn libafl_main() {
     if let Some(filenames) = res.get_many::<String>("remaining") {
         let filenames: Vec<&str> = filenames.map(std::string::String::as_str).collect();
         if !filenames.is_empty() {
-            run_testcases(&filenames);
-            return;
+            #[cfg(feature = "dump_cov")]
+            let dump_cov = res.get_flag("dump_cov");
+            #[cfg(not(feature = "dump_cov"))]
+            let dump_cov = false;
+            run_testcases(&filenames, dump_cov);
+            return 0;
         }
     }
 
@@ -142,7 +164,7 @@ pub extern "C" fn libafl_main() {
         println!("Out dir at {:?} already exists.", &out_dir);
         if !out_dir.is_dir() {
             println!("Out dir at {:?} is not a valid directory!", &out_dir);
-            return;
+            return 1;
         }
     }
     let mut crashes = out_dir.clone();
@@ -156,7 +178,7 @@ pub extern "C" fn libafl_main() {
     );
     if !in_dir.is_dir() {
         println!("In dir at {:?} is not a valid directory!", &in_dir);
-        return;
+        return 1;
     }
 
     let tokens = res.get_one::<String>("tokens").map(PathBuf::from);
@@ -178,6 +200,7 @@ pub extern "C" fn libafl_main() {
         fuzz_binary(out_dir, crashes, &in_dir, tokens, &logfile, timeout)
             .expect("An error occurred while fuzzing");
     }
+    0
 }
 
 fn count_textual_inputs(dir: &Path) -> (usize, usize) {
@@ -230,7 +253,7 @@ fn check_if_textual(seeds_dir: &Path, tokenfile: &Option<PathBuf>) -> bool {
     is_text
 }
 
-fn run_testcases(filenames: &[&str]) {
+fn run_testcases(filenames: &[&str], _dump_coverage: bool) {
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
@@ -249,8 +272,20 @@ fn run_testcases(filenames: &[&str]) {
         let mut buffer = vec![];
         file.read_to_end(&mut buffer).expect("Buffer overflow");
 
+        #[cfg(feature = "dump_cov")]
+        if _dump_coverage {
+            libafl_targets_enable_coverage_collection();
+        }
         unsafe {
             libfuzzer_test_one_input(&buffer);
+        }
+        #[cfg(feature = "dump_cov")]
+        if _dump_coverage {
+            let map = dump_covered_lines(true);
+            libafl_targets_disable_coverage_collection();
+            for (pc, sym) in map {
+                println!("PC: {:x} -> {}", pc, sym);
+            }
         }
     }
 }
@@ -265,6 +300,8 @@ fn fuzz_binary(
     logfile: &PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
+    #[cfg(feature = "dump_cov")]
+    libafl_targets_enable_coverage_collection();
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]
@@ -454,7 +491,12 @@ fn fuzz_binary(
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
         state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
+            .load_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut mgr,
+                std::slice::from_ref(seed_dir),
+            )
             .unwrap_or_else(|e| {
                 println!("Failed to load initial corpus at {seed_dir:?} - {e:?}");
                 process::exit(0);
@@ -481,6 +523,8 @@ fn fuzz_text(
     logfile: &PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
+    #[cfg(feature = "dump_cov")]
+    libafl_targets_enable_coverage_collection();
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]
@@ -691,7 +735,12 @@ fn fuzz_text(
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
         state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
+            .load_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut mgr,
+                std::slice::from_ref(seed_dir),
+            )
             .unwrap_or_else(|e| {
                 println!("Failed to load initial corpus at {seed_dir:?} {e:?}");
                 process::exit(0);

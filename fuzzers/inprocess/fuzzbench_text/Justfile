@@ -53,7 +53,7 @@ run:
 
 [linux]
 [macos]
-test: fuzzer
+test: fuzzer test-dump-cov
 	#!/bin/bash
 	rm -rf libafl_unix_shmem_server || true
 	mkdir in || true
@@ -75,3 +75,15 @@ test: fuzzer
 
 clean:
 	cargo clean
+
+test-dump-cov:
+	cargo build --profile={{PROFILE}} --features dump_cov
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -c fuzz.c -o fuzz.o
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cxx --libafl fuzz.o -o {{FUZZER_NAME}} -lm -lz
+	# Create a dummy seed
+	mkdir -p seeds_dump
+	echo "dummy" > seeds_dump/dummy
+	# Run with --dump-cov
+	./{{FUZZER_NAME}} -i seeds_dump -o corpus_dump --dump-cov seeds_dump/dummy
+	# Clean up
+	rm -rf seeds_dump corpus_dump

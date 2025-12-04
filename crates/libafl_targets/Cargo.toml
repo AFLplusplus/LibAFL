@@ -51,6 +51,7 @@ sancov_cmplog = [
   "common",
 ] # Defines cmp and __sanitizer_weak_hook functions. Use libfuzzer_interceptors to define interceptors (only compatible with Linux)
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
+sancov_pcguard_dump_cov = ["std", "backtrace"]
 sanitizer_interfaces = []
 clippy = [] # Ignore compiler warnings during clippy
 observers = ["meminterval"]
@@ -94,6 +95,7 @@ serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] } # serialization lib
 meminterval = { workspace = true, features = ["serde"], optional = true }
+backtrace = { workspace = true, optional = true }
 
 [lints]
 workspace = true

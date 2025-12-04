@@ -58,7 +58,8 @@ include!(concat!(env!("OUT_DIR"), "/constants.rs"));
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ngram4",
     feature = "sancov_ngram8",
-    feature = "sancov_ctx"
+    feature = "sancov_ctx",
+    feature = "sancov_pcguard_dump_cov"
 ))]
 pub mod sancov_pcguard;
 #[cfg(any(
@@ -66,7 +67,8 @@ pub mod sancov_pcguard;
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ngram4",
     feature = "sancov_ngram8",
-    feature = "sancov_ctx"
+    feature = "sancov_ctx",
+    feature = "sancov_pcguard_dump_cov"
 ))]
 pub use sancov_pcguard::*;
 
