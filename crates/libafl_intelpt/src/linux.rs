@@ -548,6 +548,7 @@ impl IntelPTBuilder {
         self
     }
 
+    #[must_use]
     pub fn images(mut self, images: Vec<PtImage>) -> Self {
         self.images = images;
         self
