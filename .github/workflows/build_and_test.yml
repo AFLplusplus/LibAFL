@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Install mimetype
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libfile-mimeinfo-perl lcov
+        run: sudo apt-get update && sudo apt-get install -y libfile-mimeinfo-perl
       - name: install mdbook
         uses: baptiste0928/cargo-install@v3
         with:
@@ -48,7 +48,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Install LLVM
         if: runner.os == 'MacOS'
-        run: brew install llvm@${{env.MAIN_LLVM_VERSION}} lcov
+        run: brew install llvm@${{env.MAIN_LLVM_VERSION}}
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
         if: runner.os == 'Linux'
@@ -361,9 +361,6 @@ jobs:
         uses: ./.github/workflows/fuzzer-tester-prepare
         with:
           fuzzer-name: ${{ matrix.fuzzer }}
-      - name: Install lcov
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y lcov
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -918,7 +915,7 @@ jobs:
         with:
           components: clippy
       - name: Install deps
-        run: brew install z3 gtk+3 python llvm@${{env.MAIN_LLVM_VERSION}} lcov
+        run: brew install z3 gtk+3 python llvm@${{env.MAIN_LLVM_VERSION}}
       - name: Install cxxbridge
         # Needs to match version in tinyinst-rs
         run: cargo install cxxbridge-cmd@=1.0.190
