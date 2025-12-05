@@ -79,14 +79,16 @@ static const int kPngHeaderSize = 8;
 // Rename to avoid conflict with libafl_targets default stub
 extern "C" int LLVMFuzzerTestOneInputLibPng(const uint8_t *data, size_t size) {
   static long long crash_after = -1;
-  static bool initialized = false;
+  static bool      initialized = false;
   if (!initialized) {
-    char* val = getenv("LIBAFL_CRASH_AFTER");
+    char *val = getenv("LIBAFL_CRASH_AFTER");
     if (val) {
-        crash_after = atoll(val);
-        fprintf(stderr, "DEBUG: LIBAFL_CRASH_AFTER found: %s, converted to %lld\n", val, crash_after);
+      crash_after = atoll(val);
+      fprintf(stderr,
+              "DEBUG: LIBAFL_CRASH_AFTER found: %s, converted to %lld\n", val,
+              crash_after);
     } else {
-        fprintf(stderr, "DEBUG: LIBAFL_CRASH_AFTER not found\n");
+      fprintf(stderr, "DEBUG: LIBAFL_CRASH_AFTER not found\n");
     }
     fflush(stderr);
     initialized = true;
@@ -95,7 +97,8 @@ extern "C" int LLVMFuzzerTestOneInputLibPng(const uint8_t *data, size_t size) {
     // fprintf(stderr, "DEBUG: Execution count: %lld\n", crash_after);
     crash_after--;
     if (crash_after == 0) {
-      fprintf(stderr, "Intentionally crashing in harness after limit reached\n");
+      fprintf(stderr,
+              "Intentionally crashing in harness after limit reached\n");
       fflush(stderr);
       // Trigger a crash
       abort();
