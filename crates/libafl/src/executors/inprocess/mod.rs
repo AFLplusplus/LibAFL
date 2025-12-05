@@ -403,7 +403,7 @@ mod tests {
     };
 
     #[test]
-    #[cfg_attr(feature = "std", serial(inprocess))]
+    #[cfg_attr(feature = "std", serial)]
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
         let rand = XkcdRand::new();

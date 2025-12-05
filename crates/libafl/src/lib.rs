@@ -128,7 +128,7 @@ mod tests {
     };
 
     #[test]
-    #[serial(inprocess)]
+    #[serial]
     fn test_fuzzer() {
         // # Safety
         // No concurrency per testcase

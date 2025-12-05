@@ -564,7 +564,7 @@ mod tests {
     }
 
     #[test]
-    #[serial(inprocess)]
+    #[serial]
     fn run_test_asan() {
         // Read RUST_LOG from the environment and set the log level accordingly (not using env_logger)
         // Note that in cargo test, the output of successfull tests is suppressed by default,

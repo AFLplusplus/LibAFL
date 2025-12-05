@@ -1423,7 +1423,7 @@ mod tests {
     };
 
     #[test]
-    #[serial(inprocess)]
+    #[serial]
     fn filtered_execution() {
         let execution_count = RefCell::new(0);
         let scheduler = StdScheduler::new();
