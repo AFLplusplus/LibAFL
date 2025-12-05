@@ -1507,9 +1507,9 @@ dependencies = [
 
 [[package]]
 name = "ctor"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb230974aaf0aca4d71665bed0aca156cf43b764fcb9583b69c6c3e686f35e72"
+checksum = "424e0138278faeb2b401f174ad17e715c829512d74f3d1e81eb43365c2e0590e"
 dependencies = [
  "ctor-proc-macro",
  "dtor",
@@ -3396,13 +3396,13 @@ dependencies = [
  "caps",
  "libafl_bolts",
  "libc",
- "libipt",
  "log",
  "nix 0.30.1",
  "num-traits",
  "num_enum",
  "perf-event-open-sys",
  "proc-maps",
+ "ptcov",
  "raw-cpuid",
  "static_assertions",
 ]
@@ -3624,28 +3624,6 @@ dependencies = [
  "libz-sys",
  "openssl-sys",
  "pkg-config",
-]
-
-[[package]]
-name = "libipt"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c3143c4dae9794d23fa2bbc6315847fdf3ef718caa09a7ba09238bce19fe9d4"
-dependencies = [
- "bitflags 2.10.0",
- "derive_more",
- "libipt-sys",
- "num_enum",
-]
-
-[[package]]
-name = "libipt-sys"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7609ac7c13e6e9e97027559ee7d1b093013e72996c78ba1f0e37c53b3dc090bb"
-dependencies = [
- "bindgen 0.72.1",
- "cmake",
 ]
 
 [[package]]
@@ -4795,6 +4773,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.111",
+]
+
+[[package]]
+name = "ptcov"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36fd9f341fcafdbf0b585bcb9617e5a8e3759c6277955b37c3e44dbc91528d8c"
+dependencies = [
+ "iced-x86",
 ]
 
 [[package]]
