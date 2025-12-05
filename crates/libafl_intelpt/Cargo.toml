@@ -11,10 +11,9 @@ keywords = ["fuzzing", "testing", "security", "intelpt"]
 categories = ["development-tools::testing", "no-std"]
 
 [features]
-default = ["std", "libipt"]
+default = ["std"]
 std = ["libafl_bolts/std"]
 
-libipt = ["std", "dep:libipt"]
 ## Export raw Intel PT traces on decode, useful for debug, disabled by default for best performance
 export_raw = []
 
@@ -30,10 +29,10 @@ arbitrary-int = { workspace = true }
 bitbybit = { workspace = true }
 libafl_bolts = { workspace = true }
 libc = { workspace = true }
-libipt = { workspace = true, optional = true }
 log = { workspace = true }
 num_enum = { workspace = true, default-features = false }
 num-traits = { workspace = true, default-features = false }
+ptcov = { version = "0.0.4" }
 raw-cpuid = { version = "11.1.0" }
 
 [target.'cfg(target_os = "linux" )'.dependencies]

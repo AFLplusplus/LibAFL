@@ -1,14 +1,14 @@
 extern crate alloc;
-
-use alloc::{
-    borrow::ToOwned,
-    boxed::Box,
-    ffi::CString,
-    format,
-    string::{String, ToString},
-    vec::Vec,
+#[cfg(feature = "export_raw")]
+use alloc::string::ToString;
+use alloc::{borrow::ToOwned, boxed::Box, ffi::CString, format, string::String, vec::Vec};
+use core::{
+    ffi::CStr,
+    fmt::Debug,
+    ops::{AddAssign, RangeInclusive},
+    ptr,
+    ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
 };
-use core::{ffi::CStr, fmt::Debug, ptr};
 use std::{
     fs,
     io::{Read, Seek, SeekFrom},
@@ -24,28 +24,18 @@ use arbitrary_int::u4;
 use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 use libafl_bolts::Error;
-pub use libipt::{
-    asid::Asid,
-    enc_dec_builder::{AddrFilter, AddrFilterType, AddrFilters},
-    image::{Image, SectionCache, SectionInfo},
-    status::Status,
-};
-use libipt::{
-    block::BlockDecoder,
-    enc_dec_builder::{Cpu, EncoderDecoderBuilder},
-    error::PtError,
-};
 use num_enum::TryFromPrimitive;
-use num_traits::{Euclid, SaturatingAdd};
+use num_traits::Euclid;
 use perf_event_open_sys::{
     bindings::{PERF_FLAG_FD_CLOEXEC, perf_event_attr, perf_event_mmap_page},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
+pub use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder, PtImage};
+use ptcov::{PtCpu, PtCpuVendor};
 use raw_cpuid::CpuId;
 
 use super::{PAGE_SIZE, availability};
-use crate::decoder::Decoder;
 
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
@@ -100,9 +90,7 @@ pub struct IntelPT {
     aux_head: *mut u64,
     aux_tail: *mut u64,
     previous_decode_head: u64,
-    // The lifetime of BlockDecoder<'a> is irrelevant during the building phase.
-    decoder_builder: EncoderDecoderBuilder<BlockDecoder<'static>>,
-    exclude_hv: bool,
+    ptcov_decoder: PtCoverageDecoder,
     #[cfg(feature = "export_raw")]
     last_decode_trace: Vec<u8>,
 }
@@ -120,22 +108,12 @@ impl IntelPT {
     ///
     /// Only instructions in `filters` ranges will be traced.
     /// NOTE: only filters of type `AddrFilterType::FILTER` are supported.
-    fn set_ip_filters(&mut self, filters: &AddrFilters) -> Result<(), Error> {
-        if filters
-            .iter()
-            .any(|f| f.filter_type == AddrFilterType::STOP)
-        {
-            return Err(Error::unsupported(
-                "only filters of type `AddrFilterType::FILTER` are supported",
-            ));
-        }
-
+    fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
         let str_filter = filters
             .iter()
-            .filter(|f| f.filter_type == AddrFilterType::FILTER)
             .map(|filter| {
-                let size = filter.to - filter.from + 1;
-                format!("filter {:#016x}/{:#016x} ", filter.from, size)
+                let size = filter.end() - filter.start() + 1;
+                format!("filter {:#016x}/{:#016x} ", filter.start(), size)
             })
             .reduce(|acc, s| acc + &s)
             .unwrap_or_default();
@@ -148,15 +126,11 @@ impl IntelPT {
                     Ok(()) => String::new(),
                     Err(reasons) => format!(" Possible reasons: {reasons}"),
                 };
-                let n_set_filters = filters
-                    .iter()
-                    .filter(|f| f.filter_type == AddrFilterType::FILTER)
-                    .count();
-                let not_enough_filters = if n_set_filters > nr_addr_filters().unwrap_or(0) as usize
+                let not_enough_filters = if filters.len() > nr_addr_filters().unwrap_or(0) as usize
                 {
                     format!(
                         " Not enough filters, trying to set {} filters while {} available.",
-                        n_set_filters,
+                        filters.len(),
                         nr_addr_filters().unwrap_or(0)
                     )
                 } else {
@@ -212,12 +186,12 @@ impl IntelPT {
     /// This function consumes the traces.
     pub fn decode_traces_into_map<T>(
         &mut self,
-        image: &mut Image,
+        // images: &[PtImage], todo: introduce support for JIT/ self modifying code ecc
         map_ptr: *mut T,
         map_len: usize,
     ) -> Result<(), Error>
     where
-        T: SaturatingAdd + From<u8> + Debug,
+        T: AddAssign + From<u8> + Debug,
     {
         let head = unsafe { self.aux_head.read_volatile() };
         let tail = unsafe { self.aux_tail.read_volatile() };
@@ -238,7 +212,6 @@ impl IntelPT {
                 size or refining the IP filters."
             );
         }
-        let skip = self.previous_decode_head - tail;
 
         let head_wrap = wrap_aux_pointer(head, self.perf_aux_buffer_size);
         let tail_wrap = wrap_aux_pointer(tail, self.perf_aux_buffer_size);
@@ -268,21 +241,13 @@ impl IntelPT {
             }
         }
 
-        let decoder = Decoder::new(
-            self.decoder_builder.clone(),
-            self.exclude_hv,
-            image,
-            data_ptr,
-            len,
-            skip,
-            map_ptr,
-            map_len,
-        )?;
-        let offset = decoder.decode_traces_into_map()?;
+        let pt_trace = unsafe { &*slice_from_raw_parts(data_ptr, len) };
+        let coverage = unsafe { &mut *slice_from_raw_parts_mut(map_ptr, map_len) };
+        self.ptcov_decoder.coverage(pt_trace, coverage).unwrap();
 
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
         // might not contain a PSB packet.
-        unsafe { self.aux_tail.write_volatile(tail + offset) };
+        unsafe { self.aux_tail.write_volatile(head) };
         self.previous_decode_head = head;
         Ok(())
     }
@@ -364,7 +329,8 @@ pub struct IntelPTBuilder {
     inherit: bool,
     perf_buffer_size: usize,
     perf_aux_buffer_size: usize,
-    ip_filters: AddrFilters,
+    ip_filters: Vec<RangeInclusive<u64>>,
+    images: Vec<PtImage>,
 }
 
 impl Default for IntelPTBuilder {
@@ -383,7 +349,8 @@ impl Default for IntelPTBuilder {
     ///     .unwrap()
     ///     .perf_aux_buffer_size(16 * 1024 * 1024)
     ///     .unwrap()
-    ///     .ip_filters(&Default::default());
+    ///     .images(Vec::new())
+    ///     .ip_filters(Default::default());
     /// assert_eq!(builder, IntelPTBuilder::default());
     /// ```
     fn default() -> Self {
@@ -395,14 +362,15 @@ impl Default for IntelPTBuilder {
             inherit: false,
             perf_buffer_size: 128 * PAGE_SIZE + PAGE_SIZE,
             perf_aux_buffer_size: 16 * 1024 * 1024,
-            ip_filters: AddrFilters::default(),
+            ip_filters: Vec::new(),
+            images: Vec::new(),
         }
     }
 }
 
 impl IntelPTBuilder {
     /// Build the [`IntelPT`] struct
-    pub fn build(&self) -> Result<IntelPT, Error> {
+    pub fn build(self) -> Result<IntelPT, Error> {
         self.check_config();
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
         perf_event_attr.set_exclude_kernel(self.exclude_kernel.into());
@@ -458,13 +426,12 @@ impl IntelPTBuilder {
         let aux_head = unsafe { &raw mut (*buff_metadata).aux_head };
         let aux_tail = unsafe { &raw mut (*buff_metadata).aux_tail };
 
-        let mut decoder_builder = EncoderDecoderBuilder::new()
-            .set_end_on_call(true)
-            .set_end_on_jump(true)
-            .filter(self.ip_filters);
-        if let Some(cpu) = current_cpu() {
-            decoder_builder = decoder_builder.cpu(cpu);
-        }
+        let ptcov_decoder = PtCoverageDecoderBuilder::new()
+            .cpu(current_cpu())
+            .filter_vmx_non_root(self.exclude_hv)
+            .images(self.images)
+            .build()
+            .unwrap();
 
         let mut intel_pt = IntelPT {
             fd,
@@ -475,8 +442,7 @@ impl IntelPTBuilder {
             aux_head,
             aux_tail,
             previous_decode_head: 0,
-            decoder_builder,
-            exclude_hv: self.exclude_hv,
+            ptcov_decoder,
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
         };
@@ -497,7 +463,7 @@ impl IntelPTBuilder {
 
     #[must_use]
     /// Set the process to be traced via its `PID`. Set to `None` to trace the current process.
-    pub fn pid(mut self, pid: Option<i32>) -> Self {
+    pub const fn pid(mut self, pid: Option<i32>) -> Self {
         self.pid = pid;
         self
     }
@@ -577,8 +543,14 @@ impl IntelPTBuilder {
 
     #[must_use]
     /// Set filters based on Instruction Pointer (IP)
-    pub const fn ip_filters(mut self, filters: &AddrFilters) -> Self {
-        self.ip_filters = *filters;
+    pub fn ip_filters(mut self, filters: Vec<RangeInclusive<u64>>) -> Self {
+        self.ip_filters = filters;
+        self
+    }
+
+    #[must_use]
+    pub fn images(mut self, images: Vec<PtImage>) -> Self {
+        self.images = images;
         self
     }
 }
@@ -599,13 +571,6 @@ struct PtConfig {
 /// Number of address filters available on the running CPU
 pub fn nr_addr_filters() -> Result<u32, String> {
     NR_ADDR_FILTERS.clone()
-}
-
-/// Convert [`PtError`] into [`Error`]
-#[inline]
-#[must_use]
-pub fn error_from_pt_error(err: PtError) -> Error {
-    Error::unknown(err.to_string())
 }
 
 pub(crate) fn availability_in_linux() -> Result<(), String> {
@@ -777,12 +742,10 @@ fn linux_version() -> Result<(usize, usize, usize), ()> {
     }
 }
 
-#[inline]
 const fn next_page_aligned_addr(address: u64) -> u64 {
     (address + PAGE_SIZE as u64 - 1) & !(PAGE_SIZE as u64 - 1)
 }
 
-#[inline]
 fn smp_rmb() {
     // SAFETY: just a memory barrier
     unsafe {
@@ -790,17 +753,20 @@ fn smp_rmb() {
     }
 }
 
-#[inline]
 const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
     ptr & (perf_aux_buffer_size as u64 - 1)
 }
 
-#[inline]
-fn current_cpu() -> Option<Cpu> {
+fn current_cpu() -> Option<PtCpu> {
     let cpuid = CpuId::new();
-    cpuid
-        .get_feature_info()
-        .map(|fi| Cpu::intel(fi.family_id().into(), fi.model_id(), fi.stepping_id()))
+    cpuid.get_feature_info().map(|fi| {
+        PtCpu::new(
+            PtCpuVendor::Intel,
+            fi.family_id().into(),
+            fi.model_id(),
+            fi.stepping_id(),
+        )
+    })
 }
 
 #[cfg(test)]
