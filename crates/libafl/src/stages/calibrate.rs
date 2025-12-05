@@ -481,6 +481,7 @@ mod tests {
         // This is called once at the start of the test
         unsafe {
             RegistryBuilder::register::<DisabledInCalibrationStageMetadata>();
+            RegistryBuilder::register::<crate::feedbacks::map::MapFeedbackMetadata<u8>>();
         }
 
         // Setup

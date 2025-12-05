@@ -473,6 +473,10 @@ mod tests {
 
     #[test]
     fn test_minimizer_scheduler_update_score_crash() {
+        #[cfg(not(feature = "serdeany_autoreg"))]
+        unsafe {
+            libafl_bolts::serdeany::RegistryBuilder::register::<TopRatedsMetadata>();
+        }
         let rand = StdRand::with_seed(0);
         let observer = StdMapObserver::owned("map", vec![0u8; 16]).track_indices();
         let mut scheduler: IndexesLenTimeMinimizerScheduler<QueueScheduler, NopInput, _> =

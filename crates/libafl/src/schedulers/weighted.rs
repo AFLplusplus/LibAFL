@@ -406,6 +406,13 @@ mod tests {
 
     #[test]
     fn test_weighted_scheduler_testcase_removal() {
+        #[cfg(not(feature = "serdeany_autoreg"))]
+        unsafe {
+            libafl_bolts::serdeany::RegistryBuilder::register::<
+                crate::schedulers::powersched::SchedulerMetadata,
+            >();
+        }
+
         let mut corpus = InMemoryCorpus::new();
         let mut testcase1 = Testcase::new(NopInput {});
         testcase1.set_exec_time(Duration::from_millis(1)); // High weight
