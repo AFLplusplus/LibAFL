@@ -3546,6 +3546,7 @@ dependencies = [
  "backtrace",
  "bindgen 0.72.1",
  "cc",
+ "document-features",
  "fast_rands",
  "hashbrown 0.16.1",
  "libafl",
