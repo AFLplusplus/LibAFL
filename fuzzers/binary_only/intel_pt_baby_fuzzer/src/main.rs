@@ -1,4 +1,12 @@
-use std::{hint::black_box, num::NonZero, path::PathBuf, process, time::Duration};
+use std::{
+    fs::File,
+    hint::black_box,
+    io::{Read, Seek, SeekFrom},
+    num::NonZero,
+    path::PathBuf,
+    process,
+    time::Duration,
+};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -8,7 +16,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
-        hooks::intel_pt::{IntelPTHook, SectionInfo},
+        hooks::intel_pt::{IntelPT, IntelPTHook, PtImage},
         inprocess::GenericInProcessExecutor,
         ExitKind,
     },
@@ -95,28 +103,28 @@ pub fn main() {
     // Get the memory map of the current process
     let my_pid = i32::try_from(process::id()).unwrap();
     let process_maps = get_process_maps(my_pid).unwrap();
-    let sections = process_maps
+    let images = process_maps
         .iter()
         .filter_map(|pm| {
             if pm.is_exec() && pm.filename().is_some() && pm.inode != 0 {
-                Some(SectionInfo {
-                    filename: pm.filename().unwrap().to_string_lossy().to_string(),
-                    offset: pm.offset as u64,
-                    size: pm.size() as u64,
-                    virtual_address: pm.start() as u64,
-                })
+                let mut file = File::open(pm.filename().unwrap()).unwrap();
+                let mut data = vec![0; pm.size()];
+                file.seek(SeekFrom::Start(pm.offset as u64)).unwrap();
+                file.read_exact(&mut data).unwrap();
+                Some(PtImage::new(data, pm.start() as u64))
             } else {
                 None
             }
         })
         .collect::<Vec<_>>();
 
+    let pt = IntelPT::builder().images(images).build().unwrap();
     // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
     let pt_hook = unsafe {
         IntelPTHook::builder()
+            .intel_pt(pt)
             .map_ptr(MAP_PTR)
             .map_len(MAP_SIZE)
-            .image(&sections)
     }
     .build();
 

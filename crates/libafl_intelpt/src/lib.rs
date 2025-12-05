@@ -7,7 +7,6 @@
 #![no_std]
 #![cfg(target_arch = "x86_64")]
 #![cfg(feature = "std")]
-#![cfg(feature = "libipt")]
 
 #[macro_use]
 extern crate std;
@@ -20,9 +19,6 @@ use std::fs;
 
 use raw_cpuid::CpuId;
 
-#[cfg(target_os = "linux")]
-// This should be windows compatible. It's behind linux check just to avoid unused errors etc.
-mod decoder;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
