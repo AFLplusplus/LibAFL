@@ -20,7 +20,7 @@ use crate::{
 
 /// Replay all inputs
 #[derive(Debug)]
-pub struct ReplayStage<I, H = ()> {
+pub struct ReplayStage<H, I> {
     name: Cow<'static, str>,
     phantom: PhantomData<I>,
     hook: H,
@@ -45,13 +45,13 @@ impl<I, S> ReplayHook<I, S> for () {
     }
 }
 
-impl<I> Default for ReplayStage<I, ()> {
+impl<I> Default for ReplayStage<(), I> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<I, H> Named for ReplayStage<I, H> {
+impl<H, I> Named for ReplayStage<H, I> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -108,7 +108,7 @@ static mut REPLAY_STAGE_ID: usize = 0;
 /// The name for tracing stage
 pub static REPLAY_STAGE_NAME: &str = "tracing";
 
-impl<I> ReplayStage<I, ()> {
+impl<I> ReplayStage<(), I> {
     #[must_use]
     /// Create a new replay stage
     pub fn new() -> Self {
@@ -127,7 +127,7 @@ impl<I> ReplayStage<I, ()> {
     }
 }
 
-impl<I, H> ReplayStage<I, H> {
+impl<H, I> ReplayStage<H, I> {
     #[must_use]
     /// Create a new replay stage with a hook
     pub fn with_hook(hook: H) -> Self {
@@ -146,7 +146,7 @@ impl<I, H> ReplayStage<I, H> {
     }
 }
 
-impl<E, EM, I, S, Z, H> Stage<E, EM, S, Z> for ReplayStage<I, H>
+impl<E, EM, H, I, S, Z> Stage<E, EM, S, Z> for ReplayStage<H, I>
 where
     S: HasCorpus<I> + HasSolutions<I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
@@ -208,7 +208,7 @@ where
     }
 }
 
-impl<I, S, H> Restartable<S> for ReplayStage<I, H>
+impl<H, I, S> Restartable<S> for ReplayStage<H, I>
 where
     S: HasMetadata,
 {

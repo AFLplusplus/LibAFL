@@ -5,9 +5,9 @@ use core::ffi::c_void;
 #[rustversion::nightly]
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 use core::simd::num::SimdUint;
+use core::slice;
 #[cfg(feature = "sancov_pcguard_dump_cov")]
 use core::sync::atomic::{AtomicPtr, Ordering};
-use core::slice;
 
 #[cfg(any(
     feature = "sancov_ngram4",
@@ -218,11 +218,9 @@ unsafe extern "C" {
     pub static mut __afl_prev_ctx: u32;
 }
 
-
-
 #[allow(clippy::inline_always)]
 #[inline(always)]
-pub(crate) unsafe fn handle_pc_guard_inner(guard: *mut u32) {
+pub(crate) unsafe fn sancov_pcguard_hook_impl(guard: *mut u32) {
     unsafe {
         #[allow(unused_variables, unused_mut)] // cfg dependent
         let mut pos = *guard as usize;
@@ -280,14 +278,7 @@ pub(crate) unsafe fn handle_pc_guard_inner(guard: *mut u32) {
 #[cfg(not(feature = "sancov_pcguard_dump_cov"))]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     unsafe {
-        handle_pc_guard_inner(guard);
-    }
-}
-
-#[cfg(not(feature = "sancov_pcguard_dump_cov"))]
-unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_impl(guard: *mut u32) {
-    unsafe {
-        handle_pc_guard_inner(guard);
+        sancov_pcguard_hook_impl(guard);
     }
 }
 
@@ -306,7 +297,6 @@ pub unsafe extern "C" fn __libafl_targets_trace_pc_guard(guard: *mut u32, pc: us
         hook(guard, pc);
     }
 }
-
 
 /// Initialize the sancov `pc_guard` - usually called by `llvm`.
 ///
@@ -405,4 +395,3 @@ pub fn sanitizer_cov_pc_table<'a>() -> impl Iterator<Item = &'a [PcTableEntry]> 
         pc_tables.iter().copied()
     }
 }
-

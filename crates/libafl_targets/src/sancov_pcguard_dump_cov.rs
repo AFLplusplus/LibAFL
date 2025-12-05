@@ -1,4 +1,5 @@
-//! Dump coverage to files
+//! Dump coverage to lcov .info files
+//! Use them wit genhtml to generate HTML coverage reports.
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -9,12 +10,12 @@ use std::{collections::HashMap, fs::File, io::Write as IoWrite, path::PathBuf, s
 use libafl::{
     Error,
     corpus::{Corpus, CorpusId},
-    stages::{ReplayHook, ReplayStage},
+    stages::ReplayHook,
     state::HasCorpus,
 };
 
 use crate::sancov_pcguard::{
-    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK, handle_pc_guard_inner, nop_target_pc_guard,
+    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK, nop_target_pc_guard, sancov_pcguard_hook_impl,
 };
 
 static COVERED_PCS: Mutex<Option<HashMap<usize, usize>>> = Mutex::new(None);
@@ -95,16 +96,10 @@ pub struct CoverageDumpHook {
 impl CoverageDumpHook {
     /// Create a new [`CoverageDumpHook`]
     ///
-    /// Coverage will be dumped to files in `output_dir` if provided.
+    /// Coverage will be dumped to lcov .info files in `output_dir` if provided.
     #[must_use]
     pub fn new(output_dir: Option<PathBuf>) -> Self {
         Self { output_dir }
-    }
-
-    /// Create a new [`ReplayStage`] with this hook
-    #[must_use]
-    pub fn into_stage<I>(self) -> ReplayStage<I, Self> {
-        ReplayStage::with_hook(self)
     }
 }
 
@@ -176,7 +171,7 @@ unsafe extern "C" fn __libafl_targets_trace_pc_guard_impl(guard: *mut u32, pc: u
                 *map.entry(pc).or_insert(0) += 1;
             }
         }
-        handle_pc_guard_inner(guard);
+        sancov_pcguard_hook_impl(guard);
     }
 }
 
