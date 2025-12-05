@@ -72,7 +72,7 @@ fn find_llvm_config_brew() -> Result<PathBuf, String> {
                 return Ok(path.unwrap());
             }
         }
-        Err(err) => return Err(format!("Could not execute brew --cellar: {err:?}")),
+        Err(err) => return Err(format!("Could not execute brew --prefix: {err:?}")),
     }
     match Command::new("brew").arg("--cellar").output() {
         Ok(output) => {
