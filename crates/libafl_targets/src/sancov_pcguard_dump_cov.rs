@@ -76,10 +76,10 @@ pub fn dump_covered_lines(clear: bool) -> Vec<SrcLoc> {
 
 /// Clears the covered pcguard lines.
 pub fn clear_covered_lines() {
-    if let Ok(mut guard) = COVERED_PCS.lock() {
-        if let Some(map) = guard.as_mut() {
-            map.clear();
-        }
+    if let Ok(mut guard) = COVERED_PCS.lock()
+        && let Some(map) = guard.as_mut()
+    {
+        map.clear();
     }
 }
 

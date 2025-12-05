@@ -304,30 +304,42 @@ pub unsafe extern "C" fn __libafl_targets_trace_pc_guard(guard: *mut u32, pc: us
 /// # Safety
 /// Dereferences at `start` and writes to it.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {
-    unsafe {
-        #[cfg(feature = "pointer_maps")]
-        if EDGES_MAP_PTR.is_null() {
-            EDGES_MAP_PTR = &raw mut EDGES_MAP as *mut u8;
-        }
+pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(
+    #[allow(unused_mut)] // only mut with the `coverage` feature
+    #[allow(unused_variables)] // only used with the `coverage` feature
+    mut start: *mut u32,
+    #[allow(unused_variables)] // only used with the `coverage` feature
+    stop: *mut u32,
+) {
+    #[cfg(feature = "pointer_maps")]
+    if EDGES_MAP_PTR.is_null() {
+        EDGES_MAP_PTR = &raw mut EDGES_MAP as *mut u8;
+    }
 
-        #[cfg(feature = "coverage")]
-        if core::ptr::eq(start, stop) || *start != 0 {
-            return;
-        }
+    #[cfg(feature = "coverage")]
+    if core::ptr::eq(start, stop) || unsafe { *start != 0 } {
+        return;
+    }
 
-        #[cfg(feature = "coverage")]
-        while start < stop {
+    #[cfg(feature = "coverage")]
+    while start < stop {
+        unsafe {
             *start = MAX_EDGES_FOUND as u32;
             start = start.offset(1);
+        }
 
-            #[cfg(feature = "pointer_maps")]
-            {
+        #[cfg(feature = "pointer_maps")]
+        {
+            // SAFETY: we're the only ones accessing this static
+            unsafe {
                 MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1) % EDGES_MAP_ALLOCATED_SIZE;
             }
-            #[cfg(not(feature = "pointer_maps"))]
-            {
-                let edges_map_ptr = &raw const EDGES_MAP;
+        }
+        #[cfg(not(feature = "pointer_maps"))]
+        {
+            let edges_map_ptr = &raw const EDGES_MAP;
+            // SAFETY: we're the only ones accessing these statics
+            unsafe {
                 let edges_map_len = (*edges_map_ptr).len();
                 MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1);
                 assert!(
