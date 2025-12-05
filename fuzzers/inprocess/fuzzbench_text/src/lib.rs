@@ -17,8 +17,8 @@ use std::{
 use clap::{Arg, Command};
 use content_inspector::inspect;
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::SimpleRestartingEventManager,
+    corpus::{Corpus, InMemoryCorpus, InMemoryOnDiskCorpus, OnDiskCorpus, Testcase},
+    events::{NopEventManager, SimpleRestartingEventManager},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
@@ -36,11 +36,14 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, QueueScheduler,
+        StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
-        ShadowTracingStage, StdMutationalStage,
+        calibrate::CalibrationStage,
+        power::StdPowerMutationalStage,
+        replay::{ReplayRestarterMetadata, ReplayStage},
+        GeneralizationStage, ShadowTracingStage, Stage, StdMutationalStage,
     },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
@@ -56,10 +59,7 @@ use libafl_bolts::{
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 #[cfg(feature = "dump_cov")]
-use libafl_targets::sancov_pcguard::{
-    dump_covered_lines, libafl_targets_disable_coverage_collection,
-    libafl_targets_enable_coverage_collection,
-};
+use libafl_targets::sancov_pcguard::{pcguard_enable_coverage_collection, CoverageDumpHook};
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
@@ -118,8 +118,8 @@ pub extern "C" fn libafl_main(
         cmd = cmd.arg(
             Arg::new("dump_cov")
                 .long("dump-cov")
-                .help("Dump the coverage for the given input")
-                .action(clap::ArgAction::SetTrue),
+                .help("Dump coverage to the specified directory")
+                .num_args(1),
         );
     }
 
@@ -146,9 +146,9 @@ pub extern "C" fn libafl_main(
         let filenames: Vec<&str> = filenames.map(std::string::String::as_str).collect();
         if !filenames.is_empty() {
             #[cfg(feature = "dump_cov")]
-            let dump_cov = res.get_flag("dump_cov");
+            let dump_cov = res.get_one::<String>("dump_cov").map(PathBuf::from);
             #[cfg(not(feature = "dump_cov"))]
-            let dump_cov = false;
+            let dump_cov = None;
             run_testcases(&filenames, dump_cov);
             return 0;
         }
@@ -253,7 +253,7 @@ fn check_if_textual(seeds_dir: &Path, tokenfile: &Option<PathBuf>) -> bool {
     is_text
 }
 
-fn run_testcases(filenames: &[&str], _dump_coverage: bool) {
+fn run_testcases(filenames: &[&str], _dump_coverage_dir: Option<PathBuf>) {
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
@@ -265,29 +265,60 @@ fn run_testcases(filenames: &[&str], _dump_coverage: bool) {
         "You are not fuzzing, just executing {} testcases",
         filenames.len()
     );
-    for fname in filenames {
-        println!("Executing {}", fname);
 
+    let mut feedback = ();
+    let mut objective = ();
+
+    let mut state = StdState::new(
+        StdRand::new(),
+        InMemoryCorpus::new(),
+        InMemoryCorpus::new(),
+        &mut feedback,
+        &mut objective,
+    )
+    .unwrap();
+
+    for fname in filenames {
         let mut file = File::open(fname).expect("No file found");
         let mut buffer = vec![];
         file.read_to_end(&mut buffer).expect("Buffer overflow");
-
-        #[cfg(feature = "dump_cov")]
-        if _dump_coverage {
-            libafl_targets_enable_coverage_collection();
-        }
-        unsafe {
-            libfuzzer_test_one_input(&buffer);
-        }
-        #[cfg(feature = "dump_cov")]
-        if _dump_coverage {
-            let map = dump_covered_lines(true);
-            libafl_targets_disable_coverage_collection();
-            for (pc, sym) in map {
-                println!("PC: {:x} -> {}", pc, sym);
-            }
-        }
+        let input = BytesInput::new(buffer);
+        let mut testcase = Testcase::new(input);
+        *testcase.filename_mut() = Some(fname.to_string());
+        state.corpus_mut().add(testcase).unwrap();
     }
+
+    state.add_metadata(ReplayRestarterMetadata::new());
+
+    let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), feedback, objective);
+
+    let mut harness = |input: &BytesInput| {
+        let target = input.target_bytes();
+        let buf = target.as_slice();
+        unsafe {
+            libfuzzer_test_one_input(buf);
+        }
+        ExitKind::Ok
+    };
+
+    let mut mgr = NopEventManager::new();
+    let mut executor = InProcessExecutor::new(
+        &mut harness,
+        tuple_list!(),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+    )
+    .unwrap();
+
+    #[cfg(feature = "dump_cov")]
+    let mut stage = ReplayStage::with_hook(CoverageDumpHook::new(_dump_coverage_dir));
+    #[cfg(not(feature = "dump_cov"))]
+    let mut stage = ReplayStage::new();
+
+    stage
+        .perform(&mut fuzzer, &mut executor, &mut state, &mut mgr)
+        .unwrap();
 }
 
 /// The actual fuzzer
@@ -301,7 +332,7 @@ fn fuzz_binary(
     timeout: Duration,
 ) -> Result<(), Error> {
     #[cfg(feature = "dump_cov")]
-    libafl_targets_enable_coverage_collection();
+    pcguard_enable_coverage_collection();
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]
@@ -524,7 +555,7 @@ fn fuzz_text(
     timeout: Duration,
 ) -> Result<(), Error> {
     #[cfg(feature = "dump_cov")]
-    libafl_targets_enable_coverage_collection();
+    pcguard_enable_coverage_collection();
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]

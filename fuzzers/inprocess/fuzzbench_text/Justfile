@@ -22,7 +22,7 @@ cxx:
 [linux]
 [macos]
 fuzz_o: cxx
-	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -c fuzz.c -o fuzz.o
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
 
 [windows]
 fuzz_o:
@@ -78,12 +78,16 @@ clean:
 
 test-dump-cov:
 	cargo build --profile={{PROFILE}} --features dump_cov
-	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -c fuzz.c -o fuzz.o
-	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cxx --libafl fuzz.o -o {{FUZZER_NAME}} -lm -lz
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cxx -g -rdynamic --libafl fuzz.o -o {{FUZZER_NAME}} -lm -lz
 	# Create a dummy seed
 	mkdir -p seeds_dump
+	mkdir -p coverage_dump
 	echo "dummy" > seeds_dump/dummy
 	# Run with --dump-cov
-	./{{FUZZER_NAME}} -i seeds_dump -o corpus_dump --dump-cov seeds_dump/dummy
+	./fuzzbench -i seeds_dump -o corpus_dump --dump-cov coverage_dump seeds_dump/dummy
+	# Verify output
+	ls -l coverage_dump/dummy.coverage
+	grep "PC:" coverage_dump/dummy.coverage
 	# Clean up
-	rm -rf seeds_dump corpus_dump
+	rm -rf seeds_dump corpus_dump coverage_dump
