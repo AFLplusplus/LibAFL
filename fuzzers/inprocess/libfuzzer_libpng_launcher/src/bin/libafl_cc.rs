@@ -23,7 +23,6 @@ pub fn main() {
             .silence(true)
             .parse_args(&args)
             .expect("Failed to parse the command line")
-            .link_staticlib(&dir, "libfuzzer_libpng")
             .add_configuration(Configuration::GenerateCoverageMap)
             .add_configuration(Configuration::Compound(vec![
                 Configuration::GenerateCoverageMap,
