@@ -838,33 +838,43 @@ where
                 let child_status = {
                     #[cfg(unix)]
                     let use_fork = self.fork;
+                    #[cfg(not(unix))]
+                    let use_fork = false;
 
-                    #[cfg(unix)]
                     if use_fork {
-                        #[cfg(all(unix, feature = "fork"))]
+                        #[cfg(unix)]
                         {
-                            self.shmem_provider.pre_fork()?;
-                            match unsafe { fork() }? {
-                                ForkResult::Parent(handle) => {
-                                    unsafe {
-                                        libc::signal(libc::SIGINT, libc::SIG_IGN);
+                            #[cfg(all(unix, feature = "fork"))]
+                            {
+                                self.shmem_provider.pre_fork()?;
+                                match unsafe { fork() }? {
+                                    ForkResult::Parent(handle) => {
+                                        unsafe {
+                                            libc::signal(libc::SIGINT, libc::SIG_IGN);
+                                        }
+                                        self.shmem_provider.post_fork(false)?;
+                                        handle.status()
                                     }
-                                    self.shmem_provider.post_fork(false)?;
-                                    handle.status()
-                                }
-                                ForkResult::Child => {
-                                    log::debug!(
-                                        "{} has been forked into {}",
-                                        std::os::unix::process::parent_id(),
-                                        std::process::id()
-                                    );
-                                    self.shmem_provider.post_fork(true)?;
-                                    break (staterestorer, self.shmem_provider.clone(), core_id);
+                                    ForkResult::Child => {
+                                        log::debug!(
+                                            "{} has been forked into {}",
+                                            std::os::unix::process::parent_id(),
+                                            std::process::id()
+                                        );
+                                        self.shmem_provider.post_fork(true)?;
+                                        break (
+                                            staterestorer,
+                                            self.shmem_provider.clone(),
+                                            core_id,
+                                        );
+                                    }
                                 }
                             }
+                            #[cfg(not(all(unix, feature = "fork")))]
+                            unreachable!()
                         }
-                        #[cfg(not(all(unix, feature = "fork")))]
-                        unreachable!()
+                        #[cfg(not(unix))]
+                        unreachable!("Forking not supported")
                     } else {
                         // spawn
                         unsafe {

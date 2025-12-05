@@ -12,17 +12,20 @@
 //! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
-use alloc::{boxed::Box, string::String};
+#[cfg(unix)]
+use alloc::boxed::Box;
+use alloc::string::String;
 use core::{
     fmt,
     fmt::{Debug, Formatter},
+    net::SocketAddr,
+    num::NonZeroUsize,
+    time::Duration,
 };
-#[cfg(unix)]
-use core::{num::NonZeroUsize, time::Duration};
-use std::{net::SocketAddr, process::Stdio};
+use std::process::Stdio;
 
 use libafl_bolts::{
-    core_affinity::{CoreId, Cores},
+    core_affinity::{CoreId, Cores, get_core_ids},
     os::startable_self,
     shmem::ShMemProvider,
     tuples::tuple_list,
@@ -34,7 +37,6 @@ use {
     crate::events::{CentralizedLlmpHook, StdLlmpEventHook, centralized::CentralizedEventManager},
     alloc::string::ToString,
     libafl_bolts::{
-        core_affinity::get_core_ids,
         llmp::{Broker, Brokers, LlmpBroker},
         os::{ForkResult, dup2, fork},
     },
@@ -43,13 +45,14 @@ use {
 
 #[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::{NodeDescriptor, TcpMultiMachineHooks};
+#[cfg(unix)]
+use crate::inputs::Input;
 use crate::{
     Error,
     events::{
         EventConfig, EventManagerHooksTuple, LlmpRestartingEventManager, LlmpShouldSaveState,
         ManagerKind, RestartingMgr,
     },
-    inputs::Input,
     monitors::Monitor,
 };
 
@@ -233,9 +236,11 @@ where
     {
         #[cfg(unix)]
         let use_fork = self.fork;
+        #[cfg(not(unix))]
+        let use_fork = false;
 
-        #[cfg(unix)]
         if use_fork {
+            #[cfg(unix)]
             {
                 if self.cores.ids.is_empty() {
                     return Err(Error::illegal_argument(
@@ -385,7 +390,9 @@ where
             }
             // This is the fork part for unix
             #[cfg(not(unix))]
-            unreachable!();
+            {
+                unreachable!("Forking not supported");
+            }
         } else {
             // spawn logic
             let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
@@ -403,8 +410,9 @@ where
                         })
                         .configuration(self.configuration)
                         .serialize_state(self.serialize_state)
-                        .hooks(hooks)
-                        .fork(self.fork);
+                        .hooks(hooks);
+                    #[cfg(unix)]
+                    let builder = builder.fork(self.fork);
 
                     let (state, mgr) = builder.build().launch()?;
 
@@ -512,8 +520,9 @@ where
                     .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
-                    .hooks(hooks)
-                    .fork(self.fork);
+                    .hooks(hooks);
+                #[cfg(unix)]
+                let builder = builder.fork(self.fork);
 
                 builder.build().launch()?;
 
