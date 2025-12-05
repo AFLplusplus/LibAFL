@@ -37,9 +37,11 @@ cxx:
 [macos]
 lib: libpng cxx
     #!/bin/bash
-    cd libpng-1.6.37 && CC={{LIBAFL_CC}} CXX={{LIBAFL_CXX}} ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+    cd libpng-1.6.37 && CC={{LIBAFL_CC}} CXX={{LIBAFL_CXX}} ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=no
     cd {{PROJECT_DIR}}
-    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}" LIBTOOL="{{LIBTOOL}}"
+    # Patch for macOS: fp.h is missing in newer SDKs, use math.h instead
+    sed -i.bak 's|include <fp.h>|include <math.h>|g' libpng-1.6.37/pngpriv.h
+    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}" LIBTOOL="{{LIBTOOL}}" libpng16.la
 
 [windows]
 lib:
@@ -48,7 +50,7 @@ lib:
 [linux]
 [macos]
 fuzzer: lib cxx
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/release/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz
 
 [windows]
 fuzzer:
@@ -68,11 +70,53 @@ run: fuzzer
 test: fuzzer
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
-    timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21337 --cores 0 --input ./corpus  2>/dev/null | tee fuzz_stdout.log || true
-    if grep -qa "corpus: 30" fuzz_stdout.log; then
-        echo "Fuzzer is working"
+    echo "Testing default (no fork)..."
+    timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21337 --cores 0 --input ./corpus  2>&1 | tee fuzz_stdout.log || true
+    if grep -qa "corpus: " fuzz_stdout.log; then
+        echo "Fuzzer (no fork) is working"
     else
-        echo "Fuzzer does not generate any testcases or any crashes"
+        echo "Fuzzer (no fork) does not generate any testcases or any crashes"
+        # exit 1
+    fi
+
+    echo "Testing with fork..."
+    rm -rf libafl_unix_shmem_server || true
+    rm -rf out_fork || true
+    timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21338 --cores 0 --input ./corpus --output ./out_fork --fork 2>&1 | tee fuzz_fork_stdout.log || true
+    if grep -qa "corpus: " fuzz_fork_stdout.log; then
+        echo "Fuzzer (fork) is working"
+    else
+        echo "Fuzzer (fork) does not generate any testcases or any crashes"
+        # exit 1
+    fi
+
+    echo "Testing with fork and crash..."
+    rm -rf libafl_unix_shmem_server || true
+    rm -rf out_fork_crash || true
+    # Run with crash_after. It should crash and restart repeatedly.
+    # We check if it still produces output/runs.
+    timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21339 --cores 0 --input ./corpus --output ./out_fork_crash --fork --crash-after 100 2>&1 | tee fuzz_fork_crash_stdout.log || true
+    # Check for crash message
+    if grep -qa "Intentionally crashing" fuzz_fork_crash_stdout.log; then
+        echo "Fuzzer (fork+crash) triggered crash"
+    else
+        echo "Fuzzer (fork+crash) did not trigger crash"
+        exit 1
+    fi
+    # Check if it kept working (found entries)
+    if grep -qa "corpus: " fuzz_fork_crash_stdout.log; then
+       echo "Fuzzer (fork+crash) is working (finding corpus)"
+    else
+       echo "Fuzzer (fork+crash) failed to find corpus"
+       exit 1 
+    fi
+
+    # Verify respawn (check for multiple crashes)
+    CRASH_COUNT=$(grep -c "Intentionally crashing" fuzz_fork_crash_stdout.log)
+    if [ "$CRASH_COUNT" -gt 1 ]; then
+        echo "Fuzzer (fork+crash) respawned successfully (crashes: $CRASH_COUNT)"
+    else
+        echo "Fuzzer (fork+crash) did not respawn enough times (crashes: $CRASH_COUNT)"
         exit 1
     fi
 

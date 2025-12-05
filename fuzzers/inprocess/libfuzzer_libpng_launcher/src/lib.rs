@@ -6,6 +6,7 @@ use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{self, Parser};
+#[cfg(unix)]
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
@@ -33,8 +34,12 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
+use libafl_targets::{libfuzzer_initialize, std_edges_map_observer};
 use mimalloc::MiMalloc;
+
+extern "C" {
+    fn LLVMFuzzerTestOneInputLibPng(data: *const u8, size: usize) -> i32;
+}
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -120,6 +125,10 @@ struct Opt {
     )]
     tokens: Vec<PathBuf>,
     */
+    #[arg(long, help = "Use fork mode (Launcher fork)")]
+    fork: bool,
+    #[arg(long, help = "Crash after this many iterations")]
+    crash_after: Option<u64>,
 }
 
 /// The main fn, `no_mangle` as it is a C symbol
@@ -129,6 +138,11 @@ pub extern "C" fn libafl_main() {
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
     let opt = Opt::parse();
+
+    // for testing purposes in CI only. No need to do this for normal fuzzing
+    if let Some(iters) = opt.crash_after {
+        env::set_var("LIBAFL_CRASH_AFTER", iters.to_string());
+    }
 
     let broker_port = opt.broker_port;
     let cores = opt.cores;
@@ -213,7 +227,7 @@ pub extern "C" fn libafl_main() {
             let target = input.target_bytes();
             let buf = target.as_slice();
             unsafe {
-                libfuzzer_test_one_input(buf);
+                LLVMFuzzerTestOneInputLibPng(buf.as_ptr(), buf.len());
             }
             ExitKind::Ok
         };
@@ -242,11 +256,10 @@ pub extern "C" fn libafl_main() {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
-        Ok(())
+        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)
     };
 
-    match Launcher::builder()
+    let builder = Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
@@ -255,10 +268,12 @@ pub extern "C" fn libafl_main() {
         .overcommit(opt.overcommit)
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"))
-        .build()
-        .launch()
-    {
+        .stdout_file(Some("/dev/null"));
+
+    #[cfg(unix)]
+    let builder = builder.fork(opt.fork);
+
+    match builder.build().launch() {
         Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
         Err(err) => panic!("Failed to run launcher: {err:?}"),
