@@ -79,7 +79,7 @@ pub use owned_map::*;
 /// #     &mut feedback,
 /// #     &mut (),
 /// # ).unwrap();
-/// let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
+/// let mut scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 /// # scheduler.cull(&mut state).unwrap();
 /// ```
 ///

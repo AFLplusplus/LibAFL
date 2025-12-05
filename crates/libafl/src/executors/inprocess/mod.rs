@@ -388,6 +388,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
 #[cfg(test)]
 mod tests {
     use libafl_bolts::{rands::XkcdRand, tuples::tuple_list};
+    #[cfg(feature = "serial_test")]
     use serial_test::serial;
 
     use crate::{
@@ -402,7 +403,7 @@ mod tests {
     };
 
     #[test]
-    #[serial(inprocess)]
+    #[cfg_attr(feature = "std", serial(inprocess))]
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
         let rand = XkcdRand::new();

@@ -477,7 +477,11 @@ mod tests {
     #[test]
     fn test_calibration_restart() -> Result<(), Error> {
         #[cfg(not(feature = "serdeany_autoreg"))]
-        RegistryBuilder::register::<DisabledInCalibrationStageMetadata>();
+        // # Safety
+        // This is called once at the start of the test
+        unsafe {
+            RegistryBuilder::register::<DisabledInCalibrationStageMetadata>();
+        }
 
         // Setup
         let mut state = StdState::new(
@@ -502,7 +506,7 @@ mod tests {
 
         match stage.should_restart(&mut state) {
             Err(Error::SkipRemainingStages) => (),
-            res => panic!("Expected SkipRemainingStages, got {:?}", res),
+            res => panic!("Expected SkipRemainingStages, got {res:?}"),
         }
 
         assert!(state.corpus().get(id).is_err());

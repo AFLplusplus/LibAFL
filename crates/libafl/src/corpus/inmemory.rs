@@ -207,14 +207,6 @@ impl<I> TestcaseStorageMap<I> {
     #[cfg(feature = "corpus_btreemap")]
     #[must_use]
     pub fn first(&self) -> Option<CorpusId> {
-        // assert that the first entry is indeed in the map
-        if let Some(first_id) = self.first_id {
-            assert!(
-                self.map.contains_key(&first_id),
-                "first_id {} is not in the map",
-                first_id
-            );
-        }
         self.map.iter().next().map(|x| *x.0)
     }
 
