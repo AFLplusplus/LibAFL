@@ -476,6 +476,7 @@ mod tests {
         #[cfg(not(feature = "serdeany_autoreg"))]
         unsafe {
             libafl_bolts::serdeany::RegistryBuilder::register::<TopRatedsMetadata>();
+            libafl_bolts::serdeany::RegistryBuilder::register::<MapIndexesMetadata>();
         }
         let rand = StdRand::with_seed(0);
         let observer = StdMapObserver::owned("map", vec![0u8; 16]).track_indices();

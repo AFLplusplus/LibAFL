@@ -411,6 +411,10 @@ mod tests {
             libafl_bolts::serdeany::RegistryBuilder::register::<
                 crate::schedulers::powersched::SchedulerMetadata,
             >();
+            libafl_bolts::serdeany::RegistryBuilder::register::<super::WeightedScheduleMetadata>();
+            libafl_bolts::serdeany::RegistryBuilder::register::<
+                crate::corpus::SchedulerTestcaseMetadata,
+            >();
         }
 
         let mut corpus = InMemoryCorpus::new();

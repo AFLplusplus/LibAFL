@@ -482,6 +482,7 @@ mod tests {
         unsafe {
             RegistryBuilder::register::<DisabledInCalibrationStageMetadata>();
             RegistryBuilder::register::<crate::feedbacks::map::MapFeedbackMetadata<u8>>();
+            RegistryBuilder::register::<crate::stages::RetryCountRestartHelper>();
         }
 
         // Setup
