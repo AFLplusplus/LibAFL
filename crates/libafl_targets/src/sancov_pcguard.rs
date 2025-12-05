@@ -1,23 +1,13 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
 #[cfg(feature = "sancov_pcguard_dump_cov")]
-use alloc::string::String;
-#[cfg(feature = "sancov_pcguard_dump_cov")]
 use core::ffi::c_void;
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-use core::fmt::Write;
 #[rustversion::nightly]
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 use core::simd::num::SimdUint;
 #[cfg(feature = "sancov_pcguard_dump_cov")]
 use core::sync::atomic::{AtomicPtr, Ordering};
-use core::{mem::align_of, slice};
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-use std::collections::{HashMap, HashSet};
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-use std::sync::Mutex;
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-use std::{fs::File, io::Write as IoWrite, path::PathBuf};
+use core::slice;
 
 #[cfg(any(
     feature = "sancov_ngram4",
@@ -26,13 +16,6 @@ use std::{fs::File, io::Write as IoWrite, path::PathBuf};
 ))]
 #[rustversion::nightly]
 use libafl::executors::hooks::ExecutorHook;
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-use libafl::{
-    Error,
-    corpus::{Corpus, CorpusId},
-    stages::replay::{ReplayHook, ReplayStage},
-    state::HasCorpus,
-};
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[allow(unused_imports)] // only used in an unused function
@@ -92,7 +75,7 @@ pub type PcGuardHook = unsafe extern "C" fn(*mut u32);
 pub type TargetPcGuardHook = unsafe extern "C" fn(*mut u32, usize);
 
 #[cfg(feature = "sancov_pcguard_dump_cov")]
-unsafe extern "C" fn nop_target_pc_guard(_guard: *mut u32, _pc: usize) {}
+pub(crate) unsafe extern "C" fn nop_target_pc_guard(_guard: *mut u32, _pc: usize) {}
 
 /// The global hook for `__libafl_targets_trace_pc_guard`
 #[cfg(feature = "sancov_pcguard_dump_cov")]
@@ -235,143 +218,11 @@ unsafe extern "C" {
     pub static mut __afl_prev_ctx: u32;
 }
 
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-static COVERED_PCS: Mutex<Option<HashSet<usize>>> = Mutex::new(None);
 
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-/// Dump the covered lines
-///
-/// # Arguments
-///
-/// * `clear` - Whether to clear the covered lines
-///
-/// # Returns
-///
-/// * `HashMap<usize, String>` - The covered lines, location and symbol
-///
-/// # Example
-///
-/// ```
-/// # use libafl_targets::sancov_pcguard::dump_covered_lines;
-///
-/// let map = dump_covered_lines(true);
-/// for (pc, sym) in map {
-///     println!("PC: {:x} -> {}", pc, sym);
-/// }
-/// ```
-pub fn dump_covered_lines(clear: bool) -> HashMap<usize, String> {
-    let mut res = HashMap::new();
-    #[allow(clippy::collapsible_if)]
-    if let Ok(mut guard) = COVERED_PCS.lock() {
-        if let Some(set) = guard.as_mut() {
-            for &pc in set.iter() {
-                let mut symbol_str = String::new();
-                backtrace::resolve(pc as *mut _, |symbol| {
-                    if let Some(name) = symbol.name() {
-                        let _ = write!(symbol_str, "{name}");
-                    }
-                    if let Some(filename) = symbol.filename() {
-                        let _ = write!(symbol_str, " at {}", filename.display());
-                    }
-                    if let Some(lineno) = symbol.lineno() {
-                        let _ = write!(symbol_str, ":{lineno}");
-                    }
-                });
-                res.insert(pc, symbol_str);
-            }
-            if clear {
-                set.clear();
-            }
-        }
-    }
-    res
-}
-
-/// Enable coverage collection
-pub fn pcguard_enable_coverage_collection() {
-    #[cfg(feature = "sancov_pcguard_dump_cov")]
-    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.store(
-        __libafl_targets_trace_pc_guard_impl as *mut c_void,
-        Ordering::Release,
-    );
-}
-
-/// Disable coverage collection
-pub fn pcguard_disable_coverage_collection() {
-    #[cfg(feature = "sancov_pcguard_dump_cov")]
-    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.store(nop_target_pc_guard as *mut c_void, Ordering::Release);
-}
-
-/// A hook that dumps coverage to files
-#[derive(Debug, Clone)]
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-pub struct CoverageDumpHook {
-    output_dir: Option<PathBuf>,
-}
-
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-impl CoverageDumpHook {
-    /// Create a new [`CoverageDumpHook`]
-    ///
-    /// Coverage will be dumped to files in `output_dir` if provided.
-    #[must_use]
-    pub fn new(output_dir: Option<PathBuf>) -> Self {
-        Self { output_dir }
-    }
-
-    /// Create a new [`ReplayStage`] with this hook
-    #[must_use]
-    pub fn into_stage<I>(self) -> ReplayStage<I, Self> {
-        ReplayStage::with_hook(self)
-    }
-}
-
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-impl<I, S> ReplayHook<I, S> for CoverageDumpHook
-where
-    S: HasCorpus<I>,
-{
-    fn pre_exec(&mut self, _state: &mut S, _input: &I, _id: CorpusId) -> Result<(), Error> {
-        if self.output_dir.is_some() {
-            pcguard_enable_coverage_collection();
-        }
-        Ok(())
-    }
-
-    fn post_exec(&mut self, state: &mut S, _input: &I, id: CorpusId) -> Result<(), Error> {
-        if let Some(output_dir) = &self.output_dir {
-            let map = dump_covered_lines(true);
-            pcguard_disable_coverage_collection();
-
-            let corpus = state.corpus();
-            let testcase = corpus.get(id)?.borrow();
-            let filename_owned = testcase
-                .filename()
-                .clone()
-                .unwrap_or_else(|| format!("id_{id}"));
-            let filename_path = std::path::Path::new(&filename_owned);
-            let filename = filename_path
-                .file_name()
-                .unwrap_or(filename_path.as_os_str());
-
-            let output_path = output_dir.join(format!("{}.coverage", filename.to_string_lossy()));
-            let mut file = File::create(output_path)?;
-
-            for (pc, sym) in map {
-                if sym.is_empty() {
-                    writeln!(file, "PC: {pc:x}")?;
-                } else {
-                    writeln!(file, "PC: {pc:x} -> {sym}")?;
-                }
-            }
-        }
-        Ok(())
-    }
-}
 
 #[allow(clippy::inline_always)]
 #[inline(always)]
-unsafe fn handle_pc_guard_inner(guard: *mut u32) {
+pub(crate) unsafe fn handle_pc_guard_inner(guard: *mut u32) {
     unsafe {
         #[allow(unused_variables, unused_mut)] // cfg dependent
         let mut pos = *guard as usize;
@@ -456,20 +307,6 @@ pub unsafe extern "C" fn __libafl_targets_trace_pc_guard(guard: *mut u32, pc: us
     }
 }
 
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-unsafe extern "C" fn __libafl_targets_trace_pc_guard_impl(guard: *mut u32, pc: usize) {
-    unsafe {
-        if let Ok(mut guard) = COVERED_PCS.lock() {
-            if guard.is_none() {
-                *guard = Some(HashSet::new());
-            }
-            if let Some(set) = guard.as_mut() {
-                set.insert(pc);
-            }
-        }
-        handle_pc_guard_inner(guard);
-    }
-}
 
 /// Initialize the sancov `pc_guard` - usually called by `llvm`.
 ///
@@ -569,27 +406,3 @@ pub fn sanitizer_cov_pc_table<'a>() -> impl Iterator<Item = &'a [PcTableEntry]> 
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "sancov_pcguard_dump_cov")]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_dump_cov() {
-        unsafe extern "C" {
-            fn __sanitizer_cov_trace_pc_guard(guard: *mut u32);
-        }
-        // Simulate a call to __sanitizer_cov_trace_pc_guard
-        let mut guard = 0;
-        unsafe {
-            __sanitizer_cov_trace_pc_guard(&mut guard);
-        }
-
-        let map = dump_covered_lines(false);
-        assert!(!map.is_empty());
-        for (pc, sym) in map {
-            println!("PC: {:x} -> {}", pc, sym);
-            assert!(!sym.is_empty());
-        }
-    }
-}

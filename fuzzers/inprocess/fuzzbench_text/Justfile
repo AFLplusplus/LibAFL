@@ -87,7 +87,9 @@ test-dump-cov:
 	# Run with --dump-cov
 	./fuzzbench -i seeds_dump -o corpus_dump --dump-cov coverage_dump seeds_dump/dummy
 	# Verify output
-	ls -l coverage_dump/dummy.coverage
-	grep "PC:" coverage_dump/dummy.coverage
+	ls -l coverage_dump/dummy.info
+	grep "TN:" coverage_dump/dummy.info
+	genhtml coverage_dump/dummy.info --output-directory coverage_dump/html
+	ls coverage_dump/html/index.html
 	# Clean up
-	rm -rf seeds_dump corpus_dump coverage_dump
+	#rm -rf seeds_dump corpus_dump coverage_dump

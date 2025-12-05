@@ -62,6 +62,8 @@ include!(concat!(env!("OUT_DIR"), "/constants.rs"));
     feature = "sancov_pcguard_dump_cov"
 ))]
 pub mod sancov_pcguard;
+#[cfg(feature = "sancov_pcguard_dump_cov")]
+pub mod sancov_pcguard_dump_cov;
 #[cfg(any(
     feature = "sancov_pcguard_edges",
     feature = "sancov_pcguard_hitcounts",

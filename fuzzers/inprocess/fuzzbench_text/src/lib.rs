@@ -59,7 +59,9 @@ use libafl_bolts::{
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 #[cfg(feature = "dump_cov")]
-use libafl_targets::sancov_pcguard::{pcguard_enable_coverage_collection, CoverageDumpHook};
+use libafl_targets::sancov_pcguard_dump_cov::{
+    pcguard_enable_coverage_collection, CoverageDumpHook,
+};
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
