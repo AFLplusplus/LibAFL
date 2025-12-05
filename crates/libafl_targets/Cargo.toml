@@ -120,11 +120,12 @@ windows_asan = ["common"]
 ## This is important for ensuring that weak symbols (like sanitizer hooks) are included in the final binary.
 whole_archive = []
 
+## Support for `aflpp`-style `CmpLog` maps.
 ## This feature enables extended `CmpLog` instrumentation, compatible with `AFL++`.
 ## It compiles `cmplog.c` with `CMPLOG_EXTENDED` defined.
 cmplog_extended_instrumentation = [
   "cmplog", # without `cmplog`, extended instrumentation won't compile
-] ## Support for `aflpp`-style `CmpLog` maps.
+]
 
 ## Support for function logging.
 ## This feature enables the `call` module, which provides hooks for function calls.
