@@ -188,9 +188,12 @@ mod tests {
         pcguard_enable_coverage_collection();
 
         // Simulate a call to __sanitizer_cov_trace_pc_guard
+        //
+        // # Safety
+        // The pointer is valid and points to a valid memory location.
         let mut guard = 0;
         unsafe {
-            __sanitizer_cov_trace_pc_guard(&mut guard);
+            __sanitizer_cov_trace_pc_guard(&raw mut guard);
         }
 
         let map = dump_covered_lines(true);

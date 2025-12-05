@@ -220,6 +220,7 @@ unsafe extern "C" {
 
 #[allow(clippy::inline_always)]
 #[inline(always)]
+#[allow(unused_assignments)]
 pub(crate) unsafe fn sancov_pcguard_hook_impl(guard: *mut u32) {
     unsafe {
         #[allow(unused_variables, unused_mut)] // cfg dependent
