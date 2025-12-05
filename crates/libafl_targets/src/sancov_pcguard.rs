@@ -312,9 +312,9 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(
     #[allow(unused_variables)] // only used with the `coverage` feature
     stop: *mut u32,
 ) {
-    /// # Safety
-    /// Dereferences at `start` and writes to it, as it sais on this function's title.
-    /// As unsafe as the caller wants it to be.
+    // # Safety
+    // Dereferences at `start` and writes to it, as it sais on this function's title.
+    // As unsafe as the caller wants it to be.
     #[cfg(feature = "pointer_maps")]
     unsafe {
         if EDGES_MAP_PTR.is_null() {
