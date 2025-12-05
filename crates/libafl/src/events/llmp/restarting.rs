@@ -613,7 +613,7 @@ pub fn setup_restarting_mgr_std<I, MT, S>(
 >
 where
     I: DeserializeOwned,
-    MT: Monitor + Clone,
+    MT: Monitor,
     S: Serialize + DeserializeOwned,
 {
     RestartingMgr::builder()
@@ -644,7 +644,7 @@ pub fn setup_restarting_mgr_std_adaptive<I, MT, S>(
     Error,
 >
 where
-    MT: Monitor + Clone,
+    MT: Monitor,
     S: Serialize + DeserializeOwned,
     I: DeserializeOwned,
 {
@@ -704,7 +704,7 @@ impl<EMH, I, MT, S, SP> RestartingMgr<EMH, I, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     I: DeserializeOwned,
-    MT: Monitor + Clone,
+    MT: Monitor,
     S: Serialize + DeserializeOwned,
     SP: ShMemProvider,
 {
