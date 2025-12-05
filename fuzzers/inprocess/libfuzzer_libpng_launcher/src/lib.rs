@@ -38,7 +38,7 @@ use libafl_targets::{libfuzzer_initialize, std_edges_map_observer};
 use mimalloc::MiMalloc;
 
 extern "C" {
-    fn LLVMFuzzerTestOneInputLibPng(data: *const u8, size: usize) -> i32;
+    fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
 }
 
 #[global_allocator]
@@ -227,7 +227,7 @@ pub extern "C" fn libafl_main() {
             let target = input.target_bytes();
             let buf = target.as_slice();
             unsafe {
-                LLVMFuzzerTestOneInputLibPng(buf.as_ptr(), buf.len());
+                LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len());
             }
             ExitKind::Ok
         };

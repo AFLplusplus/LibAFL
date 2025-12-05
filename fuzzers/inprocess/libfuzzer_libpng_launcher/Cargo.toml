@@ -32,6 +32,7 @@ libafl_bolts = { path = "../../../crates/libafl_bolts" }
 libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_pcguard_hitcounts",
   "libfuzzer",
+  "common",
 ] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../../crates/libafl_cc" }

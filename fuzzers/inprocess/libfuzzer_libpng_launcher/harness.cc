@@ -76,8 +76,7 @@ void user_read_data(png_structp png_ptr, png_bytep data, size_t length) {
 static const int kPngHeaderSize = 8;
 
 // Entry point for LibFuzzer.
-// Rename to avoid conflict with libafl_targets default stub
-extern "C" int LLVMFuzzerTestOneInputLibPng(const uint8_t *data, size_t size) {
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static long long crash_after = -1;
   static bool      initialized = false;
   if (!initialized) {
