@@ -354,12 +354,18 @@ where
 
                     builder.build().launch()?;
 
-                    // Broker exited. kill all clients.
+                    // Broker exited. kill all clients and wait for them to avoid zombies.
                     for handle in &handles {
                         // # Safety
                         // Normal libc call, no dereferences whatsoever
                         unsafe {
                             libc::kill(*handle, libc::SIGINT);
+                        }
+                    }
+                    // Wait for all children to avoid zombie processes
+                    for handle in &handles {
+                        unsafe {
+                            libc::waitpid(*handle, core::ptr::null_mut(), 0);
                         }
                     }
                 } else {
@@ -511,9 +517,10 @@ where
 
                 builder.build().launch()?;
 
-                //broker exited. kill all clients.
+                //broker exited. kill all clients and wait to avoid zombies.
                 for handle in &mut handles {
-                    handle.kill()?;
+                    let _ = handle.kill();
+                    let _ = handle.wait();
                 }
             } else {
                 log::info!(
@@ -916,10 +923,16 @@ where
         #[cfg(feature = "llmp_debug")]
         log::info!("The last client quit. Exiting.");
 
-        // Brokers exited. kill all clients.
+        // Brokers exited. kill all clients and wait for them to avoid zombies.
         for handle in &handles {
             unsafe {
                 libc::kill(*handle, libc::SIGINT);
+            }
+        }
+        // Wait for all children to avoid zombie processes
+        for handle in &handles {
+            unsafe {
+                libc::waitpid(*handle, core::ptr::null_mut(), 0);
             }
         }
 

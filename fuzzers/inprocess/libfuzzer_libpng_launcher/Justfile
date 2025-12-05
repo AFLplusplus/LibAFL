@@ -96,11 +96,12 @@ test: fuzzer
     # Run with crash_after. It should crash and restart repeatedly.
     # We check if it still produces output/runs.
     timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21339 --cores 0 --input ./corpus --output ./out_fork_crash --fork --crash-after 100 2>&1 | tee fuzz_fork_crash_stdout.log || true
-    # Check for crash message
-    if grep -qa "Intentionally crashing" fuzz_fork_crash_stdout.log; then
-        echo "Fuzzer (fork+crash) triggered crash"
+    # Check for objectives (crashes are recorded as objectives in the stats)
+    # Note: forked child's stderr may not propagate, so we check stats output
+    if grep -qa "objectives: [1-9]" fuzz_fork_crash_stdout.log; then
+        echo "Fuzzer (fork+crash) recorded crashes as objectives"
     else
-        echo "Fuzzer (fork+crash) did not trigger crash"
+        echo "Fuzzer (fork+crash) did not record any objectives"
         exit 1
     fi
     # Check if it kept working (found entries)
@@ -111,13 +112,24 @@ test: fuzzer
        exit 1 
     fi
 
-    # Verify respawn (check for multiple crashes)
-    CRASH_COUNT=$(grep -c "Intentionally crashing" fuzz_fork_crash_stdout.log)
-    if [ "$CRASH_COUNT" -gt 1 ]; then
-        echo "Fuzzer (fork+crash) respawned successfully (crashes: $CRASH_COUNT)"
+    # Verify respawn by checking that objectives count continues to grow
+    # (each crash at 100 execs = 1 objective, so at 500+ execs we should have 5+ objectives)
+    LAST_OBJ=$(grep -oE 'objectives: [0-9]+' fuzz_fork_crash_stdout.log | tail -1 | grep -oE '[0-9]+')
+    if [ "$LAST_OBJ" -gt "3" ]; then
+       echo "Fuzzer (fork+crash) respawned multiple times: $LAST_OBJ objectives found"
     else
-        echo "Fuzzer (fork+crash) did not respawn enough times (crashes: $CRASH_COUNT)"
-        exit 1
+       echo "Fuzzer (fork+crash) did not respawn enough (only $LAST_OBJ objectives)"
+       exit 1
+    fi
+
+    # Verify progress continues after crashes (corpus increases past initial crash point)
+    # Extract last corpus value and ensure it grew past initial crash point
+    LAST_CORPUS=$(grep -oE 'corpus: [0-9]+' fuzz_fork_crash_stdout.log | tail -1 | grep -oE '[0-9]+')
+    if [ "$LAST_CORPUS" -gt "20" ]; then
+       echo "Fuzzer (fork+crash) continues progress: last corpus = $LAST_CORPUS"
+    else
+       echo "Fuzzer (fork+crash) did not find enough corpus entries (only $LAST_CORPUS)"
+       exit 1
     fi
 
 [windows]
@@ -128,4 +140,3 @@ clean:
     rm -rf {{FUZZER_NAME}}
     make -C libpng-1.6.37 clean || true
     cargo clean
-

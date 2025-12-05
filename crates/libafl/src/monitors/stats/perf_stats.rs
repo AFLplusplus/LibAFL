@@ -351,6 +351,14 @@ impl fmt::Display for ClientPerfStats {
         // Calculate the elapsed time from the monitor
         let elapsed: f64 = self.elapsed_cycles() as f64;
 
+        // Guard against division by zero which would produce NaN
+        if elapsed == 0.0 {
+            return write!(
+                f,
+                "     NaN: Scheduler\n     NaN: Manager\n  Feedbacks:\n     NaN: Not Measured"
+            );
+        }
+
         // Calculate the percentages for each benchmark
         let scheduler_percent = self.scheduler as f64 / elapsed;
         let manager_percent = self.manager as f64 / elapsed;
