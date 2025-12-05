@@ -1,5 +1,13 @@
 use std::{
-    env, ffi::CString, fs, num::NonZero, os::unix::ffi::OsStrExt, path::PathBuf, time::Duration,
+    env,
+    ffi::CString,
+    fs,
+    fs::File,
+    io::{Read, Seek, SeekFrom},
+    num::NonZero,
+    os::unix::ffi::OsStrExt,
+    path::PathBuf,
+    time::Duration,
 };
 
 use libafl::{
@@ -7,28 +15,25 @@ use libafl::{
     events::SimpleEventManager,
     executors::{
         command::{CommandConfigurator, PTraceCommandConfigurator},
-        hooks::intel_pt::{IntelPTHook, SectionInfo},
+        hooks::intel_pt::{IntelPT, IntelPTHook, PtImage, PAGE_SIZE},
     },
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
-    observers::StdMapObserver,
+    observers::ConstMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{core_affinity, rands::StdRand, tuples::tuple_list, Error};
-use libafl_intelpt::{AddrFilter, AddrFilterType, AddrFilters, IntelPT, PAGE_SIZE};
+use libafl_bolts::{core_affinity, nonnull_raw_mut, rands::StdRand, tuples::tuple_list, Error};
 use object::{elf::PF_X, Object, ObjectSegment, SegmentFlags};
 
 // Coverage map
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
-// TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
-#[allow(static_mut_refs)] // only a problem in nightly
-static mut MAP_PTR: *mut u8 = unsafe { MAP.as_mut_ptr() };
+static mut MAP_PTR: *mut u8 = &raw mut MAP as _;
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Let's set the default logging level to `warn`
@@ -70,7 +75,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::debug!("Using core {} for fuzzing", cpu.0);
 
     // Create an observation channel using the map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", MAP_PTR, MAP_SIZE) };
+    let observer = unsafe { ConstMapObserver::from_mut_ptr("signals", nonnull_raw_mut!(MAP)) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -114,28 +119,23 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Set the instruction pointer (IP) filter and memory image of our target.
     let actual_virtual_address = executable_segment.address() + ELF_ET_DYN_BASE;
-    let filters = AddrFilters::new(&[AddrFilter::new(
-        actual_virtual_address,
-        actual_virtual_address + executable_segment.size(),
-        AddrFilterType::FILTER,
-    )])?;
+    let filters = vec![actual_virtual_address..=actual_virtual_address + executable_segment.size()];
+
+    let mut file = File::open(&target_path)?;
+    let mut data = vec![0; executable_segment.size() as usize];
+    file.seek(SeekFrom::Start(executable_segment.file_range().0))?;
+    file.read_exact(&mut data)?;
+    let images = vec![PtImage::new(data, actual_virtual_address)];
 
     let intel_pt = IntelPT::builder()
         .cpu(cpu.0)
         .inherit(true)
-        .ip_filters(&filters)
+        .ip_filters(filters)
+        .images(images)
         .build()?;
-
-    let sections = [SectionInfo {
-        filename: target_path.to_string_lossy().to_string(),
-        offset: executable_segment.file_range().0,
-        size: executable_segment.size(),
-        virtual_address: actual_virtual_address,
-    }];
 
     let hook = unsafe { IntelPTHook::builder().map_ptr(MAP_PTR).map_len(MAP_SIZE) }
         .intel_pt(intel_pt)
-        .image(&sections)
         .build();
 
     let target_cstring = CString::from(
