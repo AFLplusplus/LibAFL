@@ -69,7 +69,7 @@ fn find_llvm_config_brew() -> Result<PathBuf, String> {
                 })
             });
             if let Some(path) = glob_results.last() {
-                 return Ok(path.unwrap());
+                return Ok(path.unwrap());
             }
         }
         Err(err) => return Err(format!("Could not execute brew --cellar: {err:?}")),
