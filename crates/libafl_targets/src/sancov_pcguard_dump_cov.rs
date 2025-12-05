@@ -74,6 +74,15 @@ pub fn dump_covered_lines(clear: bool) -> Vec<SrcLoc> {
     res
 }
 
+/// Clears the covered pcguard lines.
+pub fn clear_covered_lines() {
+    if let Ok(mut guard) = COVERED_PCS.lock() {
+        if let Some(map) = guard.as_mut() {
+            map.clear();
+        }
+    }
+}
+
 /// Enable coverage collection
 pub fn pcguard_enable_coverage_collection() {
     LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.store(
