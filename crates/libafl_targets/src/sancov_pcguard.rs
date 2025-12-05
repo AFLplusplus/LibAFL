@@ -302,7 +302,8 @@ pub unsafe extern "C" fn __libafl_targets_trace_pc_guard(guard: *mut u32, pc: us
 /// Initialize the sancov `pc_guard` - usually called by `llvm`.
 ///
 /// # Safety
-/// Dereferences at `start` and writes to it.
+/// Dereferences the edges map at `start` and writes to it.
+/// Should usually not be called directly, but is called by `llvm`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(
     #[allow(unused_mut)] // only mut with the `coverage` feature
@@ -311,9 +312,14 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(
     #[allow(unused_variables)] // only used with the `coverage` feature
     stop: *mut u32,
 ) {
+    /// # Safety
+    /// Dereferences at `start` and writes to it, as it sais on this function's title.
+    /// As unsafe as the caller wants it to be.
     #[cfg(feature = "pointer_maps")]
-    if EDGES_MAP_PTR.is_null() {
-        EDGES_MAP_PTR = &raw mut EDGES_MAP as *mut u8;
+    unsafe {
+        if EDGES_MAP_PTR.is_null() {
+            EDGES_MAP_PTR = &raw mut EDGES_MAP as *mut u8;
+        }
     }
 
     #[cfg(feature = "coverage")]
