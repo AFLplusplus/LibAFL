@@ -52,6 +52,26 @@ fn dll_extension<'a>() -> &'a str {
 /// Hence, we go look for it ourselves.
 #[cfg(target_vendor = "apple")]
 fn find_llvm_config_brew() -> Result<PathBuf, String> {
+    if let Ok(output) = Command::new("brew").arg("--prefix").output() {
+        let brew_location = str::from_utf8(&output.stdout).unwrap_or_default().trim();
+        if brew_location.is_empty() {
+            return Err("Empty return from brew --prefix".to_string());
+        }
+        let location_suffix = "opt/llvm/bin/llvm-config";
+        let prefix_glob = [
+            // location for non cellared llvm
+            format!("{brew_location}/{location_suffix}"),
+        ];
+        let glob_results = prefix_glob.iter().flat_map(|location| {
+            glob(location).unwrap_or_else(|err| {
+                panic!("Could not read glob path {location} ({err})");
+            })
+        });
+        if let Some(path) = glob_results.last() {
+            return Ok(path.unwrap());
+        }
+    }
+
     match Command::new("brew").arg("--cellar").output() {
         Ok(output) => {
             let brew_cellar_location = str::from_utf8(&output.stdout).unwrap_or_default().trim();
