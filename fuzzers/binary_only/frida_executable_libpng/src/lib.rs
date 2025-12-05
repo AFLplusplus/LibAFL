@@ -1,4 +1,3 @@
-#![allow(clippy::missing_safety_doc)]
 use std::mem::transmute;
 
 use libc::{c_void, dlsym, RTLD_NEXT};
@@ -23,6 +22,8 @@ extern "C" fn _dummy_main(_argc: i32, _argv: *const *const u8, _env: *const *con
 
 static mut ORIG_MAIN: MainFunc = _dummy_main;
 
+/// # Safety
+/// Accesses mutable static variable
 #[no_mangle]
 pub unsafe extern "C" fn main_hook(
     _argc: i32,
@@ -33,6 +34,8 @@ pub unsafe extern "C" fn main_hook(
     0
 }
 
+/// # Safety
+/// Modifies mutable static variable, performs unsafe memory transmutation
 #[no_mangle]
 pub unsafe extern "C" fn __libc_start_main(
     main: extern "C" fn(i32, *const *const u8, *const *const u8) -> i32,

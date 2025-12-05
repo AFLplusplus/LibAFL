@@ -19,12 +19,10 @@ pub const MAX_INPUT_SIZE: usize = 1_048_576; // 1MB
 impl Harness {
     /// Change environment
     #[inline]
-    #[expect(clippy::ptr_arg)]
     pub fn edit_env(_env: &mut Vec<(String, String)>) {}
 
     /// Change arguments
     #[inline]
-    #[expect(clippy::ptr_arg)]
     pub fn edit_args(_args: &mut Vec<String>) {}
 
     /// Helper function to find the function we want to fuzz.

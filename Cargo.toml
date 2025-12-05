@@ -128,17 +128,17 @@ capstone = "0.13.0" # Disassembler used in libafl_unicorn to provide disassembly
 clap = "4.5.52"
 cc = "1.2.48"
 cmake = "0.1.54"
-ctor = "0.6.1"
+ctor = "0.6.3"
 document-features = "0.2.11"
 erased-serde = { version = "0.4.5", default-features = false } # erased serde
 fastbloom = { version = "0.14.0", default-features = false }
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
 hashbrown = { version = "0.16.1", default-features = false } # A faster hashmap, nostd compatible
 just = "1.43.1"
-libc = "0.2.177" # For (*nix) libc
+libc = "0.2.178" # For (*nix) libc
 libipt = { version = "0.4.0", features = ["libipt_master"] }
 libvharness_sys = { path = "./crates/libafl_qemu/libvharness_sys", version = "0.16.0", default-features = false }
-log = "0.4.28"
+log = "0.4.29"
 meminterval = "0.4.2"
 mimalloc = { version = "0.1.48", default-features = false }
 nix = { version = "0.30.1", default-features = false }
@@ -149,7 +149,7 @@ postcard = { version = "1.1.3", features = [
   "alloc",
 ], default-features = false } # no_std compatible serde serialization format
 pyo3 = { version = "0.26.0", features = ["auto-initialize"] }
-pyo3-build-config = "0.27.1"
+pyo3-build-config = "0.27.2"
 rangemap = "1.7.0"
 regex = "1.12.2"
 rustversion = "1.0.22"
@@ -160,12 +160,13 @@ serial_test = { version = "3.2.0", default-features = false }
 static_assertions = "1.1.0"
 strum = "0.27.2"
 strum_macros = "0.27.2"
+tinyinst = "0.1.1"
 toml = "0.9.7" # For parsing the injections toml file
 tuple_list = { version = "0.1.3" }
 typed-builder = "0.23.2" # Implement the builder pattern at compiletime
 typeid = "1.0.3" # Safe type_eq that doesn't rely on std specialization
 unicorn-engine = "2.0.1" # Used in libafl_unicorn
-uuid = { version = "1.18.1", features = ["serde", "v4"] }
+uuid = { version = "1.19.0", features = ["serde", "v4"] }
 which = "8.0.0"
 windows = "0.62.1"
 windows-core = "0.62.1"

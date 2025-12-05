@@ -335,6 +335,18 @@ where
     }
 }
 
+impl<T> AsRef<Self> for OutputObserver<T> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<T> AsMut<Self> for OutputObserver<T> {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 /// An observer that captures stdout of a target.
 pub type StdOutObserver = OutputObserver<StdOutMarker>;
 /// An observer that captures stderr of a target.

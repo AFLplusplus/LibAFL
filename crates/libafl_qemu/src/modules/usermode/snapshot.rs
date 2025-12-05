@@ -239,7 +239,7 @@ impl SnapshotModule {
         self.mmap_start = qemu.get_mmap_start();
         self.pages.clear();
         for map in qemu.mappings() {
-            println!("mapping: {map:?}");
+            log::debug!("mapping: {map:?}");
 
             let mut addr = map.start();
             while addr < map.end() {
