@@ -361,6 +361,9 @@ jobs:
         uses: ./.github/workflows/fuzzer-tester-prepare
         with:
           fuzzer-name: ${{ matrix.fuzzer }}
+      - name: Install lcov
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y lcov
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
