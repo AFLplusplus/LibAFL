@@ -1,6 +1,6 @@
 use std::env;
 
-use libafl_cc::{ClangWrapper, Configuration, ToolWrapper};
+use libafl_cc::{ClangWrapper, CompilerWrapper, Configuration, ToolWrapper};
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -23,6 +23,7 @@ pub fn main() {
             .silence(true)
             .parse_args(&args)
             .expect("Failed to parse the command line")
+            .link_staticlib(&dir, "libfuzzer_libpng")
             .add_configuration(Configuration::GenerateCoverageMap)
             .add_configuration(Configuration::Compound(vec![
                 Configuration::GenerateCoverageMap,
