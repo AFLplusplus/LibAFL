@@ -13,6 +13,8 @@ use libafl::{
     events::{
         launcher::Launcher, llmp::LlmpRestartingEventManager, EventConfig, EventFirer,
         EventWithStats,
+        #[cfg(feature = "tcp_manager")]
+        tcp::TcpRestartingMgr,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -153,6 +155,9 @@ struct Opt {
     fork: bool,
     #[arg(long, help = "Crash after this many iterations")]
     crash_after: Option<u64>,
+    #[cfg(feature = "tcp_manager")]
+    #[arg(long, help = "Use TCP event manager")]
+    tcp: bool,
 }
 
 /// The main fn, `no_mangle` as it is a C symbol
@@ -204,7 +209,7 @@ pub extern "C" fn libafl_main() {
 
     let mut run_client =
         |state: Option<_>,
-         mut restarting_mgr: LlmpRestartingEventManager<_, _, _, _, _>,
+         mut restarting_mgr: _,
          client_description: libafl::events::launcher::ClientDescription| {
             // Send the core_id to the monitor
             let core_id = client_description.core_id();
@@ -344,6 +349,23 @@ pub extern "C" fn libafl_main() {
 
     #[cfg(unix)]
     let builder = builder.fork(opt.fork);
+
+    #[cfg(feature = "tcp_manager")]
+    if opt.tcp {
+        println!("Running in TCP mode");
+        let (state, mgr) = TcpRestartingMgr::builder()
+            .shmem_provider(shmem_provider)
+            .broker_port(broker_port)
+            .configuration(EventConfig::from_name("default"))
+            .monitor(Some(monitor))
+            .fork(opt.fork)
+            .build()
+            .launch()
+            .expect("Failed to launch TCP manager");
+
+        run_client(state, mgr, ClientDescription::new(0, 0, Cores::from_cmdline("0").unwrap().ids[0]));
+        return;
+    }
 
     match builder.build().launch() {
         Ok(()) => (),

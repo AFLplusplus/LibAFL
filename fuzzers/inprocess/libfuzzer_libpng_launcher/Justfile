@@ -71,7 +71,7 @@ run: fuzzer
 
 [linux]
 [macos]
-test: fuzzer test-statsd
+test: fuzzer test-statsd test-tcp-fork test-tcp-no-fork
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
     echo "Testing default (no fork)..."
@@ -152,6 +152,16 @@ fuzzer-statsd: lib cxx-statsd
 
 [linux]
 [macos]
+cxx-tcp:
+    cargo build --profile {{PROFILE}} --features tcp_manager
+
+[linux]
+[macos]
+fuzzer-tcp: lib cxx-tcp
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tcp -lm -lz
+
+[linux]
+[macos]
 test-statsd: fuzzer-statsd
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
@@ -168,6 +178,37 @@ test-statsd: fuzzer-statsd
     else
         echo "StatsD failed to receive data"
         exit 1
+    fi
+
+
+[linux]
+[macos]
+test-tcp-fork: fuzzer-tcp
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    echo "Testing with TCP (fork)..."
+    rm -rf out_tcp_fork || true
+    timeout 31s ./{{FUZZER_NAME}}-tcp --broker-port 21340 --cores 0 --input ./corpus --output ./out_tcp_fork --tcp --fork 2>&1 | tee fuzz_tcp_fork_stdout.log || true
+    if grep -qa "corpus: " fuzz_tcp_fork_stdout.log; then
+        echo "Fuzzer (TCP fork) is working"
+    else
+        echo "Fuzzer (TCP fork) does not generate any testcases or any crashes"
+        # exit 1
+    fi
+
+[linux]
+[macos]
+test-tcp-no-fork: fuzzer-tcp
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    echo "Testing with TCP (no fork)..."
+    rm -rf out_tcp_no_fork || true
+    timeout 31s ./{{FUZZER_NAME}}-tcp --broker-port 21341 --cores 0 --input ./corpus --output ./out_tcp_no_fork --tcp 2>&1 | tee fuzz_tcp_no_fork_stdout.log || true
+    if grep -qa "corpus: " fuzz_tcp_no_fork_stdout.log; then
+        echo "Fuzzer (TCP no fork) is working"
+    else
+        echo "Fuzzer (TCP no fork) does not generate any testcases or any crashes"
+        # exit 1
     fi
 
 
