@@ -273,7 +273,7 @@ fn fuzz(
 
     let mut shmem_provider = StdShMemProvider::new()?;
 
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true)
     {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
         Ok(res) => res,

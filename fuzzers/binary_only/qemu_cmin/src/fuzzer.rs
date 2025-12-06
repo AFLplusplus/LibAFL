@@ -206,7 +206,7 @@ pub fn fuzz() -> Result<(), Error> {
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
     let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true)
     {
         Ok(res) => res,
         Err(err) => match err {

@@ -259,7 +259,7 @@ fn fuzz(
         .as_mut_ptr()
         .cast::<libafl_qemu::modules::cmplog::CmpLogMap>();
 
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true)
     {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
         Ok(res) => res,

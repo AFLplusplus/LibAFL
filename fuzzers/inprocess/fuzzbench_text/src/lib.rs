@@ -311,7 +311,7 @@ fn fuzz_binary(
     let mut state = None;
     */
 
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true)
     {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
         Ok(res) => res,
@@ -529,7 +529,7 @@ fn fuzz_text(
     let mut state = None;
     */
 
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true)
     {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
         Ok(res) => res,

@@ -245,7 +245,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     // Set up the most basic monitor possible.
     let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true)
     {
         Ok(res) => res,
         Err(err) => match err {

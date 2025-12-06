@@ -20,7 +20,7 @@ use std::net::TcpStream;
 use libafl_bolts::llmp::{TcpRequest, TcpResponse, recv_tcp_msg, send_tcp_msg};
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
-#[cfg(all(feature = "fork", unix))]
+#[cfg(unix)]
 use libafl_bolts::os::{ForkResult, fork};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
@@ -844,34 +844,25 @@ where
                     if use_fork {
                         #[cfg(unix)]
                         {
-                            #[cfg(all(unix, feature = "fork"))]
-                            {
-                                self.shmem_provider.pre_fork()?;
-                                match unsafe { fork() }? {
-                                    ForkResult::Parent(handle) => {
-                                        unsafe {
-                                            libc::signal(libc::SIGINT, libc::SIG_IGN);
-                                        }
-                                        self.shmem_provider.post_fork(false)?;
-                                        handle.status()
+                            self.shmem_provider.pre_fork()?;
+                            match unsafe { fork() }? {
+                                ForkResult::Parent(handle) => {
+                                    unsafe {
+                                        libc::signal(libc::SIGINT, libc::SIG_IGN);
                                     }
-                                    ForkResult::Child => {
-                                        log::debug!(
-                                            "{} has been forked into {}",
-                                            std::os::unix::process::parent_id(),
-                                            std::process::id()
-                                        );
-                                        self.shmem_provider.post_fork(true)?;
-                                        break (
-                                            staterestorer,
-                                            self.shmem_provider.clone(),
-                                            core_id,
-                                        );
-                                    }
+                                    self.shmem_provider.post_fork(false)?;
+                                    handle.status()
+                                }
+                                ForkResult::Child => {
+                                    log::debug!(
+                                        "{} has been forked into {}",
+                                        std::os::unix::process::parent_id(),
+                                        std::process::id()
+                                    );
+                                    self.shmem_provider.post_fork(true)?;
+                                    break (staterestorer, self.shmem_provider.clone(), core_id);
                                 }
                             }
-                            #[cfg(not(all(unix, feature = "fork")))]
-                            unreachable!()
                         }
                         #[cfg(not(unix))]
                         unreachable!("Forking not supported")
