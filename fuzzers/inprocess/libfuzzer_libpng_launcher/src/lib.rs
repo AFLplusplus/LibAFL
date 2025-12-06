@@ -41,12 +41,10 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-use libafl_targets::{libfuzzer_initialize, std_edges_map_observer};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 use mimalloc::MiMalloc;
 
-extern "C" {
-    fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;
-}
+
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -336,7 +334,7 @@ pub extern "C" fn libafl_main() {
             Ok(())
         };
 
-    match Launcher::builder()
+    let builder = Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
