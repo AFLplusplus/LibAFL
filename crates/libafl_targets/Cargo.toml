@@ -94,6 +94,10 @@ sancov_cmplog = [
 ## This is an alias for `sancov_pcguard_hitcounts`, enabling hitcounts coverage by default.
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
 
+## Support for `sancov` pcguard dump cov.
+## This uses pcguard to be able to dump lcov-compatible .info files.
+sancov_pcguard_dump_cov = ["std", "backtrace"]
+
 ## Compile common C code defining sanitizer options and cross-platform intrinsics.
 ## This feature compiles `common.c` and `common.h`, which are used by many other features.
 common = []
@@ -120,12 +124,11 @@ windows_asan = ["common"]
 ## This is important for ensuring that weak symbols (like sanitizer hooks) are included in the final binary.
 whole_archive = []
 
-## Support for `aflpp`-style `CmpLog` maps.
 ## This feature enables extended `CmpLog` instrumentation, compatible with `AFL++`.
 ## It compiles `cmplog.c` with `CMPLOG_EXTENDED` defined.
 cmplog_extended_instrumentation = [
   "cmplog", # without `cmplog`, extended instrumentation won't compile
-]
+] ## Support for `aflpp`-style `CmpLog` maps.
 
 ## Support for function logging.
 ## This feature enables the `call` module, which provides hooks for function calls.
@@ -217,6 +220,7 @@ serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] } # serialization lib
 meminterval = { workspace = true, features = ["serde"], optional = true }
+backtrace = { workspace = true, optional = true }
 
 [lints]
 workspace = true

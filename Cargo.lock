@@ -3543,6 +3543,7 @@ dependencies = [
 name = "libafl_targets"
 version = "0.16.0"
 dependencies = [
+ "backtrace",
  "bindgen 0.72.1",
  "cc",
  "document-features",
