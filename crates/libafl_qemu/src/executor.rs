@@ -279,6 +279,7 @@ where
         })
     }
 
+    #[must_use]
     pub fn inner(&self) -> &EmulatorInProcessExecutor<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
         &self.inner
     }
@@ -288,10 +289,18 @@ where
         BREAK_ON_TMOUT.store(true, Ordering::Release);
     }
 
+    #[must_use]
     pub fn inner_mut(
         &mut self,
     ) -> &mut EmulatorInProcessExecutor<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
         &mut self.inner
+    }
+
+    /// Retrieve the emulator, consuming the executor.
+    #[inline]
+    #[must_use]
+    pub fn into_emulator(self) -> Emulator<C, CM, ED, ET, I, S, SM> {
+        self.inner.into_state()
     }
 }
 
@@ -432,23 +441,34 @@ where
     }
 
     #[allow(clippy::type_complexity)]
+    #[must_use]
     pub fn inner(&self) -> &QemuInProcessForkExecutor<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
         &self.inner
     }
 
     #[allow(clippy::type_complexity)]
+    #[must_use]
     pub fn inner_mut(
         &mut self,
     ) -> &mut QemuInProcessForkExecutor<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
         &mut self.inner
     }
 
+    #[must_use]
     pub fn emulator(&self) -> &Emulator<C, CM, ED, ET, I, S, SM> {
         &self.inner.exposed_executor_state
     }
 
+    #[must_use]
     pub fn emulator_mut(&mut self) -> &Emulator<C, CM, ED, ET, I, S, SM> {
         &mut self.inner.exposed_executor_state
+    }
+
+    /// Retrieve the emulator, consuming the executor.
+    #[inline]
+    #[must_use]
+    pub fn into_emulator(self) -> Emulator<C, CM, ED, ET, I, S, SM> {
+        self.inner.into_state()
     }
 }
 
