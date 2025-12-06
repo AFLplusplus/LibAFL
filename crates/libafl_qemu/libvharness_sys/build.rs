@@ -7,6 +7,8 @@ const LIBVHARNESS_COMMIT: &str = "9a316966ce7aa4bd9f733491511e6ac4be6dd980";
 fn main() {
     let runs_in_docs_rs = env::var("DOCS_RS").is_ok();
 
+    let is_linux = env::var("CARGO_CFG_TARGET_OS").unwrap() == "linux";
+
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let src_dir = PathBuf::from(src_dir).join("src");
 
@@ -22,7 +24,8 @@ fn main() {
     let gen_binding = out_dir.join("bindings.rs");
     let vharness_stub = src_dir.join("stub.rs");
 
-    if runs_in_docs_rs || cfg!(feature = "clippy") {
+    if runs_in_docs_rs || cfg!(feature = "clippy") || !is_linux {
+        println!("cargo:warning=libvharness_sys only builds for Linux targets");
         fs::copy(vharness_stub, gen_binding).unwrap();
     } else {
         println!("cargo:rerun-if-env-changed=LIBVHARNESS_GEN_STUBS");

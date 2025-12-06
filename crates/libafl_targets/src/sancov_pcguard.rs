@@ -30,7 +30,7 @@ use crate::coverage::MAX_EDGES_FOUND;
 use crate::{EDGES_MAP_ALLOCATED_SIZE, coverage::EDGES_MAP_PTR};
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
-#[cfg(not(any(doc, feature = "clippy")))]
+#[cfg(not(any(doc, feature = "clippy", test)))]
 compile_error!(
     "the libafl_targets `sancov_pcguard_edges` and `sancov_pcguard_hitcounts` features are mutually exclusive."
 );
@@ -220,13 +220,13 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
         #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
         {
             pos = update_ngram(pos);
-            // println!("Wrinting to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
+            // println!("Writing to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
         }
 
         #[cfg(feature = "sancov_ctx")]
         {
             pos ^= __afl_prev_ctx as usize;
-            // println!("Wrinting to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
+            // println!("Writing to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
         }
 
         #[cfg(feature = "pointer_maps")]

@@ -566,8 +566,7 @@ pub trait HasCurrentStageId {
 /// Trait for types which track nested stages. Stages which themselves contain stage tuples should
 /// ensure that they constrain the state with this trait accordingly.
 pub trait HasNestedStage: HasCurrentStageId {
-    /// Enter a stage scope, potentially resuming to an inner stage status. Returns Ok(true) if
-    /// resumed.
+    /// Enter a stage scope, potentially resuming to an inner stage status.
     fn enter_inner_stage(&mut self) -> Result<(), Error>;
 
     /// Exit a stage scope
