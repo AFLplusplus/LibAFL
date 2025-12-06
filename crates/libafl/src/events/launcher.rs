@@ -204,11 +204,11 @@ impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
 
 impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
 where
-    MT: Monitor + Clone,
+    MT: Monitor,
     SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
-    pub fn launch<I, S>(&mut self) -> Result<(), Error>
+    pub fn launch<I, S>(self) -> Result<(), Error>
     where
         CF: FnOnce(
             Option<S>,
@@ -223,7 +223,7 @@ where
 
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[expect(clippy::too_many_lines, clippy::match_wild_err_arm)]
-    pub fn launch_with_hooks<EMH, I, S>(&mut self, hooks: EMH) -> Result<(), Error>
+    pub fn launch_with_hooks<EMH, I, S>(mut self, hooks: EMH) -> Result<(), Error>
     where
         CF: FnOnce(
             Option<S>,
@@ -345,7 +345,7 @@ where
                     // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
                     let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
                         .shmem_provider(self.shmem_provider.clone())
-                        .monitor(Some(self.monitor.clone()))
+                        .monitor(Some(self.monitor))
                         .broker_port(self.broker_port)
                         .kind(ManagerKind::Broker)
                         .remote_broker_addr(self.remote_broker_addr)
@@ -513,7 +513,7 @@ where
 
                 let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
-                    .monitor(Some(self.monitor.clone()))
+                    .monitor(Some(self.monitor))
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Broker)
                     .remote_broker_addr(self.remote_broker_addr)

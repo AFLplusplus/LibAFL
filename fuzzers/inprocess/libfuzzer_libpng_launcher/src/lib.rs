@@ -44,8 +44,6 @@ use libafl_bolts::{
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 use mimalloc::MiMalloc;
 
-
-
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
