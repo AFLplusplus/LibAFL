@@ -421,7 +421,7 @@ where
     /// * `monitor` - The monitor to use for the event manager.
     /// * `shmem_provider` - The shared memory provider to use for the event manager.
     /// * `use_fork` - Whether to use fork to spawn child processes (on Unix only)
-    ///                or to spawn the binary again with the same parameters.
+    ///   or to spawn the binary again with the same parameters.
     pub fn launch(
         monitor: MT,
         shmem_provider: &mut SP,

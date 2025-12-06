@@ -340,8 +340,7 @@ pub extern "C" fn libafl_main() {
         .cores(&cores)
         .overcommit(opt.overcommit)
         .broker_port(broker_port)
-        .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"));
+        .remote_broker_addr(opt.remote_broker_addr);
 
     #[cfg(unix)]
     let builder = builder.fork(opt.fork);
