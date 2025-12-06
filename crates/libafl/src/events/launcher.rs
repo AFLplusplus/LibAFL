@@ -129,7 +129,8 @@ pub struct Launcher<'a, CF, MT, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
-    monitor: MT,
+    #[builder(setter(transform = |x: MT| Some(x)))]
+    monitor: Option<MT>,
     /// The configuration
     configuration: EventConfig,
     /// The 'main' function to run for each client forked. This probably shouldn't return
@@ -223,7 +224,9 @@ where
 
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[expect(clippy::too_many_lines, clippy::match_wild_err_arm)]
-    pub fn launch_with_hooks<EMH, I, S>(mut self, hooks: EMH) -> Result<(), Error>
+    /// Launch the broker and the clients and fuzz with a user-supplied hook
+    #[expect(clippy::too_many_lines, clippy::match_wild_err_arm)]
+    pub fn launch_with_hooks<EMH, I, S>(self, hooks: EMH) -> Result<(), Error>
     where
         CF: FnOnce(
             Option<S>,
@@ -233,6 +236,103 @@ where
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
         I: DeserializeOwned,
         S: DeserializeOwned + Serialize,
+    {
+        let spawn_mgr = |launcher: &Self, client_description: Option<ClientDescription>, monitor: Option<MT>| {
+            if let Some(client_description) = client_description {
+                let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
+                    .shmem_provider(launcher.shmem_provider.clone())
+                    .broker_port(launcher.broker_port)
+                    .kind(ManagerKind::Client { client_description })
+                    .configuration(launcher.configuration)
+                    .serialize_state(launcher.serialize_state)
+                    .hooks(hooks);
+                #[cfg(unix)]
+                let builder = builder.fork(launcher.fork);
+                builder.build().launch()
+            } else {
+                let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
+                    .shmem_provider(launcher.shmem_provider.clone())
+                    .monitor(monitor)
+                    .broker_port(launcher.broker_port)
+                    .kind(ManagerKind::Broker)
+                    .remote_broker_addr(launcher.remote_broker_addr)
+                    .exit_cleanly_after(Some(
+                        NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap(),
+                    ))
+                    .configuration(launcher.configuration)
+                    .serialize_state(launcher.serialize_state)
+                    .hooks(hooks)
+                    .fork(launcher.fork);
+
+                builder.build().launch()
+            }
+        };
+
+        self.launch_common(spawn_mgr)
+    }
+
+    /// Launch the broker and the clients and fuzz with a user-supplied hook
+    #[cfg(feature = "tcp_manager")]
+    #[expect(clippy::too_many_lines, clippy::match_wild_err_arm)]
+    pub fn launch_tcp<EMH, I, S>(self, hooks: EMH) -> Result<(), Error>
+    where
+        CF: FnOnce(
+            Option<S>,
+            crate::events::tcp::TcpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
+            ClientDescription,
+        ) -> Result<(), Error>,
+        EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
+        I: Input,
+        S: DeserializeOwned
+            + Serialize
+            + HasExecutions
+            + HasMetadata
+            + HasImported
+            + HasSolutions<I>
+            + HasCurrentTestcase<I>
+            + Stoppable,
+    {
+        let spawn_mgr = |launcher: &Self, client_description: Option<ClientDescription>, monitor: Option<MT>| {
+            if let Some(client_description) = client_description {
+                let builder = crate::events::tcp::TcpRestartingMgr::<EMH, I, MT, S, SP>::builder()
+                    .shmem_provider(launcher.shmem_provider.clone())
+                    .broker_port(launcher.broker_port)
+                    .kind(crate::events::tcp::TcpManagerKind::Client {
+                        cpu_core: Some(client_description.core_id()),
+                    })
+                    .configuration(launcher.configuration)
+                    .serialize_state(launcher.serialize_state.is_on_restart())
+                    .hooks(hooks);
+                #[cfg(unix)]
+                let builder = builder.fork(launcher.fork);
+                builder.build().launch()
+            } else {
+                let builder = crate::events::tcp::TcpRestartingMgr::<EMH, I, MT, S, SP>::builder()
+                    .shmem_provider(launcher.shmem_provider.clone())
+                    .monitor(monitor)
+                    .broker_port(launcher.broker_port)
+                    .kind(crate::events::tcp::TcpManagerKind::Broker)
+                    .remote_broker_addr(launcher.remote_broker_addr)
+                    .exit_cleanly_after(Some(
+                        NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap(),
+                    ))
+                    .configuration(launcher.configuration)
+                    .serialize_state(launcher.serialize_state.is_on_restart())
+                    .hooks(hooks);
+                #[cfg(unix)]
+                let builder = builder.fork(launcher.fork);
+                builder.build().launch()
+            }
+        };
+
+        self.launch_common(spawn_mgr)
+    }
+
+    #[expect(clippy::too_many_lines, clippy::match_wild_err_arm)]
+    fn launch_common<EM, F, S>(mut self, spawn_mgr: F) -> Result<(), Error>
+    where
+        F: Fn(&Self, Option<ClientDescription>, Option<MT>) -> Result<(Option<S>, EM), Error>,
+        CF: FnOnce(Option<S>, EM, ClientDescription) -> Result<(), Error>,
     {
         #[cfg(unix)]
         let use_fork = self.fork;
@@ -314,19 +414,7 @@ where
                                     let client_description =
                                         ClientDescription::new(index, overcommit_id, bind_to);
 
-                                    // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                                    let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
-                                        .shmem_provider(self.shmem_provider.clone())
-                                        .broker_port(self.broker_port)
-                                        .kind(ManagerKind::Client {
-                                            client_description: client_description.clone(),
-                                        })
-                                        .configuration(self.configuration)
-                                        .serialize_state(self.serialize_state)
-                                        .hooks(hooks);
-                                    #[cfg(unix)]
-                                    let builder = builder.fork(self.fork);
-                                    let (state, mgr) = builder.build().launch()?;
+                                    let (state, mgr) = spawn_mgr(&self, Some(client_description.clone()), None)?;
 
                                     return (self.run_client.take().unwrap())(
                                         state,
@@ -342,51 +430,10 @@ where
                 if self.spawn_broker {
                     log::info!("I am broker!!.");
 
-                    // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-                    let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
-                        .shmem_provider(self.shmem_provider.clone())
-                        .monitor(Some(self.monitor))
-                        .broker_port(self.broker_port)
-                        .kind(ManagerKind::Broker)
-                        .remote_broker_addr(self.remote_broker_addr)
-                        .exit_cleanly_after(Some(
-                            NonZeroUsize::try_from(self.cores.ids.len()).unwrap(),
-                        ))
-                        .configuration(self.configuration)
-                        .serialize_state(self.serialize_state)
-                        .hooks(hooks)
-                        .fork(self.fork);
-
-                    builder.build().launch()?;
-
-                    // Broker exited. kill all clients and wait for them to avoid zombies.
-                    for handle in &handles {
-                        // # Safety
-                        // Normal libc call, no dereferences whatsoever
-                        unsafe {
-                            libc::kill(*handle, libc::SIGINT);
-                        }
-                    }
-                    // Wait for all children to avoid zombie processes
-                    for handle in &handles {
-                        unsafe {
-                            libc::waitpid(*handle, core::ptr::null_mut(), 0);
-                        }
-                    }
-                } else {
-                    for handle in &handles {
-                        let mut status = 0;
-                        log::info!(
-                            "Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit..."
-                        );
-                        unsafe {
-                            libc::waitpid(*handle, &raw mut status, 0);
-                            if status != 0 {
-                                log::info!("Client with pid {handle} exited with status {status}");
-                            }
-                        }
-                    }
+                    spawn_mgr(&self, None, self.monitor.take())?;
                 }
+
+                Self::wait_for_pids(&handles, self.spawn_broker);
             }
             // This is the fork part for unix
             #[cfg(not(unix))]
@@ -402,19 +449,7 @@ where
                     let client_description = ClientDescription::from_safe_string(&core_conf);
                     // the actual client. do the fuzzing
 
-                    let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
-                        .shmem_provider(self.shmem_provider.clone())
-                        .broker_port(self.broker_port)
-                        .kind(ManagerKind::Client {
-                            client_description: client_description.clone(),
-                        })
-                        .configuration(self.configuration)
-                        .serialize_state(self.serialize_state)
-                        .hooks(hooks);
-                    #[cfg(unix)]
-                    let builder = builder.fork(self.fork);
-
-                    let (state, mgr) = builder.build().launch()?;
+                    let (state, mgr) = spawn_mgr(&self, Some(client_description.clone()), None)?;
 
                     return (self.run_client.take().unwrap())(state, mgr, client_description);
                 }
@@ -511,39 +546,63 @@ where
             if self.spawn_broker {
                 log::info!("I am broker!!.");
 
-                let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
-                    .shmem_provider(self.shmem_provider.clone())
-                    .monitor(Some(self.monitor))
-                    .broker_port(self.broker_port)
-                    .kind(ManagerKind::Broker)
-                    .remote_broker_addr(self.remote_broker_addr)
-                    .exit_cleanly_after(Some(NonZeroUsize::try_from(self.cores.ids.len()).unwrap()))
-                    .configuration(self.configuration)
-                    .serialize_state(self.serialize_state)
-                    .hooks(hooks);
-                #[cfg(unix)]
-                let builder = builder.fork(self.fork);
+                spawn_mgr(&self, None, self.monitor.take())?;
+            }
+            
+            Self::wait_for_child_processes(&mut handles, self.spawn_broker);
+        }
+        Ok(())
+    }
 
-                builder.build().launch()?;
-
-                //broker exited. kill all clients and wait to avoid zombies.
-                for handle in &mut handles {
-                    let _ = handle.kill();
-                    let _ = handle.wait();
+    #[cfg(unix)]
+    fn wait_for_pids(handles: &[i32], spawn_broker: bool) {
+        if spawn_broker {
+            // Broker exited. kill all clients and wait for them to avoid zombies.
+            for handle in handles {
+                // # Safety
+                // Normal libc call, no dereferences whatsoever
+                unsafe {
+                    libc::kill(*handle, libc::SIGINT);
                 }
-            } else {
+            }
+            // Wait for all children to avoid zombie processes
+            for handle in handles {
+                unsafe {
+                    libc::waitpid(*handle, core::ptr::null_mut(), 0);
+                }
+            }
+        } else {
+            for handle in handles {
+                let mut status = 0;
                 log::info!(
                     "Not spawning broker (spawn_broker is false). Waiting for fuzzer children to exit..."
                 );
-                for handle in &mut handles {
-                    let ecode = handle.wait()?;
+                unsafe {
+                    libc::waitpid(*handle, &raw mut status, 0);
+                    if status != 0 {
+                        log::info!("Client with pid {handle} exited with status {status}");
+                    }
+                }
+            }
+        }
+    }
+
+    fn wait_for_child_processes(handles: &mut [std::process::Child], spawn_broker: bool) {
+        if spawn_broker {
+            for handle in &mut *handles {
+                let _ = handle.kill();
+                let _ = handle.wait();
+            }
+        } else {
+            for handle in &mut *handles {
+                let ecode = handle.wait();
+                if let Ok(ecode) = ecode {
                     if !ecode.success() {
                         log::info!("Client with handle {handle:?} exited with {ecode:?}");
                     }
                 }
             }
         }
-        Ok(())
     }
 }
 

@@ -21,7 +21,6 @@ use libafl_bolts::os::startable_self;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
-#[cfg(unix)]
 use libafl_bolts::os::{ForkResult, dup_and_mute_outputs, fork};
 use libafl_bolts::{
     ClientId,
@@ -1189,7 +1188,7 @@ where
                         }
                         ForkResult::Child => {
                             self.shmem_provider.post_fork(true)?;
-                            if std::env::var("LIBAFL_DEBUG_OUTPUT").is_err() {
+                            if env::var("LIBAFL_DEBUG_OUTPUT").is_err() {
                                 unsafe {
                                     let _ = dup_and_mute_outputs()?;
                                 }
