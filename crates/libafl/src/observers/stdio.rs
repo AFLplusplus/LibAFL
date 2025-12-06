@@ -315,14 +315,12 @@ where
         {
             let pos = file.stream_position()?;
 
-            if pos != 0 {
-                file.seek(SeekFrom::Start(0))?;
+            file.seek(SeekFrom::Start(0))?;
 
-                let mut buf = vec![0; pos as usize];
-                file.read_exact(&mut buf)?;
+            let mut buf = vec![0; pos as usize];
+            file.read_exact(&mut buf)?;
 
-                self.observe(buf);
-            }
+            self.observe(buf);
         }
         Ok(())
     }
@@ -334,6 +332,18 @@ where
         _exit_kind: &crate::executors::ExitKind,
     ) -> Result<(), Error> {
         self.post_exec_child(_state, _input, _exit_kind)
+    }
+}
+
+impl<T> AsRef<Self> for OutputObserver<T> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<T> AsMut<Self> for OutputObserver<T> {
+    fn as_mut(&mut self) -> &mut Self {
+        self
     }
 }
 

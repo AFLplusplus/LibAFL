@@ -93,7 +93,7 @@ where
             RunResult::OTHER_ERROR => Err(Error::unknown(
                 "Tinyinst RunResult is other error".to_string(),
             )),
-            _ => Err(Error::unknown("Tinyinst RunResult is unknown".to_string())),
+            _ => Err(Error::unknown("Tinyinst RunResult is unknown")),
         }
     }
 }
@@ -292,13 +292,11 @@ where
 
         let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
 
-        let tinyinst = unsafe {
-            TinyInst::new(
-                &self.tinyinst_args,
-                &program_args,
-                self.timeout.as_millis() as u32,
-            )
-        };
+        let tinyinst = TinyInst::new(
+            &self.tinyinst_args,
+            &program_args,
+            self.timeout.as_millis() as u32,
+        );
 
         Ok(TinyInstExecutor {
             tinyinst,

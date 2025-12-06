@@ -212,10 +212,12 @@ pub trait HasCurrentCorpusId {
     /// Set the current corpus index; we have started processing this corpus entry
     fn set_corpus_id(&mut self, id: CorpusId) -> Result<(), Error>;
 
-    /// Clear the current corpus index; we are done with this entry
+    /// Clear the current corpus index; we are done with this entry.
+    /// This can also be used by as stage to signal that subsequent stages should be skipped.
     fn clear_corpus_id(&mut self) -> Result<(), Error>;
 
-    /// Fetch the current corpus index -- typically used after a state recovery or transfer
+    /// Fetch the current corpus index -- typically used after a state recovery or transfer.
+    /// If it is `None`, the corpus scheduler should be called to schedule the next testcase.
     fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error>;
 }
 

@@ -11,6 +11,7 @@ edition = "2021"
 default = ["std"]
 std = []
 no_link_main = ["libafl_targets/libfuzzer_no_link_main"]
+dump_cov = ["libafl_targets/sancov_pcguard_dump_cov"]
 
 [profile.release]
 lto = true

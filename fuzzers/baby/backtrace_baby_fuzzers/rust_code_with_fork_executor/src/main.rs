@@ -20,7 +20,6 @@ use libafl::{
 };
 use libafl_bolts::{
     nonzero,
-    ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{unix_shmem, ShMemProvider},
     tuples::tuple_list,

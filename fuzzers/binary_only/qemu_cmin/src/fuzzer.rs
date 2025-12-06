@@ -42,6 +42,14 @@ use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
 #[cfg(all(feature = "fork", feature = "snapshot"))]
 compile_error!("Cannot enable both 'fork' and 'snapshot' features at the same time.");
 
+#[cfg(all(not(miri), debug_assertions))]
+#[global_allocator]
+static GLOBAL: scudo::GlobalScudoAllocator = scudo::GlobalScudoAllocator;
+
+#[cfg(all(not(miri), not(debug_assertions)))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[derive(Default)]
 pub struct Version;
 
@@ -136,7 +144,7 @@ pub fn fuzz() -> Result<(), Error> {
     let stdout_callback = |buf: &[u8]| {
         if let Ok(s) = from_utf8(buf) {
             let msg = s.trim_end();
-            if msg.len() != 0 {
+            if !msg.is_empty() {
                 log::info!("{msg}");
             }
         }

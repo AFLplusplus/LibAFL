@@ -22,7 +22,7 @@ cxx:
 [linux]
 [macos]
 fuzz_o: cxx
-	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -c fuzz.c -o fuzz.o
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
 
 [windows]
 fuzz_o:
@@ -53,7 +53,7 @@ run:
 
 [linux]
 [macos]
-test: fuzzer
+test: fuzzer test-dump-cov
 	#!/bin/bash
 	rm -rf libafl_unix_shmem_server || true
 	mkdir in || true
@@ -75,3 +75,26 @@ test: fuzzer
 
 clean:
 	cargo clean
+
+test-dump-cov:
+	cargo build --profile={{PROFILE}} --features dump_cov
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cxx -g -rdynamic --libafl fuzz.o -o {{FUZZER_NAME}} -lm -lz
+	# Create a dummy seed
+	mkdir -p seeds_dump
+	mkdir -p coverage_dump
+	echo "dummy" > seeds_dump/dummy
+	# Run with --dump-cov
+	./fuzzbench -i seeds_dump -o corpus_dump --dump-cov coverage_dump seeds_dump/dummy
+	# Verify output
+	ls -l coverage_dump/dummy.info
+	grep "TN:" coverage_dump/dummy.info
+	grep "TN:" coverage_dump/dummy.info
+	if command -v genhtml >/dev/null 2>&1; then \
+		genhtml coverage_dump/dummy.info --output-directory coverage_dump/html; \
+		ls coverage_dump/html/index.html; \
+	else \
+		echo "genhtml not found, skipping HTML report generation"; \
+	fi
+	# Clean up
+	rm -rf seeds_dump corpus_dump coverage_dump

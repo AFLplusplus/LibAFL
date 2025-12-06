@@ -1,5 +1,6 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
 #![doc = include_str!("../README.md")]
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]
 // For `std::simd`
 #![cfg_attr(nightly, feature(portable_simd))]
@@ -58,15 +59,19 @@ include!(concat!(env!("OUT_DIR"), "/constants.rs"));
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ngram4",
     feature = "sancov_ngram8",
-    feature = "sancov_ctx"
+    feature = "sancov_ctx",
+    feature = "sancov_pcguard_dump_cov"
 ))]
 pub mod sancov_pcguard;
+#[cfg(feature = "sancov_pcguard_dump_cov")]
+pub mod sancov_pcguard_dump_cov;
 #[cfg(any(
     feature = "sancov_pcguard_edges",
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ngram4",
     feature = "sancov_ngram8",
-    feature = "sancov_ctx"
+    feature = "sancov_ctx",
+    feature = "sancov_pcguard_dump_cov"
 ))]
 pub use sancov_pcguard::*;
 

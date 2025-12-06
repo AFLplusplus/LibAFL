@@ -189,9 +189,9 @@ serde = { workspace = true, default-features = false, features = [
 postcard = { workspace = true, optional = true } # no_std compatible serde serialization format
 num_enum = { workspace = true, default-features = false }
 
-ctor = { optional = true, version = "0.6.1" }
+ctor = { optional = true, version = "0.6.3" }
 miniz_oxide = { version = "0.8.0", optional = true }
-hostname = { version = "0.4.0", optional = true } # Is there really no gethostname in the stdlib?
+hostname = { version = "0.4.2", optional = true } # Is there really no gethostname in the stdlib?
 log = { workspace = true }
 nix = { workspace = true, optional = true, default-features = false, features = [
   "fs",
@@ -209,7 +209,7 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
 
 rustversion = { workspace = true }
 # optional stable simd
-wide = { version = "0.8.3", optional = true }
+wide = { version = "1.0.2", optional = true }
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }

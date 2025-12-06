@@ -1,5 +1,5 @@
 //! The `TestcaseScore` is an evaluator providing scores of corpus items.
-use alloc::string::{String, ToString};
+use alloc::string::String;
 
 use libafl_bolts::{HasLen, HasRefCnt};
 use num_traits::Zero;
@@ -102,7 +102,7 @@ where
         let mut perf_score = 100.0;
         let q_exec_us = entry
             .exec_time()
-            .ok_or_else(|| Error::key_not_found("exec_time not set".to_string()))?
+            .ok_or_else(|| Error::key_not_found("exec_time not set when computing corpus power. This happens if CalibrationStage fails to set it or is not added to stages."))?
             .as_nanos() as f64;
 
         let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
@@ -290,7 +290,7 @@ where
 
         let q_exec_us = entry
             .exec_time()
-            .ok_or_else(|| Error::key_not_found("exec_time not set".to_string()))?
+            .ok_or_else(|| Error::key_not_found("exec_time not set when computing corpus weight. This happens if CalibrationStage fails to set it or is not added to stages."))?
             .as_nanos() as f64;
         let favored = entry.has_metadata::<IsFavoredMetadata>();
 

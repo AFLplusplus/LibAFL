@@ -1,9 +1,13 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
+#[cfg(feature = "sancov_pcguard_dump_cov")]
+use core::ffi::c_void;
 #[rustversion::nightly]
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 use core::simd::num::SimdUint;
-use core::{mem::align_of, slice};
+use core::slice;
+#[cfg(feature = "sancov_pcguard_dump_cov")]
+use core::sync::atomic::{AtomicPtr, Ordering};
 
 #[cfg(any(
     feature = "sancov_ngram4",
@@ -16,21 +20,15 @@ use libafl::executors::hooks::ExecutorHook;
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[allow(unused_imports)] // only used in an unused function
 use crate::EDGES_MAP_DEFAULT_SIZE;
-#[cfg(any(
-    feature = "pointer_maps",
-    feature = "sancov_pcguard_edges",
-    feature = "sancov_pcguard_hitcounts",
-    feature = "sancov_ctx",
-    feature = "sancov_ngram4",
-    feature = "sancov_ngram8",
-))]
+#[cfg(feature = "coverage")]
 use crate::coverage::EDGES_MAP;
+#[cfg(feature = "coverage")]
 use crate::coverage::MAX_EDGES_FOUND;
 #[cfg(feature = "pointer_maps")]
 use crate::{EDGES_MAP_ALLOCATED_SIZE, coverage::EDGES_MAP_PTR};
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
-#[cfg(not(any(doc, feature = "clippy")))]
+#[cfg(not(any(doc, feature = "clippy", test)))]
 compile_error!(
     "the libafl_targets `sancov_pcguard_edges` and `sancov_pcguard_hitcounts` features are mutually exclusive."
 );
@@ -68,6 +66,21 @@ pub static SHR_4: Ngram4 = Ngram4::from_array([1, 1, 1, 1]);
 pub static SHR_8: Ngram8 = Ngram8::from_array([1, 1, 1, 1, 1, 1, 1, 1]);
 
 static mut PC_TABLES: Vec<&'static [PcTableEntry]> = Vec::new();
+
+/// Type for the PC guard hook
+pub type PcGuardHook = unsafe extern "C" fn(*mut u32);
+
+/// Type for the target PC guard hook (with PC)
+#[cfg(feature = "sancov_pcguard_dump_cov")]
+pub type TargetPcGuardHook = unsafe extern "C" fn(*mut u32, usize);
+
+#[cfg(feature = "sancov_pcguard_dump_cov")]
+pub(crate) unsafe extern "C" fn nop_target_pc_guard(_guard: *mut u32, _pc: usize) {}
+
+/// The global hook for `__libafl_targets_trace_pc_guard`
+#[cfg(feature = "sancov_pcguard_dump_cov")]
+pub static LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK: AtomicPtr<c_void> =
+    AtomicPtr::new(nop_target_pc_guard as *mut c_void);
 
 use alloc::vec::Vec;
 #[cfg(any(
@@ -205,14 +218,10 @@ unsafe extern "C" {
     pub static mut __afl_prev_ctx: u32;
 }
 
-/// Callback for sancov `pc_guard` - usually called by `llvm` on each block or edge.
-///
-/// # Safety
-/// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
-/// Should usually not be called directly.
-#[unsafe(no_mangle)]
-#[allow(unused_assignments)] // cfg dependent
-pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
+#[allow(clippy::inline_always)]
+#[inline(always)]
+#[allow(unused_assignments)]
+pub(crate) unsafe fn sancov_pcguard_hook_impl(guard: *mut u32) {
     unsafe {
         #[allow(unused_variables, unused_mut)] // cfg dependent
         let mut pos = *guard as usize;
@@ -220,13 +229,13 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
         #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
         {
             pos = update_ngram(pos);
-            // println!("Wrinting to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
+            // println!("Writing to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
         }
 
         #[cfg(feature = "sancov_ctx")]
         {
             pos ^= __afl_prev_ctx as usize;
-            // println!("Wrinting to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
+            // println!("Writing to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
         }
 
         #[cfg(feature = "pointer_maps")]
@@ -260,33 +269,83 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     }
 }
 
+/// Callback for sancov `pc_guard` - usually called by `llvm` on each block or edge.
+///
+/// # Safety
+/// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
+/// Should usually not be called directly.
+#[unsafe(no_mangle)]
+#[allow(unused_assignments)] // cfg dependent
+#[cfg(not(feature = "sancov_pcguard_dump_cov"))]
+pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
+    unsafe {
+        sancov_pcguard_hook_impl(guard);
+    }
+}
+
+/// The C shim for `__sanitizer_cov_trace_pc_guard`
+///
+/// # Safety
+/// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
+/// Should usually not be called directly.
+#[unsafe(no_mangle)]
+#[allow(unused_assignments)] // cfg dependent
+#[cfg(feature = "sancov_pcguard_dump_cov")]
+pub unsafe extern "C" fn __libafl_targets_trace_pc_guard(guard: *mut u32, pc: usize) {
+    unsafe {
+        let hook_ptr = LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.load(Ordering::Acquire);
+        let hook: TargetPcGuardHook = core::mem::transmute(hook_ptr);
+        hook(guard, pc);
+    }
+}
+
 /// Initialize the sancov `pc_guard` - usually called by `llvm`.
 ///
 /// # Safety
-/// Dereferences at `start` and writes to it.
+/// Dereferences the edges map at `start` and writes to it.
+/// Should usually not be called directly, but is called by `llvm`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {
+pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(
+    #[allow(unused_mut)] // only mut with the `coverage` feature
+    #[allow(unused_variables)] // only used with the `coverage` feature
+    mut start: *mut u32,
+    #[allow(unused_variables)] // only used with the `coverage` feature
+    stop: *mut u32,
+) {
+    // # Safety
+    // Dereferences at `start` and writes to it, as it sais on this function's title.
+    // As unsafe as the caller wants it to be.
+    #[cfg(feature = "pointer_maps")]
     unsafe {
-        #[cfg(feature = "pointer_maps")]
         if EDGES_MAP_PTR.is_null() {
             EDGES_MAP_PTR = &raw mut EDGES_MAP as *mut u8;
         }
+    }
 
-        if core::ptr::eq(start, stop) || *start != 0 {
-            return;
-        }
+    #[cfg(feature = "coverage")]
+    if core::ptr::eq(start, stop) || unsafe { *start != 0 } {
+        return;
+    }
 
-        while start < stop {
+    #[cfg(feature = "coverage")]
+    while start < stop {
+        unsafe {
             *start = MAX_EDGES_FOUND as u32;
             start = start.offset(1);
+        }
 
-            #[cfg(feature = "pointer_maps")]
-            {
+        #[cfg(feature = "pointer_maps")]
+        {
+            // SAFETY: we're the only ones accessing this static
+            unsafe {
                 MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1) % EDGES_MAP_ALLOCATED_SIZE;
             }
-            #[cfg(not(feature = "pointer_maps"))]
-            {
-                let edges_map_ptr = &raw const EDGES_MAP;
+        }
+        #[cfg(not(feature = "pointer_maps"))]
+        {
+            let edges_map_ptr = &raw const EDGES_MAP;
+            // SAFETY: we're the only ones accessing these statics
+            unsafe {
                 let edges_map_len = (*edges_map_ptr).len();
                 MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1);
                 assert!(

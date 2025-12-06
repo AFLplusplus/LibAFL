@@ -39,4 +39,6 @@ libafl_bolts = { path = "../../../crates/libafl_bolts" }
 libafl_qemu = { path = "../../../crates/libafl_qemu", features = ["usermode"] }
 libafl_targets = { path = "../../../crates/libafl_targets" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
+mimalloc = "0.1.48"
 rangemap = { version = "1.5.1" }
+scudo = "0.1.3"

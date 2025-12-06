@@ -84,7 +84,7 @@ where
     CS: RemovableScheduler<I, S> + Scheduler<I, S>,
     F: TestcasePenalty<I, S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<I> + HasMetadata,
 {
     /// Replaces the [`Testcase`] at the given [`CorpusId`]
     fn on_replace(
@@ -189,7 +189,7 @@ where
 
 impl<CS, F, I, M, O, S> Scheduler<I, S> for MinimizerScheduler<CS, F, I, M, O>
 where
-    CS: Scheduler<I, S>,
+    CS: Scheduler<I, S> + RemovableScheduler<I, S>,
     F: TestcasePenalty<I, S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -268,24 +268,33 @@ where
                         new_favoreds.push(*elem); // always retain current; we'll drop it later otherwise
                         continue;
                     }
-                    let mut old = state.corpus().get(*old_id)?.borrow_mut();
-                    if factor > F::compute(state, &mut *old)? {
-                        continue;
-                    }
+                    match state.corpus().get(*old_id) {
+                        Ok(testcase) => {
+                            let mut old = testcase.borrow_mut();
+                            if factor > F::compute(state, &mut *old)? {
+                                continue;
+                            }
 
-                    let must_remove = {
-                        let old_meta = old.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
-                            Error::key_not_found(format!(
-                                "{} needed for MinimizerScheduler not found in testcase #{old_id}",
-                                type_name::<M>()
-                            ))
-                        })?;
-                        *old_meta.refcnt_mut() -= 1;
-                        old_meta.refcnt() <= 0
-                    };
+                            let must_remove = {
+                                let old_meta = old.metadata_map_mut().get_mut::<M>().ok_or_else(|| {
+                                Error::key_not_found(format!(
+                                    "{} needed for MinimizerScheduler not found in testcase #{old_id}",
+                                    type_name::<M>()
+                                ))
+                            })?;
+                                *old_meta.refcnt_mut() -= 1;
+                                old_meta.refcnt() <= 0
+                            };
 
-                    if must_remove && self.remove_metadata {
-                        drop(old.metadata_map_mut().remove::<M>());
+                            if must_remove && self.remove_metadata {
+                                drop(old.metadata_map_mut().remove::<M>());
+                            }
+                        }
+                        Err(Error::KeyNotFound(_, _)) => {
+                            log::warn!("Corpus entry {old_id} not found");
+                            continue;
+                        }
+                        Err(e) => return Err(e),
                     }
                 }
 
@@ -319,9 +328,12 @@ where
     }
 
     /// Cull the [`Corpus`] using the [`MinimizerScheduler`]
-    pub fn cull<S>(&self, state: &S) -> Result<(), Error>
+    pub fn cull<S>(&mut self, state: &mut S) -> Result<(), Error>
     where
-        S: HasCorpus<I> + HasMetadata,
+        S: HasCorpus<I> + HasMetadata + HasRand,
+        CS: RemovableScheduler<I, S>,
+        CS: Scheduler<I, S>,
+        F: TestcasePenalty<I, S>,
     {
         let Some(top_rated) = state.metadata_map().get::<TopRatedsMetadata>() else {
             return Ok(());
@@ -331,18 +343,34 @@ where
 
         for (key, id) in &top_rated.map {
             if !acc.contains(key) {
-                let mut entry = state.corpus().get(*id)?.borrow_mut();
-                let meta = entry.metadata_map().get::<M>().ok_or_else(|| {
-                    Error::key_not_found(format!(
-                        "{} needed for MinimizerScheduler not found in testcase #{id}",
-                        type_name::<M>()
-                    ))
-                })?;
-                for elem in meta.as_iter() {
-                    acc.insert(*elem);
-                }
+                let entry = state.corpus().get(*id);
+                match entry {
+                    Ok(entry) => {
+                        let mut entry = entry.borrow_mut();
+                        let meta = entry.metadata_map().get::<M>().ok_or_else(|| {
+                            Error::key_not_found(format!(
+                                "{} needed for MinimizerScheduler not found in testcase #{id}",
+                                type_name::<M>()
+                            ))
+                        })?;
+                        for elem in meta.as_iter() {
+                            acc.insert(*elem);
+                        }
 
-                entry.add_metadata(IsFavoredMetadata {});
+                        entry.add_metadata(IsFavoredMetadata {});
+                    }
+                    Err(Error::KeyNotFound(_, _)) => {
+                        // Fallback for disabled and removed testcases.
+                        log::info!(
+                            "Removing testcase #{id} from top rateds as it was no longer in the corpus!"
+                        );
+                        self.on_remove(state, *id, &None)?;
+                        return self.cull(state);
+                    }
+                    Err(err) => {
+                        return Err(err);
+                    }
+                }
             }
         }
 
@@ -425,3 +453,53 @@ pub type LenTimeMinimizerScheduler<CS, I, M, O> =
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
 pub type IndexesLenTimeMinimizerScheduler<CS, I, O> =
     MinimizerScheduler<CS, LenTimeMulTestcasePenalty, I, MapIndexesMetadata, O>;
+
+#[cfg(test)]
+mod tests {
+    use libafl_bolts::rands::StdRand;
+
+    use crate::{
+        HasMetadata,
+        corpus::{Corpus, InMemoryCorpus, Testcase},
+        feedbacks::MapIndexesMetadata,
+        inputs::NopInput,
+        observers::{CanTrack, StdMapObserver},
+        schedulers::{
+            IndexesLenTimeMinimizerScheduler, MinimizerScheduler, QueueScheduler, Scheduler,
+            minimizer::TopRatedsMetadata,
+        },
+        state::{HasCorpus, StdState},
+    };
+
+    #[test]
+    fn test_minimizer_scheduler_update_score_crash() {
+        #[cfg(not(feature = "serdeany_autoreg"))]
+        unsafe {
+            libafl_bolts::serdeany::RegistryBuilder::register::<TopRatedsMetadata>();
+            libafl_bolts::serdeany::RegistryBuilder::register::<MapIndexesMetadata>();
+        }
+        let rand = StdRand::with_seed(0);
+        let observer = StdMapObserver::owned("map", vec![0u8; 16]).track_indices();
+        let mut scheduler: IndexesLenTimeMinimizerScheduler<QueueScheduler, NopInput, _> =
+            MinimizerScheduler::new(&observer, QueueScheduler::new());
+
+        let mut corpus = InMemoryCorpus::new();
+        let t1 = Testcase::new(NopInput {});
+        let _id1 = corpus.add(t1).unwrap();
+
+        let mut state =
+            StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ()).unwrap();
+
+        state.add_metadata(TopRatedsMetadata::new());
+        let top_rateds = state.metadata_mut::<TopRatedsMetadata>().unwrap();
+
+        top_rateds.map.insert(0, 999_usize.into());
+
+        let mut t2 = Testcase::new(NopInput {});
+        let map_meta = MapIndexesMetadata::new(vec![0]);
+        t2.add_metadata(map_meta);
+        let id2 = state.corpus_mut().add(t2).unwrap();
+
+        scheduler.on_add(&mut state, id2).unwrap();
+    }
+}

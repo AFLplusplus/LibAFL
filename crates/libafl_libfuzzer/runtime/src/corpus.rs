@@ -90,7 +90,7 @@ where
         corpus: &'a TestcaseStorageMap<I>,
     ) -> Result<&'a RefCell<Testcase<I>>, Error> {
         self.touch(id, corpus)?;
-        corpus.map.get(&id).map(|item| &item.testcase).ok_or_else(|| Error::illegal_state("Nonexistent corpus entry {id} requested (present in loaded entries, but not the mapping?)"))
+        corpus.map.get(&id).map(|item| &item.testcase).ok_or_else(|| Error::illegal_state(format!("Nonexistent corpus entry {id} requested (present in loaded entries, but not the mapping?)")))
     }
 
     fn _add(
@@ -137,6 +137,31 @@ where
         }
         self.touch(id, corpus)?;
         Ok(id)
+    }
+}
+
+impl<I> libafl::corpus::EnableDisableCorpus for LibfuzzerCorpus<I>
+where
+    I: Input + Serialize + for<'de> Deserialize<'de>,
+{
+    fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
+        if let Some(testcase) = self.mapping.enabled.remove(id) {
+            self.mapping.insert_inner_with_id(testcase, true, id)
+        } else {
+            Err(Error::key_not_found(format!(
+                "Index {id} not found in enabled testcases. Couldn't disable."
+            )))
+        }
+    }
+
+    fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
+        if let Some(testcase) = self.mapping.disabled.remove(id) {
+            self.mapping.insert_inner_with_id(testcase, false, id)
+        } else {
+            Err(Error::key_not_found(format!(
+                "Index {id} not found in disabled testcases. Couldn't enable."
+            )))
+        }
     }
 }
 

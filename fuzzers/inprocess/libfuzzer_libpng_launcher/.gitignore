@@ -1,2 +1,4 @@
 fuzzer_stats.toml
 libpng-*
+out_*
+manual_*

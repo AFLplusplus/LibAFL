@@ -45,6 +45,11 @@ impl NyxHelper {
             Error::illegal_argument(format!("Failed to load Nyx config from share dir: {e}"))
         })?;
         nyx_config.set_input_buffer_size(settings.input_buffer_size);
+        if !nyx_config.set_aux_buffer_size(settings.aux_buffer_size) {
+            return Err(Error::illegal_argument(
+                "aux_buffer_size must be multiple of 4KB and must be non-zero".to_string(),
+            ));
+        }
         nyx_config.set_process_role(match settings.parent_cpu_id {
             None => NyxProcessRole::StandAlone,
             Some(parent_cpu_id) if parent_cpu_id == settings.cpu_id => NyxProcessRole::Parent,

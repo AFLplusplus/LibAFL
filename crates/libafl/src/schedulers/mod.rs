@@ -78,10 +78,13 @@ where
     let current_id = *state.corpus().current();
 
     let mut depth = match current_id {
-        Some(parent_idx) => state
-            .testcase(parent_idx)?
-            .metadata::<SchedulerTestcaseMetadata>()?
-            .depth(),
+        Some(parent_idx) => state.corpus().get_from_all(parent_idx).map_or_else(
+            |_| {
+                log::warn!("Parent testcase with id {parent_idx} not found! Removed?");
+                Ok::<u64, Error>(0)
+            },
+            |v| Ok(v.borrow().metadata::<SchedulerTestcaseMetadata>()?.depth()),
+        )?,
         None => 0,
     };
 
@@ -138,7 +141,17 @@ where
     let current_id = *state.corpus().current();
 
     if let Some(id) = current_id {
-        let mut testcase = state.testcase_mut(id)?;
+        let Ok(testcase) = state.corpus().get_from_all(id) else {
+            log::info!("Current testcase with id {id} not found! Removed?");
+            return Ok(());
+        };
+        let mut testcase = testcase.borrow_mut();
+
+        if testcase.disabled() {
+            log::info!("Current testcase with id {id} is disabled!");
+            return Ok(());
+        }
+
         let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
 
         if tcmeta.handicap() >= 4 {
