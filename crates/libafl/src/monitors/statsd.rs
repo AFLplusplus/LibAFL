@@ -147,7 +147,7 @@ impl StatsdMonitor {
         pend_fav: u64,
         pending: u64,
         objective_size: u64,
-        edges_coverage: Option<EdgeCoverage>,
+        edges_coverage: Option<&EdgeCoverage>,
         extra_tags: &[(&str, &str)],
     ) -> Option<()> {
         // Add extra tags to the metric name if needed, or use the client's default tags
@@ -186,18 +186,16 @@ impl StatsdMonitor {
         send_gauge("pending_favs", pend_fav as f64)?;
         send_gauge("pending_total", pending as f64)?;
         send_gauge("saved_solutions", objective_size as f64)?;
-        if let Some(EdgeCoverage {
-            edges_hit,
-            edges_total,
-        }) = edges_coverage
-        {
-            send_gauge("edges_found", edges_hit as f64)?;
-            send_gauge("map_density", (edges_hit as f64) / (edges_total as f64))?;
+        if let Some(coverage) = edges_coverage {
+            send_gauge("edges_found", coverage.edges_hit as f64)?;
+            send_gauge(
+                "map_density",
+                (coverage.edges_hit as f64) / (coverage.edges_total as f64),
+            )?;
         }
         Some(())
     }
 
-    #[expect(clippy::cast_precision_loss)]
     fn try_display(&mut self, client_stats_manager: &mut ClientStatsManager) -> Option<()> {
         if self.statsd_client.is_none() {
             self.setup_statsd_client();
@@ -241,7 +239,7 @@ impl StatsdMonitor {
             pend_fav,
             pending,
             objective_size,
-            edges_coverage,
+            edges_coverage.as_ref(),
             &[],
         )?;
 
@@ -253,8 +251,7 @@ impl StatsdMonitor {
             for (client_id, client) in client_stats_manager.client_stats() {
                 let core_id_str = client
                     .get_user_stats("core_id")
-                    .map(|s| s.value().to_string())
-                    .unwrap_or_else(|| "unknown".to_string());
+                    .map_or_else(|| "unknown".to_string(), |s| s.value().to_string());
 
                 let client_id_str = client_id.0.to_string();
 
@@ -314,7 +311,7 @@ impl StatsdMonitor {
                     item_geometry.pend_fav,
                     item_geometry.pending,
                     objective_size,
-                    edges_coverage,
+                    edges_coverage.as_ref(),
                     &tags,
                 )?;
             }
