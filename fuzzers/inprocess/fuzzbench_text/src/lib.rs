@@ -311,19 +311,19 @@ fn fuzz_binary(
     let mut state = None;
     */
 
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true)
-    {
-        // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
-        Ok(res) => res,
-        Err(err) => match err {
-            Error::ShuttingDown => {
-                return Ok(());
-            }
-            _ => {
-                panic!("Failed to setup the restarter: {err}");
-            }
-        },
-    };
+    let (state, mut mgr) =
+        match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true) {
+            // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
+            Ok(res) => res,
+            Err(err) => match err {
+                Error::ShuttingDown => {
+                    return Ok(());
+                }
+                _ => {
+                    panic!("Failed to setup the restarter: {err}");
+                }
+            },
+        };
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
@@ -529,19 +529,19 @@ fn fuzz_text(
     let mut state = None;
     */
 
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true)
-    {
-        // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
-        Ok(res) => res,
-        Err(err) => match err {
-            Error::ShuttingDown => {
-                return Ok(());
-            }
-            _ => {
-                panic!("Failed to setup the restarter: {err}");
-            }
-        },
-    };
+    let (state, mut mgr) =
+        match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true) {
+            // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
+            Ok(res) => res,
+            Err(err) => match err {
+                Error::ShuttingDown => {
+                    return Ok(());
+                }
+                _ => {
+                    panic!("Failed to setup the restarter: {err}");
+                }
+            },
+        };
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)

@@ -245,18 +245,18 @@ pub fn fuzz() -> Result<(), Error> {
 
     // Set up the most basic monitor possible.
     let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true)
-    {
-        Ok(res) => res,
-        Err(err) => match err {
-            Error::ShuttingDown => {
-                return Ok(());
-            }
-            _ => {
-                panic!("Failed to setup the restarter: {err}");
-            }
-        },
-    };
+    let (state, mut mgr) =
+        match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true) {
+            Ok(res) => res,
+            Err(err) => match err {
+                Error::ShuttingDown => {
+                    return Ok(());
+                }
+                _ => {
+                    panic!("Failed to setup the restarter: {err}");
+                }
+            },
+        };
 
     // Our fuzzer is a simple queue scheduler (FIFO), and has no corpus feedback
     // or objective feedback. This is important as we need the MaxMapFeedback

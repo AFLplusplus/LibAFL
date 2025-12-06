@@ -206,18 +206,18 @@ pub fn fuzz() -> Result<(), Error> {
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
     let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true)
-    {
-        Ok(res) => res,
-        Err(err) => match err {
-            Error::ShuttingDown => {
-                return Ok(());
-            }
-            _ => {
-                panic!("Failed to setup the restarter: {err}");
-            }
-        },
-    };
+    let (state, mut mgr) =
+        match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true) {
+            Ok(res) => res,
+            Err(err) => match err {
+                Error::ShuttingDown => {
+                    return Ok(());
+                }
+                _ => {
+                    panic!("Failed to setup the restarter: {err}");
+                }
+            },
+        };
 
     let mut feedback = MaxMapFeedback::new(&edges_observer);
 
