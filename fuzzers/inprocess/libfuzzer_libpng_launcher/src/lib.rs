@@ -6,6 +6,8 @@ use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{self, Parser};
+#[cfg(feature = "tcp_manager")]
+use libafl::events::tcp::TcpRestartingMgr;
 #[cfg(feature = "statsd")]
 use libafl::monitors::statsd::StatsdMonitorTagFlavor;
 use libafl::{
@@ -149,6 +151,13 @@ struct Opt {
     )]
     tokens: Vec<PathBuf>,
     */
+    #[arg(long, help = "Use fork mode (Launcher fork)")]
+    fork: bool,
+    #[arg(long, help = "Crash after this many iterations")]
+    crash_after: Option<u64>,
+    #[cfg(feature = "tcp_manager")]
+    #[arg(long, help = "Use TCP event manager")]
+    tcp: bool,
 }
 
 /// The main fn, `no_mangle` as it is a C symbol
@@ -158,6 +167,11 @@ pub extern "C" fn libafl_main() {
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
     let opt = Opt::parse();
+
+    // for testing purposes in CI only. No need to do this for normal fuzzing
+    if let Some(iters) = opt.crash_after {
+        env::set_var("LIBAFL_CRASH_AFTER", iters.to_string());
+    }
 
     let broker_port = opt.broker_port;
     let cores = opt.cores;
@@ -195,7 +209,7 @@ pub extern "C" fn libafl_main() {
 
     let mut run_client =
         |state: Option<_>,
-         mut restarting_mgr: LlmpRestartingEventManager<_, _, _, _, _>,
+         mut restarting_mgr: _,
          client_description: libafl::events::launcher::ClientDescription| {
             // Send the core_id to the monitor
             let core_id = client_description.core_id();
@@ -323,7 +337,7 @@ pub extern "C" fn libafl_main() {
             Ok(())
         };
 
-    match Launcher::builder()
+    let builder = Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
@@ -331,11 +345,33 @@ pub extern "C" fn libafl_main() {
         .cores(&cores)
         .overcommit(opt.overcommit)
         .broker_port(broker_port)
-        .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"))
-        .build()
-        .launch()
-    {
+        .remote_broker_addr(opt.remote_broker_addr);
+
+    #[cfg(unix)]
+    let builder = builder.fork(opt.fork);
+
+    #[cfg(feature = "tcp_manager")]
+    if opt.tcp {
+        println!("Running in TCP mode");
+        let (state, mgr) = TcpRestartingMgr::builder()
+            .shmem_provider(shmem_provider)
+            .broker_port(broker_port)
+            .configuration(EventConfig::from_name("default"))
+            .monitor(Some(monitor))
+            .fork(opt.fork)
+            .build()
+            .launch()
+            .expect("Failed to launch TCP manager");
+
+        run_client(
+            state,
+            mgr,
+            ClientDescription::new(0, 0, Cores::from_cmdline("0").unwrap().ids[0]),
+        );
+        return;
+    }
+
+    match builder.build().launch() {
         Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
         Err(err) => panic!("Failed to run launcher: {err:?}"),

@@ -16,12 +16,13 @@ use std::{
 
 #[cfg(feature = "tcp_compression")]
 use libafl_bolts::compress::GzipCompressor;
-#[cfg(any(windows, not(feature = "fork")))]
+#[cfg(any(windows, unix))]
 use libafl_bolts::os::startable_self;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
-#[cfg(all(feature = "fork", unix))]
-use libafl_bolts::os::{ForkResult, fork};
+#[cfg(unix)]
+#[cfg(unix)]
+use libafl_bolts::os::{ForkResult, dup_and_mute_outputs, fork};
 use libafl_bolts::{
     ClientId,
     core_affinity::CoreId,
@@ -1037,6 +1038,10 @@ pub struct TcpRestartingMgr<EMH, I, MT, S, SP> {
     serialize_state: bool,
     /// The hooks for `handle_in_client`
     hooks: EMH,
+    /// If this manager should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
+    #[cfg(unix)]
+    #[builder(default = true)]
+    fork: bool,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(I, S)>,
 }
@@ -1171,8 +1176,8 @@ where
                 println!("Spawning next client (id {ctr}) {core_id:?}");
 
                 // On Unix, we fork (when fork feature is enabled)
-                #[cfg(all(unix, feature = "fork"))]
-                let child_status = {
+                #[cfg(unix)]
+                let child_status = if self.fork {
                     self.shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
@@ -1184,29 +1189,32 @@ where
                         }
                         ForkResult::Child => {
                             self.shmem_provider.post_fork(true)?;
+                            if std::env::var("LIBAFL_DEBUG_OUTPUT").is_err() {
+                                unsafe {
+                                    let _ = dup_and_mute_outputs()?;
+                                }
+                            }
                             break (staterestorer, self.shmem_provider.clone(), core_id);
                         }
                     }
+                } else {
+                    unsafe {
+                        libc::signal(libc::SIGINT, libc::SIG_IGN);
+                    }
+                    startable_self()?.status()?.code().unwrap_or_default()
                 };
 
-                // If this guy wants to fork, then ignore sigit
-                #[cfg(any(windows, not(feature = "fork")))]
-                unsafe {
-                    #[cfg(windows)]
-                    libafl_bolts::os::windows_exceptions::signal(
-                        libafl_bolts::os::windows_exceptions::SIGINT,
-                        libafl_bolts::os::windows_exceptions::sig_ign(),
-                    );
-
-                    #[cfg(unix)]
-                    libc::signal(libc::SIGINT, libc::SIG_IGN);
-                }
-
                 // On Windows (or in any case without fork), we spawn ourself again
-                #[cfg(any(windows, not(feature = "fork")))]
-                let child_status = startable_self()?.status()?;
-                #[cfg(any(windows, not(feature = "fork")))]
-                let child_status = child_status.code().unwrap_or_default();
+                #[cfg(windows)]
+                let child_status = {
+                    unsafe {
+                        libafl_bolts::os::windows_exceptions::signal(
+                            libafl_bolts::os::windows_exceptions::SIGINT,
+                            libafl_bolts::os::windows_exceptions::sig_ign(),
+                        );
+                    }
+                    startable_self()?.status()?.code().unwrap_or_default()
+                };
 
                 compiler_fence(Ordering::SeqCst);
 

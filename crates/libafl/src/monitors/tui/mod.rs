@@ -436,18 +436,18 @@ impl Monitor for TuiMonitor {
 
         #[cfg(feature = "introspection")]
         {
-            // Print the client performance monitor. Skip the Client IDs that have never sent anything.
-            for (i, (_, client)) in client_stats_manager
+            // Print the client performance monitor. Skip clients with no introspection data
+            // (e.g., broker that never fuzzes will have elapsed_cycles == 0)
+            for (client_id, client) in client_stats_manager
                 .client_stats()
                 .iter()
-                .filter(|(_, x)| x.enabled())
-                .enumerate()
+                .filter(|(_, x)| x.enabled() && x.introspection_stats.elapsed_cycles() > 0)
             {
                 self.context
                     .write()
                     .unwrap()
                     .introspection
-                    .entry(i + 1)
+                    .entry(client_id.0 as usize)
                     .or_default()
                     .grab_data(&client.introspection_stats);
             }
