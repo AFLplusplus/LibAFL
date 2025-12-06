@@ -89,7 +89,12 @@ test-dump-cov:
 	# Verify output
 	ls -l coverage_dump/dummy.info
 	grep "TN:" coverage_dump/dummy.info
-	genhtml coverage_dump/dummy.info --output-directory coverage_dump/html
-	ls coverage_dump/html/index.html
+	grep "TN:" coverage_dump/dummy.info
+	if command -v genhtml >/dev/null 2>&1; then \
+		genhtml coverage_dump/dummy.info --output-directory coverage_dump/html; \
+		ls coverage_dump/html/index.html; \
+	else \
+		echo "genhtml not found, skipping HTML report generation"; \
+	fi
 	# Clean up
 	#rm -rf seeds_dump corpus_dump coverage_dump

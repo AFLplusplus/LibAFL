@@ -1,5 +1,6 @@
-//! Dump coverage to lcov .info files
-//! Use them wit genhtml to generate HTML coverage reports.
+//! Dump coverage to `gcov`/[`lcov`](https://github.com/linux-test-project/lcov)
+//! `.info` files.
+//! Use them with `genhtml` to generate HTML coverage reports.
 use alloc::{
     string::{String, ToString},
     vec::Vec,
