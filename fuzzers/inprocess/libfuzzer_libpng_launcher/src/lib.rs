@@ -6,6 +6,8 @@ use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{self, Parser};
+#[cfg(feature = "tcp_manager")]
+use libafl::events::tcp::TcpRestartingMgr;
 #[cfg(feature = "statsd")]
 use libafl::monitors::statsd::StatsdMonitorTagFlavor;
 use libafl::{
@@ -13,8 +15,6 @@ use libafl::{
     events::{
         launcher::Launcher, llmp::LlmpRestartingEventManager, EventConfig, EventFirer,
         EventWithStats,
-        #[cfg(feature = "tcp_manager")]
-        tcp::TcpRestartingMgr,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -363,7 +363,11 @@ pub extern "C" fn libafl_main() {
             .launch()
             .expect("Failed to launch TCP manager");
 
-        run_client(state, mgr, ClientDescription::new(0, 0, Cores::from_cmdline("0").unwrap().ids[0]));
+        run_client(
+            state,
+            mgr,
+            ClientDescription::new(0, 0, Cores::from_cmdline("0").unwrap().ids[0]),
+        );
         return;
     }
 
