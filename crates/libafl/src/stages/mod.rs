@@ -177,7 +177,14 @@ where
 
                 let stage = &mut self.0;
 
-                stage.perform_restartable(fuzzer, executor, state, manager)?;
+                match stage.perform_restartable(fuzzer, executor, state, manager) {
+                    Ok(()) => {}
+                    Err(Error::SkipRemainingStages) => {
+                        state.clear_stage_id()?;
+                        return Ok(());
+                    }
+                    Err(e) => return Err(e),
+                }
 
                 state.clear_stage_id()?;
             }
@@ -190,7 +197,14 @@ where
 
                 let stage = &mut self.0;
 
-                stage.perform_restartable(fuzzer, executor, state, manager)?;
+                match stage.perform_restartable(fuzzer, executor, state, manager) {
+                    Ok(()) => {}
+                    Err(Error::SkipRemainingStages) => {
+                        state.clear_stage_id()?;
+                        return Ok(());
+                    }
+                    Err(e) => return Err(e),
+                }
 
                 state.clear_stage_id()?;
             }
@@ -207,7 +221,10 @@ where
         }
 
         // Execute the remaining stages
-        self.1.perform_all(fuzzer, executor, state, manager)
+        match self.1.perform_all(fuzzer, executor, state, manager) {
+            Ok(()) | Err(Error::SkipRemainingStages) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -290,14 +307,28 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        self.iter_mut().try_for_each(|stage| {
-            if state.stop_requested() {
-                state.discard_stop_request();
-                manager.on_shutdown()?;
-                return Err(Error::shutting_down());
-            }
-            stage.perform_restartable(fuzzer, executor, state, manager)
-        })
+        self.iter_mut()
+            .try_for_each(|stage| {
+                if state.stop_requested() {
+                    state.discard_stop_request();
+                    manager.on_shutdown()?;
+                    return Err(Error::shutting_down());
+                }
+                match stage.perform_restartable(fuzzer, executor, state, manager) {
+                    Ok(()) => Ok(()),
+                    Err(Error::SkipRemainingStages) => {
+                        // Skip the remaining stages
+                        // We return an error to stop the iterator, but we want to return Ok(()) from perform_all
+
+                        Err(Error::SkipRemainingStages)
+                    }
+                    Err(e) => Err(e),
+                }
+            })
+            .or_else(|e| match e {
+                Error::SkipRemainingStages => Ok(()),
+                _ => Err(e),
+            })
     }
 }
 

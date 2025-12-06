@@ -79,8 +79,8 @@ pub use owned_map::*;
 /// #     &mut feedback,
 /// #     &mut (),
 /// # ).unwrap();
-/// let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
-/// # scheduler.cull(&state).unwrap();
+/// let mut scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
+/// # scheduler.cull(&mut state).unwrap();
 /// ```
 ///
 /// [`MapObserver`] implementors: see [`StdMapObserver`] for an example implementation.

@@ -93,7 +93,7 @@ where
             RunResult::OTHER_ERROR => Err(Error::unknown(
                 "Tinyinst RunResult is other error".to_string(),
             )),
-            _ => Err(Error::unknown("Tinyinst RunResult is unknown".to_string())),
+            _ => Err(Error::unknown("Tinyinst RunResult is unknown")),
         }
     }
 }

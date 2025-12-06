@@ -1409,6 +1409,7 @@ mod tests {
     use core::cell::RefCell;
 
     use libafl_bolts::rands::StdRand;
+    use serial_test::serial;
 
     use crate::{
         StdFuzzer,
@@ -1422,6 +1423,7 @@ mod tests {
     };
 
     #[test]
+    #[serial]
     fn filtered_execution() {
         let execution_count = RefCell::new(0);
         let scheduler = StdScheduler::new();
