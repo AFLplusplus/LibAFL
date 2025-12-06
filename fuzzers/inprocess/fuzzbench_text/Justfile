@@ -97,4 +97,4 @@ test-dump-cov:
 		echo "genhtml not found, skipping HTML report generation"; \
 	fi
 	# Clean up
-	#rm -rf seeds_dump corpus_dump coverage_dump
+	rm -rf seeds_dump corpus_dump coverage_dump
