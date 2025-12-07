@@ -13,8 +13,10 @@ use libafl::monitors::statsd::StatsdMonitorTagFlavor;
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
-        launcher::Launcher, ClientDescription, EventConfig, EventFirer, EventReceiver,
-        EventRestarter, EventWithStats, HasEventManagerId, ProgressReporter, SendExiting,
+        centralized::CentralizedEventManager,
+        launcher::{Launcher, StdCentralizedInnerMgr},
+        ClientDescription, EventConfig, EventFirer, EventReceiver, EventRestarter, EventWithStats,
+        HasEventManagerId, ProgressReporter, SendExiting, SimpleEventManager,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -39,7 +41,7 @@ use libafl::{
 use libafl_bolts::{
     core_affinity::Cores,
     rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider},
+    shmem::{ShMemProvider, StdShMem, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,
 };
@@ -198,7 +200,7 @@ pub extern "C" fn libafl_main() {
         libafl::monitors::OptionalMonitor::new(if opt.statsd {
             Some(
                 libafl::monitors::StatsdMonitor::new(
-                    opt.statsd_host,
+                    opt.statsd_host.clone(),
                     opt.statsd_port,
                     StatsdMonitorTagFlavor::default(),
                 )
@@ -355,6 +357,7 @@ pub extern "C" fn libafl_main() {
             .configuration(EventConfig::from_name("default"))
             .monitor(monitor)
             .run_client(|s, m, c| run_client(s, m, c, &opt))
+        .main_run_client(|_: Option<FuzzerState>, _: CentralizedEventManager<StdCentralizedInnerMgr<BytesInput, FuzzerState, StdShMem, StdShMemProvider>, BytesInput, FuzzerState, StdShMem, StdShMemProvider>, _: ClientDescription| Ok::<(), libafl::Error>(()))
             .cores(&cores)
             .overcommit(opt.overcommit)
             .broker_port(broker_port)
@@ -375,6 +378,7 @@ pub extern "C" fn libafl_main() {
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
         .run_client(|s, m, c| run_client(s, m, c, &opt))
+        .main_run_client(|_: Option<FuzzerState>, _: CentralizedEventManager<StdCentralizedInnerMgr<BytesInput, FuzzerState, StdShMem, StdShMemProvider>, BytesInput, FuzzerState, StdShMem, StdShMemProvider>, _: ClientDescription| Ok::<(), libafl::Error>(()))
         .cores(&cores)
         .overcommit(opt.overcommit)
         .broker_port(broker_port)

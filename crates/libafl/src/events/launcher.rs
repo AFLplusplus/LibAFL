@@ -43,10 +43,14 @@ use {
     std::{fs::File, os::unix::io::AsRawFd},
 };
 
+#[cfg(feature = "tcp_manager")]
+use crate::HasMetadata;
 #[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::{NodeDescriptor, TcpMultiMachineHooks};
 #[cfg(unix)]
 use crate::inputs::Input;
+#[cfg(feature = "tcp_manager")]
+use crate::state::{HasCurrentTestcase, HasExecutions, HasImported, HasSolutions, Stoppable};
 use crate::{
     Error,
     events::{
@@ -125,7 +129,7 @@ impl ClientDescription {
 ///
 /// Will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
 #[derive(TypedBuilder)]
-pub struct Launcher<'a, CF, MT, SP> {
+pub struct Launcher<'a, CF, MF, MT, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -136,9 +140,15 @@ pub struct Launcher<'a, CF, MT, SP> {
     /// The 'main' function to run for each client forked. This probably shouldn't return
     #[builder(default, setter(strip_option))]
     run_client: Option<CF>,
+    /// The 'main' function to run for the main evaluator node.
+    #[builder(default, setter(strip_option))]
+    main_run_client: Option<MF>,
     /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
     #[builder(default = 1337_u16)]
     broker_port: u16,
+    /// The centralized broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
+    #[builder(default = 1338_u16)]
+    centralized_broker_port: u16,
     /// The list of cores to run on
     cores: &'a Cores,
     /// The number of clients to spawn on each core
@@ -168,6 +178,8 @@ pub struct Launcher<'a, CF, MT, SP> {
     /// clusters.
     #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
+    #[cfg(feature = "multi_machine")]
+    multi_machine_node_descriptor: NodeDescriptor<SocketAddr>,
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
     /// The reason you may not want this is, if you already have a [`Launcher`]
     /// with a different configuration (for the same target) running on this machine.
@@ -183,12 +195,13 @@ pub struct Launcher<'a, CF, MT, SP> {
     fork: bool,
 }
 
-impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
+impl<CF, MF, MT, SP> Debug for Launcher<'_, CF, MF, MT, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbg_struct = f.debug_struct("Launcher");
         dbg_struct
             .field("configuration", &self.configuration)
             .field("broker_port", &self.broker_port)
+            .field("centralized_broker_port", &self.centralized_broker_port)
             .field("core", &self.cores)
             .field("spawn_broker", &self.spawn_broker)
             .field("remote_broker_addr", &self.remote_broker_addr);
@@ -203,7 +216,7 @@ impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
     }
 }
 
-impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
+impl<CF, MF, MT, SP> Launcher<'_, CF, MF, MT, SP>
 where
     MT: Monitor,
     SP: ShMemProvider,
@@ -237,7 +250,9 @@ where
         I: DeserializeOwned,
         S: DeserializeOwned + Serialize,
     {
-        let spawn_mgr = |launcher: &Self, client_description: Option<ClientDescription>, monitor: Option<MT>| {
+        let spawn_mgr = |launcher: &Self,
+                         client_description: Option<ClientDescription>,
+                         monitor: Option<MT>| {
             if let Some(client_description) = client_description {
                 let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
                     .shmem_provider(launcher.shmem_provider.clone())
@@ -291,8 +306,11 @@ where
             + HasSolutions<I>
             + HasCurrentTestcase<I>
             + Stoppable,
+        MT: Clone,
     {
-        let spawn_mgr = |launcher: &Self, client_description: Option<ClientDescription>, monitor: Option<MT>| {
+        let spawn_mgr = |launcher: &Self,
+                         client_description: Option<ClientDescription>,
+                         monitor: Option<MT>| {
             if let Some(client_description) = client_description {
                 let builder = crate::events::tcp::TcpRestartingMgr::<EMH, I, MT, S, SP>::builder()
                     .shmem_provider(launcher.shmem_provider.clone())
@@ -301,7 +319,7 @@ where
                         cpu_core: Some(client_description.core_id()),
                     })
                     .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state.is_on_restart())
+                    .serialize_state(launcher.serialize_state.on_restart())
                     .hooks(hooks);
                 #[cfg(unix)]
                 let builder = builder.fork(launcher.fork);
@@ -317,7 +335,7 @@ where
                         NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap(),
                     ))
                     .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state.is_on_restart())
+                    .serialize_state(launcher.serialize_state.on_restart())
                     .hooks(hooks);
                 #[cfg(unix)]
                 let builder = builder.fork(launcher.fork);
@@ -414,7 +432,8 @@ where
                                     let client_description =
                                         ClientDescription::new(index, overcommit_id, bind_to);
 
-                                    let (state, mgr) = spawn_mgr(&self, Some(client_description.clone()), None)?;
+                                    let (state, mgr) =
+                                        spawn_mgr(&self, Some(client_description.clone()), None)?;
 
                                     return (self.run_client.take().unwrap())(
                                         state,
@@ -548,7 +567,7 @@ where
                 let monitor = self.monitor.take();
                 spawn_mgr(&self, None, monitor)?;
             }
-            
+
             Self::wait_for_child_processes(&mut handles, self.spawn_broker);
         }
         Ok(())
@@ -606,104 +625,16 @@ where
     }
 }
 
-/// A Launcher that minimizes re-execution of shared testcases.
-///
-/// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores with a single main and multiple secondary nodes
-/// This is for centralized, the 4th argument of the closure should mean if this is the main node.
 #[cfg(unix)]
-#[derive(TypedBuilder)]
-pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
-    /// The `ShmemProvider` to use
-    shmem_provider: SP,
-    /// The monitor instance to use
-    monitor: MT,
-    /// The configuration
-    configuration: EventConfig,
-    /// The 'main' function to run for each secondary client forked. This probably shouldn't return
-    #[builder(default, setter(strip_option))]
-    secondary_run_client: Option<CF>,
-    /// The 'main' function to run for the main evaluator node.
-    #[builder(default, setter(strip_option))]
-    main_run_client: Option<MF>,
-    /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
-    #[builder(default = 1337_u16)]
-    broker_port: u16,
-    /// The centralized broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
-    #[builder(default = 1338_u16)]
-    centralized_broker_port: u16,
-    /// The time observer by which to adaptively serialize
-    /// The list of cores to run on
-    cores: &'a Cores,
-    /// The number of clients to spawn on each core
-    #[builder(default = 1)]
-    overcommit: usize,
-    /// A file name to write all client output to
-    #[builder(default = None)]
-    stdout_file: Option<&'a str>,
-    /// The time in milliseconds to delay between child launches
-    #[builder(default = 10)]
-    launch_delay: u64,
-    /// The actual, opened, `stdout_file` - so that we keep it open until the end
-    #[builder(setter(skip), default = None)]
-    opened_stdout_file: Option<File>,
-    /// A file name to write all client stderr output to. If not specified, output is sent to
-    /// `stdout_file`.
-    #[builder(default = None)]
-    stderr_file: Option<&'a str>,
-    /// The actual, opened, `stdout_file` - so that we keep it open until the end
-    #[builder(setter(skip), default = None)]
-    opened_stderr_file: Option<File>,
-    /// The `ip:port` address of another broker to connect our new broker to for multi-machine
-    /// clusters.
-    #[builder(default = None)]
-    remote_broker_addr: Option<SocketAddr>,
-    #[cfg(feature = "multi_machine")]
-    multi_machine_node_descriptor: NodeDescriptor<SocketAddr>,
-    /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
-    /// The reason you may not want this is, if you already have a [`Launcher`]
-    /// with a different configuration (for the same target) running on this machine.
-    /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
-    #[builder(default = true)]
-    spawn_broker: bool,
-    /// Tell the manager to serialize or not the state on restart
-    #[builder(default = LlmpShouldSaveState::OnRestart)]
-    serialize_state: LlmpShouldSaveState,
-    /// If this launcher should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
-    #[builder(default = true)]
-    fork: bool,
-}
-
-#[cfg(unix)]
-impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Launcher")
-            .field("configuration", &self.configuration)
-            .field("broker_port", &self.broker_port)
-            .field("cores", &self.cores)
-            .field("overcommit", &self.overcommit)
-            .field("spawn_broker", &self.spawn_broker)
-            .field("remote_broker_addr", &self.remote_broker_addr)
-            .field("stdout_file", &self.stdout_file)
-            .field("stderr_file", &self.stderr_file)
-            .finish_non_exhaustive()
-    }
-}
-
-/// The standard inner manager of centralized
-#[cfg(unix)]
-pub type StdCentralizedInnerMgr<I, S, SHM, SP> = LlmpRestartingEventManager<(), I, S, SHM, SP>;
-
-#[cfg(unix)]
-impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
-where
-    MT: Monitor + Clone + 'static,
-    SP: ShMemProvider + 'static,
-{
-    /// Launch a standard Centralized-based fuzzer
-    pub fn launch<I, S>(&mut self) -> Result<(), Error>
+impl<CF, MF, MT, SP> Launcher<'_, CF, MF, MT, SP> {
+    /// Launch a Centralized-based fuzzer
+    #[cfg(unix)]
+    pub fn launch_centralized<I, S>(self) -> Result<(), Error>
     where
+        I: Input + Send + Sync + 'static,
         S: DeserializeOwned + Serialize,
-        I: DeserializeOwned + Input + Send + Sync + 'static,
+        MT: Monitor + Clone + 'static,
+        SP: ShMemProvider + 'static,
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<
@@ -742,26 +673,23 @@ where
                 builder.build().launch()
             };
 
-        self.launch_generic(restarting_mgr_builder, restarting_mgr_builder)
+        self.launch_centralized_custom(restarting_mgr_builder, restarting_mgr_builder)
     }
-}
 
-#[cfg(unix)]
-impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
-where
-    MT: Monitor + Clone + 'static,
-    SP: ShMemProvider + 'static,
-{
     /// Launch a Centralized-based fuzzer.
     /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.
     /// - `secondary_inner_mgr_builder` will be called to build the inner manager of the secondary nodes.
-    pub fn launch_generic<EM, EMB, I, S>(
-        &mut self,
+    #[cfg(unix)]
+    pub fn launch_centralized_custom<EM, EMB, I, S>(
+        mut self,
         main_inner_mgr_builder: EMB,
         secondary_inner_mgr_builder: EMB,
     ) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
+        S: DeserializeOwned + Serialize,
+        MT: Monitor + Clone + 'static,
+        SP: ShMemProvider + 'static,
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<EM, I, S, SP::ShMem, SP>,
@@ -789,7 +717,7 @@ where
             ));
         }
 
-        if self.secondary_run_client.is_none() {
+        if self.run_client.is_none() {
             return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),
             ));
@@ -855,7 +783,7 @@ where
                                 // Main client
                                 log::debug!("Running main client on PID {}", std::process::id());
                                 let (state, mgr) = main_inner_mgr_builder.take().unwrap()(
-                                    self,
+                                    &self,
                                     client_description.clone(),
                                 )?;
 
@@ -884,7 +812,7 @@ where
                                     std::process::id()
                                 );
                                 let (state, mgr) = secondary_inner_mgr_builder.take().unwrap()(
-                                    self,
+                                    &self,
                                     client_description.clone(),
                                 )?;
 
@@ -896,11 +824,7 @@ where
                                     self.centralized_broker_port,
                                 )?;
 
-                                self.secondary_run_client.take().unwrap()(
-                                    state,
-                                    c_mgr,
-                                    client_description,
-                                )?;
+                                self.run_client.take().unwrap()(state, c_mgr, client_description)?;
                                 Err(Error::shutting_down())
                             }
                         }?,
@@ -960,11 +884,19 @@ where
             log::info!("I am broker!!.");
 
             #[cfg(not(feature = "multi_machine"))]
-            let llmp_hook = tuple_list!(StdLlmpEventHook::<I, MT>::new(self.monitor.clone())?);
+            let llmp_hook = tuple_list!(StdLlmpEventHook::<I, MT>::new(
+                self.monitor
+                    .clone()
+                    .expect("Monitor must be provided when spawning a broker")
+            )?);
 
             #[cfg(feature = "multi_machine")]
             let llmp_hook = tuple_list!(
-                StdLlmpEventHook::<I, MT>::new(self.monitor.clone())?,
+                StdLlmpEventHook::<I, MT>::new(
+                    self.monitor
+                        .clone()
+                        .expect("Monitor must be provided when spawning a broker")
+                )?,
                 multi_machine_sender_hook,
             );
 
@@ -1007,3 +939,7 @@ where
         Err(Error::shutting_down())
     }
 }
+
+/// The standard inner manager of centralized
+#[cfg(unix)]
+pub type StdCentralizedInnerMgr<I, S, SHM, SP> = LlmpRestartingEventManager<(), I, S, SHM, SP>;
