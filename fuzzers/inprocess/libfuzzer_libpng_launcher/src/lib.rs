@@ -12,7 +12,10 @@ use libafl::events::tcp::TcpRestartingMgr;
 use libafl::monitors::statsd::StatsdMonitorTagFlavor;
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig, EventFirer, EventWithStats},
+    events::{
+        launcher::Launcher, ClientDescription, EventConfig, EventFirer, EventReceiver,
+        EventRestarter, EventWithStats, HasEventManagerId, ProgressReporter, SendExiting,
+    },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -45,6 +48,11 @@ use mimalloc::MiMalloc;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
+
+type FuzzerState =
+    StdState<InMemoryCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
+
+/// Parse a millis string to a [`Duration`]. Used for arg parsing.
 
 /// Parse a millis string to a [`Duration`]. Used for arg parsing.
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
@@ -153,7 +161,10 @@ struct Opt {
     #[arg(long, help = "Crash after this many iterations")]
     crash_after: Option<u64>,
     #[cfg(feature = "tcp_manager")]
-    #[arg(long, help = "Use TCP event manager")]
+    #[arg(
+        long,
+        help = "Use TCP event manager for IPC instead of LLMP (slower, but might have its benefits?)"
+    )]
     tcp: bool,
 }
 
@@ -171,7 +182,7 @@ pub extern "C" fn libafl_main() {
     }
 
     let broker_port = opt.broker_port;
-    let cores = opt.cores;
+    let cores = opt.cores.clone();
 
     println!(
         "Workdir: {:?}",
@@ -204,13 +215,20 @@ pub extern "C" fn libafl_main() {
         MultiMonitor::new(|s| println!("{s}")),
     );
 
-    type MyState =
-        StdState<InMemoryCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
-
-    let run_client_node = |state: Option<MyState>,
-                           mut restarting_mgr: _,
-                           client_description: libafl::events::launcher::ClientDescription,
-                           opt: &Opt| {
+    fn run_client<EM>(
+        state: Option<FuzzerState>,
+        mut restarting_mgr: EM,
+        client_description: ClientDescription,
+        opt: &Opt,
+    ) -> Result<(), Error>
+    where
+        EM: EventFirer<BytesInput, FuzzerState>
+            + EventRestarter<FuzzerState>
+            + HasEventManagerId
+            + ProgressReporter<FuzzerState>
+            + EventReceiver<BytesInput, FuzzerState>
+            + SendExiting,
+    {
         // Send the core_id to the monitor
         let core_id = client_description.core_id();
 
@@ -327,13 +345,36 @@ pub extern "C" fn libafl_main() {
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
         Ok(())
-    };
+    }
+
+    #[cfg(feature = "tcp_manager")]
+    if opt.tcp {
+        println!("Running in TCP mode");
+        let builder = Launcher::builder()
+            .shmem_provider(shmem_provider)
+            .configuration(EventConfig::from_name("default"))
+            .monitor(monitor)
+            .run_client(|s, m, c| run_client(s, m, c, &opt))
+            .cores(&cores)
+            .overcommit(opt.overcommit)
+            .broker_port(broker_port)
+            .remote_broker_addr(opt.remote_broker_addr);
+
+        #[cfg(unix)]
+        let builder = builder.fork(opt.fork);
+
+        builder
+            .build()
+            .launch_tcp(tuple_list!())
+            .expect("Failed to launch TCP manager");
+        return;
+    }
 
     let builder = Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
-        .run_client(|s, m, c| run_client_node(s, m, c, &opt))
+        .run_client(|s, m, c| run_client(s, m, c, &opt))
         .cores(&cores)
         .overcommit(opt.overcommit)
         .broker_port(broker_port)
@@ -341,15 +382,6 @@ pub extern "C" fn libafl_main() {
 
     #[cfg(unix)]
     let builder = builder.fork(opt.fork);
-
-    #[cfg(feature = "tcp_manager")]
-    if opt.tcp {
-        println!("Running in TCP mode");
-        builder
-            .launch_tcp(tuple_list!())
-            .expect("Failed to launch TCP manager");
-        return;
-    }
 
     match builder.build().launch() {
         Ok(()) => (),
