@@ -236,9 +236,6 @@ where
     }
 
     /// Launch the broker and the clients and fuzz with a user-supplied hook
-    #[expect(clippy::too_many_lines, clippy::match_wild_err_arm)]
-    /// Launch the broker and the clients and fuzz with a user-supplied hook
-    #[expect(clippy::too_many_lines, clippy::match_wild_err_arm)]
     pub fn launch_with_hooks<EMH, I, S>(self, hooks: EMH) -> Result<(), Error>
     where
         CF: FnOnce(
@@ -615,10 +612,8 @@ where
         } else {
             for handle in &mut *handles {
                 let ecode = handle.wait();
-                if let Ok(ecode) = ecode {
-                    if !ecode.success() {
-                        log::info!("Client with handle {handle:?} exited with {ecode:?}");
-                    }
+                if ecode.as_ref().is_ok_and(|e| !e.success()) {
+                    log::info!("Client with handle {handle:?} exited with {ecode:?}");
                 }
             }
         }

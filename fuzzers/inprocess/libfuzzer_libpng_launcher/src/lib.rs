@@ -177,6 +177,9 @@ pub extern "C" fn libafl_main() {
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
     let opt = Opt::parse();
+    println!("AFL_SHMEM_SERVICE_STARTED: {:?}", env::var("AFL_SHMEM_SERVICE_STARTED"));
+    use std::io::Write;
+    std::io::stdout().flush().unwrap();
 
     // for testing purposes in CI only. No need to do this for normal fuzzing
     if let Some(iters) = opt.crash_after {
