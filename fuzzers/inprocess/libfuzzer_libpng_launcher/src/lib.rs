@@ -8,6 +8,7 @@ use std::{env, net::SocketAddr, path::PathBuf};
 use clap::{self, Parser};
 #[cfg(feature = "tcp_manager")]
 use libafl::events::tcp::TcpRestartingMgr;
+use libafl::executors::Executor;
 #[cfg(feature = "statsd")]
 use libafl::monitors::statsd::StatsdMonitorTagFlavor;
 use libafl::{
@@ -180,6 +181,8 @@ pub extern "C" fn libafl_main() {
     println!("AFL_SHMEM_SERVICE_STARTED: {:?}", env::var("AFL_SHMEM_SERVICE_STARTED"));
     use std::io::Write;
     std::io::stdout().flush().unwrap();
+    libafl_bolts::SimpleStdoutLogger::set_logger().unwrap();
+    log::set_max_level(log::LevelFilter::Info);
 
     // for testing purposes in CI only. No need to do this for normal fuzzing
     if let Some(iters) = opt.crash_after {
@@ -339,7 +342,6 @@ pub extern "C" fn libafl_main() {
         if unsafe { libfuzzer_initialize(&args) } == -1 {
             println!("Warning: LLVMFuzzerInitialize failed with -1");
         }
-
         // In case the corpus is empty (on first run), reset
         if state.must_load_initial_inputs() {
             state
@@ -348,7 +350,10 @@ pub extern "C" fn libafl_main() {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
+        println!("Starting fuzz_loop");
+        let result = fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr);
+        println!("fuzz_loop returned {:?}", result);
+        result?;
         Ok(())
     }
 
