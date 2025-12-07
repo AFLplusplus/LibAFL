@@ -429,8 +429,8 @@ where
 
                 if self.spawn_broker {
                     log::info!("I am broker!!.");
-
-                    spawn_mgr(&self, None, self.monitor.take())?;
+                    let monitor = self.monitor.take();
+                    spawn_mgr(&self, None, monitor)?;
                 }
 
                 Self::wait_for_pids(&handles, self.spawn_broker);
@@ -545,8 +545,8 @@ where
 
             if self.spawn_broker {
                 log::info!("I am broker!!.");
-
-                spawn_mgr(&self, None, self.monitor.take())?;
+                let monitor = self.monitor.take();
+                spawn_mgr(&self, None, monitor)?;
             }
             
             Self::wait_for_child_processes(&mut handles, self.spawn_broker);
