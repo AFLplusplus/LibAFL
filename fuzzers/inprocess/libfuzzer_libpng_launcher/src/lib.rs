@@ -8,7 +8,6 @@ use std::{env, net::SocketAddr, path::PathBuf};
 use clap::{self, Parser};
 #[cfg(feature = "tcp_manager")]
 use libafl::events::tcp::TcpRestartingMgr;
-use libafl::executors::Executor;
 #[cfg(feature = "statsd")]
 use libafl::monitors::statsd::StatsdMonitorTagFlavor;
 use libafl::{
@@ -19,7 +18,7 @@ use libafl::{
         ClientDescription, EventConfig, EventFirer, EventReceiver, EventRestarter, EventWithStats,
         HasEventManagerId, ProgressReporter, SendExiting, SimpleEventManager,
     },
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{inprocess::InProcessExecutor, Executor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -178,7 +177,10 @@ pub extern "C" fn libafl_main() {
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
     let opt = Opt::parse();
-    println!("AFL_SHMEM_SERVICE_STARTED: {:?}", env::var("AFL_SHMEM_SERVICE_STARTED"));
+    println!(
+        "AFL_SHMEM_SERVICE_STARTED: {:?}",
+        env::var("AFL_SHMEM_SERVICE_STARTED")
+    );
     use std::io::Write;
     std::io::stdout().flush().unwrap();
     libafl_bolts::SimpleStdoutLogger::set_logger().unwrap();
@@ -365,7 +367,17 @@ pub extern "C" fn libafl_main() {
             .configuration(EventConfig::from_name("default"))
             .monitor(monitor)
             .run_client(|s, m, c| run_client(s, m, c, &opt))
-        .main_run_client(|_: Option<FuzzerState>, _: CentralizedEventManager<StdCentralizedInnerMgr<BytesInput, FuzzerState, StdShMem, StdShMemProvider>, BytesInput, FuzzerState, StdShMem, StdShMemProvider>, _: ClientDescription| Ok::<(), libafl::Error>(()))
+            .main_run_client(
+                |_: Option<FuzzerState>,
+                 _: CentralizedEventManager<
+                    StdCentralizedInnerMgr<BytesInput, FuzzerState, StdShMem, StdShMemProvider>,
+                    BytesInput,
+                    FuzzerState,
+                    StdShMem,
+                    StdShMemProvider,
+                >,
+                 _: ClientDescription| Ok::<(), libafl::Error>(()),
+            )
             .cores(&cores)
             .overcommit(opt.overcommit)
             .broker_port(broker_port)
@@ -386,7 +398,17 @@ pub extern "C" fn libafl_main() {
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
         .run_client(|s, m, c| run_client(s, m, c, &opt))
-        .main_run_client(|_: Option<FuzzerState>, _: CentralizedEventManager<StdCentralizedInnerMgr<BytesInput, FuzzerState, StdShMem, StdShMemProvider>, BytesInput, FuzzerState, StdShMem, StdShMemProvider>, _: ClientDescription| Ok::<(), libafl::Error>(()))
+        .main_run_client(
+            |_: Option<FuzzerState>,
+             _: CentralizedEventManager<
+                StdCentralizedInnerMgr<BytesInput, FuzzerState, StdShMem, StdShMemProvider>,
+                BytesInput,
+                FuzzerState,
+                StdShMem,
+                StdShMemProvider,
+            >,
+             _: ClientDescription| Ok::<(), libafl::Error>(()),
+        )
         .cores(&cores)
         .overcommit(opt.overcommit)
         .broker_port(broker_port)

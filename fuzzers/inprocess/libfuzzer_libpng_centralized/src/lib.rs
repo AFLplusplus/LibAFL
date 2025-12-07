@@ -9,8 +9,7 @@ use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
-        centralized::CentralizedEventManager, launcher::Launcher, ClientDescription,
-        EventConfig,
+        centralized::CentralizedEventManager, launcher::Launcher, ClientDescription, EventConfig,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,

@@ -6,6 +6,7 @@ CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
 FUZZER := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 LIBAFL_CC := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
 LIBAFL_CXX := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
+LIBTOOL := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_libtool"
 
 
 alias cc := cxx
@@ -36,18 +37,25 @@ cxx:
 [macos]
 lib: libpng cxx
     #!/bin/bash
-    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}"
     cd {{PROJECT_DIR}}
-    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}"
+    # Patch for macOS: fp.h is missing in newer SDKs, use math.h instead
+    sed -i.bak 's|include <fp.h>|include <math.h>|g' libpng-1.6.37/pngpriv.h
+    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}" LIBTOOL="{{LIBTOOL}}" || true
 
 [windows]
 lib:
     echo "Unsupported on this platform"
 
 [linux]
+fuzzer: lib cxx
+    cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/release/liblibfuzzer_libpng.a -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz
+
 [macos]
 fuzzer: lib cxx
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz
+    cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/release/liblibfuzzer_libpng.a -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz -framework CoreFoundation -framework Security
 
 [windows]
 fuzzer:
