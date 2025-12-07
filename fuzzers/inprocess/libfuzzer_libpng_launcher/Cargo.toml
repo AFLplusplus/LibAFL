@@ -11,7 +11,7 @@ edition = "2021"
 default = ["std"]
 std = []
 statsd = ["libafl/statsd_monitor"]
-tcp_manager = []
+tcp_manager = ["libafl/tcp_manager"]
 
 [profile.release]
 lto = true
