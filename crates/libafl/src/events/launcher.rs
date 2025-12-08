@@ -212,7 +212,7 @@ pub struct LauncherBuilder<'a, CF, MF, MT, SP> {
     fork: bool,
 }
 
-impl<'a> LauncherBuilder<'a, (), (), (), ()> {
+impl LauncherBuilder<'_, (), (), (), ()> {
     /// Create a new builder
     #[must_use]
     pub fn new() -> Self {
@@ -239,6 +239,12 @@ impl<'a> LauncherBuilder<'a, (), (), (), ()> {
             #[cfg(unix)]
             fork: true,
         }
+    }
+}
+
+impl Default for LauncherBuilder<'_, (), (), (), ()> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
