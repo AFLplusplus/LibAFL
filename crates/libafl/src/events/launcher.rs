@@ -31,7 +31,6 @@ use libafl_bolts::{
     tuples::tuple_list,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use typed_builder::TypedBuilder;
 #[cfg(unix)]
 use {
     crate::events::{CentralizedLlmpHook, StdLlmpEventHook, centralized::CentralizedEventManager},
@@ -128,55 +127,42 @@ impl ClientDescription {
 /// Provides a [`Launcher`], which can be used to launch a fuzzing run on a specified list of cores
 ///
 /// Will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
-#[derive(TypedBuilder)]
 pub struct Launcher<'a, CF, MF, MT, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
-    #[builder(setter(transform = |x: MT| Some(x)))]
     monitor: Option<MT>,
     /// The configuration
     configuration: EventConfig,
     /// The 'main' function to run for each client forked. This probably shouldn't return
-    #[builder(default, setter(strip_option))]
     run_client: Option<CF>,
     /// The 'main' function to run for the main evaluator node.
-    #[builder(default, setter(strip_option))]
     main_run_client: Option<MF>,
     /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
-    #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The centralized broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
-    #[builder(default = 1338_u16)]
     centralized_broker_port: u16,
     /// The list of cores to run on
     cores: &'a Cores,
     /// The number of clients to spawn on each core
-    #[builder(default = 1)]
     overcommit: usize,
     /// A file name to write all client output to
     #[cfg(unix)]
-    #[builder(default = None)]
     stdout_file: Option<&'a str>,
     /// The time in milliseconds to delay between child launches
-    #[builder(default = 10)]
     launch_delay: u64,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(unix)]
-    #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
     /// `stdout_file`.
     #[cfg(unix)]
-    #[builder(default = None)]
     stderr_file: Option<&'a str>,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
     #[cfg(unix)]
-    #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
-    #[builder(default = None)]
     remote_broker_addr: Option<SocketAddr>,
     #[cfg(feature = "multi_machine")]
     multi_machine_node_descriptor: NodeDescriptor<SocketAddr>,
@@ -184,15 +170,311 @@ pub struct Launcher<'a, CF, MF, MT, SP> {
     /// The reason you may not want this is, if you already have a [`Launcher`]
     /// with a different configuration (for the same target) running on this machine.
     /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
-    #[builder(default = true)]
     spawn_broker: bool,
     /// Tell the manager to serialize or not the state on restart
-    #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
     /// If this launcher should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
     #[cfg(unix)]
-    #[builder(default = true)]
     fork: bool,
+}
+
+impl<'a> Launcher<'a, (), (), (), ()> {
+    /// The builder for the launcher
+    #[must_use]
+    pub fn builder() -> LauncherBuilder<'a, (), (), (), ()> {
+        LauncherBuilder::new()
+    }
+}
+
+/// The builder for the launcher
+#[derive(Debug)]
+pub struct LauncherBuilder<'a, CF, MF, MT, SP> {
+    shmem_provider: Option<SP>,
+    monitor: Option<MT>,
+    configuration: Option<EventConfig>,
+    run_client: Option<CF>,
+    main_run_client: Option<MF>,
+    broker_port: u16,
+    centralized_broker_port: u16,
+    cores: Option<&'a Cores>,
+    overcommit: usize,
+    #[cfg(unix)]
+    stdout_file: Option<&'a str>,
+    launch_delay: u64,
+    #[cfg(unix)]
+    stderr_file: Option<&'a str>,
+    remote_broker_addr: Option<SocketAddr>,
+    #[cfg(feature = "multi_machine")]
+    multi_machine_node_descriptor: Option<NodeDescriptor<SocketAddr>>,
+    spawn_broker: bool,
+    serialize_state: LlmpShouldSaveState,
+    #[cfg(unix)]
+    fork: bool,
+}
+
+impl<'a> LauncherBuilder<'a, (), (), (), ()> {
+    /// Create a new builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            shmem_provider: None,
+            monitor: None,
+            configuration: None,
+            run_client: None,
+            main_run_client: None,
+            broker_port: 1337,
+            centralized_broker_port: 1338,
+            cores: None,
+            overcommit: 1,
+            #[cfg(unix)]
+            stdout_file: None,
+            launch_delay: 10,
+            #[cfg(unix)]
+            stderr_file: None,
+            remote_broker_addr: None,
+            #[cfg(feature = "multi_machine")]
+            multi_machine_node_descriptor: None,
+            spawn_broker: true,
+            serialize_state: LlmpShouldSaveState::OnRestart,
+            #[cfg(unix)]
+            fork: true,
+        }
+    }
+}
+
+impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
+    /// The `ShmemProvider` to use
+    pub fn shmem_provider<NewSP>(
+        self,
+        shmem_provider: NewSP,
+    ) -> LauncherBuilder<'a, CF, MF, MT, NewSP> {
+        LauncherBuilder {
+            shmem_provider: Some(shmem_provider),
+            monitor: self.monitor,
+            configuration: self.configuration,
+            run_client: self.run_client,
+            main_run_client: self.main_run_client,
+            broker_port: self.broker_port,
+            centralized_broker_port: self.centralized_broker_port,
+            cores: self.cores,
+            overcommit: self.overcommit,
+            #[cfg(unix)]
+            stdout_file: self.stdout_file,
+            launch_delay: self.launch_delay,
+            #[cfg(unix)]
+            stderr_file: self.stderr_file,
+            remote_broker_addr: self.remote_broker_addr,
+            #[cfg(feature = "multi_machine")]
+            multi_machine_node_descriptor: self.multi_machine_node_descriptor,
+            spawn_broker: self.spawn_broker,
+            serialize_state: self.serialize_state,
+            #[cfg(unix)]
+            fork: self.fork,
+        }
+    }
+
+    /// The monitor instance to use
+    pub fn monitor<NewMT>(self, monitor: NewMT) -> LauncherBuilder<'a, CF, MF, NewMT, SP> {
+        LauncherBuilder {
+            shmem_provider: self.shmem_provider,
+            monitor: Some(monitor),
+            configuration: self.configuration,
+            run_client: self.run_client,
+            main_run_client: self.main_run_client,
+            broker_port: self.broker_port,
+            centralized_broker_port: self.centralized_broker_port,
+            cores: self.cores,
+            overcommit: self.overcommit,
+            #[cfg(unix)]
+            stdout_file: self.stdout_file,
+            launch_delay: self.launch_delay,
+            #[cfg(unix)]
+            stderr_file: self.stderr_file,
+            remote_broker_addr: self.remote_broker_addr,
+            #[cfg(feature = "multi_machine")]
+            multi_machine_node_descriptor: self.multi_machine_node_descriptor,
+            spawn_broker: self.spawn_broker,
+            serialize_state: self.serialize_state,
+            #[cfg(unix)]
+            fork: self.fork,
+        }
+    }
+
+    /// The configuration
+    pub fn configuration(mut self, configuration: EventConfig) -> Self {
+        self.configuration = Some(configuration);
+        self
+    }
+
+    /// The 'main' function to run for each client forked. This probably shouldn't return
+    pub fn run_client<NewCF>(self, run_client: NewCF) -> LauncherBuilder<'a, NewCF, MF, MT, SP> {
+        LauncherBuilder {
+            shmem_provider: self.shmem_provider,
+            monitor: self.monitor,
+            configuration: self.configuration,
+            run_client: Some(run_client),
+            main_run_client: self.main_run_client,
+            broker_port: self.broker_port,
+            centralized_broker_port: self.centralized_broker_port,
+            cores: self.cores,
+            overcommit: self.overcommit,
+            #[cfg(unix)]
+            stdout_file: self.stdout_file,
+            launch_delay: self.launch_delay,
+            #[cfg(unix)]
+            stderr_file: self.stderr_file,
+            remote_broker_addr: self.remote_broker_addr,
+            #[cfg(feature = "multi_machine")]
+            multi_machine_node_descriptor: self.multi_machine_node_descriptor,
+            spawn_broker: self.spawn_broker,
+            serialize_state: self.serialize_state,
+            #[cfg(unix)]
+            fork: self.fork,
+        }
+    }
+
+    /// The 'main' function to run for the main evaluator node.
+    pub fn main_run_client<NewMF>(
+        self,
+        main_run_client: NewMF,
+    ) -> LauncherBuilder<'a, CF, NewMF, MT, SP> {
+        LauncherBuilder {
+            shmem_provider: self.shmem_provider,
+            monitor: self.monitor,
+            configuration: self.configuration,
+            run_client: self.run_client,
+            main_run_client: Some(main_run_client),
+            broker_port: self.broker_port,
+            centralized_broker_port: self.centralized_broker_port,
+            cores: self.cores,
+            overcommit: self.overcommit,
+            #[cfg(unix)]
+            stdout_file: self.stdout_file,
+            launch_delay: self.launch_delay,
+            #[cfg(unix)]
+            stderr_file: self.stderr_file,
+            remote_broker_addr: self.remote_broker_addr,
+            #[cfg(feature = "multi_machine")]
+            multi_machine_node_descriptor: self.multi_machine_node_descriptor,
+            spawn_broker: self.spawn_broker,
+            serialize_state: self.serialize_state,
+            #[cfg(unix)]
+            fork: self.fork,
+        }
+    }
+
+    /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
+    pub fn broker_port(mut self, broker_port: u16) -> Self {
+        self.broker_port = broker_port;
+        self
+    }
+
+    /// The centralized broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
+    pub fn centralized_broker_port(mut self, centralized_broker_port: u16) -> Self {
+        self.centralized_broker_port = centralized_broker_port;
+        self
+    }
+
+    /// The list of cores to run on
+    pub fn cores(mut self, cores: &'a Cores) -> Self {
+        self.cores = Some(cores);
+        self
+    }
+
+    /// The number of clients to spawn on each core
+    pub fn overcommit(mut self, overcommit: usize) -> Self {
+        self.overcommit = overcommit;
+        self
+    }
+
+    /// A file name to write all client output to
+    #[cfg(unix)]
+    pub fn stdout_file(mut self, stdout_file: Option<&'a str>) -> Self {
+        self.stdout_file = stdout_file;
+        self
+    }
+
+    /// The time in milliseconds to delay between child launches
+    pub fn launch_delay(mut self, launch_delay: u64) -> Self {
+        self.launch_delay = launch_delay;
+        self
+    }
+
+    /// A file name to write all client stderr output to. If not specified, output is sent to
+    /// `stdout_file`.
+    #[cfg(unix)]
+    pub fn stderr_file(mut self, stderr_file: Option<&'a str>) -> Self {
+        self.stderr_file = stderr_file;
+        self
+    }
+
+    /// The `ip:port` address of another broker to connect our new broker to for multi-machine
+    /// clusters.
+    pub fn remote_broker_addr(mut self, remote_broker_addr: Option<SocketAddr>) -> Self {
+        self.remote_broker_addr = remote_broker_addr;
+        self
+    }
+
+    #[cfg(feature = "multi_machine")]
+    pub fn multi_machine_node_descriptor(
+        mut self,
+        multi_machine_node_descriptor: NodeDescriptor<SocketAddr>,
+    ) -> Self {
+        self.multi_machine_node_descriptor = Some(multi_machine_node_descriptor);
+        self
+    }
+
+    /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
+    pub fn spawn_broker(mut self, spawn_broker: bool) -> Self {
+        self.spawn_broker = spawn_broker;
+        self
+    }
+
+    /// Tell the manager to serialize or not the state on restart
+    pub fn serialize_state(mut self, serialize_state: LlmpShouldSaveState) -> Self {
+        self.serialize_state = serialize_state;
+        self
+    }
+
+    /// If this launcher should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
+    #[cfg(unix)]
+    pub fn fork(mut self, fork: bool) -> Self {
+        self.fork = fork;
+        self
+    }
+
+    /// Build the launcher
+    pub fn build(self) -> Launcher<'a, CF, MF, MT, SP> {
+        Launcher {
+            shmem_provider: self.shmem_provider.expect("shmem_provider not set"),
+            monitor: self.monitor,
+            configuration: self.configuration.expect("configuration not set"),
+            run_client: self.run_client,
+            main_run_client: self.main_run_client,
+            broker_port: self.broker_port,
+            centralized_broker_port: self.centralized_broker_port,
+            cores: self.cores.expect("cores not set"),
+            overcommit: self.overcommit,
+            #[cfg(unix)]
+            stdout_file: self.stdout_file,
+            launch_delay: self.launch_delay,
+            #[cfg(unix)]
+            opened_stdout_file: None,
+            #[cfg(unix)]
+            stderr_file: self.stderr_file,
+            #[cfg(unix)]
+            opened_stderr_file: None,
+            remote_broker_addr: self.remote_broker_addr,
+            #[cfg(feature = "multi_machine")]
+            multi_machine_node_descriptor: self
+                .multi_machine_node_descriptor
+                .expect("multi_machine_node_descriptor not set"),
+            spawn_broker: self.spawn_broker,
+            serialize_state: self.serialize_state,
+            #[cfg(unix)]
+            fork: self.fork,
+        }
+    }
 }
 
 impl<CF, MF, MT, SP> Debug for Launcher<'_, CF, MF, MT, SP> {
