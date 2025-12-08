@@ -15,9 +15,7 @@ use libafl::{
     state::HasCorpus,
 };
 
-use crate::sancov_pcguard::{
-    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK, nop_target_pc_guard, sancov_pcguard_hook_impl,
-};
+use crate::sancov_pcguard::{LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK, nop_target_pc_guard};
 
 static COVERED_PCS: Mutex<Option<HashMap<usize, usize>>> = Mutex::new(None);
 
@@ -172,17 +170,14 @@ where
     }
 }
 
-unsafe extern "C" fn __libafl_targets_trace_pc_guard_impl(guard: *mut u32, pc: usize) {
-    unsafe {
-        if let Ok(mut guard) = COVERED_PCS.lock() {
-            if guard.is_none() {
-                *guard = Some(HashMap::new());
-            }
-            if let Some(map) = guard.as_mut() {
-                *map.entry(pc).or_insert(0) += 1;
-            }
+unsafe extern "C" fn __libafl_targets_trace_pc_guard_impl(_guard: *mut u32, pc: usize) {
+    if let Ok(mut guard) = COVERED_PCS.lock() {
+        if guard.is_none() {
+            *guard = Some(HashMap::new());
         }
-        sancov_pcguard_hook_impl(guard);
+        if let Some(map) = guard.as_mut() {
+            *map.entry(pc).or_insert(0) += 1;
+        }
     }
 }
 
