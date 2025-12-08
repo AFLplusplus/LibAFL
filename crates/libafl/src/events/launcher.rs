@@ -578,8 +578,9 @@ where
                     ))
                     .configuration(launcher.configuration)
                     .serialize_state(launcher.serialize_state)
-                    .hooks(hooks)
-                    .fork(launcher.fork);
+                    .hooks(hooks);
+                #[cfg(unix)]
+                let builder = builder.fork(launcher.fork);
 
                 builder.build().launch()
             }
@@ -967,8 +968,9 @@ impl<CF, MF, MT, SP> Launcher<'_, CF, MF, MT, SP> {
                     .kind(ManagerKind::Client { client_description })
                     .configuration(centralized_launcher.configuration)
                     .serialize_state(centralized_launcher.serialize_state)
-                    .hooks(tuple_list!())
-                    .fork(centralized_launcher.fork);
+                    .hooks(tuple_list!());
+                #[cfg(unix)]
+                let builder = builder.fork(centralized_launcher.fork);
 
                 builder.build().launch()
             };
