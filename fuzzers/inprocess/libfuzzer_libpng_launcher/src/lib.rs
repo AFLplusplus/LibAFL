@@ -398,17 +398,6 @@ pub extern "C" fn libafl_main() {
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
         .run_client(|s, m, c| run_client(s, m, c, &opt))
-        .main_run_client(
-            |_: Option<FuzzerState>,
-             _: CentralizedEventManager<
-                StdCentralizedInnerMgr<BytesInput, FuzzerState, StdShMem, StdShMemProvider>,
-                BytesInput,
-                FuzzerState,
-                StdShMem,
-                StdShMemProvider,
-            >,
-             _: ClientDescription| Ok::<(), libafl::Error>(()),
-        )
         .cores(&cores)
         .overcommit(opt.overcommit)
         .broker_port(broker_port)

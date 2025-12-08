@@ -9,7 +9,9 @@ use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
-        centralized::CentralizedEventManager, launcher::Launcher, ClientDescription, EventConfig,
+        centralized::CentralizedEventManager,
+        launcher::{CentralizedLauncher, Launcher},
+        ClientDescription, EventConfig,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -251,7 +253,7 @@ pub extern "C" fn libafl_main() {
 
     let mut main_run_client = secondary_run_client; // clone it just for borrow checker
 
-    match libafl::events::launcher::Launcher::builder()
+    match CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
