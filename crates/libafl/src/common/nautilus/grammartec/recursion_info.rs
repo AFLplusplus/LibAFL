@@ -12,6 +12,7 @@ use crate::common::nautilus::grammartec::{
     tree::Tree,
 };
 
+/// Information about recursions in a tree
 pub struct RecursionInfo {
     recursive_parents: HashMap<NodeId, NodeId>,
     sampler: LoadedDiceSampler,
@@ -30,6 +31,7 @@ impl fmt::Debug for RecursionInfo {
 }
 
 impl RecursionInfo {
+    /// Create a new [`RecursionInfo`]
     #[must_use]
     pub fn new(t: &Tree, n: NTermId, ctx: &Context) -> Option<Self> {
         let (recursive_parents, node_by_offset, depth_by_offset) =
@@ -96,11 +98,13 @@ impl RecursionInfo {
         })
     }
 
+    /// Get a random recursion pair
     pub fn get_random_recursion_pair<R: Rand>(&mut self, rand: &mut R) -> (NodeId, NodeId) {
         let offset = self.sampler.sample(rand);
         self.get_recursion_pair_by_offset(offset)
     }
 
+    /// Get a recursion pair by offset
     #[must_use]
     pub fn get_recursion_pair_by_offset(&self, offset: usize) -> (NodeId, NodeId) {
         let node1 = self.node_by_offset[offset];
@@ -111,6 +115,7 @@ impl RecursionInfo {
         (node2, node1)
     }
 
+    /// Get the number of recursions
     #[must_use]
     pub fn get_number_of_recursions(&self) -> usize {
         self.node_by_offset.len()
