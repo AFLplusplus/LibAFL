@@ -37,9 +37,13 @@ cxx:
 [macos]
 lib: libpng cxx
     #!/bin/bash
-    cd libpng-1.6.37 && CC={{LIBAFL_CC}} CXX={{LIBAFL_CXX}} ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+    if [ ! -f libpng-1.6.37/.libs/libpng16.a ]; then
+        cd libpng-1.6.37 && CC={{LIBAFL_CC}} CXX={{LIBAFL_CXX}} ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=no
+    else
+        echo "libpng already built, skipping configure..."
+    fi
     cd {{PROJECT_DIR}}
-    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}" LIBTOOL="{{LIBTOOL}}"
+    make -C libpng-1.6.37 libpng16.la CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}" LIBTOOL="{{LIBTOOL}}"
 
 [windows]
 lib:
@@ -65,7 +69,7 @@ run: fuzzer
 
 [linux]
 [macos]
-test: fuzzer
+test: fuzzer test-statsd
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
     timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21337 --cores 0 --input ./corpus  2>/dev/null | tee fuzz_stdout.log || true
@@ -79,6 +83,37 @@ test: fuzzer
 [windows]
 test: fuzzer
     echo "Unsupported on this platform"
+
+[linux]
+[macos]
+cxx-statsd:
+    cargo build --profile {{PROFILE}} --features statsd
+
+[linux]
+[macos]
+fuzzer-statsd: lib cxx-statsd
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-statsd -lm -lz
+
+[linux]
+[macos]
+test-statsd: fuzzer-statsd
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    rm -f statsd_out.log
+    # Start python listener in background
+    python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(('127.0.0.1', 8126)); s.settimeout(25); d=s.recv(1024); print(d)" > statsd_out.log &
+    LISTENER_PID=$!
+    # Run fuzzer for a few seconds
+    timeout 20s ./{{FUZZER_NAME}}-statsd --broker-port 21338 --cores 0 --input ./corpus --statsd --statsd-port 8126 > fuzzer_statsd.log 2>&1 || true
+    # Wait for listener to potentially finish if it got data
+    wait $LISTENER_PID || true
+    if [ -s statsd_out.log ]; then
+        echo "StatsD received data"
+    else
+        echo "StatsD failed to receive data"
+        exit 1
+    fi
+
 
 clean:
     rm -rf {{FUZZER_NAME}}

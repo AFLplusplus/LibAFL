@@ -196,6 +196,19 @@ fn main() {
             .compile("coverage");
     }
 
+    #[cfg(feature = "sancov_pcguard_dump_cov")]
+    {
+        println!("cargo:rerun-if-changed=src/sancov_pcguard.c");
+        let mut sancov_pcguard = cc::Build::new();
+        #[cfg(feature = "whole_archive")]
+        {
+            sancov_pcguard.link_lib_modifier("+whole-archive");
+        }
+        sancov_pcguard
+            .file(src_dir.join("sancov_pcguard.c"))
+            .compile("sancov_pcguard");
+    }
+
     #[cfg(feature = "cmplog")]
     {
         println!("cargo:rerun-if-changed=src/cmplog.h");

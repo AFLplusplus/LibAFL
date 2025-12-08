@@ -19,7 +19,9 @@ categories = [
 ]
 
 [package.metadata.docs.rs]
+features = ["document-features"]
 all-features = true
+
 
 [features]
 default = [
@@ -31,52 +33,176 @@ default = [
   "coverage",
   "common",
 ]
+
+#! # Feature Flags
+#! ### General Features
+
+## Enables features that need rust's `std` lib to work, like print, env, ... support
 std = ["libafl/std"]
+
+## Collects performance statistics of the fuzzing pipeline and displays it on `Monitor` components
 introspection = ["libafl/introspection"]
-libfuzzer = ["std", "common"]
-libfuzzer_no_link_main = ["libfuzzer"]
-libfuzzer_define_run_driver = ["libfuzzer"]
-libfuzzer_interceptors = ["libfuzzer", "sancov_cmplog"]
-libfuzzer_oom = ["libfuzzer"]
-sanitizers_flags = []
-pointer_maps = []
-sancov_pcguard_edges = ["coverage"]
-sancov_pcguard_hitcounts = ["coverage"]
-sancov_value_profile = ["common"]
+
+## Support for the `sancov` 8-bit counters.
+## This feature enables the `8-bit-counters` runtime for `LibAFL`, which uses a global `COUNTERS_MAPS` to store coverage maps.
+## It is compatible with LLVM's `SanitizerCoverage` 8-bit counters instrumentation.
 sancov_8bit = []
+
+## Support for `sancov` pcguard edge coverage.
+## This feature enables the `pcguard` runtime for `LibAFL`, specifically for edge coverage.
+## It instruments edges by writing a `1` to the coverage map at the corresponding index.
+## This is non-colliding coverage.
+## Mutually exclusive with `sancov_pcguard_hitcounts`.
+sancov_pcguard_edges = ["coverage"]
+
+## Support for `sancov` pcguard hitcounts coverage.
+## This feature enables the `pcguard` runtime for `LibAFL`, specifically for hitcounts coverage.
+## It instruments edges by incrementing the counter in the coverage map at the corresponding index.
+## This is non-colliding coverage.
+## Mutually exclusive with `sancov_pcguard_edges`.
+sancov_pcguard_hitcounts = ["coverage"]
+
+## Support for `sancov` value profile.
+## This feature enables value profiling in the `sancov` runtime.
+## It compiles `sancov_cmp.c` with `SANCOV_VALUE_PROFILE` defined, enabling tracing of comparisons.
+sancov_value_profile = ["common"]
+
+## Support for `sancov` ngram4 coverage.
+## This feature enables NGRAM-4 instrumentation in the `sancov` runtime.
+## It maintains a history of the last 4 locations to provide context-sensitive coverage.
 sancov_ngram4 = ["coverage"]
+
+## Support for `sancov` ngram8 coverage.
+## This feature enables NGRAM-8 instrumentation in the `sancov` runtime.
+## It maintains a history of the last 8 locations to provide context-sensitive coverage.
 sancov_ngram8 = ["coverage"]
+
+## Support for `sancov` context coverage.
+## This feature enables context-sensitive coverage in the `sancov` runtime.
+## It XORs the current position with the previous context ID to distinguish paths based on calling context.
 sancov_ctx = ["coverage"]
+
+## Support for `sancov`-based cmplog.
+## This feature enables comparison logging using the LLVM `sancov` runtime.
+## It compiles `sancov_cmp.c` with `SANCOV_CMPLOG` defined and links against weak symbols for comparison hooks.
+## This allows tracing of comparison operands for advanced fuzzing techniques like RedQueen.
 sancov_cmplog = [
   "common",
 ] # Defines cmp and __sanitizer_weak_hook functions. Use libfuzzer_interceptors to define interceptors (only compatible with Linux)
+
+## Support for `sancov` pcguard.
+## This is an alias for `sancov_pcguard_hitcounts`, enabling hitcounts coverage by default.
 sancov_pcguard = ["sancov_pcguard_hitcounts"]
-sanitizer_interfaces = []
-clippy = [] # Ignore compiler warnings during clippy
-observers = ["meminterval"]
-common = [
-] # Compile common C code defining sanitizer options and cross-platform intrinsics
-coverage = ["common"] # Compile C code definining coverage maps
-cmplog = ["common"] # Compile C code defining cmp log maps
-forkserver = [
-  "common",
-  "nix",
-  "libafl/std",
-  "libafl/fork",
-] # Compile C code for forkserver support
-windows_asan = ["common"] # Compile C code for ASAN on Windows
-whole_archive = [] # use +whole-archive to ensure the presence of weak symbols
+
+## Support for `sancov` pcguard dump cov.
+## This uses pcguard to be able to dump lcov-compatible .info files.
+sancov_pcguard_dump_cov = ["std", "backtrace"]
+
+## Compile common C code defining sanitizer options and cross-platform intrinsics.
+## This feature compiles `common.c` and `common.h`, which are used by many other features.
+common = []
+
+## Compile C code definining coverage maps.
+## This feature compiles `coverage.c`, which defines the edge coverage map (`EDGES_MAP`) and related variables.
+coverage = ["common"]
+
+## Compile C code defining cmp log maps.
+## This feature compiles `cmplog.c` and `cmplog.h`, which define the comparison logging map and related structures.
+cmplog = ["common"]
+
+## Compile C code for forkserver support.
+## This feature compiles `forkserver.rs` and enables the forkserver protocol for communicating with the fuzzer.
+## It allows the target to be spawned and controlled by a parent fuzzer process.
+forkserver = ["common", "nix", "libafl/std", "libafl/fork"]
+
+## Compile C code for ASan on Windows.
+## This feature compiles `windows_asan.c` and `windows_asan.rs` to provide AddressSanitizer support on Windows.
+windows_asan = ["common"]
+
+## use +whole-archive to ensure the presence of weak symbols.
+## This feature adds the `+whole-archive` modifier to linked libraries in `build.rs`.
+## This is important for ensuring that weak symbols (like sanitizer hooks) are included in the final binary.
+whole_archive = []
+
+## This feature enables extended `CmpLog` instrumentation, compatible with `AFL++`.
+## It compiles `cmplog.c` with `CMPLOG_EXTENDED` defined.
 cmplog_extended_instrumentation = [
   "cmplog", # without `cmplog`, extended instrumentation won't compile
-] # support for aflpp cmplog map, we will remove this once aflpp and libafl cmplog shares the same LLVM passes.
+] ## Support for `aflpp`-style `CmpLog` maps.
+
+## Support for function logging.
+## This feature enables the `call` module, which provides hooks for function calls.
+## It allows tracing function entries and exits.
 function-logging = ["common", "std"]
+
+## Tracks the Feedbacks and the Objectives that were interesting for a Testcase.
+## This feature enables tracking of hit feedbacks in the `libfuzzer` OOM observer.
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
+
+#! ### Libfuzzer-compatibility Features
+
+## Libfuzzer compatibility mode.
+## This feature compiles `libfuzzer.c` and enables Libfuzzer compatibility.
+## It allows `LibAFL` to be used as a drop-in replacement for Libfuzzer.
+libfuzzer = ["std", "common"]
+
+## Libfuzzer mode without linking main.
+## This feature defines `FUZZER_NO_LINK_MAIN` when compiling `libfuzzer.c`.
+## It prevents the definition of a `main` function, which is useful when the target already has a `main`.
+libfuzzer_no_link_main = ["libfuzzer"]
+
+## Libfuzzer mode defining run driver.
+## This feature defines `FUZZER_DEFINE_RUN_DRIVER` when compiling `libfuzzer.c`.
+## It defines the `run_driver` symbol, which is used by some Libfuzzer targets.
+libfuzzer_define_run_driver = ["libfuzzer"]
+
+## Libfuzzer interceptors.
+## This feature compiles `FuzzerInterceptors.cpp`, which defines interceptors for common library functions (e.g., `malloc`, `free`).
+## It is used to track memory allocations and other events in Libfuzzer compatibility mode.
+libfuzzer_interceptors = ["libfuzzer", "sancov_cmplog"]
+
+## Libfuzzer OOM handling.
+## This feature enables Out-Of-Memory (OOM) handling in Libfuzzer compatibility mode.
+## It registers a handler to catch OOM errors and report them to the fuzzer.
+libfuzzer_oom = ["libfuzzer"]
+
+#! ### Sanitizer Features
+
+## Sanitizer flags.
+## This feature defines `DEFAULT_SANITIZERS_OPTIONS` in `common.c`.
+## It sets default options for sanitizers (e.g., ASAN, MSAN) to be compatible with fuzzing.
+sanitizers_flags = []
+
+## Pointer maps.
+## This feature changes the way coverage maps are accessed.
+## Instead of using fixed-size arrays, it uses pointers to access the maps.
+## This is useful when the map location is not known at compile time or when using shared memory.
+pointer_maps = []
+
+## Sanitizer interfaces.
+## This feature generates Rust bindings for sanitizer interface headers (`sanitizer_interfaces.h`).
+## It allows accessing sanitizer functions and structures from Rust code.
+sanitizer_interfaces = []
+
+## Ignore compiler warnings during clippy.
+## This feature suppresses clippy warnings in generated code or specific modules.
+clippy = []
+
+## Observers.
+## This feature enables observer implementations in `sancov_8bit` and `cmps`.
+## It allows using these observers to track coverage and comparison values.
+observers = ["meminterval"]
+
+## Document all features of this crate (for `cargo doc`)
+document-features = ["dep:document-features"]
+
 [build-dependencies]
 bindgen = "0.72.1"
 cc = { version = "1.2.48", features = ["parallel"] }
 rustversion = "1.0.22"
 
 [dependencies]
+document-features = { workspace = true, optional = true }
 libafl = { workspace = true, features = [], default-features = false }
 libafl_bolts = { workspace = true, features = [] }
 libafl_core = { workspace = true, features = [] }
@@ -94,6 +220,7 @@ serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] } # serialization lib
 meminterval = { workspace = true, features = ["serde"], optional = true }
+backtrace = { workspace = true, optional = true }
 
 [lints]
 workspace = true

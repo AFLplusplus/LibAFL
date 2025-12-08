@@ -20,18 +20,38 @@ use crate::{
 
 /// Replay all inputs
 #[derive(Debug)]
-pub struct ReplayStage<I> {
+pub struct ReplayStage<H, I> {
     name: Cow<'static, str>,
     phantom: PhantomData<I>,
+    hook: H,
 }
 
-impl<I> Default for ReplayStage<I> {
+/// A hook for the replay stage
+pub trait ReplayHook<I, S> {
+    /// Called before the execution of the input
+    fn pre_exec(&mut self, state: &mut S, input: &I, id: CorpusId) -> Result<(), Error>;
+
+    /// Called after the execution of the input
+    fn post_exec(&mut self, state: &mut S, input: &I, id: CorpusId) -> Result<(), Error>;
+}
+
+impl<I, S> ReplayHook<I, S> for () {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I, _id: CorpusId) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_exec(&mut self, _state: &mut S, _input: &I, _id: CorpusId) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<I> Default for ReplayStage<(), I> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<I> Named for ReplayStage<I> {
+impl<H, I> Named for ReplayStage<H, I> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -88,7 +108,7 @@ static mut REPLAY_STAGE_ID: usize = 0;
 /// The name for tracing stage
 pub static REPLAY_STAGE_NAME: &str = "tracing";
 
-impl<I> ReplayStage<I> {
+impl<I> ReplayStage<(), I> {
     #[must_use]
     /// Create a new replay stage
     pub fn new() -> Self {
@@ -102,15 +122,36 @@ impl<I> ReplayStage<I> {
         Self {
             name: Cow::Owned(REPLAY_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
             phantom: PhantomData,
+            hook: (),
         }
     }
 }
 
-impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for ReplayStage<I>
+impl<H, I> ReplayStage<H, I> {
+    #[must_use]
+    /// Create a new replay stage with a hook
+    pub fn with_hook(hook: H) -> Self {
+        // unsafe but impossible that you create two threads both instantiating this instance
+        let stage_id = unsafe {
+            let ret = REPLAY_STAGE_ID;
+            REPLAY_STAGE_ID += 1;
+            ret
+        };
+
+        Self {
+            name: Cow::Owned(REPLAY_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
+            phantom: PhantomData,
+            hook,
+        }
+    }
+}
+
+impl<E, EM, H, I, S, Z> Stage<E, EM, S, Z> for ReplayStage<H, I>
 where
     S: HasCorpus<I> + HasSolutions<I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
     I: Clone,
+    H: ReplayHook<I, S>,
 {
     #[inline]
     fn perform(
@@ -137,7 +178,9 @@ where
                 input.clone()
             };
 
+            self.hook.pre_exec(state, &input, id)?;
             fuzzer.evaluate_input(state, executor, manager, &input)?;
+            self.hook.post_exec(state, &input, id)?;
         }
 
         let solution_ids: Vec<CorpusId> = state.solutions().ids().collect();
@@ -156,14 +199,16 @@ where
                 input.clone()
             };
 
+            self.hook.pre_exec(state, &input, id)?;
             fuzzer.evaluate_input(state, executor, manager, &input)?;
+            self.hook.post_exec(state, &input, id)?;
         }
         log::info!("DONE :)");
         Ok(())
     }
 }
 
-impl<I, S> Restartable<S> for ReplayStage<I>
+impl<H, I, S> Restartable<S> for ReplayStage<H, I>
 where
     S: HasMetadata,
 {
