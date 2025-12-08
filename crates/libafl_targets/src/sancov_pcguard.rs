@@ -293,7 +293,17 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 pub unsafe extern "C" fn __libafl_targets_trace_pc_guard(guard: *mut u32, pc: usize) {
     unsafe {
         sanitizer_cov_pcguard_impl_impl(guard);
-        let hook_ptr = LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.load(Ordering::Acquire);
+        let hook_ptr = LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.load(Ordering::Relaxed);
+        if hook_ptr != nop_target_pc_guard as *mut c_void {
+            call_hook_cold(hook_ptr, guard, pc);
+        }
+    }
+}
+
+#[cfg(feature = "sancov_pcguard_dump_cov")]
+#[cold]
+unsafe fn call_hook_cold(hook_ptr: *mut c_void, guard: *mut u32, pc: usize) {
+    unsafe {
         let hook: TargetPcGuardHook = core::mem::transmute(hook_ptr);
         hook(guard, pc);
     }

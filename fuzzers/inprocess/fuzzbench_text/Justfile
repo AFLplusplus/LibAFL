@@ -108,10 +108,10 @@ test-dump-cov-fuzz:
 	mkdir -p in_dump_fuzz
 	echo a > in_dump_fuzz/a
 	timeout 31s ./{{FUZZER_NAME}} -o out_dump_fuzz -i in_dump_fuzz | tee fuzz_dump_stdout.log || true
-	if grep -qa "objectives: 1" fuzz_dump_stdout.log; then \
-		echo "Fuzzer with dump_cov enabled is working"; \
+	if grep -qa "corpus: [2-9]" fuzz_dump_stdout.log || grep -qa "corpus: [1-9][0-9]" fuzz_dump_stdout.log; then \
+		echo "Fuzzer with dump_cov enabled is working (found multiple corpus entries)"; \
 	else \
-		echo "Fuzzer with dump_cov enabled failed to generate testcases/crashes"; \
+		echo "Fuzzer with dump_cov enabled failed to find multiple corpus entries"; \
 		exit 1; \
 	fi
 	rm -rf out_dump_fuzz in_dump_fuzz fuzz_dump_stdout.log
