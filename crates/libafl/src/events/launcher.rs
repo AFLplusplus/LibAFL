@@ -244,6 +244,7 @@ impl<'a> LauncherBuilder<'a, (), (), (), ()> {
 
 impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
     /// The `ShmemProvider` to use
+    #[must_use]
     pub fn shmem_provider<NewSP>(
         self,
         shmem_provider: NewSP,
@@ -274,6 +275,7 @@ impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
     }
 
     /// The monitor instance to use
+    #[must_use]
     pub fn monitor<NewMT>(self, monitor: NewMT) -> LauncherBuilder<'a, CF, MF, NewMT, SP> {
         LauncherBuilder {
             shmem_provider: self.shmem_provider,
@@ -301,12 +303,14 @@ impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
     }
 
     /// The configuration
+    #[must_use]
     pub fn configuration(mut self, configuration: EventConfig) -> Self {
         self.configuration = Some(configuration);
         self
     }
 
     /// The 'main' function to run for each client forked. This probably shouldn't return
+    #[must_use]
     pub fn run_client<NewCF>(self, run_client: NewCF) -> LauncherBuilder<'a, NewCF, MF, MT, SP> {
         LauncherBuilder {
             shmem_provider: self.shmem_provider,
@@ -334,6 +338,7 @@ impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
     }
 
     /// The 'main' function to run for the main evaluator node.
+    #[must_use]
     pub fn main_run_client<NewMF>(
         self,
         main_run_client: NewMF,
@@ -364,24 +369,28 @@ impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
     }
 
     /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
+    #[must_use]
     pub fn broker_port(mut self, broker_port: u16) -> Self {
         self.broker_port = broker_port;
         self
     }
 
     /// The centralized broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
+    #[must_use]
     pub fn centralized_broker_port(mut self, centralized_broker_port: u16) -> Self {
         self.centralized_broker_port = centralized_broker_port;
         self
     }
 
     /// The list of cores to run on
+    #[must_use]
     pub fn cores(mut self, cores: &'a Cores) -> Self {
         self.cores = Some(cores);
         self
     }
 
     /// The number of clients to spawn on each core
+    #[must_use]
     pub fn overcommit(mut self, overcommit: usize) -> Self {
         self.overcommit = overcommit;
         self
@@ -389,12 +398,14 @@ impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
 
     /// A file name to write all client output to
     #[cfg(unix)]
+    #[must_use]
     pub fn stdout_file(mut self, stdout_file: Option<&'a str>) -> Self {
         self.stdout_file = stdout_file;
         self
     }
 
     /// The time in milliseconds to delay between child launches
+    #[must_use]
     pub fn launch_delay(mut self, launch_delay: u64) -> Self {
         self.launch_delay = launch_delay;
         self
@@ -403,6 +414,7 @@ impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
     /// A file name to write all client stderr output to. If not specified, output is sent to
     /// `stdout_file`.
     #[cfg(unix)]
+    #[must_use]
     pub fn stderr_file(mut self, stderr_file: Option<&'a str>) -> Self {
         self.stderr_file = stderr_file;
         self
@@ -410,12 +422,14 @@ impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
 
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
+    #[must_use]
     pub fn remote_broker_addr(mut self, remote_broker_addr: Option<SocketAddr>) -> Self {
         self.remote_broker_addr = remote_broker_addr;
         self
     }
 
     #[cfg(feature = "multi_machine")]
+    #[must_use]
     pub fn multi_machine_node_descriptor(
         mut self,
         multi_machine_node_descriptor: NodeDescriptor<SocketAddr>,
@@ -425,12 +439,14 @@ impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
     }
 
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
+    #[must_use]
     pub fn spawn_broker(mut self, spawn_broker: bool) -> Self {
         self.spawn_broker = spawn_broker;
         self
     }
 
     /// Tell the manager to serialize or not the state on restart
+    #[must_use]
     pub fn serialize_state(mut self, serialize_state: LlmpShouldSaveState) -> Self {
         self.serialize_state = serialize_state;
         self
@@ -438,6 +454,7 @@ impl<'a, CF, MF, MT, SP> LauncherBuilder<'a, CF, MF, MT, SP> {
 
     /// If this launcher should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
     #[cfg(unix)]
+    #[must_use]
     pub fn fork(mut self, fork: bool) -> Self {
         self.fork = fork;
         self
