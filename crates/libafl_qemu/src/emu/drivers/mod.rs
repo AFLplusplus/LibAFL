@@ -8,19 +8,18 @@ use std::{cell::OnceCell, fmt::Debug};
 use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::ObserversTuple};
 use libafl_bolts::os::{CTRL_C_EXIT, unix_signals::Signal};
 
+#[cfg(not(feature = "systemmode"))]
+use crate::InputLocation;
 #[cfg(feature = "systemmode")]
 use crate::PhysMemoryChunk;
+#[cfg(feature = "systemmode")]
+use crate::emu::systemmode::SystemInputLocation as InputLocation;
 use crate::{
     Emulator, EmulatorExitError, EmulatorExitResult, IsSnapshotManager, Qemu, QemuError,
     QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError, SnapshotManagerError,
     command::{CommandError, CommandManager, IsCommand},
     modules::EmulatorModuleTuple,
 };
-
-#[cfg(not(feature = "systemmode"))]
-use crate::InputLocation;
-#[cfg(feature = "systemmode")]
-use crate::emu::systemmode::SystemInputLocation as InputLocation;
 
 #[cfg(not(feature = "nyx"))]
 pub mod lqemu;

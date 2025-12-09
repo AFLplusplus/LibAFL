@@ -146,7 +146,7 @@ where
 }
 
 /// Offers accessors to modules' page filters.
-#[cfg(feature = "systemmode")]
+
 pub trait HasPageFilter {
     type PageFilter: PageFilter;
 
@@ -387,7 +387,6 @@ impl PageFilter for NopPageFilter {
 #[allow(dead_code)]
 pub(crate) static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> =
     UnsafeCell::new(NopAddressFilter);
-#[cfg(feature = "systemmode")]
 pub(crate) static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::new(NopPageFilter);
 
 #[cfg(all(feature = "systemmode", test))]

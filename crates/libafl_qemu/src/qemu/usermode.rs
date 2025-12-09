@@ -1,3 +1,5 @@
+#[cfg(not(feature = "systemmode"))]
+use std::ptr::copy_nonoverlapping;
 use std::{
     ffi::c_void, mem::MaybeUninit, ops::Range, slice::from_raw_parts_mut,
     str::from_utf8_unchecked_mut,
@@ -15,8 +17,6 @@ use libafl_qemu_sys::{
 use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
 use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
-#[cfg(not(feature = "systemmode"))]
-use std::ptr::copy_nonoverlapping;
 
 #[cfg(doc)]
 use crate::modules::snapshot::SnapshotModule;

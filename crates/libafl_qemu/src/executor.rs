@@ -166,7 +166,7 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
 pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
     signal: Signal,
     info: &mut siginfo_t,
-    mut context: Option<&mut ucontext_t>,
+    context: Option<&mut ucontext_t>,
     data: &mut InProcessExecutorHandlerData,
 ) where
     E: HasObservers + HasInProcessHooks<I, S>,

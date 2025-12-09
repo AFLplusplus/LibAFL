@@ -68,7 +68,7 @@ impl<C, I, S>
         QemuConfigBuilder,
         I,
         S,
-        usermode::StdSnapshotManager,
+        super::StdSnapshotManager,
     >
 where
     S: HasExecutions + Unpin,
@@ -80,7 +80,7 @@ where
         Self {
             modules: tuple_list!(),
             command_manager: StdCommandManager::default(),
-            snapshot_manager: usermode::StdSnapshotManager::default(),
+            snapshot_manager: super::StdSnapshotManager::default(),
             driver: StdEmulatorDriver::builder().build(),
             qemu_parameters: None,
             phantom: PhantomData,

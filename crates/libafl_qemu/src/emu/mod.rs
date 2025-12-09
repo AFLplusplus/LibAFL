@@ -41,10 +41,9 @@ pub use usermode::*;
 #[cfg(feature = "systemmode")]
 pub(crate) mod systemmode;
 #[cfg(feature = "systemmode")]
-pub use systemmode::*;
-
-#[cfg(feature = "systemmode")]
 pub use systemmode::StdSnapshotManager;
+#[cfg(feature = "systemmode")]
+pub use systemmode::*;
 #[cfg(all(feature = "usermode", not(feature = "systemmode")))]
 pub use usermode::StdSnapshotManager;
 

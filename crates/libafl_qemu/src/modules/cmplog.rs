@@ -14,14 +14,12 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "usermode")]
 use crate::capstone;
-#[cfg(feature = "systemmode")]
-use crate::modules::utils::filters::{HasPageFilter, NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
     Qemu,
     emu::EmulatorModules,
     modules::{
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
-        utils::filters::{HasAddressFilter, StdAddressFilter},
+        utils::filters::{HasAddressFilter, NopPageFilter, StdAddressFilter},
     },
     qemu::Hook,
 };
@@ -351,9 +349,7 @@ impl CmpLogRoutinesModule {
             let mut code = {
                 #[cfg(all(feature = "usermode", not(feature = "systemmode")))]
                 {
-                    unsafe {
-                        std::slice::from_raw_parts(qemu.g2h(pc), 512);
-                    }
+                    unsafe { std::slice::from_raw_parts(qemu.g2h(pc), 512) }
                 }
                 #[cfg(feature = "systemmode")]
                 {
@@ -399,9 +395,7 @@ impl CmpLogRoutinesModule {
 
                 #[cfg(all(feature = "usermode", not(feature = "systemmode")))]
                 {
-                    code = unsafe {
-                        std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
-                    };
+                    code = unsafe { std::slice::from_raw_parts(qemu.g2h(iaddr), 512) };
                 }
                 #[cfg(feature = "systemmode")]
                 {
@@ -473,11 +467,13 @@ impl crate::modules::utils::filters::HasPageFilter for CmpLogRoutinesModule {
     }
 
     #[cfg(not(feature = "systemmode"))]
+    #[allow(static_mut_refs)]
     fn page_filter(&self) -> &Self::PageFilter {
         unsafe { &*crate::modules::utils::filters::NOP_PAGE_FILTER.get() }
     }
 
     #[cfg(not(feature = "systemmode"))]
+    #[allow(static_mut_refs)]
     fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
         unsafe {
             (&raw mut crate::modules::utils::filters::NOP_PAGE_FILTER)
