@@ -111,7 +111,6 @@ fn main() {
     let mut opt = Opt::parse();
     parse_envs(&mut opt).expect("invalid configuration");
     executor::check_binary(&mut opt, SHMEM_ENV_VAR).expect("binary to be valid");
-    println!("DEBUG: opt.broker_port = {:?}", opt.broker_port);
 
     // Create the shared memory map provider for LLMP
     #[cfg(not(feature = "fuzzbench"))]
@@ -140,8 +139,9 @@ fn main() {
     #[cfg(not(feature = "fuzzbench"))]
     let res = {
         let cores = opt.cores.clone().expect("invariant; should never occur");
-        let launcher = CentralizedLauncher::builder()
+        CentralizedLauncher::builder()
             .shmem_provider(shmem_provider)
+            .broker_port(opt.broker_port.unwrap_or(1337))
             .configuration(EventConfig::from_name("default"))
             .monitor(monitor)
             .main_run_client(
@@ -187,9 +187,8 @@ fn main() {
                 },
             )
             .cores(&cores)
-            .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))
-            .build();
-        launcher.launch_centralized()
+            .build()
+            .launch_centralized()
     };
     #[cfg(feature = "fuzzbench")]
     let res = {
@@ -205,6 +204,7 @@ fn main() {
         Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
 }
+
 
 #[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, Parser, Clone)]
