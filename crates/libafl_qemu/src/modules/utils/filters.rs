@@ -69,13 +69,13 @@ where
     }
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
 pub trait HasStdFilters: HasAddressFilter {}
 
 #[cfg(feature = "systemmode")]
 pub trait HasStdFilters: HasAddressFilter + HasPageFilter {}
 
-#[cfg(feature = "usermode")]
+#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
 pub trait HasStdFiltersTuple: HasAddressFilterTuple {}
 
 #[cfg(feature = "systemmode")]
@@ -130,7 +130,7 @@ where
     }
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
 impl<M> HasStdFilters for M where M: HasAddressFilter {}
 
 #[cfg(feature = "systemmode")]
@@ -289,7 +289,7 @@ pub struct PageFilterVec {
 #[derive(Debug, Clone)]
 pub struct StdPageFilter(FilterList<PageFilterVec>);
 
-#[cfg(feature = "usermode")]
+#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
 pub type StdPageFilter = NopPageFilter;
 
 #[cfg(feature = "systemmode")]
@@ -434,13 +434,6 @@ mod tests {
         fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
             &mut self.page_filter
         }
-    }
-
-    impl<AF, PF> HasStdFilters for DummyModule<AF, PF>
-    where
-        AF: AddressFilter,
-        PF: PageFilter,
-    {
     }
 
     fn gen_module<AF, PF>(af: AF, pf: PF) -> impl HasStdFilters<AddressFilter = AF, PageFilter = PF>

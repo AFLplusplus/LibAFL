@@ -317,9 +317,9 @@ where
         if let Some(h) = emulator_modules.modules().match_first_type::<Self>() {
             #[allow(unused_mut)] // cfg dependent
             let mut code = {
-                #[cfg(feature = "usermode")]
+                #[cfg(all(feature = "usermode", not(feature = "systemmode")))]
                 unsafe {
-                    std::slice::from_raw_parts(qemu.g2h(pc), 512)
+                    std::slice::from_raw_parts(qemu.g2h(pc), 512);
                 }
                 #[cfg(feature = "systemmode")]
                 &mut [0; 512]
@@ -361,7 +361,7 @@ where
 
                 iaddr += insn.bytes().len() as GuestAddr;
 
-                #[cfg(feature = "usermode")]
+                #[cfg(all(feature = "usermode", not(feature = "systemmode")))]
                 {
                     code = unsafe { std::slice::from_raw_parts(qemu.g2h(iaddr), 512) };
                 }

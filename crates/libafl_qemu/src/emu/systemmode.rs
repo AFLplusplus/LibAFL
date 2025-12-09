@@ -22,13 +22,13 @@ pub type StdSnapshotManager = FastSnapshotManager;
 /// We store the memory location to which the input should be written,
 /// and the return register containing the number bytes effectively written.
 #[derive(Debug, Clone)]
-pub struct InputLocation {
+pub struct SystemInputLocation {
     location: HostMemorySegments,
     ret_register: Option<Regs>,
     cpu: CPU,
 }
 
-impl InputLocation {
+impl SystemInputLocation {
     #[must_use]
     pub fn new(qemu: Qemu, mem_chunk: &QemuMemoryChunk, ret_register: Option<Regs>) -> Self {
         let location = mem_chunk.to_host_segments(qemu);
@@ -59,6 +59,9 @@ impl InputLocation {
         unsafe { self.location.write(input) }
     }
 }
+
+#[cfg(not(feature = "usermode"))]
+pub type InputLocation = SystemInputLocation;
 
 impl IsSnapshotManager for SnapshotManager {
     fn save(&mut self, qemu: Qemu) -> SnapshotId {

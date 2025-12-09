@@ -1,18 +1,22 @@
 use std::{
-    ffi::c_void, mem::MaybeUninit, ops::Range, ptr::copy_nonoverlapping, slice::from_raw_parts_mut,
+    ffi::c_void, mem::MaybeUninit, ops::Range, slice::from_raw_parts_mut,
     str::from_utf8_unchecked_mut,
 };
 
 use libafl_bolts::{Error, os::unix_signals::Signal};
+#[cfg(not(feature = "systemmode"))]
+use libafl_qemu_sys::libafl_qemu_run;
 use libafl_qemu_sys::{
     GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
-    libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run,
-    libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps,
+    libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_set_brk,
+    mmap_next_start, pageflags_get_root, read_self_maps,
 };
 use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
 use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
+#[cfg(not(feature = "systemmode"))]
+use std::ptr::copy_nonoverlapping;
 
 #[cfg(doc)]
 use crate::modules::snapshot::SnapshotModule;
@@ -183,10 +187,11 @@ impl CPU {
     /// This will read from a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
+    #[cfg(not(feature = "systemmode"))]
     pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
+        let host_addr = self.g2h(addr);
         unsafe {
-            let host_addr = Qemu::get().unwrap().g2h(addr);
-            copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
+            copy_nonoverlapping(host_addr as *const u8, buf.as_mut_ptr(), buf.len());
         }
     }
 
@@ -197,10 +202,11 @@ impl CPU {
     /// This will write to a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
+    #[cfg(not(feature = "systemmode"))]
     pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
+        let host_addr = self.g2h(addr);
         unsafe {
-            let host_addr = Qemu::get().unwrap().g2h(addr);
-            copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
+            copy_nonoverlapping(buf.as_ptr(), host_addr as *mut u8, buf.len());
         }
     }
 
@@ -285,6 +291,7 @@ impl Qemu {
         }
     }
 
+    #[cfg(not(feature = "systemmode"))]
     pub(super) unsafe fn run_inner(self) {
         unsafe {
             libafl_qemu_run();

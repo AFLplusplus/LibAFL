@@ -22,10 +22,14 @@ use parser::{
 use parser::{SetMapCommandParser, StartPhysCommandParser};
 
 use super::{CommandError, IsCommand, IsStdCommandManager};
+#[cfg(not(feature = "systemmode"))]
+use crate::InputLocation;
+#[cfg(feature = "systemmode")]
+use crate::emu::systemmode::SystemInputLocation as InputLocation;
 use crate::{
     Emulator, EmulatorDriverError, EmulatorDriverResult, EmulatorExitResult, GenericEmulatorDriver,
-    GuestReg, InputLocation, InputSetter, IsSnapshotManager, Regs,
-    define_std_command_manager_bound, define_std_command_manager_inner,
+    GuestReg, InputSetter, IsSnapshotManager, Regs, define_std_command_manager_bound,
+    define_std_command_manager_inner,
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
 };
 #[cfg(feature = "systemmode")]

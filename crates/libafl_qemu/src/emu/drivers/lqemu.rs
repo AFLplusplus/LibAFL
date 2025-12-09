@@ -3,7 +3,11 @@ use std::cell::OnceCell;
 use libafl::inputs::HasTargetBytes;
 use libafl_bolts::AsSlice;
 
-use crate::{GuestReg, InputLocation, Qemu};
+#[cfg(not(feature = "systemmode"))]
+use crate::InputLocation;
+#[cfg(feature = "systemmode")]
+use crate::emu::systemmode::SystemInputLocation as InputLocation;
+use crate::{GuestReg, Qemu};
 
 #[derive(Debug, Default, Clone)]
 pub struct LqemuInputSetter {

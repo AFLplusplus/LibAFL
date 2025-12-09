@@ -45,7 +45,7 @@ impl<I, S, T> EmulatorModule<I, S> for IntelPTModule<T>
 where
     I: Unpin,
     S: Unpin + HasMetadata,
-    T: SaturatingAdd + From<u8> + Debug + 'static,
+    T: SaturatingAdd + From<u8> + Debug + 'static + std::ops::AddAssign,
 {
     fn pre_qemu_init<ET>(
         &mut self,
@@ -90,7 +90,7 @@ where
         pt.disable_tracing().unwrap();
 
         let _ = pt
-            .decode_traces_into_map(&mut self.image, self.map_ptr, self.map_len)
+            .decode_traces_into_map(self.map_ptr, self.map_len)
             .inspect_err(|e| log::warn!("Intel PT trace decode failed: {e}"));
 
         #[cfg(feature = "intel_pt_export_raw")]

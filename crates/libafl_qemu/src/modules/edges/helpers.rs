@@ -123,8 +123,8 @@ mod generators {
             {
                 let paging_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
-                if !module.must_instrument(src, paging_id)
-                    && !module.must_instrument(dest, paging_id)
+                if !module.must_instrument_with_page_id(src, paging_id)
+                    && !module.must_instrument_with_page_id(dest, paging_id)
                 {
                     return None;
                 }
@@ -203,8 +203,8 @@ mod generators {
             {
                 let paging_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
-                if !module.must_instrument(src, paging_id)
-                    && !module.must_instrument(dest, paging_id)
+                if !module.must_instrument_with_page_id(src, paging_id)
+                    && !module.must_instrument_with_page_id(dest, paging_id)
                 {
                     return None;
                 }
@@ -268,7 +268,7 @@ mod generators {
             {
                 let page_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
-                if !module.must_instrument(pc, page_id) {
+                if !module.must_instrument_with_page_id(pc, page_id) {
                     return None;
                 }
             }
