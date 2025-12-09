@@ -9,9 +9,8 @@ use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
-        centralized::CentralizedEventManager,
-        launcher::{CentralizedLauncher, Launcher},
-        ClientDescription, EventConfig,
+        centralized::CentralizedEventManager, launcher::CentralizedLauncher, ClientDescription,
+        EventConfig,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -261,8 +260,7 @@ pub extern "C" fn libafl_main() {
         .main_run_client(&mut main_run_client)
         .cores(&cores)
         .broker_port(broker_port)
-        .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"))
+        .centralized_broker_port(1340)
         .build()
         .launch_centralized()
     {

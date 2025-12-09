@@ -22,7 +22,9 @@ use core::{
     num::NonZeroUsize,
     time::Duration,
 };
-use std::{process::Stdio, vec::Vec};
+use std::process::Stdio;
+#[cfg(unix)]
+use std::vec::Vec;
 
 use libafl_bolts::{
     core_affinity::{CoreId, Cores, get_core_ids},
@@ -260,6 +262,7 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             centralized_broker_port: self.centralized_broker_port,
             cores: self.cores,
             overcommit: self.overcommit,
+            #[cfg(unix)]
             stdout_file: self.stdout_file,
             launch_delay: self.launch_delay,
             #[cfg(unix)]
@@ -1013,6 +1016,7 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     main_run_client: Option<MF>,
 }
 
+#[cfg(unix)]
 impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CentralizedLauncher")
@@ -1021,6 +1025,7 @@ impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
     }
 }
 
+#[cfg(unix)]
 impl<'a> CentralizedLauncher<'a, (), (), (), ()> {
     /// Create a builder for [`CentralizedLauncher`]
     #[must_use]
@@ -1144,7 +1149,8 @@ where
 
         // Force shmem server startup in the parent process before forking
         // This prevents a race condition where multiple children try to start the server.
-        let _ = self.launcher.shmem_provider.clone().new_shmem(4096)?;
+        // We keep the shmem alive to ensure the server stays running.
+        let _dummy_shmem = self.launcher.shmem_provider.clone().new_shmem(4096)?;
 
         // Spawn clients
         let mut index = 0_usize;
