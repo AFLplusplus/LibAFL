@@ -13,12 +13,16 @@ use super::{
     tree::{Tree, TreeLike},
 };
 
+/// A wrapper around [`ChunkStore`] that allows for concurrent access
 #[derive(Debug)]
 pub struct ChunkStoreWrapper {
+    /// The wrapped [`ChunkStore`]
     pub chunkstore: RwLock<ChunkStore>,
+    /// Whether the store is locked
     pub is_locked: AtomicBool,
 }
 impl ChunkStoreWrapper {
+    /// Create a new [`ChunkStoreWrapper`]
     #[must_use]
     pub fn new(work_dir: String) -> Self {
         ChunkStoreWrapper {
@@ -28,6 +32,7 @@ impl ChunkStoreWrapper {
     }
 }
 
+/// A store for chunks of trees
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChunkStore {
     nts_to_chunks: HashMap<NTermId, Vec<(usize, NodeId)>>,
@@ -38,6 +43,7 @@ pub struct ChunkStore {
 }
 
 impl ChunkStore {
+    /// Create a new [`ChunkStore`]
     #[must_use]
     pub fn new(work_dir: String) -> Self {
         ChunkStore {
@@ -49,6 +55,7 @@ impl ChunkStore {
         }
     }
 
+    /// Add a tree to the store
     pub fn add_tree(&mut self, tree: Tree, ctx: &Context) {
         let mut buffer = vec![];
         let id = self.trees.len();
@@ -81,6 +88,7 @@ impl ChunkStore {
         }
     }
 
+    /// Get an alternative tree for a given rule
     pub fn get_alternative_to<R: Rand>(
         &self,
         rand: &mut R,
@@ -99,6 +107,7 @@ impl ChunkStore {
         selected.map(|&(tid, nid)| (&self.trees[tid], nid))
     }
 
+    /// Get the number of trees in the store
     #[must_use]
     pub fn trees(&self) -> usize {
         self.trees.len()

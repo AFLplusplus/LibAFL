@@ -22,6 +22,7 @@ use super::{
     rule::{PlainRule, RegExpRule, Rule, RuleChild, RuleIdOrCustom},
 };
 
+/// A step in the unparsing process
 enum UnparseStep<'dat> {
     Term(&'dat [u8]),
     Nonterm(NTermId),
@@ -163,47 +164,64 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
     }
 }
 
+/// A trait for tree-like structures
 pub trait TreeLike
 where
     Self: Sized,
 {
+    /// Get the rule ID at the given node
     fn get_rule_id(&self, n: NodeId) -> RuleId;
+    /// Get the size of the tree
     fn size(&self) -> usize;
+    /// Convert to a [`Tree`]
     fn to_tree(&self, _: &Context) -> Tree;
+    /// Get the rule at the given node
     fn get_rule<'c>(&self, n: NodeId, ctx: &'c Context) -> &'c Rule;
+    /// Get the rule or custom rule at the given node
     fn get_rule_or_custom(&self, n: NodeId) -> &RuleIdOrCustom;
+    /// Get the custom rule data at the given node
     fn get_custom_rule_data(&self, n: NodeId) -> &[u8];
+    /// Get the nonterminal ID at the given node
     fn get_nonterm_id(&self, n: NodeId, ctx: &Context) -> NTermId {
         self.get_rule(n, ctx).nonterm()
     }
 
+    /// Unparse the tree to a writer
     fn unparse<W: Write>(&self, id: NodeId, ctx: &Context, mut w: &mut W) {
         Unparser::new(id, &mut w, self, ctx).unparse();
     }
 
+    /// Unparse the tree to a writer (from root)
     fn unparse_to<W: Write>(&self, ctx: &Context, w: &mut W) {
         self.unparse(NodeId::from(0), ctx, w);
     }
 
+    /// Unparse the tree to a vector
     fn unparse_to_vec(&self, ctx: &Context) -> Vec<u8> {
         self.unparse_node_to_vec(NodeId::from(0), ctx)
     }
 
+    /// Unparse a node to a vector
     fn unparse_node_to_vec(&self, n: NodeId, ctx: &Context) -> Vec<u8> {
         let mut data = vec![];
         self.unparse(n, ctx, &mut data);
         data
     }
 
+    /// Unparse the tree to stdout
     fn unparse_print(&self, ctx: &Context) {
         self.unparse_to(ctx, &mut stdout());
     }
 }
 
+/// A tree representation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tree {
+    /// The rules in the tree
     pub rules: Vec<RuleIdOrCustom>,
+    /// The sizes of the subtrees
     pub sizes: Vec<usize>,
+    /// The parents of the nodes
     pub paren: Vec<NodeId>,
 }
 
@@ -234,6 +252,7 @@ impl TreeLike for Tree {
 }
 
 impl Tree {
+    /// Create a new tree from a vector of rules
     #[must_use]
     pub fn from_rule_vec(rules: Vec<RuleIdOrCustom>, ctx: &Context) -> Self {
         let sizes = vec![0; rules.len()];
@@ -249,6 +268,7 @@ impl Tree {
         res
     }
 
+    /// Get the rule ID at the given node
     #[must_use]
     pub fn get_rule_id(&self, n: NodeId) -> RuleId {
         self.rules[n.to_i()].id()
@@ -259,11 +279,13 @@ impl Tree {
         &self.rules[n.to_i()]
     }
 
+    /// Get the size of the subtree at the given node
     #[must_use]
     pub fn subtree_size(&self, n: NodeId) -> usize {
         self.sizes[n.to_i()]
     }
 
+    /// Create a mutation that replaces a subtree
     #[must_use]
     pub fn mutate_replace_from_tree<'a>(
         &'a self,
@@ -326,6 +348,7 @@ impl Tree {
         &self.rules[from.into()..to.into()]
     }
 
+    /// Get the parent of the given node
     #[must_use]
     pub fn get_parent(&self, n: NodeId) -> Option<NodeId> {
         if n == NodeId::from(0) {
@@ -335,12 +358,14 @@ impl Tree {
         }
     }
 
+    /// Truncate the tree
     pub fn truncate(&mut self) {
         self.rules.truncate(0);
         self.sizes.truncate(0);
         self.paren.truncate(0);
     }
 
+    /// Generate a tree from a nonterminal
     pub fn generate_from_nt<R: Rand>(
         &mut self,
         rand: &mut R,
@@ -352,6 +377,7 @@ impl Tree {
         self.generate_from_rule(rand, ruleid, len - 1, ctx);
     }
 
+    /// Generate a tree from a rule
     pub fn generate_from_rule<R: Rand>(
         &mut self,
         rand: &mut R,
@@ -382,6 +408,7 @@ impl Tree {
         }
     }
 
+    /// Calculate recursions in the tree
     #[must_use]
     pub fn calc_recursions(&self, ctx: &Context) -> Option<Vec<RecursionInfo>> {
         let mut ret = Vec::new();
@@ -422,14 +449,19 @@ impl Tree {
     }
 }
 
+/// A mutation of a tree
 #[derive(Debug)]
 pub struct TreeMutation<'a> {
+    /// The prefix of the mutation
     pub prefix: &'a [RuleIdOrCustom],
+    /// The replacement part of the mutation
     pub repl: &'a [RuleIdOrCustom],
+    /// The postfix of the mutation
     pub postfix: &'a [RuleIdOrCustom],
 }
 
 impl<'a> TreeMutation<'a> {
+    /// Get the rule at the given node
     #[must_use]
     pub fn get_at(&self, n: NodeId) -> &'a RuleIdOrCustom {
         let i = n.to_i();

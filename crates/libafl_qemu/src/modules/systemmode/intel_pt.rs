@@ -1,10 +1,9 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, ops::AddAssign};
 
 use libafl::{HasMetadata, observers::ObserversTuple};
-pub use libafl_intelpt::{AddrFilter, AddrFilterType, AddrFilters, SectionInfo};
-use libafl_intelpt::{Image, IntelPT, IntelPTBuilder};
+pub use libafl_intelpt::PtImage;
+use libafl_intelpt::{IntelPT, IntelPTBuilder};
 use libafl_qemu_sys::CPUArchStatePtr;
-use num_traits::SaturatingAdd;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -18,17 +17,12 @@ pub struct IntelPTModule<T = u8> {
     pt: Option<IntelPT>,
     #[builder(default = IntelPTModule::default_pt_builder())]
     intel_pt_builder: IntelPTBuilder,
-    #[builder(setter(transform = |sections: &[SectionInfo]| {
-        let mut i = Image::new(None).unwrap();
-        i.add_files_cached(sections, None).unwrap();
-        i
-    }))]
-    image: Image,
     map_ptr: *mut T,
     map_len: usize,
 }
 
 impl IntelPTModule {
+    #[must_use]
     pub fn default_pt_builder() -> IntelPTBuilder {
         IntelPT::builder().exclude_kernel(false).exclude_hv(true)
     }
@@ -45,7 +39,7 @@ impl<I, S, T> EmulatorModule<I, S> for IntelPTModule<T>
 where
     I: Unpin,
     S: Unpin + HasMetadata,
-    T: SaturatingAdd + From<u8> + Debug + 'static + std::ops::AddAssign,
+    T: AddAssign + From<u8> + Debug + 'static,
 {
     fn pre_qemu_init<ET>(
         &mut self,
@@ -69,9 +63,7 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
-        if self.pt.is_none() {
-            panic!("Intel PT module not initialized.");
-        }
+        assert!(self.pt.is_some(), "Intel PT module not initialized.");
     }
 
     fn post_exec<OT, ET>(
@@ -119,14 +111,15 @@ where
         .match_first_type_mut::<IntelPTModule<T>>()
         .unwrap();
 
-    if intel_pt_module.pt.is_some() {
-        panic!("Intel PT module already initialized, only single core VMs are supported ATM.");
-    }
+    assert!(
+        intel_pt_module.pt.is_none(),
+        "Intel PT module already initialized, only single core VMs are supported ATM."
+    );
 
     let pt = intel_pt_module
         .intel_pt_builder
         .clone()
-        .pid(Some(tid as i32))
+        .pid(Some(tid.try_into().unwrap()))
         .build()
         .unwrap();
 
