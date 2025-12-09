@@ -207,7 +207,7 @@ pub fn fuzz() -> Result<(), Error> {
 
     let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
     let (state, mut mgr) =
-        match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true) {
+        match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, false) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {
