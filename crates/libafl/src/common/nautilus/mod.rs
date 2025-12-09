@@ -1,7 +1,7 @@
 //! `LibAFL` version of the [`Nautilus`](https://github.com/nautilus-fuzz/nautilus) grammar fuzzer
 #![doc = include_str!("README.md")]
 
-#[allow(missing_docs)]
+/// Grammartec module
 pub mod grammartec;
-#[allow(missing_docs)]
+/// Regex mutator module
 pub mod regex_mutator;
