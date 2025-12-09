@@ -108,6 +108,11 @@ impl TuiUi {
             self.clients = all;
         }
 
+        let main_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .split(f.area());
+
         let body = Layout::default()
             .constraints(if self.show_logs {
                 if cfg!(feature = "introspection") {
@@ -128,7 +133,7 @@ impl TuiUi {
             } else {
                 [Constraint::Percentage(50), Constraint::Percentage(50)].as_ref()
             })
-            .split(f.area());
+            .split(main_layout[0]);
         let top_body = body[0];
         let mid_body = body[1];
 
@@ -139,6 +144,11 @@ impl TuiUi {
             let bottom_body = body[2];
             self.draw_logs(f, app, bottom_body);
         }
+
+        let footer = Paragraph::new("Press Q to exit")
+            .style(Style::default().fg(Color::Gray))
+            .alignment(Alignment::Center);
+        f.render_widget(footer, main_layout[1]);
     }
 
     #[expect(clippy::too_many_lines)]
@@ -253,6 +263,7 @@ impl TuiUi {
             }
             _ => {}
         }
+
         self.draw_overall_generic_text(f, app, bottom_layout);
     }
 
