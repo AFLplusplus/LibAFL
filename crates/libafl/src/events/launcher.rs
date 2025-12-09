@@ -1323,6 +1323,15 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         }
     }
 
+    /// The 'main' function to run for each client forked. This shouldn not return.
+    #[must_use]
+    pub fn secondary_run_client<NewCF>(
+        self,
+        run_client: NewCF,
+    ) -> CentralizedLauncherBuilder<'a, NewCF, MF, MT, SP> {
+        self.run_client(run_client)
+    }
+
     /// The 'main' function to run for the main evaluator node.
     #[must_use]
     pub fn main_run_client<NewMF>(
