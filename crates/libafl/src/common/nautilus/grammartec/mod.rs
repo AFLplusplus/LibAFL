@@ -8,6 +8,7 @@ pub mod mutator;
 /// Newtypes module
 pub mod newtypes;
 #[cfg(feature = "nautilus_py")]
+/// Module to load grammars from Python scripts
 pub mod python_grammar_loader;
 /// Recursion info module
 pub mod recursion_info;

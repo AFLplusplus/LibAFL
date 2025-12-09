@@ -585,6 +585,7 @@ pub enum SymExpr {
 }
 
 #[cfg(feature = "std")]
+/// Serialization format module
 pub mod serialization_format;
 
 /// The environment name used to identify the hitmap for the concolic runtime.
