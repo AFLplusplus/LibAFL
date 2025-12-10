@@ -388,7 +388,7 @@ impl PageFilter for NopPageFilter {
 #[cfg(any(feature = "injections", not(cpu_target = "hexagon")))]
 pub(crate) static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> =
     UnsafeCell::new(NopAddressFilter);
-#[cfg(not(cpu_target = "hexagon"))]
+#[cfg(all(feature = "systemmode", not(cpu_target = "hexagon")))]
 pub(crate) static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::new(NopPageFilter);
 
 #[cfg(all(feature = "systemmode", test))]
