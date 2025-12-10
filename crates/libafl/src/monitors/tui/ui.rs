@@ -1,6 +1,7 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use std::sync::RwLock;
 
+use libafl_bolts::current_time;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Layout, Rect},
@@ -238,6 +239,7 @@ impl TuiUi {
         // Actually draw_time_chart takes &TimedStats. If we hold ctx_read, it's fine.
 
         if let Some(name) = graph_name {
+            let run_time = current_time().saturating_sub(ctx_read.start_time);
             match name {
                 "corpus" => draw_time_chart(
                     "corpus chart",
@@ -247,6 +249,7 @@ impl TuiUi {
                     &ctx_read.corpus_size_timed,
                     &mut self.graph_data,
                     self.enhanced_graphics,
+                    run_time,
                 ),
                 "objectives" => draw_time_chart(
                     "objectives chart",
@@ -256,6 +259,7 @@ impl TuiUi {
                     &ctx_read.objective_size_timed,
                     &mut self.graph_data,
                     self.enhanced_graphics,
+                    run_time,
                 ),
                 "exec/sec" => draw_time_chart(
                     "speed chart",
@@ -265,6 +269,7 @@ impl TuiUi {
                     &ctx_read.execs_per_sec_timed,
                     &mut self.graph_data,
                     self.enhanced_graphics,
+                    run_time,
                 ),
                 custom_name => {
                     if let Some(stats) = ctx_read.custom_timed.get(custom_name) {
@@ -276,6 +281,7 @@ impl TuiUi {
                             stats,
                             &mut self.graph_data,
                             self.enhanced_graphics,
+                            run_time,
                         );
                     }
                 }
@@ -356,8 +362,7 @@ impl TuiUi {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
+    use libafl_bolts::{current_time, format_duration};
     use ratatui::{Terminal, backend::TestBackend};
 
     use super::*;
