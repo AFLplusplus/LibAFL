@@ -146,18 +146,24 @@ where
             .map_observer(edges_observer.as_mut())
             .build()?;
 
-        let mut snapshot_module = SnapshotModule::with_filters(AsanGuestModule::snapshot_filters());
+        let snapshot_module = if self.options.rerun_input.is_some() {
+            None
+        } else {
+            let mut snapshot_module =
+                SnapshotModule::with_filters(AsanGuestModule::snapshot_filters());
 
-        /*
-         * Since the generics for the modules are already excessive when taking
-         * into accout asan, asan guest mode, cmplog, and injection, we will
-         * always include the SnapshotModule in all configurations, but simply
-         * not use it when it is not required. See the table at the top of this
-         * file for details.
-         */
-        if !self.options.snapshots || self.options.iterations.is_some() {
-            snapshot_module.use_manual_reset();
-        }
+            /*
+             * Since the generics for the modules are already excessive when taking
+             * into accout asan, asan guest mode, cmplog, and injection, we will
+             * always include the SnapshotModule in all configurations, but simply
+             * not use it when it is not required. See the table at the top of this
+             * file for details.
+             */
+            if !self.options.snapshots || self.options.iterations.is_some() {
+                snapshot_module.use_manual_reset();
+            }
+            Some(snapshot_module)
+        };
 
         let modules = modules
             .prepend(edge_coverage_module)
@@ -334,7 +340,7 @@ where
                 &mut state,
                 &mut fuzzer,
                 &mut shadow_executor,
-                Self::reset_shadow_executor_snapshot_module,
+                |_, _| (),
                 qemu,
                 &mut stages,
             )
@@ -360,7 +366,7 @@ where
                 &mut state,
                 &mut fuzzer,
                 &mut executor,
-                Self::reset_executor_snapshot_module,
+                |_, _| (),
                 qemu,
                 &mut stages,
             )
@@ -369,12 +375,12 @@ where
 
     #[allow(clippy::type_complexity)] // TODO: make less complex
     fn reset_executor_snapshot_module<C, CM, ED, EM, ET, H, I, OT, S, SM, Z>(
-        executor: &mut QemuExecutor<C, CM, ED, EM, (SnapshotModule, ET), H, I, OT, S, SM, Z>,
+        executor: &mut QemuExecutor<C, CM, ED, EM, (Option<SnapshotModule>, ET), H, I, OT, S, SM, Z>,
         qemu: Qemu,
     ) where
         ET: EmulatorModuleTuple<I, S>,
         H: for<'e, 's, 'i> FnMut(
-            &'e mut Emulator<C, CM, ED, (SnapshotModule, ET), I, S, SM>,
+            &'e mut Emulator<C, CM, ED, (Option<SnapshotModule>, ET), I, S, SM>,
             &'s mut S,
             &'i I,
         ) -> ExitKind,
@@ -388,13 +394,14 @@ where
             .modules_mut()
             .modules_mut()
             .0
-            .reset(qemu);
+            .as_mut()
+            .map(|s| s.reset(qemu));
     }
 
     #[allow(clippy::type_complexity)]
     fn reset_shadow_executor_snapshot_module<C, CM, ED, EM, ET, H, I, OT, S, SM, SOT, Z>(
         executor: &mut ShadowExecutor<
-            QemuExecutor<C, CM, ED, EM, (SnapshotModule, ET), H, I, OT, S, SM, Z>,
+            QemuExecutor<C, CM, ED, EM, (Option<SnapshotModule>, ET), H, I, OT, S, SM, Z>,
             I,
             S,
             SOT,
@@ -403,7 +410,7 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
         H: for<'e, 's, 'i> FnMut(
-            &'e mut Emulator<C, CM, ED, (SnapshotModule, ET), I, S, SM>,
+            &'e mut Emulator<C, CM, ED, (Option<SnapshotModule>, ET), I, S, SM>,
             &'s mut S,
             &'i I,
         ) -> ExitKind,
@@ -419,7 +426,8 @@ where
             .modules_mut()
             .modules_mut()
             .0
-            .reset(qemu);
+            .as_mut()
+            .map(|s| s.reset(qemu));
     }
 
     fn fuzz<Z, E, RSM, ST>(
