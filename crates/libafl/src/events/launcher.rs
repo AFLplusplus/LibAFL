@@ -48,7 +48,6 @@ use crate::HasMetadata;
 use crate::events::multi_machine::NodeDescriptor;
 #[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::TcpMultiMachineHooks;
-
 #[cfg(any(unix, feature = "tcp_manager"))]
 use crate::inputs::Input;
 #[cfg(feature = "tcp_manager")]
