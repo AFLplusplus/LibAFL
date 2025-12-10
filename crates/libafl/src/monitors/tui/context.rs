@@ -1,4 +1,8 @@
-use alloc::{collections::VecDeque, string::String, vec::Vec};
+use alloc::{
+    collections::VecDeque,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::time::Duration;
 
 use hashbrown::HashMap;
@@ -11,6 +15,9 @@ pub use crate::monitors::stats::{
 /// The default time window for charts (10 minutes)
 pub const DEFAULT_TIME_WINDOW: u64 = 60 * 10; // 10 min
 const DEFAULT_LOGS_NUMBER: usize = 128;
+
+/// The default charts to show (Corpus, Objectives, Execs/Sec)
+pub const DEFAULT_CHARTS: &[&str] = &["corpus", "objectives", "exec/sec"];
 
 // TimedStat and TimedStats moved to crate::monitors::stats::timed
 
@@ -122,7 +129,7 @@ impl TuiContext {
             total_item_geometry: None,
             total_process_timing: ProcessTiming::new(),
             plot_configs: HashMap::default(),
-            graphs: Vec::new(),
+            graphs: DEFAULT_CHARTS.iter().map(ToString::to_string).collect(),
             corpus_size_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
             objective_size_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
             execs_per_sec_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),

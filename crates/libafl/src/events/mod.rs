@@ -295,6 +295,11 @@ impl<I> EventWithStats<I> {
     pub fn stats(&self) -> &ExecStats {
         &self.stats
     }
+
+    /// Deconstruct this into its parts
+    pub fn into_parts(self) -> (Event<I>, ExecStats) {
+        (self.event, self.stats)
+    }
 }
 
 // TODO remove forward_id as not anymore needed for centralized

@@ -1,12 +1,7 @@
-use alloc::{
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::{string::String, vec::Vec};
 use core::time::Duration;
-use std::sync::RwLock;
 
-use libafl_bolts::{current_time, format_big_number, format_duration};
+use libafl_bolts::format_duration;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Rect},
@@ -14,13 +9,14 @@ use ratatui::{
     symbols,
     text::Span,
     widgets::{
-        Axis, Block, Borders, Cell, Chart, Dataset, List, ListItem, Row, Table, block::Title,
+        Axis, Block, Borders, Cell, Chart, Dataset, List, ListItem, Row, Table,
+        block::{Position, Title},
     },
 };
 
 use crate::monitors::{
-    stats::user_stats::UserStatsValue,
-    tui::{ItemGeometry, ProcessTiming, TimedStats, TuiContext},
+    stats::{ProcessTiming, TimedStat},
+    tui::ItemGeometry,
 };
 
 /// Options for drawing a time chart
@@ -30,8 +26,10 @@ pub struct TimeChartOptions<'a> {
     pub title: &'a str,
     /// The name of the Y-axis
     pub y_name: &'a str,
-    /// The stats to plot
-    pub stats: &'a TimedStats,
+    /// The stats to plot (series of points)
+    pub stats: &'a [TimedStat],
+    /// The window duration for the chart
+    pub window: Duration,
     /// A buffer to hold the graph data (to avoid allocations)
     pub graph_data: &'a mut Vec<(f64, f64)>,
     /// Whether to use enhanced graphics (Braille) or not
@@ -42,8 +40,6 @@ pub struct TimeChartOptions<'a> {
     pub preset_y_range: Option<(f64, f64)>,
 }
 
-/// Draw the time chart with the given stats
-#[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
 /// Options for drawing a time chart with multiple series
 #[derive(Debug)]
 pub struct MultiTimeChartOptions<'a> {
@@ -51,8 +47,8 @@ pub struct MultiTimeChartOptions<'a> {
     pub title: &'a str,
     /// The name of the Y-axis
     pub y_name: &'a str,
-    /// The stats to plot: (Name, Stats, Style)
-    pub series: Vec<(&'a str, &'a TimedStats, Style)>,
+    /// The stats to plot: (Name, Series, Window, Style)
+    pub series: Vec<(&'a str, &'a [TimedStat], Duration, Style)>,
     /// Buffers to hold the graph data (to avoid allocations). Must match series length.
     pub graph_data: &'a mut Vec<Vec<(f64, f64)>>,
     /// Whether to use enhanced graphics (Braille) or not
@@ -64,12 +60,12 @@ pub struct MultiTimeChartOptions<'a> {
 }
 
 /// Draw the time chart with the given stats
-#[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
 pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
     let TimeChartOptions {
         title,
         y_name,
         stats,
+        window,
         graph_data,
         enhanced_graphics,
         current_time,
@@ -87,6 +83,7 @@ pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
         series: vec![(
             "",
             stats,
+            window,
             Style::default()
                 .fg(Color::LightYellow)
                 .add_modifier(Modifier::BOLD),
@@ -120,11 +117,8 @@ pub fn draw_multi_time_chart(f: &mut Frame, area: Rect, options: MultiTimeChartO
         return;
     }
 
-    // Determine common window and global min/max
-    // We assume all stats have roughly similar window settings, or we just use the first/max.
-    // Let's use the first one for window calculation for now, or max window?
-    // Usually they are all default window.
-    let window = series[0].1.window;
+    // Determine global min/max
+    let window = series[0].2; // Use first series window as reference
 
     let end = current_time;
     let start = end.saturating_sub(window);
@@ -164,28 +158,23 @@ pub fn draw_multi_time_chart(f: &mut Frame, area: Rect, options: MultiTimeChartO
     let mut global_min_y: Option<f64> = None;
     let mut global_max_y: Option<f64> = None;
 
-    for (idx, (_, stats, _)) in series.iter().enumerate() {
+    for (idx, (_, stats, _, _)) in series.iter().enumerate() {
         if idx >= graph_data.len() {
             break; // Should not happen if caller provides correct buffers
         }
         let data = &mut graph_data[idx];
         data.clear();
 
-        let (s1, s2) = stats.series.as_slices();
-        let idx1 = s1.partition_point(|x| x.time < start);
-        let start_index = if idx1 == s1.len() {
-            s1.len() + s2.partition_point(|x| x.time < start)
-        } else {
-            idx1
-        }
-        .saturating_sub(1);
+        // stats is &[TimedStat] (sorted by time presumably)
+        let s = *stats;
+        let start_index = s.partition_point(|x| x.time < start).saturating_sub(1);
 
         let mut prev = (0, 0.0);
-        if let Some(first) = stats.series.get(start_index) {
+        if let Some(first) = s.get(start_index) {
             prev = (to_x(&first.time), first.item);
         }
 
-        for ts in stats.series.iter().skip(start_index) {
+        for ts in s.iter().skip(start_index) {
             let x = to_x(&ts.time);
 
             global_max_y = Some(global_max_y.map_or(ts.item, |m| m.max(ts.item)));
@@ -240,7 +229,7 @@ pub fn draw_multi_time_chart(f: &mut Frame, area: Rect, options: MultiTimeChartO
     let datasets: Vec<Dataset> = series
         .iter()
         .enumerate()
-        .map(|(idx, (name, _, style))| {
+        .map(|(idx, (name, _, _, style))| {
             Dataset::default()
                 .name(*name)
                 .marker(if enhanced_graphics {
@@ -303,7 +292,8 @@ pub fn draw_multi_time_chart(f: &mut Frame, area: Rect, options: MultiTimeChartO
 }
 
 /// Generic helper to draw a simple Key-Value table
-pub fn draw_info_table<'a, I>(
+/// This unifies duplicated logic for generic stats
+pub fn draw_key_value_block<'a, I>(
     f: &mut Frame,
     area: Rect,
     title: &str,
@@ -316,7 +306,12 @@ pub fn draw_info_table<'a, I>(
         .into_iter()
         .map(|(k, v)| Row::new([Cell::from(k), Cell::from(Span::raw(v))]));
 
-    let mut block = Block::default().borders(Borders::ALL);
+    let mut block = Block::default().borders(if title.is_empty() {
+        Borders::LEFT | Borders::RIGHT | Borders::BOTTOM
+    } else {
+        Borders::ALL
+    });
+
     if !title.is_empty() {
         block = block.title(Span::styled(
             title,
@@ -331,32 +326,7 @@ pub fn draw_info_table<'a, I>(
 }
 
 /// Draw the geometry information of the fuzzing items (testcases)
-pub fn draw_item_geometry_text(
-    f: &mut Frame,
-    app: &Arc<RwLock<TuiContext>>,
-    area: Rect,
-    is_overall: bool,
-    client_idx: usize,
-    clients_list: &[usize],
-) {
-    let tui_context = app.read().unwrap();
-    let empty_geometry: ItemGeometry = ItemGeometry::new();
-    let item_geometry: &ItemGeometry = if is_overall {
-        tui_context
-            .total_item_geometry
-            .as_ref()
-            .unwrap_or(&empty_geometry)
-    } else if clients_list.is_empty() {
-        &empty_geometry
-    } else {
-        let clients = &tui_context.clients;
-        let client = clients.get(&client_idx);
-        match client {
-            Some(client) => client.item_geometry.as_ref().unwrap_or(&empty_geometry),
-            None => &empty_geometry,
-        }
-    };
-
+pub fn draw_item_geometry_text(f: &mut Frame, area: Rect, item_geometry: &ItemGeometry) {
     let data = [
         (Span::raw("pending"), format!("{}", item_geometry.pending)),
         (Span::raw("pend fav"), format!("{}", item_geometry.pend_fav)),
@@ -371,7 +341,7 @@ pub fn draw_item_geometry_text(
         ),
     ];
 
-    draw_info_table(
+    draw_key_value_block(
         f,
         area,
         "item geometry",
@@ -383,225 +353,74 @@ pub fn draw_item_geometry_text(
 /// Draw the process timing information
 pub fn draw_process_timing_text(
     f: &mut Frame,
-    app: &Arc<RwLock<TuiContext>>,
     area: Rect,
     title: &str,
-    is_overall: bool,
-    client_idx: usize,
-    clients_list: &[usize],
+    data: &ProcessTiming,
+    run_time: Duration,
 ) {
-    let tui_context = app.read().unwrap();
-    let empty_timing: ProcessTiming = ProcessTiming::new();
-    let tup: (Duration, &ProcessTiming) = if is_overall {
-        (tui_context.start_time, &tui_context.total_process_timing)
-    } else if clients_list.is_empty() {
-        (current_time(), &empty_timing)
-    } else {
-        let clients = &tui_context.clients;
-        let client = clients.get(&client_idx);
-        let client = client.as_ref();
-        if let Some(client) = client {
-            (
-                client.process_timing.client_start_time,
-                &client.process_timing,
-            )
-        } else {
-            log::warn!("Client {client_idx} was `None`. Race condition?");
-            (current_time(), &empty_timing)
-        }
-    };
-
-    let data = [
-        (
-            Span::raw("run time"),
-            format_duration(&current_time().saturating_sub(tup.0)),
-        ),
-        (Span::raw("exec speed"), tup.1.exec_speed.clone()),
+    let rows = [
+        (Span::raw("run time"), format_duration(&run_time)),
+        (Span::raw("exec speed"), data.exec_speed.clone()),
         (
             Span::raw("last new entry"),
-            format_duration(&(tup.1.last_new_entry)),
+            format_duration(&(data.last_new_entry)),
         ),
         (
             Span::raw("last solution"),
-            format_duration(&(tup.1.last_saved_solution)),
+            format_duration(&(data.last_saved_solution)),
         ),
     ];
 
-    draw_info_table(
+    draw_key_value_block(
         f,
         area,
         title,
-        data,
+        rows,
         &[Constraint::Length(24), Constraint::Min(5)],
     );
 }
 
-/// Draw the overall/generic stats (clients count, corpus size, etc.)
-pub fn draw_overall_generic_text(
-    f: &mut Frame,
-    app: &Arc<RwLock<TuiContext>>,
-    area: Rect,
-    title: &str,
-    clients_len: usize,
-) {
-    let items = {
-        let app = app.read().unwrap();
-        vec![
-            Row::new(vec![
-                Cell::from(Span::raw("clients")),
-                Cell::from(Span::raw(format!("{clients_len}"))),
-                Cell::from(Span::raw("total execs")),
-                Cell::from(Span::raw(
-                    format_big_number(app.total_execs)
-                        .split_once('(')
-                        .map_or_else(
-                            || format_big_number(app.total_execs),
-                            |(a, _)| a.trim().to_string(),
-                        ),
-                )),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("solutions")),
-                Cell::from(Span::raw(format_big_number(app.total_solutions))),
-                Cell::from(Span::raw("corpus count")),
-                Cell::from(Span::raw(format_big_number(app.total_corpus_count))),
-            ]),
-        ]
-    };
-
-    let mut block = Block::default().borders(if title.is_empty() {
-        Borders::LEFT | Borders::RIGHT | Borders::BOTTOM
-    } else {
-        Borders::ALL
-    });
-    if !title.is_empty() {
-        block = block.title(Span::styled(
-            title,
-            Style::default()
-                .fg(Color::LightCyan)
-                .add_modifier(Modifier::BOLD),
-        ));
-    }
-
-    let table = Table::default().rows(items).block(block).widths([
-        Constraint::Length(10), // "clients" + padding
-        Constraint::Min(5),
-        Constraint::Length(14), // "total execs" + padding
-        Constraint::Min(5),
-    ]);
-    f.render_widget(table, area);
-}
-
-/// Draw the generic stats for a client (corpus, executions)
-pub fn draw_client_generic_text(
-    f: &mut Frame,
-    app: &Arc<RwLock<TuiContext>>,
-    area: Rect,
-    title: &str,
-    client_idx: usize,
-) {
-    let data = {
-        let app = app.read().unwrap();
-        let mut rows = vec![
-            (
-                Span::raw("corpus count"),
-                format_big_number(
-                    app.clients
-                        .get(&client_idx)
-                        .map_or(0, |x| x.client_stats.corpus_size()),
-                ),
-            ),
-            (
-                Span::raw("total execs"),
-                format_big_number(
-                    app.clients
-                        .get(&client_idx)
-                        .map_or(0, |x| x.client_stats.executions()),
-                ),
-            ),
-        ];
-
-        if let Some(client) = app.clients.get(&client_idx) {
-            if let Some(cycles) = client.cycles_done() {
-                rows.push((Span::raw("cycles done"), format!("{cycles}")));
-            }
-            rows.push((
-                Span::raw("solutions"),
-                format!("{}", client.client_stats.objective_size()),
-            ));
-        }
-        rows
-    };
-
-    draw_info_table(
-        f,
-        area,
-        title,
-        data,
-        &[Constraint::Length(20), Constraint::Min(5)],
-    );
-}
-
-/// Draw introspection stats (scheduler, manager, stages)
-// draw_introspection_text removed, using UserStats instead
-
 /// Draw the client logs
 #[allow(deprecated)]
-pub fn draw_logs(f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect, enable_wrap: bool) {
-    let app = app.read().unwrap();
+pub fn draw_logs(f: &mut Frame, area: Rect, logs: &[String], enable_wrap: bool) {
     let num_lines = area.height.saturating_sub(2) as usize;
-
-    let mut logs: Vec<ListItem> = vec![];
+    let mut list_items: Vec<ListItem> = Vec::with_capacity(num_lines);
 
     if enable_wrap {
         let width = area.width.saturating_sub(2) as usize;
         if width > 0 {
-            // Process logs in reverse to fill from bottom
-            for msg in app.client_logs.iter().rev() {
+            for msg in logs.iter().rev() {
                 let mut lines = vec![];
                 let chars: Vec<char> = msg.chars().collect();
                 if chars.len() <= width {
                     lines.push(msg.clone());
                 } else {
-                    let mut first = true;
-                    // Char-based wrapping
-                    // Space-aware word wrapping
+                    // ... wrapping logic ...
+                    // (Presumed context from previous view, re-implemented briefly)
                     let mut i = 0;
+                    let mut first = true;
                     while i < chars.len() {
                         let limit = if first {
                             width
                         } else {
                             width.saturating_sub(2)
                         };
-
                         let remaining = chars.len() - i;
-                        if remaining <= limit {
-                            // Fits entirely
-                            let chunk: String = chars[i..].iter().collect();
-                            if first {
-                                lines.push(chunk);
-                                // first = false; // Unused as we break immediately
-                            } else {
-                                lines.push(format!("  {chunk}"));
+                        let chunk_len = if remaining <= limit {
+                            remaining
+                        } else {
+                            let mut split = limit;
+                            if let Some(pos) = chars[i..i + limit]
+                                .iter()
+                                .rposition(|c| c.is_whitespace())
+                                .filter(|&p| p > 0)
+                            {
+                                split = pos + 1;
                             }
-                            break;
-                        }
+                            split
+                        };
 
-                        // Need to split
-                        let mut split_idx = limit;
-                        // finding the last space within the limit
-                        if let Some(pos) =
-                            chars[i..i + limit].iter().rposition(|c| c.is_whitespace())
-                        {
-                            if pos > 0 {
-                                // avoid splitting at 0 if possible
-                                split_idx = pos + 1; // include space in the previous line, or split after it
-                            }
-                        }
-
-                        let chunk_len = core::cmp::min(split_idx, remaining);
                         let chunk: String = chars[i..i + chunk_len].iter().collect();
-
                         if first {
                             lines.push(chunk);
                             first = false;
@@ -612,29 +431,27 @@ pub fn draw_logs(f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect, enabl
                     }
                 }
 
-                // Add lines to logs (which is filling reversed)
                 for line in lines.into_iter().rev() {
-                    logs.push(ListItem::new(Span::raw(line)));
-                    if logs.len() >= num_lines {
+                    list_items.push(ListItem::new(Span::raw(line)));
+                    if list_items.len() >= num_lines {
                         break;
                     }
                 }
-                if logs.len() >= num_lines {
+                if list_items.len() >= num_lines {
                     break;
                 }
             }
-            logs.reverse();
+            list_items.reverse();
         }
     } else {
-        let start_index = app.client_logs.len().saturating_sub(num_lines);
-        logs = app
-            .client_logs
-            .range(start_index..)
+        let start_index = logs.len().saturating_sub(num_lines);
+        list_items = logs[start_index..]
+            .iter()
             .map(|msg| ListItem::new(Span::raw(msg)))
             .collect();
     }
 
-    let logs = List::new(logs).block(
+    let logs_widget = List::new(list_items).block(
         Block::default()
             .borders(Borders::ALL)
             .title(Span::styled(
@@ -643,6 +460,7 @@ pub fn draw_logs(f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect, enabl
                     .fg(Color::LightCyan)
                     .add_modifier(Modifier::BOLD),
             ))
+            // Using title_top/bottom or alignment deprecated approach (will fix in ui.rs separately if needed)
             .title(
                 Title::from(Span::styled(
                     if enable_wrap { "wrapped" } else { "raw" },
@@ -657,88 +475,54 @@ pub fn draw_logs(f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect, enabl
                         .fg(Color::LightMagenta)
                         .add_modifier(Modifier::BOLD),
                 ))
-                .position(ratatui::widgets::block::Position::Bottom)
+                .position(Position::Bottom)
                 .alignment(Alignment::Right),
             ),
     );
-    f.render_widget(logs, area);
+    f.render_widget(logs_widget, area);
 }
 
 /// Draw the user stats
 pub fn draw_user_stats(
     f: &mut Frame,
-    app: &Arc<RwLock<TuiContext>>,
     area: Rect,
-    client_idx: usize,
+    _client_idx: usize,
+    stats: &[(Span, String)],
     scroll: usize,
 ) -> usize {
-    use crate::monitors::stats::user_stats::PlotConfig;
+    let total_stats = stats.len();
+    let max_items = area.height.saturating_sub(2) as usize;
 
-    let app = app.read().unwrap();
-
-    if let Some(client) = app.clients.get(&client_idx) {
-        let mut keys: Vec<_> = client.client_stats.user_stats().keys().collect();
-        keys.sort();
-
-        let total_stats = keys.len();
-        // Title + Borders = 2
-        let max_items = area.height.saturating_sub(2) as usize;
-
-        if total_stats == 0 {
-            return max_items;
-        }
-
-        let start_idx = if scroll >= total_stats { 0 } else { scroll };
-
-        let visible_keys = keys.iter().skip(start_idx).take(max_items).map(|k| {
-            let val = client.client_stats.user_stats().get(*k).unwrap();
-            let val_str = match val.value() {
-                UserStatsValue::Number(n) => format_big_number(*n),
-                UserStatsValue::Float(f) => format!("{f:.2}"),
-                UserStatsValue::String(s) => s.to_string(),
-                UserStatsValue::Ratio(a, b) => {
-                    if *b == 0 {
-                        "0/0".into()
-                    } else {
-                        format!("{a}/{b} ({:.2}%)", (*a as f64 / *b as f64) * 100.0)
-                    }
-                }
-                UserStatsValue::Percent(p) => format!("{:.2}%", p * 100.0),
-            };
-
-            let style = match val.plot_config() {
-                PlotConfig::None => Style::default(),
-                PlotConfig::Color(r, g, b) => Style::default().fg(Color::Rgb(r, g, b)),
-                PlotConfig::SimpleColor(c) => Style::default().fg(Color::Indexed(c)),
-            };
-
-            (Span::styled(k.as_ref(), style), val_str)
-        });
-
-        let end_idx = (start_idx + max_items).min(total_stats);
-        let nav_hint = match (start_idx > 0, total_stats > start_idx + max_items) {
-            (true, true) => " (u/U)",
-            (true, false) => " (U)",
-            (false, true) => " (u)",
-            (false, false) => "",
-        };
-
-        let title = format!(
-            "User Stats {}-{}/{}{}",
-            start_idx + 1,
-            end_idx,
-            total_stats,
-            nav_hint
-        );
-
-        draw_info_table(
-            f,
-            area,
-            &title,
-            visible_keys,
-            &[Constraint::Percentage(70), Constraint::Percentage(30)],
-        );
+    if total_stats == 0 {
         return max_items;
     }
-    0
+
+    let start_idx = if scroll >= total_stats { 0 } else { scroll };
+    let end_idx = (start_idx + max_items).min(total_stats);
+
+    let visible_stats = stats[start_idx..end_idx].iter().cloned();
+
+    let nav_hint = match (start_idx > 0, total_stats > start_idx + max_items) {
+        (true, true) => " (u/U)",
+        (true, false) => " (U)",
+        (false, true) => " (u)",
+        (false, false) => "",
+    };
+
+    let title = format!(
+        "User Stats {}-{}/{}{}",
+        start_idx + 1,
+        end_idx,
+        total_stats,
+        nav_hint
+    );
+
+    draw_key_value_block(
+        f,
+        area,
+        &title,
+        visible_stats,
+        &[Constraint::Percentage(70), Constraint::Percentage(30)],
+    );
+    max_items
 }

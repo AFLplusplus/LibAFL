@@ -6,6 +6,7 @@ use alloc::{
     boxed::Box,
     string::{String, ToString},
     sync::Arc,
+    vec::Vec,
 };
 use core::{fmt::Write as _, time::Duration};
 use std::{
@@ -89,23 +90,87 @@ impl Monitor for TuiMonitor {
     ) -> Result<(), Error> {
         let cur_time = current_time();
 
-        {
+        // 1. Prepare global stats (no lock needed yet)
+        let (execsec, totalexec, run_time, exec_per_sec_pretty, corpus_size, objective_size) = {
             let global_stats = client_stats_manager.global_stats();
-            let execsec = global_stats.execs_per_sec as u64;
-            let totalexec = global_stats.total_execs;
-            let run_time = global_stats.run_time;
-            let exec_per_sec_pretty = global_stats.execs_per_sec_pretty.clone();
+            (
+                global_stats.execs_per_sec as u64,
+                global_stats.total_execs,
+                global_stats.run_time,
+                global_stats.execs_per_sec_pretty.clone(),
+                global_stats.corpus_size,
+                global_stats.objective_size,
+            )
+        };
+
+        // 2. Prepare client stats (no lock needed yet)
+        client_stats_manager.client_stats_insert(sender_id)?;
+
+        let (exec_sec, client_process_timing, client_item_geometry, client_snapshot) =
+            client_stats_manager.update_client_stats_for(sender_id, |client| {
+                (
+                    client.execs_per_sec_pretty(cur_time),
+                    client.process_timing(),
+                    client.item_geometry(),
+                    client.clone(),
+                )
+            })?;
+
+        // 3. Prepare log message
+        let sender = format!("#{}", sender_id.0);
+        let pad = if event_msg.len() + sender.len() < 13 {
+            " ".repeat(13 - event_msg.len() - sender.len())
+        } else {
+            String::new()
+        };
+        let head = format!("{event_msg}{pad} {sender}");
+        let mut fmt = format!(
+            "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            head,
+            format_big_number(client_snapshot.corpus_size()),
+            format_big_number(client_snapshot.objective_size()),
+            format_big_number(client_snapshot.executions()),
+            exec_sec
+        );
+
+        let client_run_time = cur_time.saturating_sub(client_stats_manager.start_time());
+
+        // Collect stats to update in context (to avoid locking inside loops)
+        // Store Cow to avoid allocation if possible
+        let mut chart_updates = Vec::new();
+
+        for (key, val) in client_snapshot.user_stats() {
+            write!(fmt, ", {key}: {val}").unwrap();
+            if let Some(val_f64) = val.value().as_f64() {
+                chart_updates.push((key, val.plot_config(), val_f64));
+            }
+        }
+        for (key, val) in client_stats_manager.aggregated() {
+            write!(fmt, ", {key}: {val}").unwrap();
+            if let Some(val) = val.as_f64() {
+                chart_updates.push((
+                    key,
+                    crate::monitors::stats::user_stats::PlotConfig::None,
+                    val,
+                ));
+            }
+        }
+
+        // 4. Update TuiContext (Lock ONCE)
+        {
             let mut ctx = self.context.write().unwrap();
-            ctx.total_corpus_count = global_stats.corpus_size;
-            ctx.total_solutions = global_stats.objective_size;
-            ctx.corpus_size_timed
-                .add(run_time, global_stats.corpus_size as f64);
+
+            // Global updates
+            ctx.total_corpus_count = corpus_size;
+            ctx.total_solutions = objective_size;
+            ctx.corpus_size_timed.add(run_time, corpus_size as f64);
             ctx.objective_size_timed
-                .add(run_time, global_stats.objective_size as f64);
+                .add(run_time, objective_size as f64);
+
             let total_process_timing =
                 client_stats_manager.process_timing(exec_per_sec_pretty, totalexec);
-
             ctx.total_process_timing = total_process_timing;
+
             ctx.execs_per_sec_timed.add(run_time, execsec as f64);
             ctx.start_time = client_stats_manager.start_time();
             ctx.total_execs = totalexec;
@@ -118,78 +183,46 @@ impl Monitor for TuiMonitor {
                  }| format!("{}%", edges_hit * 100 / edges_total),
             );
             ctx.total_item_geometry = client_stats_manager.item_geometry();
-        }
 
-        client_stats_manager.client_stats_insert(sender_id)?;
-        let exec_sec = client_stats_manager
-            .update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time))?;
-        let client = client_stats_manager.client_stats_for(sender_id)?;
-
-        let sender = format!("#{}", sender_id.0);
-        let pad = if event_msg.len() + sender.len() < 13 {
-            " ".repeat(13 - event_msg.len() - sender.len())
-        } else {
-            String::new()
-        };
-        let head = format!("{event_msg}{pad} {sender}");
-        let mut fmt = format!(
-            "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
-            head,
-            format_big_number(client.corpus_size()),
-            format_big_number(client.objective_size()),
-            format_big_number(client.executions()),
-            exec_sec
-        );
-        let run_time = cur_time.saturating_sub(client_stats_manager.start_time());
-        for (key, val) in client.user_stats() {
-            write!(fmt, ", {key}: {val}").unwrap();
-
-            // If the value is a number, we can add it to the custom charts
-            if let Some(val_f64) = val.value().as_f64() {
-                let mut ctx = self.context.write().unwrap();
-                if !ctx.graphs.contains(&key.to_string()) {
+            // Chart updates
+            for (key, config, val) in chart_updates {
+                if !ctx.graphs.iter().any(|k| k == key.as_ref()) {
                     ctx.graphs.push(key.to_string());
                 }
-
-                let config = val.plot_config();
                 if config != crate::monitors::stats::user_stats::PlotConfig::None {
-                    ctx.plot_configs.insert(key.to_string(), config);
+                    // Check if we already have it to avoid allocating key string
+                    if !ctx.plot_configs.contains_key(key.as_ref()) {
+                        ctx.plot_configs.insert(key.to_string(), config);
+                    }
                 }
 
-                ctx.custom_timed
-                    .entry(key.to_string())
-                    .or_insert_with(|| {
-                        TimedStats::new(Duration::from_secs(context::DEFAULT_TIME_WINDOW))
-                    })
-                    .add(run_time, val_f64);
-            }
-        }
-        for (key, val) in client_stats_manager.aggregated() {
-            write!(fmt, ", {key}: {val}").unwrap();
-
-            // If the value is a number, we can add it to the custom charts
-            if let Some(val) = val.as_f64() {
-                let mut ctx = self.context.write().unwrap();
-                if !ctx.graphs.contains(&key.to_string()) {
-                    ctx.graphs.push(key.to_string());
+                // Optimization: Try to get mutable reference without allocating String
+                if let Some(stats) = ctx.custom_timed.get_mut(key.as_ref()) {
+                    stats.add(client_run_time, val);
+                } else {
+                    ctx.custom_timed
+                        .entry(key.to_string())
+                        .or_insert_with(|| {
+                            TimedStats::new(Duration::from_secs(context::DEFAULT_TIME_WINDOW))
+                        })
+                        .add(client_run_time, val);
                 }
-                ctx.custom_timed
-                    .entry(key.to_string())
-                    .or_insert_with(|| {
-                        TimedStats::new(Duration::from_secs(context::DEFAULT_TIME_WINDOW))
-                    })
-                    .add(run_time, val);
             }
-        }
 
-        {
-            let mut ctx = self.context.write().unwrap();
-            client_stats_manager.update_client_stats_for(sender_id, |client| {
-                ctx.clients
-                    .entry(sender_id.0 as usize)
-                    .or_default()
-                    .grab_data(client);
-            })?;
+            // Client data update
+            if let Some(c) = ctx.clients.get_mut(&(sender_id.0 as usize)) {
+                c.process_timing = client_process_timing;
+                c.item_geometry = client_item_geometry;
+                c.client_stats = client_snapshot;
+            } else {
+                let mut c = ClientTuiContext::default();
+                c.process_timing = client_process_timing;
+                c.item_geometry = client_item_geometry;
+                c.client_stats = client_snapshot;
+                ctx.clients.insert(sender_id.0 as usize, c);
+            }
+
+            // Client logs
             while ctx.client_logs.len() >= DEFAULT_LOGS_NUMBER {
                 ctx.client_logs.pop_front();
             }

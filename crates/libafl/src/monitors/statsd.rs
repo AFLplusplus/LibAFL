@@ -22,7 +22,7 @@ use libafl_bolts::{ClientId, Error};
 
 use super::{
     Monitor,
-    stats::{ClientStatsManager, EdgeCoverage, ItemGeometry, manager::GlobalStats},
+    stats::{ClientStatsManager, EdgeCoverage, manager::GlobalStats},
 };
 
 const METRIC_PREFIX: &str = "fuzzing";
@@ -218,13 +218,18 @@ impl StatsdMonitor {
         let execs_per_sec = *execs_per_sec;
         let corpus_size = *corpus_size;
         let objective_size = *objective_size;
-        let ItemGeometry {
-            pending,
-            pend_fav,
-            own_finds,
-            imported,
-            stability,
-        } = client_stats_manager.item_geometry();
+        let (pending, pend_fav, own_finds, imported, stability) =
+            if let Some(item_geometry) = client_stats_manager.item_geometry() {
+                (
+                    item_geometry.pending,
+                    item_geometry.pend_fav,
+                    item_geometry.own_finds,
+                    item_geometry.imported,
+                    item_geometry.stability,
+                )
+            } else {
+                (0, 0, 0, 0, None)
+            };
         let edges_coverage = client_stats_manager.edges_coverage();
 
         Self::send_metrics(
