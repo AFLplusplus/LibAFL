@@ -219,12 +219,4 @@ used_underscore_binding = "allow"
 broken_intra_doc_links = "deny"
 
 
-[profile.dev]
-panic = "abort"
 
-[profile.release]
-panic = "abort"
-lto = true
-codegen-units = 1
-opt-level = 3
-debug = true
