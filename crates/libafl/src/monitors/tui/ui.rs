@@ -501,6 +501,8 @@ impl TuiUi {
         if new_is_narrow && !self.is_narrow {
             self.show_logs = false;
             self.charts_tab_idx = 0;
+        } else if !new_is_narrow && self.charts_tab_idx == 0 && self.tabs.len() > 1 {
+            self.charts_tab_idx = 1;
         }
         self.is_narrow = new_is_narrow;
 
