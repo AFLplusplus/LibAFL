@@ -108,7 +108,7 @@ where
     }
 }
 
-#[expect(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, clippy::cast_possible_wrap)]
 fn syscall_write_hook<F, ET, I, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,

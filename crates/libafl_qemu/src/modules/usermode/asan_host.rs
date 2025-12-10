@@ -1203,7 +1203,7 @@ where
     if let Some(asan_mappings) = &h.asan_mappings
         && asan_mappings
             .iter()
-            .any(|m| m.start() <= (pc as u64) && (pc as u64) < m.end())
+            .any(|m| m.start() <= u64::from(pc) && u64::from(pc) < m.end())
     {
         return None;
     }
@@ -1299,7 +1299,7 @@ where
     if let Some(asan_mappings) = &h.asan_mappings
         && asan_mappings
             .iter()
-            .any(|m| m.start() <= (pc as u64) && (pc as u64) < m.end())
+            .any(|m| m.start() <= u64::from(pc) && u64::from(pc) < m.end())
     {
         return Some(0);
     }

@@ -479,7 +479,7 @@ impl SnapshotModule {
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
-                        if self.interval_filter.to_zero(*page as u64).is_some() {
+                        if self.interval_filter.to_zero(u64::from(*page)).is_some() {
                             if !Self::modify_mapping(qemu, new_maps, *page) {
                                 return true; // Restore later
                             }
@@ -509,7 +509,7 @@ impl SnapshotModule {
                 for entry in self
                     .maps
                     .tree
-                    .query_mut((*page as u64)..((*page as u64) + SNAPSHOT_PAGE_SIZE as u64))
+                    .query_mut(u64::from(*page)..(u64::from(*page) + SNAPSHOT_PAGE_SIZE as u64))
                 {
                     if !entry.value.perms.unwrap_or(MmapPerms::None).writable()
                         && !entry.value.changed
@@ -524,7 +524,7 @@ impl SnapshotModule {
                     }
                 }
 
-                if self.interval_filter.to_zero(*page as u64).is_some() {
+                if self.interval_filter.to_zero(u64::from(*page)).is_some() {
                     unsafe { qemu.write_mem_unchecked(*page, &SNAPSHOT_PAGE_ZEROES) };
                 } else if let Some(info) = self.pages.get_mut(page) {
                     // TODO avoid duplicated memcpy
@@ -538,7 +538,7 @@ impl SnapshotModule {
             unsafe { (*acc.get()).clear() };
         }
 
-        for entry in self.maps.tree.query_mut(0..(GuestAddr::MAX as u64)) {
+        for entry in self.maps.tree.query_mut(0..u64::from(GuestAddr::MAX)) {
             if entry.value.changed {
                 qemu.mprotect(
                     entry.interval.start as GuestAddr,
@@ -563,7 +563,7 @@ impl SnapshotModule {
         let mut found = false;
         for entry in maps
             .tree
-            .query_mut((page as u64)..((page as u64) + SNAPSHOT_PAGE_SIZE as u64))
+            .query_mut(u64::from(page)..(u64::from(page) + SNAPSHOT_PAGE_SIZE as u64))
         {
             if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
                 drop(qemu.mprotect(
@@ -588,7 +588,7 @@ impl SnapshotModule {
 
         self.maps
             .tree
-            .query((start as u64)..((start as u64) + (size as u64)))
+            .query(u64::from(start)..(u64::from(start) + (size as u64)))
             .next()
             .is_none()
     }
@@ -604,7 +604,7 @@ impl SnapshotModule {
             }
             let mut mapping = self.new_maps.lock().unwrap();
             mapping.tree.insert(
-                (start as u64)..(start as u64 + (size as u64)),
+                u64::from(start)..(u64::from(start) + (size as u64)),
                 MemoryRegionInfo {
                     perms,
                     changed: true,
@@ -633,7 +633,7 @@ impl SnapshotModule {
         }
         let mut mapping = self.new_maps.lock().unwrap();
 
-        let interval = Interval::new(start as u64, start as u64 + (size as u64));
+        let interval = Interval::new(u64::from(start), u64::from(start) + (size as u64));
         let mut found = vec![]; //  TODO optimize
         for entry in mapping.tree.query(interval) {
             found.push((*entry.interval, entry.value.perms));
@@ -680,7 +680,7 @@ impl SnapshotModule {
 
         let mut mapping = self.new_maps.lock().unwrap();
 
-        let interval = Interval::new(start as u64, (start as u64) + (size as u64));
+        let interval = Interval::new(u64::from(start), u64::from(start) + (size as u64));
         let mut found = vec![]; //  TODO optimize
         for entry in mapping.tree.query(interval) {
             found.push((*entry.interval, entry.value.perms));
@@ -718,7 +718,7 @@ impl SnapshotModule {
     pub fn reset_maps(&mut self, qemu: Qemu) {
         let new_maps = self.new_maps.get_mut().unwrap();
 
-        for entry in self.maps.tree.query(0..(GuestAddr::MAX as u64)) {
+        for entry in self.maps.tree.query(0..u64::from(GuestAddr::MAX)) {
             let mut found = vec![]; //  TODO optimize
             for overlap in new_maps.tree.query(*entry.interval) {
                 found.push((
@@ -761,7 +761,7 @@ impl SnapshotModule {
         }
 
         let mut to_unmap = vec![];
-        for entry in new_maps.tree.query(0..(GuestAddr::MAX as u64)) {
+        for entry in new_maps.tree.query(0..u64::from(GuestAddr::MAX)) {
             to_unmap.push((*entry.interval, entry.value.changed, entry.value.perms));
         }
         for (i, ..) in to_unmap {
@@ -900,7 +900,11 @@ where
     SyscallHookResult::Run
 }
 
-#[expect(non_upper_case_globals, clippy::too_many_arguments)]
+#[expect(
+    non_upper_case_globals,
+    clippy::too_many_arguments,
+    clippy::cast_possible_wrap
+)]
 pub fn trace_mmap_snapshot<ET, I, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,

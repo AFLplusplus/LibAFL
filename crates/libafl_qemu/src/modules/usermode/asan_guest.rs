@@ -65,12 +65,12 @@ impl AsanGuestModule<StdAddressFilter> {
     pub fn snapshot_filters() -> IntervalSnapshotFilters {
         IntervalSnapshotFilters::from(vec![IntervalSnapshotFilter::ZeroList(vec![
             Range {
-                start: Self::LOW_SHADOW_START as u64,
-                end: Self::LOW_SHADOW_END as u64 + 1,
+                start: u64::from(Self::LOW_SHADOW_START),
+                end: u64::from(Self::LOW_SHADOW_END) + 1,
             },
             Range {
-                start: Self::HIGH_SHADOW_START as u64,
-                end: Self::HIGH_SHADOW_END as u64 + 1,
+                start: u64::from(Self::HIGH_SHADOW_START),
+                end: u64::from(Self::HIGH_SHADOW_END) + 1,
             },
         ])])
     }
@@ -120,7 +120,7 @@ where
     if let Some(asan_mappings) = &h.asan_mappings
         && asan_mappings
             .iter()
-            .any(|m| m.start() <= (pc as u64) && (pc as u64) < m.end())
+            .any(|m| m.start() <= u64::from(pc) && u64::from(pc) < m.end())
     {
         return None;
     }
@@ -287,8 +287,8 @@ where
         let high_shadow = mappings
             .iter()
             .find(|m| {
-                m.start() <= (Self::HIGH_SHADOW_START as u64)
-                    && m.end() > (Self::HIGH_SHADOW_END as u64)
+                m.start() <= u64::from(Self::HIGH_SHADOW_START)
+                    && m.end() > u64::from(Self::HIGH_SHADOW_END)
             })
             .expect("HighShadow not found, confirm ASAN DSO is loaded in the guest");
         log::info!("high_shadow: {high_shadow:}");
@@ -296,8 +296,8 @@ where
         let low_shadow = mappings
             .iter()
             .find(|m| {
-                m.start() <= (Self::LOW_SHADOW_START as u64)
-                    && m.end() > (Self::LOW_SHADOW_END as u64)
+                m.start() <= u64::from(Self::LOW_SHADOW_START)
+                    && m.end() > u64::from(Self::LOW_SHADOW_END)
             })
             .expect("LowShadow not found, confirm ASAN DSO is loaded in the guest");
         log::info!("low_shadow: {low_shadow:}");

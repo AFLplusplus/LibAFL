@@ -267,15 +267,9 @@ where
             // Path -> pc_start..pc_end, where pc_start is the smallest pc for the path and pc_end the biggest pc.
             let mut i = 0;
             for ((map_start, map_end), map_path) in qemu.mappings().filter_map(|m| {
-                m.path().filter(|p| !p.is_empty()).map(|p| {
-                    (
-                        (
-                            u64::try_from(m.start()).unwrap(),
-                            u64::try_from(m.end()).unwrap(),
-                        ),
-                        p.clone(),
-                    )
-                })
+                m.path()
+                    .filter(|p| !p.is_empty())
+                    .map(|p| ((m.start(), m.end()), p.clone()))
             }) {
                 // Check if path is already present
                 match module_path_map.entry(map_path) {

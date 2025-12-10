@@ -389,9 +389,8 @@ impl Qemu {
     }
 
     pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
-        let res = unsafe {
-            libafl_qemu_sys::target_mprotect(addr.into(), size as GuestUsize, perms.into())
-        };
+        let res =
+            unsafe { libafl_qemu_sys::target_mprotect(addr, size as GuestUsize, perms.into()) };
         if res == 0 {
             Ok(())
         } else {
@@ -400,7 +399,7 @@ impl Qemu {
     }
 
     pub fn unmap(&self, addr: GuestAddr, size: usize) -> Result<(), String> {
-        if unsafe { libafl_qemu_sys::target_munmap(addr.into(), size as GuestUsize) } == 0 {
+        if unsafe { libafl_qemu_sys::target_munmap(addr, size as GuestUsize) } == 0 {
             Ok(())
         } else {
             Err(format!("Failed to unmap {addr}"))
