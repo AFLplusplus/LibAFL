@@ -1,5 +1,9 @@
 //! Stage to compute and report AFL++ stats
-use alloc::{borrow::Cow, string::String, vec::Vec};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{
     fmt::{Debug, Display},
     marker::PhantomData,
@@ -12,6 +16,7 @@ use std::{
     process,
 };
 
+use hashbrown::HashMap;
 #[cfg(unix)]
 use libafl_bolts::os::peak_rss_mb_child_processes;
 use libafl_bolts::{
@@ -30,13 +35,12 @@ use crate::{
     events::{Event, EventFirer, EventWithStats},
     executors::HasObservers,
     feedbacks::{HasObserverHandle, MapFeedbackMetadata},
-    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{HasQueueCycles, minimizer::IsFavoredMetadata},
     stages::{Restartable, Stage, calibrate::UnstableEntriesMetadata},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable},
-    std::string::ToString,
 };
 
 /// AFL++'s default stats update interval
@@ -415,26 +419,61 @@ where
 
         drop(testcase);
 
-        // We construct this simple json by hand to squeeze out some extra speed.
-        let json = format!(
-            "{{\
-                \"pending\":{},\
-                \"pending_fav\":{},\
-                \"own_finds\":{},\
-                \"imported\":{}\
-            }}",
-            stats.pending_total, stats.pending_favs, stats.corpus_found, stats.corpus_imported
+        // Send the stats as a list of UserStats
+        let mut stats_map = HashMap::default();
+        stats_map.insert(
+            Cow::Borrowed("pending"),
+            UserStats::new(
+                UserStatsValue::Number(stats.pending_total as u64),
+                AggregatorOps::Sum,
+            ),
+        );
+        stats_map.insert(
+            Cow::Borrowed("pending_fav"),
+            UserStats::new(
+                UserStatsValue::Number(stats.pending_favs as u64),
+                AggregatorOps::Sum,
+            ),
+        );
+        stats_map.insert(
+            Cow::Borrowed("own_finds"),
+            UserStats::new(
+                UserStatsValue::Number(stats.corpus_found as u64),
+                AggregatorOps::Sum,
+            ),
+        );
+        stats_map.insert(
+            Cow::Borrowed("imported"),
+            UserStats::new(
+                UserStatsValue::Number(stats.corpus_imported as u64),
+                AggregatorOps::Sum,
+            ),
+        );
+        stats_map.insert(
+            Cow::Borrowed("cycles_done"),
+            UserStats::new(UserStatsValue::Number(self.cycles_done), AggregatorOps::Sum),
+        );
+        stats_map.insert(
+            Cow::Borrowed("cycles_wo_finds"),
+            UserStats::new(
+                UserStatsValue::Number(self.cycles_wo_finds),
+                AggregatorOps::Sum,
+            ),
+        );
+        let stability = stats.stability;
+        stats_map.insert(
+            Cow::Borrowed("stability"),
+            UserStats::new(
+                UserStatsValue::Percent(stability / 100.0),
+                AggregatorOps::Avg,
+            ),
         );
 
         manager.fire(
             state,
             EventWithStats::with_current_time(
-                Event::UpdateUserStats {
-                    name: Cow::Borrowed("AflStats"),
-                    value: UserStats::new(
-                        UserStatsValue::String(Cow::Owned(json)),
-                        AggregatorOps::None,
-                    ),
+                Event::UpdateUserStatsList {
+                    stats: stats_map,
                     phantom: PhantomData,
                 },
                 *state.executions(),

@@ -10,6 +10,7 @@ pub use simple::*;
 pub mod centralized;
 #[cfg(all(unix, feature = "std"))]
 pub use centralized::*;
+use hashbrown::HashMap;
 #[cfg(feature = "std")]
 pub mod launcher;
 
@@ -331,6 +332,13 @@ pub enum Event<I> {
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
+    /// New list of user stats event to monitor.
+    UpdateUserStatsList {
+        /// Custom user monitor name
+        stats: HashMap<Cow<'static, str>, UserStats>,
+        /// [`PhantomData`]
+        phantom: PhantomData<I>,
+    },
     /// New monitor with performance monitor.
     #[cfg(feature = "introspection")]
     UpdatePerfMonitor {
@@ -371,7 +379,7 @@ impl<I> Event<I> {
         match self {
             Event::NewTestcase { .. } => "Testcase",
             Event::Heartbeat => "Client Heartbeat",
-            Event::UpdateUserStats { .. } => "UserStats",
+            Event::UpdateUserStats { .. } | Event::UpdateUserStatsList { .. } => "UserStats",
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor { .. } => "PerfMonitor",
             Event::Objective { .. } => "Objective",
@@ -393,7 +401,9 @@ impl<I> Event<I> {
                 Cow::Owned(format!("Testcase {}", input.generate_name(None)))
             }
             Event::Heartbeat => Cow::Borrowed("Client Heartbeat"),
-            Event::UpdateUserStats { .. } => Cow::Borrowed("UserStats"),
+            Event::UpdateUserStats { .. } | Event::UpdateUserStatsList { .. } => {
+                Cow::Borrowed("UserStats")
+            }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor { .. } => Cow::Borrowed("PerfMonitor"),
             Event::Objective { .. } => Cow::Borrowed("Objective"),

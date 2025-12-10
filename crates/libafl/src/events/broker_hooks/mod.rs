@@ -160,6 +160,17 @@ where
                 monitor.display(client_stats_manager, event.name(), client_id)?;
                 Ok(BrokerEventResult::Handled)
             }
+            Event::UpdateUserStatsList { stats, .. } => {
+                client_stats_manager.client_stats_insert(client_id)?;
+                for (name, value) in stats {
+                    client_stats_manager.update_client_stats_for(client_id, |client_stat| {
+                        client_stat.update_user_stats(name.clone(), value.clone());
+                    })?;
+                    client_stats_manager.aggregate(name);
+                }
+                monitor.display(client_stats_manager, event.name(), client_id)?;
+                Ok(BrokerEventResult::Handled)
+            }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor {
                 introspection_stats,

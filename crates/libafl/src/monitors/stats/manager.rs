@@ -1,14 +1,10 @@
 //! Client statistics manager
 
-#[cfg(feature = "std")]
-use alloc::string::ToString;
 use alloc::{borrow::Cow, string::String};
 use core::time::Duration;
 
 use hashbrown::HashMap;
 use libafl_bolts::{ClientId, Error, current_time, format_duration};
-#[cfg(feature = "std")]
-use serde_json::Value;
 
 use super::{ClientStats, EdgeCoverage, ProcessTiming, user_stats::UserStatsValue};
 #[cfg(feature = "std")]
@@ -241,23 +237,25 @@ impl ClientStatsManager {
             .iter()
             .filter(|(_, client)| client.enabled())
         {
-            let afl_stats = client.get_user_stats("AflStats");
             let stability = client.get_user_stats("stability").map_or(
                 UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
                 Clone::clone,
             );
 
-            if let Some(stat) = afl_stats {
-                let stats = stat.to_string();
-                let afl_stats_json: Value = serde_json::from_str(stats.as_str()).unwrap();
-                total_item_geometry.pending +=
-                    afl_stats_json["pending"].as_u64().unwrap_or_default();
-                total_item_geometry.pend_fav +=
-                    afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
-                total_item_geometry.own_finds +=
-                    afl_stats_json["own_finds"].as_u64().unwrap_or_default();
-                total_item_geometry.imported +=
-                    afl_stats_json["imported"].as_u64().unwrap_or_default();
+            if let Some(pending) = client.get_user_stats("pending") {
+                total_item_geometry.pending += pending.value().as_u64().unwrap_or_default();
+            }
+
+            if let Some(pend_fav) = client.get_user_stats("pending_fav") {
+                total_item_geometry.pend_fav += pend_fav.value().as_u64().unwrap_or_default();
+            }
+
+            if let Some(own_finds) = client.get_user_stats("own_finds") {
+                total_item_geometry.own_finds += own_finds.value().as_u64().unwrap_or_default();
+            }
+
+            if let Some(imported) = client.get_user_stats("imported") {
+                total_item_geometry.imported += imported.value().as_u64().unwrap_or_default();
             }
 
             if let UserStatsValue::Ratio(a, b) = stability.value() {

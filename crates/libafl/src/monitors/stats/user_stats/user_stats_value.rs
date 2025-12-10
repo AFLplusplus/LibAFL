@@ -30,6 +30,24 @@ impl UserStatsValue {
         }
     }
 
+    /// Get the value as u64, if possible
+    #[must_use]
+    pub fn as_u64(&self) -> Option<u64> {
+        match self {
+            Self::Number(n) => Some(*n),
+            Self::Float(f) => Some(*f as u64),
+            Self::Ratio(a, b) => {
+                if *b == 0 {
+                    None
+                } else {
+                    Some(a / b)
+                }
+            }
+            Self::Percent(p) => Some((p * 100.0) as u64),
+            Self::String(_) => None,
+        }
+    }
+
     /// Divide by the number of elements
     #[expect(clippy::cast_precision_loss)]
     pub fn stats_div(&mut self, divisor: usize) -> Option<Self> {
