@@ -21,7 +21,7 @@ pub const DEFAULT_CHARTS: &[&str] = &["corpus", "objectives", "exec/sec"];
 
 // TimedStat and TimedStats moved to crate::monitors::stats::timed
 
-/// The context for a single client tracked in this [`TuiMonitor`]
+/// The context for a single client tracked in this [`crate::monitors::tui::TuiMonitor`]
 #[derive(Debug, Default, Clone)]
 pub struct ClientTuiContext {
     /// The client stats
@@ -68,7 +68,7 @@ impl ClientTuiContext {
     }
 }
 
-/// The [`TuiContext`] for this [`TuiMonitor`]
+/// The [`TuiContext`] for this [`crate::monitors::tui::TuiMonitor`]
 #[derive(Debug, Clone)]
 pub struct TuiContext {
     /// The graphs to display

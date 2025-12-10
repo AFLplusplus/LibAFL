@@ -373,7 +373,7 @@ where
                 client_stats_manager.client_stats_insert(client_id)?;
                 client_stats_manager.update_client_stats_for(client_id, |client| {
                     // Update the performance monitor for this client
-                    client.update_introspection_stats((**introspection_stats).clone());
+                    client.update_introspection_stats(&(**introspection_stats).clone());
                 })?;
 
                 // Display the monitor via `.display` only on core #1

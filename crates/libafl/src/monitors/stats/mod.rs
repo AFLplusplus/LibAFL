@@ -315,12 +315,14 @@ impl ClientStats {
 
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
     #[cfg(feature = "introspection")]
-    pub fn update_introspection_stats(&mut self, introspection_stats: ClientPerfStats) {
+    pub fn update_introspection_stats(&mut self, introspection_stats: &ClientPerfStats) {
+        #[allow(clippy::cast_precision_loss)]
         let elapsed = introspection_stats.elapsed_cycles() as f64;
         if elapsed == 0.0 {
             return;
         }
 
+        #[allow(clippy::cast_precision_loss)]
         let scheduler_percent = introspection_stats.scheduler_cycles() as f64 / elapsed;
         self.update_user_stats(
             "scheduler".into(),
@@ -330,6 +332,7 @@ impl ClientStats {
             ),
         );
 
+        #[allow(clippy::cast_precision_loss)]
         let manager_percent = introspection_stats.manager_cycles() as f64 / elapsed;
         self.update_user_stats(
             "manager".into(),

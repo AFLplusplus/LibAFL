@@ -255,7 +255,7 @@ where
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
-                    client_stat.update_introspection_stats((**introspection_stats).clone());
+                    client_stat.update_introspection_stats(&(**introspection_stats).clone());
                 })?;
                 monitor.display(client_stats_manager, event.name(), ClientId(0))?;
                 Ok(BrokerEventResult::Handled)

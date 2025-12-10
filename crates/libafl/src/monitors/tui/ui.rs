@@ -913,7 +913,7 @@ impl TuiUi {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use core::time::Duration;
 
     use ratatui::{Terminal, backend::TestBackend};
 
@@ -947,7 +947,7 @@ mod tests {
         terminal.draw(|f| tui_ui.draw(f, &ctx)).unwrap();
 
         let buffer = terminal.backend().buffer();
-        let content = format!("{:?}", buffer);
+        let content = format!("{buffer:?}");
         assert!(content.contains("Test log"), "Logs should be visible");
     }
 }
