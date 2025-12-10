@@ -1,95 +1,20 @@
-use alloc::{
-    collections::VecDeque,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{collections::VecDeque, string::String, vec::Vec};
 use core::time::Duration;
 
 use hashbrown::HashMap;
-use libafl_bolts::current_time;
 
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::perf_stats::{ClientPerfStats, PerfFeature};
 pub use crate::monitors::stats::{
-    ClientStats, EdgeCoverage, ItemGeometry, ProcessTiming, user_stats::UserStats,
+    ClientStats, EdgeCoverage, ItemGeometry, ProcessTiming, TimedStat, TimedStats,
+    user_stats::UserStats,
 };
 
 /// The default time window for charts (10 minutes)
 pub const DEFAULT_TIME_WINDOW: u64 = 60 * 10; // 10 min
 const DEFAULT_LOGS_NUMBER: usize = 128;
 
-/// A single status entry for timings
-#[derive(Debug, Copy, Clone)]
-pub struct TimedStat {
-    /// The time
-    pub time: Duration,
-    /// The item
-    pub item: f64,
-}
-
-/// Stats for timings
-#[derive(Debug, Clone)]
-pub struct TimedStats {
-    /// Series of [`TimedStat`] entries
-    pub series: VecDeque<TimedStat>,
-    /// The time window to keep track of
-    pub window: Duration,
-}
-
-impl TimedStats {
-    /// Create a new [`TimedStats`] struct
-    #[must_use]
-    pub fn new(window: Duration) -> Self {
-        Self {
-            series: VecDeque::new(),
-            window,
-        }
-    }
-
-    /// Add a stat datapoint
-    pub fn add(&mut self, time: Duration, item: f64) {
-        if self.series.is_empty() || (self.series.back().unwrap().item - item).abs() > f64::EPSILON
-        {
-            while self.series.front().is_some()
-                && time
-                    .checked_sub(self.series.front().unwrap().time)
-                    .unwrap_or(self.window)
-                    >= self.window
-            {
-                self.series.pop_front();
-            }
-            self.series.push_back(TimedStat { time, item });
-        }
-    }
-
-    /// Add a stat datapoint for the `current_time`
-    pub fn add_now(&mut self, item: f64) {
-        let time = current_time();
-        self.add(time, item);
-    }
-
-    /// Change the window duration
-    pub fn update_window(&mut self, window: Duration) {
-        let default_stat = TimedStat {
-            time: Duration::from_secs(0),
-            item: 0.0,
-        };
-
-        self.window = window;
-        while !self.series.is_empty()
-            && self
-                .series
-                .back()
-                .unwrap_or(&default_stat)
-                .time
-                .checked_sub(self.series.front().unwrap_or(&default_stat).time)
-                .unwrap_or(window)
-                >= window
-        {
-            self.series.pop_front();
-        }
-    }
-}
+// TimedStat and TimedStats moved to crate::monitors::stats::timed
 
 /// The context for a single client tracked in this [`TuiMonitor`]
 #[derive(Debug, Default, Clone)]
@@ -114,20 +39,9 @@ impl ClientTuiContext {
     /// Get the number of cycles done
     #[must_use]
     pub fn cycles_done(&self) -> Option<u64> {
-        #[cfg(feature = "std")]
-        {
-            if let Some(cycles) = self.client_stats.get_user_stats("cycles_done") {
-                return cycles.value().as_u64();
-            }
-
-            self.client_stats.get_user_stats("AflStats").map(|s| {
-                let json: serde_json::Value =
-                    serde_json::from_str(&s.to_string()).unwrap_or(serde_json::json!({}));
-                json["cycles_done"].as_u64().unwrap_or(0)
-            })
-        }
-        #[cfg(not(feature = "std"))]
-        None
+        self.client_stats
+            .get_user_stats("cycles_done")
+            .and_then(|s| s.value().as_u64())
     }
 
     /// Get the number of executions
@@ -209,7 +123,7 @@ impl TuiContext {
             total_execs: 0,
             start_time,
 
-            total_map_density: "0%".to_string(),
+            total_map_density: String::from("0%"),
             total_solutions: 0,
             total_corpus_count: 0,
             total_item_geometry: None,

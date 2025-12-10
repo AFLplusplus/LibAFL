@@ -3,12 +3,10 @@
 pub mod manager;
 #[cfg(feature = "introspection")]
 pub mod perf_stats;
+pub mod timed;
 pub mod user_stats;
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
+use alloc::{borrow::Cow, string::String};
 use core::time::Duration;
 
 use hashbrown::HashMap;
@@ -17,8 +15,7 @@ pub use manager::ClientStatsManager;
 #[cfg(feature = "introspection")]
 pub use perf_stats::{ClientPerfStats, PerfFeature};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "std")]
-use serde_json::Value;
+pub use timed::*;
 pub use user_stats::{AggregatorOps, UserStats, UserStatsValue};
 
 #[cfg(feature = "afl_exec_sec")]
@@ -103,7 +100,7 @@ impl ProcessTiming {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            exec_speed: "0".to_string(),
+            exec_speed: String::from("0"),
             ..Default::default()
         }
     }
@@ -364,53 +361,44 @@ impl ClientStats {
     }
 
     /// Get item geometry of current client
+    /// Get item geometry of current client
     #[expect(clippy::cast_precision_loss)]
-    #[cfg(feature = "std")]
     #[must_use]
     pub fn item_geometry(&self) -> Option<ItemGeometry> {
-        let default_json = serde_json::json!({
-            "pending": 0,
-            "pend_fav": 0,
-            "imported": 0,
-            "own_finds": 0,
-        });
-
-        let afl_stats_str = self.get_user_stats("AflStats").map(ToString::to_string);
-        // If we have no AflStats, do we show empty Geometry?
-        // User requested: "if item geometry is not sent (no stats for example), just don't show that info"
-        // So we should return None if AflStats is missing.
-        let afl_stats = afl_stats_str.unwrap_or(default_json.to_string());
-
-        // Check if we actually had stats. If not, and no other stats, maybe return None?
-        // But wait, stability might exist independently?
-        // Let's check if AflStats existed.
-        let has_afl_stats = self.get_user_stats("AflStats").is_some();
-
-        let afl_stats_json: Value =
-            serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
-        let pending = afl_stats_json["pending"].as_u64().unwrap_or_default();
-        let pend_fav = afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
-        let imported = afl_stats_json["imported"].as_u64().unwrap_or_default();
-        let own_finds = afl_stats_json["own_finds"].as_u64().unwrap_or_default();
+        let pending = self
+            .get_user_stats("pending")
+            .map_or(0, |s| s.value().as_u64().unwrap_or(0));
+        let pend_fav = self
+            .get_user_stats("pending_fav")
+            .map_or(0, |s| s.value().as_u64().unwrap_or(0));
+        let imported = self
+            .get_user_stats("imported")
+            .map_or(0, |s| s.value().as_u64().unwrap_or(0));
+        let own_finds = self
+            .get_user_stats("own_finds")
+            .map_or(0, |s| s.value().as_u64().unwrap_or(0));
 
         let stability = self.get_user_stats("stability").map_or(
             UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
             Clone::clone,
         );
-        let has_stability = self.get_user_stats("stability").is_some();
 
-        if !has_afl_stats && !has_stability {
+        // We want to return None if we have NO relevant stats, to avoid showing empty charts/info
+        // "pending" is a good indicator if we have data.
+        if self.get_user_stats("pending").is_none() && self.get_user_stats("stability").is_none() {
             return None;
         }
 
-        let stability = if let UserStatsValue::Ratio(a, b) = stability.value() {
-            if *b == 0 {
-                Some(0.0)
-            } else {
-                Some((*a as f64) / (*b as f64))
+        let stability = match stability.value() {
+            UserStatsValue::Ratio(a, b) => {
+                if *b == 0 {
+                    Some(0.0)
+                } else {
+                    Some((*a as f64) / (*b as f64))
+                }
             }
-        } else {
-            None
+            UserStatsValue::Percent(p) => Some(*p),
+            _ => None,
         };
 
         Some(ItemGeometry {

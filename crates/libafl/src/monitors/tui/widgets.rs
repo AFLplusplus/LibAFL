@@ -18,7 +18,10 @@ use ratatui::{
     },
 };
 
-use crate::monitors::tui::{ItemGeometry, ProcessTiming, TimedStats, TuiContext};
+use crate::monitors::{
+    stats::user_stats::UserStatsValue,
+    tui::{ItemGeometry, ProcessTiming, TimedStats, TuiContext},
+};
 
 /// Options for drawing a time chart
 #[derive(Debug)]
@@ -35,6 +38,8 @@ pub struct TimeChartOptions<'a> {
     pub enhanced_graphics: bool,
     /// The current running time
     pub current_time: Duration,
+    /// Optional preset range for Y axis (min, max). Data outside this range will expand it.
+    pub preset_y_range: Option<(f64, f64)>,
 }
 
 /// Draw the time chart with the given stats
@@ -47,6 +52,7 @@ pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
         graph_data,
         enhanced_graphics,
         current_time,
+        preset_y_range,
     } = options;
 
     let last_stat_time = stats.series.back().map_or(current_time, |s| s.time);
@@ -153,11 +159,21 @@ pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
     }
 
     // Ensure reasonable bounds if empty or flat
-    let min_y = min_y.unwrap_or(0.0);
+    if let Some((p_min, p_max)) = preset_y_range {
+        min_y = Some(min_y.map_or(p_min, |m| m.min(p_min)));
+        max_y = Some(max_y.map_or(p_max, |m| m.max(p_max)));
+    }
+
+    let mut min_y = min_y.unwrap_or(0.0);
     let mut max_y = max_y.unwrap_or(0.0);
 
+    if preset_y_range.is_none() && min_y >= 0.0 {
+        min_y = 0.0;
+        max_y = max_y.max(1.0);
+    }
+
     if (min_y - max_y).abs() < f64::EPSILON {
-        max_y = min_y + 2.0;
+        max_y = min_y + 1.0;
     }
     if max_x > prev.0 + 1 {
         for v in (prev.0 + 1)..max_x {
@@ -626,4 +642,70 @@ pub fn draw_logs(f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect, enabl
             ),
     );
     f.render_widget(logs, area);
+}
+
+/// Draw the user stats
+pub fn draw_user_stats(
+    f: &mut Frame,
+    app: &Arc<RwLock<TuiContext>>,
+    area: Rect,
+    client_idx: usize,
+    scroll: usize,
+) -> usize {
+    let app = app.read().unwrap();
+
+    if let Some(client) = app.clients.get(&client_idx) {
+        let mut keys: Vec<_> = client.client_stats.user_stats().keys().collect();
+        keys.sort();
+
+        let total_stats = keys.len();
+        // Title + Borders = 2
+        let max_items = area.height.saturating_sub(2) as usize;
+
+        if total_stats == 0 {
+            return max_items;
+        }
+
+        let start_idx = if scroll >= total_stats {
+            0
+        } else {
+            scroll
+        };
+
+        let visible_keys = keys
+            .iter()
+            .skip(start_idx)
+            .take(max_items)
+            .map(|k| {
+                let val = client.client_stats.user_stats().get(*k).unwrap();
+                let val_str = match val.value() {
+                    UserStatsValue::Number(n) => format_big_number(*n),
+                    UserStatsValue::Float(f) => format!("{f:.2}"),
+                    UserStatsValue::String(s) => s.to_string(),
+                    UserStatsValue::Ratio(a, b) => {
+                        if *b == 0 {
+                            "0/0".into()
+                        } else {
+                            format!("{a}/{b} ({:.2}%)", (*a as f64 / *b as f64) * 100.0)
+                        }
+                    }
+                    UserStatsValue::Percent(p) => format!("{:.2}%", p * 100.0),
+                };
+                (k.as_ref(), val_str)
+            });
+
+        let title = format!(
+            "User Stats ({start_idx}-{}/{total_stats}){}",
+            (start_idx + max_items).min(total_stats),
+            if total_stats > start_idx + max_items {
+                " `u` for next"
+            } else {
+                ""
+            }
+        );
+
+        draw_info_table(f, area, &title, visible_keys);
+        return max_items;
+    }
+    0
 }

@@ -16,7 +16,7 @@ use super::{
     layout::{split_client, split_main, split_overall, split_title, split_top},
     widgets::{
         TimeChartOptions, draw_client_generic_text, draw_item_geometry_text, draw_logs,
-        draw_overall_generic_text, draw_process_timing_text, draw_time_chart,
+        draw_overall_generic_text, draw_process_timing_text, draw_time_chart, draw_user_stats,
     },
 };
 use crate::monitors::tui::TuiContext;
@@ -40,6 +40,8 @@ pub struct TuiUi {
     pub should_quit: bool,
     /// If the UI should refresh
     pub(crate) should_refresh: bool,
+    user_stats_scroll: usize,
+    pub(crate) user_stats_page_size: usize,
 }
 
 fn next_larger(sorted: &[usize], value: usize) -> Option<usize> {
@@ -79,6 +81,8 @@ impl TuiUi {
             logs_wrap: false,
             should_quit: false,
             should_refresh: false,
+            user_stats_scroll: 0,
+            user_stats_page_size: 10, // Default to 10
         }
     }
 
@@ -144,6 +148,14 @@ impl TuiUi {
                     let w = timer.window / 2;
                     timer.update_window(w);
                 }
+            }
+            'u' => {
+                self.user_stats_scroll += self.user_stats_page_size;
+            }
+            'U' => {
+                self.user_stats_scroll = self
+                    .user_stats_scroll
+                    .saturating_sub(self.user_stats_page_size);
             }
             _ => {}
         }
@@ -500,6 +512,7 @@ impl TuiUi {
                         graph_data: &mut self.graph_data,
                         enhanced_graphics: self.enhanced_graphics,
                         current_time: run_time,
+                        preset_y_range: None,
                     },
                 ),
                 "objectives" => draw_time_chart(
@@ -512,6 +525,7 @@ impl TuiUi {
                         graph_data: &mut self.graph_data,
                         enhanced_graphics: self.enhanced_graphics,
                         current_time: run_time,
+                        preset_y_range: None,
                     },
                 ),
                 "exec/sec" => draw_time_chart(
@@ -524,6 +538,7 @@ impl TuiUi {
                         graph_data: &mut self.graph_data,
                         enhanced_graphics: self.enhanced_graphics,
                         current_time: run_time,
+                        preset_y_range: None,
                     },
                 ),
                 custom_name => {
@@ -538,6 +553,7 @@ impl TuiUi {
                                 graph_data: &mut self.graph_data,
                                 enhanced_graphics: self.enhanced_graphics,
                                 current_time: run_time,
+                                preset_y_range: None,
                             },
                         );
                     }
@@ -624,7 +640,8 @@ impl TuiUi {
             if has_process_timing {
                 constraints.push(Constraint::Length(6));
             }
-            constraints.push(Constraint::Min(0)); // Geometry/Empty
+            constraints.push(Constraint::Length(8)); // Geometry
+            constraints.push(Constraint::Min(0)); // User Stats
 
             let client_layout = Layout::default()
                 .direction(ratatui::layout::Direction::Vertical)
@@ -649,6 +666,12 @@ impl TuiUi {
 
             if has_geometry && let Some(chunk) = client_layout.get(next_idx) {
                 draw_item_geometry_text(f, app, *chunk, false, self.client_idx, &self.clients);
+                next_idx += 1;
+            }
+
+            if let Some(chunk) = client_layout.get(next_idx) {
+                self.user_stats_page_size =
+                    draw_user_stats(f, app, *chunk, self.client_idx, self.user_stats_scroll);
             }
         } else {
             let (left_col, right_col) = split_client(client_area);
@@ -662,6 +685,14 @@ impl TuiUi {
                 .split(left_col);
 
             draw_client_generic_text(f, app, left_chunks[0], "Overview", self.client_idx);
+            
+            self.user_stats_page_size = draw_user_stats(
+                f,
+                app,
+                left_chunks[1],
+                self.client_idx,
+                self.user_stats_scroll,
+            );
 
             // Right Column: Process Timing + Item Geometry (optional)
             // If !has_process_timing, just Geometry or empty
