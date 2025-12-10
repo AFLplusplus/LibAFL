@@ -19,6 +19,7 @@ tui_monitor = ["libafl/tui_monitor"]
 default = ["fork", "tui_monitor"]
 
 [profile.release]
+panic = "abort"
 lto = true
 codegen-units = 1
 opt-level = 3

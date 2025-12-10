@@ -53,7 +53,7 @@ lib:
 
 [linux]
 fuzzer: lib cxx
-    clang++ {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/release/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz --libafl-ignore-configurations
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/release/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz --libafl-ignore-configurations -Wl,--allow-multiple-definition
 
 [macos]
 fuzzer: lib cxx
