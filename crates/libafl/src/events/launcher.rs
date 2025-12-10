@@ -555,7 +555,6 @@ where
 
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[cfg(feature = "tcp_manager")]
-    #[expect(clippy::too_many_lines)]
     pub fn launch_tcp<EMH, I, S>(self, hooks: EMH) -> Result<(), Error>
     where
         CF: FnOnce(
