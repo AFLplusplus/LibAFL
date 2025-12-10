@@ -1,8 +1,4 @@
-use alloc::{
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::{string::String, sync::Arc, vec::Vec};
 use std::sync::RwLock;
 
 use libafl_bolts::current_time;
@@ -19,14 +15,15 @@ use super::widgets::draw_introspection_text;
 use super::{
     layout::{split_client, split_main, split_overall, split_title, split_top},
     widgets::{
-        draw_client_generic_text, draw_item_geometry_text, draw_logs, draw_overall_generic_text,
-        draw_process_timing_text, draw_time_chart,
+        TimeChartOptions, draw_client_generic_text, draw_item_geometry_text, draw_logs,
+        draw_overall_generic_text, draw_process_timing_text, draw_time_chart,
     },
 };
 use crate::monitors::tui::TuiContext;
 
 /// The UI for the TUI monitor
 #[derive(Default, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct TuiUi {
     title: String,
     version: String,
@@ -41,6 +38,8 @@ pub struct TuiUi {
 
     /// If the UI should quit
     pub should_quit: bool,
+    /// If the UI should refresh
+    pub(crate) should_refresh: bool,
 }
 
 fn next_larger(sorted: &[usize], value: usize) -> Option<usize> {
@@ -79,15 +78,15 @@ impl TuiUi {
             is_narrow: false,
             logs_wrap: false,
             should_quit: false,
+            should_refresh: false,
         }
     }
 
     /// Handle a key event
     pub fn on_key(&mut self, c: char, app: &Arc<RwLock<TuiContext>>) {
         match c {
-            'q' => {
-                self.should_quit = true;
-            }
+            'q' => self.should_quit = true,
+            'r' => self.should_refresh = true,
             'g' => {
                 let ctx = app.read().unwrap();
                 let params = ctx.graphs.len();
@@ -99,6 +98,18 @@ impl TuiUi {
                     } else {
                         // Normal behavior
                         self.charts_tab_idx = (self.charts_tab_idx + 1) % params;
+                    }
+                }
+            }
+            'G' => {
+                let ctx = app.read().unwrap();
+                let params = ctx.graphs.len();
+                if params > 0 {
+                    if self.is_narrow {
+                        let total = params + 1;
+                        self.charts_tab_idx = (self.charts_tab_idx + total - 1) % total;
+                    } else {
+                        self.charts_tab_idx = (self.charts_tab_idx + params - 1) % params;
                     }
                 }
             }
@@ -274,10 +285,31 @@ impl TuiUi {
             next_idx += 1;
         }
 
-        if has_geometry {
-            if let Some(chunk) = chunks.get(next_idx) {
-                draw_item_geometry_text(f, app, *chunk, true, self.client_idx, &self.clients);
-            }
+        if has_geometry && let Some(chunk) = chunks.get(next_idx) {
+            draw_item_geometry_text(f, app, *chunk, true, self.client_idx, &self.clients);
+        }
+    }
+
+    fn calculate_tab_window(
+        &self,
+        total_tabs: usize,
+        max_display_tabs: usize,
+    ) -> (usize, usize, usize) {
+        if total_tabs <= max_display_tabs {
+            (0, total_tabs, self.charts_tab_idx)
+        } else {
+            let half = max_display_tabs / 2;
+            let start = self.charts_tab_idx.saturating_sub(half);
+            let start = if start + max_display_tabs > total_tabs {
+                total_tabs.saturating_sub(max_display_tabs)
+            } else {
+                start
+            };
+            (
+                start,
+                start + max_display_tabs,
+                self.charts_tab_idx.saturating_sub(start),
+            )
         }
     }
 
@@ -290,7 +322,7 @@ impl TuiUi {
         has_charts: bool,
     ) {
         let overall_layout = split_overall(area);
-        // split_overall now returns a single area (or we treat it as such)
+        // split_overall now returns a single Rect
 
         let ctx_read = app.read().unwrap();
 
@@ -300,10 +332,14 @@ impl TuiUi {
             // 1.. = Charts
 
             // Prepare Tabs
-            let mut tab_titles = vec![Span::from("Overview")];
-            tab_titles.extend(ctx_read.graphs.iter().map(|g| Span::from(g.clone())));
+            let mut all_titles = vec![Span::from("Overview")];
+            all_titles.extend(ctx_read.graphs.iter().map(|g| Span::from(g.clone())));
 
-            let tabs = Tabs::new(tab_titles)
+            // Sliding window logic
+            let (start_idx, end_idx, selected_idx) = self.calculate_tab_window(all_titles.len(), 5);
+            let visible_titles = all_titles[start_idx..end_idx].to_vec();
+
+            let tabs = Tabs::new(visible_titles)
                 .block(
                     Block::default()
                         .title(Span::styled(
@@ -314,7 +350,7 @@ impl TuiUi {
                         ))
                         .title(
                             ratatui::widgets::block::Title::from(Span::styled(
-                                " `g` for next ",
+                                " G/g ",
                                 Style::default()
                                     .fg(Color::LightCyan)
                                     .add_modifier(Modifier::BOLD),
@@ -324,13 +360,11 @@ impl TuiUi {
                         .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
                 )
                 .highlight_style(Style::default().fg(Color::LightYellow))
-                .select(self.charts_tab_idx);
+                .select(selected_idx);
 
             // We split the top area into [Tabs, Content]
-            let layout_parts = split_title(overall_layout[0]);
-            f.render_widget(tabs, layout_parts[0]);
-
-            let content_area = layout_parts[1];
+            let (tab_area, content_area) = split_title(overall_layout);
+            f.render_widget(tabs, tab_area);
 
             if self.charts_tab_idx == 0 {
                 // RENDER STATS (Generic, Timing, Geometry) in content_area
@@ -358,7 +392,7 @@ impl TuiUi {
             } else {
                 // TAB > 0: Chart
                 let graph_idx = self.charts_tab_idx - 1;
-                let name = ctx_read.graphs.get(graph_idx).map(|s| s.to_string());
+                let name = ctx_read.graphs.get(graph_idx).cloned();
                 drop(ctx_read);
 
                 (Some(content_area), name)
@@ -367,14 +401,14 @@ impl TuiUi {
             // NORMAL MODE
             drop(ctx_read);
 
-            let top_layout = if !has_charts {
-                vec![overall_layout[0]]
+            let (left_col, right_col) = if has_charts {
+                split_top(overall_layout)
             } else {
-                split_top(overall_layout[0])
+                (overall_layout, Rect::default())
             };
 
             // LEFT COLUMN: Stats
-            let left_title_layout = split_title(top_layout[0]);
+            let (left_title_area, left_stats_area) = split_title(left_col);
             let status_bar: String = format!("{} ({})", self.title, self.version.as_str());
             let text = vec![Line::from(Span::styled(
                 &status_bar,
@@ -386,7 +420,7 @@ impl TuiUi {
             let paragraph = Paragraph::new(text)
                 .block(block)
                 .alignment(Alignment::Center);
-            f.render_widget(paragraph, left_title_layout[0]);
+            f.render_widget(paragraph, left_title_area);
 
             let (has_process_timing, has_geometry) = {
                 let ctx = app.read().unwrap();
@@ -402,7 +436,7 @@ impl TuiUi {
             self.draw_stats_column(
                 f,
                 app,
-                left_title_layout[1],
+                left_stats_area,
                 has_process_timing,
                 has_geometry,
                 false,
@@ -414,30 +448,31 @@ impl TuiUi {
 
             // RIGHT COLUMN: Charts
             let ctx_read = app.read().unwrap();
-            let tabs = Tabs::new(
-                ctx_read
-                    .graphs
-                    .iter()
-                    .map(|g| Span::from(g.clone()))
-                    .collect::<Vec<Span>>(),
-            )
-            .block(
-                Block::default()
-                    .title(Span::styled(
-                        "charts (`g` for next)",
-                        Style::default()
-                            .fg(Color::LightCyan)
-                            .add_modifier(Modifier::BOLD),
-                    ))
-                    .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
-            )
-            .highlight_style(Style::default().fg(Color::LightYellow))
-            .select(self.charts_tab_idx);
+            let all_titles: Vec<Span> = ctx_read
+                .graphs
+                .iter()
+                .map(|g| Span::from(g.clone()))
+                .collect();
 
-            let title_chart_layout = split_title(top_layout[1]);
-            f.render_widget(tabs, title_chart_layout[0]);
+            let (start_idx, end_idx, selected_idx) = self.calculate_tab_window(all_titles.len(), 5);
+            let visible_titles = all_titles[start_idx..end_idx].to_vec();
 
-            let chart_layout = title_chart_layout[1];
+            let tabs = Tabs::new(visible_titles)
+                .block(
+                    Block::default()
+                        .title(Span::styled(
+                            "charts (G/g)",
+                            Style::default()
+                                .fg(Color::LightCyan)
+                                .add_modifier(Modifier::BOLD),
+                        ))
+                        .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
+                )
+                .highlight_style(Style::default().fg(Color::LightYellow))
+                .select(selected_idx);
+
+            let (right_title_area, right_chart_area) = split_title(right_col);
+            f.render_widget(tabs, right_title_area);
 
             let idx = if self.charts_tab_idx >= ctx_read.graphs.len() {
                 0
@@ -445,10 +480,10 @@ impl TuiUi {
                 self.charts_tab_idx
             };
 
-            let graph_name = ctx_read.graphs.get(idx).map(|s| s.to_string());
+            let graph_name = ctx_read.graphs.get(idx).cloned();
             drop(ctx_read);
 
-            (Some(chart_layout), graph_name)
+            (Some(right_chart_area), graph_name)
         };
 
         if let (Some(layout), Some(name)) = (chart_layout, graph_name) {
@@ -456,46 +491,54 @@ impl TuiUi {
             let run_time = current_time().saturating_sub(ctx_read.start_time);
             match name.as_str() {
                 "corpus" => draw_time_chart(
-                    "",
-                    "corpus size",
                     f,
                     layout,
-                    &ctx_read.corpus_size_timed,
-                    &mut self.graph_data,
-                    self.enhanced_graphics,
-                    run_time,
+                    TimeChartOptions {
+                        title: "",
+                        y_name: "corpus size",
+                        stats: &ctx_read.corpus_size_timed,
+                        graph_data: &mut self.graph_data,
+                        enhanced_graphics: self.enhanced_graphics,
+                        current_time: run_time,
+                    },
                 ),
                 "objectives" => draw_time_chart(
-                    "",
-                    "objectives",
                     f,
                     layout,
-                    &ctx_read.objective_size_timed,
-                    &mut self.graph_data,
-                    self.enhanced_graphics,
-                    run_time,
+                    TimeChartOptions {
+                        title: "",
+                        y_name: "objectives",
+                        stats: &ctx_read.objective_size_timed,
+                        graph_data: &mut self.graph_data,
+                        enhanced_graphics: self.enhanced_graphics,
+                        current_time: run_time,
+                    },
                 ),
                 "exec/sec" => draw_time_chart(
-                    "",
-                    "exec/sec",
                     f,
                     layout,
-                    &ctx_read.execs_per_sec_timed,
-                    &mut self.graph_data,
-                    self.enhanced_graphics,
-                    run_time,
+                    TimeChartOptions {
+                        title: "",
+                        y_name: "exec/sec",
+                        stats: &ctx_read.execs_per_sec_timed,
+                        graph_data: &mut self.graph_data,
+                        enhanced_graphics: self.enhanced_graphics,
+                        current_time: run_time,
+                    },
                 ),
                 custom_name => {
                     if let Some(stats) = ctx_read.custom_timed.get(custom_name) {
                         draw_time_chart(
-                            "",
-                            custom_name,
                             f,
                             layout,
-                            stats,
-                            &mut self.graph_data,
-                            self.enhanced_graphics,
-                            run_time,
+                            TimeChartOptions {
+                                title: "",
+                                y_name: custom_name,
+                                stats,
+                                graph_data: &mut self.graph_data,
+                                enhanced_graphics: self.enhanced_graphics,
+                                current_time: run_time,
+                            },
                         );
                     }
                 }
@@ -604,14 +647,11 @@ impl TuiUi {
                 next_idx += 1;
             }
 
-            if has_geometry {
-                if let Some(chunk) = client_layout.get(next_idx) {
-                    draw_item_geometry_text(f, app, *chunk, false, self.client_idx, &self.clients);
-                }
+            if has_geometry && let Some(chunk) = client_layout.get(next_idx) {
+                draw_item_geometry_text(f, app, *chunk, false, self.client_idx, &self.clients);
             }
         } else {
-            let left_layout = split_client(client_area);
-            let right_layout_area = left_layout[1];
+            let (left_col, right_col) = split_client(client_area);
 
             // Left Column: Generic only
             // Limit height to 6 to match Right Column (General) and avoid big blanks
@@ -619,7 +659,7 @@ impl TuiUi {
             let left_chunks = Layout::default()
                 .direction(ratatui::layout::Direction::Vertical)
                 .constraints(left_constraints)
-                .split(left_layout[0]);
+                .split(left_col);
 
             draw_client_generic_text(f, app, left_chunks[0], "Overview", self.client_idx);
 
@@ -635,7 +675,7 @@ impl TuiUi {
             let right_chunks = Layout::default()
                 .direction(ratatui::layout::Direction::Vertical)
                 .constraints(right_constraints)
-                .split(right_layout_area);
+                .split(right_col);
 
             let mut next_idx = 0;
             if has_process_timing {
@@ -651,10 +691,8 @@ impl TuiUi {
                 next_idx += 1;
             }
 
-            if has_geometry {
-                if let Some(chunk) = right_chunks.get(next_idx) {
-                    draw_item_geometry_text(f, app, *chunk, false, self.client_idx, &self.clients);
-                }
+            if has_geometry && let Some(chunk) = right_chunks.get(next_idx) {
+                draw_item_geometry_text(f, app, *chunk, false, self.client_idx, &self.clients);
             }
         }
     }

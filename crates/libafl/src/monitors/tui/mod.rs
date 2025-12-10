@@ -140,15 +140,29 @@ impl Monitor for TuiMonitor {
             format_big_number(client.executions()),
             exec_sec
         );
+        let run_time = cur_time.saturating_sub(client_stats_manager.start_time());
         for (key, val) in client.user_stats() {
             write!(fmt, ", {key}: {val}").unwrap();
+
+            // If the value is a number, we can add it to the custom charts
+            if let Some(val) = val.value().as_f64() {
+                let mut ctx = self.context.write().unwrap();
+                if !ctx.graphs.contains(&key.to_string()) {
+                    ctx.graphs.push(key.to_string());
+                }
+                ctx.custom_timed
+                    .entry(key.to_string())
+                    .or_insert_with(|| {
+                        TimedStats::new(Duration::from_secs(context::DEFAULT_TIME_WINDOW))
+                    })
+                    .add(run_time, val);
+            }
         }
-        let run_time = cur_time.saturating_sub(client_stats_manager.start_time());
         for (key, val) in client_stats_manager.aggregated() {
             write!(fmt, ", {key}: {val}").unwrap();
 
             // If the value is a number, we can add it to the custom charts
-            if let Ok(val) = val.to_string().parse::<f64>() {
+            if let Some(val) = val.as_f64() {
                 let mut ctx = self.context.write().unwrap();
                 if !ctx.graphs.contains(&key.to_string()) {
                     ctx.graphs.push(key.to_string());
@@ -288,6 +302,12 @@ fn run_tui_thread<W: Write + Send + Sync + 'static>(
             if last_tick.elapsed() >= tick_rate {
                 //context.on_tick();
                 last_tick = Instant::now();
+            }
+            if ui.should_refresh {
+                ui.should_refresh = false;
+                cnt = 0;
+                last_repaint = Instant::now();
+                drop(terminal.clear());
             }
             if ui.should_quit {
                 // restore terminal

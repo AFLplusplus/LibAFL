@@ -20,22 +20,36 @@ use ratatui::{
 
 use crate::monitors::tui::{ItemGeometry, ProcessTiming, TimedStats, TuiContext};
 
+/// Options for drawing a time chart
+#[derive(Debug)]
+pub struct TimeChartOptions<'a> {
+    /// The title of the chart
+    pub title: &'a str,
+    /// The name of the Y-axis
+    pub y_name: &'a str,
+    /// The stats to plot
+    pub stats: &'a TimedStats,
+    /// A buffer to hold the graph data (to avoid allocations)
+    pub graph_data: &'a mut Vec<(f64, f64)>,
+    /// Whether to use enhanced graphics (Braille) or not
+    pub enhanced_graphics: bool,
+    /// The current running time
+    pub current_time: Duration,
+}
+
 /// Draw the time chart with the given stats
 #[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
-pub fn draw_time_chart(
-    title: &str,
-    y_name: &str,
-    f: &mut Frame,
-    area: Rect,
-    stats: &TimedStats,
-    graph_data: &mut Vec<(f64, f64)>,
-    enhanced_graphics: bool,
-    current_time: Duration,
-) {
-    // if stats.series.is_empty() {
-    //     return;
-    // }
-    let last_stat_time = stats.series.back().map(|s| s.time).unwrap_or(current_time);
+pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
+    let TimeChartOptions {
+        title,
+        y_name,
+        stats,
+        graph_data,
+        enhanced_graphics,
+        current_time,
+    } = options;
+
+    let last_stat_time = stats.series.back().map_or(current_time, |s| s.time);
     let end = last_stat_time.max(current_time);
     let start = end.saturating_sub(stats.window);
 
@@ -204,11 +218,13 @@ pub fn draw_time_chart(
 }
 
 /// Generic helper to draw a simple Key-Value table
-pub fn draw_info_table(f: &mut Frame, area: Rect, title: &str, data: Vec<(&str, String)>) {
-    let rows: Vec<Row> = data
+pub fn draw_info_table<'a, I>(f: &mut Frame, area: Rect, title: &str, data: I)
+where
+    I: IntoIterator<Item = (&'a str, String)>,
+{
+    let rows = data
         .into_iter()
-        .map(|(k, v)| Row::new(vec![Cell::from(Span::raw(k)), Cell::from(Span::raw(v))]))
-        .collect();
+        .map(|(k, v)| Row::new([Cell::from(Span::raw(k)), Cell::from(Span::raw(v))]));
 
     let mut block = Block::default().borders(Borders::ALL);
     if !title.is_empty() {
@@ -254,7 +270,7 @@ pub fn draw_item_geometry_text(
         }
     };
 
-    let data = vec![
+    let data = [
         ("pending", format!("{}", item_geometry.pending)),
         ("pend fav", format!("{}", item_geometry.pend_fav)),
         ("own finds", format!("{}", item_geometry.own_finds)),
@@ -299,7 +315,7 @@ pub fn draw_process_timing_text(
         }
     };
 
-    let data = vec![
+    let data = [
         (
             "run time",
             format_duration(&current_time().saturating_sub(tup.0)),
@@ -333,8 +349,10 @@ pub fn draw_overall_generic_text(
                 Cell::from(Span::raw(
                     format_big_number(app.total_execs)
                         .split_once('(')
-                        .map(|(a, _)| a.trim().to_string())
-                        .unwrap_or_else(|| format_big_number(app.total_execs)),
+                        .map_or_else(
+                            || format_big_number(app.total_execs),
+                            |(a, _)| a.trim().to_string(),
+                        ),
                 )),
             ]),
             Row::new(vec![
@@ -545,14 +563,14 @@ pub fn draw_logs(f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect, enabl
                         } else {
                             width.saturating_sub(2)
                         };
-                        let chunk_len = std::cmp::min(limit, chars.len() - i);
+                        let chunk_len = core::cmp::min(limit, chars.len() - i);
                         let chunk: String = chars[i..i + chunk_len].iter().collect();
 
                         if first {
                             lines.push(chunk);
                             first = false;
                         } else {
-                            lines.push(format!("  {}", chunk));
+                            lines.push(format!("  {chunk}"));
                         }
                         i += chunk_len;
                     }

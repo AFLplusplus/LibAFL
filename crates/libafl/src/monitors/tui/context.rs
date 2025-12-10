@@ -50,7 +50,7 @@ impl TimedStats {
     pub fn add(&mut self, time: Duration, item: f64) {
         if self.series.is_empty() || (self.series.back().unwrap().item - item).abs() > f64::EPSILON
         {
-            if self.series.front().is_some()
+            while self.series.front().is_some()
                 && time
                     .checked_sub(self.series.front().unwrap().time)
                     .unwrap_or(self.window)

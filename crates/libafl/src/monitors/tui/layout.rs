@@ -74,7 +74,7 @@ pub fn split_main(area: Rect, show_logs: bool, introspection: bool, has_charts: 
 
 /// Splits the overall stats area into top stats and bottom
 #[must_use]
-pub fn split_overall(area: Rect) -> Vec<Rect> {
+pub fn split_overall(area: Rect) -> Rect {
     // We used to split into Top/Bottom, but now we want to use the whole area
     // effectively as one block for columns, or just return the area as is?
     // The UI code expects a list of rects.
@@ -82,31 +82,31 @@ pub fn split_overall(area: Rect) -> Vec<Rect> {
     // Actually, `split_main` reserves 17 lines for this area.
     // We can just return [area] from here?
     // But `ratatui::layout::split` returns Vec<Rect>.
-    vec![area]
+    area
 }
 
 /// Splits the top area into left (stats) and right (charts)
 #[must_use]
-pub fn split_top(area: Rect) -> Vec<Rect> {
-    Layout::default()
+pub fn split_top(area: Rect) -> (Rect, Rect) {
+    let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(area)
-        .to_vec()
+        .split(area);
+    (chunks[0], chunks[1])
 }
 
 /// Splits the area to reserve space for a title
 #[must_use]
-pub fn split_title(area: Rect) -> Vec<Rect> {
-    Layout::default()
+pub fn split_title(area: Rect) -> (Rect, Rect) {
+    let chunks = Layout::default()
         .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
-        .split(area)
-        .to_vec()
+        .split(area);
+    (chunks[0], chunks[1])
 }
 
 /// Splits the process timing area
 #[must_use]
-pub fn split_process_timing(area: Rect) -> Vec<Rect> {
+pub fn split_process_timing(area: Rect) -> (Rect, Rect) {
     // If area is compact, we might want fewer lines for process timing
     let height = if area.height < 15 {
         4 // Compact: 3 lines content + borders? No, borders take 2. 
@@ -116,19 +116,19 @@ pub fn split_process_timing(area: Rect) -> Vec<Rect> {
         7 // Standard
     };
 
-    Layout::default()
+    let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(height), Constraint::Min(0)].as_ref())
-        .split(area)
-        .to_vec()
+        .split(area);
+    (chunks[0], chunks[1])
 }
 
 /// Splits the client area into left and right columns
 #[must_use]
-pub fn split_client(area: Rect) -> Vec<Rect> {
-    Layout::default()
+pub fn split_client(area: Rect) -> (Rect, Rect) {
+    let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(area)
-        .to_vec()
+        .split(area);
+    (chunks[0], chunks[1])
 }

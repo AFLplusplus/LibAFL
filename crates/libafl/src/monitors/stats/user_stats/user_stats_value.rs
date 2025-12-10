@@ -49,6 +49,25 @@ impl UserStatsValue {
         }
     }
 
+    /// Get the value as f64, if possible
+    #[must_use]
+    #[expect(clippy::cast_precision_loss)]
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Self::Number(n) => Some(*n as f64),
+            Self::Float(f) => Some(*f),
+            Self::Ratio(a, b) => {
+                if *b == 0 {
+                    None
+                } else {
+                    Some(*a as f64 / *b as f64)
+                }
+            }
+            Self::Percent(p) => Some(*p),
+            Self::String(_) => None,
+        }
+    }
+
     /// Divide by the number of elements
     #[expect(clippy::cast_precision_loss)]
     pub fn stats_div(&mut self, divisor: usize) -> Option<Self> {
