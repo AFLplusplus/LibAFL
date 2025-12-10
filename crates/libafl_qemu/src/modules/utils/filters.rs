@@ -3,7 +3,9 @@
 //! It is not a module by itself, but instead used as helper to have filters
 //! in other modules.
 
-use std::{cell::UnsafeCell, fmt::Debug, ops::Range};
+#[cfg(any(feature = "injections", not(cpu_target = "hexagon")))]
+use std::cell::UnsafeCell;
+use std::{fmt::Debug, ops::Range};
 
 use hashbrown::HashSet;
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
