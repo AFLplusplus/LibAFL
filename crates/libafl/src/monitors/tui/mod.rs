@@ -148,7 +148,7 @@ impl Monitor for TuiMonitor {
             write!(fmt, ", {key}: {val}").unwrap();
 
             // If the value is a number, we can add it to the custom charts
-            if let Some(val) = val.to_string().parse::<f64>().ok() {
+            if let Ok(val) = val.to_string().parse::<f64>() {
                 let mut ctx = self.context.write().unwrap();
                 if !ctx.graphs.contains(&key.to_string()) {
                     ctx.graphs.push(key.to_string());
@@ -237,6 +237,7 @@ fn run_tui_thread<W: Write + Send + Sync + 'static>(
         let mut ui = tui_ui;
 
         let mut last_tick = Instant::now();
+        let mut last_repaint = Instant::now();
         let mut cnt = 0;
 
         // Catching panics when the main thread dies
@@ -260,6 +261,14 @@ fn run_tui_thread<W: Write + Send + Sync + 'static>(
             if cnt < 8 {
                 drop(terminal.clear());
                 cnt += 1;
+            } else {
+                let clients_count = context.read().unwrap().clients.len();
+                // Only redraw the UI every 10 seconds if there are not more clients registered.
+                // If there are more clients registered, they won't print stdout or stderr as they are other processes.
+                if clients_count <= 1 && last_repaint.elapsed() > Duration::from_secs(10) {
+                    drop(terminal.clear());
+                    last_repaint = Instant::now();
+                }
             }
             terminal.draw(|f| ui.draw(f, &context))?;
 

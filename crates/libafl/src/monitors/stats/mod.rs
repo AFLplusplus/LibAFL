@@ -367,16 +367,24 @@ impl ClientStats {
     #[expect(clippy::cast_precision_loss)]
     #[cfg(feature = "std")]
     #[must_use]
-    pub fn item_geometry(&self) -> ItemGeometry {
+    pub fn item_geometry(&self) -> Option<ItemGeometry> {
         let default_json = serde_json::json!({
             "pending": 0,
             "pend_fav": 0,
             "imported": 0,
             "own_finds": 0,
         });
-        let afl_stats = self
-            .get_user_stats("AflStats")
-            .map_or(default_json.to_string(), ToString::to_string);
+
+        let afl_stats_str = self.get_user_stats("AflStats").map(ToString::to_string);
+        // If we have no AflStats, do we show empty Geometry?
+        // User requested: "if item geometry is not sent (no stats for example), just don't show that info"
+        // So we should return None if AflStats is missing.
+        let afl_stats = afl_stats_str.unwrap_or(default_json.to_string());
+
+        // Check if we actually had stats. If not, and no other stats, maybe return None?
+        // But wait, stability might exist independently?
+        // Let's check if AflStats existed.
+        let has_afl_stats = self.get_user_stats("AflStats").is_some();
 
         let afl_stats_json: Value =
             serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
@@ -389,6 +397,11 @@ impl ClientStats {
             UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
             Clone::clone,
         );
+        let has_stability = self.get_user_stats("stability").is_some();
+
+        if !has_afl_stats && !has_stability {
+            return None;
+        }
 
         let stability = if let UserStatsValue::Ratio(a, b) = stability.value() {
             if *b == 0 {
@@ -400,13 +413,13 @@ impl ClientStats {
             None
         };
 
-        ItemGeometry {
+        Some(ItemGeometry {
             pending,
             pend_fav,
             own_finds,
             imported,
             stability,
-        }
+        })
     }
 }
 

@@ -1,4 +1,8 @@
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use std::sync::RwLock;
 
 use libafl_bolts::current_time;
@@ -15,8 +19,8 @@ use super::widgets::draw_introspection_text;
 use super::{
     layout::{split_client, split_main, split_overall, split_title, split_top},
     widgets::{
-        draw_client_generic_text, draw_client_results_text, draw_item_geometry_text, draw_logs,
-        draw_overall_generic_text, draw_process_timing_text, draw_time_chart,
+        draw_client_generic_text, draw_item_geometry_text, draw_logs, draw_overall_generic_text,
+        draw_process_timing_text, draw_time_chart,
     },
 };
 use crate::monitors::tui::TuiContext;
@@ -32,6 +36,8 @@ pub struct TuiUi {
     clients: Vec<usize>,
     charts_tab_idx: usize,
     graph_data: Vec<(f64, f64)>,
+    is_narrow: bool,
+    logs_wrap: bool,
 
     /// If the UI should quit
     pub should_quit: bool,
@@ -67,7 +73,12 @@ impl TuiUi {
             enhanced_graphics,
             show_logs: true,
             client_idx: 0,
-            ..TuiUi::default()
+            clients: vec![],
+            charts_tab_idx: 0,
+            graph_data: vec![],
+            is_narrow: false,
+            logs_wrap: false,
+            should_quit: false,
         }
     }
 
@@ -78,10 +89,24 @@ impl TuiUi {
                 self.should_quit = true;
             }
             'g' => {
-                self.charts_tab_idx = (self.charts_tab_idx + 1) % 3;
+                let ctx = app.read().unwrap();
+                let params = ctx.graphs.len();
+                if params > 0 {
+                    if self.is_narrow {
+                        // 0 = Generic, 1..=params = Charts
+                        // Total items = params + 1
+                        self.charts_tab_idx = (self.charts_tab_idx + 1) % (params + 1);
+                    } else {
+                        // Normal behavior
+                        self.charts_tab_idx = (self.charts_tab_idx + 1) % params;
+                    }
+                }
             }
             't' => {
                 self.show_logs = !self.show_logs;
+            }
+            'w' => {
+                self.logs_wrap = !self.logs_wrap;
             }
             '+' => {
                 let mut ctx = app.write().unwrap();
@@ -91,6 +116,10 @@ impl TuiUi {
                 ctx.objective_size_timed.update_window(w);
                 let w = ctx.execs_per_sec_timed.window * 2;
                 ctx.execs_per_sec_timed.update_window(w);
+                for timer in ctx.custom_timed.values_mut() {
+                    let w = timer.window * 2;
+                    timer.update_window(w);
+                }
             }
             '-' => {
                 let mut ctx = app.write().unwrap();
@@ -100,15 +129,23 @@ impl TuiUi {
                 ctx.objective_size_timed.update_window(w);
                 let w = ctx.execs_per_sec_timed.window / 2;
                 ctx.execs_per_sec_timed.update_window(w);
+                for timer in ctx.custom_timed.values_mut() {
+                    let w = timer.window / 2;
+                    timer.update_window(w);
+                }
             }
             _ => {}
         }
     }
 
+    const NARROW_WIDTH_THRESHOLD: u16 = 75;
+
     /// Move to the next client
     pub fn on_right(&mut self) {
         if let Some(idx) = next_larger(&self.clients, self.client_idx) {
             self.client_idx = self.clients[idx];
+        } else if !self.clients.is_empty() {
+            self.client_idx = self.clients[0];
         }
     }
 
@@ -116,6 +153,8 @@ impl TuiUi {
     pub fn on_left(&mut self) {
         if let Some(idx) = next_smaller(&self.clients, self.client_idx) {
             self.client_idx = self.clients[idx];
+        } else if !self.clients.is_empty() {
+            self.client_idx = *self.clients.last().unwrap();
         }
     }
 
@@ -136,136 +175,351 @@ impl TuiUi {
             self.clients = all;
         }
 
+        #[cfg(feature = "introspection")]
+        let introspection = true;
+        #[cfg(not(feature = "introspection"))]
+        let introspection = false;
+
+        let has_charts = {
+            let ctx = app.read().unwrap();
+            !ctx.graphs.is_empty()
+        };
+
         let area = f.area();
-        let body = split_main(area, self.show_logs, cfg!(feature = "introspection"));
+        // If transitioning to narrow mode, enable wrap and reset tabs to Overview.
+        let new_is_narrow = area.width < Self::NARROW_WIDTH_THRESHOLD;
+        if new_is_narrow && !self.is_narrow {
+            self.show_logs = false;
+            // Force reset to Overview tab
+            self.charts_tab_idx = 0;
+        }
+        self.is_narrow = new_is_narrow;
+
+        // Narrow Mode or Short Mode with Logs: Replace Client View with Logs
+        // "Short" = height < 28 (approx)
+        let is_short = area.height < 28;
+
+        if (self.is_narrow || is_short) && self.show_logs {
+            // Use split_main to calculate Top height properly
+            let body = split_main(area, true, introspection, has_charts);
+            let top_body = body[0];
+            // Logs take the rest
+            let logs_area = Rect::new(
+                area.x,
+                top_body.bottom(),
+                area.width,
+                area.height.saturating_sub(top_body.height),
+            );
+
+            // In narrow mode, we removed the title of "Overview", preventing double headers.
+            self.draw_overall_ui(f, app, top_body, has_charts);
+            draw_logs(f, app, logs_area, self.logs_wrap);
+            return;
+        }
+
+        let body = split_main(area, self.show_logs, introspection, has_charts);
 
         let top_body = body[0];
         let mid_body = body[1];
 
-        self.draw_overall_ui(f, app, top_body);
-        self.draw_client_ui(f, app, mid_body);
+        self.draw_overall_ui(f, app, top_body, has_charts);
+        self.draw_client_ui(f, app, mid_body, self.show_logs);
 
-        if self.show_logs {
+        if self.show_logs && body.len() > 2 {
             let bottom_body = body[2];
-            draw_logs(f, app, bottom_body);
+            draw_logs(f, app, bottom_body, self.logs_wrap);
         }
     }
 
-    fn draw_overall_ui(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect) {
+    #[allow(deprecated)]
+    fn draw_overall_ui(
+        &mut self,
+        f: &mut Frame,
+        app: &Arc<RwLock<TuiContext>>,
+        area: Rect,
+        has_charts: bool,
+    ) {
         let overall_layout = split_overall(area);
         // split_overall now returns a single area (or we treat it as such)
-        // split_top splits it into Left (Stats) and Right (Charts)
-        let top_layout = split_top(overall_layout[0]);
 
-        // LEFT COLUMN: Stats
-        // We want to stack Title, Generic, ProcessTiming, ItemGeometry.
+        // In narrow mode, we treat the whole area as one block.
+        // In normal mode, we split into Left (Stats) and Right (Charts).
 
-        // 1. Title (3 lines)
-        let left_title_layout = split_title(top_layout[0]);
-        let status_bar: String = format!("{} ({})", self.title, self.version.as_str());
-        let text = vec![Line::from(Span::styled(
-            &status_bar,
-            Style::default()
-                .fg(Color::LightMagenta)
-                .add_modifier(Modifier::BOLD),
-        ))];
-        let block = Block::default().borders(Borders::ALL);
-        let paragraph = Paragraph::new(text)
-            .block(block)
-            .alignment(Alignment::Center);
-        f.render_widget(paragraph, left_title_layout[0]);
-
-        // 2. Stats (Generic -> Process -> Item)
-        // Available height in left_title_layout[1] is (Total - 3).
-        // Standard: 21 - 3 = 18. Compact: 17 - 3 = 14.
-
-        let stats_area = left_title_layout[1];
-        let stats_height = stats_area.height;
-
-        // We need to fit 3 items.
-        // Generic: 4 lines.
-        // Process: 5 or 7.
-        // Item: Remaining.
-
-        let p_height = if stats_height < 16 { 5 } else { 7 }; // If we have 14 lines, 14 < 16 -> 5. 4+5=9. Item gets 5. Total 14.
-        let g_height = 4;
-
-        let left_stats_layout = Layout::default()
-            .direction(ratatui::layout::Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(g_height),
-                    Constraint::Length(p_height),
-                    Constraint::Min(0),
-                ]
-                .as_ref(),
-            )
-            .split(stats_area);
-
-        draw_overall_generic_text(f, app, left_stats_layout[0], self.clients.len());
-        draw_process_timing_text(f, app, left_stats_layout[1], true, 0, &[]);
-        draw_item_geometry_text(f, app, left_stats_layout[2], true, 0, &[]);
-
-        // RIGHT COLUMN: Charts
-        // We need tab titles for all graphs
         let ctx_read = app.read().unwrap();
-        let tabs = Tabs::new(
-            ctx_read
-                .graphs
-                .iter()
-                .map(|g| Span::from(g.clone()))
-                .collect::<Vec<Span>>(),
-        )
-        .block(
-            Block::default()
-                .title(Span::styled(
-                    "charts",
-                    Style::default()
-                        .fg(Color::LightCyan)
-                        .add_modifier(Modifier::BOLD),
-                ))
-                .borders(Borders::ALL),
-        )
-        .highlight_style(Style::default().fg(Color::LightYellow))
-        .select(self.charts_tab_idx);
 
-        let title_chart_layout = split_title(top_layout[1]);
-        f.render_widget(tabs, title_chart_layout[0]);
+        let (chart_layout, graph_name) = if self.is_narrow {
+            // NARROW MODE
+            // 0 = Generic Stats
+            // 1.. = Charts
 
-        let chart_layout = title_chart_layout[1];
-        let graph_name = ctx_read.graphs.get(self.charts_tab_idx).map(|s| s.as_str());
+            // Prepare Tabs
+            let mut tab_titles = vec![Span::from("Overview")];
+            tab_titles.extend(ctx_read.graphs.iter().map(|g| Span::from(g.clone())));
 
-        // Drop lock before drawing charts if needed, but drawing takes &stats ref which is tied to ctx_read?
-        // Actually draw_time_chart takes &TimedStats. If we hold ctx_read, it's fine.
+            let tabs = Tabs::new(tab_titles)
+                .block(
+                    Block::default()
+                        .title(Span::styled(
+                            &self.title,
+                            Style::default()
+                                .fg(Color::LightMagenta)
+                                .add_modifier(Modifier::BOLD),
+                        ))
+                        .title(
+                            ratatui::widgets::block::Title::from(Span::styled(
+                                " `g` for next ",
+                                Style::default()
+                                    .fg(Color::LightCyan)
+                                    .add_modifier(Modifier::BOLD),
+                            ))
+                            .alignment(Alignment::Right),
+                        )
+                        .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
+                )
+                .highlight_style(Style::default().fg(Color::LightYellow))
+                .select(self.charts_tab_idx);
 
-        if let Some(name) = graph_name {
+            // We split the top area into [Tabs, Content]
+            let layout_parts = split_title(overall_layout[0]);
+            f.render_widget(tabs, layout_parts[0]);
+
+            let content_area = layout_parts[1];
+
+            if self.charts_tab_idx == 0 {
+                // RENDER STATS (Generic, Timing, Geometry) in content_area
+                let (has_process_timing, has_geometry) = {
+                    let has_geometry = ctx_read.total_item_geometry.is_some();
+                    let has_timing = if let Some(client) = ctx_read.clients.get(&0) {
+                        client.process_timing.exec_speed != "0/sec"
+                    } else {
+                        false
+                    };
+                    (has_timing, has_geometry)
+                };
+
+                let p_height = if has_process_timing { 6 } else { 0 };
+                let g_height = 4; // Generic height
+
+                let mut constraints = vec![Constraint::Length(g_height)];
+                if has_process_timing {
+                    constraints.push(Constraint::Length(p_height));
+                }
+                constraints.push(Constraint::Min(0)); // Geometry or empty
+
+                let left_stats_layout = Layout::default()
+                    .direction(ratatui::layout::Direction::Vertical)
+                    .constraints(constraints)
+                    .split(content_area);
+
+                // Need "app" (Arc<RwLock>) for these calls, we have it passed in function args.
+                // We dropped ctx_read?? logic above used ctx_read.
+                // Wait, draw helper functions take "app" (lock).
+                // So we must drop ctx_read before calling them?
+                // Or existing code held ctx_read?
+                // Existing code called `draw_overall_generic_text(f, app, ...)` which likely locks inside.
+                // So we must drop ctx_read before calling these helpers.
+                drop(ctx_read);
+
+                draw_overall_generic_text(f, app, left_stats_layout[0], "", self.clients.len());
+
+                let mut next_idx = 1;
+                if has_process_timing {
+                    draw_process_timing_text(
+                        f,
+                        app,
+                        left_stats_layout[next_idx],
+                        "General",
+                        true,
+                        self.client_idx,
+                        &self.clients,
+                    );
+                    next_idx += 1;
+                }
+
+                if has_geometry {
+                    if let Some(chunk) = left_stats_layout.get(next_idx) {
+                        draw_item_geometry_text(
+                            f,
+                            app,
+                            *chunk,
+                            true,
+                            self.client_idx,
+                            &self.clients,
+                        );
+                    }
+                }
+
+                (None, None)
+            } else {
+                // TAB > 0: Chart
+                let graph_idx = self.charts_tab_idx - 1;
+                let name = ctx_read.graphs.get(graph_idx).map(|s| s.as_str()); // This is ref to ctx_read string?
+                // We need to clone the name string or keep ctx_read alive?
+                // `draw_time_chart` takes `&str`.
+                // But we need to return `name` out of this block where `ctx_read` lives.
+                // Actually `draw_time_chart` will be called later.
+                // If we return `name` (ref), we need ctx_read alive.
+                // But we drop ctx_read in Stats branch?
+                // We can't keep ctx_read alive easily if we return from if/else.
+                // So let's clone name to String, or re-acquire lock later?
+                // We can return `Option<String>` for name.
+                let name_owned = name.map(|s| s.to_string());
+                drop(ctx_read);
+
+                (Some(content_area), name_owned)
+            }
+        } else {
+            // NORMAL MODE
+            drop(ctx_read); // Drop generic lock, helpers might lock?
+
+            // Re-acquire or assume stats logic needs lock?
+            // Existing logic re-acquired inside helpers? Yes.
+
+            let top_layout = if !has_charts {
+                vec![overall_layout[0]]
+            } else {
+                split_top(overall_layout[0])
+            };
+
+            // LEFT COLUMN: Stats
+            let left_title_layout = split_title(top_layout[0]);
+            let status_bar: String = format!("{} ({})", self.title, self.version.as_str());
+            let text = vec![Line::from(Span::styled(
+                &status_bar,
+                Style::default()
+                    .fg(Color::LightMagenta)
+                    .add_modifier(Modifier::BOLD),
+            ))];
+            let block = Block::default().borders(Borders::ALL);
+            let paragraph = Paragraph::new(text)
+                .block(block)
+                .alignment(Alignment::Center);
+            f.render_widget(paragraph, left_title_layout[0]);
+
+            let (has_process_timing, has_geometry) = {
+                let ctx = app.read().unwrap();
+                let has_geometry = ctx.total_item_geometry.is_some();
+                let has_timing = if let Some(client) = ctx.clients.get(&0) {
+                    client.process_timing.exec_speed != "0/sec"
+                } else {
+                    false
+                };
+                (has_timing, has_geometry)
+            };
+
+            let stats_area = left_title_layout[1];
+
+            let p_height = if has_process_timing { 6 } else { 0 };
+            let g_height = 4; // Generic height
+
+            let mut constraints = vec![Constraint::Length(g_height)];
+            if has_process_timing {
+                constraints.push(Constraint::Length(p_height));
+            }
+            constraints.push(Constraint::Min(0)); // Geometry or empty
+
+            let left_stats_layout = Layout::default()
+                .direction(ratatui::layout::Direction::Vertical)
+                .constraints(constraints)
+                .split(stats_area);
+
+            draw_overall_generic_text(f, app, left_stats_layout[0], "Overview", self.clients.len());
+
+            let mut next_idx = 1;
+            if has_process_timing {
+                draw_process_timing_text(
+                    f,
+                    app,
+                    left_stats_layout[next_idx],
+                    "General",
+                    true,
+                    self.client_idx,
+                    &self.clients,
+                );
+                next_idx += 1;
+            }
+
+            if has_geometry {
+                if let Some(chunk) = left_stats_layout.get(next_idx) {
+                    draw_item_geometry_text(f, app, *chunk, true, self.client_idx, &self.clients);
+                }
+            }
+
+            if !has_charts {
+                return;
+            }
+
+            // RIGHT COLUMN: Charts
+            let ctx_read = app.read().unwrap();
+            let tabs = Tabs::new(
+                ctx_read
+                    .graphs
+                    .iter()
+                    .map(|g| Span::from(g.clone()))
+                    .collect::<Vec<Span>>(),
+            )
+            .block(
+                Block::default()
+                    .title(Span::styled(
+                        "charts (`g` for next)",
+                        Style::default()
+                            .fg(Color::LightCyan)
+                            .add_modifier(Modifier::BOLD),
+                    ))
+                    .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
+            )
+            .highlight_style(Style::default().fg(Color::LightYellow))
+            .select(self.charts_tab_idx);
+
+            let title_chart_layout = split_title(top_layout[1]);
+            f.render_widget(tabs, title_chart_layout[0]);
+
+            let chart_layout = title_chart_layout[1];
+            // charts_tab_idx might be out of sync if we switched from narrow (idx > graphs.len)?
+            // narrow mode allows idx = graphs.len (params+1).
+            // But normal mode max idx is params-1.
+            // We should cap it.
+            let idx = if self.charts_tab_idx >= ctx_read.graphs.len() {
+                0
+            } else {
+                self.charts_tab_idx
+            };
+
+            let graph_name = ctx_read.graphs.get(idx).map(|s| s.to_string());
+            drop(ctx_read);
+
+            (Some(chart_layout), graph_name)
+        };
+
+        if let (Some(layout), Some(name)) = (chart_layout, graph_name) {
+            let ctx_read = app.read().unwrap();
             let run_time = current_time().saturating_sub(ctx_read.start_time);
-            match name {
+            match name.as_str() {
                 "corpus" => draw_time_chart(
-                    "corpus chart",
+                    "",
                     "corpus size",
                     f,
-                    chart_layout,
+                    layout,
                     &ctx_read.corpus_size_timed,
                     &mut self.graph_data,
                     self.enhanced_graphics,
                     run_time,
                 ),
                 "objectives" => draw_time_chart(
-                    "objectives chart",
+                    "",
                     "objectives",
                     f,
-                    chart_layout,
+                    layout,
                     &ctx_read.objective_size_timed,
                     &mut self.graph_data,
                     self.enhanced_graphics,
                     run_time,
                 ),
                 "exec/sec" => draw_time_chart(
-                    "speed chart",
+                    "",
                     "exec/sec",
                     f,
-                    chart_layout,
+                    layout,
                     &ctx_read.execs_per_sec_timed,
                     &mut self.graph_data,
                     self.enhanced_graphics,
@@ -274,10 +528,10 @@ impl TuiUi {
                 custom_name => {
                     if let Some(stats) = ctx_read.custom_timed.get(custom_name) {
                         draw_time_chart(
-                            custom_name,
+                            "",
                             custom_name,
                             f,
-                            chart_layout,
+                            layout,
                             stats,
                             &mut self.graph_data,
                             self.enhanced_graphics,
@@ -289,8 +543,15 @@ impl TuiUi {
         }
     }
 
-    fn draw_client_ui(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect) {
-        let client_block = Block::default()
+    #[allow(deprecated)]
+    fn draw_client_ui(
+        &mut self,
+        f: &mut Frame,
+        app: &Arc<RwLock<TuiContext>>,
+        area: Rect,
+        show_logs: bool,
+    ) {
+        let mut client_block = Block::default()
             .title(Span::styled(
                 format!(
                     "client #{}{}",
@@ -307,6 +568,19 @@ impl TuiUi {
             ))
             .borders(Borders::ALL);
 
+        if !show_logs {
+            use ratatui::widgets::block::Title;
+            client_block = client_block.title(
+                Title::from(Span::styled(
+                    "`t` for logs, `q` to quit",
+                    Style::default()
+                        .fg(Color::LightMagenta)
+                        .add_modifier(Modifier::BOLD),
+                ))
+                .alignment(Alignment::Right),
+            );
+        }
+
         #[allow(unused_mut)] // cfg dependent
         let mut client_area = client_block.inner(area);
         f.render_widget(client_block, area);
@@ -322,53 +596,120 @@ impl TuiUi {
             draw_introspection_text(f, app, introspection_layout, self.client_idx);
         }
 
-        let left_layout = split_client(client_area);
-        let right_layout = left_layout[1];
+        let narrow = area.width < Self::NARROW_WIDTH_THRESHOLD;
 
-        let left_top_layout = Layout::default()
-            .direction(ratatui::layout::Direction::Vertical)
-            .constraints([Constraint::Length(4), Constraint::Min(0)].as_ref())
-            .split(left_layout[0]);
-        let left_bottom_layout = left_top_layout[1];
+        let (has_process_timing, has_geometry) = {
+            let ctx = app.read().unwrap();
+            let has_geometry = if let Some(client) = ctx.clients.get(&self.client_idx) {
+                client.item_geometry.is_some()
+            } else {
+                false
+            };
 
-        draw_client_generic_text(f, app, left_top_layout[0], self.client_idx);
-        draw_process_timing_text(
-            f,
-            app,
-            left_bottom_layout,
-            false,
-            self.client_idx,
-            &self.clients,
-        );
+            let has_timing = if let Some(client) = ctx.clients.get(&self.client_idx) {
+                client.process_timing.exec_speed != "0/sec"
+            } else {
+                false
+            };
+            (has_timing, has_geometry)
+        };
 
-        let height = if right_layout.height < 12 { 5 } else { 7 };
-        let right_top_layout = Layout::default()
-            .direction(ratatui::layout::Direction::Vertical)
-            .constraints([Constraint::Length(height), Constraint::Min(0)].as_ref())
-            .split(right_layout);
-        let right_bottom_layout = right_top_layout[1];
+        if narrow {
+            let mut constraints = vec![
+                Constraint::Length(6), // Generic
+            ];
+            if has_process_timing {
+                constraints.push(Constraint::Length(6));
+            }
+            constraints.push(Constraint::Min(0)); // Geometry/Empty
 
-        draw_item_geometry_text(
-            f,
-            app,
-            right_top_layout[0],
-            false,
-            self.client_idx,
-            &self.clients,
-        );
-        draw_client_results_text(f, app, right_bottom_layout, self.client_idx);
+            let client_layout = Layout::default()
+                .direction(ratatui::layout::Direction::Vertical)
+                .constraints(constraints)
+                .split(client_area);
+
+            draw_client_generic_text(f, app, client_layout[0], "Overview", self.client_idx);
+
+            let mut next_idx = 1;
+            if has_process_timing {
+                draw_process_timing_text(
+                    f,
+                    app,
+                    client_layout[next_idx],
+                    "General",
+                    false,
+                    self.client_idx,
+                    &self.clients,
+                );
+                next_idx += 1;
+            }
+
+            if has_geometry {
+                if let Some(chunk) = client_layout.get(next_idx) {
+                    draw_item_geometry_text(f, app, *chunk, false, self.client_idx, &self.clients);
+                }
+            }
+        } else {
+            let left_layout = split_client(client_area);
+            let right_layout_area = left_layout[1];
+
+            // Left Column: Generic only
+            // Limit height to 6 to match Right Column (General) and avoid big blanks
+            let left_constraints = vec![Constraint::Length(6), Constraint::Min(0)];
+            let left_chunks = Layout::default()
+                .direction(ratatui::layout::Direction::Vertical)
+                .constraints(left_constraints)
+                .split(left_layout[0]);
+
+            draw_client_generic_text(f, app, left_chunks[0], "Overview", self.client_idx);
+
+            // Right Column: Process Timing + Item Geometry (optional)
+            // If !has_process_timing, just Geometry or empty
+
+            let mut right_constraints = vec![];
+            if has_process_timing {
+                right_constraints.push(Constraint::Length(6));
+            }
+            right_constraints.push(Constraint::Min(0));
+
+            let right_chunks = Layout::default()
+                .direction(ratatui::layout::Direction::Vertical)
+                .constraints(right_constraints)
+                .split(right_layout_area);
+
+            let mut next_idx = 0;
+            if has_process_timing {
+                draw_process_timing_text(
+                    f,
+                    app,
+                    right_chunks[next_idx],
+                    "General",
+                    false,
+                    self.client_idx,
+                    &self.clients,
+                );
+                next_idx += 1;
+            }
+
+            if has_geometry {
+                if let Some(chunk) = right_chunks.get(next_idx) {
+                    draw_item_geometry_text(f, app, *chunk, false, self.client_idx, &self.clients);
+                }
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::{current_time, format_duration};
+    use std::time::Duration;
+
     use ratatui::{Terminal, backend::TestBackend};
 
     use super::*;
     #[cfg(feature = "introspection")]
     use crate::monitors::tui::PerfTuiContext;
-    use crate::monitors::tui::{String, TuiContext};
+    use crate::monitors::tui::{ClientTuiContext, ItemGeometry, String, TuiContext};
 
     #[test]
     fn test_ui_rendering() {
@@ -423,7 +764,7 @@ mod tests {
         // Basic verification
         let content = format!("{:?}", buffer);
         assert!(content.contains("Test Fuzzer"));
-        assert!(content.contains("generic"));
+        assert!(content.contains("Overview"));
         assert!(content.contains("clients"));
     }
 
@@ -461,5 +802,334 @@ mod tests {
                 content
             );
         }
+    }
+
+    #[test]
+    fn test_item_geometry_visibility() {
+        // Setup mock data
+        let mut tui_ui = TuiUi::new("Test Fuzzer".into(), false);
+        // Start time 0
+        let mut ctx_struct = TuiContext::new(Duration::from_secs(0));
+        // Ensure total_item_geometry is None initially
+        ctx_struct.total_item_geometry = None;
+        let context = Arc::new(RwLock::new(ctx_struct));
+
+        let backend = TestBackend::new(80, 40);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        // Case 1: No Item Geometry (default is None)
+        terminal
+            .draw(|f| {
+                tui_ui.draw(f, &context);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+        assert!(
+            !content.contains("item geometry"),
+            "Item Geometry should be hidden when None"
+        );
+
+        // Case 2: With Item Geometry
+        {
+            let mut ctx = context.write().unwrap();
+            ctx.total_item_geometry = Some(ItemGeometry::new());
+        }
+
+        terminal
+            .draw(|f| {
+                tui_ui.draw(f, &context);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+        assert!(
+            content.contains("item geometry"),
+            "Item Geometry should be visible when Some"
+        );
+    }
+
+    #[test]
+    fn test_narrow_layout() {
+        // Setup mock data
+        let mut tui_ui = TuiUi::new("Test Fuzzer".into(), true); // Show logs enabled
+        let mut ctx_struct = TuiContext::new(Duration::from_secs(0));
+
+        // Add a client with process timing data
+        let mut client = ClientTuiContext::default();
+        client.process_timing.exec_speed = "100/sec".into();
+        ctx_struct.clients.insert(0, client);
+
+        ctx_struct
+            .client_logs
+            .push_back(String::from("Log message 1"));
+        let context = Arc::new(RwLock::new(ctx_struct));
+
+        // Width 60 (< 75)
+        let backend = TestBackend::new(60, 40);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|f| {
+                tui_ui.draw(f, &context);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+
+        // 1. Charts should be hidden (no "charts" title, but "view" tabs might be present)
+        // With new logic, we show "view (...)" tabs.
+        // We assert that "charts" block title is NOT present.
+        assert!(
+            !content.contains("charts (`g` for next)"),
+            "Charts block should be hidden on narrow screen"
+        );
+
+        // 2. Logs SHOULD be HIDDEN initially due to auto-hide on narrow transition
+        assert!(
+            !content.contains("clients logs"),
+            "Logs should be auto-hidden on narrow screen transition"
+        );
+
+        // 3. Toggle logs ON
+        tui_ui.on_key('t', &context);
+
+        terminal
+            .draw(|f| {
+                tui_ui.draw(f, &context);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+
+        // 4. Logs SHOULD be VISIBLE now
+        assert!(
+            content.contains("clients logs"),
+            "Logs should be visible on narrow screen after toggle"
+        );
+        assert!(
+            content.contains("Log message 1"),
+            "Log content should be visible on narrow screen"
+        );
+
+        // 3. Client View should be HIDDEN
+        assert!(
+            !content.contains("client #0"),
+            "Client View should be hidden/replaced by logs"
+        );
+
+        // 4. Stats should be visible (Generic tab)
+        assert!(
+            content.contains("Overview"),
+            "Overview tab/stats should be visible"
+        );
+
+        // Test toggling logs off
+        tui_ui.on_key('t', &context); // Toggle off
+
+        terminal
+            .draw(|f| {
+                tui_ui.draw(f, &context);
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+
+        // Now Logs hidden, Client View visible
+        assert!(
+            !content.contains("clients logs"),
+            "Logs should be hidden when toggled off"
+        );
+        assert!(
+            content.contains("client #0"),
+            "Client View should be visible when logs hidden"
+        );
+    }
+
+    #[test]
+    fn test_logs_scrolling() {
+        // Setup mock data
+        let mut tui_ui = TuiUi::new("Test Fuzzer".into(), true);
+        let mut ctx_struct = TuiContext::new(Duration::from_secs(0));
+
+        // Add 20 logs
+        for i in 0..20 {
+            ctx_struct.client_logs.push_back(format!("Log message {i}"));
+        }
+        let context = Arc::new(RwLock::new(ctx_struct));
+
+        // Create terminal with height that fits limited logs
+        // Height 24: Top=17? Mid=6? Logs=Remaining?
+        // split_main: if 24 available -> available=19.
+        // 19-6=13 for Top?
+        // Wait, logs_min=5. available = 24-5 = 19.
+        // split_main logic for 19: (13, 6).
+        // Actual logs height = 24 - 13 - 6 = 5.
+        // 5 lines total for logs. 2 borders. 3 content lines.
+        // So we expect 3 logs.
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|f| {
+                tui_ui.draw(f, &context);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+
+        // We expect the LATEST logs (19, 18, 17)
+        assert!(
+            content.contains("Log message 19"),
+            "Log 19 should be visible"
+        );
+        assert!(
+            content.contains("Log message 18"),
+            "Log 18 should be visible"
+        );
+
+        // We expect OLDEST logs to be hidden
+        assert!(!content.contains("Log message 0"), "Log 0 should be hidden");
+        assert!(!content.contains("Log message 5"), "Log 5 should be hidden");
+    }
+
+    #[test]
+    fn test_client_navigation() {
+        // Setup mock data
+        let mut tui_ui = TuiUi::new("Test Fuzzer".into(), true);
+        let mut ctx_struct = TuiContext::new(Duration::from_secs(0));
+
+        // Add 2 clients with distinct data
+        let mut c0 = ClientTuiContext::default();
+        c0.client_stats.update_corpus_size(123);
+        ctx_struct.clients.insert(0, c0);
+
+        let mut c1 = ClientTuiContext::default();
+        c1.client_stats.update_corpus_size(456);
+        ctx_struct.clients.insert(1, c1);
+
+        ctx_struct.clients_num = 2; // Sync clients_num to prevent draw reset
+
+        let context = Arc::new(RwLock::new(ctx_struct));
+
+        // Initial state
+        tui_ui.clients = vec![0, 1]; // Manually sync clients list for test (usually done in draw)
+        assert_eq!(tui_ui.client_idx, 0);
+
+        let backend = TestBackend::new(80, 40);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        // Check Initial Client (0) Data
+        terminal.draw(|f| tui_ui.draw(f, &context)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+        assert!(
+            content.contains("123"),
+            "Client 0 data (123) should be visible initially. Content: {}",
+            content
+        );
+        assert!(
+            !content.contains("456"),
+            "Client 1 data (456) should NOT be visible initially. Content: {}",
+            content
+        );
+        assert!(
+            content.contains("client #0"),
+            "Client #0 title should be visible"
+        );
+
+        // Test Navigation Logic
+        tui_ui.on_right();
+        assert_eq!(
+            tui_ui.client_idx, 1,
+            "Right arrow should move to next client"
+        );
+
+        // Check Client 1 Data
+        terminal.draw(|f| tui_ui.draw(f, &context)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+        assert!(
+            content.contains("456"),
+            "Client 1 data (456) should be visible after navigation. Content: {}",
+            content
+        );
+        assert!(
+            !content.contains("123"),
+            "Client 0 data (123) should NOT be visible after navigation. Content: {}",
+            content
+        );
+        assert!(
+            content.contains("client #1"),
+            "Client #1 title should be visible"
+        );
+
+        tui_ui.on_right();
+        assert_eq!(
+            tui_ui.client_idx, 0,
+            "Right arrow at end should wrap to first"
+        );
+
+        tui_ui.on_left();
+        assert_eq!(
+            tui_ui.client_idx, 1,
+            "Left arrow at start should wrap to last"
+        );
+
+        tui_ui.on_left();
+        assert_eq!(
+            tui_ui.client_idx, 0,
+            "Left arrow should move to previous client"
+        );
+
+        // Test Display (Arrows Hint)
+        terminal.draw(|f| tui_ui.draw(f, &context)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+
+        assert!(
+            content.contains("arrows to switch"),
+            "Arrows hint should be visible when multiple clients exist. Content: {}",
+            content
+        );
+
+        // Test Display (No Hint for Single Client)
+        {
+            let mut ctx = context.write().unwrap();
+            ctx.clients.remove(&1);
+        }
+        // Force sync clients in UI
+        tui_ui.clients = vec![0];
+
+        terminal.draw(|f| tui_ui.draw(f, &context)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+
+        assert!(
+            !content.contains("arrows to switch"),
+            "Arrows hint should be hidden when only one client exists. Content: {}",
+            content
+        );
+
+        // Test Log Hint when logs hidden
+        tui_ui.show_logs = false;
+        terminal.draw(|f| tui_ui.draw(f, &context)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let content = format!("{:?}", buffer);
+
+        assert!(
+            content.contains("`q` to quit"),
+            "Quit hint should be visible when logs are hidden"
+        );
+        assert!(
+            content.contains("`t` for logs"),
+            "Logs hint should be visible when logs are hidden"
+        );
     }
 }

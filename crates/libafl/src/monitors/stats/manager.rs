@@ -225,13 +225,16 @@ impl ClientStatsManager {
     #[expect(clippy::cast_precision_loss)]
     #[cfg(feature = "std")]
     #[must_use]
-    pub fn item_geometry(&self) -> ItemGeometry {
+    pub fn item_geometry(&self) -> Option<ItemGeometry> {
         let mut total_item_geometry = ItemGeometry::new();
         if self.client_stats.is_empty() {
-            return total_item_geometry;
+            // If we have no clients, we have no stats
+            return None;
         }
         let mut ratio_a: u64 = 0;
         let mut ratio_b: u64 = 0;
+        let mut has_stats = false;
+
         for (_, client) in self
             .client_stats()
             .iter()
@@ -244,32 +247,52 @@ impl ClientStatsManager {
 
             if let Some(pending) = client.get_user_stats("pending") {
                 total_item_geometry.pending += pending.value().as_u64().unwrap_or_default();
+                has_stats = true;
             }
 
             if let Some(pend_fav) = client.get_user_stats("pending_fav") {
                 total_item_geometry.pend_fav += pend_fav.value().as_u64().unwrap_or_default();
+                has_stats = true;
             }
 
             if let Some(own_finds) = client.get_user_stats("own_finds") {
                 total_item_geometry.own_finds += own_finds.value().as_u64().unwrap_or_default();
+                has_stats = true;
             }
 
             if let Some(imported) = client.get_user_stats("imported") {
                 total_item_geometry.imported += imported.value().as_u64().unwrap_or_default();
+                has_stats = true;
             }
 
             if let UserStatsValue::Ratio(a, b) = stability.value() {
                 ratio_a += a;
                 ratio_b += b;
+                // Stability is always present if we have any stats? Not necessarily.
+                // But UserStats::new creates a default one.
+                // We should check if 'stability' actually existed in the client stats?
+                // The original code used map_or with default.
+                // If it was default (0/100), it might not mean "stats present".
+                // But if ratio_b > 0 (it is 100 default), and ratio_a > 0?
+                if *a > 0 {
+                    has_stats = true;
+                }
             }
         }
+
+        // If we didn't find specific stats, return None.
+        // This hides the widget when these specific stats are missing.
+        if !has_stats {
+            return None;
+        }
+
         total_item_geometry.stability = if ratio_b == 0 {
             None
         } else {
             Some((ratio_a as f64) / (ratio_b as f64))
         };
 
-        total_item_geometry
+        Some(total_item_geometry)
     }
 }
 
