@@ -226,7 +226,7 @@ impl TuiUi {
                             Span::raw("cycles done"),
                             client
                                 .cycles_done()
-                                .map_or("".to_string(), |c| c.to_string()),
+                                .map_or(String::new(), |c| c.to_string()),
                         ),
                         (
                             Span::raw("solutions"),
@@ -250,7 +250,9 @@ impl TuiUi {
                                 if *b == 0 {
                                     "0/0".into()
                                 } else {
-                                    format!("{a}/{b} ({:.2}%)", (*a as f64 / *b as f64) * 100.0)
+                                    #[allow(clippy::cast_precision_loss)]
+                                    let percentage = (*a as f64 / *b as f64) * 100.0;
+                                    format!("{a}/{b} ({percentage:.2}%)")
                                 }
                             }
                             UserStatsValue::Percent(p) => format!("{:.2}%", p * 100.0),
@@ -312,7 +314,7 @@ impl TuiUi {
                                     PlotConfig::SimpleColor(c) => {
                                         Style::default().fg(Color::Indexed(*c))
                                     }
-                                    _ => Style::default(),
+                                    PlotConfig::None => Style::default(),
                                 };
                                 series.push((
                                     key.clone(),
@@ -487,7 +489,7 @@ impl TuiUi {
     /// Draw the current TUI context
     pub fn draw(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>) {
         let prepared = self.prepare_data(app);
-        self.tabs = prepared.tabs.clone();
+        self.tabs.clone_from(&prepared.tabs);
 
         #[cfg(feature = "introspection")]
         let introspection = true;
@@ -536,11 +538,10 @@ impl TuiUi {
     }
 
     fn calculate_tab_window(&self, titles: &[String], max_width: usize) -> (usize, usize, usize) {
-        self.calculate_tab_window_for_index(titles, max_width, self.charts_tab_idx)
+        Self::calculate_tab_window_for_index(titles, max_width, self.charts_tab_idx)
     }
 
     fn calculate_tab_window_for_index(
-        &self,
         titles: &[String],
         max_width: usize,
         selected_idx: usize,
@@ -630,7 +631,7 @@ impl TuiUi {
             f.render_widget(tabs_widget, tab_area);
 
             if self.charts_tab_idx == 0 {
-                self.draw_stats_column(f, content_area, data, true);
+                Self::draw_stats_column(f, content_area, data, true);
             } else {
                 self.draw_chart(f, content_area, data);
             }
@@ -664,7 +665,7 @@ impl TuiUi {
             .alignment(Alignment::Center);
             f.render_widget(p, left_title);
 
-            self.draw_stats_column(f, left_stats, data, false);
+            Self::draw_stats_column(f, left_stats, data, false);
 
             if !has_charts || data.tabs.len() <= 1 {
                 return;
@@ -683,7 +684,7 @@ impl TuiUi {
             // Or temporarily fake self.charts_tab_idx? No, that requires mut self.
 
             // Let's modify calculate_tab_window to take the selected index.
-            let (start, end, selected) = self.calculate_tab_window_for_index(
+            let (start, end, selected) = Self::calculate_tab_window_for_index(
                 &chart_titles,
                 available_width,
                 visual_selected_idx,
@@ -728,13 +729,7 @@ impl TuiUi {
         }
     }
 
-    fn draw_stats_column(
-        &self,
-        f: &mut Frame,
-        area: Rect,
-        data: &PreparedFrameData,
-        is_narrow: bool,
-    ) {
+    fn draw_stats_column(f: &mut Frame, area: Rect, data: &PreparedFrameData, is_narrow: bool) {
         let has_timing = data.total_timing.is_some();
         let mut constraints = vec![Constraint::Length(4)];
         if has_timing {

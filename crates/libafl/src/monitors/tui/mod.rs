@@ -215,10 +215,11 @@ impl Monitor for TuiMonitor {
                 c.item_geometry = client_item_geometry;
                 c.client_stats = client_snapshot;
             } else {
-                let mut c = ClientTuiContext::default();
-                c.process_timing = client_process_timing;
-                c.item_geometry = client_item_geometry;
-                c.client_stats = client_snapshot;
+                let c = ClientTuiContext {
+                    process_timing: client_process_timing,
+                    item_geometry: client_item_geometry,
+                    client_stats: client_snapshot,
+                };
                 ctx.clients.insert(sender_id.0 as usize, c);
             }
 
