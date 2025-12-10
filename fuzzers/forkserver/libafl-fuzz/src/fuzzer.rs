@@ -50,7 +50,6 @@ use libafl_bolts::{
     core_affinity::CoreId,
     current_nanos, current_time,
     fs::get_unique_std_input_file,
-    ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
