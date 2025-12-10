@@ -32,6 +32,7 @@ impl UserStatsValue {
 
     /// Get the value as u64, if possible
     #[must_use]
+    #[expect(clippy::cast_sign_loss)]
     pub fn as_u64(&self) -> Option<u64> {
         match self {
             Self::Number(n) => Some(*n),

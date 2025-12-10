@@ -203,6 +203,30 @@ pub fn draw_time_chart(
     f.render_widget(chart, area);
 }
 
+/// Generic helper to draw a simple Key-Value table
+pub fn draw_info_table(f: &mut Frame, area: Rect, title: &str, data: Vec<(&str, String)>) {
+    let rows: Vec<Row> = data
+        .into_iter()
+        .map(|(k, v)| Row::new(vec![Cell::from(Span::raw(k)), Cell::from(Span::raw(v))]))
+        .collect();
+
+    let mut block = Block::default().borders(Borders::ALL);
+    if !title.is_empty() {
+        block = block.title(Span::styled(
+            title,
+            Style::default()
+                .fg(Color::LightCyan)
+                .add_modifier(Modifier::BOLD),
+        ));
+    }
+
+    let table = Table::default()
+        .rows(rows)
+        .block(block)
+        .widths([Constraint::Length(16), Constraint::Min(5)]);
+    f.render_widget(table, area);
+}
+
 /// Draw the geometry information of the fuzzing items (testcases)
 pub fn draw_item_geometry_text(
     f: &mut Frame,
@@ -224,53 +248,24 @@ pub fn draw_item_geometry_text(
     } else {
         let clients = &tui_context.clients;
         let client = clients.get(&client_idx);
-        if let Some(client) = client {
-            client.item_geometry.as_ref().unwrap_or(&empty_geometry)
-        } else {
-            &empty_geometry
+        match client {
+            Some(client) => client.item_geometry.as_ref().unwrap_or(&empty_geometry),
+            None => &empty_geometry,
         }
     };
 
-    let items = vec![
-        Row::new(vec![
-            Cell::from(Span::raw("pending")),
-            Cell::from(Span::raw(format!("{}", item_geometry.pending))),
-        ]),
-        Row::new(vec![
-            Cell::from(Span::raw("pend fav")),
-            Cell::from(Span::raw(format!("{}", item_geometry.pend_fav))),
-        ]),
-        Row::new(vec![
-            Cell::from(Span::raw("own finds")),
-            Cell::from(Span::raw(format!("{}", item_geometry.own_finds))),
-        ]),
-        Row::new(vec![
-            Cell::from(Span::raw("imported")),
-            Cell::from(Span::raw(format!("{}", item_geometry.imported))),
-        ]),
-        Row::new(vec![
-            Cell::from(Span::raw("stability")),
-            Cell::from(Span::raw(format!(
-                "{:.2}%",
-                item_geometry.stability.unwrap_or(0.0) * 100.0
-            ))),
-        ]),
+    let data = vec![
+        ("pending", format!("{}", item_geometry.pending)),
+        ("pend fav", format!("{}", item_geometry.pend_fav)),
+        ("own finds", format!("{}", item_geometry.own_finds)),
+        ("imported", format!("{}", item_geometry.imported)),
+        (
+            "stability",
+            format!("{:.2}%", item_geometry.stability.unwrap_or(0.0) * 100.0),
+        ),
     ];
 
-    let table = Table::default()
-        .rows(items)
-        .block(
-            Block::default()
-                .title(Span::styled(
-                    "item geometry",
-                    Style::default()
-                        .fg(Color::LightCyan)
-                        .add_modifier(Modifier::BOLD),
-                ))
-                .borders(Borders::ALL),
-        )
-        .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-    f.render_widget(table, area);
+    draw_info_table(f, area, "item geometry", data);
 }
 
 /// Draw the process timing information
@@ -303,42 +298,21 @@ pub fn draw_process_timing_text(
             (current_time(), &empty_timing)
         }
     };
-    let items = vec![
-        Row::new(vec![
-            Cell::from(Span::raw("run time")),
-            Cell::from(Span::raw(format_duration(
-                &current_time().saturating_sub(tup.0),
-            ))),
-        ]),
-        Row::new(vec![
-            Cell::from(Span::raw("exec speed")),
-            Cell::from(Span::raw(&tup.1.exec_speed)),
-        ]),
-        Row::new(vec![
-            Cell::from(Span::raw("last new entry")),
-            Cell::from(Span::raw(format_duration(&(tup.1.last_new_entry)))),
-        ]),
-        Row::new(vec![
-            Cell::from(Span::raw("last solution")),
-            Cell::from(Span::raw(format_duration(&(tup.1.last_saved_solution)))),
-        ]),
+
+    let data = vec![
+        (
+            "run time",
+            format_duration(&current_time().saturating_sub(tup.0)),
+        ),
+        ("exec speed", tup.1.exec_speed.clone()),
+        ("last new entry", format_duration(&(tup.1.last_new_entry))),
+        (
+            "last solution",
+            format_duration(&(tup.1.last_saved_solution)),
+        ),
     ];
 
-    let mut block = Block::default().borders(Borders::ALL);
-    if !title.is_empty() {
-        block = block.title(Span::styled(
-            title,
-            Style::default()
-                .fg(Color::LightCyan)
-                .add_modifier(Modifier::BOLD),
-        ));
-    }
-
-    let table = Table::default()
-        .rows(items)
-        .block(block)
-        .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-    f.render_widget(table, area);
+    draw_info_table(f, area, title, data);
 }
 
 /// Draw the overall/generic stats (clients count, corpus size, etc.)
@@ -387,10 +361,10 @@ pub fn draw_overall_generic_text(
     }
 
     let table = Table::default().rows(items).block(block).widths([
-        Constraint::Percentage(30),
-        Constraint::Percentage(20),
-        Constraint::Percentage(30),
-        Constraint::Percentage(20),
+        Constraint::Length(10), // "clients" + padding
+        Constraint::Min(5),
+        Constraint::Length(14), // "total execs" + padding
+        Constraint::Min(5),
     ]);
     f.render_widget(table, area);
 }
@@ -403,60 +377,40 @@ pub fn draw_client_generic_text(
     title: &str,
     client_idx: usize,
 ) {
-    let items = {
+    let data = {
         let app = app.read().unwrap();
         let mut rows = vec![
-            Row::new(vec![
-                Cell::from(Span::raw("corpus count")),
-                Cell::from(Span::raw(format_big_number(
+            (
+                "corpus count",
+                format_big_number(
                     app.clients
                         .get(&client_idx)
                         .map_or(0, |x| x.client_stats.corpus_size()),
-                ))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("total execs")),
-                Cell::from(Span::raw(format_big_number(
+                ),
+            ),
+            (
+                "total execs",
+                format_big_number(
                     app.clients
                         .get(&client_idx)
                         .map_or(0, |x| x.client_stats.executions()),
-                ))),
-            ]),
+                ),
+            ),
         ];
 
         if let Some(client) = app.clients.get(&client_idx) {
             if let Some(cycles) = client.cycles_done() {
-                rows.push(Row::new(vec![
-                    Cell::from(Span::raw("cycles done")),
-                    Cell::from(Span::raw(format!("{cycles}"))),
-                ]));
+                rows.push(("cycles done", format!("{cycles}")));
             }
-            rows.push(Row::new(vec![
-                Cell::from(Span::raw("solutions")),
-                Cell::from(Span::raw(format!(
-                    "{}",
-                    client.client_stats.objective_size()
-                ))),
-            ]));
+            rows.push((
+                "solutions",
+                format!("{}", client.client_stats.objective_size()),
+            ));
         }
         rows
     };
 
-    let mut block = Block::default().borders(Borders::ALL);
-    if !title.is_empty() {
-        block = block.title(Span::styled(
-            title,
-            Style::default()
-                .fg(Color::LightCyan)
-                .add_modifier(Modifier::BOLD),
-        ));
-    }
-
-    let table = Table::default()
-        .rows(items)
-        .block(block)
-        .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-    f.render_widget(table, area);
+    draw_info_table(f, area, title, data);
 }
 
 /// Draw introspection stats (scheduler, manager, stages)

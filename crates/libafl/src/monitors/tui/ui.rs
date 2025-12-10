@@ -180,10 +180,7 @@ impl TuiUi {
         #[cfg(not(feature = "introspection"))]
         let introspection = false;
 
-        let has_charts = {
-            let ctx = app.read().unwrap();
-            !ctx.graphs.is_empty()
-        };
+        let has_charts = !app.read().unwrap().graphs.is_empty();
 
         let area = f.area();
         // If transitioning to narrow mode, enable wrap and reset tabs to Overview.
@@ -198,8 +195,9 @@ impl TuiUi {
         // Narrow Mode or Short Mode with Logs: Replace Client View with Logs
         // "Short" = height < 28 (approx)
         let is_short = area.height < 28;
+        let replace_client_with_logs = (self.is_narrow || is_short) && self.show_logs;
 
-        if (self.is_narrow || is_short) && self.show_logs {
+        if replace_client_with_logs {
             // Use split_main to calculate Top height properly
             let body = split_main(area, true, introspection, has_charts);
             let top_body = body[0];
@@ -214,20 +212,72 @@ impl TuiUi {
             // In narrow mode, we removed the title of "Overview", preventing double headers.
             self.draw_overall_ui(f, app, top_body, has_charts);
             draw_logs(f, app, logs_area, self.logs_wrap);
-            return;
+        } else {
+            let body = split_main(area, self.show_logs, introspection, has_charts);
+
+            let top_body = body[0];
+            let mid_body = body[1];
+
+            self.draw_overall_ui(f, app, top_body, has_charts);
+            self.draw_client_ui(f, app, mid_body, self.show_logs);
+
+            if self.show_logs && body.len() > 2 {
+                let bottom_body = body[2];
+                draw_logs(f, app, bottom_body, self.logs_wrap);
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_stats_column(
+        &self,
+        f: &mut Frame,
+        app: &Arc<RwLock<TuiContext>>,
+        area: Rect,
+        has_process_timing: bool,
+        has_geometry: bool,
+        is_narrow: bool,
+    ) {
+        let p_height = if has_process_timing { 6 } else { 0 };
+        let g_height = 4; // Generic height
+
+        let mut constraints = vec![Constraint::Length(g_height)];
+        if has_process_timing {
+            constraints.push(Constraint::Length(p_height));
+        }
+        constraints.push(Constraint::Min(0)); // Geometry or empty
+
+        let chunks = Layout::default()
+            .direction(ratatui::layout::Direction::Vertical)
+            .constraints(constraints)
+            .split(area);
+
+        draw_overall_generic_text(
+            f,
+            app,
+            chunks[0],
+            if is_narrow { "" } else { "Overview" },
+            self.clients.len(),
+        );
+
+        let mut next_idx = 1;
+        if has_process_timing {
+            draw_process_timing_text(
+                f,
+                app,
+                chunks[next_idx],
+                "General",
+                true,
+                self.client_idx,
+                &self.clients,
+            );
+            next_idx += 1;
         }
 
-        let body = split_main(area, self.show_logs, introspection, has_charts);
-
-        let top_body = body[0];
-        let mid_body = body[1];
-
-        self.draw_overall_ui(f, app, top_body, has_charts);
-        self.draw_client_ui(f, app, mid_body, self.show_logs);
-
-        if self.show_logs && body.len() > 2 {
-            let bottom_body = body[2];
-            draw_logs(f, app, bottom_body, self.logs_wrap);
+        if has_geometry {
+            if let Some(chunk) = chunks.get(next_idx) {
+                draw_item_geometry_text(f, app, *chunk, true, self.client_idx, &self.clients);
+            }
         }
     }
 
@@ -241,9 +291,6 @@ impl TuiUi {
     ) {
         let overall_layout = split_overall(area);
         // split_overall now returns a single area (or we treat it as such)
-
-        // In narrow mode, we treat the whole area as one block.
-        // In normal mode, we split into Left (Stats) and Right (Charts).
 
         let ctx_read = app.read().unwrap();
 
@@ -296,84 +343,29 @@ impl TuiUi {
                     };
                     (has_timing, has_geometry)
                 };
-
-                let p_height = if has_process_timing { 6 } else { 0 };
-                let g_height = 4; // Generic height
-
-                let mut constraints = vec![Constraint::Length(g_height)];
-                if has_process_timing {
-                    constraints.push(Constraint::Length(p_height));
-                }
-                constraints.push(Constraint::Min(0)); // Geometry or empty
-
-                let left_stats_layout = Layout::default()
-                    .direction(ratatui::layout::Direction::Vertical)
-                    .constraints(constraints)
-                    .split(content_area);
-
-                // Need "app" (Arc<RwLock>) for these calls, we have it passed in function args.
-                // We dropped ctx_read?? logic above used ctx_read.
-                // Wait, draw helper functions take "app" (lock).
-                // So we must drop ctx_read before calling them?
-                // Or existing code held ctx_read?
-                // Existing code called `draw_overall_generic_text(f, app, ...)` which likely locks inside.
-                // So we must drop ctx_read before calling these helpers.
                 drop(ctx_read);
 
-                draw_overall_generic_text(f, app, left_stats_layout[0], "", self.clients.len());
-
-                let mut next_idx = 1;
-                if has_process_timing {
-                    draw_process_timing_text(
-                        f,
-                        app,
-                        left_stats_layout[next_idx],
-                        "General",
-                        true,
-                        self.client_idx,
-                        &self.clients,
-                    );
-                    next_idx += 1;
-                }
-
-                if has_geometry {
-                    if let Some(chunk) = left_stats_layout.get(next_idx) {
-                        draw_item_geometry_text(
-                            f,
-                            app,
-                            *chunk,
-                            true,
-                            self.client_idx,
-                            &self.clients,
-                        );
-                    }
-                }
+                self.draw_stats_column(
+                    f,
+                    app,
+                    content_area,
+                    has_process_timing,
+                    has_geometry,
+                    true,
+                );
 
                 (None, None)
             } else {
                 // TAB > 0: Chart
                 let graph_idx = self.charts_tab_idx - 1;
-                let name = ctx_read.graphs.get(graph_idx).map(|s| s.as_str()); // This is ref to ctx_read string?
-                // We need to clone the name string or keep ctx_read alive?
-                // `draw_time_chart` takes `&str`.
-                // But we need to return `name` out of this block where `ctx_read` lives.
-                // Actually `draw_time_chart` will be called later.
-                // If we return `name` (ref), we need ctx_read alive.
-                // But we drop ctx_read in Stats branch?
-                // We can't keep ctx_read alive easily if we return from if/else.
-                // So let's clone name to String, or re-acquire lock later?
-                // We can return `Option<String>` for name.
-                let name_owned = name.map(|s| s.to_string());
+                let name = ctx_read.graphs.get(graph_idx).map(|s| s.to_string());
                 drop(ctx_read);
 
-                (Some(content_area), name_owned)
+                (Some(content_area), name)
             }
         } else {
             // NORMAL MODE
-            drop(ctx_read); // Drop generic lock, helpers might lock?
-
-            // Re-acquire or assume stats logic needs lock?
-            // Existing logic re-acquired inside helpers? Yes.
+            drop(ctx_read);
 
             let top_layout = if !has_charts {
                 vec![overall_layout[0]]
@@ -407,43 +399,14 @@ impl TuiUi {
                 (has_timing, has_geometry)
             };
 
-            let stats_area = left_title_layout[1];
-
-            let p_height = if has_process_timing { 6 } else { 0 };
-            let g_height = 4; // Generic height
-
-            let mut constraints = vec![Constraint::Length(g_height)];
-            if has_process_timing {
-                constraints.push(Constraint::Length(p_height));
-            }
-            constraints.push(Constraint::Min(0)); // Geometry or empty
-
-            let left_stats_layout = Layout::default()
-                .direction(ratatui::layout::Direction::Vertical)
-                .constraints(constraints)
-                .split(stats_area);
-
-            draw_overall_generic_text(f, app, left_stats_layout[0], "Overview", self.clients.len());
-
-            let mut next_idx = 1;
-            if has_process_timing {
-                draw_process_timing_text(
-                    f,
-                    app,
-                    left_stats_layout[next_idx],
-                    "General",
-                    true,
-                    self.client_idx,
-                    &self.clients,
-                );
-                next_idx += 1;
-            }
-
-            if has_geometry {
-                if let Some(chunk) = left_stats_layout.get(next_idx) {
-                    draw_item_geometry_text(f, app, *chunk, true, self.client_idx, &self.clients);
-                }
-            }
+            self.draw_stats_column(
+                f,
+                app,
+                left_title_layout[1],
+                has_process_timing,
+                has_geometry,
+                false,
+            );
 
             if !has_charts {
                 return;
@@ -475,10 +438,7 @@ impl TuiUi {
             f.render_widget(tabs, title_chart_layout[0]);
 
             let chart_layout = title_chart_layout[1];
-            // charts_tab_idx might be out of sync if we switched from narrow (idx > graphs.len)?
-            // narrow mode allows idx = graphs.len (params+1).
-            // But normal mode max idx is params-1.
-            // We should cap it.
+
             let idx = if self.charts_tab_idx >= ctx_read.graphs.len() {
                 0
             } else {
