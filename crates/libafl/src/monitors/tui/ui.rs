@@ -150,12 +150,45 @@ impl TuiUi {
                 }
             }
             'u' => {
-                self.user_stats_scroll += self.user_stats_page_size;
+                let ctx = app.read().unwrap();
+                if let Some(client) = ctx.clients.get(&self.client_idx) {
+                    let total = client.client_stats.user_stats().len();
+                    if total > 0 {
+                        self.user_stats_scroll += self.user_stats_page_size;
+                        if self.user_stats_scroll >= total {
+                            self.user_stats_scroll = 0;
+                        }
+                    }
+                }
             }
             'U' => {
-                self.user_stats_scroll = self
-                    .user_stats_scroll
-                    .saturating_sub(self.user_stats_page_size);
+                // If at 0, wrap to end? Or just saturate at 0?
+                // Standard behavior often stops at 0. But for "cycle" (tabbed through), maybe wrap?
+                // Given "stuck after a few wraps" implies user expects it to cycle.
+                // Let's implement cycle for U too for symmetry.
+                let ctx = app.read().unwrap();
+                if let Some(client) = ctx.clients.get(&self.client_idx) {
+                    let total = client.client_stats.user_stats().len();
+                    if total > 0 {
+                        if self.user_stats_scroll == 0 {
+                            // Wrap to last valid page start
+                            // e.g. total 15, page 10. Last start is 10.
+                            // total 20, page 10. Last start is 10.
+                            // total 10, page 10. Last start is 0.
+                            let remainder = total % self.user_stats_page_size;
+                            if remainder == 0 {
+                                self.user_stats_scroll =
+                                    total.saturating_sub(self.user_stats_page_size);
+                            } else {
+                                self.user_stats_scroll = total - remainder;
+                            }
+                        } else {
+                            self.user_stats_scroll = self
+                                .user_stats_scroll
+                                .saturating_sub(self.user_stats_page_size);
+                        }
+                    }
+                }
             }
             _ => {}
         }
@@ -685,7 +718,7 @@ impl TuiUi {
                 .split(left_col);
 
             draw_client_generic_text(f, app, left_chunks[0], "Overview", self.client_idx);
-            
+
             self.user_stats_page_size = draw_user_stats(
                 f,
                 app,

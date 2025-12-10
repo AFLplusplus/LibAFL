@@ -666,42 +666,40 @@ pub fn draw_user_stats(
             return max_items;
         }
 
-        let start_idx = if scroll >= total_stats {
-            0
-        } else {
-            scroll
+        let start_idx = if scroll >= total_stats { 0 } else { scroll };
+
+        let visible_keys = keys.iter().skip(start_idx).take(max_items).map(|k| {
+            let val = client.client_stats.user_stats().get(*k).unwrap();
+            let val_str = match val.value() {
+                UserStatsValue::Number(n) => format_big_number(*n),
+                UserStatsValue::Float(f) => format!("{f:.2}"),
+                UserStatsValue::String(s) => s.to_string(),
+                UserStatsValue::Ratio(a, b) => {
+                    if *b == 0 {
+                        "0/0".into()
+                    } else {
+                        format!("{a}/{b} ({:.2}%)", (*a as f64 / *b as f64) * 100.0)
+                    }
+                }
+                UserStatsValue::Percent(p) => format!("{:.2}%", p * 100.0),
+            };
+            (k.as_ref(), val_str)
+        });
+
+        let end_idx = (start_idx + max_items).min(total_stats);
+        let nav_hint = match (start_idx > 0, total_stats > start_idx + max_items) {
+            (true, true) => " (u/U)",
+            (true, false) => " (U)",
+            (false, true) => " (u)",
+            (false, false) => "",
         };
 
-        let visible_keys = keys
-            .iter()
-            .skip(start_idx)
-            .take(max_items)
-            .map(|k| {
-                let val = client.client_stats.user_stats().get(*k).unwrap();
-                let val_str = match val.value() {
-                    UserStatsValue::Number(n) => format_big_number(*n),
-                    UserStatsValue::Float(f) => format!("{f:.2}"),
-                    UserStatsValue::String(s) => s.to_string(),
-                    UserStatsValue::Ratio(a, b) => {
-                        if *b == 0 {
-                            "0/0".into()
-                        } else {
-                            format!("{a}/{b} ({:.2}%)", (*a as f64 / *b as f64) * 100.0)
-                        }
-                    }
-                    UserStatsValue::Percent(p) => format!("{:.2}%", p * 100.0),
-                };
-                (k.as_ref(), val_str)
-            });
-
         let title = format!(
-            "User Stats ({start_idx}-{}/{total_stats}){}",
-            (start_idx + max_items).min(total_stats),
-            if total_stats > start_idx + max_items {
-                " `u` for next"
-            } else {
-                ""
-            }
+            "User Stats {}-{}/{}{}",
+            start_idx + 1,
+            end_idx,
+            total_stats,
+            nav_hint
         );
 
         draw_info_table(f, area, &title, visible_keys);
