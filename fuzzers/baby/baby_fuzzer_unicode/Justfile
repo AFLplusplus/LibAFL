@@ -25,7 +25,10 @@ test: fuzzer
 	# And we can check if it runs.
 	cargo build --profile={{PROFILE}} --features=tui
 	timeout 5s {{FUZZER}} || true
-	echo "Fuzzer TUI build verification completed."
+	# Test introspection build
+	cargo build --profile={{PROFILE}} --features=introspection
+	timeout 5s {{FUZZER}} || true
+	echo "Fuzzer TUI and Introspection build verification completed."
 
 [windows]
 test: fuzzer

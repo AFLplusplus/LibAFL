@@ -333,7 +333,7 @@ pub enum Event<I> {
         phantom: PhantomData<I>,
     },
     /// New list of user stats event to monitor.
-    UpdateUserStatsList {
+    UpdateUserStatsMap {
         /// Custom user monitor name
         stats: HashMap<Cow<'static, str>, UserStats>,
         /// [`PhantomData`]
@@ -379,7 +379,7 @@ impl<I> Event<I> {
         match self {
             Event::NewTestcase { .. } => "Testcase",
             Event::Heartbeat => "Client Heartbeat",
-            Event::UpdateUserStats { .. } | Event::UpdateUserStatsList { .. } => "UserStats",
+            Event::UpdateUserStats { .. } | Event::UpdateUserStatsMap { .. } => "UserStats",
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor { .. } => "PerfMonitor",
             Event::Objective { .. } => "Objective",
@@ -401,7 +401,7 @@ impl<I> Event<I> {
                 Cow::Owned(format!("Testcase {}", input.generate_name(None)))
             }
             Event::Heartbeat => Cow::Borrowed("Client Heartbeat"),
-            Event::UpdateUserStats { .. } | Event::UpdateUserStatsList { .. } => {
+            Event::UpdateUserStats { .. } | Event::UpdateUserStatsMap { .. } => {
                 Cow::Borrowed("UserStats")
             }
             #[cfg(feature = "introspection")]

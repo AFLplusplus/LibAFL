@@ -51,9 +51,9 @@ pub struct ClientStats {
     start_time: Duration,
     /// User-defined stats
     user_stats: HashMap<Cow<'static, str>, UserStats>,
-    /// Client performance statistics
-    #[cfg(feature = "introspection")]
-    pub introspection_stats: ClientPerfStats,
+    // Client performance statistics
+    // #[cfg(feature = "introspection")]
+    // pub introspection_stats: ClientPerfStats,
     // This field is marked as skip_serializing and skip_deserializing,
     // which means when deserializing, its default value, i.e. all stats
     // is updated, will be filled in this field. This could help preventing
@@ -316,7 +316,53 @@ impl ClientStats {
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
     #[cfg(feature = "introspection")]
     pub fn update_introspection_stats(&mut self, introspection_stats: ClientPerfStats) {
-        self.introspection_stats = introspection_stats;
+        let elapsed = introspection_stats.elapsed_cycles() as f64;
+        if elapsed == 0.0 {
+            return;
+        }
+
+        let scheduler_percent = introspection_stats.scheduler_cycles() as f64 / elapsed;
+        self.update_user_stats(
+            "scheduler".into(),
+            UserStats::new(
+                UserStatsValue::Percent(scheduler_percent),
+                AggregatorOps::Avg,
+            ),
+        );
+
+        let manager_percent = introspection_stats.manager_cycles() as f64 / elapsed;
+        self.update_user_stats(
+            "manager".into(),
+            UserStats::new(UserStatsValue::Percent(manager_percent), AggregatorOps::Avg),
+        );
+
+        for (stage_index, features) in introspection_stats.used_stages() {
+            for (feature_index, feature) in features.iter().enumerate() {
+                let feature_percent = *feature as f64 / elapsed;
+                if feature_percent == 0.0 {
+                    continue;
+                }
+                let feature_name: PerfFeature = feature_index.into();
+                self.update_user_stats(
+                    format!("stage {stage_index}: {feature_name:?}").into(),
+                    UserStats::new(UserStatsValue::Percent(feature_percent), AggregatorOps::Avg),
+                );
+            }
+        }
+
+        for (name, val) in introspection_stats.feedbacks() {
+            let feedback_percent = *val as f64 / elapsed;
+            if feedback_percent == 0.0 {
+                continue;
+            }
+            self.update_user_stats(
+                format!("feedback: {name}").into(),
+                UserStats::new(
+                    UserStatsValue::Percent(feedback_percent),
+                    AggregatorOps::Avg,
+                ),
+            );
+        }
     }
 
     /// Get process timing of current client.

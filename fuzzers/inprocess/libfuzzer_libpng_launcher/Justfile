@@ -115,6 +115,33 @@ test-statsd: fuzzer-statsd
     fi
 
 
+
+[linux]
+[macos]
+cxx-tui:
+    cargo build --profile {{PROFILE}} --features tui
+
+[linux]
+[macos]
+fuzzer-tui: lib cxx-tui
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tui -lm -lz
+
+[linux]
+[macos]
+test-tui: fuzzer-tui
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    # Run fuzzer with TUI for a few seconds
+    # verify it doesn't crash immediately
+    timeout 5s ./{{FUZZER_NAME}}-tui --broker-port 21339 --cores 0 --input ./corpus --tui > fuzzer_tui.log 2>&1 || true
+    if grep -q "panic" fuzzer_tui.log; then
+        echo "Fuzzer panicked"
+        cat fuzzer_tui.log
+        exit 1
+    fi
+    echo "TUI Fuzzer ran successfully (for 5s)"
+
+
 clean:
     rm -rf {{FUZZER_NAME}}
     make -C libpng-1.6.37 clean || true

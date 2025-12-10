@@ -401,6 +401,20 @@ where
                 log::log!((*severity_level).into(), "{message}");
                 Ok(BrokerEventResult::Handled)
             }
+            Event::UpdateUserStatsMap { stats, phantom: _ } => {
+                client_stats_manager.client_stats_insert(client_id)?;
+                let keys: Vec<_> = stats.keys().cloned().collect();
+                client_stats_manager.update_client_stats_for(client_id, |client| {
+                    for (name, value) in stats {
+                        client.update_user_stats(name, value);
+                    }
+                })?;
+                for name in keys {
+                    client_stats_manager.aggregate(name);
+                }
+                monitor.display(client_stats_manager, event.name(), client_id)?;
+                Ok(BrokerEventResult::Handled)
+            }
             Event::Stop => Ok(BrokerEventResult::Forward),
             //_ => Ok(BrokerEventResult::Forward),
         }

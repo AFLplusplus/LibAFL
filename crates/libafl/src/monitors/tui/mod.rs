@@ -145,17 +145,23 @@ impl Monitor for TuiMonitor {
             write!(fmt, ", {key}: {val}").unwrap();
 
             // If the value is a number, we can add it to the custom charts
-            if let Some(val) = val.value().as_f64() {
+            if let Some(val_f64) = val.value().as_f64() {
                 let mut ctx = self.context.write().unwrap();
                 if !ctx.graphs.contains(&key.to_string()) {
                     ctx.graphs.push(key.to_string());
                 }
+
+                let config = val.plot_config();
+                if config != crate::monitors::stats::user_stats::PlotConfig::None {
+                    ctx.plot_configs.insert(key.to_string(), config);
+                }
+
                 ctx.custom_timed
                     .entry(key.to_string())
                     .or_insert_with(|| {
                         TimedStats::new(Duration::from_secs(context::DEFAULT_TIME_WINDOW))
                     })
-                    .add(run_time, val);
+                    .add(run_time, val_f64);
             }
         }
         for (key, val) in client_stats_manager.aggregated() {

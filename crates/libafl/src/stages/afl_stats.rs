@@ -472,7 +472,7 @@ where
         manager.fire(
             state,
             EventWithStats::with_current_time(
-                Event::UpdateUserStatsList {
+                Event::UpdateUserStatsMap {
                     stats: stats_map,
                     phantom: PhantomData,
                 },

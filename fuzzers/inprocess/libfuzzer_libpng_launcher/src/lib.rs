@@ -8,6 +8,8 @@ use std::{env, net::SocketAddr, path::PathBuf};
 use clap::{self, Parser};
 #[cfg(feature = "statsd")]
 use libafl::monitors::statsd::StatsdMonitorTagFlavor;
+#[cfg(feature = "tui")]
+use libafl::monitors::tui::TuiMonitor;
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
@@ -30,7 +32,9 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::mutational::StdMutationalStage,
+    stages::{
+        afl_stats::AflStatsStage, calibrate::CalibrationStage, mutational::StdMutationalStage,
+    },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
@@ -137,6 +141,10 @@ struct Opt {
     #[cfg(feature = "statsd")]
     #[arg(long, help = "Enable StatsD", name = "STATSD", default_value = "false")]
     statsd: bool,
+
+    #[cfg(feature = "tui")]
+    #[arg(long, help = "Enable TUI", name = "TUI", default_value = "false")]
+    tui: bool,
     /*
     /// This fuzzer has hard-coded tokens
     #[arg(
@@ -169,30 +177,6 @@ pub extern "C" fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    #[cfg(feature = "statsd")]
-    let monitor = tuple_list!(
-        OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
-        MultiMonitor::new(|s| println!("{s}")),
-        libafl::monitors::OptionalMonitor::new(if opt.statsd {
-            Some(
-                libafl::monitors::StatsdMonitor::new(
-                    opt.statsd_host,
-                    opt.statsd_port,
-                    StatsdMonitorTagFlavor::default(),
-                )
-                .with_per_client_stats(true),
-            )
-        } else {
-            None
-        })
-    );
-
-    #[cfg(not(feature = "statsd"))]
-    let monitor = tuple_list!(
-        OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
-        MultiMonitor::new(|s| println!("{s}")),
-    );
-
     let mut run_client =
         |state: Option<_>,
          mut restarting_mgr: LlmpRestartingEventManager<_, _, _, _, _>,
@@ -210,9 +194,10 @@ pub extern "C" fn libafl_main() {
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
+            let map_feedback = MaxMapFeedback::new(&edges_observer);
             let mut feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
-                MaxMapFeedback::new(&edges_observer),
+                map_feedback.clone(),
                 // Time feedback, this one does not need a feedback state
                 TimeFeedback::new(&time_observer)
             );
@@ -269,7 +254,19 @@ pub extern "C" fn libafl_main() {
 
             // Setup a basic mutator with a mutational stage
             let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-            let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+            let calibration = CalibrationStage::new(&map_feedback);
+            let afl_stats = AflStatsStage::builder()
+                .map_feedback(&map_feedback)
+                .stats_file(opt.output.join("fuzzer_stats"))
+                .report_interval(Duration::from_secs(5))
+                .core_id(core_id)
+                .banner("libfuzzer_libpng".into())
+                .version("0.16.0".into())
+                .target_mode("LibFuzzer".into())
+                .build()
+                .unwrap();
+
+            let mut stages = tuple_list!(calibration, StdMutationalStage::new(mutator), afl_stats);
 
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler =
@@ -323,21 +320,123 @@ pub extern "C" fn libafl_main() {
             Ok(())
         };
 
-    match Launcher::builder()
-        .shmem_provider(shmem_provider)
-        .configuration(EventConfig::from_name("default"))
-        .monitor(monitor)
-        .run_client(&mut run_client)
-        .cores(&cores)
-        .overcommit(opt.overcommit)
-        .broker_port(broker_port)
-        .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"))
-        .build()
-        .launch()
+    #[cfg(feature = "tui")]
     {
-        Ok(()) => (),
-        Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
-        Err(err) => panic!("Failed to run launcher: {err:?}"),
+        #[cfg(feature = "statsd")]
+        let statsd = libafl::monitors::OptionalMonitor::new(if opt.statsd {
+            Some(
+                libafl::monitors::StatsdMonitor::new(
+                    opt.statsd_host.clone(),
+                    opt.statsd_port,
+                    StatsdMonitorTagFlavor::default(),
+                )
+                .with_per_client_stats(true),
+            )
+        } else {
+            None
+        });
+
+        #[cfg(feature = "statsd")]
+        let monitor = tuple_list!(
+            OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
+            libafl::monitors::OptionalMonitor::new(if !opt.tui {
+                Some(MultiMonitor::new(|s| println!("{s}")))
+            } else {
+                None
+            }),
+            libafl::monitors::OptionalMonitor::new(if opt.tui {
+                Some(
+                    TuiMonitor::builder()
+                        .title("libfuzzer_libpng")
+                        .enhanced_graphics(true)
+                        .build(),
+                )
+            } else {
+                None
+            }),
+            statsd
+        );
+
+        #[cfg(not(feature = "statsd"))]
+        let monitor = tuple_list!(
+            OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
+            libafl::monitors::OptionalMonitor::new(if !opt.tui {
+                Some(MultiMonitor::new(|s| println!("{s}")))
+            } else {
+                None
+            }),
+            libafl::monitors::OptionalMonitor::new(if opt.tui {
+                Some(
+                    TuiMonitor::builder()
+                        .title("libfuzzer_libpng")
+                        .enhanced_graphics(true)
+                        .build(),
+                )
+            } else {
+                None
+            }),
+        );
+        match Launcher::builder()
+            .shmem_provider(shmem_provider)
+            .configuration(EventConfig::from_name("default"))
+            .monitor(monitor)
+            .run_client(&mut run_client)
+            .cores(&cores)
+            .overcommit(opt.overcommit)
+            .broker_port(broker_port)
+            .remote_broker_addr(opt.remote_broker_addr)
+            .stdout_file(Some("/dev/null"))
+            .build()
+            .launch()
+        {
+            Ok(()) => (),
+            Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
+            Err(err) => panic!("Failed to run launcher: {err:?}"),
+        }
+    }
+
+    #[cfg(not(feature = "tui"))]
+    {
+        #[cfg(feature = "statsd")]
+        let monitor = tuple_list!(
+            OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
+            MultiMonitor::new(|s| println!("{s}")),
+            libafl::monitors::OptionalMonitor::new(if opt.statsd {
+                Some(
+                    libafl::monitors::StatsdMonitor::new(
+                        opt.statsd_host,
+                        opt.statsd_port,
+                        StatsdMonitorTagFlavor::default(),
+                    )
+                    .with_per_client_stats(true),
+                )
+            } else {
+                None
+            })
+        );
+
+        #[cfg(not(feature = "statsd"))]
+        let monitor = tuple_list!(
+            OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
+            MultiMonitor::new(|s| println!("{s}")),
+        );
+
+        match Launcher::builder()
+            .shmem_provider(shmem_provider)
+            .configuration(EventConfig::from_name("default"))
+            .monitor(monitor)
+            .run_client(&mut run_client)
+            .cores(&cores)
+            .overcommit(opt.overcommit)
+            .broker_port(broker_port)
+            .remote_broker_addr(opt.remote_broker_addr)
+            .stdout_file(Some("/dev/null"))
+            .build()
+            .launch()
+        {
+            Ok(()) => (),
+            Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
+            Err(err) => panic!("Failed to run launcher: {err:?}"),
+        }
     }
 }

@@ -296,8 +296,18 @@ impl StatsdMonitor {
 
                 let corpus_size = client.corpus_size();
                 let objective_size = client.objective_size();
-                let item_geometry = client.item_geometry();
-                let edges_coverage = client.edges_coverage();
+                let (pend_fav, pending, own_finds, imported, stability) =
+                    if let Some(item_geometry) = client.item_geometry() {
+                        (
+                            item_geometry.pend_fav,
+                            item_geometry.pending,
+                            item_geometry.own_finds,
+                            item_geometry.imported,
+                            item_geometry.stability,
+                        )
+                    } else {
+                        (0, 0, 0, 0, None)
+                    };
 
                 Self::send_metrics(
                     statsd_client,
@@ -305,11 +315,11 @@ impl StatsdMonitor {
                     execs,
                     client_execs_per_sec,
                     corpus_size,
-                    item_geometry.own_finds,
-                    item_geometry.imported,
-                    item_geometry.stability,
-                    item_geometry.pend_fav,
-                    item_geometry.pending,
+                    own_finds,
+                    imported,
+                    stability,
+                    pend_fav,
+                    pending,
                     objective_size,
                     edges_coverage.as_ref(),
                     &tags,

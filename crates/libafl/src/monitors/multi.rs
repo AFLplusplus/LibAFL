@@ -85,19 +85,7 @@ where
         // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]
         {
-            // Print the client performance monitor. Skip the Client 0 which is the broker
-            for (i, (_, client)) in client_stats_manager
-                .client_stats()
-                .iter()
-                .filter(|(_, x)| x.enabled())
-                .enumerate()
-            {
-                let fmt = format!("Client {:03}:\n{}", i + 1, client.introspection_stats);
-                (self.print_fn)(&fmt);
-            }
-
-            // Separate the spacing just a bit
-            (self.print_fn)("\n");
+            // Introspection stats are now part of UserStats, so they are already printed above.
         }
         Ok(())
     }

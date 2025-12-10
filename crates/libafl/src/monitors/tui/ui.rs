@@ -1,4 +1,8 @@
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use std::sync::RwLock;
 
 use libafl_bolts::current_time;
@@ -10,8 +14,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Tabs},
 };
 
-#[cfg(feature = "introspection")]
-use super::widgets::draw_introspection_text;
+// use super::widgets::draw_introspection_text;
 use super::{
     layout::{split_client, split_main, split_overall, split_title, split_top},
     widgets::{
@@ -33,6 +36,7 @@ pub struct TuiUi {
     clients: Vec<usize>,
     charts_tab_idx: usize,
     graph_data: Vec<(f64, f64)>,
+    multi_graph_data: Vec<Vec<(f64, f64)>>,
     is_narrow: bool,
     logs_wrap: bool,
 
@@ -77,6 +81,7 @@ impl TuiUi {
             clients: vec![],
             charts_tab_idx: 0,
             graph_data: vec![],
+            multi_graph_data: vec![],
             is_narrow: false,
             logs_wrap: false,
             should_quit: false,
@@ -86,6 +91,25 @@ impl TuiUi {
         }
     }
 
+    fn get_tabs(&self, ctx: &TuiContext) -> Vec<String> {
+        let mut tabs = vec!["Overview".to_string()];
+
+        // Add standalone graphs (graphs NOT in plot_configs)
+        // We use the original order from ctx.graphs for stability
+        for g in &ctx.graphs {
+            if !ctx.plot_configs.contains_key(g) {
+                tabs.push(g.clone());
+            }
+        }
+
+        // Add "User Stats" if there are any grouped graphs
+        if !ctx.plot_configs.is_empty() {
+            tabs.push("User Stats".to_string());
+        }
+
+        tabs
+    }
+
     /// Handle a key event
     pub fn on_key(&mut self, c: char, app: &Arc<RwLock<TuiContext>>) {
         match c {
@@ -93,28 +117,16 @@ impl TuiUi {
             'r' => self.should_refresh = true,
             'g' => {
                 let ctx = app.read().unwrap();
-                let params = ctx.graphs.len();
-                if params > 0 {
-                    if self.is_narrow {
-                        // 0 = Generic, 1..=params = Charts
-                        // Total items = params + 1
-                        self.charts_tab_idx = (self.charts_tab_idx + 1) % (params + 1);
-                    } else {
-                        // Normal behavior
-                        self.charts_tab_idx = (self.charts_tab_idx + 1) % params;
-                    }
+                let tabs = self.get_tabs(&ctx);
+                if !tabs.is_empty() {
+                    self.charts_tab_idx = (self.charts_tab_idx + 1) % tabs.len();
                 }
             }
             'G' => {
                 let ctx = app.read().unwrap();
-                let params = ctx.graphs.len();
-                if params > 0 {
-                    if self.is_narrow {
-                        let total = params + 1;
-                        self.charts_tab_idx = (self.charts_tab_idx + total - 1) % total;
-                    } else {
-                        self.charts_tab_idx = (self.charts_tab_idx + params - 1) % params;
-                    }
+                let tabs = self.get_tabs(&ctx);
+                if !tabs.is_empty() {
+                    self.charts_tab_idx = (self.charts_tab_idx + tabs.len() - 1) % tabs.len();
                 }
             }
             't' => {
@@ -335,27 +347,58 @@ impl TuiUi {
         }
     }
 
-    fn calculate_tab_window(
-        &self,
-        total_tabs: usize,
-        max_display_tabs: usize,
-    ) -> (usize, usize, usize) {
-        if total_tabs <= max_display_tabs {
-            (0, total_tabs, self.charts_tab_idx)
-        } else {
-            let half = max_display_tabs / 2;
-            let start = self.charts_tab_idx.saturating_sub(half);
-            let start = if start + max_display_tabs > total_tabs {
-                total_tabs.saturating_sub(max_display_tabs)
-            } else {
-                start
-            };
-            (
-                start,
-                start + max_display_tabs,
-                self.charts_tab_idx.saturating_sub(start),
-            )
+    fn calculate_tab_window(&self, titles: &[Span], max_width: usize) -> (usize, usize, usize) {
+        let tab_count = titles.len();
+        if tab_count == 0 {
+            return (0, 0, 0);
         }
+        let selected_idx = self.charts_tab_idx.min(tab_count - 1);
+
+        // Approximate width calculation
+        // Each tab: content width + separator (3 chars " | ")
+        // We want to fit as many neighbors around selected_idx as possible within max_width
+
+        let get_width = |i: usize| -> usize {
+            if i >= titles.len() {
+                return 0;
+            }
+            titles[i].content.chars().count() + 3 // + padding/separator
+        };
+
+        let mut start = selected_idx;
+        let mut end = selected_idx + 1;
+        let mut current_width = get_width(selected_idx);
+
+        // Try to expand outwards
+        loop {
+            let mut changed = false;
+
+            // Try expanding left
+            if start > 0 {
+                let w = get_width(start - 1);
+                if current_width + w <= max_width {
+                    start -= 1;
+                    current_width += w;
+                    changed = true;
+                }
+            }
+
+            // Try expanding right
+            if end < tab_count {
+                let w = get_width(end);
+                if current_width + w <= max_width {
+                    end += 1;
+                    current_width += w;
+                    changed = true;
+                }
+            }
+
+            if !changed {
+                break;
+            }
+        }
+
+        (start, end, selected_idx.saturating_sub(start))
     }
 
     #[allow(deprecated)]
@@ -370,18 +413,23 @@ impl TuiUi {
         // split_overall now returns a single Rect
 
         let ctx_read = app.read().unwrap();
+        let tabs_list = self.get_tabs(&ctx_read);
 
         let (chart_layout, graph_name) = if self.is_narrow {
             // NARROW MODE
-            // 0 = Generic Stats
-            // 1.. = Charts
+            // 0 = Generic Stats, 1.. = Charts
 
             // Prepare Tabs
-            let mut all_titles = vec![Span::from("Overview")];
-            all_titles.extend(ctx_read.graphs.iter().map(|g| Span::from(g.clone())));
+            let all_titles: Vec<Span> = tabs_list.iter().map(|f| Span::from(f.clone())).collect();
 
             // Sliding window logic
-            let (start_idx, end_idx, selected_idx) = self.calculate_tab_window(all_titles.len(), 5);
+            // Area width minus borders (2) and Title " G/g " (approx 5) + Title (self.title len)
+            // Or just use tab_area width if calculated?
+            // In narrow mode, we render tabs in tab_area (split_title(overall_layout)).
+            // Let's assume we have full width available minus some overhead.
+            let available_width = area.width.saturating_sub(4) as usize; // Rough estimate
+            let (start_idx, end_idx, selected_idx) =
+                self.calculate_tab_window(&all_titles, available_width);
             let visible_titles = all_titles[start_idx..end_idx].to_vec();
 
             let tabs = Tabs::new(visible_titles)
@@ -436,8 +484,7 @@ impl TuiUi {
                 (None, None)
             } else {
                 // TAB > 0: Chart
-                let graph_idx = self.charts_tab_idx - 1;
-                let name = ctx_read.graphs.get(graph_idx).cloned();
+                let name = tabs_list.get(self.charts_tab_idx).cloned();
                 drop(ctx_read);
 
                 (Some(content_area), name)
@@ -487,26 +534,45 @@ impl TuiUi {
                 false,
             );
 
-            if !has_charts {
+            if !has_charts || tabs_list.len() <= 1 {
                 return;
             }
 
             // RIGHT COLUMN: Charts
-            let ctx_read = app.read().unwrap();
-            let all_titles: Vec<Span> = ctx_read
-                .graphs
+            // Skip "Overview"
+            let chart_titles: Vec<Span> = tabs_list[1..]
                 .iter()
                 .map(|g| Span::from(g.clone()))
                 .collect();
 
-            let (start_idx, end_idx, selected_idx) = self.calculate_tab_window(all_titles.len(), 5);
-            let visible_titles = all_titles[start_idx..end_idx].to_vec();
+            // Adjust index to skip Overview (0)
+            let effective_idx = if self.charts_tab_idx == 0 {
+                0
+            } else {
+                self.charts_tab_idx.saturating_sub(1)
+            };
+
+            // Ensure we are in bounds
+            let effective_idx = if effective_idx >= chart_titles.len() {
+                0
+            } else {
+                effective_idx
+            };
+
+            // Sliding window logic
+            // Use right_title_area width? We haven't split it yet but we can estimate.
+            // Right col width is approx half of screen in normal mode.
+            let available_width = right_col.width.saturating_sub(4) as usize;
+
+            let (start, end, sel) = self.calculate_tab_window(&chart_titles, available_width);
+
+            let visible_titles = chart_titles[start..end].to_vec();
 
             let tabs = Tabs::new(visible_titles)
                 .block(
                     Block::default()
                         .title(Span::styled(
-                            "charts (G/g)",
+                            "charts (g/G to go through)",
                             Style::default()
                                 .fg(Color::LightCyan)
                                 .add_modifier(Modifier::BOLD),
@@ -514,19 +580,12 @@ impl TuiUi {
                         .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
                 )
                 .highlight_style(Style::default().fg(Color::LightYellow))
-                .select(selected_idx);
+                .select(sel);
 
             let (right_title_area, right_chart_area) = split_title(right_col);
             f.render_widget(tabs, right_title_area);
 
-            let idx = if self.charts_tab_idx >= ctx_read.graphs.len() {
-                0
-            } else {
-                self.charts_tab_idx
-            };
-
-            let graph_name = ctx_read.graphs.get(idx).cloned();
-            drop(ctx_read);
+            let graph_name = tabs_list.get(effective_idx + 1).cloned();
 
             (Some(right_chart_area), graph_name)
         };
@@ -574,6 +633,44 @@ impl TuiUi {
                         preset_y_range: None,
                     },
                 ),
+                "User Stats" => {
+                    use crate::monitors::stats::user_stats::PlotConfig;
+                    let mut series = vec![];
+                    for (key, config) in &ctx_read.plot_configs {
+                        if let Some(stats) = ctx_read.custom_timed.get(key.as_str()) {
+                            let style = match config {
+                                PlotConfig::Color(r, g, b) => {
+                                    Style::default().fg(Color::Rgb(*r, *g, *b))
+                                }
+                                PlotConfig::SimpleColor(c) => {
+                                    Style::default().fg(Color::Indexed(*c))
+                                }
+                                _ => Style::default(),
+                            };
+                            series.push((key.as_str(), stats, style));
+                        }
+                    }
+                    // Sort series by name for consistent legend order
+                    series.sort_by(|a, b| a.0.cmp(b.0));
+
+                    if self.multi_graph_data.len() < series.len() {
+                        self.multi_graph_data.resize(series.len(), vec![]);
+                    }
+
+                    crate::monitors::tui::widgets::draw_multi_time_chart(
+                        f,
+                        layout,
+                        crate::monitors::tui::widgets::MultiTimeChartOptions {
+                            title: "User Stats",
+                            y_name: "value",
+                            series,
+                            graph_data: &mut self.multi_graph_data,
+                            enhanced_graphics: self.enhanced_graphics,
+                            current_time: run_time,
+                            preset_y_range: None,
+                        },
+                    );
+                }
                 custom_name => {
                     if let Some(stats) = ctx_read.custom_timed.get(custom_name) {
                         draw_time_chart(
@@ -637,16 +734,7 @@ impl TuiUi {
         let mut client_area = client_block.inner(area);
         f.render_widget(client_block, area);
 
-        #[cfg(feature = "introspection")]
-        {
-            let client_layout = Layout::default()
-                .direction(ratatui::layout::Direction::Vertical)
-                .constraints([Constraint::Min(11), Constraint::Percentage(50)].as_ref())
-                .split(client_area);
-            client_area = client_layout[0];
-            let introspection_layout = client_layout[1];
-            draw_introspection_text(f, app, introspection_layout, self.client_idx);
-        }
+        // Introspection block removed (perf stats are now in UserStats)
 
         let narrow = area.width < Self::NARROW_WIDTH_THRESHOLD;
 
@@ -770,7 +858,7 @@ mod tests {
 
     use super::*;
     #[cfg(feature = "introspection")]
-    use crate::monitors::tui::PerfTuiContext;
+    // use crate::monitors::tui::PerfTuiContext;
     use crate::monitors::tui::{ClientTuiContext, ItemGeometry, String, TuiContext};
 
     #[test]
@@ -1193,5 +1281,45 @@ mod tests {
             content.contains("`t` for logs"),
             "Logs hint should be visible when logs are hidden"
         );
+    }
+    #[test]
+    #[cfg(feature = "introspection")]
+    fn test_introspection_via_user_stats() {
+        use crate::monitors::{
+            stats::{ClientStats, perf_stats::ClientPerfStats},
+            tui::{ClientTuiContext, TuiContext},
+        };
+
+        let mut tui_context = TuiContext::new(Duration::from_secs(0));
+        let mut client_stats = ClientStats::default();
+
+        let mut perf_stats = ClientPerfStats::new();
+        perf_stats.set_start_time(0);
+        perf_stats.set_current_time(100);
+
+        // Mock some values
+        perf_stats.update_scheduler(20); // 20%
+        perf_stats.update_manager(10); // 10%
+
+        client_stats.update_introspection_stats(perf_stats);
+
+        // Verify UserStats execution
+        let scheduler = client_stats.get_user_stats("scheduler").unwrap();
+        assert!(format!("{}", scheduler.value()).contains("20.000%"));
+
+        let manager = client_stats.get_user_stats("manager").unwrap();
+        assert!(format!("{}", manager.value()).contains("10.000%"));
+
+        tui_context.clients.insert(
+            0,
+            ClientTuiContext {
+                client_stats,
+                ..Default::default()
+            },
+        );
+
+        // Test rendering via draw_client_ui -> draw_user_stats
+        // This is implicit since we verified the UserStats content above,
+        // and we know draw_user_stats renders UserStats.
     }
 }

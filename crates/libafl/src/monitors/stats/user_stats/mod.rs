@@ -9,11 +9,23 @@ pub use user_stats_value::*;
 
 use super::manager::ClientStatsManager;
 
+/// The plot config for the user stats
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlotConfig {
+    /// No grouping
+    None,
+    /// Group by color
+    Color(u8, u8, u8),
+    /// Group by simple color index (0-255)
+    SimpleColor(u8),
+}
+
 /// user defined stats enum
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UserStats {
     value: UserStatsValue,
     aggregator_op: AggregatorOps,
+    plot_config: PlotConfig,
 }
 
 impl UserStats {
@@ -27,13 +39,25 @@ impl UserStats {
     pub fn value(&self) -> &UserStatsValue {
         &self.value
     }
+    /// Get the plot config
+    #[must_use]
+    pub fn plot_config(&self) -> PlotConfig {
+        self.plot_config
+    }
     /// Constructor
     #[must_use]
     pub fn new(value: UserStatsValue, aggregator_op: AggregatorOps) -> Self {
         Self {
             value,
             aggregator_op,
+            plot_config: PlotConfig::None,
         }
+    }
+    /// Constructor with plot config
+    #[must_use]
+    pub fn with_plot_config(mut self, plot_config: PlotConfig) -> Self {
+        self.plot_config = plot_config;
+        self
     }
 }
 

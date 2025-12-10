@@ -3,11 +3,9 @@ use core::time::Duration;
 
 use hashbrown::HashMap;
 
-#[cfg(feature = "introspection")]
-use crate::monitors::stats::perf_stats::{ClientPerfStats, PerfFeature};
 pub use crate::monitors::stats::{
     ClientStats, EdgeCoverage, ItemGeometry, ProcessTiming, TimedStat, TimedStats,
-    user_stats::UserStats,
+    user_stats::{PlotConfig, UserStats},
 };
 
 /// The default time window for charts (10 minutes)
@@ -75,6 +73,8 @@ pub struct TuiContext {
     pub objective_size_timed: TimedStats,
     /// Timed execs per sec
     pub execs_per_sec_timed: TimedStats,
+    /// The plot configs for the custom stats
+    pub plot_configs: HashMap<String, PlotConfig>,
     /// Timed custom user stats
     pub custom_timed: HashMap<String, TimedStats>,
 
@@ -93,41 +93,40 @@ pub struct TuiContext {
 
     /// Total map density
     pub total_map_density: String,
+
     /// Total solutions
     pub total_solutions: u64,
     /// Total corpus count
     pub total_corpus_count: u64,
 
-    /// Total process timing
-    pub total_process_timing: ProcessTiming,
     /// Total item geometry
     pub total_item_geometry: Option<ItemGeometry>,
+
+    /// Total process timing
+    pub total_process_timing: ProcessTiming,
 }
 
 impl TuiContext {
-    /// Create a new TUI context
+    /// Create a new [`TuiContext`]
     #[must_use]
     pub fn new(start_time: Duration) -> Self {
         Self {
-            graphs: vec!["corpus".into(), "objectives".into(), "exec/sec".into()],
-            corpus_size_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
-            objective_size_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
-            execs_per_sec_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
-            custom_timed: HashMap::default(),
-
-            clients: HashMap::default(),
-
-            client_logs: VecDeque::with_capacity(DEFAULT_LOGS_NUMBER),
-
-            clients_num: 0,
-            total_execs: 0,
             start_time,
-
-            total_map_density: String::from("0%"),
+            clients: HashMap::default(),
+            client_logs: VecDeque::with_capacity(DEFAULT_LOGS_NUMBER),
+            total_execs: 0,
+            clients_num: 0,
+            total_map_density: String::new(),
             total_solutions: 0,
             total_corpus_count: 0,
             total_item_geometry: None,
             total_process_timing: ProcessTiming::new(),
+            plot_configs: HashMap::default(),
+            graphs: Vec::new(),
+            corpus_size_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
+            objective_size_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
+            execs_per_sec_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
+            custom_timed: HashMap::default(),
         }
     }
 }

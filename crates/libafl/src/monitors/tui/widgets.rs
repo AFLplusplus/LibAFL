@@ -44,6 +44,27 @@ pub struct TimeChartOptions<'a> {
 
 /// Draw the time chart with the given stats
 #[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
+/// Options for drawing a time chart with multiple series
+#[derive(Debug)]
+pub struct MultiTimeChartOptions<'a> {
+    /// The title of the chart
+    pub title: &'a str,
+    /// The name of the Y-axis
+    pub y_name: &'a str,
+    /// The stats to plot: (Name, Stats, Style)
+    pub series: Vec<(&'a str, &'a TimedStats, Style)>,
+    /// Buffers to hold the graph data (to avoid allocations). Must match series length.
+    pub graph_data: &'a mut Vec<Vec<(f64, f64)>>,
+    /// Whether to use enhanced graphics (Braille) or not
+    pub enhanced_graphics: bool,
+    /// The current running time
+    pub current_time: Duration,
+    /// Optional preset range for Y axis (min, max). Data outside this range will expand it.
+    pub preset_y_range: Option<(f64, f64)>,
+}
+
+/// Draw the time chart with the given stats
+#[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
 pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
     let TimeChartOptions {
         title,
@@ -55,32 +76,71 @@ pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
         preset_y_range,
     } = options;
 
-    let last_stat_time = stats.series.back().map_or(current_time, |s| s.time);
-    let end = last_stat_time.max(current_time);
-    let start = end.saturating_sub(stats.window);
+    // Create a temporary buffer for the single series
+    let mut temp_data = vec![];
+    core::mem::swap(graph_data, &mut temp_data);
+    let mut buffers = vec![temp_data];
 
-    // Ensure we have at least some window to avoid division by zero
-    let window = if start == end {
+    let multi_options = MultiTimeChartOptions {
+        title,
+        y_name,
+        series: vec![(
+            "",
+            stats,
+            Style::default()
+                .fg(Color::LightYellow)
+                .add_modifier(Modifier::BOLD),
+        )],
+        graph_data: &mut buffers,
+        enhanced_graphics,
+        current_time,
+        preset_y_range,
+    };
+
+    draw_multi_time_chart(f, area, multi_options);
+
+    // Restore buffer
+    core::mem::swap(graph_data, &mut buffers[0]);
+}
+
+/// Draw a time chart with multiple series
+#[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
+pub fn draw_multi_time_chart(f: &mut Frame, area: Rect, options: MultiTimeChartOptions) {
+    let MultiTimeChartOptions {
+        title,
+        y_name,
+        series,
+        graph_data,
+        enhanced_graphics,
+        current_time,
+        preset_y_range,
+    } = options;
+
+    if series.is_empty() {
+        return;
+    }
+
+    // Determine common window and global min/max
+    // We assume all stats have roughly similar window settings, or we just use the first/max.
+    // Let's use the first one for window calculation for now, or max window?
+    // Usually they are all default window.
+    let window = series[0].1.window;
+
+    let end = current_time;
+    let start = end.saturating_sub(window);
+
+    // Calculate time unit and X conversion
+    let max_x = u64::from(area.width);
+
+    let window_dur = if start == end {
         Duration::from_secs(1)
     } else {
         end.saturating_sub(start)
     };
 
-    let min_lbl_x = format_duration(&start);
-    let med_lbl_x = format_duration(&(window / 2));
-    let max_lbl_x = format_duration(&end);
-
-    let x_labels = vec![
-        Span::styled(min_lbl_x, Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(med_lbl_x),
-        Span::styled(max_lbl_x, Style::default().add_modifier(Modifier::BOLD)),
-    ];
-
-    let max_x = u64::from(area.width);
-
-    let time_unit = if max_x > window.as_secs() {
+    let time_unit = if max_x > window_dur.as_secs() {
         0 // millis / 10
-    } else if max_x > window.as_secs() * 60 {
+    } else if max_x > window_dur.as_secs() * 60 {
         1 // secs
     } else {
         2 // min
@@ -96,105 +156,103 @@ pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
         }
     };
 
-    let window_unit = convert_time(&window).max(1); // Ensure non-zero
-
+    let window_unit = convert_time(&window_dur).max(1);
     let to_x =
         |d: &Duration| (convert_time(d).saturating_sub(convert_time(&start))) * max_x / window_unit;
 
-    graph_data.clear();
+    // Process each series
+    let mut global_min_y: Option<f64> = None;
+    let mut global_max_y: Option<f64> = None;
 
-    // Initialize bounds
-    let mut max_y: Option<f64> = None;
-    let mut min_y: Option<f64> = None;
+    for (idx, (_, stats, _)) in series.iter().enumerate() {
+        if idx >= graph_data.len() {
+            break; // Should not happen if caller provides correct buffers
+        }
+        let data = &mut graph_data[idx];
+        data.clear();
 
-    // Find the starting index efficiently
-    let (s1, s2) = stats.series.as_slices();
-    let idx1 = s1.partition_point(|x| x.time < start);
-    let start_index = if idx1 == s1.len() {
-        s1.len() + s2.partition_point(|x| x.time < start)
-    } else {
-        idx1
-    }
-    .saturating_sub(1); // Include one point before start for continuity
-
-    let mut prev = (0, 0.0);
-    // Initialize with first visible point (or the one just before)
-    if let Some(first) = stats.series.get(start_index) {
-        prev = (to_x(&first.time), first.item);
-    }
-
-    for ts in stats.series.iter().skip(start_index) {
-        let x = to_x(&ts.time);
-
-        // Update bounds for ALL points to ensure auto-scaling covers spikes even if not drawn
-        max_y = Some(max_y.map_or(ts.item, |m| m.max(ts.item)));
-        min_y = Some(min_y.map_or(ts.item, |m| m.min(ts.item)));
-
-        if x > prev.0 || graph_data.is_empty() {
-            if x > prev.0 + 1 && !graph_data.is_empty() {
-                // Fill gap
-                for v in (prev.0 + 1)..x {
-                    graph_data.push((v as f64, prev.1));
-                }
-            }
-            graph_data.push((x as f64, ts.item));
-            prev = (x, ts.item);
+        let (s1, s2) = stats.series.as_slices();
+        let idx1 = s1.partition_point(|x| x.time < start);
+        let start_index = if idx1 == s1.len() {
+            s1.len() + s2.partition_point(|x| x.time < start)
         } else {
-            // Same X coordinate, update last point to latest value
-            if let Some(last) = graph_data.last_mut() {
-                last.1 = ts.item;
+            idx1
+        }
+        .saturating_sub(1);
+
+        let mut prev = (0, 0.0);
+        if let Some(first) = stats.series.get(start_index) {
+            prev = (to_x(&first.time), first.item);
+        }
+
+        for ts in stats.series.iter().skip(start_index) {
+            let x = to_x(&ts.time);
+
+            global_max_y = Some(global_max_y.map_or(ts.item, |m| m.max(ts.item)));
+            global_min_y = Some(global_min_y.map_or(ts.item, |m| m.min(ts.item)));
+
+            if x > prev.0 || data.is_empty() {
+                if x > prev.0 + 1 && !data.is_empty() {
+                    for v in (prev.0 + 1)..x {
+                        data.push((v as f64, prev.1));
+                    }
+                }
+                data.push((x as f64, ts.item));
+                prev = (x, ts.item);
+            } else {
+                if let Some(last) = data.last_mut() {
+                    last.1 = ts.item;
+                }
+                prev.1 = ts.item;
             }
-            prev.1 = ts.item;
+        }
+
+        // Extrapolate
+        let end_x = to_x(&end);
+        if end_x > prev.0 {
+            for v in (prev.0 + 1)..=end_x.min(max_x) {
+                data.push((v as f64, prev.1));
+            }
+        }
+        if max_x > prev.0 + 1 {
+            for v in (prev.0 + 1)..max_x {
+                data.push((v as f64, prev.1));
+            }
         }
     }
 
-    // Extrapolate to current time (end)
-    let end_x = to_x(&end);
-    if end_x > prev.0 {
-        for v in (prev.0 + 1)..=end_x.min(max_x) {
-            graph_data.push((v as f64, prev.1));
-        }
-        // Ensure the last point is exactly at end_x/current value
-        // Use prev.1 as the value since we are extrapolating flat line
-    }
-
-    // Ensure reasonable bounds if empty or flat
     if let Some((p_min, p_max)) = preset_y_range {
-        min_y = Some(min_y.map_or(p_min, |m| m.min(p_min)));
-        max_y = Some(max_y.map_or(p_max, |m| m.max(p_max)));
+        global_min_y = Some(global_min_y.map_or(p_min, |m| m.min(p_min)));
+        global_max_y = Some(global_max_y.map_or(p_max, |m| m.max(p_max)));
     }
 
-    let mut min_y = min_y.unwrap_or(0.0);
-    let mut max_y = max_y.unwrap_or(0.0);
+    let min_y = global_min_y.unwrap_or(0.0);
+    let mut max_y = global_max_y.unwrap_or(0.0);
 
     if preset_y_range.is_none() && min_y >= 0.0 {
-        min_y = 0.0;
         max_y = max_y.max(1.0);
     }
-
     if (min_y - max_y).abs() < f64::EPSILON {
         max_y = min_y + 1.0;
     }
-    if max_x > prev.0 + 1 {
-        for v in (prev.0 + 1)..max_x {
-            graph_data.push((v as f64, prev.1));
-        }
-    }
 
-    let datasets = vec![
-        Dataset::default()
-            .marker(if enhanced_graphics {
-                symbols::Marker::Braille
-            } else {
-                symbols::Marker::Dot
-            })
-            .style(
-                Style::default()
-                    .fg(Color::LightYellow)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .data(graph_data),
-    ];
+    // Create Datasets
+    let datasets: Vec<Dataset> = series
+        .iter()
+        .enumerate()
+        .map(|(idx, (name, _, style))| {
+            Dataset::default()
+                .name(*name)
+                .marker(if enhanced_graphics {
+                    symbols::Marker::Braille
+                } else {
+                    symbols::Marker::Dot
+                })
+                .style(*style)
+                .data(&graph_data[idx])
+        })
+        .collect();
+
     let mut block = Block::default().borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT);
     if !title.is_empty() {
         block = block.title(Span::styled(
@@ -204,6 +262,16 @@ pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
                 .add_modifier(Modifier::BOLD),
         ));
     }
+
+    let min_lbl_x = format_duration(&start);
+    let med_lbl_x = format_duration(&(window_dur / 2));
+    let max_lbl_x = format_duration(&end);
+    let x_labels = vec![
+        Span::styled(min_lbl_x, Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(med_lbl_x),
+        Span::styled(max_lbl_x, Style::default().add_modifier(Modifier::BOLD)),
+    ];
+
     let chart = Chart::new(datasets)
         .block(block)
         .x_axis(
@@ -230,17 +298,23 @@ pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
                     ),
                 ]),
         );
+
     f.render_widget(chart, area);
 }
 
 /// Generic helper to draw a simple Key-Value table
-pub fn draw_info_table<'a, I>(f: &mut Frame, area: Rect, title: &str, data: I)
-where
-    I: IntoIterator<Item = (&'a str, String)>,
+pub fn draw_info_table<'a, I>(
+    f: &mut Frame,
+    area: Rect,
+    title: &str,
+    data: I,
+    constraints: &[Constraint],
+) where
+    I: IntoIterator<Item = (Span<'a>, String)>,
 {
     let rows = data
         .into_iter()
-        .map(|(k, v)| Row::new([Cell::from(Span::raw(k)), Cell::from(Span::raw(v))]));
+        .map(|(k, v)| Row::new([Cell::from(k), Cell::from(Span::raw(v))]));
 
     let mut block = Block::default().borders(Borders::ALL);
     if !title.is_empty() {
@@ -252,10 +326,7 @@ where
         ));
     }
 
-    let table = Table::default()
-        .rows(rows)
-        .block(block)
-        .widths([Constraint::Length(16), Constraint::Min(5)]);
+    let table = Table::default().rows(rows).block(block).widths(constraints);
     f.render_widget(table, area);
 }
 
@@ -287,17 +358,26 @@ pub fn draw_item_geometry_text(
     };
 
     let data = [
-        ("pending", format!("{}", item_geometry.pending)),
-        ("pend fav", format!("{}", item_geometry.pend_fav)),
-        ("own finds", format!("{}", item_geometry.own_finds)),
-        ("imported", format!("{}", item_geometry.imported)),
+        (Span::raw("pending"), format!("{}", item_geometry.pending)),
+        (Span::raw("pend fav"), format!("{}", item_geometry.pend_fav)),
         (
-            "stability",
+            Span::raw("own finds"),
+            format!("{}", item_geometry.own_finds),
+        ),
+        (Span::raw("imported"), format!("{}", item_geometry.imported)),
+        (
+            Span::raw("stability"),
             format!("{:.2}%", item_geometry.stability.unwrap_or(0.0) * 100.0),
         ),
     ];
 
-    draw_info_table(f, area, "item geometry", data);
+    draw_info_table(
+        f,
+        area,
+        "item geometry",
+        data,
+        &[Constraint::Length(20), Constraint::Min(5)],
+    );
 }
 
 /// Draw the process timing information
@@ -333,18 +413,27 @@ pub fn draw_process_timing_text(
 
     let data = [
         (
-            "run time",
+            Span::raw("run time"),
             format_duration(&current_time().saturating_sub(tup.0)),
         ),
-        ("exec speed", tup.1.exec_speed.clone()),
-        ("last new entry", format_duration(&(tup.1.last_new_entry))),
+        (Span::raw("exec speed"), tup.1.exec_speed.clone()),
         (
-            "last solution",
+            Span::raw("last new entry"),
+            format_duration(&(tup.1.last_new_entry)),
+        ),
+        (
+            Span::raw("last solution"),
             format_duration(&(tup.1.last_saved_solution)),
         ),
     ];
 
-    draw_info_table(f, area, title, data);
+    draw_info_table(
+        f,
+        area,
+        title,
+        data,
+        &[Constraint::Length(24), Constraint::Min(5)],
+    );
 }
 
 /// Draw the overall/generic stats (clients count, corpus size, etc.)
@@ -415,7 +504,7 @@ pub fn draw_client_generic_text(
         let app = app.read().unwrap();
         let mut rows = vec![
             (
-                "corpus count",
+                Span::raw("corpus count"),
                 format_big_number(
                     app.clients
                         .get(&client_idx)
@@ -423,7 +512,7 @@ pub fn draw_client_generic_text(
                 ),
             ),
             (
-                "total execs",
+                Span::raw("total execs"),
                 format_big_number(
                     app.clients
                         .get(&client_idx)
@@ -434,123 +523,27 @@ pub fn draw_client_generic_text(
 
         if let Some(client) = app.clients.get(&client_idx) {
             if let Some(cycles) = client.cycles_done() {
-                rows.push(("cycles done", format!("{cycles}")));
+                rows.push((Span::raw("cycles done"), format!("{cycles}")));
             }
             rows.push((
-                "solutions",
+                Span::raw("solutions"),
                 format!("{}", client.client_stats.objective_size()),
             ));
         }
         rows
     };
 
-    draw_info_table(f, area, title, data);
+    draw_info_table(
+        f,
+        area,
+        title,
+        data,
+        &[Constraint::Length(20), Constraint::Min(5)],
+    );
 }
 
 /// Draw introspection stats (scheduler, manager, stages)
-#[cfg(feature = "introspection")]
-pub fn draw_introspection_text(
-    f: &mut Frame,
-    app: &Arc<RwLock<TuiContext>>,
-    area: Rect,
-    client_idx: usize,
-) {
-    let mut items = vec![];
-    {
-        let ctx = app.read().unwrap();
-        if let Some(client) = ctx.clients.get(&client_idx) {
-            let m = &client.client_stats.introspection_stats;
-            // Calculate the elapsed time from the monitor
-            let elapsed: f64 = m.elapsed_cycles() as f64;
-
-            // Calculate the percentages for each benchmark
-            let scheduler = m.scheduler_cycles() as f64 / elapsed;
-            let manager = m.manager_cycles() as f64 / elapsed;
-
-            // Calculate the remaining percentage that has not been benchmarked
-            let mut other_percent = 1.0;
-            other_percent -= scheduler;
-            other_percent -= manager;
-
-            items.push(Row::new(vec![
-                Cell::from(Span::raw("scheduler")),
-                Cell::from(Span::raw(format!("{:.2}%", scheduler * 100.0))),
-            ]));
-            items.push(Row::new(vec![
-                Cell::from(Span::raw("manager")),
-                Cell::from(Span::raw(format!("{:.2}%", manager * 100.0))),
-            ]));
-
-            // Calculate each stage
-            // Make sure we only iterate over used stages
-            for (stage_index, features) in m.used_stages() {
-                items.push(Row::new(vec![
-                    Cell::from(Span::raw(format!("stage {stage_index}"))),
-                    Cell::from(Span::raw("")),
-                ]));
-
-                for (feature_index, feature) in features.iter().enumerate() {
-                    // Calculate this current stage's percentage
-                    let feature_percent = *feature as f64 / elapsed;
-
-                    // Ignore this feature if it isn't used
-                    if feature_percent == 0.0 {
-                        continue;
-                    }
-
-                    // Update the other percent by removing this current percent
-                    other_percent -= feature_percent;
-
-                    // Get the actual feature from the feature index for printing its name
-                    let feature: crate::monitors::stats::perf_stats::PerfFeature =
-                        feature_index.into();
-                    items.push(Row::new(vec![
-                        Cell::from(Span::raw(format!("{feature:?}"))),
-                        Cell::from(Span::raw(format!("{:.2}%", feature_percent * 100.0))),
-                    ]));
-                }
-            }
-
-            for (feedback_name, feedback_time) in m.feedbacks() {
-                // Calculate this current stage's percentage
-                let feedback_percent = *feedback_time as f64 / elapsed;
-
-                // Ignore this feedback if it isn't used
-                if feedback_percent == 0.0 {
-                    continue;
-                }
-
-                // Update the other percent by removing this current percent
-                other_percent -= feedback_percent;
-
-                items.push(Row::new(vec![
-                    Cell::from(Span::raw(feedback_name.clone())),
-                    Cell::from(Span::raw(format!("{:.2}%", feedback_percent * 100.0))),
-                ]));
-            }
-
-            items.push(Row::new(vec![
-                Cell::from(Span::raw("not measured")),
-                Cell::from(Span::raw(format!("{:.2}%", other_percent * 100.0))),
-            ]));
-        }
-    }
-
-    let table = Table::default()
-        .rows(items)
-        .block(
-            Block::default()
-                .title(Span::styled(
-                    "introspection",
-                    Style::default()
-                        .fg(Color::LightCyan)
-                        .add_modifier(Modifier::BOLD),
-                ))
-                .borders(Borders::ALL),
-        )
-        .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-    f.render_widget(table, area);
-}
+// draw_introspection_text removed, using UserStats instead
 
 /// Draw the client logs
 #[allow(deprecated)]
@@ -572,6 +565,7 @@ pub fn draw_logs(f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect, enabl
                 } else {
                     let mut first = true;
                     // Char-based wrapping
+                    // Space-aware word wrapping
                     let mut i = 0;
                     while i < chars.len() {
                         let limit = if first {
@@ -579,7 +573,33 @@ pub fn draw_logs(f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect, enabl
                         } else {
                             width.saturating_sub(2)
                         };
-                        let chunk_len = core::cmp::min(limit, chars.len() - i);
+
+                        let remaining = chars.len() - i;
+                        if remaining <= limit {
+                            // Fits entirely
+                            let chunk: String = chars[i..].iter().collect();
+                            if first {
+                                lines.push(chunk);
+                                // first = false; // Unused as we break immediately
+                            } else {
+                                lines.push(format!("  {chunk}"));
+                            }
+                            break;
+                        }
+
+                        // Need to split
+                        let mut split_idx = limit;
+                        // finding the last space within the limit
+                        if let Some(pos) =
+                            chars[i..i + limit].iter().rposition(|c| c.is_whitespace())
+                        {
+                            if pos > 0 {
+                                // avoid splitting at 0 if possible
+                                split_idx = pos + 1; // include space in the previous line, or split after it
+                            }
+                        }
+
+                        let chunk_len = core::cmp::min(split_idx, remaining);
                         let chunk: String = chars[i..i + chunk_len].iter().collect();
 
                         if first {
@@ -625,17 +645,17 @@ pub fn draw_logs(f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect, enabl
             ))
             .title(
                 Title::from(Span::styled(
-                    "`q` to quit",
-                    Style::default()
-                        .fg(Color::LightMagenta)
-                        .add_modifier(Modifier::BOLD),
+                    if enable_wrap { "wrapped" } else { "raw" },
+                    Style::default().fg(Color::DarkGray),
                 ))
                 .alignment(Alignment::Right),
             )
             .title(
                 Title::from(Span::styled(
-                    if enable_wrap { "wrapped" } else { "raw" },
-                    Style::default().fg(Color::DarkGray),
+                    "`q` to quit",
+                    Style::default()
+                        .fg(Color::LightMagenta)
+                        .add_modifier(Modifier::BOLD),
                 ))
                 .position(ratatui::widgets::block::Position::Bottom)
                 .alignment(Alignment::Right),
@@ -652,6 +672,8 @@ pub fn draw_user_stats(
     client_idx: usize,
     scroll: usize,
 ) -> usize {
+    use crate::monitors::stats::user_stats::PlotConfig;
+
     let app = app.read().unwrap();
 
     if let Some(client) = app.clients.get(&client_idx) {
@@ -683,7 +705,14 @@ pub fn draw_user_stats(
                 }
                 UserStatsValue::Percent(p) => format!("{:.2}%", p * 100.0),
             };
-            (k.as_ref(), val_str)
+
+            let style = match val.plot_config() {
+                PlotConfig::None => Style::default(),
+                PlotConfig::Color(r, g, b) => Style::default().fg(Color::Rgb(r, g, b)),
+                PlotConfig::SimpleColor(c) => Style::default().fg(Color::Indexed(c)),
+            };
+
+            (Span::styled(k.as_ref(), style), val_str)
         });
 
         let end_idx = (start_idx + max_items).min(total_stats);
@@ -702,7 +731,13 @@ pub fn draw_user_stats(
             nav_hint
         );
 
-        draw_info_table(f, area, &title, visible_keys);
+        draw_info_table(
+            f,
+            area,
+            &title,
+            visible_keys,
+            &[Constraint::Percentage(70), Constraint::Percentage(30)],
+        );
         return max_items;
     }
     0

@@ -11,9 +11,9 @@ pub fn split_main(area: Rect, show_logs: bool, introspection: bool, has_charts: 
             Layout::default()
                 .constraints(
                     [
-                        Constraint::Percentage(41),
-                        Constraint::Percentage(44),
-                        Constraint::Percentage(15),
+                        Constraint::Percentage(40),
+                        Constraint::Percentage(30),
+                        Constraint::Percentage(30),
                     ]
                     .as_ref(),
                 )
