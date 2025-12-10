@@ -900,11 +900,8 @@ where
     SyscallHookResult::Run
 }
 
-#[expect(
-    non_upper_case_globals,
-    clippy::too_many_arguments,
-    clippy::cast_possible_wrap
-)]
+#[expect(non_upper_case_globals, clippy::too_many_arguments)]
+#[allow(clippy::cast_possible_wrap)]
 pub fn trace_mmap_snapshot<ET, I, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,
