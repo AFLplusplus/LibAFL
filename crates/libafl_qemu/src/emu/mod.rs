@@ -154,7 +154,9 @@ impl Add<GuestUsize> for GuestAddrKind {
 
     fn add(self, rhs: GuestUsize) -> Self::Output {
         match self {
-            GuestAddrKind::Physical(paddr) => GuestAddrKind::Physical(paddr + rhs as GuestPhysAddr),
+            GuestAddrKind::Physical(paddr) => {
+                GuestAddrKind::Physical(paddr + GuestPhysAddr::from(rhs))
+            }
             GuestAddrKind::Virtual(vaddr) => GuestAddrKind::Virtual(vaddr + rhs as GuestVirtAddr),
         }
     }

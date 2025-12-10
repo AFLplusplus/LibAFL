@@ -1,4 +1,5 @@
 import "../../../just/libafl-qemu.just"
+
 FUZZER_NAME := "qemu_baremetal"
 VHARNESS := BUILD_DIR / "vharness_out"
 

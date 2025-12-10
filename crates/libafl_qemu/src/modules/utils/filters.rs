@@ -146,7 +146,6 @@ where
 }
 
 /// Offers accessors to modules' page filters.
-
 pub trait HasPageFilter {
     type PageFilter: PageFilter;
 

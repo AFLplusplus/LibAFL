@@ -98,7 +98,7 @@ impl<C, I, S>
         QemuConfigBuilder,
         I,
         S,
-        systemmode::StdSnapshotManager,
+        super::systemmode::StdSnapshotManager,
     >
 where
     S: HasExecutions + Unpin,

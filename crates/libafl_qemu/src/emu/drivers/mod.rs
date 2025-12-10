@@ -181,6 +181,7 @@ pub enum MapKind {
     Cmp,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 pub struct StdEmulatorDriverBuilder<IS> {
     input_setter: IS,
     hooks_locked: bool,
@@ -209,6 +210,7 @@ where
 }
 
 impl<IS> StdEmulatorDriverBuilder<IS> {
+    #[allow(clippy::fn_params_excessive_bools)]
     pub fn new(
         input_setter: IS,
         hooks_locked: bool,
@@ -253,6 +255,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
     }
 
     #[cfg(feature = "systemmode")]
+    #[must_use]
     pub fn allow_page_on_start(self, allow_page_on_start: bool) -> Self {
         Self::new(
             self.input_setter,
@@ -265,6 +268,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
     }
 
     #[cfg(feature = "x86_64")]
+    #[must_use]
     pub fn process_only(self, process_only: bool) -> Self {
         Self::new(
             self.input_setter,

@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "usermode")]
 use crate::capstone;
+#[cfg(feature = "systemmode")]
+use crate::modules::utils::filters::{HasPageFilter, NOP_PAGE_FILTER};
 use crate::{
     Qemu,
     emu::EmulatorModules,

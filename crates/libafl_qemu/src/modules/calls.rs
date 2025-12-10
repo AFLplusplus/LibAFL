@@ -521,7 +521,7 @@ impl<'a> CallTraceCollector for OnCrashBacktraceCollector<'a>
 where
     'a: 'static,
 {
-    #[expect(clippy::unnecessary_cast)]
+    #[allow(clippy::unnecessary_cast)]
     fn on_call<ET, I, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, I, S>,
@@ -533,10 +533,10 @@ where
         I: Unpin,
         S: Unpin,
     {
-        self.callstack_hash ^= pc as u64 + call_len as u64;
+        self.callstack_hash ^= u64::from(pc) + call_len as u64;
     }
 
-    #[expect(clippy::unnecessary_cast)]
+    #[allow(clippy::unnecessary_cast)]
     fn on_ret<ET, I, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, I, S>,
@@ -548,7 +548,7 @@ where
         I: Unpin,
         S: Unpin,
     {
-        self.callstack_hash ^= ret_addr as u64;
+        self.callstack_hash ^= u64::from(ret_addr);
     }
 
     fn pre_exec<I>(&mut self, _qemu: Qemu, _input: &I)

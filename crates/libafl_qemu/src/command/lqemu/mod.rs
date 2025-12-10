@@ -206,11 +206,11 @@ where
 
             // Auto page filtering if option is enabled
             #[cfg(feature = "systemmode")]
-            if emu.driver_mut().allow_page_on_start() {
-                if let Some(paging_id) = qemu.current_cpu().unwrap().current_paging_id() {
-                    log::info!("Filter: allow page ID {paging_id}.");
-                    emu.modules_mut().modules_mut().allow_page_id_all(paging_id);
-                }
+            if emu.driver_mut().allow_page_on_start()
+                && let Some(paging_id) = qemu.current_cpu().unwrap().current_paging_id()
+            {
+                log::info!("Filter: allow page ID {paging_id}.");
+                emu.modules_mut().modules_mut().allow_page_id_all(paging_id);
             }
 
             // Make sure JIT cache is empty just before starting
@@ -456,6 +456,7 @@ where
 
 #[cfg(feature = "systemmode")]
 impl SetMapCommand {
+    #[must_use]
     pub fn new(kind: MapKind, map: QemuMemoryChunk) -> Self {
         Self { kind, map }
     }

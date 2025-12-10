@@ -189,9 +189,9 @@ impl CPU {
     /// This may only be safely used for valid guest addresses!
     #[cfg(not(feature = "systemmode"))]
     pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
-        let host_addr = self.g2h(addr);
+        let host_addr = self.g2h::<u8>(addr);
         unsafe {
-            copy_nonoverlapping(host_addr as *const u8, buf.as_mut_ptr(), buf.len());
+            copy_nonoverlapping(host_addr.cast_const(), buf.as_mut_ptr(), buf.len());
         }
     }
 
@@ -204,9 +204,9 @@ impl CPU {
     /// This may only be safely used for valid guest addresses!
     #[cfg(not(feature = "systemmode"))]
     pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
-        let host_addr = self.g2h(addr);
+        let host_addr = self.g2h::<u8>(addr);
         unsafe {
-            copy_nonoverlapping(buf.as_ptr(), host_addr as *mut u8, buf.len());
+            copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
         }
     }
 
