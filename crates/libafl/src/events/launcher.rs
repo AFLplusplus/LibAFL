@@ -23,8 +23,6 @@ use core::{
     time::Duration,
 };
 use std::process::Stdio;
-#[cfg(unix)]
-use std::vec::Vec;
 
 use libafl_bolts::{
     core_affinity::{CoreId, Cores, get_core_ids},
@@ -46,9 +44,11 @@ use {
 
 #[cfg(feature = "tcp_manager")]
 use crate::HasMetadata;
+#[cfg(feature = "multi_machine")]
+use crate::events::multi_machine::NodeDescriptor;
 #[cfg(all(unix, feature = "multi_machine"))]
-use crate::events::multi_machine::{NodeDescriptor, TcpMultiMachineHooks};
-#[cfg(unix)]
+use crate::events::multi_machine::TcpMultiMachineHooks;
+
 use crate::inputs::Input;
 #[cfg(feature = "tcp_manager")]
 use crate::state::{HasCurrentTestcase, HasExecutions, HasImported, HasSolutions, Stoppable};
@@ -891,7 +891,7 @@ where
 
     /// Launch the common broker logic
     #[cfg(unix)]
-    pub fn launch_common_broker<I, S>(self, handles: Vec<libc::pid_t>) -> Result<(), Error>
+    pub fn launch_common_broker<I, S>(self, handles: &[libc::pid_t]) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
         S: DeserializeOwned + Serialize,
@@ -989,13 +989,13 @@ where
         log::info!("The last client quit. Exiting.");
 
         // Brokers exited. kill all clients and wait for them to avoid zombies.
-        for handle in &handles {
+        for handle in handles {
             unsafe {
                 libc::kill(*handle, libc::SIGINT);
             }
         }
         // Wait for all children to avoid zombie processes
-        for handle in &handles {
+        for handle in handles {
             unsafe {
                 libc::waitpid(*handle, core::ptr::null_mut(), 0);
             }
@@ -1252,7 +1252,7 @@ where
             }
         }
 
-        self.launcher.launch_common_broker::<I, S>(handles)
+        self.launcher.launch_common_broker::<I, S>(&handles)
     }
 }
 
@@ -1273,6 +1273,13 @@ impl CentralizedLauncherBuilder<'_, (), (), (), ()> {
             builder: LauncherBuilder::new(),
             main_run_client: None,
         }
+    }
+}
+
+#[cfg(unix)]
+impl Default for CentralizedLauncherBuilder<'_, (), (), (), ()> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

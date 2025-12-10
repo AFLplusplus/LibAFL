@@ -205,7 +205,6 @@ fn main() {
     }
 }
 
-
 #[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, Parser, Clone)]
 #[command(
