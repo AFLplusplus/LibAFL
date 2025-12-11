@@ -341,6 +341,7 @@ impl ClientStats {
 
         for (stage_index, features) in introspection_stats.used_stages() {
             for (feature_index, feature) in features.iter().enumerate() {
+                #[allow(clippy::cast_precision_loss)]
                 let feature_percent = *feature as f64 / elapsed;
                 if feature_percent == 0.0 {
                     continue;
@@ -354,6 +355,7 @@ impl ClientStats {
         }
 
         for (name, val) in introspection_stats.feedbacks() {
+            #[allow(clippy::cast_precision_loss)]
             let feedback_percent = *val as f64 / elapsed;
             if feedback_percent == 0.0 {
                 continue;

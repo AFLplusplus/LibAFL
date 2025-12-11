@@ -187,10 +187,10 @@ impl TuiUi {
         let total_timing_data = if ctx.total_process_timing.exec_speed != "0/sec" {
             Some(&ctx.total_process_timing)
         } else if let Some(client) = ctx.clients.get(&0) {
-            if client.process_timing.exec_speed != "0/sec" {
-                Some(&client.process_timing)
-            } else {
+            if client.process_timing.exec_speed == "0/sec" {
                 None
+            } else {
+                Some(&client.process_timing)
             }
         } else {
             None
@@ -203,13 +203,13 @@ impl TuiUi {
         // 2. Client Stats
         let (client_generic_stats, client_timing, client_geometry, client_user_stats) =
             if let Some(client) = ctx.clients.get(&self.client_idx) {
-                let timing = if client.process_timing.exec_speed != "0/sec" {
+                let timing = if client.process_timing.exec_speed == "0/sec" {
+                    None
+                } else {
                     Some((
                         client.process_timing.clone(),
                         current_time().saturating_sub(client.process_timing.client_start_time),
                     ))
-                } else {
-                    None
                 };
 
                 let generic = GenericStats {
