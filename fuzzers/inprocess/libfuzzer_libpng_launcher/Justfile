@@ -78,7 +78,7 @@ test: fuzzer test-statsd test-tcp-fork test-tcp-no-fork
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
     echo "Testing default (no fork)..."
-    timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21337 --cores 0 --input ./corpus  2>&1 | tee fuzz_stdout.log || true
+    timeout 31s ./{{FUZZER_NAME}} --broker-port 21337 --cores 0 --input ./corpus  2>&1 | tee fuzz_stdout.log || true
     if grep -qa "corpus: " fuzz_stdout.log; then
         echo "Fuzzer (no fork) is working"
     else
@@ -89,7 +89,7 @@ test: fuzzer test-statsd test-tcp-fork test-tcp-no-fork
     echo "Testing with fork..."
     rm -rf libafl_unix_shmem_server || true
     rm -rf out_fork || true
-    timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21338 --cores 0 --input ./corpus --output ./out_fork --fork 2>&1 | tee fuzz_fork_stdout.log || true
+    timeout 31s ./{{FUZZER_NAME}} --broker-port 21338 --cores 0 --input ./corpus --output ./out_fork --fork 2>&1 | tee fuzz_fork_stdout.log || true
     if grep -qa "corpus: " fuzz_fork_stdout.log; then
         echo "Fuzzer (fork) is working"
     else
@@ -102,7 +102,7 @@ test: fuzzer test-statsd test-tcp-fork test-tcp-no-fork
     rm -rf out_fork_crash || true
     # Run with crash_after. It should crash and restart repeatedly.
     # We check if it still produces output/runs.
-    timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21339 --cores 0 --input ./corpus --output ./out_fork_crash --fork --crash-after 100 2>&1 | tee fuzz_fork_crash_stdout.log || true
+    timeout 31s ./{{FUZZER_NAME}} --broker-port 21339 --cores 0 --input ./corpus --output ./out_fork_crash --fork --crash-after 100 2>&1 | tee fuzz_fork_crash_stdout.log || true
     # Check for objectives (crashes are recorded as objectives in the stats)
     # Note: forked child's stderr may not propagate, so we check stats output
     if grep -qa "objectives: [1-9]" fuzz_fork_crash_stdout.log; then
@@ -199,11 +199,11 @@ test-tcp-fork: fuzzer-tcp
     rm -rf libafl_unix_shmem_server || true
     echo "Testing with TCP (fork)..."
     rm -rf out_tcp_fork || true
-    timeout 31s ./{{FUZZER_NAME}}-tcp --broker-port 21340 --cores 0 --input ./corpus --output ./out_tcp_fork --tcp --fork > /dev/null 2>&1 || true
-    if [ -d "out_tcp_fork/default/queue" ]; then
+    timeout 31s ./{{FUZZER_NAME}}-tcp --broker-port 21340 --cores 0 --input ./corpus --output ./out_tcp_fork --tcp --fork > fuzz_tcp_fork.log 2>&1 || true
+    if grep -qa "corpus: " fuzz_tcp_fork.log; then
         echo "Fuzzer (TCP fork) is working"
     else
-        echo "Fuzzer (TCP fork) failed: queue directory not found"
+        echo "Fuzzer (TCP fork) failed: no corpus found in log"
         exit 1
     fi
 
@@ -214,11 +214,11 @@ test-tcp-no-fork: fuzzer-tcp
     rm -rf libafl_unix_shmem_server || true
     echo "Testing with TCP (no fork)..."
     rm -rf out_tcp_no_fork || true
-    timeout 31s ./{{FUZZER_NAME}}-tcp --broker-port 21341 --cores 0 --input ./corpus --output ./out_tcp_no_fork --tcp > /dev/null 2>&1 || true
-    if [ -d "out_tcp_no_fork/default/queue" ]; then
+    timeout 31s ./{{FUZZER_NAME}}-tcp --broker-port 21341 --cores 0 --input ./corpus --output ./out_tcp_no_fork --tcp > fuzz_tcp_no_fork.log 2>&1 || true
+    if grep -qa "corpus: " fuzz_tcp_no_fork.log; then
         echo "Fuzzer (TCP no fork) is working"
     else
-        echo "Fuzzer (TCP no fork) failed: queue directory not found"
+        echo "Fuzzer (TCP no fork) failed: no corpus found in log"
         exit 1
     fi
 
