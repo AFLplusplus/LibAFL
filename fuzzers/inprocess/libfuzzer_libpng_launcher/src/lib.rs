@@ -231,9 +231,10 @@ pub extern "C" fn libafl_main() {
                 EventWithStats::with_current_time(
                     libafl::events::Event::UpdateUserStats {
                         name: "core_id".to_string().into(),
-                        value: UserStats::new(
+                        value: UserStats::with_tag(
                             UserStatsValue::String(core_id.0.to_string().into()),
                             AggregatorOps::None,
+                            TAG_CORE_ID,
                         ),
                         phantom: Default::default(),
                     },

@@ -482,11 +482,11 @@ pub fn draw_logs(f: &mut Frame, area: Rect, logs: &[String], enable_wrap: bool) 
     f.render_widget(logs_widget, area);
 }
 
-/// Draw the user stats
-pub fn draw_user_stats(
+/// Draw a scrolled list of stats
+pub fn draw_scrolled_stats(
     f: &mut Frame,
     area: Rect,
-    _client_idx: usize,
+    block_title: &str,
     stats: &[(Span, String)],
     scroll: usize,
 ) -> usize {
@@ -510,7 +510,7 @@ pub fn draw_user_stats(
     };
 
     let title = format!(
-        "User Stats {}-{}/{}{}",
+        "{block_title} {}-{}/{}{}",
         start_idx + 1,
         end_idx,
         total_stats,
@@ -525,4 +525,15 @@ pub fn draw_user_stats(
         &[Constraint::Percentage(70), Constraint::Percentage(30)],
     );
     max_items
+}
+
+/// Draw the user stats
+pub fn draw_user_stats(
+    f: &mut Frame,
+    area: Rect,
+    _client_idx: usize,
+    stats: &[(Span, String)],
+    scroll: usize,
+) -> usize {
+    draw_scrolled_stats(f, area, "User Stats", stats, scroll)
 }

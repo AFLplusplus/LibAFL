@@ -35,7 +35,11 @@ use crate::{
     events::{Event, EventFirer, EventWithStats},
     executors::HasObservers,
     feedbacks::{HasObserverHandle, MapFeedbackMetadata},
-    monitors::stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::user_stats::{
+        AggregatorOps, TAG_AFL_STATS_CYCLES_DONE, TAG_AFL_STATS_CYCLES_WO_FINDS,
+        TAG_AFL_STATS_IMPORTED, TAG_AFL_STATS_OWN_FINDS, TAG_AFL_STATS_PENDING,
+        TAG_AFL_STATS_PENDING_FAV, UserStats, UserStatsValue,
+    },
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{HasQueueCycles, minimizer::IsFavoredMetadata},
@@ -423,49 +427,50 @@ where
         let mut stats_map = HashMap::default();
         stats_map.insert(
             Cow::Borrowed("pending"),
-            UserStats::new(
+            UserStats::with_tag(
                 UserStatsValue::Number(stats.pending_total as u64),
                 AggregatorOps::Sum,
+                TAG_AFL_STATS_PENDING,
             ),
         );
         stats_map.insert(
             Cow::Borrowed("pending_fav"),
-            UserStats::new(
+            UserStats::with_tag(
                 UserStatsValue::Number(stats.pending_favs as u64),
                 AggregatorOps::Sum,
+                TAG_AFL_STATS_PENDING_FAV,
             ),
         );
         stats_map.insert(
             Cow::Borrowed("own_finds"),
-            UserStats::new(
+            UserStats::with_tag(
                 UserStatsValue::Number(stats.corpus_found as u64),
                 AggregatorOps::Sum,
+                TAG_AFL_STATS_OWN_FINDS,
             ),
         );
         stats_map.insert(
             Cow::Borrowed("imported"),
-            UserStats::new(
+            UserStats::with_tag(
                 UserStatsValue::Number(stats.corpus_imported as u64),
                 AggregatorOps::Sum,
+                TAG_AFL_STATS_IMPORTED,
             ),
         );
         stats_map.insert(
             Cow::Borrowed("cycles_done"),
-            UserStats::new(UserStatsValue::Number(self.cycles_done), AggregatorOps::Sum),
+            UserStats::with_tag(
+                UserStatsValue::Number(self.cycles_done),
+                AggregatorOps::Sum,
+                TAG_AFL_STATS_CYCLES_DONE,
+            ),
         );
         stats_map.insert(
             Cow::Borrowed("cycles_wo_finds"),
-            UserStats::new(
+            UserStats::with_tag(
                 UserStatsValue::Number(self.cycles_wo_finds),
                 AggregatorOps::Sum,
-            ),
-        );
-        let stability = stats.stability;
-        stats_map.insert(
-            Cow::Borrowed("stability"),
-            UserStats::new(
-                UserStatsValue::Percent(stability / 100.0),
-                AggregatorOps::Avg,
+                TAG_AFL_STATS_CYCLES_WO_FINDS,
             ),
         );
 

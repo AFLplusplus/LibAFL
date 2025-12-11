@@ -10,7 +10,10 @@ use super::{ClientStats, EdgeCoverage, ProcessTiming, user_stats::UserStatsValue
 #[cfg(feature = "std")]
 use super::{
     ItemGeometry,
-    user_stats::{AggregatorOps, UserStats},
+    user_stats::{
+        TAG_AFL_STATS_IMPORTED, TAG_AFL_STATS_OWN_FINDS, TAG_AFL_STATS_PENDING,
+        TAG_AFL_STATS_PENDING_FAV, TAG_CALIBRATE_STABILITY, UserStats,
+    },
 };
 
 /// Manager of all client's statistics
@@ -240,43 +243,37 @@ impl ClientStatsManager {
             .iter()
             .filter(|(_, client)| client.enabled())
         {
-            let stability = client.get_user_stats("stability").map_or(
-                UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
-                Clone::clone,
-            );
+            let stability = client
+                .user_stats
+                .values()
+                .filter(|v| v.tag() == Some(TAG_CALIBRATE_STABILITY))
+                .map(UserStats::value)
+                .next();
 
-            if let Some(pending) = client.get_user_stats("pending") {
-                total_item_geometry.pending += pending.value().as_u64().unwrap_or_default();
+            for stat in client.user_stats_by_tag(TAG_AFL_STATS_PENDING) {
+                total_item_geometry.pending += stat.value().as_u64().unwrap_or_default();
                 has_stats = true;
             }
 
-            if let Some(pend_fav) = client.get_user_stats("pending_fav") {
-                total_item_geometry.pend_fav += pend_fav.value().as_u64().unwrap_or_default();
+            for stat in client.user_stats_by_tag(TAG_AFL_STATS_PENDING_FAV) {
+                total_item_geometry.pend_fav += stat.value().as_u64().unwrap_or_default();
                 has_stats = true;
             }
 
-            if let Some(own_finds) = client.get_user_stats("own_finds") {
-                total_item_geometry.own_finds += own_finds.value().as_u64().unwrap_or_default();
+            for stat in client.user_stats_by_tag(TAG_AFL_STATS_OWN_FINDS) {
+                total_item_geometry.own_finds += stat.value().as_u64().unwrap_or_default();
                 has_stats = true;
             }
 
-            if let Some(imported) = client.get_user_stats("imported") {
-                total_item_geometry.imported += imported.value().as_u64().unwrap_or_default();
+            for stat in client.user_stats_by_tag(TAG_AFL_STATS_IMPORTED) {
+                total_item_geometry.imported += stat.value().as_u64().unwrap_or_default();
                 has_stats = true;
             }
 
-            if let UserStatsValue::Ratio(a, b) = stability.value() {
+            if let Some(UserStatsValue::Ratio(a, b)) = stability {
                 ratio_a += a;
                 ratio_b += b;
-                // Stability is always present if we have any stats? Not necessarily.
-                // But UserStats::new creates a default one.
-                // We should check if 'stability' actually existed in the client stats?
-                // The original code used map_or with default.
-                // If it was default (0/100), it might not mean "stats present".
-                // But if ratio_b > 0 (it is 100 default), and ratio_a > 0?
-                if *a > 0 {
-                    has_stats = true;
-                }
+                has_stats = true;
             }
         }
 

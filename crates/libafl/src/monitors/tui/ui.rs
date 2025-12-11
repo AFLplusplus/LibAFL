@@ -19,13 +19,13 @@ use super::{
     layout::{split_client, split_main, split_overall, split_title, split_top},
     widgets::{
         MultiTimeChartOptions, TimeChartOptions, draw_item_geometry_text, draw_key_value_block,
-        draw_logs, draw_multi_time_chart, draw_process_timing_text, draw_time_chart,
-        draw_user_stats,
+        draw_logs, draw_multi_time_chart, draw_process_timing_text, draw_scrolled_stats,
+        draw_time_chart, draw_user_stats,
     },
 };
 use crate::monitors::{
     stats::{
-        ProcessTiming, TimedStat,
+        PerfFeature, ProcessTiming, TimedStat,
         user_stats::{PlotConfig, UserStatsValue},
     },
     tui::{ItemGeometry, TuiContext},
@@ -55,6 +55,11 @@ pub struct TuiUi {
     pub(crate) should_refresh: bool,
     user_stats_scroll: usize,
     pub(crate) user_stats_page_size: usize,
+
+    #[cfg(feature = "introspection")]
+    perf_stats_scroll: usize,
+    #[cfg(feature = "introspection")]
+    pub(crate) perf_stats_page_size: usize,
 }
 
 #[derive(Debug)]
@@ -82,6 +87,9 @@ struct PreparedFrameData {
     // Charts
     tabs: Vec<String>,
     active_chart: Option<ChartKind>,
+
+    #[cfg(feature = "introspection")]
+    client_perf_stats: Vec<(Span<'static>, String)>,
 }
 
 #[derive(Debug)]
@@ -134,6 +142,10 @@ impl TuiUi {
             should_refresh: false,
             user_stats_scroll: 0,
             user_stats_page_size: 10,
+            #[cfg(feature = "introspection")]
+            perf_stats_scroll: 0,
+            #[cfg(feature = "introspection")]
+            perf_stats_page_size: 10,
         }
     }
 
@@ -278,6 +290,57 @@ impl TuiUi {
                 (GenericStats { labels: vec![] }, None, None, vec![])
             };
 
+        #[cfg(feature = "introspection")]
+        let client_perf_stats = if let Some(client) = ctx.clients.get(&self.client_idx) {
+            let stats = &client.client_stats.introspection_stats;
+            let mut vec = Vec::new();
+            #[allow(clippy::cast_precision_loss)]
+            let elapsed = stats.elapsed_cycles() as f64;
+            if elapsed != 0.0 {
+                #[allow(clippy::cast_precision_loss)]
+                let scheduler_percent = stats.scheduler_cycles() as f64 / elapsed;
+                vec.push((
+                    Span::raw("scheduler"),
+                    format!("{:.2}%", scheduler_percent * 100.0),
+                ));
+
+                #[allow(clippy::cast_precision_loss)]
+                let manager_percent = stats.manager_cycles() as f64 / elapsed;
+                vec.push((
+                    Span::raw("manager"),
+                    format!("{:.2}%", manager_percent * 100.0),
+                ));
+
+                for (stage_index, features) in stats.used_stages() {
+                    for (feature_index, feature) in features.iter().enumerate() {
+                        #[allow(clippy::cast_precision_loss)]
+                        let feature_percent = *feature as f64 / elapsed;
+                        if feature_percent > 0.0 {
+                            let feature_name: PerfFeature = feature_index.into();
+                            vec.push((
+                                Span::raw(format!("stage {stage_index}: {feature_name:?}")),
+                                format!("{:.2}%", feature_percent * 100.0),
+                            ));
+                        }
+                    }
+                }
+
+                for (name, val) in stats.feedbacks() {
+                    #[allow(clippy::cast_precision_loss)]
+                    let feedback_percent = *val as f64 / elapsed;
+                    if feedback_percent > 0.0 {
+                        vec.push((
+                            Span::raw(format!("feedback: {name}")),
+                            format!("{:.2}%", feedback_percent * 100.0),
+                        ));
+                    }
+                }
+            }
+            vec
+        } else {
+            vec![]
+        };
+
         // 3. Logs
         let logs: Vec<String> = ctx.client_logs.iter().cloned().collect();
 
@@ -373,6 +436,8 @@ impl TuiUi {
             logs,
             tabs,
             active_chart,
+            #[cfg(feature = "introspection")]
+            client_perf_stats,
         }
     }
 
@@ -458,6 +523,92 @@ impl TuiUi {
                             self.user_stats_scroll = self
                                 .user_stats_scroll
                                 .saturating_sub(self.user_stats_page_size);
+                        }
+                    }
+                }
+            }
+            #[cfg(feature = "introspection")]
+            'p' => {
+                // We don't have access to prepared data here easily, but we can access client stats via app
+                // However, the perf stats list is generated in prepare_data.
+                // We can guess the length if we regenerate it or stored it?
+                // Storing it in TuiUi might be cleaner but TuiUi is rebuilt/state separate?
+                // Actually TuiUi is persistent.
+                // But we don't store prepared data in TuiUi.
+                // For simplicity, we might just increment unlimited and clamp during draw?
+                // Or better: access the client stats and count.
+                // We need to lock and count.
+                let ctx = app.read().unwrap();
+                #[allow(clippy::cast_precision_loss)]
+                if let Some(client) = ctx.clients.get(&self.client_idx) {
+                    let stats = &client.client_stats.introspection_stats;
+                    // Count items:
+                    // 2 (Scheduler, Manager)
+                    // + used_stages * features
+                    // + feedbacks
+                    let mut total = 2;
+                    for (_, features) in stats.used_stages() {
+                        for feature in features {
+                            #[allow(clippy::cast_precision_loss)]
+                            if *feature as f64 / stats.elapsed_cycles() as f64 != 0.0 {
+                                total += 1;
+                            }
+                        }
+                    }
+                    // Wait, logic above is complex to replicate here just for scrolling.
+                    // Ideally we clamp in draw. But we need to wrap around.
+                    // For now let's just use a simple increment and let draw clamp it?
+                    // But wrap around requires knowing max.
+                    // Let's replicate the counting logic slightly simplified or just accept potential desync?
+                    // Replicating logic is safest.
+
+                    for (_, val) in stats.feedbacks() {
+                        if *val as f64 / stats.elapsed_cycles() as f64 != 0.0 {
+                            total += 1;
+                        }
+                    }
+
+                    if total > 0 {
+                        self.perf_stats_scroll += self.perf_stats_page_size;
+                        if self.perf_stats_scroll >= total {
+                            self.perf_stats_scroll = 0;
+                        }
+                    }
+                }
+            }
+            #[cfg(feature = "introspection")]
+            'P' => {
+                let ctx = app.read().unwrap();
+                #[allow(clippy::cast_precision_loss)]
+                if let Some(client) = ctx.clients.get(&self.client_idx) {
+                    let stats = &client.client_stats.introspection_stats;
+                    let mut total = 2;
+                    for (_, features) in stats.used_stages() {
+                        for feature in features {
+                            if *feature as f64 / stats.elapsed_cycles() as f64 != 0.0 {
+                                total += 1;
+                            }
+                        }
+                    }
+                    for (_, val) in stats.feedbacks() {
+                        if *val as f64 / stats.elapsed_cycles() as f64 != 0.0 {
+                            total += 1;
+                        }
+                    }
+
+                    if total > 0 {
+                        if self.perf_stats_scroll == 0 {
+                            let remainder = total % self.perf_stats_page_size;
+                            if remainder == 0 {
+                                self.perf_stats_scroll =
+                                    total.saturating_sub(self.perf_stats_page_size);
+                            } else {
+                                self.perf_stats_scroll = total - remainder;
+                            }
+                        } else {
+                            self.perf_stats_scroll = self
+                                .perf_stats_scroll
+                                .saturating_sub(self.perf_stats_page_size);
                         }
                     }
                 }
@@ -892,6 +1043,9 @@ impl TuiUi {
         if data.client_timing.is_some() {
             right_constraints.push(Constraint::Length(6));
         }
+        if data.client_geometry.is_some() {
+            right_constraints.push(Constraint::Length(8));
+        }
         right_constraints.push(Constraint::Min(0));
 
         let right_chunks = Layout::default()
@@ -907,6 +1061,20 @@ impl TuiUi {
 
         if let (Some(geometry), Some(chunk)) = (&data.client_geometry, right_chunks.get(next_idx)) {
             draw_item_geometry_text(f, *chunk, geometry);
+            next_idx += 1;
+        }
+
+        #[cfg(feature = "introspection")]
+        if !data.client_perf_stats.is_empty()
+            && let Some(chunk) = right_chunks.get(next_idx)
+        {
+            self.perf_stats_page_size = draw_scrolled_stats(
+                f,
+                *chunk,
+                "Client Perf Stats",
+                &data.client_perf_stats,
+                self.perf_stats_scroll,
+            );
         }
     }
 }

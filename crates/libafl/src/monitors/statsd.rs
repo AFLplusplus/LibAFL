@@ -22,7 +22,7 @@ use libafl_bolts::{ClientId, Error};
 
 use super::{
     Monitor,
-    stats::{ClientStatsManager, EdgeCoverage, manager::GlobalStats},
+    stats::{ClientStatsManager, EdgeCoverage, manager::GlobalStats, user_stats::TAG_CORE_ID},
 };
 
 const METRIC_PREFIX: &str = "fuzzing";
@@ -255,7 +255,8 @@ impl StatsdMonitor {
             // It has `client_stats()` method which returns `&HashMap<ClientId, ClientStats>`.
             for (client_id, client) in client_stats_manager.client_stats() {
                 let core_id_str = client
-                    .get_user_stats("core_id")
+                    .user_stats_by_tag(TAG_CORE_ID)
+                    .next()
                     .map_or_else(|| "unknown".to_string(), |s| s.value().to_string());
 
                 let client_id_str = client_id.0.to_string();

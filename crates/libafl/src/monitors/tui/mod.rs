@@ -186,7 +186,7 @@ impl Monitor for TuiMonitor {
 
             // Chart updates
             for (key, config, val) in chart_updates {
-                if !ctx.graphs.iter().any(|k| k == key.as_ref()) {
+                if !ctx.graphs.iter().any(|k| k.as_str() == key.as_ref()) {
                     ctx.graphs.push(key.to_string());
                 }
                 if config != crate::monitors::stats::user_stats::PlotConfig::None {

@@ -68,6 +68,15 @@ impl UserStatsValue {
         }
     }
 
+    /// Get the value as ratio, if possible
+    #[must_use]
+    pub fn as_ratio(&self) -> Option<(u64, u64)> {
+        match self {
+            Self::Ratio(a, b) => Some((*a, *b)),
+            _ => None,
+        }
+    }
+
     /// Divide by the number of elements
     #[expect(clippy::cast_precision_loss)]
     pub fn stats_div(&mut self, divisor: usize) -> Option<Self> {

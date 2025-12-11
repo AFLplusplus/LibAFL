@@ -559,7 +559,6 @@ impl CmpLogRuntime {
 
     /// Emit the instrumentation code which is responsible for operands value extraction and cmplog map population
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-    #[expect(clippy::too_many_lines)]
     #[inline]
     pub fn emit_comparison_handling(
         &self,
@@ -748,7 +747,7 @@ impl CmpLogRuntime {
     }
 
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-    #[expect(clippy::similar_names, clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     #[inline]
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
     #[must_use]
@@ -822,10 +821,9 @@ impl CmpLogRuntime {
         }
 
         // cbz marked as special since there is only 1 operand
-        #[expect(clippy::cast_sign_loss)]
+
         let special_case = matches!(instr.opcode, Opcode::CBZ | Opcode::CBNZ);
 
-        #[expect(clippy::cast_sign_loss, clippy::similar_names)]
         let operand1 = match instr.operands[0] {
             //the only possibilities are registers for the first operand
             //precompute the aarch64 frida register because it is ambiguous if register=31 means xzr or sp in yaxpeax
@@ -838,7 +836,6 @@ impl CmpLogRuntime {
             _ => panic!("First argument is not a register"), //this should never be possible in arm64
         };
 
-        #[expect(clippy::cast_sign_loss)]
         let operand2 = if special_case {
             Some((CmplogOperandType::Imm(0), None))
         } else {

@@ -118,8 +118,7 @@ char *crash = NULL;
 #ifdef __cplusplus
 extern "C"
 #endif  // __cplusplus
-    void FUZZ_TARGET_MODIFIERS
-    fuzz(char *name) {
+    void FUZZ_TARGET_MODIFIERS fuzz(char *name) {
   char    *sample_bytes = NULL;
   uint32_t sample_size = 0;
 

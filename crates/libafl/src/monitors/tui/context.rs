@@ -9,7 +9,7 @@ use hashbrown::HashMap;
 
 pub use crate::monitors::stats::{
     ClientStats, EdgeCoverage, ItemGeometry, ProcessTiming, TimedStat, TimedStats,
-    user_stats::{PlotConfig, UserStats},
+    user_stats::{PlotConfig, TAG_AFL_STATS_CYCLES_DONE, UserStats},
 };
 
 /// The default time window for charts (10 minutes)
@@ -45,8 +45,9 @@ impl ClientTuiContext {
     #[must_use]
     pub fn cycles_done(&self) -> Option<u64> {
         self.client_stats
-            .get_user_stats("cycles_done")
-            .and_then(|s| s.value().as_u64())
+            .user_stats_by_tag(TAG_AFL_STATS_CYCLES_DONE)
+            .next()
+            .and_then(|s: &UserStats| s.value().as_u64())
     }
 
     /// Get the number of executions

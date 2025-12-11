@@ -16,7 +16,11 @@ pub use manager::ClientStatsManager;
 pub use perf_stats::{ClientPerfStats, PerfFeature};
 use serde::{Deserialize, Serialize};
 pub use timed::*;
-pub use user_stats::{AggregatorOps, UserStats, UserStatsValue};
+pub use user_stats::{
+    AggregatorOps, TAG_AFL_STATS_IMPORTED, TAG_AFL_STATS_OWN_FINDS, TAG_AFL_STATS_PENDING,
+    TAG_AFL_STATS_PENDING_FAV, TAG_CALIBRATE_STABILITY, TAG_MAP, UserStats, UserStatsTag,
+    UserStatsValue,
+};
 
 #[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
@@ -51,9 +55,9 @@ pub struct ClientStats {
     start_time: Duration,
     /// User-defined stats
     user_stats: HashMap<Cow<'static, str>, UserStats>,
-    // Client performance statistics
-    // #[cfg(feature = "introspection")]
-    // pub introspection_stats: ClientPerfStats,
+    /// Client performance statistics
+    #[cfg(feature = "introspection")]
+    pub introspection_stats: ClientPerfStats,
     // This field is marked as skip_serializing and skip_deserializing,
     // which means when deserializing, its default value, i.e. all stats
     // is updated, will be filled in this field. This could help preventing
@@ -313,6 +317,13 @@ impl ClientStats {
         self.user_stats.get(name)
     }
 
+    /// Get user-defined stats using the tag
+    pub fn user_stats_by_tag(&self, tag: UserStatsTag) -> impl Iterator<Item = &UserStats> {
+        self.user_stats
+            .values()
+            .filter(move |v| v.tag() == Some(tag))
+    }
+
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
     #[cfg(feature = "introspection")]
     pub fn update_introspection_stats(&mut self, introspection_stats: &ClientPerfStats) {
@@ -322,52 +333,7 @@ impl ClientStats {
             return;
         }
 
-        #[allow(clippy::cast_precision_loss)]
-        let scheduler_percent = introspection_stats.scheduler_cycles() as f64 / elapsed;
-        self.update_user_stats(
-            "scheduler".into(),
-            UserStats::new(
-                UserStatsValue::Percent(scheduler_percent),
-                AggregatorOps::Avg,
-            ),
-        );
-
-        #[allow(clippy::cast_precision_loss)]
-        let manager_percent = introspection_stats.manager_cycles() as f64 / elapsed;
-        self.update_user_stats(
-            "manager".into(),
-            UserStats::new(UserStatsValue::Percent(manager_percent), AggregatorOps::Avg),
-        );
-
-        for (stage_index, features) in introspection_stats.used_stages() {
-            for (feature_index, feature) in features.iter().enumerate() {
-                #[allow(clippy::cast_precision_loss)]
-                let feature_percent = *feature as f64 / elapsed;
-                if feature_percent == 0.0 {
-                    continue;
-                }
-                let feature_name: PerfFeature = feature_index.into();
-                self.update_user_stats(
-                    format!("stage {stage_index}: {feature_name:?}").into(),
-                    UserStats::new(UserStatsValue::Percent(feature_percent), AggregatorOps::Avg),
-                );
-            }
-        }
-
-        for (name, val) in introspection_stats.feedbacks() {
-            #[allow(clippy::cast_precision_loss)]
-            let feedback_percent = *val as f64 / elapsed;
-            if feedback_percent == 0.0 {
-                continue;
-            }
-            self.update_user_stats(
-                format!("feedback: {name}").into(),
-                UserStats::new(
-                    UserStatsValue::Percent(feedback_percent),
-                    AggregatorOps::Avg,
-                ),
-            );
-        }
+        self.introspection_stats = introspection_stats.clone();
     }
 
     /// Get process timing of current client.
@@ -398,59 +364,85 @@ impl ClientStats {
     }
 
     /// Get edge coverage of current client
+    ///
+    /// This is using userstats set by [`libafl::feedbacks::MapFeedback`]
     #[must_use]
     pub fn edges_coverage(&self) -> Option<EdgeCoverage> {
-        self.get_user_stats("edges").and_then(|user_stats| {
-            let UserStatsValue::Ratio(edges_hit, edges_total) = user_stats.value() else {
-                return None;
-            };
+        let mut edges_hit = 0;
+        let mut edges_total = 0;
+        let mut found = false;
+
+        for stat in self.user_stats_by_tag(TAG_MAP) {
+            if let UserStatsValue::Ratio(hit, total) = stat.value() {
+                edges_hit += hit;
+                edges_total += total;
+                found = true;
+            }
+        }
+
+        if found {
             Some(EdgeCoverage {
-                edges_hit: *edges_hit,
-                edges_total: *edges_total,
+                edges_hit,
+                edges_total,
             })
-        })
+        } else {
+            None
+        }
     }
 
     /// Get item geometry of current client
-    /// Get item geometry of current client
-    #[expect(clippy::cast_precision_loss)]
+    ///
+    /// This is using userstats set by [`libafl::stages::AflStatsStage`].
     #[must_use]
     pub fn item_geometry(&self) -> Option<ItemGeometry> {
         let pending = self
-            .get_user_stats("pending")
-            .map_or(0, |s| s.value().as_u64().unwrap_or(0));
+            .user_stats_by_tag(TAG_AFL_STATS_PENDING)
+            .map(|s| s.value().as_u64().unwrap_or(0))
+            .sum();
         let pend_fav = self
-            .get_user_stats("pending_fav")
-            .map_or(0, |s| s.value().as_u64().unwrap_or(0));
+            .user_stats_by_tag(TAG_AFL_STATS_PENDING_FAV)
+            .map(|s| s.value().as_u64().unwrap_or(0))
+            .sum();
         let imported = self
-            .get_user_stats("imported")
-            .map_or(0, |s| s.value().as_u64().unwrap_or(0));
+            .user_stats_by_tag(TAG_AFL_STATS_IMPORTED)
+            .map(|s| s.value().as_u64().unwrap_or(0))
+            .sum();
         let own_finds = self
-            .get_user_stats("own_finds")
-            .map_or(0, |s| s.value().as_u64().unwrap_or(0));
+            .user_stats_by_tag(TAG_AFL_STATS_OWN_FINDS)
+            .map(|s| s.value().as_u64().unwrap_or(0))
+            .sum();
 
-        let stability = self.get_user_stats("stability").map_or(
-            UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
-            Clone::clone,
-        );
+        let (stability_sum, stability_count) = self
+            .user_stats
+            .values()
+            .filter(|v| v.tag() == Some(TAG_CALIBRATE_STABILITY))
+            .fold((0.0, 0), |(sum, count), s| {
+                (
+                    sum + s.value().as_ratio().map_or(0.0, |(a, b)| {
+                        #[expect(clippy::cast_precision_loss)]
+                        let ret = a as f64 / b as f64;
+                        ret
+                    }),
+                    count + 1,
+                )
+            });
+
+        let stability = if stability_count > 0 {
+            Some(stability_sum / f64::from(stability_count))
+        } else {
+            None
+        };
 
         // We want to return None if we have NO relevant stats, to avoid showing empty charts/info
         // "pending" is a good indicator if we have data.
-        if self.get_user_stats("pending").is_none() && self.get_user_stats("stability").is_none() {
+        if self
+            .user_stats_by_tag(TAG_AFL_STATS_PENDING)
+            .next()
+            .is_none()
+            && stability.is_none()
+        {
             return None;
         }
-
-        let stability = match stability.value() {
-            UserStatsValue::Ratio(a, b) => {
-                if *b == 0 {
-                    Some(0.0)
-                } else {
-                    Some((*a as f64) / (*b as f64))
-                }
-            }
-            UserStatsValue::Percent(p) => Some(*p),
-            _ => None,
-        };
 
         Some(ItemGeometry {
             pending,

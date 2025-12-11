@@ -384,7 +384,8 @@ impl<I> Event<I> {
         match self {
             Event::NewTestcase { .. } => "Testcase",
             Event::Heartbeat => "Client Heartbeat",
-            Event::UpdateUserStats { .. } | Event::UpdateUserStatsMap { .. } => "UserStats",
+            Event::UpdateUserStatsMap { .. } => "UserStatsMap",
+            Event::UpdateUserStats { .. } => "UserStats",
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor { .. } => "PerfMonitor",
             Event::Objective { .. } => "Objective",
