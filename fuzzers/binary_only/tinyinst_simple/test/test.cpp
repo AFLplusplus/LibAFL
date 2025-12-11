@@ -115,12 +115,11 @@ char *crash = NULL;
 // actual target function
 
 // Use extern "C" to preserve the function name for instrumentation
-// clang-format off
 #ifdef __cplusplus
 extern "C"
 #endif  // __cplusplus
-void FUZZ_TARGET_MODIFIERS fuzz(char *name) {
-// clang-format on
+    void FUZZ_TARGET_MODIFIERS
+    fuzz(char *name) {
   char    *sample_bytes = NULL;
   uint32_t sample_size = 0;
 
