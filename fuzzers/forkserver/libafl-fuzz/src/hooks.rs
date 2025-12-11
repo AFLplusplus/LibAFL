@@ -6,6 +6,7 @@ use libafl::{
 use libafl_bolts::ClientId;
 
 #[derive(Copy, Clone)]
+#[allow(dead_code)]
 pub struct LibAflFuzzEventHook {
     exit_on_solution: bool,
 }
