@@ -12,15 +12,17 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Tabs},
+    widgets::{Borders, Paragraph, Tabs},
 };
 
+#[cfg(feature = "introspection")]
+use super::widgets::draw_scrolled_stats;
 use super::{
     layout::{split_client, split_main, split_overall, split_title, split_top},
     widgets::{
-        MultiTimeChartOptions, TimeChartOptions, draw_item_geometry_text, draw_key_value_block,
-        draw_logs, draw_multi_time_chart, draw_process_timing_text, draw_scrolled_stats,
-        draw_time_chart, draw_user_stats,
+        MultiTimeChartOptions, TimeChartOptions, calculate_tab_window, draw_item_geometry_text,
+        draw_key_value_block, draw_logs, draw_main_block, draw_multi_time_chart,
+        draw_process_timing_text, draw_time_chart, draw_user_stats,
     },
 };
 #[cfg(feature = "introspection")]
@@ -764,57 +766,6 @@ impl TuiUi {
         }
     }
 
-    fn calculate_tab_window(&self, titles: &[String], max_width: usize) -> (usize, usize, usize) {
-        Self::calculate_tab_window_for_index(titles, max_width, self.charts_tab_idx)
-    }
-
-    fn calculate_tab_window_for_index(
-        titles: &[String],
-        max_width: usize,
-        selected_idx: usize,
-    ) -> (usize, usize, usize) {
-        let tab_count = titles.len();
-        if tab_count == 0 {
-            return (0, 0, 0);
-        }
-        let selected_idx = selected_idx.min(tab_count - 1);
-        let get_width = |i: usize| -> usize {
-            if i >= titles.len() {
-                0
-            } else {
-                titles[i].chars().count() + 3
-            }
-        };
-
-        let mut start = selected_idx;
-        let mut end = selected_idx + 1;
-        let mut current_width = get_width(selected_idx);
-
-        loop {
-            let mut changed = false;
-            if start > 0 {
-                let w = get_width(start - 1);
-                if current_width + w <= max_width {
-                    start -= 1;
-                    current_width += w;
-                    changed = true;
-                }
-            }
-            if end < tab_count {
-                let w = get_width(end);
-                if current_width + w <= max_width {
-                    end += 1;
-                    current_width += w;
-                    changed = true;
-                }
-            }
-            if !changed {
-                break;
-            }
-        }
-        (start, end, selected_idx.saturating_sub(start))
-    }
-
     fn draw_overall_ui(
         &mut self,
         f: &mut Frame,
@@ -827,32 +778,25 @@ impl TuiUi {
 
         if self.is_narrow {
             let available_width = area.width.saturating_sub(4) as usize;
-            let (start, end, selected) = self.calculate_tab_window(&data.tabs, available_width);
+            let (start, end, selected) =
+                calculate_tab_window(&data.tabs, available_width, self.charts_tab_idx);
             let visible_titles: Vec<Span> = data.tabs[start..end]
                 .iter()
                 .map(|s| Span::from(s.clone()))
                 .collect();
 
             let tabs_widget = Tabs::new(visible_titles)
-                .block(
-                    Block::default()
-                        .title(Span::styled(
-                            &self.title,
-                            Style::default()
-                                .fg(Color::LightMagenta)
-                                .add_modifier(Modifier::BOLD),
-                        ))
-                        .title_top(
-                            Line::from(Span::styled(
-                                " G/g ",
-                                Style::default()
-                                    .fg(Color::LightCyan)
-                                    .add_modifier(Modifier::BOLD),
-                            ))
-                            .alignment(Alignment::Right),
-                        )
-                        .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
-                )
+                .block(draw_main_block(
+                    &self.title,
+                    Borders::TOP | Borders::LEFT | Borders::RIGHT,
+                    Some(Line::from(Span::styled(
+                        " G/g ",
+                        Style::default()
+                            .fg(Color::LightCyan)
+                            .add_modifier(Modifier::BOLD),
+                    ))),
+                    None,
+                ))
                 .highlight_style(Style::default().fg(Color::LightYellow))
                 .select(selected);
             f.render_widget(tabs_widget, tab_area);
@@ -870,15 +814,6 @@ impl TuiUi {
             };
 
             let has_charts = data.tabs.len() > 1;
-            // In wide mode (implied here), we always want to show a chart if available, even if selected index is 0 (Overview)
-            // If charts_tab_idx is 0, we default to the first chart (index 1 in tabs list)
-            // We override active_chart calculation in prepare_data or handle it here?
-            // Actually, prepare_data should handle it. But we need to check if prepare_data did it.
-
-            // ... (previous code)
-
-            // Correction for prepare_data (apply logic changes via prepare_data change, here we just use what we have)
-            // But we need to fix the visual "selected" index.
 
             let (left_title, left_stats) = split_title(left_col);
             let status_bar = format!("{} ({})", self.title, self.version);
@@ -888,7 +823,15 @@ impl TuiUi {
                     .fg(Color::LightMagenta)
                     .add_modifier(Modifier::BOLD),
             )))
-            .block(Block::default().borders(Borders::ALL))
+            .block(draw_main_block(&self.title, Borders::ALL, None, None)) // Using draw_main_block for status bar too? Wait, status bar had Borders::ALL. draw_main_block allows configuring borders. But title was "headers" before? No, it was empty title?
+            // Prior code: .block(Block::default().borders(Borders::ALL))
+            // So title was empty.
+            // draw_main_block takes a title.
+            // I should pass empty string if needed, or maybe just use Block::default() for simple cases if draw_main_block is too specific?
+            // But I want consistently styled blocks.
+            // The status bar in prior code had NO title on the block itself?
+            // "let p = ... .block(Block::default().borders(Borders::ALL))" -> Yes, no title.
+            // So draw_main_block("", Borders::ALL, None, None) works.
             .alignment(Alignment::Center);
             f.render_widget(p, left_title);
 
@@ -900,22 +843,10 @@ impl TuiUi {
 
             let chart_titles: Vec<String> = data.tabs[1..].to_vec();
             let available_width = right_col.width.saturating_sub(4) as usize;
-            // calculated window needs correct selected index relative to chart_titles
-            // charts_tab_idx 0 (Overview) -> Select 0 (First Chart)
-            // charts_tab_idx 1 (First Chart) -> Select 0 (First Chart)
-            // charts_tab_idx 2 (Second Chart) -> Select 1 (Second Chart)
             let visual_selected_idx = self.charts_tab_idx.saturating_sub(1);
 
-            // We need a helper that takes explicit selected index, or modify calculate_tab_window to take it?
-            // Existing calculate_tab_window uses self.charts_tab_idx. We should probably modify it to take a param.
-            // Or temporarily fake self.charts_tab_idx? No, that requires mut self.
-
-            // Let's modify calculate_tab_window to take the selected index.
-            let (start, end, selected) = Self::calculate_tab_window_for_index(
-                &chart_titles,
-                available_width,
-                visual_selected_idx,
-            );
+            let (start, end, selected) =
+                calculate_tab_window(&chart_titles, available_width, visual_selected_idx);
 
             let visible_titles: Vec<Span> = chart_titles[start..end]
                 .iter()
@@ -923,29 +854,21 @@ impl TuiUi {
                 .collect();
 
             let tabs_widget = Tabs::new(visible_titles)
-                .block(
-                    Block::default()
-                        .title(Span::styled(
-                            "charts",
-                            Style::default()
-                                .fg(Color::LightCyan)
-                                .add_modifier(Modifier::BOLD),
-                        ))
-                        .title_top(
-                            Line::from(Span::styled(
-                                format!(
-                                    " {}/{} (switch g/G) ",
-                                    self.charts_tab_idx.max(1),
-                                    data.tabs.len().saturating_sub(1)
-                                ),
-                                Style::default()
-                                    .fg(Color::LightCyan)
-                                    .add_modifier(Modifier::BOLD),
-                            ))
-                            .alignment(Alignment::Right),
-                        )
-                        .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT),
-                )
+                .block(draw_main_block(
+                    "charts",
+                    Borders::TOP | Borders::LEFT | Borders::RIGHT,
+                    Some(Line::from(Span::styled(
+                        format!(
+                            " {}/{} (switch g/G) ",
+                            self.charts_tab_idx.max(1),
+                            data.tabs.len().saturating_sub(1)
+                        ),
+                        Style::default()
+                            .fg(Color::LightCyan)
+                            .add_modifier(Modifier::BOLD),
+                    ))),
+                    None,
+                ))
                 .highlight_style(Style::default().fg(Color::LightYellow))
                 .select(selected);
 
@@ -1064,26 +987,19 @@ impl TuiUi {
                 ""
             }
         );
-        let mut block = Block::default()
-            .title(Span::styled(
-                title,
-                Style::default()
-                    .fg(Color::LightCyan)
-                    .add_modifier(Modifier::BOLD),
-            ))
-            .borders(Borders::ALL);
 
-        if !show_logs {
-            block = block.title(
-                Line::from(Span::styled(
-                    "`t` for logs, `q` to quit",
-                    Style::default()
-                        .fg(Color::LightMagenta)
-                        .add_modifier(Modifier::BOLD),
-                ))
-                .alignment(Alignment::Right),
-            );
-        }
+        let top_right_hint = if show_logs {
+            None
+        } else {
+            Some(Line::from(Span::styled(
+                "`t` for logs, `q` to quit",
+                Style::default()
+                    .fg(Color::LightMagenta)
+                    .add_modifier(Modifier::BOLD),
+            )))
+        };
+
+        let block = draw_main_block(&title, Borders::ALL, top_right_hint, None);
 
         let client_area = block.inner(area);
         f.render_widget(block, area);

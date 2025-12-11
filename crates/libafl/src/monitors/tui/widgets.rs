@@ -7,12 +7,84 @@ use ratatui::{
     layout::{Alignment, Constraint, Rect},
     style::{Color, Modifier, Style},
     symbols,
-    text::Span,
-    widgets::{
-        Axis, Block, Borders, Cell, Chart, Dataset, List, ListItem, Row, Table,
-        block::{Position, Title},
-    },
+    text::{Line, Span},
+    widgets::{Axis, Block, Borders, Cell, Chart, Dataset, List, ListItem, Row, Table},
 };
+
+/// Helper to create a standard Block with title, borders, and optional hints
+#[must_use]
+pub fn draw_main_block<'a>(
+    title: &'a str,
+    borders: Borders,
+    top_right_text: Option<Line<'a>>,
+    bottom_right_text: Option<Line<'a>>,
+) -> Block<'a> {
+    let mut block = Block::default().borders(borders).title(Span::styled(
+        title,
+        Style::default()
+            .fg(Color::LightCyan)
+            .add_modifier(Modifier::BOLD),
+    ));
+
+    if let Some(text) = top_right_text {
+        block = block.title_top(text.alignment(Alignment::Right));
+    }
+
+    if let Some(text) = bottom_right_text {
+        block = block.title_bottom(text.alignment(Alignment::Right));
+    }
+
+    block
+}
+
+/// Calculate the sliding window for tabs
+#[must_use]
+pub fn calculate_tab_window(
+    titles: &[String],
+    max_width: usize,
+    selected_idx: usize,
+) -> (usize, usize, usize) {
+    let tab_count = titles.len();
+    if tab_count == 0 {
+        return (0, 0, 0);
+    }
+    let selected_idx = selected_idx.min(tab_count - 1);
+    let get_width = |i: usize| -> usize {
+        if i >= titles.len() {
+            0
+        } else {
+            titles[i].chars().count() + 3
+        }
+    };
+
+    let mut start = selected_idx;
+    let mut end = selected_idx + 1;
+    let mut current_width = get_width(selected_idx);
+
+    loop {
+        let mut changed = false;
+        if start > 0 {
+            let w = get_width(start - 1);
+            if current_width + w <= max_width {
+                start -= 1;
+                current_width += w;
+                changed = true;
+            }
+        }
+        if end < tab_count {
+            let w = get_width(end);
+            if current_width + w <= max_width {
+                end += 1;
+                current_width += w;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    (start, end, selected_idx.saturating_sub(start))
+}
 
 use crate::monitors::{
     stats::{ProcessTiming, TimedStat},
@@ -462,21 +534,20 @@ pub fn draw_logs(f: &mut Frame, area: Rect, logs: &[String], enable_wrap: bool) 
                     .add_modifier(Modifier::BOLD),
             ))
             // Using title_top/bottom or alignment deprecated approach (will fix in ui.rs separately if needed)
-            .title(
-                Title::from(Span::styled(
+            .title_top(
+                Line::from(Span::styled(
                     if enable_wrap { "wrapped" } else { "raw" },
                     Style::default().fg(Color::DarkGray),
                 ))
                 .alignment(Alignment::Right),
             )
-            .title(
-                Title::from(Span::styled(
+            .title_bottom(
+                Line::from(Span::styled(
                     "`r` to refresh, `q` to quit",
                     Style::default()
                         .fg(Color::LightMagenta)
                         .add_modifier(Modifier::BOLD),
                 ))
-                .position(Position::Bottom)
                 .alignment(Alignment::Right),
             ),
     );
