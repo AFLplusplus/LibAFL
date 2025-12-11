@@ -262,188 +262,219 @@ where
 {
     #[expect(clippy::too_many_lines)]
     fn perform(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
-    ) -> Result<(), Error> {
-        let Some(corpus_idx) = state.current_corpus_id()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
-        let testcase = state.corpus().get(corpus_idx)?.borrow();
-        // NOTE: scheduled_count represents the amount of fuzz runs a
-        // testcase has had. Since this stage is kept at the very end of stage list,
-        // the entry would have been fuzzed already (and should contain IsFavoredMetadata) but would have a scheduled count of zero
-        // since the scheduled count is incremented after all stages have been run.
-        if testcase.scheduled_count() == 0 {
-            // New testcase!
-            self.cycles_wo_finds = 0;
-            self.update_last_find();
-            #[cfg(feature = "track_hit_feedbacks")]
-            {
-                self.maybe_update_last_crash(&testcase, state);
-                self.maybe_update_last_hang(&testcase, state);
-            }
-            self.update_has_fuzzed_size();
-            self.maybe_update_is_favored_size(&testcase);
+    &mut self,
+    fuzzer: &mut Z,
+    executor: &mut E,
+    state: &mut S,
+    manager: &mut EM,
+) -> Result<(), Error> {
+    // First, get the current corpus index. If none, return an error because
+    // this stage expects to be processing a valid corpus index.
+    let Some(corpus_idx) = state.current_corpus_id()? else {
+        return Err(Error::illegal_state(
+            "state is not currently processing a corpus index",
+        ));
+    };
+
+    // Borrow the testcase from the corpus (immutable borrow)
+    let testcase = state.corpus().get(corpus_idx)?.borrow();
+
+    // ----------------------------------------------------------------------
+    // Prepare JSON for the current testcase (filename + corpus_idx) but
+    // DO NOT call manager.fire yet to avoid mutable borrow conflicts.
+    // ----------------------------------------------------------------------
+    use std::path::Path;
+
+    let current_testcase_json = match testcase.filename() {
+        Some(fname) => {
+            let s = Path::new(&fname).to_string_lossy().into_owned();
+            serde_json::json!({
+                "corpus_idx": corpus_idx,
+                "filename": s
+            }).to_string()
         }
-        self.maybe_update_slowest_exec(&testcase);
-        self.maybe_update_max_depth(&testcase);
-
-        // See if we actually need to run the stage, if not, avoid dynamic value computation.
-        if !self.check_interval() {
-            return Ok(());
+        None => {
+            serde_json::json!({
+                "corpus_idx": corpus_idx
+            }).to_string()
         }
+    };
 
-        let corpus_size = state.corpus().count();
-        let total_executions = *state.executions();
+    // ----------------------------------------------------------------------
+    // Continue using testcase normally
+    // ----------------------------------------------------------------------
+    if testcase.scheduled_count() == 0 {
+        // This is a new testcase, reset cycles and update relevant stats
+        self.cycles_wo_finds = 0;
+        self.update_last_find();
 
-        let scheduler = fuzzer.scheduler();
-        let queue_cycles = scheduler.queue_cycles();
-        self.maybe_update_cycles(queue_cycles);
-        self.maybe_update_cycles_wo_finds(queue_cycles);
-
-        let map_feedback = state
-            .named_metadata_map()
-            .get::<MapFeedbackMetadata<<O as MapObserver>::Entry>>(&self.map_name)
-            .unwrap();
-
-        let filled_entries_in_map = map_feedback.num_covered_map_indexes;
-        let observers = executor.observers();
-        let map = observers[&self.map_observer_handle].as_ref();
-        let map_size = map.usable_count();
-
-        // Since we do not calibrate when using `QueueScheduler`; we cannot calculate unstable entries.
-        let unstable_entries_in_map = state
-            .metadata_map()
-            .get::<UnstableEntriesMetadata>()
-            .map_or(0, |m| m.unstable_entries().len());
-
-        let auto_dict_entries = if self.autotokens_enabled {
-            state
-                .metadata::<Tokens>()?
-                .len()
-                .saturating_sub(self.dict_count)
-        } else {
-            0
-        };
-        let stats = AflFuzzerStats {
-            start_time: self.start_time,
-            last_update: self.last_report_time.as_secs(),
-            run_time: self.last_report_time.as_secs() - self.start_time,
-            fuzzer_pid: self.pid,
-            cycles_done: queue_cycles,
-            cycles_wo_find: self.cycles_wo_finds,
-            fuzz_time: state
-                .metadata::<FuzzTime>()
-                .map_or(Duration::from_secs(0), |d| d.0)
-                .as_secs(),
-            calibration_time: state
-                .metadata::<CalibrationTime>()
-                .map_or(Duration::from_secs(0), |d| d.0)
-                .as_secs(),
-            sync_time: state
-                .metadata::<SyncTime>()
-                .map_or(Duration::from_secs(0), |d| d.0)
-                .as_secs(),
-            trim_time: 0, // TODO
-            execs_done: total_executions,
-            execs_per_sec: *state.executions(),     // TODO
-            execs_ps_last_min: *state.executions(), // TODO
-            max_depth: self.max_depth,
-            corpus_count: corpus_size,
-            corpus_favored: corpus_size - self.is_favored_size,
-            corpus_found: corpus_size - state.imported(),
-            corpus_imported: *state.imported(),
-            cur_item: corpus_idx.into(),
-            pending_total: corpus_size - self.has_fuzzed_size,
-            pending_favs: 0, // TODO
-            time_wo_finds: current_time().saturating_sub(self.last_find).as_secs(),
-            corpus_variable: 0,
-            stability: self.calculate_stability(unstable_entries_in_map, filled_entries_in_map),
-            #[expect(clippy::cast_precision_loss)]
-            bitmap_cvg: (filled_entries_in_map as f64 / map_size as f64) * 100.0,
-            saved_crashes: self.saved_crashes,
-            saved_hangs: self.saved_hangs,
-            last_find: self.last_find,
-            last_hang: self.last_hang,
-            last_crash: self.last_crash,
-            execs_since_crash: total_executions - self.execs_at_last_objective,
-            exec_timeout: self.exec_timeout,
-            slowest_exec_ms: self.slowest_exec.as_millis(),
-            // TODO: getting rss_mb may take some extra millis, so might make sense to make this optional
-            #[cfg(unix)]
-            peak_rss_mb: peak_rss_mb_child_processes()?,
-            #[cfg(not(unix))]
-            peak_rss_mb: 0, // TODO for Windows
-            cpu_affinity: self.core_id.0,
-            total_edges: map_size,
-            edges_found: filled_entries_in_map,
-            var_byte_count: unstable_entries_in_map,
-            havoc_expansion: 0, // TODO
-            auto_dict_entries,
-            testcache_size: 0,
-            testcache_count: 0,
-            testcache_evict: 0,
-            afl_banner: &self.afl_banner,
-            afl_version: &self.afl_version,
-            target_mode: &self.target_mode,
-            command_line: &self.command_line,
-        };
-        let plot_data = AFLPlotData {
-            corpus_count: &stats.corpus_count,
-            cur_item: &stats.cur_item,
-            cycles_done: &stats.cycles_done,
-            edges_found: &stats.edges_found,
-            total_edges: &stats.total_edges,
-            execs_per_sec: &stats.execs_per_sec,
-            pending_total: &stats.pending_total,
-            pending_favs: &stats.pending_favs,
-            max_depth: &stats.max_depth,
-            relative_time: &stats.run_time,
-            saved_hangs: &stats.saved_hangs,
-            saved_crashes: &stats.saved_crashes,
-            execs_done: &stats.execs_done,
-        };
-        self.maybe_write_fuzzer_stats(&stats)?;
-        if self.plot_file_path.is_some() {
-            self.write_plot_data(&plot_data)?;
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.maybe_update_last_crash(&testcase, state);
+            self.maybe_update_last_hang(&testcase, state);
         }
 
-        drop(testcase);
-
-        // We construct this simple json by hand to squeeze out some extra speed.
-        let json = format!(
-            "{{\
-                \"pending\":{},\
-                \"pending_fav\":{},\
-                \"own_finds\":{},\
-                \"imported\":{}\
-            }}",
-            stats.pending_total, stats.pending_favs, stats.corpus_found, stats.corpus_imported
-        );
-
-        manager.fire(
-            state,
-            EventWithStats::with_current_time(
-                Event::UpdateUserStats {
-                    name: Cow::Borrowed("AflStats"),
-                    value: UserStats::new(
-                        UserStatsValue::String(Cow::Owned(json)),
-                        AggregatorOps::None,
-                    ),
-                    phantom: PhantomData,
-                },
-                *state.executions(),
-            ),
-        )?;
-
-        Ok(())
+        self.update_has_fuzzed_size();
+        self.maybe_update_is_favored_size(&testcase);
     }
+
+    self.maybe_update_slowest_exec(&testcase);
+    self.maybe_update_max_depth(&testcase);
+
+    // Skip stage if interval check fails
+    if !self.check_interval() {
+        return Ok(());
+    }
+
+    // Gather corpus and execution stats
+    let corpus_size = state.corpus().count();
+    let total_executions = *state.executions();
+    let scheduler = fuzzer.scheduler();
+    let queue_cycles = scheduler.queue_cycles();
+    self.maybe_update_cycles(queue_cycles);
+    self.maybe_update_cycles_wo_finds(queue_cycles);
+
+    // Map feedback for coverage
+    let map_feedback = state
+        .named_metadata_map()
+        .get::<MapFeedbackMetadata<<O as MapObserver>::Entry>>(&self.map_name)
+        .unwrap();
+    let filled_entries_in_map = map_feedback.num_covered_map_indexes;
+
+    let observers = executor.observers();
+    let map = observers[&self.map_observer_handle].as_ref();
+    let map_size = map.usable_count();
+
+    let unstable_entries_in_map = state
+        .metadata_map()
+        .get::<UnstableEntriesMetadata>()
+        .map_or(0, |m| m.unstable_entries().len());
+
+    let auto_dict_entries = if self.autotokens_enabled {
+        state.metadata::<Tokens>()?.len().saturating_sub(self.dict_count)
+    } else {
+        0
+    };
+
+    // Build stats struct
+    let stats = AflFuzzerStats {
+        start_time: self.start_time,
+        last_update: self.last_report_time.as_secs(),
+        run_time: self.last_report_time.as_secs() - self.start_time,
+        fuzzer_pid: self.pid,
+        cycles_done: queue_cycles,
+        cycles_wo_find: self.cycles_wo_finds,
+        fuzz_time: state.metadata::<FuzzTime>().map_or(Duration::from_secs(0), |d| d.0).as_secs(),
+        calibration_time: state.metadata::<CalibrationTime>().map_or(Duration::from_secs(0), |d| d.0).as_secs(),
+        sync_time: state.metadata::<SyncTime>().map_or(Duration::from_secs(0), |d| d.0).as_secs(),
+        trim_time: 0,
+        execs_done: total_executions,
+        execs_per_sec: *state.executions(),
+        execs_ps_last_min: *state.executions(),
+        max_depth: self.max_depth,
+        corpus_count: corpus_size,
+        corpus_favored: corpus_size - self.is_favored_size,
+        corpus_found: corpus_size - state.imported(),
+        corpus_imported: *state.imported(),
+        cur_item: corpus_idx.into(),
+        pending_total: corpus_size - self.has_fuzzed_size,
+        pending_favs: 0,
+        time_wo_finds: current_time().saturating_sub(self.last_find).as_secs(),
+        corpus_variable: 0,
+        stability: self.calculate_stability(unstable_entries_in_map, filled_entries_in_map),
+        #[expect(clippy::cast_precision_loss)]
+        bitmap_cvg: (filled_entries_in_map as f64 / map_size as f64) * 100.0,
+        saved_crashes: self.saved_crashes,
+        saved_hangs: self.saved_hangs,
+        last_find: self.last_find,
+        last_hang: self.last_hang,
+        last_crash: self.last_crash,
+        execs_since_crash: total_executions - self.execs_at_last_objective,
+        exec_timeout: self.exec_timeout,
+        slowest_exec_ms: self.slowest_exec.as_millis(),
+        #[cfg(unix)]
+        peak_rss_mb: peak_rss_mb_child_processes()?,
+        #[cfg(not(unix))]
+        peak_rss_mb: 0,
+        cpu_affinity: self.core_id.0,
+        total_edges: map_size,
+        edges_found: filled_entries_in_map,
+        var_byte_count: unstable_entries_in_map,
+        havoc_expansion: 0,
+        auto_dict_entries,
+        testcache_size: 0,
+        testcache_count: 0,
+        testcache_evict: 0,
+        afl_banner: &self.afl_banner,
+        afl_version: &self.afl_version,
+        target_mode: &self.target_mode,
+        command_line: &self.command_line,
+    };
+
+    let plot_data = AFLPlotData {
+        corpus_count: &stats.corpus_count,
+        cur_item: &stats.cur_item,
+        cycles_done: &stats.cycles_done,
+        edges_found: &stats.edges_found,
+        total_edges: &stats.total_edges,
+        execs_per_sec: &stats.execs_per_sec,
+        pending_total: &stats.pending_total,
+        pending_favs: &stats.pending_favs,
+        max_depth: &stats.max_depth,
+        relative_time: &stats.run_time,
+        saved_hangs: &stats.saved_hangs,
+        saved_crashes: &stats.saved_crashes,
+        execs_done: &stats.execs_done,
+    };
+
+    self.maybe_write_fuzzer_stats(&stats)?;
+    if self.plot_file_path.is_some() {
+        self.write_plot_data(&plot_data)?;
+    }
+
+    // Drop the immutable borrow here so we can safely use manager.fire
+    drop(testcase);
+
+    // Fire the UpdateUserStats event for the current testcase
+    manager.fire(
+        state,
+        EventWithStats::with_current_time(
+            Event::UpdateUserStats {
+                name: Cow::Borrowed("current_testcase"),
+                value: UserStats::new(
+                    UserStatsValue::String(Cow::Owned(current_testcase_json)),
+                    AggregatorOps::None,
+                ),
+                phantom: PhantomData,
+            },
+            *state.executions(),
+        ),
+    )?;
+
+    // Fire a separate AflStats JSON update
+    let json = format!(
+        "{{\"pending\":{},\"pending_fav\":{},\"own_finds\":{},\"imported\":{}}}",
+        stats.pending_total, stats.pending_favs, stats.corpus_found, stats.corpus_imported
+    );
+
+    manager.fire(
+        state,
+        EventWithStats::with_current_time(
+            Event::UpdateUserStats {
+                name: Cow::Borrowed("AflStats"),
+                value: UserStats::new(
+                    UserStatsValue::String(Cow::Owned(json)),
+                    AggregatorOps::None,
+                ),
+                phantom: PhantomData,
+            },
+            *state.executions(),
+        ),
+    )?;
+
+    Ok(())
 }
+
 
 impl<C, I, O, S> Restartable<S> for AflStatsStage<C, I, O> {
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
