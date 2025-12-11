@@ -217,6 +217,3 @@ used_underscore_binding = "allow"
 [workspace.lints.rustdoc]
 # Deny
 broken_intra_doc_links = "deny"
-
-
-

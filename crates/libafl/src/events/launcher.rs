@@ -44,7 +44,7 @@ use {
 
 #[cfg(feature = "tcp_manager")]
 use crate::HasMetadata;
-#[cfg(feature = "multi_machine")]
+#[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::NodeDescriptor;
 #[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::TcpMultiMachineHooks;
@@ -164,7 +164,7 @@ pub struct Launcher<'a, CF, MT, SP> {
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
     remote_broker_addr: Option<SocketAddr>,
-    #[cfg(feature = "multi_machine")]
+    #[cfg(all(unix, feature = "multi_machine"))]
     multi_machine_node_descriptor: NodeDescriptor<SocketAddr>,
     /// If this launcher should spawn a new `broker` on `[Self::broker_port]` (default).
     /// The reason you may not want this is, if you already have a [`Launcher`]
@@ -203,7 +203,7 @@ pub struct LauncherBuilder<'a, CF, MT, SP> {
     #[cfg(unix)]
     stderr_file: Option<&'a str>,
     remote_broker_addr: Option<SocketAddr>,
-    #[cfg(feature = "multi_machine")]
+    #[cfg(all(unix, feature = "multi_machine"))]
     multi_machine_node_descriptor: Option<NodeDescriptor<SocketAddr>>,
     spawn_broker: bool,
     serialize_state: LlmpShouldSaveState,
@@ -230,7 +230,7 @@ impl LauncherBuilder<'_, (), (), ()> {
             #[cfg(unix)]
             stderr_file: None,
             remote_broker_addr: None,
-            #[cfg(feature = "multi_machine")]
+            #[cfg(all(unix, feature = "multi_machine"))]
             multi_machine_node_descriptor: None,
             spawn_broker: true,
             serialize_state: LlmpShouldSaveState::OnRestart,
@@ -268,7 +268,7 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             #[cfg(unix)]
             stderr_file: self.stderr_file,
             remote_broker_addr: self.remote_broker_addr,
-            #[cfg(feature = "multi_machine")]
+            #[cfg(all(unix, feature = "multi_machine"))]
             multi_machine_node_descriptor: self.multi_machine_node_descriptor,
             spawn_broker: self.spawn_broker,
             serialize_state: self.serialize_state,
@@ -295,7 +295,7 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             #[cfg(unix)]
             stderr_file: self.stderr_file,
             remote_broker_addr: self.remote_broker_addr,
-            #[cfg(feature = "multi_machine")]
+            #[cfg(all(unix, feature = "multi_machine"))]
             multi_machine_node_descriptor: self.multi_machine_node_descriptor,
             spawn_broker: self.spawn_broker,
             serialize_state: self.serialize_state,
@@ -329,7 +329,7 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             #[cfg(unix)]
             stderr_file: self.stderr_file,
             remote_broker_addr: self.remote_broker_addr,
-            #[cfg(feature = "multi_machine")]
+            #[cfg(all(unix, feature = "multi_machine"))]
             multi_machine_node_descriptor: self.multi_machine_node_descriptor,
             spawn_broker: self.spawn_broker,
             serialize_state: self.serialize_state,
@@ -399,7 +399,7 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
     }
 
     /// The node descriptor for multi-machine clusters
-    #[cfg(feature = "multi_machine")]
+    #[cfg(all(unix, feature = "multi_machine"))]
     #[must_use]
     pub fn multi_machine_node_descriptor(
         mut self,
@@ -452,7 +452,7 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             #[cfg(unix)]
             opened_stderr_file: None,
             remote_broker_addr: self.remote_broker_addr,
-            #[cfg(feature = "multi_machine")]
+            #[cfg(all(unix, feature = "multi_machine"))]
             multi_machine_node_descriptor: self
                 .multi_machine_node_descriptor
                 .expect("multi_machine_node_descriptor not set"),
