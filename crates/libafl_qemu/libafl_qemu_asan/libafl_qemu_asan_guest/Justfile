@@ -66,20 +66,16 @@ rename_guest: rel_guest
 	#!/bin/sh
 	. {{ DOTENV }}
 	${CROSS_OBJCOPY} \
-		--redefine-syms={{ GUEST_SOURCE_DIR }}/rename_real.syms \
 		--redefine-syms={{ GUEST_SOURCE_DIR }}/rename_patch.syms \
 		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_guest.rel \
 		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_guest.renamed
 
 [unix]
-link_guest: rename_guest
+link_guest: compile_guest build_libc
 	#!/bin/sh
 	. {{ DOTENV }}
 	${CROSS_CC} \
 		-shared \
-		-nodefaultlibs \
-		-nostartfiles \
-		-nostdlib \
 		-g \
 		-u aligned_alloc \
 		-u atoi \
@@ -104,9 +100,8 @@ link_guest: rename_guest
 		-Wl,--gc-sections \
 		-Wl,--no-undefined \
 		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libafl_qemu_asan_guest.so \
-		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_guest.renamed \
-		-L {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }} \
-		"-lafl_asan_libc"
+		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_guest.a \
+		-L {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}
 
 strip_guest: link_guest
 	#!/bin/sh

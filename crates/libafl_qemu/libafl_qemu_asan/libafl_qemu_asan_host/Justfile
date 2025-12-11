@@ -66,7 +66,6 @@ rename_host: rel_host
 	#!/bin/sh
 	. {{ DOTENV }}
 	${CROSS_OBJCOPY} \
-		--redefine-syms={{ HOST_SOURCE_DIR }}/rename_real.syms \
 		--redefine-syms={{ HOST_SOURCE_DIR }}/rename_patch.syms \
 		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.rel \
 		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.renamed
@@ -77,9 +76,7 @@ link_host: rename_host
 	. {{ DOTENV }}
 	${CROSS_CC} \
 		-shared \
-		-nodefaultlibs \
-		-nostartfiles \
-		-nostdlib \
+		-shared \
 		-g \
 		-u aligned_alloc \
 		-u atoi \
@@ -105,8 +102,7 @@ link_host: rename_host
 		-Wl,--no-undefined \
 		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libafl_qemu_asan_host.so \
 		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.renamed \
-		-L {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }} \
-		"-lafl_asan_libc"
+		-L {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}
 
 [unix]
 strip_host: link_host

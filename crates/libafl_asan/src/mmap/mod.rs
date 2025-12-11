@@ -65,4 +65,5 @@ pub trait Mmap: Sized + Ord + Debug + Send {
     fn dont_dump(addr: GuestAddr, len: usize) -> Result<(), Self::Error>;
     fn as_slice(&self) -> &[u8];
     fn as_mut_slice(&mut self) -> &mut [u8];
+    fn dummy() -> Self;
 }

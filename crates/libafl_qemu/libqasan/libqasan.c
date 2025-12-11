@@ -106,6 +106,7 @@ const size_t ALLOC_ALIGN_SIZE = (1UL << ALLOC_ALIGN_POW);
 
 __attribute__((constructor)) void __libqasan_init() {
   if (__libqasan_is_initialized) { return; }
+  if (getenv("SKIP_LIBQASAN_INIT")) { return; }
   __libqasan_is_initialized = 1;
 
   __libqasan_init_hooks();

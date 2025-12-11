@@ -136,17 +136,27 @@ static int quarantine_push(struct chunk_begin *ck) {
   return 1;
 }
 
+static int __libqasan_initializing;
+
 void __libqasan_init_malloc(void) {
-  if (__libqasan_malloc_initialized) return;
+  QASAN_LOG("init_malloc entry\n");
+  if (__libqasan_malloc_initialized || __libqasan_initializing) {
+      QASAN_LOG("init_malloc skipped\n");
+      return;
+  }
+  __libqasan_initializing = 1;
 
 #ifdef USE_LIBC_ALLOC
+  QASAN_LOG("dlsym memalign\n");
   __lq_libc_memalign = dlsym(RTLD_NEXT, "memalign");
+  QASAN_LOG("dlsym free\n");
   __lq_libc_free = dlsym(RTLD_NEXT, "free");
 #endif
 
   LOCK_INIT(&quarantine_lock, PTHREAD_PROCESS_PRIVATE);
 
   __libqasan_malloc_initialized = 1;
+  __libqasan_initializing = 0;
   QASAN_LOG("\n");
   QASAN_LOG("Allocator initialization done.\n");
   QASAN_LOG("\n");
@@ -163,6 +173,7 @@ size_t __libqasan_malloc_usable_size(void *ptr) {
 }
 
 void *__libqasan_malloc(size_t size) {
+  // QASAN_LOG("malloc(%zu)\n", size);
   if (!__libqasan_malloc_initialized) {
     __libqasan_init_malloc();
 

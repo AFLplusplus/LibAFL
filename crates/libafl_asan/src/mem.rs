@@ -1,6 +1,15 @@
 use core::mem::transmute;
 
+#[cfg(not(feature = "libc"))]
 use nostd_musl::{bcmp, memcmp, memcpy, memmove, memset, strlen};
+
+#[cfg(feature = "libc")]
+use libc::{memcmp, memcpy, memmove, memset, strlen};
+
+#[cfg(feature = "libc")]
+unsafe extern "C" fn bcmp(s1: *const core::ffi::c_void, s2: *const core::ffi::c_void, n: usize) -> i32 {
+    memcmp(s1, s2, n)
+}
 
 #[cfg(all(feature = "global_allocator", feature = "dlmalloc"))]
 use crate::allocator::backend::dlmalloc::DlmallocBackend;

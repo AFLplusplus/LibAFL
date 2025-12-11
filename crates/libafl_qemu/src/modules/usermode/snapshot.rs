@@ -848,7 +848,7 @@ pub fn trace_write_snapshot<ET, I, S, const SIZE: usize>(
     I: Unpin,
     S: Unpin,
 {
-    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+    let h = get_snapshot_module_mut(emulator_modules).unwrap();
     h.access(addr, SIZE);
 }
 
@@ -865,7 +865,7 @@ pub fn trace_write_n_snapshot<ET, I, S>(
     I: Unpin,
     S: Unpin,
 {
-    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+    let h = get_snapshot_module_mut(emulator_modules).unwrap();
     h.access(addr, size);
 }
 
@@ -891,13 +891,37 @@ where
     S: Unpin,
 {
     if i64::from(sys_num) == SYS_munmap {
-        let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+        let h = get_snapshot_module_mut(emulator_modules).unwrap();
         if !h.is_unmap_allowed(a0 as GuestAddr, a1 as usize) {
             return SyscallHookResult::Skip(0);
         }
     }
 
     SyscallHookResult::Run
+}
+
+pub fn get_snapshot_module_mut<ET, I, S>(
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
+) -> Option<&mut SnapshotModule>
+where
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
+{
+    if let Some(h) = emulator_modules.get_mut::<SnapshotModule>() {
+        // We can't return it directly because of borrow checker limitations with conditional return
+        // So we use a trick or just unsafe pointer cast if needed, but let's try safe first.
+        // Actually, we can just return it.
+        // But we need to handle the Option case too.
+        // Since we can't easily return from different branches if types differ (though they are same type here),
+        // we might need to use unsafe to extend lifetime or just use raw pointers.
+        // Let's use raw pointers to avoid borrow checker hell with multiple mutable borrows.
+        unsafe { Some(&mut *(h as *mut SnapshotModule)) }
+    } else {
+        emulator_modules
+            .get_mut::<Option<SnapshotModule>>()
+            .and_then(|h| h.as_mut())
+    }
 }
 
 #[expect(non_upper_case_globals, clippy::too_many_arguments)]
@@ -959,18 +983,18 @@ where
         #[cfg(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "i386"))]
         SYS_fstatat64 => {
             if a2 != 0 {
-                let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+                let h = get_snapshot_module_mut(emulator_modules).unwrap();
                 h.access(a2, 4096); // stat is not greater than a page
             }
         }
         #[cfg(not(cpu_target = "riscv32"))]
         SYS_statfs | SYS_fstat | SYS_fstatfs => {
-            let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+            let h = get_snapshot_module_mut(emulator_modules).unwrap();
             h.access(a1, 4096); // stat is not greater than a page
         }
         #[cfg(not(cpu_target = "riscv32"))]
         SYS_getrandom => {
-            let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+            let h = get_snapshot_module_mut(emulator_modules).unwrap();
             h.access(a0, a1 as usize);
         }
         SYS_brk => {
@@ -990,7 +1014,7 @@ where
             #[cfg(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "riscv32"))]
             if sys_const == SYS_mmap2 {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
-                    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+                    let h = get_snapshot_module_mut(emulator_modules).unwrap();
                     h.add_mapped(result, a1 as usize, Some(prot));
                 }
             }
@@ -999,22 +1023,22 @@ where
             if sys_const == SYS_mmap
                 && let Ok(prot) = MmapPerms::try_from(a2 as i32)
             {
-                let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+                let h = get_snapshot_module_mut(emulator_modules).unwrap();
                 h.add_mapped(result, a1 as usize, Some(prot));
             }
 
             if sys_const == SYS_mremap {
-                let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+                let h = get_snapshot_module_mut(emulator_modules).unwrap();
                 // TODO get the old permissions from the removed mapping
                 h.remove_mapped(a0, a1 as usize);
                 h.add_mapped(result, a2 as usize, None);
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
-                    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+                    let h = get_snapshot_module_mut(emulator_modules).unwrap();
                     h.change_mapped_perms(a0, a1 as usize, Some(prot));
                 }
             } else if sys_const == SYS_munmap {
-                let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+                let h = get_snapshot_module_mut(emulator_modules).unwrap();
                 if h.is_unmap_allowed(a0, a1 as usize) {
                     h.remove_mapped(a0, a1 as usize);
                 }

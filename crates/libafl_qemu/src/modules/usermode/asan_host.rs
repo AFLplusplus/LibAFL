@@ -28,7 +28,7 @@ use crate::{
     modules::{
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
         calls::FullBacktraceCollector,
-        snapshot::SnapshotModule,
+        snapshot::{get_snapshot_module_mut, SnapshotModule},
         utils::filters::{HasAddressFilter, StdAddressFilter},
     },
     qemu::{Hook, MemAccessInfo, QemuHooks, SyscallHookResult},
@@ -538,6 +538,7 @@ impl AsanGiovese {
         Box::pin(res)
     }
 
+    #[allow(dead_code)]
     extern "C" fn fake_syscall(
         mut self: Pin<&mut Self>,
         sys_num: i32,
@@ -895,6 +896,7 @@ impl AsanGiovese {
     }
 
     pub fn allocation(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
+        eprintln!("ALLOC: pc={:#x} start={:#x} end={:#x}", pc, start, end);
         self.alloc_remove(start, end);
         self.alloc_insert(pc, start, end);
     }
@@ -977,7 +979,7 @@ where
 
     fn pre_qemu_init<ET>(
         &mut self,
-        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         qemu_params: &mut QemuParams,
     ) where
         ET: EmulatorModuleTuple<I, S>,
@@ -996,7 +998,6 @@ where
 
             let asan_lib = env::var_os("CUSTOM_LIBAFL_QEMU_ASAN_PATH")
                 .map_or(asan_lib, |x| PathBuf::from(x.to_string_lossy().to_string()));
-
             assert!(
                 asan_lib.as_path().exists(),
                 "The ASAN library doesn't exist: {}",
@@ -1007,6 +1008,9 @@ where
                 .to_str()
                 .expect("The path to the asan lib is invalid")
                 .to_string();
+
+            eprintln!("ASan Host: Preloading {}", asan_lib);
+            // qemu_params.add_env("LD_PRELOAD", &asan_lib);
 
             println!("Loading ASAN: {asan_lib:}");
 
@@ -1037,17 +1041,19 @@ where
             }
 
             if !added {
+                eprintln!("Args before: {:?}", args);
                 args.insert(1, "LD_PRELOAD=".to_string() + &asan_lib);
                 args.insert(1, "-E".into());
+                eprintln!("Args after: {:?}", args);
             }
             Some(asan_lib)
         } else {
             None
         };
 
-        unsafe {
-            AsanGiovese::init(&mut self.rt, emulator_modules.hooks().qemu_hooks());
-        }
+        // unsafe {
+        //     AsanGiovese::init(&mut self.rt, emulator_modules.hooks().qemu_hooks());
+        // }
 
         *qemu_params = QemuParams::Cli(args);
 
@@ -1058,6 +1064,10 @@ where
     where
         ET: EmulatorModuleTuple<I, S>,
     {
+        unsafe {
+            AsanGiovese::init(&mut self.rt, emulator_modules.hooks().qemu_hooks());
+        }
+
         emulator_modules.pre_syscalls(Hook::Function(qasan_fake_syscall::<ET, I, S>));
 
         if self.rt.error_callback.is_some() {
@@ -1323,7 +1333,7 @@ pub fn trace_write_asan_snapshot<ET, I, S, const N: usize>(
         let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
         h.write::<N>(qemu, id as GuestAddr, addr);
     }
-    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+    let h = get_snapshot_module_mut(emulator_modules).unwrap();
     h.access(addr, N);
 }
 
@@ -1344,7 +1354,7 @@ pub fn trace_write_n_asan_snapshot<ET, I, S>(
         let h = emulator_modules.get_mut::<AsanHostModule>().unwrap();
         h.read_n(qemu, id as GuestAddr, addr, size);
     }
-    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+    let h = get_snapshot_module_mut(emulator_modules).unwrap();
     h.access(addr, size);
 }
 
@@ -1387,6 +1397,17 @@ where
             }
             QasanAction::SwapState => {
                 h.set_enabled(!h.enabled());
+            }
+            QasanAction::Alloc => {
+                let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
+                eprintln!("FakeSyscall Alloc: pc={:#x} a1={:#x} a2={:#x}", pc, a1, a2);
+                if a2 > 0 {
+                    h.alloc(pc, a1, a1 + a2);
+                }
+            }
+            QasanAction::Dealloc => {
+                let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
+                h.dealloc(qemu, pc, a1);
             }
             _ => (),
         }
