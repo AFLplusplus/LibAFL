@@ -365,7 +365,7 @@ impl ClientStats {
 
     /// Get edge coverage of current client
     ///
-    /// This is using userstats set by [`libafl::feedbacks::MapFeedback`]
+    /// This is using userstats set by [`crate::feedbacks::MapFeedback`]
     #[must_use]
     pub fn edges_coverage(&self) -> Option<EdgeCoverage> {
         let mut edges_hit = 0;
@@ -392,7 +392,7 @@ impl ClientStats {
 
     /// Get item geometry of current client
     ///
-    /// This is using userstats set by [`libafl::stages::AflStatsStage`].
+    /// This is using userstats set by [`crate::stages::AflStatsStage`].
     #[must_use]
     pub fn item_geometry(&self) -> Option<ItemGeometry> {
         let pending = self
