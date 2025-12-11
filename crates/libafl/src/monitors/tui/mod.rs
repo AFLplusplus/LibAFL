@@ -133,6 +133,26 @@ impl Monitor for TuiMonitor {
             exec_sec
         );
 
+        #[cfg(feature = "introspection")]
+        if event_msg.contains("PerfMonitor") {
+            let stats = &client_snapshot.introspection_stats;
+            #[allow(clippy::cast_precision_loss)]
+            let elapsed = stats.elapsed_cycles() as f64;
+            if elapsed > 0.0 {
+                #[allow(clippy::cast_precision_loss)]
+                let scheduler_percent = stats.scheduler_cycles() as f64 / elapsed;
+                #[allow(clippy::cast_precision_loss)]
+                let manager_percent = stats.manager_cycles() as f64 / elapsed;
+                write!(
+                    fmt,
+                    ", scheduler: {:.2}%, manager: {:.2}%",
+                    scheduler_percent * 100.0,
+                    manager_percent * 100.0
+                )
+                .unwrap();
+            }
+        }
+
         let client_run_time = cur_time.saturating_sub(client_stats_manager.start_time());
 
         // Collect stats to update in context (to avoid locking inside loops)

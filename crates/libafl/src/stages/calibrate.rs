@@ -439,7 +439,7 @@ where
             track_stability: true,
             phantom: PhantomData,
             name: Cow::Owned(CALIBRATION_STAGE_NAME.to_owned() + ":" + &map_name),
-            stability_userstats_name: Cow::Owned(format!("stability_{map_name}")),
+            stability_userstats_name: Cow::Owned(format!("{map_name}_stability")),
         }
     }
 

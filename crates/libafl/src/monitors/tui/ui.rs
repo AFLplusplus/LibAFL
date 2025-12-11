@@ -23,9 +23,11 @@ use super::{
         draw_time_chart, draw_user_stats,
     },
 };
+#[cfg(feature = "introspection")]
+use crate::monitors::stats::PerfFeature;
 use crate::monitors::{
     stats::{
-        PerfFeature, ProcessTiming, TimedStat,
+        ProcessTiming, TimedStat,
         user_stats::{PlotConfig, UserStatsValue},
     },
     tui::{ItemGeometry, TuiContext},
@@ -60,6 +62,10 @@ pub struct TuiUi {
     perf_stats_scroll: usize,
     #[cfg(feature = "introspection")]
     pub(crate) perf_stats_page_size: usize,
+
+    show_geometry: bool,
+    item_geometry_scroll: usize,
+    pub(crate) item_geometry_page_size: usize,
 }
 
 #[derive(Debug)]
@@ -146,6 +152,9 @@ impl TuiUi {
             perf_stats_scroll: 0,
             #[cfg(feature = "introspection")]
             perf_stats_page_size: 10,
+            show_geometry: false,
+            item_geometry_scroll: 0,
+            item_geometry_page_size: 10,
         }
     }
 
@@ -296,21 +305,31 @@ impl TuiUi {
             let mut vec = Vec::new();
             #[allow(clippy::cast_precision_loss)]
             let elapsed = stats.elapsed_cycles() as f64;
+            let scheduler_percent = if elapsed == 0.0 {
+                0.0
+            } else {
+                #[allow(clippy::cast_precision_loss)]
+                let v = stats.scheduler_cycles() as f64 / elapsed;
+                v
+            };
+            vec.push((
+                Span::raw("scheduler"),
+                format!("{:.2}%", scheduler_percent * 100.0),
+            ));
+
+            let manager_percent = if elapsed == 0.0 {
+                0.0
+            } else {
+                #[allow(clippy::cast_precision_loss)]
+                let v = stats.manager_cycles() as f64 / elapsed;
+                v
+            };
+            vec.push((
+                Span::raw("manager"),
+                format!("{:.2}%", manager_percent * 100.0),
+            ));
+
             if elapsed != 0.0 {
-                #[allow(clippy::cast_precision_loss)]
-                let scheduler_percent = stats.scheduler_cycles() as f64 / elapsed;
-                vec.push((
-                    Span::raw("scheduler"),
-                    format!("{:.2}%", scheduler_percent * 100.0),
-                ));
-
-                #[allow(clippy::cast_precision_loss)]
-                let manager_percent = stats.manager_cycles() as f64 / elapsed;
-                vec.push((
-                    Span::raw("manager"),
-                    format!("{:.2}%", manager_percent * 100.0),
-                ));
-
                 for (stage_index, features) in stats.used_stages() {
                     for (feature_index, feature) in features.iter().enumerate() {
                         #[allow(clippy::cast_precision_loss)]
@@ -528,76 +547,125 @@ impl TuiUi {
                 }
             }
             #[cfg(feature = "introspection")]
-            'p' => {
-                // We don't have access to prepared data here easily, but we can access client stats via app
-                // However, the perf stats list is generated in prepare_data.
-                // We can guess the length if we regenerate it or stored it?
-                // Storing it in TuiUi might be cleaner but TuiUi is rebuilt/state separate?
-                // Actually TuiUi is persistent.
-                // But we don't store prepared data in TuiUi.
-                // For simplicity, we might just increment unlimited and clamp during draw?
-                // Or better: access the client stats and count.
-                // We need to lock and count.
+            'i' => {
                 let ctx = app.read().unwrap();
                 #[allow(clippy::cast_precision_loss)]
                 if let Some(client) = ctx.clients.get(&self.client_idx) {
+                    let has_geometry = client.item_geometry.is_some();
                     let stats = &client.client_stats.introspection_stats;
-                    // Count items:
-                    // 2 (Scheduler, Manager)
-                    // + used_stages * features
-                    // + feedbacks
+
                     let mut total = 2;
-                    for (_, features) in stats.used_stages() {
-                        for feature in features {
+                    let elapsed = stats.elapsed_cycles() as f64;
+                    if elapsed != 0.0 {
+                        for (_, features) in stats.used_stages() {
+                            for feature in features {
+                                #[allow(clippy::cast_precision_loss)]
+                                if *feature as f64 / elapsed > 0.0 {
+                                    total += 1;
+                                }
+                            }
+                        }
+                        for (_, val) in stats.feedbacks() {
                             #[allow(clippy::cast_precision_loss)]
-                            if *feature as f64 / stats.elapsed_cycles() as f64 != 0.0 {
+                            if *val as f64 / elapsed > 0.0 {
                                 total += 1;
                             }
                         }
                     }
-                    // Wait, logic above is complex to replicate here just for scrolling.
-                    // Ideally we clamp in draw. But we need to wrap around.
-                    // For now let's just use a simple increment and let draw clamp it?
-                    // But wrap around requires knowing max.
-                    // Let's replicate the counting logic slightly simplified or just accept potential desync?
-                    // Replicating logic is safest.
 
-                    for (_, val) in stats.feedbacks() {
-                        if *val as f64 / stats.elapsed_cycles() as f64 != 0.0 {
-                            total += 1;
+                    if self.show_geometry {
+                        let geo_total = 5;
+                        let next = self.item_geometry_scroll + self.item_geometry_page_size;
+                        if next >= geo_total {
+                            if total > 0 {
+                                self.show_geometry = false;
+                                self.perf_stats_scroll = 0;
+                            } else {
+                                self.item_geometry_scroll = 0;
+                            }
+                        } else {
+                            self.item_geometry_scroll = next;
                         }
-                    }
-
-                    if total > 0 {
-                        self.perf_stats_scroll += self.perf_stats_page_size;
-                        if self.perf_stats_scroll >= total {
-                            self.perf_stats_scroll = 0;
+                    } else {
+                        let next = self.perf_stats_scroll + self.perf_stats_page_size;
+                        if next >= total {
+                            if has_geometry {
+                                self.show_geometry = true;
+                                self.item_geometry_scroll = 0;
+                            } else {
+                                self.perf_stats_scroll = 0;
+                            }
+                        } else {
+                            self.perf_stats_scroll = next;
                         }
                     }
                 }
             }
             #[cfg(feature = "introspection")]
-            'P' => {
+            'I' => {
                 let ctx = app.read().unwrap();
                 #[allow(clippy::cast_precision_loss)]
                 if let Some(client) = ctx.clients.get(&self.client_idx) {
+                    let has_geometry = client.item_geometry.is_some();
                     let stats = &client.client_stats.introspection_stats;
+
                     let mut total = 2;
-                    for (_, features) in stats.used_stages() {
-                        for feature in features {
-                            if *feature as f64 / stats.elapsed_cycles() as f64 != 0.0 {
+                    let elapsed = stats.elapsed_cycles() as f64;
+                    if elapsed != 0.0 {
+                        for (_, features) in stats.used_stages() {
+                            for feature in features {
+                                #[allow(clippy::cast_precision_loss)]
+                                if *feature as f64 / elapsed > 0.0 {
+                                    total += 1;
+                                }
+                            }
+                        }
+                        for (_, val) in stats.feedbacks() {
+                            #[allow(clippy::cast_precision_loss)]
+                            if *val as f64 / elapsed > 0.0 {
                                 total += 1;
                             }
                         }
                     }
-                    for (_, val) in stats.feedbacks() {
-                        if *val as f64 / stats.elapsed_cycles() as f64 != 0.0 {
-                            total += 1;
-                        }
-                    }
 
-                    if total > 0 {
-                        if self.perf_stats_scroll == 0 {
+                    if self.show_geometry {
+                        if self.item_geometry_scroll == 0 {
+                            if total > 0 {
+                                self.show_geometry = false;
+                                let remainder = total % self.perf_stats_page_size;
+                                if remainder == 0 {
+                                    self.perf_stats_scroll =
+                                        total.saturating_sub(self.perf_stats_page_size);
+                                } else {
+                                    self.perf_stats_scroll = total - remainder;
+                                }
+                            } else {
+                                let geo_total = 5;
+                                let remainder = geo_total % self.item_geometry_page_size;
+                                if remainder == 0 {
+                                    self.item_geometry_scroll =
+                                        geo_total.saturating_sub(self.item_geometry_page_size);
+                                } else {
+                                    self.item_geometry_scroll = geo_total - remainder;
+                                }
+                            }
+                        } else {
+                            self.item_geometry_scroll = self
+                                .item_geometry_scroll
+                                .saturating_sub(self.item_geometry_page_size);
+                        }
+                    } else if self.perf_stats_scroll == 0 {
+                        if has_geometry {
+                            self.show_geometry = true;
+                            let geo_total = 5;
+                            let remainder = geo_total % self.item_geometry_page_size;
+                            if remainder == 0 {
+                                self.item_geometry_scroll =
+                                    geo_total.saturating_sub(self.item_geometry_page_size);
+                            } else {
+                                self.item_geometry_scroll = geo_total - remainder;
+                            }
+                        } else if total > 0 {
                             let remainder = total % self.perf_stats_page_size;
                             if remainder == 0 {
                                 self.perf_stats_scroll =
@@ -605,11 +673,19 @@ impl TuiUi {
                             } else {
                                 self.perf_stats_scroll = total - remainder;
                             }
-                        } else {
-                            self.perf_stats_scroll = self
-                                .perf_stats_scroll
-                                .saturating_sub(self.perf_stats_page_size);
                         }
+                    } else {
+                        self.perf_stats_scroll = self
+                            .perf_stats_scroll
+                            .saturating_sub(self.perf_stats_page_size);
+                    }
+                }
+            }
+            '0'..='9' => {
+                if let Some(i) = c.to_digit(10) {
+                    let i = i as usize;
+                    if i < self.tabs.len() {
+                        self.charts_tab_idx = i;
                     }
                 }
             }
@@ -914,7 +990,7 @@ impl TuiUi {
         }
 
         if let (Some(geometry), Some(chunk)) = (&data.total_geometry, chunks.get(next_idx)) {
-            draw_item_geometry_text(f, *chunk, geometry);
+            draw_item_geometry_text(f, *chunk, geometry, "", 0, false);
         }
     }
 
@@ -1038,13 +1114,10 @@ impl TuiUi {
             self.user_stats_scroll,
         );
 
-        // Right: Timing + Geometry
+        // Right: Timing + Geometry/Perf Stats
         let mut right_constraints = vec![];
         if data.client_timing.is_some() {
             right_constraints.push(Constraint::Length(6));
-        }
-        if data.client_geometry.is_some() {
-            right_constraints.push(Constraint::Length(8));
         }
         right_constraints.push(Constraint::Min(0));
 
@@ -1059,22 +1132,41 @@ impl TuiUi {
             next_idx += 1;
         }
 
-        if let (Some(geometry), Some(chunk)) = (&data.client_geometry, right_chunks.get(next_idx)) {
-            draw_item_geometry_text(f, *chunk, geometry);
-            next_idx += 1;
-        }
+        if let Some(chunk) = right_chunks.get(next_idx) {
+            #[cfg(feature = "introspection")]
+            let has_perf_stats = !data.client_perf_stats.is_empty();
+            #[cfg(not(feature = "introspection"))]
+            let has_perf_stats = false;
 
-        #[cfg(feature = "introspection")]
-        if !data.client_perf_stats.is_empty()
-            && let Some(chunk) = right_chunks.get(next_idx)
-        {
-            self.perf_stats_page_size = draw_scrolled_stats(
-                f,
-                *chunk,
-                "Client Perf Stats",
-                &data.client_perf_stats,
-                self.perf_stats_scroll,
-            );
+            let has_geometry = data.client_geometry.is_some();
+            let show_geo = has_geometry && (self.show_geometry || !has_perf_stats);
+
+            if show_geo {
+                if let Some(geometry) = &data.client_geometry {
+                    let hint = if has_perf_stats { " (i/I)" } else { "" };
+                    self.item_geometry_page_size = draw_item_geometry_text(
+                        f,
+                        *chunk,
+                        geometry,
+                        hint,
+                        self.item_geometry_scroll,
+                        has_perf_stats,
+                    );
+                }
+            } else {
+                #[cfg(feature = "introspection")]
+                if has_perf_stats {
+                    self.perf_stats_page_size = draw_scrolled_stats(
+                        f,
+                        *chunk,
+                        "Client Perf Stats",
+                        &data.client_perf_stats,
+                        self.perf_stats_scroll,
+                        " (i/I)",
+                        true,
+                    );
+                }
+            }
         }
     }
 }

@@ -326,8 +326,15 @@ pub fn draw_key_value_block<'a, I>(
 }
 
 /// Draw the geometry information of the fuzzing items (testcases)
-pub fn draw_item_geometry_text(f: &mut Frame, area: Rect, item_geometry: &ItemGeometry) {
-    let data = [
+pub fn draw_item_geometry_text(
+    f: &mut Frame,
+    area: Rect,
+    item_geometry: &ItemGeometry,
+    hint: &str,
+    scroll: usize,
+    force_hint: bool,
+) -> usize {
+    let data = vec![
         (Span::raw("pending"), format!("{}", item_geometry.pending)),
         (Span::raw("pend fav"), format!("{}", item_geometry.pend_fav)),
         (
@@ -341,13 +348,7 @@ pub fn draw_item_geometry_text(f: &mut Frame, area: Rect, item_geometry: &ItemGe
         ),
     ];
 
-    draw_key_value_block(
-        f,
-        area,
-        "item geometry",
-        data,
-        &[Constraint::Length(20), Constraint::Min(5)],
-    );
+    draw_scrolled_stats(f, area, "item geometry", &data, scroll, hint, force_hint)
 }
 
 /// Draw the process timing information
@@ -470,7 +471,7 @@ pub fn draw_logs(f: &mut Frame, area: Rect, logs: &[String], enable_wrap: bool) 
             )
             .title(
                 Title::from(Span::styled(
-                    "`q` to quit",
+                    "`r` to refresh, `q` to quit",
                     Style::default()
                         .fg(Color::LightMagenta)
                         .add_modifier(Modifier::BOLD),
@@ -489,6 +490,8 @@ pub fn draw_scrolled_stats(
     block_title: &str,
     stats: &[(Span, String)],
     scroll: usize,
+    nav_hint_str: &str,
+    force_hint: bool,
 ) -> usize {
     let total_stats = stats.len();
     let max_items = area.height.saturating_sub(2) as usize;
@@ -503,10 +506,14 @@ pub fn draw_scrolled_stats(
     let visible_stats = stats[start_idx..end_idx].iter().cloned();
 
     let nav_hint = match (start_idx > 0, total_stats > start_idx + max_items) {
-        (true, true) => " (u/U)",
-        (true, false) => " (U)",
-        (false, true) => " (u)",
-        (false, false) => "",
+        (true, _) | (_, true) => nav_hint_str,
+        (false, false) => {
+            if force_hint {
+                nav_hint_str
+            } else {
+                ""
+            }
+        }
     };
 
     let title = format!(
@@ -535,5 +542,5 @@ pub fn draw_user_stats(
     stats: &[(Span, String)],
     scroll: usize,
 ) -> usize {
-    draw_scrolled_stats(f, area, "User Stats", stats, scroll)
+    draw_scrolled_stats(f, area, "User Stats", stats, scroll, " (u/U)", false)
 }
