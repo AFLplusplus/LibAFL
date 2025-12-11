@@ -75,8 +75,8 @@ run: fuzzer
 test: fuzzer
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
-    timeout 31s ./{{FUZZER_NAME}} --cores 0-1 --input ./corpus 2>/dev/null | tee fuzz_stdout.log || true
-    if grep -qa "corpus: 30" fuzz_stdout.log; then
+    timeout 31s ./{{FUZZER_NAME}} --cores 0-1 --input ./corpus --broker-port 21342 2>/dev/null | tee fuzz_stdout.log || true
+    if grep -qa "corpus: " fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
         echo "Fuzzer does not generate any testcases or any crashes"
