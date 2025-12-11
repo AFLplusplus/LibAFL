@@ -150,11 +150,11 @@ cxx-statsd:
 
 [linux]
 fuzzer-statsd: lib cxx-statsd
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/release/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-statsd -lm -lz
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/{{PROFILE_DIR}}/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-statsd -lm -lz -Wl,--allow-multiple-definition
 
 [macos]
 fuzzer-statsd: lib cxx-statsd
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/release/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-statsd -lm -lz -framework CoreFoundation -framework Security
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/{{PROFILE_DIR}}/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-statsd -lm -lz -framework CoreFoundation -framework Security -Wl,--allow-multiple-definition
 
 [linux]
 [macos]
@@ -164,12 +164,12 @@ cxx-tcp:
 [linux]
 fuzzer-tcp: lib cxx-tcp
     cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/release -llibfuzzer_libpng -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tcp -lm -lz
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,--whole-archive {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -Wl,--no-whole-archive -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tcp -lm -lz -Wl,--allow-multiple-definition -fsanitize=undefined
 
 [macos]
 fuzzer-tcp: lib cxx-tcp
     cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/release -llibfuzzer_libpng -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tcp -lm -lz -framework CoreFoundation -framework Security
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tcp -lm -lz -framework CoreFoundation -framework Security -Wl,--allow-multiple-definition -fsanitize=undefined
 
 [linux]
 [macos]
