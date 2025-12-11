@@ -62,7 +62,7 @@ static FRONTEND: Lazy<Mutex<GuestFrontend>> = Lazy::new(|| {
     let msg = c"ASAN: Logger initialized\n";
     let msg = c"ASAN: Logger initialized\n";
     unsafe { raw_write(2, msg.as_ptr() as *const _, msg.count_bytes()); }
-    unsafe { *(0 as *mut u8) = 0; } // Force crash to verify execution
+    unsafe { raw_write(2, msg.as_ptr() as *const _, msg.count_bytes()); }
     info!("ASAN Guest initializing...");
     let backend = GuestBackend::new(PAGE_SIZE);
     let shadow = GuestShadow::<GuestMap, DefaultShadowLayout>::new().unwrap();
