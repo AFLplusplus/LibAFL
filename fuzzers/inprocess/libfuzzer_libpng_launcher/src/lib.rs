@@ -22,7 +22,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::{
-        stats::{AggregatorOps, UserStats, UserStatsValue},
+        stats::{user_stats::TAG_CORE_ID, AggregatorOps, UserStats, UserStatsValue},
         MultiMonitor, OnDiskTomlMonitor,
     },
     mutators::{
