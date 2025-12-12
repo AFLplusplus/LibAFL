@@ -13,9 +13,10 @@
 use alloc::{
     borrow::Cow,
     string::{String, ToString},
+    sync::Arc,
     vec::Vec,
 };
-use std::{net::UdpSocket, sync::Arc};
+use std::net::UdpSocket;
 
 use cadence::{BufferedUdpMetricSink, Gauged, QueuingMetricSink, StatsdClient};
 use libafl_bolts::{ClientId, Error};

@@ -252,7 +252,6 @@ impl Monitor for TuiMonitor {
             ctx.client_logs.push_back(fmt);
         }
 
-
         Ok(())
     }
 }

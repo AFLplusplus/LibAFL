@@ -7,7 +7,6 @@ use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{self, Parser};
 #[cfg(feature = "tcp_manager")]
-
 #[cfg(feature = "statsd")]
 use libafl::monitors::statsd::StatsdMonitorTagFlavor;
 #[cfg(feature = "tui")]
@@ -15,9 +14,8 @@ use libafl::monitors::tui::TuiMonitor;
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
-        launcher::Launcher,
-        ClientDescription, EventConfig, EventFirer, EventReceiver, EventRestarter, EventWithStats,
-        HasEventManagerId, ProgressReporter, SendExiting,
+        launcher::Launcher, ClientDescription, EventConfig, EventFirer, EventReceiver,
+        EventRestarter, EventWithStats, HasEventManagerId, ProgressReporter, SendExiting,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -477,11 +475,7 @@ pub extern "C" fn libafl_main() {
         #[cfg(unix)]
         let builder = builder.fork(opt.fork);
 
-        match builder
-            .build()
-            .launch()
-
-        {
+        match builder.build().launch() {
             Ok(()) => (),
             Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
             Err(err) => panic!("Failed to run launcher: {err:?}"),
@@ -510,5 +504,4 @@ pub extern "C" fn libafl_main() {
             Err(err) => panic!("Failed to run launcher: {err:?}"),
         }
     }
-
 }
