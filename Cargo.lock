@@ -3081,9 +3081,9 @@ checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
 name = "just"
-version = "1.44.0"
+version = "1.44.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce23554b8b75490ca9b446ef62bad72a14693909d1f8a1cbb5e3f85b8712a0cf"
+checksum = "8661a6c21a4eb8f83dc528ff2d731adf23fcfd89b6bed06cbe48964abfa05be7"
 dependencies = [
  "ansi_term",
  "blake3 1.8.2",
@@ -5654,9 +5654,9 @@ dependencies = [
 
 [[package]]
 name = "shell-words"
-version = "1.1.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24188a676b6ae68c3b2cb3a01be17fbf7240ce009799bb56d5b1409051e78fde"
+checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
 
 [[package]]
 name = "shellexpand"
