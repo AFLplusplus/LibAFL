@@ -35,10 +35,10 @@ fn main() {
     if !afl_cc_path.is_file() {
         let mut afl_cc_make = Command::new("make");
         afl_cc_make.arg("all").current_dir(afl_path);
-        if let Ok(llvm_config) = env::var("LLVM_CONFIG") {
-            if !llvm_config.is_empty() {
-                afl_cc_make.env("LLVM_CONFIG", llvm_config);
-            }
+        if let Ok(llvm_config) = env::var("LLVM_CONFIG")
+            && !llvm_config.is_empty()
+        {
+            afl_cc_make.env("LLVM_CONFIG", llvm_config);
         }
         afl_cc_make.status().unwrap();
     }
@@ -48,10 +48,10 @@ fn main() {
         .args(["src/program.c", "-o"])
         .arg(format!("{cwd}/target/release/program"));
 
-    if let Ok(llvm_config) = env::var("LLVM_CONFIG") {
-        if !llvm_config.is_empty() {
-            compile_command.env("LLVM_CONFIG", llvm_config);
-        }
+    if let Ok(llvm_config) = env::var("LLVM_CONFIG")
+        && !llvm_config.is_empty()
+    {
+        compile_command.env("LLVM_CONFIG", llvm_config);
     }
 
     compile_command.status().unwrap();

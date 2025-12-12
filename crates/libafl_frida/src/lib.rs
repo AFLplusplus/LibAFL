@@ -95,6 +95,7 @@ pub struct FridaOptions {
     enable_coverage: bool,
     enable_drcov: bool,
     instrument_suppress_locations: Option<Vec<(String, usize)>>,
+    #[cfg(feature = "cmplog")]
     enable_cmplog: bool,
 }
 
@@ -110,6 +111,7 @@ impl FridaOptions {
     pub fn parse_env_options() -> Self {
         let mut options = Self::default();
         let mut asan_cores = None;
+        #[cfg(feature = "cmplog")]
         let mut cmplog_cores = None;
 
         if let Ok(env_options) = std::env::var("LIBAFL_FRIDA_OPTIONS") {
@@ -174,6 +176,7 @@ impl FridaOptions {
                             "DrCov is not currently supported on targets other than aarch64"
                         );
                     }
+                    #[cfg(feature = "cmplog")]
                     "cmplog" => {
                         options.enable_cmplog = value.parse().unwrap();
                         #[cfg(not(target_arch = "aarch64"))]
@@ -182,11 +185,8 @@ impl FridaOptions {
                             "cmplog is not currently supported on targets other than aarch64"
                         );
 
-                        #[cfg(not(feature = "cmplog"))]
-                        if options.enable_cmplog {
-                            panic!("cmplog feature is disabled!");
-                        }
                     }
+                    #[cfg(feature = "cmplog")]
                     "cmplog-cores" => {
                         cmplog_cores = Cores::from_cmdline(value).ok();
                     }
@@ -208,6 +208,7 @@ impl FridaOptions {
                 let core_id: CoreId = core_ids[0];
                 options.enable_asan = asan_cores.ids.contains(&core_id);
             }
+            #[cfg(feature = "cmplog")]
             if options.enable_cmplog
                 && let Some(cmplog_cores) = cmplog_cores
             {
@@ -249,7 +250,14 @@ impl FridaOptions {
     #[must_use]
     #[inline]
     pub fn cmplog_enabled(&self) -> bool {
-        self.enable_cmplog
+        #[cfg(feature = "cmplog")]
+        {
+            self.enable_cmplog
+        }
+        #[cfg(not(feature = "cmplog"))]
+        {
+            false
+        }
     }
 
     /// Should ASAN detect leaks
@@ -323,6 +331,7 @@ impl Default for FridaOptions {
             enable_coverage: true,
             enable_drcov: false,
             instrument_suppress_locations: None,
+            #[cfg(feature = "cmplog")]
             enable_cmplog: false,
         };
         #[cfg(target_pointer_width = "32")]
@@ -337,6 +346,7 @@ impl Default for FridaOptions {
             enable_coverage: true,
             enable_drcov: false,
             instrument_suppress_locations: None,
+            #[cfg(feature = "cmplog")]
             enable_cmplog: false,
         };
     }

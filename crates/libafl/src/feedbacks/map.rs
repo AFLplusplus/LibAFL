@@ -31,7 +31,7 @@ use crate::{
     events::{Event, EventFirer, EventWithStats},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
-    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue, user_stats::TAG_MAP},
     observers::{CanTrack, MapObserver},
     state::HasExecutions,
 };
@@ -446,9 +446,10 @@ where
             EventWithStats::with_current_time(
                 Event::UpdateUserStats {
                     name: self.stats_name.clone(),
-                    value: UserStats::new(
+                    value: UserStats::with_tag(
                         UserStatsValue::Ratio(covered as u64, len as u64),
                         AggregatorOps::Avg,
+                        TAG_MAP,
                     ),
                     phantom: PhantomData,
                 },

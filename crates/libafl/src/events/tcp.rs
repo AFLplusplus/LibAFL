@@ -298,7 +298,7 @@ where
                 &mut self.monitor,
                 &mut self.client_stats_manager,
                 client_id,
-                &event,
+                event,
             )? {
                 BrokerEventResult::Forward => {
                     tx_bc.send(buf).expect("Could not send");
@@ -321,38 +321,37 @@ where
         monitor: &mut MT,
         client_stats_manager: &mut ClientStatsManager,
         client_id: ClientId,
-        event: &EventWithStats<I>,
+        event: EventWithStats<I>,
     ) -> Result<BrokerEventResult, Error> {
-        let stats = event.stats();
+        let (event, stats) = event.into_parts();
 
         client_stats_manager.client_stats_insert(client_id)?;
         client_stats_manager.update_client_stats_for(client_id, |client_stat| {
             client_stat.update_executions(stats.executions, stats.time);
         })?;
 
-        let event = event.event();
         match event {
             Event::NewTestcase {
                 corpus_size,
                 forward_id,
                 ..
             } => {
-                let id = if let Some(id) = *forward_id {
+                let id = if let Some(id) = forward_id {
                     id
                 } else {
                     client_id
                 };
                 client_stats_manager.client_stats_insert(id)?;
                 client_stats_manager.update_client_stats_for(id, |client| {
-                    client.update_corpus_size(*corpus_size as u64);
+                    client.update_corpus_size(corpus_size as u64);
                 })?;
                 monitor.display(client_stats_manager, event.name(), id)?;
                 Ok(BrokerEventResult::Forward)
             }
             Event::Heartbeat => Ok(BrokerEventResult::Handled),
             Event::UpdateUserStats {
-                name,
-                value,
+                ref name,
+                ref value,
                 phantom: _,
             } => {
                 client_stats_manager.client_stats_insert(client_id)?;
@@ -365,7 +364,7 @@ where
             }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor {
-                introspection_stats,
+                ref introspection_stats,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
@@ -374,7 +373,7 @@ where
                 client_stats_manager.client_stats_insert(client_id)?;
                 client_stats_manager.update_client_stats_for(client_id, |client| {
                     // Update the performance monitor for this client
-                    client.update_introspection_stats((**introspection_stats).clone());
+                    client.update_introspection_stats(introspection_stats);
                 })?;
 
                 // Display the monitor via `.display` only on core #1
@@ -385,8 +384,8 @@ where
             }
             Event::Objective { objective_size, .. } => {
                 client_stats_manager.client_stats_insert(client_id)?;
-                client_stats_manager.update_client_stats_for(client_id, |client| {
-                    client.update_objective_size(*objective_size as u64);
+                client_stats_manager.update_client_stats_for(client_id, |client_stat| {
+                    client_stat.update_objective_size(objective_size as u64);
                 })?;
                 monitor.display(client_stats_manager, event.name(), client_id)?;
                 Ok(BrokerEventResult::Handled)
@@ -396,9 +395,27 @@ where
                 message,
                 phantom: _,
             } => {
-                let (_, _) = (severity_level, message);
                 // TODO rely on Monitor
-                log::log!((*severity_level).into(), "{message}");
+                log::log!(severity_level.into(), "{message}");
+                Ok(BrokerEventResult::Handled)
+            }
+            Event::UpdateUserStatsMap {
+                ref stats,
+                phantom: _,
+            } => {
+                client_stats_manager.client_stats_insert(client_id)?;
+                // Collect keys to avoid borrowing stats while updating (if we needed to, but here we clone keys anyway)
+                let keys: Vec<_> = stats.keys().cloned().collect();
+
+                client_stats_manager.update_client_stats_for(client_id, |client| {
+                    for (name, value) in stats {
+                        client.update_user_stats(name.clone(), value.clone());
+                    }
+                })?;
+                for name in keys {
+                    client_stats_manager.aggregate(&name);
+                }
+                monitor.display(client_stats_manager, event.name(), client_id)?;
                 Ok(BrokerEventResult::Handled)
             }
             Event::Stop => Ok(BrokerEventResult::Forward),
