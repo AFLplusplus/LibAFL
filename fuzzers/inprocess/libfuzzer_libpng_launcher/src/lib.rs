@@ -463,7 +463,7 @@ pub extern "C" fn libafl_main() {
                 None
             }),
         );
-        match Launcher::builder()
+        let builder = Launcher::builder()
             .shmem_provider(shmem_provider)
             .configuration(EventConfig::from_name("default"))
             .monitor(monitor)
@@ -472,9 +472,15 @@ pub extern "C" fn libafl_main() {
             .overcommit(opt.overcommit)
             .broker_port(broker_port)
             .remote_broker_addr(opt.remote_broker_addr)
-            .stdout_file(Some("/dev/null"))
+            .stdout_file(Some("/dev/null"));
+
+        #[cfg(unix)]
+        let builder = builder.fork(opt.fork);
+
+        match builder
             .build()
             .launch()
+
         {
             Ok(()) => (),
             Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
@@ -484,7 +490,7 @@ pub extern "C" fn libafl_main() {
 
     #[cfg(not(feature = "tui"))]
     {
-        match Launcher::builder()
+        let builder = Launcher::builder()
             .shmem_provider(shmem_provider)
             .configuration(EventConfig::from_name("default"))
             .monitor(monitor)
@@ -493,10 +499,12 @@ pub extern "C" fn libafl_main() {
             .overcommit(opt.overcommit)
             .broker_port(broker_port)
             .remote_broker_addr(opt.remote_broker_addr)
-            .stdout_file(Some("/dev/null"))
-            .build()
-            .launch()
-        {
+            .stdout_file(Some("/dev/null"));
+
+        #[cfg(unix)]
+        let builder = builder.fork(opt.fork);
+
+        match builder.build().launch() {
             Ok(()) => (),
             Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
             Err(err) => panic!("Failed to run launcher: {err:?}"),
