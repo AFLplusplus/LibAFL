@@ -133,7 +133,14 @@ impl Monitor for SimplePrintingMonitor {
         // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]
         {
-            // Introspection stats are now part of UserStats, so they are already printed above.
+            // Print the client performance monitor.
+            println!(
+                "Client {:03}:\n{}",
+                sender_id.0,
+                client_stats_manager.get(sender_id)?.introspection_stats
+            );
+            // Separate the spacing just a bit
+            println!();
         }
         Ok(())
     }
@@ -191,7 +198,16 @@ where
         // Only print perf monitor if the feature is enabled
         #[cfg(feature = "introspection")]
         {
-            // Introspection stats are now part of UserStats, so they are already printed above.
+            // Print the client performance monitor.
+            let fmt = format!(
+                "Client {:03}:\n{}",
+                sender_id.0,
+                client_stats_manager.get(sender_id)?.introspection_stats
+            );
+            (self.print_fn)(&fmt);
+
+            // Separate the spacing just a bit
+            (self.print_fn)("");
         }
         Ok(())
     }
