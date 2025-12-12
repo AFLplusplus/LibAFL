@@ -6,7 +6,6 @@ use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{self, Parser};
-#[cfg(feature = "tcp_manager")]
 #[cfg(feature = "statsd")]
 use libafl::monitors::statsd::StatsdMonitorTagFlavor;
 #[cfg(feature = "tui")]
