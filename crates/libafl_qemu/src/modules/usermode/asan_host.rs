@@ -896,7 +896,7 @@ impl AsanGiovese {
     }
 
     pub fn allocation(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
-        eprintln!("ALLOC: pc={:#x} start={:#x} end={:#x}", pc, start, end);
+        eprintln!("ALLOC: pc={pc:#x} start={start:#x} end={end:#x}");
         self.alloc_remove(start, end);
         self.alloc_insert(pc, start, end);
     }
@@ -1009,7 +1009,7 @@ where
                 .expect("The path to the asan lib is invalid")
                 .to_string();
 
-            eprintln!("ASan Host: Preloading {}", asan_lib);
+            eprintln!("ASan Host: Preloading {asan_lib}");
             // qemu_params.add_env("LD_PRELOAD", &asan_lib);
 
             println!("Loading ASAN: {asan_lib:}");
@@ -1041,10 +1041,10 @@ where
             }
 
             if !added {
-                eprintln!("Args before: {:?}", args);
+                eprintln!("Args before: {args:?}");
                 args.insert(1, "LD_PRELOAD=".to_string() + &asan_lib);
                 args.insert(1, "-E".into());
-                eprintln!("Args after: {:?}", args);
+                eprintln!("Args after: {args:?}");
             }
             Some(asan_lib)
         } else {
@@ -1400,7 +1400,7 @@ where
             }
             QasanAction::Alloc => {
                 let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
-                eprintln!("FakeSyscall Alloc: pc={:#x} a1={:#x} a2={:#x}", pc, a1, a2);
+                eprintln!("FakeSyscall Alloc: pc={pc:#x} a1={a1:#x} a2={a2:#x}");
                 if a2 > 0 {
                     h.alloc(pc, a1, a1 + a2);
                 }

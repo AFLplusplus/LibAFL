@@ -916,7 +916,7 @@ where
         // Since we can't easily return from different branches if types differ (though they are same type here),
         // we might need to use unsafe to extend lifetime or just use raw pointers.
         // Let's use raw pointers to avoid borrow checker hell with multiple mutable borrows.
-        unsafe { Some(&mut *(h as *mut SnapshotModule)) }
+        unsafe { Some(&mut *std::ptr::from_mut::<SnapshotModule>(h)) }
     } else {
         emulator_modules
             .get_mut::<Option<SnapshotModule>>()
