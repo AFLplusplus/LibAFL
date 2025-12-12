@@ -56,6 +56,7 @@ do
     -r "inputs/$test.txt" \
     --input dummy \
     --output out \
+    --port 1339 \
     --asan-host-cores 0 \
     -- qasan 2>&1 | tr -d '\0')
 

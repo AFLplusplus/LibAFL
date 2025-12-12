@@ -58,7 +58,7 @@ static FRONTEND: Lazy<Mutex<GuestFrontend>> = Lazy::new(|| {
         .ok()
         .and_then(|e| e.log_level())
         .unwrap_or(Level::Warn);
-    LibcLogger::initialize::<GuestSyms>(level);
+    // LibcLogger::initialize::<GuestSyms>(level);
     let msg = c"ASAN: Logger initialized\n";
     let msg = c"ASAN: Logger initialized\n";
     unsafe { raw_write(2, msg.as_ptr() as *const _, msg.count_bytes()); }
@@ -500,4 +500,14 @@ pub unsafe extern "C" fn pvalloc(size: usize) -> *mut c_void {
     unsafe { log_to_file_raw(msg); }
     let size = (size + 4095) & !4095;
     unsafe { memalign(4096, size) }
+}
+
+#[cfg(not(feature = "test"))]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    let msg = c"Panic!\n";
+    unsafe { raw_write(1, msg.as_ptr() as *const _, msg.count_bytes()); }
+    unsafe { raw_write(2, msg.as_ptr() as *const _, msg.count_bytes()); }
+    unsafe { raw_syscall(231, 1, 0, 0, 0); } // SYS_exit_group = 231 on x86_64
+    loop {}
 }
