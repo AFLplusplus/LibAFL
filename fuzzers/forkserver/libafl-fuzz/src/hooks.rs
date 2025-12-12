@@ -5,6 +5,7 @@ use libafl::{
 };
 use libafl_bolts::ClientId;
 
+// TODO: Assistance required! "struct `LibAflFuzzEventHook` is never constructed"?
 #[derive(Copy, Clone)]
 pub struct LibAflFuzzEventHook {
     exit_on_solution: bool,
