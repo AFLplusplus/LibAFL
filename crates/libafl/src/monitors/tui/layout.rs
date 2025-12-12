@@ -2,6 +2,12 @@ use alloc::vec::Vec;
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
+const LOGS_MIN_HEIGHT: u16 = 5;
+const PROCESS_TIMING_HEIGHT: u16 = 7;
+const PROCESS_TIMING_COMPACT_HEIGHT: u16 = 4;
+const DEFAULT_TOP_HEIGHT_WITH_CHARTS: u16 = 15;
+const DEFAULT_TOP_HEIGHT_NO_CHARTS: u16 = 12;
+
 /// Splits the main area into top (overall), middle (client), and bottom (logs)
 #[must_use]
 pub fn split_main(area: Rect, show_logs: bool, introspection: bool, has_charts: bool) -> Vec<Rect> {
@@ -21,43 +27,32 @@ pub fn split_main(area: Rect, show_logs: bool, introspection: bool, has_charts: 
                 .to_vec()
         } else {
             // Normal mode
-            // We want to ensure at least 5 lines for logs.
-            let logs_min = 5;
-            let available = area.height.saturating_sub(logs_min);
+            let available = area.height.saturating_sub(LOGS_MIN_HEIGHT);
 
-            // Standard: Top 21 + Mid 6 = 27.
-            // Compact target: Top 17 + Mid 6 = 23.
-            // If no charts, Top can be smaller (just Stats).
-            // Stats: Generic(4) + Process(6) + borders = ~12?
-            // Let's rely on has_charts to reduce Top.
-            // If has_charts, we use 15 (Standard) instead of 21 to give logs more space.
-            let default_top = if has_charts { 15 } else { 12 };
-            let compact_top = if has_charts { 15 } else { 12 };
-
-            let (top_len, mid_len) = if available >= (default_top + 6) {
-                (default_top, 6) // Standard
-            } else if available >= (compact_top + 6) {
-                (compact_top, 6) // Compact
+            let target_top = if has_charts {
+                DEFAULT_TOP_HEIGHT_WITH_CHARTS
             } else {
-                // Squeeze mode
-                // Try to keep Top at compact_top if possible, squeeze Mid.
-                if available > compact_top {
-                    (compact_top, available - compact_top)
-                } else {
-                    (available.saturating_sub(6).max(1), 6)
-                }
+                DEFAULT_TOP_HEIGHT_NO_CHARTS
             };
 
-            // Adjust if calculations went wrong compared to actual height?
-            // `available` was based on height - 5.
-            // So top_len + mid_len <= height - 5.
+            let mid_len = 6;
+            let (top_len, mid_len) = if available >= (target_top + mid_len) {
+                (target_top, mid_len)
+            } else {
+                // Squeeze mode: prioritize Top, squeeze Mid
+                if available > target_top {
+                    (target_top, available - target_top)
+                } else {
+                    (available.saturating_sub(mid_len).max(1), mid_len)
+                }
+            };
 
             Layout::default()
                 .constraints(
                     [
                         Constraint::Length(top_len),
                         Constraint::Length(mid_len),
-                        Constraint::Min(logs_min), // prioritize logs at end
+                        Constraint::Min(LOGS_MIN_HEIGHT), // prioritize logs at end
                     ]
                     .as_ref(),
                 )
@@ -70,19 +65,6 @@ pub fn split_main(area: Rect, show_logs: bool, introspection: bool, has_charts: 
             .split(area)
             .to_vec()
     }
-}
-
-/// Splits the overall stats area into top stats and bottom
-#[must_use]
-pub fn split_overall(area: Rect) -> Rect {
-    // We used to split into Top/Bottom, but now we want to use the whole area
-    // effectively as one block for columns, or just return the area as is?
-    // The UI code expects a list of rects.
-    // Let's just return the area split into one, or keep the function for compatibility but it returns [area].
-    // Actually, `split_main` reserves 17 lines for this area.
-    // We can just return [area] from here?
-    // But `ratatui::layout::split` returns Vec<Rect>.
-    area
 }
 
 /// Splits the top area into left (stats) and right (charts)
@@ -107,13 +89,10 @@ pub fn split_title(area: Rect) -> (Rect, Rect) {
 /// Splits the process timing area
 #[must_use]
 pub fn split_process_timing(area: Rect) -> (Rect, Rect) {
-    // If area is compact, we might want fewer lines for process timing
     let height = if area.height < 15 {
-        4 // Compact: 3 lines content + borders? No, borders take 2. 
-    // If we want to hide stuff, we need to be careful.
-    // Let's say 4 lines: 2 borders + 2 content lines.
+        PROCESS_TIMING_COMPACT_HEIGHT
     } else {
-        7 // Standard
+        PROCESS_TIMING_HEIGHT
     };
 
     let chunks = Layout::default()

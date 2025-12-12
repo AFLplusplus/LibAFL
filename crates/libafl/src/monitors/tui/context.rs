@@ -8,8 +8,8 @@ use core::time::Duration;
 use hashbrown::HashMap;
 
 pub use crate::monitors::stats::{
-    ClientStats, EdgeCoverage, ItemGeometry, ProcessTiming, TimedStat, TimedStats,
-    user_stats::{PlotConfig, TAG_AFL_STATS_CYCLES_DONE, UserStats},
+    ClientStats, EdgeCoverage, ItemGeometry, ProcessTiming, TimedStat, TimedStats, UserStatsTag,
+    user_stats::{TAG_AFL_STATS_CYCLES_DONE, UserStats},
 };
 
 /// The default time window for charts (10 minutes)
@@ -74,15 +74,14 @@ impl ClientTuiContext {
 pub struct TuiContext {
     /// The graphs to display
     pub graphs: Vec<String>,
-
+    pub(crate) tags: HashMap<String, UserStatsTag>,
     /// Timed corpus size
     pub corpus_size_timed: TimedStats,
     /// Timed objective size
     pub objective_size_timed: TimedStats,
     /// Timed execs per sec
+    /// Timed execs per sec
     pub execs_per_sec_timed: TimedStats,
-    /// The plot configs for the custom stats
-    pub plot_configs: HashMap<String, PlotConfig>,
     /// Timed custom user stats
     pub custom_timed: HashMap<String, TimedStats>,
 
@@ -129,8 +128,8 @@ impl TuiContext {
             total_corpus_count: 0,
             total_item_geometry: None,
             total_process_timing: ProcessTiming::new(),
-            plot_configs: HashMap::default(),
             graphs: DEFAULT_CHARTS.iter().map(ToString::to_string).collect(),
+            tags: HashMap::default(),
             corpus_size_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
             objective_size_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
             execs_per_sec_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),

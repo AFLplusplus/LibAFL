@@ -277,8 +277,6 @@ impl ClientStatsManager {
             }
         }
 
-        // If we didn't find specific stats, return None.
-        // This hides the widget when these specific stats are missing.
         if !has_stats {
             return None;
         }

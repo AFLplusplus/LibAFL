@@ -64,7 +64,6 @@ pub struct UserStats {
     tag: Option<UserStatsTag>,
     value: UserStatsValue,
     aggregator_op: AggregatorOps,
-    plot_config: PlotConfig,
 }
 
 impl UserStats {
@@ -83,11 +82,7 @@ impl UserStats {
     pub fn tag(&self) -> Option<UserStatsTag> {
         self.tag
     }
-    /// Get the plot config
-    #[must_use]
-    pub fn plot_config(&self) -> PlotConfig {
-        self.plot_config
-    }
+
     /// Constructor
     #[must_use]
     pub fn new(value: UserStatsValue, aggregator_op: AggregatorOps) -> Self {
@@ -95,7 +90,6 @@ impl UserStats {
             tag: None,
             value,
             aggregator_op,
-            plot_config: PlotConfig::None,
         }
     }
 
@@ -110,23 +104,6 @@ impl UserStats {
             value,
             aggregator_op,
             tag: Some(tag),
-            plot_config: PlotConfig::None,
-        }
-    }
-
-    /// Constructor with a tag and plot config
-    #[must_use]
-    pub fn with_tag_and_plot_config(
-        value: UserStatsValue,
-        aggregator_op: AggregatorOps,
-        tag: UserStatsTag,
-        plot_config: PlotConfig,
-    ) -> Self {
-        Self {
-            value,
-            aggregator_op,
-            tag: Some(tag),
-            plot_config,
         }
     }
 }

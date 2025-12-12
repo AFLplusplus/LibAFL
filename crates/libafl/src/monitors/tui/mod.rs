@@ -158,21 +158,24 @@ impl Monitor for TuiMonitor {
         // Collect stats to update in context (to avoid locking inside loops)
         // Store Cow to avoid allocation if possible
         let mut chart_updates = Vec::new();
+        let mut tag_updates = Vec::new();
 
         for (key, val) in client_snapshot.user_stats() {
             write!(fmt, ", {key}: {val}").unwrap();
+
+            // Collect tags for better coloring
+            if let Some(tag) = val.tag() {
+                tag_updates.push((key.clone(), tag));
+            }
+
             if let Some(val_f64) = val.value().as_f64() {
-                chart_updates.push((key, val.plot_config(), val_f64));
+                chart_updates.push((key, val_f64));
             }
         }
         for (key, val) in client_stats_manager.aggregated() {
             write!(fmt, ", {key}: {val}").unwrap();
             if let Some(val) = val.as_f64() {
-                chart_updates.push((
-                    key,
-                    crate::monitors::stats::user_stats::PlotConfig::None,
-                    val,
-                ));
+                chart_updates.push((key, val));
             }
         }
 
@@ -204,16 +207,15 @@ impl Monitor for TuiMonitor {
             );
             ctx.total_item_geometry = client_stats_manager.item_geometry();
 
+            // Tag updates
+            for (key, tag) in tag_updates {
+                ctx.tags.insert(key.into_owned(), tag);
+            }
+
             // Chart updates
-            for (key, config, val) in chart_updates {
+            for (key, val) in chart_updates {
                 if !ctx.graphs.iter().any(|k| k.as_str() == key.as_ref()) {
                     ctx.graphs.push(key.to_string());
-                }
-                if config != crate::monitors::stats::user_stats::PlotConfig::None {
-                    // Check if we already have it to avoid allocating key string
-                    if !ctx.plot_configs.contains_key(key.as_ref()) {
-                        ctx.plot_configs.insert(key.to_string(), config);
-                    }
                 }
 
                 // Optimization: Try to get mutable reference without allocating String

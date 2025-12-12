@@ -110,6 +110,8 @@ pub struct TimeChartOptions<'a> {
     pub current_time: Duration,
     /// Optional preset range for Y axis (min, max). Data outside this range will expand it.
     pub preset_y_range: Option<(f64, f64)>,
+    /// The style of the chart
+    pub style: Style,
 }
 
 /// Options for drawing a time chart with multiple series
@@ -142,6 +144,7 @@ pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
         enhanced_graphics,
         current_time,
         preset_y_range,
+        style,
     } = options;
 
     // Create a temporary buffer for the single series
@@ -152,14 +155,7 @@ pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
     let multi_options = MultiTimeChartOptions {
         title,
         y_name,
-        series: vec![(
-            "",
-            stats,
-            window,
-            Style::default()
-                .fg(Color::LightYellow)
-                .add_modifier(Modifier::BOLD),
-        )],
+        series: vec![("", stats, window, style)],
         graph_data: &mut buffers,
         enhanced_graphics,
         current_time,

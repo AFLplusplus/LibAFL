@@ -18,7 +18,7 @@ use ratatui::{
 #[cfg(feature = "introspection")]
 use super::widgets::draw_scrolled_stats;
 use super::{
-    layout::{split_client, split_main, split_overall, split_title, split_top},
+    layout::{split_client, split_main, split_title, split_top},
     widgets::{
         MultiTimeChartOptions, TimeChartOptions, calculate_tab_window, draw_item_geometry_text,
         draw_key_value_block, draw_logs, draw_main_block, draw_multi_time_chart,
@@ -28,10 +28,7 @@ use super::{
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::monitors::{
-    stats::{
-        ProcessTiming, TimedStat,
-        user_stats::{PlotConfig, UserStatsValue},
-    },
+    stats::{ProcessTiming, TimedStat, user_stats::UserStatsValue},
     tui::{ItemGeometry, TuiContext},
 };
 
@@ -107,6 +104,7 @@ enum ChartKind {
         series: Vec<TimedStat>,
         window: Duration,
         run_time: Duration,
+        style: Style,
     },
     Multi {
         name: String,
@@ -162,14 +160,7 @@ impl TuiUi {
 
     fn get_tabs(ctx: &TuiContext) -> Vec<String> {
         let mut tabs = vec!["Overview".to_string()];
-        for g in &ctx.graphs {
-            if !ctx.plot_configs.contains_key(g) {
-                tabs.push(g.clone());
-            }
-        }
-        if !ctx.plot_configs.is_empty() {
-            tabs.push("User Stats".to_string());
-        }
+        tabs.extend(ctx.graphs.clone());
         tabs
     }
 
@@ -281,11 +272,23 @@ impl TuiUi {
                             UserStatsValue::Percent(p) => format!("{:.2}%", p * 100.0),
                         };
 
-                        let style = match val.plot_config() {
-                            PlotConfig::None => Style::default(),
-                            PlotConfig::Color(r, g, b) => Style::default().fg(Color::Rgb(r, g, b)),
-                            PlotConfig::SimpleColor(c) => Style::default().fg(Color::Indexed(c)),
-                        };
+                        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                        use std::hash::{Hash, Hasher};
+                        if let Some(tag) = val.tag() {
+                            tag.hash(&mut hasher);
+                        } else {
+                            k.hash(&mut hasher);
+                        }
+                        let color_idx = hasher.finish() as usize % 6;
+                        let colors = [
+                            Color::Red,
+                            Color::Green,
+                            Color::Yellow,
+                            Color::Blue,
+                            Color::Magenta,
+                            Color::Cyan,
+                        ];
+                        let style = Style::default().fg(colors[color_idx]);
 
                         (Span::styled(k.to_string(), style), val_str)
                     })
@@ -389,24 +392,26 @@ impl TuiUi {
                     "Overview" => None, // Should not happen if we start at 1
                     "User Stats" => {
                         let mut series = vec![];
-                        for (key, config) in &ctx.plot_configs {
-                            if let Some(stats) = ctx.custom_timed.get(key.as_str()) {
-                                let style = match config {
-                                    PlotConfig::Color(r, g, b) => {
-                                        Style::default().fg(Color::Rgb(*r, *g, *b))
-                                    }
-                                    PlotConfig::SimpleColor(c) => {
-                                        Style::default().fg(Color::Indexed(*c))
-                                    }
-                                    PlotConfig::None => Style::default(),
-                                };
-                                series.push((
-                                    key.clone(),
-                                    stats.series.clone().into(),
-                                    stats.window,
-                                    style,
-                                ));
-                            }
+                        let colors = [
+                            Color::Red,
+                            Color::Green,
+                            Color::Yellow,
+                            Color::Blue,
+                            Color::Magenta,
+                            Color::Cyan,
+                        ];
+                        for (key, stats) in &ctx.custom_timed {
+                            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                            use std::hash::{Hash, Hasher};
+                            key.hash(&mut hasher);
+                            let color_idx = hasher.finish() as usize % 6;
+                            let style = Style::default().fg(colors[color_idx]);
+                            series.push((
+                                key.clone(),
+                                stats.series.clone().into(),
+                                stats.window,
+                                style,
+                            ));
                         }
                         series.sort_by(|a, b| a.0.cmp(&b.0));
                         Some(ChartKind::Multi {
@@ -420,24 +425,54 @@ impl TuiUi {
                         series: ctx.corpus_size_timed.series.clone().into(),
                         window: ctx.corpus_size_timed.window,
                         run_time,
+                        style: Style::default()
+                            .fg(Color::LightYellow)
+                            .add_modifier(Modifier::BOLD),
                     }),
                     "objectives" => Some(ChartKind::Single {
                         name: "objectives".to_string(),
                         series: ctx.objective_size_timed.series.clone().into(),
                         window: ctx.objective_size_timed.window,
                         run_time,
+                        style: Style::default()
+                            .fg(Color::LightYellow)
+                            .add_modifier(Modifier::BOLD),
                     }),
                     "exec/sec" => Some(ChartKind::Single {
                         name: "exec/sec".to_string(),
                         series: ctx.execs_per_sec_timed.series.clone().into(),
                         window: ctx.execs_per_sec_timed.window,
                         run_time,
+                        style: Style::default()
+                            .fg(Color::LightYellow)
+                            .add_modifier(Modifier::BOLD),
                     }),
-                    custom => ctx.custom_timed.get(custom).map(|stats| ChartKind::Single {
-                        name: custom.to_string(),
-                        series: stats.series.clone().into(),
-                        window: stats.window,
-                        run_time,
+                    custom => ctx.custom_timed.get(custom).map(|stats| {
+                        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                        use std::hash::{Hash, Hasher};
+                        if let Some(tag) = ctx.tags.get(custom) {
+                            tag.hash(&mut hasher);
+                        } else {
+                            custom.hash(&mut hasher);
+                        }
+                        let color_idx = hasher.finish() as usize % 6;
+                        let colors = [
+                            Color::Red,
+                            Color::Green,
+                            Color::Yellow,
+                            Color::Blue,
+                            Color::Magenta,
+                            Color::Cyan,
+                        ];
+                        let style = Style::default().fg(colors[color_idx]);
+
+                        ChartKind::Single {
+                            name: custom.to_string(),
+                            series: stats.series.clone().into(),
+                            window: stats.window,
+                            run_time,
+                            style,
+                        }
                     }),
                 };
             }
@@ -696,6 +731,7 @@ impl TuiUi {
     }
 
     const NARROW_WIDTH_THRESHOLD: u16 = 75;
+    const SHORT_HEIGHT_THRESHOLD: u16 = 28;
 
     /// Move to the next client
     pub fn on_right(&mut self) {
@@ -737,7 +773,7 @@ impl TuiUi {
         }
         self.is_narrow = new_is_narrow;
 
-        let is_short = area.height < 28;
+        let is_short = area.height < Self::SHORT_HEIGHT_THRESHOLD;
         let replace_client_with_logs = (self.is_narrow || is_short) && self.show_logs;
 
         if replace_client_with_logs {
@@ -773,7 +809,7 @@ impl TuiUi {
         has_charts: bool,
         data: &PreparedFrameData,
     ) {
-        let overall_layout = split_overall(area);
+        let overall_layout = area;
         let (tab_area, content_area) = split_title(overall_layout);
 
         if self.is_narrow {
@@ -823,15 +859,7 @@ impl TuiUi {
                     .fg(Color::LightMagenta)
                     .add_modifier(Modifier::BOLD),
             )))
-            .block(draw_main_block(&self.title, Borders::ALL, None, None)) // Using draw_main_block for status bar too? Wait, status bar had Borders::ALL. draw_main_block allows configuring borders. But title was "headers" before? No, it was empty title?
-            // Prior code: .block(Block::default().borders(Borders::ALL))
-            // So title was empty.
-            // draw_main_block takes a title.
-            // I should pass empty string if needed, or maybe just use Block::default() for simple cases if draw_main_block is too specific?
-            // But I want consistently styled blocks.
-            // The status bar in prior code had NO title on the block itself?
-            // "let p = ... .block(Block::default().borders(Borders::ALL))" -> Yes, no title.
-            // So draw_main_block("", Borders::ALL, None, None) works.
+            .block(draw_main_block(&self.title, Borders::ALL, None, None))
             .alignment(Alignment::Center);
             f.render_widget(p, left_title);
 
@@ -925,6 +953,7 @@ impl TuiUi {
                     series,
                     window,
                     run_time,
+                    style,
                 } => {
                     draw_time_chart(
                         f,
@@ -938,6 +967,7 @@ impl TuiUi {
                             enhanced_graphics: self.enhanced_graphics,
                             current_time: *run_time,
                             preset_y_range: None,
+                            style: *style,
                         },
                     );
                 }
