@@ -908,9 +908,8 @@ where
     I: Unpin,
     S: Unpin,
 {
-    let emu_ptr = emulator_modules as *mut EmulatorModules<ET, I, S>;
-    if let Some(h) = unsafe { (*emu_ptr).get_mut::<SnapshotModule>() } {
-        return Some(h);
+    if emulator_modules.get::<SnapshotModule>().is_some() {
+        return emulator_modules.get_mut::<SnapshotModule>();
     }
     emulator_modules
         .get_mut::<Option<SnapshotModule>>()
