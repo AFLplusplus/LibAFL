@@ -171,15 +171,38 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> DefaultFrontend<B, S, T> {
         red_zone_size: usize,
         quarantine_size: usize,
     ) -> Result<DefaultFrontend<B, S, T>, DefaultFrontendError<S, T>> {
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        unsafe fn raw_write_stderr(msg: &[u8]) {
+            unsafe {
+                core::arch::asm!(
+                    "syscall",
+                    in("rax") 1, // SYS_write
+                    in("rdi") 2, // fd 2 (stderr)
+                    in("rsi") msg.as_ptr(),
+                    in("rdx") msg.len(),
+                    out("rcx") _,
+                    out("r11") _,
+                    options(nostack)
+                );
+            }
+        }
+        #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+        unsafe fn raw_write_stderr(_msg: &[u8]) {}
+
+        unsafe { raw_write_stderr(b"DefaultFrontend::new called\n") };
+
         if !red_zone_size.is_multiple_of(Self::ALLOC_ALIGN_SIZE) {
             Err(DefaultFrontendError::InvalidRedZoneSize(red_zone_size))?;
         }
+        unsafe { raw_write_stderr(b"DefaultFrontend::new: creating HashMap\n") };
+        let allocations = HashMap::with_capacity_and_hasher(4096, Hasher::default());
+        unsafe { raw_write_stderr(b"DefaultFrontend::new: HashMap created\n") };
         Ok(DefaultFrontend::<B, S, T> {
             backend,
             shadow,
             tracking,
             red_zone_size,
-            allocations: HashMap::with_capacity_and_hasher(4096, Hasher::default()),
+            allocations,
             quarantine: VecDeque::new(),
             quarantine_size,
             quaratine_used: 0,

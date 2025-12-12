@@ -79,7 +79,6 @@ pub(crate) unsafe extern "C" fn nop_target_pc_guard(_guard: *mut u32, _pc: usize
 
 /// The global hook for `__libafl_targets_trace_pc_guard`
 #[cfg(feature = "sancov_pcguard_dump_cov")]
-#[cfg(feature = "sancov_pcguard_dump_cov")]
 pub static LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK: AtomicPtr<TargetPcGuardHook> =
     AtomicPtr::new(nop_target_pc_guard as *mut TargetPcGuardHook);
 

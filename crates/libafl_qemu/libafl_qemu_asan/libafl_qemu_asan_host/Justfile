@@ -102,11 +102,9 @@ link_host: rename_host
 		-u write \
 		-Wl,--version-script={{ HOST_SOURCE_DIR }}/host.map \
 		-Wl,--gc-sections \
-		-Wl,--no-undefined \
 		-o {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/_libafl_qemu_asan_host.so \
 		{{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}/libafl_qemu_asan_host.renamed \
-		-L {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }} \
-		"-lafl_asan_libc"
+		-L {{ TARGET_DIR }}/$CROSS_TARGET/{{ PROFILE_DIR }}
 
 [unix]
 strip_host: link_host
