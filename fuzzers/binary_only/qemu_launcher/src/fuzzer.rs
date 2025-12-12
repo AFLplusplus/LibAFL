@@ -22,13 +22,13 @@ use libafl_bolts::{os::dup2, os::dup_and_mute_outputs};
 
 use crate::{client::Client, options::FuzzerOptions};
 
-// #[cfg(all(not(miri), debug_assertions))]
-// #[global_allocator]
-// static GLOBAL: scudo::GlobalScudoAllocator = scudo::GlobalScudoAllocator;
+#[cfg(all(not(miri), debug_assertions))]
+#[global_allocator]
+static GLOBAL: scudo::GlobalScudoAllocator = scudo::GlobalScudoAllocator;
 
-// #[cfg(all(not(miri), not(debug_assertions)))]
-// #[global_allocator]
-// static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+#[cfg(all(not(miri), not(debug_assertions)))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 pub struct Fuzzer {
     options: FuzzerOptions,

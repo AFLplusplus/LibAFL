@@ -48,7 +48,6 @@ libafl_bolts = { path = "../../../crates/libafl_bolts", features = [
   "errors_backtrace",
 ] }
 libafl_qemu = { path = "../../../crates/libafl_qemu", features = [
-  "x86_64",
   "usermode",
   "asan_rust",
 ] }

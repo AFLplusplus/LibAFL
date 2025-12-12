@@ -44,16 +44,39 @@ pub type HostEnv = Env<LibcFileReader<HostSyms>>;
 
 const PAGE_SIZE: usize = 4096;
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[inline(always)]
+unsafe fn raw_write(fd: i32, buf: *const u8, count: usize) {
+    core::arch::asm!(
+        "syscall",
+        in("rax") 1, // SYS_write
+        in("rdi") fd,
+        in("rsi") buf,
+        in("rdx") count,
+        out("rcx") _,
+        out("r11") _,
+        options(nostack, preserves_flags)
+    );
+}
+
+#[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+unsafe fn raw_write(_fd: i32, _buf: *const u8, _count: usize) {
+}
+
 static FRONTEND: Lazy<Mutex<HostFontend>> = Lazy::new(|| {
+    unsafe { raw_write(2, b"ASAN Host initializing...\n" as *const u8, 24) };
     let level = HostEnv::initialize()
         .ok()
         .and_then(|e| e.log_level())
         .unwrap_or(Level::Warn);
     LibcLogger::initialize::<HostSyms>(level);
-    info!("ASAN Host initializing...");
+    unsafe { raw_write(2, b"Logger initialized\n" as *const u8, 19) };
     let backend = HostBackend::new(DlmallocBackend::new(PAGE_SIZE));
+    unsafe { raw_write(2, b"Backend initialized\n" as *const u8, 20) };
     let shadow = HostShadow::<HostInterface>::new().unwrap();
+    unsafe { raw_write(2, b"Shadow initialized\n" as *const u8, 19) };
     let tracking = HostTracking::<HostInterface>::new().unwrap();
+    unsafe { raw_write(2, b"Tracking initialized\n" as *const u8, 21) };
     let frontend = HostFontend::new(
         backend,
         shadow,
@@ -62,17 +85,21 @@ static FRONTEND: Lazy<Mutex<HostFontend>> = Lazy::new(|| {
         HostFontend::DEFAULT_QUARANTINE_SIZE,
     )
     .unwrap();
+    unsafe { raw_write(2, b"Frontend initialized\n" as *const u8, 21) };
     let mappings = Maps::new(
         MapIterator::<LibcFileReader<Syms>>::new()
             .unwrap()
             .collect(),
     );
+    unsafe { raw_write(2, b"Maps initialized\n" as *const u8, 17) };
     Patches::init(mappings);
+    unsafe { raw_write(2, b"Patches initialized\n" as *const u8, 20) };
     for hook in PatchedHooks::default() {
+        unsafe { raw_write(2, b"Applying hook...\n" as *const u8, 17) };
         let target = hook.lookup::<HostSyms>().unwrap();
         Patches::apply::<RawPatch, HostMmap>(target, hook.destination).unwrap();
     }
-    info!("ASAN Host initialized.");
+    unsafe { raw_write(2, b"ASAN Host initialized.\n" as *const u8, 23) };
     Mutex::new(frontend)
 });
 
