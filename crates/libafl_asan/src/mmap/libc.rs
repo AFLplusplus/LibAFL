@@ -153,14 +153,6 @@ impl<S: Symbols> LibcMmap<S> {
         let errno = unsafe { *errno_location() };
         Ok(errno)
     }
-
-    pub fn dummy() -> Self {
-        Self {
-            addr: 0,
-            len: 0,
-            phantom: PhantomData,
-        }
-    }
 }
 
 impl<S: Symbols> Mmap for LibcMmap<S> {
@@ -198,7 +190,8 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
         unsafe { asan_swap(false) };
         let flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE | libc::MAP_FIXED;
 
-        // let flags = flags | libc::MAP_FIXED_NOREPLACE;
+        #[cfg(target_os = "linux")]
+        let flags = flags | libc::MAP_FIXED_NOREPLACE;
 
         let map = unsafe {
             fn_mmap(
@@ -283,14 +276,6 @@ impl<S: Symbols> Mmap for LibcMmap<S> {
         }
         Ok(())
     }
-
-    fn dummy() -> Self {
-        Self {
-            addr: 0,
-            len: 0,
-            phantom: PhantomData,
-        }
-    }
 }
 
 impl From<&MmapProt> for c_int {
@@ -311,9 +296,6 @@ impl From<&MmapProt> for c_int {
 
 impl<S: Symbols> Drop for LibcMmap<S> {
     fn drop(&mut self) {
-        if self.len == 0 {
-            return;
-        }
         let fn_munmap = Self::get_munmap().unwrap();
         unsafe { asan_swap(false) };
         let ret = unsafe { fn_munmap(self.addr as *mut c_void, self.len) };

@@ -40,10 +40,6 @@ mod tests {
         fn dont_dump(_addr: GuestAddr, _len: usize) -> Result<(), Self::Error> {
             unimplemented!()
         }
-
-        fn dummy() -> Self {
-            Self
-        }
     }
 
     #[derive(Debug)]

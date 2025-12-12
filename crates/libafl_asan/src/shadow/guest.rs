@@ -5,7 +5,7 @@
 use alloc::fmt::Debug;
 use core::marker::PhantomData;
 
-use log::{debug, trace, warn};
+use log::{debug, trace};
 use thiserror::Error;
 
 use crate::{
@@ -271,10 +271,8 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
             Self::LOW_SHADOW_OFFSET,
             Self::LOW_SHADOW_OFFSET + Self::LOW_SHADOW_SIZE
         );
-        let lo = Self::map_shadow(Self::LOW_SHADOW_OFFSET, Self::LOW_SHADOW_SIZE).or_else(|e| {
-            warn!("Failed to map low shadow: {:?}", e);
-            Ok(M::dummy())
-        })?;
+        let lo = Self::map_shadow(Self::LOW_SHADOW_OFFSET, Self::LOW_SHADOW_SIZE)
+            .map_err(|e| GuestShadowError::MmapError(e))?;
         trace!(
             "Mapping high shadow: {:#x}-{:#x}",
             Self::HIGH_SHADOW_OFFSET,

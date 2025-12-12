@@ -1051,10 +1051,6 @@ where
             None
         };
 
-        // unsafe {
-        //     AsanGiovese::init(&mut self.rt, emulator_modules.hooks().qemu_hooks());
-        // }
-
         *qemu_params = QemuParams::Cli(args);
 
         self.asan_lib = asan_lib;
@@ -1064,6 +1060,8 @@ where
     where
         ET: EmulatorModuleTuple<I, S>,
     {
+        /// # Safety
+        /// The hooks and runtime are valid at this point.
         unsafe {
             AsanGiovese::init(&mut self.rt, emulator_modules.hooks().qemu_hooks());
         }
@@ -1397,17 +1395,6 @@ where
             }
             QasanAction::SwapState => {
                 h.set_enabled(!h.enabled());
-            }
-            QasanAction::Alloc => {
-                let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
-                eprintln!("FakeSyscall Alloc: pc={pc:#x} a1={a1:#x} a2={a2:#x}");
-                if a2 > 0 {
-                    h.alloc(pc, a1, a1 + a2);
-                }
-            }
-            QasanAction::Dealloc => {
-                let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
-                h.dealloc(qemu, pc, a1);
             }
             _ => (),
         }

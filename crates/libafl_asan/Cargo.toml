@@ -73,7 +73,7 @@ log = { version = "0.4.29", default-features = false, features = [
 libc = { version = "0.2.178", default-features = false, optional = true }
 nostd-musl = { version = "0.1.6", default-features = false, features = [
   "optimized-assembly",
-], optional = true }
+] }
 nostd-printf = { version = "0.1.4", default-features = false }
 
 readonly = { version = "0.2.12", default-features = false }

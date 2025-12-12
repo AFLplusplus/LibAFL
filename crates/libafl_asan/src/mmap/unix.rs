@@ -101,10 +101,6 @@ impl Mmap for MmapRegion {
                 .map_err(|errno| MmapError::FailedToMadviseDontDump(addr, len, errno))
         }
     }
-
-    fn dummy() -> Self {
-        Self { addr: 0, len: 0 }
-    }
 }
 
 impl From<&MmapProt> for MprotectFlags {

@@ -10,15 +10,19 @@ crate-type = ["staticlib"]
 
 [features]
 default = []
-test = ["libafl_asan/test"]
+test = ["libafl_asan/test", "libafl_asan_libc/test"]
 
 [dependencies]
 libafl_asan = { path = "../../../libafl_asan", default-features = false, features = [
-  "guest",
-  "libc",
   "dlmalloc",
+  "global_allocator",
+  "guest",
+  "hooks",
+  "libc",
+  "mimalloc",
+  "tracking",
 ] }
-# libafl_asan_libc = { path = "../../../libafl_asan/libafl_asan_libc", default-features = false }
+libafl_asan_libc = { path = "../../../libafl_asan/libafl_asan_libc", default-features = false }
 log = { version = "0.4.22", default-features = false, features = [
   "release_max_level_info",
 ] }
@@ -27,5 +31,3 @@ spin = { version = "0.9.8", default-features = false, features = [
   "mutex",
   "spin_mutex",
 ] }
-libc = "0.2"
-# mimalloc = { version = "0.1", default-features = false }

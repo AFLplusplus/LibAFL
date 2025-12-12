@@ -909,19 +909,11 @@ where
     S: Unpin,
 {
     if let Some(h) = emulator_modules.get_mut::<SnapshotModule>() {
-        // We can't return it directly because of borrow checker limitations with conditional return
-        // So we use a trick or just unsafe pointer cast if needed, but let's try safe first.
-        // Actually, we can just return it.
-        // But we need to handle the Option case too.
-        // Since we can't easily return from different branches if types differ (though they are same type here),
-        // we might need to use unsafe to extend lifetime or just use raw pointers.
-        // Let's use raw pointers to avoid borrow checker hell with multiple mutable borrows.
-        unsafe { Some(&mut *std::ptr::from_mut::<SnapshotModule>(h)) }
-    } else {
-        emulator_modules
-            .get_mut::<Option<SnapshotModule>>()
-            .and_then(|h| h.as_mut())
+        return Some(h);
     }
+    emulator_modules
+        .get_mut::<Option<SnapshotModule>>()
+        .and_then(|h| h.as_mut())
 }
 
 #[expect(non_upper_case_globals, clippy::too_many_arguments)]
