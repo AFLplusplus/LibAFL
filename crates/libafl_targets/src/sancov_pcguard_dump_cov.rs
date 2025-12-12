@@ -5,7 +5,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{ffi::c_void, sync::atomic::Ordering};
+use core::sync::atomic::Ordering;
 use std::{collections::HashMap, fs::File, io::Write as IoWrite, path::PathBuf, sync::Mutex};
 
 use libafl::{
@@ -15,7 +15,9 @@ use libafl::{
     state::HasCorpus,
 };
 
-use crate::sancov_pcguard::{LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK, TargetPcGuardHook, nop_target_pc_guard};
+use crate::sancov_pcguard::{
+    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK, TargetPcGuardHook, nop_target_pc_guard,
+};
 
 static COVERED_PCS: Mutex<Option<HashMap<usize, usize>>> = Mutex::new(None);
 
@@ -93,7 +95,10 @@ pub fn pcguard_enable_coverage_collection() {
 
 /// Disable coverage collection for `dump_cov` mode.
 pub fn pcguard_disable_coverage_collection() {
-    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.store(nop_target_pc_guard as *mut TargetPcGuardHook, Ordering::Release);
+    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.store(
+        nop_target_pc_guard as *mut TargetPcGuardHook,
+        Ordering::Release,
+    );
 }
 
 /// A hook that dumps coverage to files
