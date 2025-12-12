@@ -3,7 +3,10 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
-use core::time::Duration;
+use core::{
+    hash::{Hash, Hasher},
+    time::Duration,
+};
 use std::sync::RwLock;
 
 use libafl_bolts::{current_time, format_big_number};
@@ -28,7 +31,14 @@ use super::{
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::monitors::{
-    stats::{ProcessTiming, TimedStat, user_stats::UserStatsValue},
+    stats::{
+        ProcessTiming, TimedStat,
+        user_stats::{
+            TAG_AFL_STATS_CYCLES_DONE, TAG_AFL_STATS_CYCLES_WO_FINDS, TAG_AFL_STATS_IMPORTED,
+            TAG_AFL_STATS_OWN_FINDS, TAG_AFL_STATS_PENDING, TAG_AFL_STATS_PENDING_FAV,
+            TAG_AFL_STATS_PENDING_FAVORED, TAG_CALIBRATE_STABILITY, UserStatsValue,
+        },
+    },
     tui::{ItemGeometry, TuiContext},
 };
 
@@ -254,6 +264,24 @@ impl TuiUi {
                 keys.sort();
                 let user_stats_vec = keys
                     .into_iter()
+                    .filter(|k| {
+                        let val = client.client_stats.user_stats().get(*k).unwrap();
+                        if let Some(tag) = val.tag() {
+                            !matches!(
+                                tag,
+                                TAG_AFL_STATS_CYCLES_DONE
+                                    | TAG_AFL_STATS_CYCLES_WO_FINDS
+                                    | TAG_AFL_STATS_IMPORTED
+                                    | TAG_AFL_STATS_OWN_FINDS
+                                    | TAG_AFL_STATS_PENDING
+                                    | TAG_AFL_STATS_PENDING_FAV
+                                    | TAG_AFL_STATS_PENDING_FAVORED
+                                    | TAG_CALIBRATE_STABILITY
+                            )
+                        } else {
+                            true
+                        }
+                    })
                     .map(|k| {
                         let val = client.client_stats.user_stats().get(k).unwrap();
                         let val_str = match val.value() {
@@ -273,7 +301,7 @@ impl TuiUi {
                         };
 
                         let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                        use std::hash::{Hash, Hasher};
+
                         if let Some(tag) = val.tag() {
                             tag.hash(&mut hasher);
                         } else {
@@ -402,7 +430,6 @@ impl TuiUi {
                         ];
                         for (key, stats) in &ctx.custom_timed {
                             let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                            use std::hash::{Hash, Hasher};
                             key.hash(&mut hasher);
                             let color_idx = hasher.finish() as usize % 6;
                             let style = Style::default().fg(colors[color_idx]);
@@ -449,7 +476,6 @@ impl TuiUi {
                     }),
                     custom => ctx.custom_timed.get(custom).map(|stats| {
                         let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                        use std::hash::{Hash, Hasher};
                         if let Some(tag) = ctx.tags.get(custom) {
                             tag.hash(&mut hasher);
                         } else {
