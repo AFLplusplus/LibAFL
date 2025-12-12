@@ -107,7 +107,7 @@ impl FridaOptions {
     /// # Panics
     /// Panics, if no `=` sign exists in input, or or `value` behind `=` has zero length.
     #[must_use]
-    #[expect(clippy::too_many_lines, clippy::assertions_on_constants)]
+    #[expect(clippy::too_many_lines)]
     pub fn parse_env_options() -> Self {
         let mut options = Self::default();
         let mut asan_cores = None;
