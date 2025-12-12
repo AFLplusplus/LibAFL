@@ -941,7 +941,7 @@ where
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
     match i64::from(sys_num) {
         SYS_read | SYS_pread64 => {
-            let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+            let h = get_snapshot_module_mut(emulator_modules).unwrap();
             /*
              * Only note the access if the call is successful. And only mark the
              * portion of the buffer which has actually been modified.
@@ -951,12 +951,12 @@ where
             }
         }
         SYS_readlinkat => {
-            let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+            let h = get_snapshot_module_mut(emulator_modules).unwrap();
             h.access(a2, a3 as usize);
         }
         #[cfg(not(cpu_target = "riscv32"))]
         SYS_futex => {
-            let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+            let h = get_snapshot_module_mut(emulator_modules).unwrap();
             h.access(a0, a3 as usize);
         }
         #[cfg(not(any(
@@ -968,7 +968,7 @@ where
         )))]
         SYS_newfstatat => {
             if a2 != 0 {
-                let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
+                let h = get_snapshot_module_mut(emulator_modules).unwrap();
                 h.access(a2, 4096); // stat is not greater than a page
             }
         }

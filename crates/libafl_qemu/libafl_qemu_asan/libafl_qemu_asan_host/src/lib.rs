@@ -352,20 +352,13 @@ unsafe fn raw_close(_fd: i32) {}
 
 unsafe fn log_msg(msg: &[u8]) {
     unsafe {
-        /*
-        // raw_write(2, msg.as_ptr(), msg.len());
-        let fd = raw_open(b"/tmp/asan_debug.log\0".as_ptr(), 1089, 438); // O_WRONLY | O_CREAT | O_APPEND, 0666
+        raw_write(2, msg.as_ptr(), msg.len());
+        // Also try file for persistence
+        let fd = raw_open(b"/tmp/asan_host.log\0".as_ptr(), 1089, 438);
         if fd >= 0 {
             raw_write(fd, msg.as_ptr(), msg.len());
             raw_close(fd);
         }
-        */
-        core::arch::asm!(
-            "syscall",
-            in("rax") 60, // SYS_exit
-            in("rdi") 42,
-            options(nostack, noreturn)
-        );
     }
 }
 
