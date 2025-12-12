@@ -10,6 +10,7 @@ pub use simple::*;
 pub mod centralized;
 #[cfg(all(unix, feature = "std"))]
 pub use centralized::*;
+use hashbrown::HashMap;
 #[cfg(feature = "std")]
 pub mod launcher;
 
@@ -294,6 +295,11 @@ impl<I> EventWithStats<I> {
     pub fn stats(&self) -> &ExecStats {
         &self.stats
     }
+
+    /// Deconstruct this into its parts
+    pub fn into_parts(self) -> (Event<I>, ExecStats) {
+        (self.event, self.stats)
+    }
 }
 
 // TODO remove forward_id as not anymore needed for centralized
@@ -328,6 +334,13 @@ pub enum Event<I> {
         name: Cow<'static, str>,
         /// Custom user monitor value
         value: UserStats,
+        /// [`PhantomData`]
+        phantom: PhantomData<I>,
+    },
+    /// New list of user stats event to monitor.
+    UpdateUserStatsMap {
+        /// Custom user monitor name
+        stats: HashMap<Cow<'static, str>, UserStats>,
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
@@ -371,6 +384,7 @@ impl<I> Event<I> {
         match self {
             Event::NewTestcase { .. } => "Testcase",
             Event::Heartbeat => "Client Heartbeat",
+            Event::UpdateUserStatsMap { .. } => "UserStatsMap",
             Event::UpdateUserStats { .. } => "UserStats",
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor { .. } => "PerfMonitor",
@@ -393,7 +407,9 @@ impl<I> Event<I> {
                 Cow::Owned(format!("Testcase {}", input.generate_name(None)))
             }
             Event::Heartbeat => Cow::Borrowed("Client Heartbeat"),
-            Event::UpdateUserStats { .. } => Cow::Borrowed("UserStats"),
+            Event::UpdateUserStats { .. } | Event::UpdateUserStatsMap { .. } => {
+                Cow::Borrowed("UserStats")
+            }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor { .. } => Cow::Borrowed("PerfMonitor"),
             Event::Objective { .. } => Cow::Borrowed("Objective"),

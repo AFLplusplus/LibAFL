@@ -5,7 +5,7 @@ use libafl_bolts::{ClientId, Error};
 use crate::monitors::{Monitor, stats::ClientStatsManager};
 
 /// The wrapped monitor will keep displaying until the closure evaluates to false
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WhileMonitor<CB, M> {
     closure: CB,
     monitor: M,
@@ -45,7 +45,7 @@ where
 }
 
 /// The wrapped monitor will display if the closure evaluates to true
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfMonitor<CB, M> {
     closure: CB,
     monitor: M,
@@ -85,7 +85,7 @@ where
 }
 
 /// Either wrapped monitors will display based on the closure evaluation
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfElseMonitor<CB, M1, M2> {
     closure: CB,
     if_monitor: M1,
@@ -135,7 +135,7 @@ where
 }
 
 /// A monitor wrapper where the monitor does not need to be initialized, but can be [`None`].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OptionalMonitor<M> {
     monitor: Option<M>,
 }

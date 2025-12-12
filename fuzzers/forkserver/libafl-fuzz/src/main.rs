@@ -76,7 +76,6 @@ use corpus::{check_autoresume, create_dir_if_not_exists};
 mod corpus;
 mod executor;
 mod fuzzer;
-mod hooks;
 use env_parser::parse_envs;
 use fuzzer::run_client;
 use libafl::{schedulers::powersched::BaseSchedule, Error};

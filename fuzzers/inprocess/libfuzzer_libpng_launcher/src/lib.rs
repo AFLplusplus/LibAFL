@@ -7,24 +7,25 @@ use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::{self, Parser};
 #[cfg(feature = "tcp_manager")]
-use libafl::events::tcp::TcpRestartingMgr;
+
 #[cfg(feature = "statsd")]
 use libafl::monitors::statsd::StatsdMonitorTagFlavor;
+#[cfg(feature = "tui")]
+use libafl::monitors::tui::TuiMonitor;
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
-        centralized::CentralizedEventManager,
-        launcher::{Launcher, StdCentralizedInnerMgr},
+        launcher::Launcher,
         ClientDescription, EventConfig, EventFirer, EventReceiver, EventRestarter, EventWithStats,
-        HasEventManagerId, ProgressReporter, SendExiting, SimpleEventManager,
+        HasEventManagerId, ProgressReporter, SendExiting,
     },
-    executors::{inprocess::InProcessExecutor, Executor, ExitKind},
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::{
-        stats::{AggregatorOps, UserStats, UserStatsValue},
+        stats::{user_stats::TAG_CORE_ID, AggregatorOps, UserStats, UserStatsValue},
         MultiMonitor, OnDiskTomlMonitor,
     },
     mutators::{
@@ -34,14 +35,16 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::mutational::StdMutationalStage,
+    stages::{
+        afl_stats::AflStatsStage, calibrate::CalibrationStage, mutational::StdMutationalStage,
+    },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
     rands::StdRand,
-    shmem::{ShMemProvider, StdShMem, StdShMemProvider},
+    shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,
 };
@@ -146,6 +149,10 @@ struct Opt {
     #[cfg(feature = "statsd")]
     #[arg(long, help = "Enable StatsD", name = "STATSD", default_value = "false")]
     statsd: bool,
+
+    #[cfg(feature = "tui")]
+    #[arg(long, help = "Enable TUI", name = "TUI", default_value = "false")]
+    tui: bool,
     /*
     /// This fuzzer has hard-coded tokens
     #[arg(
@@ -168,6 +175,10 @@ struct Opt {
         help = "Use TCP event manager for IPC instead of LLMP (slower, but might have its benefits?)"
     )]
     tcp: bool,
+}
+
+fn print_fmt(s: &str) {
+    println!("{s}");
 }
 
 /// The main fn, `no_mangle` as it is a C symbol
@@ -204,7 +215,7 @@ pub extern "C" fn libafl_main() {
     #[cfg(feature = "statsd")]
     let monitor = tuple_list!(
         OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
-        MultiMonitor::new(|s| println!("{s}")),
+        MultiMonitor::new(print_fmt),
         libafl::monitors::OptionalMonitor::new(if opt.statsd {
             Some(
                 libafl::monitors::StatsdMonitor::new(
@@ -222,7 +233,7 @@ pub extern "C" fn libafl_main() {
     #[cfg(not(feature = "statsd"))]
     let monitor = tuple_list!(
         OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
-        MultiMonitor::new(|s| println!("{s}")),
+        MultiMonitor::new(print_fmt),
     );
 
     fn run_client<EM>(
@@ -251,9 +262,10 @@ pub extern "C" fn libafl_main() {
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
+        let map_feedback = MaxMapFeedback::new(&edges_observer);
         let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::new(&edges_observer),
+            map_feedback.clone(),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::new(&time_observer)
         );
@@ -287,9 +299,10 @@ pub extern "C" fn libafl_main() {
             EventWithStats::with_current_time(
                 libafl::events::Event::UpdateUserStats {
                     name: "core_id".to_string().into(),
-                    value: UserStats::new(
+                    value: UserStats::with_tag(
                         UserStatsValue::String(core_id.0.to_string().into()),
                         AggregatorOps::None,
+                        TAG_CORE_ID,
                     ),
                     phantom: Default::default(),
                 },
@@ -310,7 +323,19 @@ pub extern "C" fn libafl_main() {
 
         // Setup a basic mutator with a mutational stage
         let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+        let calibration = CalibrationStage::new(&map_feedback);
+        let afl_stats = AflStatsStage::builder()
+            .map_feedback(&map_feedback)
+            .stats_file(opt.output.join("fuzzer_stats"))
+            .report_interval(Duration::from_secs(5))
+            .core_id(core_id)
+            .banner("libfuzzer_libpng".into())
+            .version("0.16.0".into())
+            .target_mode("LibFuzzer".into())
+            .build()
+            .unwrap();
+
+        let mut stages = tuple_list!(calibration, StdMutationalStage::new(mutator), afl_stats);
 
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler =
@@ -367,7 +392,6 @@ pub extern "C" fn libafl_main() {
             .configuration(EventConfig::from_name("default"))
             .monitor(monitor)
             .run_client(|s, m, c| run_client(s, m, c, &opt))
-
             .cores(&cores)
             .overcommit(opt.overcommit)
             .broker_port(broker_port)
@@ -383,22 +407,100 @@ pub extern "C" fn libafl_main() {
         return;
     }
 
-    let builder = Launcher::builder()
-        .shmem_provider(shmem_provider)
-        .configuration(EventConfig::from_name("default"))
-        .monitor(monitor)
-        .run_client(|s, m, c| run_client(s, m, c, &opt))
-        .cores(&cores)
-        .overcommit(opt.overcommit)
-        .broker_port(broker_port)
-        .remote_broker_addr(opt.remote_broker_addr);
+    #[cfg(feature = "tui")]
+    {
+        #[cfg(feature = "statsd")]
+        let statsd = libafl::monitors::OptionalMonitor::new(if opt.statsd {
+            Some(
+                libafl::monitors::StatsdMonitor::new(
+                    opt.statsd_host.clone(),
+                    opt.statsd_port,
+                    StatsdMonitorTagFlavor::default(),
+                )
+                .with_per_client_stats(true),
+            )
+        } else {
+            None
+        });
 
-    #[cfg(unix)]
-    let builder = builder.fork(opt.fork);
+        #[cfg(feature = "statsd")]
+        let monitor = tuple_list!(
+            OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
+            libafl::monitors::OptionalMonitor::new(if !opt.tui {
+                Some(MultiMonitor::new(print_fmt))
+            } else {
+                None
+            }),
+            libafl::monitors::OptionalMonitor::new(if opt.tui {
+                Some(
+                    TuiMonitor::builder()
+                        .title("libfuzzer_libpng")
+                        .enhanced_graphics(true)
+                        .build(),
+                )
+            } else {
+                None
+            }),
+            statsd
+        );
 
-    match builder.build().launch() {
-        Ok(()) => (),
-        Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
-        Err(err) => panic!("Failed to run launcher: {err:?}"),
+        #[cfg(not(feature = "statsd"))]
+        let monitor = tuple_list!(
+            OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
+            libafl::monitors::OptionalMonitor::new(if !opt.tui {
+                Some(MultiMonitor::new(print_fmt))
+            } else {
+                None
+            }),
+            libafl::monitors::OptionalMonitor::new(if opt.tui {
+                Some(
+                    TuiMonitor::builder()
+                        .title("libfuzzer_libpng")
+                        .enhanced_graphics(true)
+                        .build(),
+                )
+            } else {
+                None
+            }),
+        );
+        match Launcher::builder()
+            .shmem_provider(shmem_provider)
+            .configuration(EventConfig::from_name("default"))
+            .monitor(monitor)
+            .run_client(|s, m, c| run_client(s, m, c, &opt))
+            .cores(&cores)
+            .overcommit(opt.overcommit)
+            .broker_port(broker_port)
+            .remote_broker_addr(opt.remote_broker_addr)
+            .stdout_file(Some("/dev/null"))
+            .build()
+            .launch()
+        {
+            Ok(()) => (),
+            Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
+            Err(err) => panic!("Failed to run launcher: {err:?}"),
+        }
     }
+
+    #[cfg(not(feature = "tui"))]
+    {
+        match Launcher::builder()
+            .shmem_provider(shmem_provider)
+            .configuration(EventConfig::from_name("default"))
+            .monitor(monitor)
+            .run_client(|s, m, c| run_client(s, m, c, &opt))
+            .cores(&cores)
+            .overcommit(opt.overcommit)
+            .broker_port(broker_port)
+            .remote_broker_addr(opt.remote_broker_addr)
+            .stdout_file(Some("/dev/null"))
+            .build()
+            .launch()
+        {
+            Ok(()) => (),
+            Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
+            Err(err) => panic!("Failed to run launcher: {err:?}"),
+        }
+    }
+
 }

@@ -237,6 +237,19 @@ where
                 monitor.display(client_stats_manager, event.name(), ClientId(0))?;
                 Ok(BrokerEventResult::Handled)
             }
+            Event::UpdateUserStatsMap { stats, .. } => {
+                client_stats_manager.client_stats_insert(ClientId(0))?;
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
+                    for (name, value) in stats {
+                        client_stat.update_user_stats(name.clone(), value.clone());
+                    }
+                })?;
+                for name in stats.keys() {
+                    client_stats_manager.aggregate(name);
+                }
+                monitor.display(client_stats_manager, event.name(), ClientId(0))?;
+                Ok(BrokerEventResult::Handled)
+            }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor {
                 introspection_stats,
@@ -244,7 +257,7 @@ where
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
-                    client_stat.update_introspection_stats((**introspection_stats).clone());
+                    client_stat.update_introspection_stats(introspection_stats);
                 })?;
                 monitor.display(client_stats_manager, event.name(), ClientId(0))?;
                 Ok(BrokerEventResult::Handled)

@@ -149,6 +149,12 @@ impl ClientPerfStats {
         self.current_time = time;
     }
 
+    /// Set the start time with the given time
+    #[inline]
+    pub fn set_start_time(&mut self, time: u64) {
+        self.start_time = time;
+    }
+
     /// Start a timer with the current time counter
     #[inline]
     pub fn start_timer(&mut self) {

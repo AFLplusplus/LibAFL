@@ -12,6 +12,7 @@ default = ["std"]
 std = []
 statsd = ["libafl/statsd_monitor"]
 tcp_manager = ["libafl/tcp_manager"]
+tui = ["libafl/tui_monitor"]
 
 [profile.release]
 lto = true

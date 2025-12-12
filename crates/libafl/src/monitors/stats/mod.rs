@@ -3,12 +3,10 @@
 pub mod manager;
 #[cfg(feature = "introspection")]
 pub mod perf_stats;
+pub mod timed;
 pub mod user_stats;
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-};
+use alloc::{borrow::Cow, string::String};
 use core::time::Duration;
 
 use hashbrown::HashMap;
@@ -17,9 +15,12 @@ pub use manager::ClientStatsManager;
 #[cfg(feature = "introspection")]
 pub use perf_stats::{ClientPerfStats, PerfFeature};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "std")]
-use serde_json::Value;
-pub use user_stats::{AggregatorOps, UserStats, UserStatsValue};
+pub use timed::*;
+pub use user_stats::{
+    AggregatorOps, TAG_AFL_STATS_IMPORTED, TAG_AFL_STATS_OWN_FINDS, TAG_AFL_STATS_PENDING,
+    TAG_AFL_STATS_PENDING_FAV, TAG_CALIBRATE_STABILITY, TAG_MAP, UserStats, UserStatsTag,
+    UserStatsValue,
+};
 
 #[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
@@ -103,7 +104,7 @@ impl ProcessTiming {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            exec_speed: "0".to_string(),
+            exec_speed: String::from("0"),
             ..Default::default()
         }
     }
@@ -316,10 +317,23 @@ impl ClientStats {
         self.user_stats.get(name)
     }
 
+    /// Get user-defined stats using the tag
+    pub fn user_stats_by_tag(&self, tag: UserStatsTag) -> impl Iterator<Item = &UserStats> {
+        self.user_stats
+            .values()
+            .filter(move |v| v.tag() == Some(tag))
+    }
+
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
     #[cfg(feature = "introspection")]
-    pub fn update_introspection_stats(&mut self, introspection_stats: ClientPerfStats) {
-        self.introspection_stats = introspection_stats;
+    pub fn update_introspection_stats(&mut self, introspection_stats: &ClientPerfStats) {
+        #[allow(clippy::cast_precision_loss)]
+        let elapsed = introspection_stats.elapsed_cycles() as f64;
+        if elapsed == 0.0 {
+            return;
+        }
+
+        self.introspection_stats = introspection_stats.clone();
     }
 
     /// Get process timing of current client.
@@ -350,63 +364,93 @@ impl ClientStats {
     }
 
     /// Get edge coverage of current client
+    ///
+    /// This is using userstats set by [`crate::feedbacks::MapFeedback`]
     #[must_use]
     pub fn edges_coverage(&self) -> Option<EdgeCoverage> {
-        self.get_user_stats("edges").and_then(|user_stats| {
-            let UserStatsValue::Ratio(edges_hit, edges_total) = user_stats.value() else {
-                return None;
-            };
+        let mut edges_hit = 0;
+        let mut edges_total = 0;
+        let mut found = false;
+
+        for stat in self.user_stats_by_tag(TAG_MAP) {
+            if let UserStatsValue::Ratio(hit, total) = stat.value() {
+                edges_hit += hit;
+                edges_total += total;
+                found = true;
+            }
+        }
+
+        if found {
             Some(EdgeCoverage {
-                edges_hit: *edges_hit,
-                edges_total: *edges_total,
+                edges_hit,
+                edges_total,
             })
-        })
+        } else {
+            None
+        }
     }
 
     /// Get item geometry of current client
-    #[expect(clippy::cast_precision_loss)]
-    #[cfg(feature = "std")]
+    ///
+    /// This is using userstats set by [`crate::stages::AflStatsStage`].
     #[must_use]
-    pub fn item_geometry(&self) -> ItemGeometry {
-        let default_json = serde_json::json!({
-            "pending": 0,
-            "pend_fav": 0,
-            "imported": 0,
-            "own_finds": 0,
-        });
-        let afl_stats = self
-            .get_user_stats("AflStats")
-            .map_or(default_json.to_string(), ToString::to_string);
+    pub fn item_geometry(&self) -> Option<ItemGeometry> {
+        let pending = self
+            .user_stats_by_tag(TAG_AFL_STATS_PENDING)
+            .map(|s| s.value().as_u64().unwrap_or(0))
+            .sum();
+        let pend_fav = self
+            .user_stats_by_tag(TAG_AFL_STATS_PENDING_FAV)
+            .map(|s| s.value().as_u64().unwrap_or(0))
+            .sum();
+        let imported = self
+            .user_stats_by_tag(TAG_AFL_STATS_IMPORTED)
+            .map(|s| s.value().as_u64().unwrap_or(0))
+            .sum();
+        let own_finds = self
+            .user_stats_by_tag(TAG_AFL_STATS_OWN_FINDS)
+            .map(|s| s.value().as_u64().unwrap_or(0))
+            .sum();
 
-        let afl_stats_json: Value =
-            serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
-        let pending = afl_stats_json["pending"].as_u64().unwrap_or_default();
-        let pend_fav = afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
-        let imported = afl_stats_json["imported"].as_u64().unwrap_or_default();
-        let own_finds = afl_stats_json["own_finds"].as_u64().unwrap_or_default();
+        let (stability_sum, stability_count) = self
+            .user_stats
+            .values()
+            .filter(|v| v.tag() == Some(TAG_CALIBRATE_STABILITY))
+            .fold((0.0, 0), |(sum, count), s| {
+                (
+                    sum + s.value().as_ratio().map_or(0.0, |(a, b)| {
+                        #[expect(clippy::cast_precision_loss)]
+                        let ret = a as f64 / b as f64;
+                        ret
+                    }),
+                    count + 1,
+                )
+            });
 
-        let stability = self.get_user_stats("stability").map_or(
-            UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
-            Clone::clone,
-        );
-
-        let stability = if let UserStatsValue::Ratio(a, b) = stability.value() {
-            if *b == 0 {
-                Some(0.0)
-            } else {
-                Some((*a as f64) / (*b as f64))
-            }
+        let stability = if stability_count > 0 {
+            Some(stability_sum / f64::from(stability_count))
         } else {
             None
         };
 
-        ItemGeometry {
+        // We want to return None if we have NO relevant stats, to avoid showing empty charts/info
+        // "pending" is a good indicator if we have data.
+        if self
+            .user_stats_by_tag(TAG_AFL_STATS_PENDING)
+            .next()
+            .is_none()
+            && stability.is_none()
+        {
+            return None;
+        }
+
+        Some(ItemGeometry {
             pending,
             pend_fav,
             own_finds,
             imported,
             stability,
-        }
+        })
     }
 }
 

@@ -1,20 +1,19 @@
 //! Client statistics manager
 
-#[cfg(feature = "std")]
-use alloc::string::ToString;
 use alloc::{borrow::Cow, string::String};
 use core::time::Duration;
 
 use hashbrown::HashMap;
 use libafl_bolts::{ClientId, Error, current_time, format_duration};
-#[cfg(feature = "std")]
-use serde_json::Value;
 
 use super::{ClientStats, EdgeCoverage, ProcessTiming, user_stats::UserStatsValue};
 #[cfg(feature = "std")]
 use super::{
     ItemGeometry,
-    user_stats::{AggregatorOps, UserStats},
+    user_stats::{
+        TAG_AFL_STATS_IMPORTED, TAG_AFL_STATS_OWN_FINDS, TAG_AFL_STATS_PENDING,
+        TAG_AFL_STATS_PENDING_FAV, TAG_CALIBRATE_STABILITY, UserStats,
+    },
 };
 
 /// Manager of all client's statistics
@@ -229,49 +228,66 @@ impl ClientStatsManager {
     #[expect(clippy::cast_precision_loss)]
     #[cfg(feature = "std")]
     #[must_use]
-    pub fn item_geometry(&self) -> ItemGeometry {
+    pub fn item_geometry(&self) -> Option<ItemGeometry> {
         let mut total_item_geometry = ItemGeometry::new();
         if self.client_stats.is_empty() {
-            return total_item_geometry;
+            // If we have no clients, we have no stats
+            return None;
         }
         let mut ratio_a: u64 = 0;
         let mut ratio_b: u64 = 0;
+        let mut has_stats = false;
+
         for (_, client) in self
             .client_stats()
             .iter()
             .filter(|(_, client)| client.enabled())
         {
-            let afl_stats = client.get_user_stats("AflStats");
-            let stability = client.get_user_stats("stability").map_or(
-                UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
-                Clone::clone,
-            );
+            let stability = client
+                .user_stats
+                .values()
+                .filter(|v| v.tag() == Some(TAG_CALIBRATE_STABILITY))
+                .map(UserStats::value)
+                .next();
 
-            if let Some(stat) = afl_stats {
-                let stats = stat.to_string();
-                let afl_stats_json: Value = serde_json::from_str(stats.as_str()).unwrap();
-                total_item_geometry.pending +=
-                    afl_stats_json["pending"].as_u64().unwrap_or_default();
-                total_item_geometry.pend_fav +=
-                    afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
-                total_item_geometry.own_finds +=
-                    afl_stats_json["own_finds"].as_u64().unwrap_or_default();
-                total_item_geometry.imported +=
-                    afl_stats_json["imported"].as_u64().unwrap_or_default();
+            for stat in client.user_stats_by_tag(TAG_AFL_STATS_PENDING) {
+                total_item_geometry.pending += stat.value().as_u64().unwrap_or_default();
+                has_stats = true;
             }
 
-            if let UserStatsValue::Ratio(a, b) = stability.value() {
+            for stat in client.user_stats_by_tag(TAG_AFL_STATS_PENDING_FAV) {
+                total_item_geometry.pend_fav += stat.value().as_u64().unwrap_or_default();
+                has_stats = true;
+            }
+
+            for stat in client.user_stats_by_tag(TAG_AFL_STATS_OWN_FINDS) {
+                total_item_geometry.own_finds += stat.value().as_u64().unwrap_or_default();
+                has_stats = true;
+            }
+
+            for stat in client.user_stats_by_tag(TAG_AFL_STATS_IMPORTED) {
+                total_item_geometry.imported += stat.value().as_u64().unwrap_or_default();
+                has_stats = true;
+            }
+
+            if let Some(UserStatsValue::Ratio(a, b)) = stability {
                 ratio_a += a;
                 ratio_b += b;
+                has_stats = true;
             }
         }
+
+        if !has_stats {
+            return None;
+        }
+
         total_item_geometry.stability = if ratio_b == 0 {
             None
         } else {
             Some((ratio_a as f64) / (ratio_b as f64))
         };
 
-        total_item_geometry
+        Some(total_item_geometry)
     }
 }
 
