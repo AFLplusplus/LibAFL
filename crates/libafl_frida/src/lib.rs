@@ -182,8 +182,8 @@ impl FridaOptions {
                             "cmplog is not currently supported on targets other than aarch64"
                         );
 
-                        if options.enable_cmplog {
-                            assert!(cfg!(feature = "cmplog"), "cmplog feature is disabled!");
+                        if options.enable_cmplog && !cfg!(feature = "cmplog") {
+                            panic!("cmplog feature is disabled!");
                         }
                     }
                     "cmplog-cores" => {

@@ -34,7 +34,7 @@ pub fn generate_base_filename(state: &mut LibaflFuzzState, id: CorpusId) -> Stri
             0
         };
         let execs = *state.executions();
-        let time = (current_time() - *state.start_time()).as_secs();
+        let time = current_time().checked_sub(*state.start_time()).unwrap().as_secs();
         format!("id:{id:0>6},src:{src:0>6},time:{time},execs:{execs},op:havoc,rep:0",)
     };
     name

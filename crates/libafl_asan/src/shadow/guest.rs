@@ -271,11 +271,10 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
             Self::LOW_SHADOW_OFFSET,
             Self::LOW_SHADOW_OFFSET + Self::LOW_SHADOW_SIZE
         );
-        let lo = Self::map_shadow(Self::LOW_SHADOW_OFFSET, Self::LOW_SHADOW_SIZE)
-            .or_else(|e| {
-                warn!("Failed to map low shadow: {:?}", e);
-                Ok(M::dummy())
-            })?;
+        let lo = Self::map_shadow(Self::LOW_SHADOW_OFFSET, Self::LOW_SHADOW_SIZE).or_else(|e| {
+            warn!("Failed to map low shadow: {:?}", e);
+            Ok(M::dummy())
+        })?;
         trace!(
             "Mapping high shadow: {:#x}-{:#x}",
             Self::HIGH_SHADOW_OFFSET,

@@ -28,7 +28,7 @@ use crate::{
     modules::{
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
         calls::FullBacktraceCollector,
-        snapshot::{get_snapshot_module_mut, SnapshotModule},
+        snapshot::{SnapshotModule, get_snapshot_module_mut},
         utils::filters::{HasAddressFilter, StdAddressFilter},
     },
     qemu::{Hook, MemAccessInfo, QemuHooks, SyscallHookResult},

@@ -47,7 +47,11 @@ libafl = { path = "../../../crates/libafl", features = ["tui_monitor"] }
 libafl_bolts = { path = "../../../crates/libafl_bolts", features = [
   "errors_backtrace",
 ] }
-libafl_qemu = { path = "../../../crates/libafl_qemu", features = ["x86_64", "usermode", "asan_rust"] }
+libafl_qemu = { path = "../../../crates/libafl_qemu", features = [
+  "x86_64",
+  "usermode",
+  "asan_rust",
+] }
 libafl_targets = { path = "../../../crates/libafl_targets" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 mimalloc = "0.1.48"

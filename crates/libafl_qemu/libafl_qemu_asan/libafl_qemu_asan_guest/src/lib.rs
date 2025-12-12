@@ -502,12 +502,12 @@ pub unsafe extern "C" fn pvalloc(size: usize) -> *mut c_void {
     unsafe { memalign(4096, size) }
 }
 
-#[cfg(not(feature = "test"))]
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    let msg = c"Panic!\n";
-    unsafe { raw_write(1, msg.as_ptr() as *const _, msg.count_bytes()); }
-    unsafe { raw_write(2, msg.as_ptr() as *const _, msg.count_bytes()); }
-    unsafe { raw_syscall(231, 1, 0, 0, 0); } // SYS_exit_group = 231 on x86_64
-    loop {}
-}
+// #[cfg(not(feature = "test"))]
+// #[panic_handler]
+// fn panic(_info: &core::panic::PanicInfo) -> ! {
+//     let msg = c"Panic!\n";
+//     unsafe { raw_write(1, msg.as_ptr() as *const _, msg.count_bytes()); }
+//     unsafe { raw_write(2, msg.as_ptr() as *const _, msg.count_bytes()); }
+//     unsafe { raw_syscall(231, 1, 0, 0, 0); } // SYS_exit_group = 231 on x86_64
+//     loop {}
+// }
