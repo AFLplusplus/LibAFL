@@ -88,10 +88,7 @@ void *__libqasan_mmap(void *addr, size_t length, int prot, int flags, int fd,
   void *p = __lq_libc_mmap(addr, length, prot, flags, fd, offset);
   QASAN_SWAP(state);
 
-  if (p == MAP_FAILED) {
-      QASAN_LOG("mmap failed: %p, errno: %d\n", p, errno);
-      return MAP_FAILED;
-  }
+  if (!p) return NULL;
 
   QASAN_UNPOISON(p, length);
 
