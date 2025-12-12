@@ -20,7 +20,9 @@ use crate::{
     feedbacks::{HasObserverHandle, map::MapFeedbackMetadata},
     fuzzer::Evaluator,
     inputs::Input,
-    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::{
+        AggregatorOps, UserStats, UserStatsValue, user_stats::TAG_CALIBRATE_STABILITY,
+    },
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::{Restartable, RetryCountRestartHelper, Stage},
@@ -130,6 +132,7 @@ where
 pub struct CalibrationStage<C, I, O, OT, S> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
+    stability_userstats_name: Cow<'static, str>,
     name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
@@ -344,10 +347,11 @@ where
                     state,
                     EventWithStats::with_current_time(
                         Event::UpdateUserStats {
-                            name: Cow::from("stability"),
-                            value: UserStats::new(
+                            name: self.stability_userstats_name.clone(),
+                            value: UserStats::with_tag(
                                 UserStatsValue::Ratio(stable_count, map_first_filled_count as u64),
                                 AggregatorOps::Avg,
+                                TAG_CALIBRATE_STABILITY,
                             ),
                             phantom: PhantomData,
                         },
@@ -360,13 +364,14 @@ where
                 state,
                 EventWithStats::with_current_time(
                     Event::UpdateUserStats {
-                        name: Cow::from("stability"),
-                        value: UserStats::new(
+                        name: self.stability_userstats_name.clone(),
+                        value: UserStats::with_tag(
                             UserStatsValue::Ratio(
                                 map_first_filled_count as u64,
                                 map_first_filled_count as u64,
                             ),
                             AggregatorOps::Avg,
+                            TAG_CALIBRATE_STABILITY,
                         ),
                         phantom: PhantomData,
                     },
@@ -433,9 +438,8 @@ where
             stage_max: CAL_STAGE_START,
             track_stability: true,
             phantom: PhantomData,
-            name: Cow::Owned(
-                CALIBRATION_STAGE_NAME.to_owned() + ":" + map_name.into_owned().as_str(),
-            ),
+            name: Cow::Owned(CALIBRATION_STAGE_NAME.to_owned() + ":" + &map_name),
+            stability_userstats_name: Cow::Owned(format!("{map_name}_stability")),
         }
     }
 

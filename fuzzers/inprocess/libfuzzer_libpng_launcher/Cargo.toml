@@ -11,6 +11,7 @@ edition = "2021"
 default = ["std"]
 std = []
 statsd = ["libafl/statsd_monitor"]
+tui = ["libafl/tui_monitor"]
 
 [profile.release]
 lto = true

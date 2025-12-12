@@ -34,12 +34,10 @@ pub fn generate_base_filename(state: &mut LibaflFuzzState, id: CorpusId) -> Stri
             0
         };
         let execs = *state.executions();
-
-        // TODO: Assistance required! Is this the right way to do it?
-        let time = current_time()
+        let time = (current_time()
             .checked_sub(*state.start_time())
-            .unwrap_or_default()
-            .as_secs();
+            .unwrap_or_default())
+        .as_secs();
         format!("id:{id:0>6},src:{src:0>6},time:{time},execs:{execs},op:havoc,rep:0",)
     };
     name

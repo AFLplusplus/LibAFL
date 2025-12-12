@@ -56,11 +56,9 @@ pub trait HasCorpus<I> {
 /// This state contains important information about the current run
 /// and can be used to restart the fuzzing process at any time.
 ///
-/// This [`State`] is here for documentation purpose.
-/// You should *NOT* implement this trait for any of your struct,
-/// but when you implement your customized state, you can look at this trait to see what would be needed.
-#[allow(dead_code)]
-trait State:
+/// You don't need to implement this completely, but instead can
+/// implement indiviual traits that fit your usecase.
+pub trait State:
     Serialize
     + DeserializeOwned
     + MaybeHasClientPerfMonitor
