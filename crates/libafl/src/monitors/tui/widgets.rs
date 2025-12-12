@@ -327,7 +327,7 @@ pub fn draw_multi_time_chart(f: &mut Frame, area: Rect, options: MultiTimeChartO
     }
 
     let min_lbl_x = format_duration(&start);
-    let med_lbl_x = format_duration(&(window_dur / 2));
+    let med_lbl_x = format_duration(&(start + window_dur / 2));
     let max_lbl_x = format_duration(&end);
     let x_labels = vec![
         Span::styled(min_lbl_x, Style::default().add_modifier(Modifier::BOLD)),

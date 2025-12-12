@@ -21,6 +21,8 @@ pub struct TimedStats {
     pub series: VecDeque<TimedStat>,
     /// The time window to keep track of
     pub window: Duration,
+    /// The retention window (how long to keep data)
+    pub retention: Duration,
 }
 
 impl TimedStats {
@@ -30,6 +32,7 @@ impl TimedStats {
         Self {
             series: VecDeque::new(),
             window,
+            retention: window,
         }
     }
 
@@ -40,8 +43,8 @@ impl TimedStats {
             while self.series.front().is_some()
                 && time
                     .checked_sub(self.series.front().unwrap().time)
-                    .unwrap_or(self.window)
-                    >= self.window
+                    .unwrap_or(self.retention)
+                    >= self.retention
             {
                 self.series.pop_front();
             }
@@ -63,6 +66,9 @@ impl TimedStats {
         };
 
         self.window = window;
+        if window > self.retention {
+            self.retention = window;
+        }
         while !self.series.is_empty()
             && self
                 .series
@@ -70,8 +76,8 @@ impl TimedStats {
                 .unwrap_or(&default_stat)
                 .time
                 .checked_sub(self.series.front().unwrap_or(&default_stat).time)
-                .unwrap_or(window)
-                >= window
+                .unwrap_or(self.retention)
+                >= self.retention
         {
             self.series.pop_front();
         }

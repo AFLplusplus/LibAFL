@@ -313,7 +313,7 @@ impl TuiUi {
                     } else {
                         k.hash(&mut hasher);
                     }
-                    let color_idx = hasher.finish() as usize % 5;
+                    let color_idx = hasher.finish() as usize % 4;
                     let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
                     let style = Style::default().fg(colors[color_idx]);
 
@@ -418,7 +418,7 @@ impl TuiUi {
                         for (key, stats) in &ctx.custom_timed {
                             let mut hasher = std::collections::hash_map::DefaultHasher::new();
                             key.hash(&mut hasher);
-                            let color_idx = hasher.finish() as usize % 5;
+                            let color_idx = hasher.finish() as usize % 4;
                             let style = Style::default().fg(colors[color_idx]);
                             series.push((
                                 key.clone(),
@@ -468,7 +468,7 @@ impl TuiUi {
                         } else {
                             custom.hash(&mut hasher);
                         }
-                        let color_idx = hasher.finish() as usize % 5;
+                        let color_idx = hasher.finish() as usize % 4;
                         let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
                         let style = Style::default().fg(colors[color_idx]);
 
