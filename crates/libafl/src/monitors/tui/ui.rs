@@ -36,7 +36,7 @@ use crate::monitors::{
         user_stats::{
             TAG_AFL_STATS_CYCLES_DONE, TAG_AFL_STATS_CYCLES_WO_FINDS, TAG_AFL_STATS_IMPORTED,
             TAG_AFL_STATS_OWN_FINDS, TAG_AFL_STATS_PENDING, TAG_AFL_STATS_PENDING_FAV,
-            TAG_AFL_STATS_PENDING_FAVORED, TAG_CALIBRATE_STABILITY, UserStatsValue,
+            TAG_AFL_STATS_PENDING_FAVORED, UserStatsTag, UserStatsValue,
         },
     },
     tui::{ItemGeometry, TuiContext},
@@ -174,14 +174,26 @@ impl TuiUi {
         tabs
     }
 
-    /// Prepare all data needed for the frame in a single "Lock" scope
-    fn prepare_data(&mut self, app: &Arc<RwLock<TuiContext>>) -> PreparedFrameData {
-        let mut ctx = app.read().unwrap();
-        // Check if clients list changed
-        if ctx.clients_num != self.clients.len() {
-            drop(ctx);
-            ctx = app.read().unwrap();
+    /// Some stats are already displayed in other contexts. We can filter those.
+    fn is_redundant_userstat(tag: Option<UserStatsTag>) -> bool {
+        if let Some(tag) = tag {
+            matches!(
+                tag,
+                TAG_AFL_STATS_CYCLES_DONE
+                    | TAG_AFL_STATS_CYCLES_WO_FINDS
+                    | TAG_AFL_STATS_IMPORTED
+                    | TAG_AFL_STATS_OWN_FINDS
+                    | TAG_AFL_STATS_PENDING
+                    | TAG_AFL_STATS_PENDING_FAV
+                    | TAG_AFL_STATS_PENDING_FAVORED
+            )
+        } else {
+            false
+        }
+    }
 
+    fn update_clients_list(&mut self, ctx: &TuiContext) {
+        if ctx.clients_num != self.clients.len() {
             let mut all: Vec<usize> = ctx.clients.keys().copied().collect();
             all.sort_unstable();
             if !all.is_empty() && !all.contains(&self.client_idx) {
@@ -189,11 +201,10 @@ impl TuiUi {
             }
             self.clients = all;
         }
+    }
 
-        let run_time = current_time().saturating_sub(ctx.start_time);
-
-        // 1. Overall Stats
-        let generic_stats = GenericStats {
+    fn prepare_overall_stats(ctx: &TuiContext) -> GenericStats {
+        GenericStats {
             labels: vec![
                 (Span::raw("clients"), format!("{}", ctx.clients.len())),
                 (Span::raw("total execs"), format_big_number(ctx.total_execs)),
@@ -206,144 +217,138 @@ impl TuiUi {
                     format_big_number(ctx.total_corpus_count),
                 ),
             ],
-        };
+        }
+    }
 
-        let total_timing_data = if ctx.total_process_timing.exec_speed != "0/sec" {
-            Some(&ctx.total_process_timing)
+    fn prepare_total_timing(
+        ctx: &TuiContext,
+        run_time: Duration,
+    ) -> Option<(ProcessTiming, Duration)> {
+        if ctx.total_process_timing.exec_speed != "0/sec" {
+            Some((ctx.total_process_timing.clone(), run_time))
         } else if let Some(client) = ctx.clients.get(&0) {
             if client.process_timing.exec_speed == "0/sec" {
                 None
             } else {
-                Some(&client.process_timing)
+                Some((client.process_timing.clone(), run_time))
             }
         } else {
             None
-        };
+        }
+    }
 
-        let total_timing = total_timing_data.map(|t| (t.clone(), run_time));
-
-        let total_geometry = ctx.total_item_geometry.clone();
-
-        // 2. Client Stats
-        let (client_generic_stats, client_timing, client_geometry, client_user_stats) =
-            if let Some(client) = ctx.clients.get(&self.client_idx) {
-                let timing = if client.process_timing.exec_speed == "0/sec" {
-                    None
-                } else {
-                    Some((
-                        client.process_timing.clone(),
-                        current_time().saturating_sub(client.process_timing.client_start_time),
-                    ))
-                };
-
-                let generic = GenericStats {
-                    labels: vec![
-                        (
-                            Span::raw("corpus count"),
-                            format_big_number(client.client_stats.corpus_size()),
-                        ),
-                        (
-                            Span::raw("total execs"),
-                            format_big_number(client.client_stats.executions()),
-                        ),
-                        (
-                            Span::raw("cycles done"),
-                            client
-                                .cycles_done()
-                                .map_or(String::new(), |c| c.to_string()),
-                        ),
-                        (
-                            Span::raw("solutions"),
-                            format_big_number(client.client_stats.objective_size()),
-                        ),
-                    ],
-                };
-
-                // Format user stats
-                let mut keys: Vec<_> = client.client_stats.user_stats().keys().collect();
-                keys.sort();
-                let user_stats_vec = keys
-                    .into_iter()
-                    .filter(|k| {
-                        let val = client.client_stats.user_stats().get(*k).unwrap();
-                        if let Some(tag) = val.tag() {
-                            !matches!(
-                                tag,
-                                TAG_AFL_STATS_CYCLES_DONE
-                                    | TAG_AFL_STATS_CYCLES_WO_FINDS
-                                    | TAG_AFL_STATS_IMPORTED
-                                    | TAG_AFL_STATS_OWN_FINDS
-                                    | TAG_AFL_STATS_PENDING
-                                    | TAG_AFL_STATS_PENDING_FAV
-                                    | TAG_AFL_STATS_PENDING_FAVORED
-                                    | TAG_CALIBRATE_STABILITY
-                            )
-                        } else {
-                            true
-                        }
-                    })
-                    .map(|k| {
-                        let val = client.client_stats.user_stats().get(k).unwrap();
-                        let val_str = match val.value() {
-                            UserStatsValue::Number(n) => format_big_number(*n),
-                            UserStatsValue::Float(f) => format!("{f:.2}"),
-                            UserStatsValue::String(s) => s.to_string(),
-                            UserStatsValue::Ratio(a, b) => {
-                                if *b == 0 {
-                                    "0/0".into()
-                                } else {
-                                    #[allow(clippy::cast_precision_loss)]
-                                    let percentage = (*a as f64 / *b as f64) * 100.0;
-                                    format!("{a}/{b} ({percentage:.2}%)")
-                                }
-                            }
-                            UserStatsValue::Percent(p) => format!("{:.2}%", p * 100.0),
-                        };
-
-                        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-
-                        if let Some(tag) = val.tag() {
-                            tag.hash(&mut hasher);
-                        } else {
-                            k.hash(&mut hasher);
-                        }
-                        let color_idx = hasher.finish() as usize % 6;
-                        let colors = [
-                            Color::Red,
-                            Color::Green,
-                            Color::Yellow,
-                            Color::Blue,
-                            Color::Magenta,
-                            Color::Cyan,
-                        ];
-                        let style = Style::default().fg(colors[color_idx]);
-
-                        (Span::styled(k.to_string(), style), val_str)
-                    })
-                    .collect();
-
-                (
-                    generic,
-                    timing,
-                    client.item_geometry.clone(),
-                    user_stats_vec,
-                )
+    #[allow(clippy::cast_precision_loss, clippy::type_complexity)]
+    fn prepare_client_data(
+        &self,
+        ctx: &TuiContext,
+    ) -> (
+        GenericStats,
+        Option<(ProcessTiming, Duration)>,
+        Option<ItemGeometry>,
+        Vec<(Span<'static>, String)>,
+    ) {
+        if let Some(client) = ctx.clients.get(&self.client_idx) {
+            let timing = if client.process_timing.exec_speed == "0/sec" {
+                None
             } else {
-                (GenericStats { labels: vec![] }, None, None, vec![])
+                Some((
+                    client.process_timing.clone(),
+                    current_time().saturating_sub(client.process_timing.client_start_time),
+                ))
             };
 
-        #[cfg(feature = "introspection")]
-        let client_perf_stats = if let Some(client) = ctx.clients.get(&self.client_idx) {
+            let generic = GenericStats {
+                labels: vec![
+                    (
+                        Span::raw("corpus count"),
+                        format_big_number(client.client_stats.corpus_size()),
+                    ),
+                    (
+                        Span::raw("total execs"),
+                        format_big_number(client.client_stats.executions()),
+                    ),
+                    (
+                        Span::raw("cycles done"),
+                        client
+                            .cycles_done()
+                            .map_or(String::new(), |c| c.to_string()),
+                    ),
+                    (
+                        Span::raw("solutions"),
+                        format_big_number(client.client_stats.objective_size()),
+                    ),
+                ],
+            };
+
+            // Format user stats
+            let mut keys: Vec<_> = client.client_stats.user_stats().keys().collect();
+            keys.sort();
+            let user_stats_vec = keys
+                .into_iter()
+                .filter(|k| {
+                    let val = client.client_stats.user_stats().get(*k).unwrap();
+                    !Self::is_redundant_userstat(val.tag())
+                })
+                .map(|k| {
+                    let val = client.client_stats.user_stats().get(k).unwrap();
+                    let val_str = match val.value() {
+                        UserStatsValue::Number(n) => format_big_number(*n),
+                        UserStatsValue::Float(f) => format!("{f:.2}"),
+                        UserStatsValue::String(s) => s.to_string(),
+                        UserStatsValue::Ratio(a, b) => {
+                            if *b == 0 {
+                                "0/0".into()
+                            } else {
+                                let percentage = (*a as f64 / *b as f64) * 100.0;
+                                format!("{a}/{b} ({percentage:.2}%)")
+                            }
+                        }
+                        UserStatsValue::Percent(p) => format!("{:.2}%", p * 100.0),
+                    };
+
+                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+
+                    if let Some(tag) = val.tag() {
+                        tag.hash(&mut hasher);
+                    } else {
+                        k.hash(&mut hasher);
+                    }
+                    let color_idx = hasher.finish() as usize % 5;
+                    let colors = [
+                        Color::Red,
+                        Color::Green,
+                        Color::Blue,
+                        Color::Magenta,
+                        Color::Cyan,
+                    ];
+                    let style = Style::default().fg(colors[color_idx]);
+
+                    (Span::styled(k.to_string(), style), val_str)
+                })
+                .collect();
+
+            (
+                generic,
+                timing,
+                client.item_geometry.clone(),
+                user_stats_vec,
+            )
+        } else {
+            (GenericStats { labels: vec![] }, None, None, vec![])
+        }
+    }
+
+    #[cfg(feature = "introspection")]
+    #[allow(clippy::cast_precision_loss)]
+    fn prepare_client_perf_stats(&self, ctx: &TuiContext) -> Vec<(Span<'static>, String)> {
+        if let Some(client) = ctx.clients.get(&self.client_idx) {
             let stats = &client.client_stats.introspection_stats;
             let mut vec = Vec::new();
-            #[allow(clippy::cast_precision_loss)]
             let elapsed = stats.elapsed_cycles() as f64;
             let scheduler_percent = if elapsed == 0.0 {
                 0.0
             } else {
-                #[allow(clippy::cast_precision_loss)]
-                let v = stats.scheduler_cycles() as f64 / elapsed;
-                v
+                stats.scheduler_cycles() as f64 / elapsed
             };
             vec.push((
                 Span::raw("scheduler"),
@@ -353,9 +358,7 @@ impl TuiUi {
             let manager_percent = if elapsed == 0.0 {
                 0.0
             } else {
-                #[allow(clippy::cast_precision_loss)]
-                let v = stats.manager_cycles() as f64 / elapsed;
-                v
+                stats.manager_cycles() as f64 / elapsed
             };
             vec.push((
                 Span::raw("manager"),
@@ -365,7 +368,6 @@ impl TuiUi {
             if elapsed != 0.0 {
                 for (stage_index, features) in stats.used_stages() {
                     for (feature_index, feature) in features.iter().enumerate() {
-                        #[allow(clippy::cast_precision_loss)]
                         let feature_percent = *feature as f64 / elapsed;
                         if feature_percent > 0.0 {
                             let feature_name: PerfFeature = feature_index.into();
@@ -378,7 +380,6 @@ impl TuiUi {
                 }
 
                 for (name, val) in stats.feedbacks() {
-                    #[allow(clippy::cast_precision_loss)]
                     let feedback_percent = *val as f64 / elapsed;
                     if feedback_percent > 0.0 {
                         vec.push((
@@ -391,21 +392,21 @@ impl TuiUi {
             vec
         } else {
             vec![]
-        };
+        }
+    }
 
-        // 3. Logs
-        let logs: Vec<String> = ctx.client_logs.iter().cloned().collect();
-
-        // 4. Charts
-        let tabs = Self::get_tabs(&ctx);
+    fn prepare_charts(
+        &mut self,
+        ctx: &TuiContext,
+        run_time: Duration,
+    ) -> (Vec<String>, Option<ChartKind>) {
+        let tabs = Self::get_tabs(ctx);
         if self.charts_tab_idx >= tabs.len() {
             self.charts_tab_idx = 0;
         }
 
         let mut active_chart = None;
         if tabs.len() > 1 {
-            // If tab_idx is 0 (Overview), we default to the first chart (index 1) for the right pane in wide mode.
-            // In narrow mode, this might not be used, but it's safe to compute.
             let chart_idx = if self.charts_tab_idx == 0 {
                 1
             } else {
@@ -414,16 +415,14 @@ impl TuiUi {
 
             if chart_idx < tabs.len() {
                 let key = &tabs[chart_idx];
-                let run_time = current_time().saturating_sub(ctx.start_time);
 
                 active_chart = match key.as_str() {
-                    "Overview" => None, // Should not happen if we start at 1
+                    "Overview" => None,
                     "User Stats" => {
                         let mut series = vec![];
                         let colors = [
                             Color::Red,
                             Color::Green,
-                            Color::Yellow,
                             Color::Blue,
                             Color::Magenta,
                             Color::Cyan,
@@ -431,7 +430,7 @@ impl TuiUi {
                         for (key, stats) in &ctx.custom_timed {
                             let mut hasher = std::collections::hash_map::DefaultHasher::new();
                             key.hash(&mut hasher);
-                            let color_idx = hasher.finish() as usize % 6;
+                            let color_idx = hasher.finish() as usize % 5;
                             let style = Style::default().fg(colors[color_idx]);
                             series.push((
                                 key.clone(),
@@ -481,11 +480,10 @@ impl TuiUi {
                         } else {
                             custom.hash(&mut hasher);
                         }
-                        let color_idx = hasher.finish() as usize % 6;
+                        let color_idx = hasher.finish() as usize % 5;
                         let colors = [
                             Color::Red,
                             Color::Green,
-                            Color::Yellow,
                             Color::Blue,
                             Color::Magenta,
                             Color::Cyan,
@@ -502,9 +500,36 @@ impl TuiUi {
                     }),
                 };
             }
-        } else {
-            active_chart = None;
         }
+        (tabs, active_chart)
+    }
+
+    /// Prepare the data for the next frame
+    #[allow(clippy::cast_precision_loss)]
+    fn prepare_data(&mut self, ctx: &TuiContext) -> PreparedFrameData {
+        self.update_clients_list(ctx);
+
+        let run_time = current_time().saturating_sub(ctx.start_time);
+
+        // 1. Overall Stats
+        let generic_stats = Self::prepare_overall_stats(ctx);
+
+        let total_timing = Self::prepare_total_timing(ctx, run_time);
+
+        let total_geometry = ctx.total_item_geometry.clone();
+
+        // 2. Client Stats
+        let (client_generic_stats, client_timing, client_geometry, client_user_stats) =
+            self.prepare_client_data(ctx);
+
+        #[cfg(feature = "introspection")]
+        let client_perf_stats = self.prepare_client_perf_stats(ctx);
+
+        // 3. Logs
+        let logs: Vec<String> = ctx.client_logs.iter().cloned().collect();
+
+        // 4. Charts
+        let (tabs, active_chart) = self.prepare_charts(ctx, run_time);
 
         PreparedFrameData {
             generic_stats,
@@ -779,7 +804,9 @@ impl TuiUi {
 
     /// Draw the current TUI context
     pub fn draw(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>) {
-        let prepared = self.prepare_data(app);
+        let ctx = app.read().unwrap();
+        let prepared = self.prepare_data(&ctx);
+        drop(ctx);
         self.tabs.clone_from(&prepared.tabs);
 
         #[cfg(feature = "introspection")]
@@ -1020,6 +1047,7 @@ impl TuiUi {
                             enhanced_graphics: self.enhanced_graphics,
                             current_time: *run_time,
                             preset_y_range: None,
+                            title_style: None,
                         },
                     );
                 }

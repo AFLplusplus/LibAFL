@@ -131,6 +131,8 @@ pub struct MultiTimeChartOptions<'a> {
     pub current_time: Duration,
     /// Optional preset range for Y axis (min, max). Data outside this range will expand it.
     pub preset_y_range: Option<(f64, f64)>,
+    /// Optional style for the title
+    pub title_style: Option<Style>,
 }
 
 /// Draw the time chart with the given stats
@@ -160,6 +162,7 @@ pub fn draw_time_chart(f: &mut Frame, area: Rect, options: TimeChartOptions) {
         enhanced_graphics,
         current_time,
         preset_y_range,
+        title_style: Some(style),
     };
 
     draw_multi_time_chart(f, area, multi_options);
@@ -179,6 +182,7 @@ pub fn draw_multi_time_chart(f: &mut Frame, area: Rect, options: MultiTimeChartO
         enhanced_graphics,
         current_time,
         preset_y_range,
+        title_style,
     } = options;
 
     if series.is_empty() {
@@ -314,9 +318,11 @@ pub fn draw_multi_time_chart(f: &mut Frame, area: Rect, options: MultiTimeChartO
     if !title.is_empty() {
         block = block.title(Span::styled(
             title,
-            Style::default()
-                .fg(Color::LightCyan)
-                .add_modifier(Modifier::BOLD),
+            title_style.unwrap_or_else(|| {
+                Style::default()
+                    .fg(Color::LightCyan)
+                    .add_modifier(Modifier::BOLD)
+            }),
         ));
     }
 
