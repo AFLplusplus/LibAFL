@@ -374,7 +374,19 @@ where
 
     #[allow(clippy::type_complexity)] // TODO: make less complex
     fn reset_executor_snapshot_module<C, CM, ED, EM, ET, H, I, OT, S, SM, Z>(
-        executor: &mut QemuExecutor<C, CM, ED, EM, (Option<SnapshotModule>, ET), H, I, OT, S, SM, Z>,
+        executor: &mut QemuExecutor<
+            C,
+            CM,
+            ED,
+            EM,
+            (Option<SnapshotModule>, ET),
+            H,
+            I,
+            OT,
+            S,
+            SM,
+            Z,
+        >,
         qemu: Qemu,
     ) where
         ET: EmulatorModuleTuple<I, S>,
