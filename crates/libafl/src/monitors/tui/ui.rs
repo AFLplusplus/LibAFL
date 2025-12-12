@@ -314,13 +314,7 @@ impl TuiUi {
                         k.hash(&mut hasher);
                     }
                     let color_idx = hasher.finish() as usize % 5;
-                    let colors = [
-                        Color::Red,
-                        Color::Green,
-                        Color::Blue,
-                        Color::Magenta,
-                        Color::Cyan,
-                    ];
+                    let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
                     let style = Style::default().fg(colors[color_idx]);
 
                     (Span::styled(k.to_string(), style), val_str)
@@ -420,13 +414,7 @@ impl TuiUi {
                     "Overview" => None,
                     "User Stats" => {
                         let mut series = vec![];
-                        let colors = [
-                            Color::Red,
-                            Color::Green,
-                            Color::Blue,
-                            Color::Magenta,
-                            Color::Cyan,
-                        ];
+                        let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
                         for (key, stats) in &ctx.custom_timed {
                             let mut hasher = std::collections::hash_map::DefaultHasher::new();
                             key.hash(&mut hasher);
@@ -481,13 +469,7 @@ impl TuiUi {
                             custom.hash(&mut hasher);
                         }
                         let color_idx = hasher.finish() as usize % 5;
-                        let colors = [
-                            Color::Red,
-                            Color::Green,
-                            Color::Blue,
-                            Color::Magenta,
-                            Color::Cyan,
-                        ];
+                        let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
                         let style = Style::default().fg(colors[color_idx]);
 
                         ChartKind::Single {
@@ -886,8 +868,16 @@ impl TuiUi {
                     ))),
                     None,
                 ))
-                .highlight_style(Style::default().fg(Color::LightYellow))
-                .select(selected);
+                .select(selected)
+                .highlight_style(Style::default().fg(if self.charts_tab_idx > 0 {
+                    if let Some(ChartKind::Single { style, .. }) = &data.active_chart {
+                        style.fg.unwrap_or(Color::LightYellow)
+                    } else {
+                        Color::LightYellow
+                    }
+                } else {
+                    Color::LightYellow
+                }));
             f.render_widget(tabs_widget, tab_area);
 
             if self.charts_tab_idx == 0 {
@@ -950,8 +940,14 @@ impl TuiUi {
                     ))),
                     None,
                 ))
-                .highlight_style(Style::default().fg(Color::LightYellow))
-                .select(selected);
+                .select(selected)
+                .highlight_style(Style::default().fg(
+                    if let Some(ChartKind::Single { style, .. }) = &data.active_chart {
+                        style.fg.unwrap_or(Color::LightYellow)
+                    } else {
+                        Color::LightYellow
+                    },
+                ));
 
             let (right_title, right_chart) = split_title(right_col);
             f.render_widget(tabs_widget, right_title);
