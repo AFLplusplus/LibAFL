@@ -55,8 +55,6 @@ type FuzzerState =
     StdState<InMemoryCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 /// Parse a millis string to a [`Duration`]. Used for arg parsing.
-
-/// Parse a millis string to a [`Duration`]. Used for arg parsing.
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
     Ok(Duration::from_millis(time.parse()?))
 }
@@ -210,28 +208,54 @@ pub extern "C" fn libafl_main() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     #[cfg(feature = "statsd")]
-    let monitor = tuple_list!(
-        OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
-        MultiMonitor::new(print_fmt),
-        libafl::monitors::OptionalMonitor::new(if opt.statsd {
-            Some(
-                libafl::monitors::StatsdMonitor::new(
-                    opt.statsd_host.clone(),
-                    opt.statsd_port,
-                    StatsdMonitorTagFlavor::default(),
-                )
-                .with_per_client_stats(true),
+    let statsd = libafl::monitors::OptionalMonitor::new(if opt.statsd {
+        Some(
+            libafl::monitors::StatsdMonitor::new(
+                opt.statsd_host.clone(),
+                opt.statsd_port,
+                StatsdMonitorTagFlavor::default(),
             )
+            .with_per_client_stats(true),
+        )
+    } else {
+        None
+    });
+
+    let m_ondisk = OnDiskTomlMonitor::new("./fuzzer_stats.toml");
+    let m_multi = libafl::monitors::OptionalMonitor::new(
+        #[cfg(feature = "tui")]
+        if !opt.tui {
+            Some(MultiMonitor::new(print_fmt))
         } else {
             None
-        })
+        },
+        #[cfg(not(feature = "tui"))]
+        Some(MultiMonitor::new(print_fmt)),
     );
 
-    #[cfg(not(feature = "statsd"))]
-    let monitor = tuple_list!(
-        OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
-        MultiMonitor::new(print_fmt),
-    );
+    #[cfg(feature = "tui")]
+    let m_tui = libafl::monitors::OptionalMonitor::new(if opt.tui {
+        Some(
+            TuiMonitor::builder()
+                .title("libfuzzer_libpng")
+                .enhanced_graphics(true)
+                .build(),
+        )
+    } else {
+        None
+    });
+
+    #[cfg(all(not(feature = "tui"), not(feature = "statsd")))]
+    let monitor = (m_ondisk, (m_multi, ()));
+
+    #[cfg(all(feature = "tui", not(feature = "statsd")))]
+    let monitor = (m_ondisk, (m_multi, (m_tui, ())));
+
+    #[cfg(all(not(feature = "tui"), feature = "statsd"))]
+    let monitor = (m_ondisk, (m_multi, (statsd, ())));
+
+    #[cfg(all(feature = "tui", feature = "statsd"))]
+    let monitor = (m_ondisk, (m_multi, (m_tui, (statsd, ()))));
 
     fn run_client<EM>(
         state: Option<FuzzerState>,
@@ -404,103 +428,23 @@ pub extern "C" fn libafl_main() {
         return;
     }
 
-    #[cfg(feature = "tui")]
-    {
-        #[cfg(feature = "statsd")]
-        let statsd = libafl::monitors::OptionalMonitor::new(if opt.statsd {
-            Some(
-                libafl::monitors::StatsdMonitor::new(
-                    opt.statsd_host.clone(),
-                    opt.statsd_port,
-                    StatsdMonitorTagFlavor::default(),
-                )
-                .with_per_client_stats(true),
-            )
-        } else {
-            None
-        });
+    let builder = Launcher::builder()
+        .shmem_provider(shmem_provider)
+        .configuration(EventConfig::from_name("default"))
+        .monitor(monitor)
+        .run_client(|s, m, c| run_client(s, m, c, &opt))
+        .cores(&cores)
+        .overcommit(opt.overcommit)
+        .broker_port(broker_port)
+        .remote_broker_addr(opt.remote_broker_addr)
+        .stdout_file(Some("/dev/null"));
 
-        #[cfg(feature = "statsd")]
-        let monitor = tuple_list!(
-            OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
-            libafl::monitors::OptionalMonitor::new(if !opt.tui {
-                Some(MultiMonitor::new(print_fmt))
-            } else {
-                None
-            }),
-            libafl::monitors::OptionalMonitor::new(if opt.tui {
-                Some(
-                    TuiMonitor::builder()
-                        .title("libfuzzer_libpng")
-                        .enhanced_graphics(true)
-                        .build(),
-                )
-            } else {
-                None
-            }),
-            statsd
-        );
+    #[cfg(unix)]
+    let builder = builder.fork(opt.fork);
 
-        #[cfg(not(feature = "statsd"))]
-        let monitor = tuple_list!(
-            OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
-            libafl::monitors::OptionalMonitor::new(if !opt.tui {
-                Some(MultiMonitor::new(print_fmt))
-            } else {
-                None
-            }),
-            libafl::monitors::OptionalMonitor::new(if opt.tui {
-                Some(
-                    TuiMonitor::builder()
-                        .title("libfuzzer_libpng")
-                        .enhanced_graphics(true)
-                        .build(),
-                )
-            } else {
-                None
-            }),
-        );
-        let builder = Launcher::builder()
-            .shmem_provider(shmem_provider)
-            .configuration(EventConfig::from_name("default"))
-            .monitor(monitor)
-            .run_client(|s, m, c| run_client(s, m, c, &opt))
-            .cores(&cores)
-            .overcommit(opt.overcommit)
-            .broker_port(broker_port)
-            .remote_broker_addr(opt.remote_broker_addr)
-            .stdout_file(Some("/dev/null"));
-
-        #[cfg(unix)]
-        let builder = builder.fork(opt.fork);
-
-        match builder.build().launch() {
-            Ok(()) => (),
-            Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
-            Err(err) => panic!("Failed to run launcher: {err:?}"),
-        }
-    }
-
-    #[cfg(not(feature = "tui"))]
-    {
-        let builder = Launcher::builder()
-            .shmem_provider(shmem_provider)
-            .configuration(EventConfig::from_name("default"))
-            .monitor(monitor)
-            .run_client(|s, m, c| run_client(s, m, c, &opt))
-            .cores(&cores)
-            .overcommit(opt.overcommit)
-            .broker_port(broker_port)
-            .remote_broker_addr(opt.remote_broker_addr)
-            .stdout_file(Some("/dev/null"));
-
-        #[cfg(unix)]
-        let builder = builder.fork(opt.fork);
-
-        match builder.build().launch() {
-            Ok(()) => (),
-            Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
-            Err(err) => panic!("Failed to run launcher: {err:?}"),
-        }
+    match builder.build().launch() {
+        Ok(()) => (),
+        Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
+        Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
 }
