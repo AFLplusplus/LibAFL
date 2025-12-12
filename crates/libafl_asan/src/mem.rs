@@ -11,7 +11,7 @@ unsafe extern "C" fn bcmp(
     s2: *const core::ffi::c_void,
     n: usize,
 ) -> i32 {
-    memcmp(s1, s2, n)
+    unsafe { memcmp(s1, s2, n) }
 }
 
 #[cfg(all(feature = "global_allocator", feature = "dlmalloc"))]

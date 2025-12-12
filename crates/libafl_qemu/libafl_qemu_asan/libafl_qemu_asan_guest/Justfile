@@ -8,6 +8,7 @@ GUEST_SOURCE_DIR := source_directory()
 compile_guest:
 	#!/bin/sh
 	. {{ DOTENV }}
+	export RUSTC_BOOTSTRAP=1
 	cargo \
 		build \
 		--package libafl_qemu_asan_guest \
@@ -19,6 +20,7 @@ compile_guest:
 fix_guest:
 	#!/bin/sh
 	. {{ DOTENV }}
+	export RUSTC_BOOTSTRAP=1
 	cargo \
 		fix \
 		--package libafl_qemu_asan_guest \
