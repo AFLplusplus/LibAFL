@@ -184,7 +184,6 @@ impl FridaOptions {
                             !options.enable_cmplog,
                             "cmplog is not currently supported on targets other than aarch64"
                         );
-
                     }
                     #[cfg(feature = "cmplog")]
                     "cmplog-cores" => {

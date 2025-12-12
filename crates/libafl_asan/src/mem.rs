@@ -1,10 +1,9 @@
 use core::mem::transmute;
 
-#[cfg(all(not(feature = "libc"), feature = "nostd-musl"))]
-use nostd_musl::{bcmp, memcmp, memcpy, memmove, memset, strlen};
-
 #[cfg(feature = "libc")]
 use libc::{memcmp, memcpy, memmove, memset, strlen};
+#[cfg(all(not(feature = "libc"), feature = "nostd-musl"))]
+use nostd_musl::{bcmp, memcmp, memcpy, memmove, memset, strlen};
 
 #[cfg(feature = "libc")]
 unsafe extern "C" fn bcmp(
