@@ -1060,8 +1060,6 @@ where
     where
         ET: EmulatorModuleTuple<I, S>,
     {
-        /// # Safety
-        /// The hooks and runtime are valid at this point.
         unsafe {
             AsanGiovese::init(&mut self.rt, emulator_modules.hooks().qemu_hooks());
         }
