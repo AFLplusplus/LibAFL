@@ -31,6 +31,9 @@ use libafl_bolts::{
     tuples::tuple_list,
     AsSlice, AsSliceMut,
 };
+#[cfg(feature = "snapshot")]
+use libafl_qemu::modules::SnapshotModule;
+use libafl_qemu::QemuExecutor;
 use libafl_qemu::{
     elf::EasyElf,
     modules::{edges::StdEdgeCoverageChildModule, RedirectStdoutModule},
@@ -39,12 +42,7 @@ use libafl_qemu::{
 };
 #[cfg(feature = "snapshot")]
 use libafl_qemu::{modules::SnapshotModule, QemuExecutor};
-use libafl_qemu::QemuExecutor;
-#[cfg(feature = "snapshot")]
-use libafl_qemu::modules::SnapshotModule;
 use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
-
-
 
 #[derive(Default)]
 pub struct Version;
@@ -257,7 +255,7 @@ pub fn fuzz() {
         // Rust harness: this closure copies an input buffer to our private region
         // for target function input and updates registers to a single iteration
         // before telling QEMU to resume execution.
-    let mut harness =
+        let mut harness =
             |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
                 let target = input.target_bytes();
                 let mut buf = target.as_slice();

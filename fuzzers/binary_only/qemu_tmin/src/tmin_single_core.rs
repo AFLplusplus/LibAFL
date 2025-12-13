@@ -28,18 +28,16 @@ use libafl_bolts::{
     tuples::tuple_list,
     AsSlice, AsSliceMut,
 };
+#[cfg(feature = "snapshot")]
+use libafl_qemu::modules::SnapshotModule;
+use libafl_qemu::QemuExecutor;
 use libafl_qemu::{
     elf::EasyElf,
     modules::{edges::StdEdgeCoverageChildModule, RedirectStdoutModule},
     ArchExtras, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason,
     QemuShutdownCause, Regs,
 };
-use libafl_qemu::QemuExecutor;
-#[cfg(feature = "snapshot")]
-use libafl_qemu::modules::SnapshotModule;
 use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
-
-
 
 #[derive(Default)]
 pub struct Version;
