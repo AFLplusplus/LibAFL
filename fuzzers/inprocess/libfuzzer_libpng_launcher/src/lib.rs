@@ -348,7 +348,7 @@ pub extern "C" fn libafl_main() {
         let afl_stats = AflStatsStage::builder()
             .map_feedback(&map_feedback)
             .stats_file(opt.output.join("fuzzer_stats"))
-            .report_interval(Duration::from_secs(5))
+            .report_interval(Duration::from_millis(1000))
             .core_id(core_id)
             .banner("libfuzzer_libpng".into())
             .version("0.16.0".into())
@@ -435,7 +435,6 @@ pub extern "C" fn libafl_main() {
         .run_client(|s, m, c| run_client(s, m, c, &opt))
         .cores(&cores)
         .overcommit(opt.overcommit)
-        .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"));
 
