@@ -54,6 +54,12 @@ test_inner: harness build
 
     source {{ DOTENV }}
 
+    if [[ -z "$CROSS_TARGET" ]]; then
+       if [[ "{{ ARCH }}" == "x86_64" ]]; then
+           CROSS_TARGET="x86_64-unknown-linux-gnu"
+       fi
+    fi
+
     export QEMU_LAUNCHER={{ FUZZER }}
 
     ./tests/injection/test.sh || exit 1

@@ -1,4 +1,5 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
+
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use core::sync::atomic::{Ordering, compiler_fence};
@@ -7,9 +8,9 @@ use core::{fmt::Debug, marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use hashbrown::HashMap;
 use libafl_bolts::ClientId;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+#[cfg(feature = "std")]
 use libafl_bolts::os::startable_self;
-#[cfg(all(feature = "std", feature = "fork", unix))]
+#[cfg(all(feature = "std", unix))]
 use libafl_bolts::os::{ForkResult, fork};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::{SIGNAL_RECURSION_EXIT, unix_signals::setup_signal_handler};
@@ -188,6 +189,7 @@ impl<I, MT, S> SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
+    S: Stoppable,
 {
     /// Creates a new [`SimpleEventManager`].
     pub fn new(monitor: MT) -> Self {
@@ -426,7 +428,18 @@ where
     /// Launch the simple restarting manager.
     /// This `EventManager` is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
-    pub fn launch(monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
+    ///
+    /// # Arguments
+    ///
+    /// * `monitor` - The monitor to use for the event manager.
+    /// * `shmem_provider` - The shared memory provider to use for the event manager.
+    /// * `use_fork` - Whether to use fork to spawn child processes (on Unix only)
+    ///   or to spawn the binary again with the same parameters.
+    pub fn launch(
+        monitor: MT,
+        shmem_provider: &mut SP,
+        _use_fork: bool,
+    ) -> Result<(Option<S>, Self), Error>
     where
         S: DeserializeOwned + Serialize + HasSolutions<I>,
         MT: Debug,
@@ -455,8 +468,8 @@ where
                 log::info!("Spawning next client (id {ctr})");
 
                 // On Unix, we fork
-                #[cfg(all(unix, feature = "fork"))]
-                let child_status = {
+                #[cfg(unix)]
+                let child_status = if _use_fork {
                     shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
@@ -471,26 +484,15 @@ where
                             break staterestorer;
                         }
                     }
+                } else {
+                    unsafe {
+                        libc::signal(libc::SIGINT, libc::SIG_IGN);
+                    }
+                    startable_self()?.status()?.code().unwrap_or_default()
                 };
 
-                // If this guy wants to fork, then ignore sigit
-                #[cfg(any(windows, not(feature = "fork")))]
-                unsafe {
-                    #[cfg(windows)]
-                    libafl_bolts::os::windows_exceptions::signal(
-                        libafl_bolts::os::windows_exceptions::SIGINT,
-                        libafl_bolts::os::windows_exceptions::sig_ign(),
-                    );
-
-                    #[cfg(unix)]
-                    libc::signal(libc::SIGINT, libc::SIG_IGN);
-                }
-
-                // On Windows (or in any case without forks), we spawn ourself again
-                #[cfg(any(windows, not(feature = "fork")))]
-                let child_status = startable_self()?.status()?;
-                #[cfg(any(windows, not(feature = "fork")))]
-                let child_status = child_status.code().unwrap_or_default();
+                #[cfg(not(unix))]
+                let child_status = startable_self()?.status()?.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst);
 

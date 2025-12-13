@@ -24,7 +24,7 @@ name = "tmin_multi_core"
 path = "src/tmin_multi_core.rs"
 
 [features]
-default = ["std", "snapshot"]
+default = ["std", "fork"]
 fork = []
 snapshot = []
 std = []

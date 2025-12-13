@@ -3,6 +3,7 @@ import "libafl-qemu.just"
 # Useful rules to build libpng for multiple architecture.
 
 OPTIMIZATIONS := env("OPTIMIZATIONS", if ARCH == "ppc" { "no" } else { "yes" })
+REAL_CC := if ARCH == "x86_64" { "gcc" } else { "arm-linux-gnueabi-gcc" }
 
 DEPS_DIR := TARGET_DIR / "deps"
 
@@ -41,8 +42,8 @@ zlib: zlib_wget
     mkdir {{ TARGET_DIR }}/build-zlib/
 
     cd {{ TARGET_DIR }}/build-zlib/ && \
-        CC=$CROSS_CC \
-        CFLAGS=$CROSS_CFLAGS \
+        CC={{REAL_CC}} \
+        CFLAGS="$CROSS_CFLAGS -Wno-error" \
         {{ DEPS_DIR }}/zlib-1.2.13/configure \
             --prefix=./zlib
 
@@ -69,7 +70,7 @@ libpng: arch_dir zlib libpng_wget
     mkdir {{TARGET_DIR}}/build-png/
 
     cd {{ TARGET_DIR }}/build-png/ && \
-        CC=$CROSS_CC \
+        AFL_NO_INSTRUMENT=1 CC=$CROSS_CC \
         CFLAGS="$CROSS_CFLAGS -I"{{ TARGET_DIR }}/build-zlib/zlib/lib"" \
         LDFLAGS=-L"{{ TARGET_DIR }}/build-zlib/zlib/lib" \
         {{ DEPS_DIR }}/libpng-1.6.37/configure \

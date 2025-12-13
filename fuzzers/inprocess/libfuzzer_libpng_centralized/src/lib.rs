@@ -256,14 +256,13 @@ pub extern "C" fn libafl_main() {
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
-        .secondary_run_client(&mut secondary_run_client)
+        .run_client(&mut secondary_run_client)
         .main_run_client(&mut main_run_client)
         .cores(&cores)
         .broker_port(broker_port)
-        .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"))
+        .centralized_broker_port(1340)
         .build()
-        .launch()
+        .launch_centralized()
     {
         Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),

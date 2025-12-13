@@ -8,17 +8,31 @@ fn main() {
     println!("cargo:rerun-if-changed=cc/src/log.c");
     println!("cargo:rerun-if-changed=cc/src/vasprintf.c");
 
-    cc::Build::new()
-        .define("_GNU_SOURCE", None)
-        .opt_level(3)
-        .flag("-Werror")
-        .flag("-fno-stack-protector")
-        .flag("-U_FORTIFY_SOURCE")
-        .flag("-D_FORTIFY_SOURCE=0")
-        .flag("-ffunction-sections")
-        .include("cc/include/")
-        .file("cc/src/asprintf.c")
-        .compile("asprintf");
+    if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() != "windows" {
+        cc::Build::new()
+            .define("_GNU_SOURCE", None)
+            .opt_level(3)
+            .flag("-Werror")
+            .flag("-fno-stack-protector")
+            .flag("-U_FORTIFY_SOURCE")
+            .flag("-D_FORTIFY_SOURCE=0")
+            .flag("-ffunction-sections")
+            .include("cc/include/")
+            .file("cc/src/asprintf.c")
+            .compile("asprintf");
+
+        cc::Build::new()
+            .define("_GNU_SOURCE", None)
+            .opt_level(3)
+            .flag("-Werror")
+            .flag("-fno-stack-protector")
+            .flag("-U_FORTIFY_SOURCE")
+            .flag("-D_FORTIFY_SOURCE=0")
+            .flag("-ffunction-sections")
+            .include("cc/include/")
+            .file("cc/src/vasprintf.c")
+            .compile("vasprintf");
+    }
 
     cc::Build::new()
         .define("_GNU_SOURCE", None)
@@ -31,16 +45,4 @@ fn main() {
         .include("cc/include/")
         .file("cc/src/log.c")
         .compile("log");
-
-    cc::Build::new()
-        .define("_GNU_SOURCE", None)
-        .opt_level(3)
-        .flag("-Werror")
-        .flag("-fno-stack-protector")
-        .flag("-U_FORTIFY_SOURCE")
-        .flag("-D_FORTIFY_SOURCE=0")
-        .flag("-ffunction-sections")
-        .include("cc/include/")
-        .file("cc/src/vasprintf.c")
-        .compile("vasprintf");
 }

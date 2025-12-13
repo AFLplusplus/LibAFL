@@ -96,6 +96,8 @@ where
     S: Unpin,
     F: FnMut(&[u8]) + 'static,
 {
+    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+
     fn first_exec<ET>(
         &mut self,
         _qemu: Qemu,

@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "test"), no_std)]
 use core::ffi::{c_char, c_void};
-#[cfg(not(any(feature = "test", clippy)))]
+#[cfg(all(not(feature = "test"), not(test)))]
 use core::panic::PanicInfo;
 
 /// # Safety
@@ -18,7 +18,7 @@ pub unsafe extern "C" fn dlerror() -> *mut c_char {
 }
 
 #[panic_handler]
-#[cfg(not(any(feature = "test", clippy)))]
+#[cfg(all(not(feature = "test"), not(test)))]
 fn panic(_info: &PanicInfo) -> ! {
     unimplemented!()
 }

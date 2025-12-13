@@ -17,6 +17,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <cstdlib>
 
 #include <vector>
 
@@ -76,9 +77,34 @@ void user_read_data(png_structp png_ptr, png_bytep data, size_t length) {
 static const int kPngHeaderSize = 8;
 
 // Entry point for LibFuzzer.
-// Roughly follows the libpng book example:
-// http://www.libpng.org/pub/png/book/chapter13.html
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  static long long crash_after = -1;
+  static bool      initialized = false;
+  if (!initialized) {
+    char *val = getenv("LIBAFL_CRASH_AFTER");
+    if (val) {
+      crash_after = atoll(val);
+      fprintf(stderr,
+              "DEBUG: LIBAFL_CRASH_AFTER found: %s, converted to %lld\n", val,
+              crash_after);
+    } else {
+      fprintf(stderr, "DEBUG: LIBAFL_CRASH_AFTER not found\n");
+    }
+    fflush(stderr);
+    initialized = true;
+  }
+  if (crash_after >= 0) {
+    // fprintf(stderr, "DEBUG: Execution count: %lld\n", crash_after);
+    crash_after--;
+    if (crash_after == 0) {
+      fprintf(stderr,
+              "Intentionally crashing in harness after limit reached\n");
+      fflush(stderr);
+      // Trigger a crash
+      abort();
+    }
+  }
+
   if (size < kPngHeaderSize) { return 0; }
 
   std::vector<unsigned char> v(data, data + size);
