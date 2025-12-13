@@ -6,8 +6,7 @@
 use core::simd::num::SimdUint;
 use core::slice;
 #[cfg(feature = "sancov_pcguard_dump_cov")]
-#[allow(unused_imports)]
-use core::sync::atomic::{AtomicPtr, AtomicBool, Ordering};
+use core::sync::atomic::{AtomicPtr, Ordering};
 
 #[cfg(any(
     feature = "sancov_ngram4",
@@ -76,12 +75,12 @@ pub type TargetPcGuardHook = unsafe extern "C" fn(*mut u32, usize);
 
 /// Function ptr that does nothing.
 #[cfg(feature = "sancov_pcguard_dump_cov")]
-#[allow(dead_code)]
 pub(crate) unsafe extern "C" fn nop_target_pc_guard(_guard: *mut u32, _pc: usize) {}
 
 /// The global hook for `__libafl_targets_trace_pc_guard`
 #[cfg(feature = "sancov_pcguard_dump_cov")]
-pub static DUMP_COV_ENABLED: AtomicBool = AtomicBool::new(false);
+pub static LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK: AtomicPtr<TargetPcGuardHook> =
+    AtomicPtr::new(nop_target_pc_guard as *mut TargetPcGuardHook);
 
 use alloc::vec::Vec;
 #[cfg(any(
@@ -294,9 +293,8 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 pub unsafe extern "C" fn __libafl_targets_trace_pc_guard(guard: *mut u32, pc: usize) {
     unsafe {
         sanitizer_cov_pcguard_impl(guard);
-        if DUMP_COV_ENABLED.load(Ordering::Relaxed) {
-             crate::sancov_pcguard_dump_cov::__libafl_targets_trace_pc_guard_impl(guard, pc);
-        }
+        let hook_ptr = LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.load(Ordering::Relaxed);
+        (*hook_ptr)(guard, pc);
     }
 }
 

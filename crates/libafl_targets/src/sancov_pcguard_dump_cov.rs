@@ -15,7 +15,9 @@ use libafl::{
     state::HasCorpus,
 };
 
-use crate::sancov_pcguard::DUMP_COV_ENABLED;
+use crate::sancov_pcguard::{
+    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK, TargetPcGuardHook, nop_target_pc_guard,
+};
 
 static COVERED_PCS: Mutex<Option<HashMap<usize, usize>>> = Mutex::new(None);
 
@@ -85,12 +87,18 @@ pub fn clear_covered_lines() {
 /// Enable coverage collection for `dump_cov` mode.
 /// Get the covered lines using [`dump_covered_lines`].
 pub fn pcguard_enable_coverage_collection() {
-    DUMP_COV_ENABLED.store(true, Ordering::Release);
+    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.store(
+        __libafl_targets_trace_pc_guard_impl as *mut TargetPcGuardHook,
+        Ordering::Release,
+    );
 }
 
 /// Disable coverage collection for `dump_cov` mode.
 pub fn pcguard_disable_coverage_collection() {
-    DUMP_COV_ENABLED.store(false, Ordering::Release);
+    LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.store(
+        nop_target_pc_guard as *mut TargetPcGuardHook,
+        Ordering::Release,
+    );
 }
 
 /// A hook that dumps coverage to files
@@ -167,9 +175,7 @@ where
     }
 }
 
-#[unsafe(no_mangle)]
-#[allow(missing_docs)]
-pub unsafe extern "C" fn __libafl_targets_trace_pc_guard_impl(_guard: *mut u32, pc: usize) {
+unsafe extern "C" fn __libafl_targets_trace_pc_guard_impl(_guard: *mut u32, pc: usize) {
     if let Ok(mut guard) = COVERED_PCS.lock() {
         if guard.is_none() {
             *guard = Some(HashMap::new());
