@@ -87,8 +87,11 @@ pub fn clear_covered_lines() {
 /// Enable coverage collection for `dump_cov` mode.
 /// Get the covered lines using [`dump_covered_lines`].
 pub fn pcguard_enable_coverage_collection() {
+    let addr = __libafl_targets_trace_pc_guard_impl as *mut TargetPcGuardHook;
+    let msg = format!("Enabling coverage collection, addr: {:p}\n", addr);
+    let _ = std::io::stderr().write_all(msg.as_bytes());
     LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.store(
-        __libafl_targets_trace_pc_guard_impl as *mut TargetPcGuardHook,
+        addr,
         Ordering::Release,
     );
 }
@@ -175,7 +178,11 @@ where
     }
 }
 
-unsafe extern "C" fn __libafl_targets_trace_pc_guard_impl(_guard: *mut u32, pc: usize) {
+#[unsafe(no_mangle)]
+#[allow(missing_docs)]
+pub unsafe extern "C" fn __libafl_targets_trace_pc_guard_impl(_guard: *mut u32, pc: usize) {
+    let msg = b"Inside trace_pc_guard_impl\n";
+    let _ = std::io::stderr().write_all(msg);
     if let Ok(mut guard) = COVERED_PCS.lock() {
         if guard.is_none() {
             *guard = Some(HashMap::new());

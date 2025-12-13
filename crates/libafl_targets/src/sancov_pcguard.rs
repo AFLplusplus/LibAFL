@@ -6,7 +6,11 @@
 use core::simd::num::SimdUint;
 use core::slice;
 #[cfg(feature = "sancov_pcguard_dump_cov")]
+#[allow(unused_imports)]
 use core::sync::atomic::{AtomicPtr, Ordering};
+#[cfg(feature = "sancov_pcguard_dump_cov")]
+#[allow(unused_imports)]
+use std::io::Write;
 
 #[cfg(any(
     feature = "sancov_ngram4",
@@ -292,9 +296,25 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __libafl_targets_trace_pc_guard(guard: *mut u32, pc: usize) {
     unsafe {
+        // let msg = b"Entering trace_pc_guard\n";
+        // let _ = std::io::stderr().write_all(msg);
         sanitizer_cov_pcguard_impl(guard);
+        
+        // Call directly to debug
+        crate::sancov_pcguard_dump_cov::__libafl_targets_trace_pc_guard_impl(guard, pc);
+
+        /*
         let hook_ptr = LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.load(Ordering::Relaxed);
+        
+        let msg = format!("hook_ptr: {:p}\n", hook_ptr);
+        let _ = std::io::stderr().write_all(msg.as_bytes());
+
+        if hook_ptr.is_null() {
+            let msg = b"hook_ptr is null!\n";
+            let _ = std::io::stderr().write_all(msg);
+        }
         (*hook_ptr)(guard, pc);
+        */
     }
 }
 
