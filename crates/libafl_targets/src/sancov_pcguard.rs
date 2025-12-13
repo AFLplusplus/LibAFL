@@ -79,8 +79,8 @@ pub(crate) unsafe extern "C" fn nop_target_pc_guard(_guard: *mut u32, _pc: usize
 
 /// The global hook for `__libafl_targets_trace_pc_guard`
 #[cfg(feature = "sancov_pcguard_dump_cov")]
-pub static LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK: AtomicPtr<TargetPcGuardHook> =
-    AtomicPtr::new(nop_target_pc_guard as *mut TargetPcGuardHook);
+pub static LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK: AtomicPtr<()> =
+    AtomicPtr::new(nop_target_pc_guard as *mut ());
 
 use alloc::vec::Vec;
 #[cfg(any(
@@ -294,7 +294,8 @@ pub unsafe extern "C" fn __libafl_targets_trace_pc_guard(guard: *mut u32, pc: us
     unsafe {
         sanitizer_cov_pcguard_impl(guard);
         let hook_ptr = LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.load(Ordering::Relaxed);
-        (*hook_ptr)(guard, pc);
+        let hook: TargetPcGuardHook = core::mem::transmute(hook_ptr);
+        (hook)(guard, pc);
     }
 }
 
