@@ -75,6 +75,8 @@ run: fuzzer
 test: fuzzer
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
+    mkdir -p corpus
+    cp {{PROJECT_DIR}}/libpng-1.6.37/contrib/pngsuite/basn0g01.png corpus/ || true
     timeout 31s ./{{FUZZER_NAME}} --cores 0-1 --input ./corpus --broker-port 21342 2>/dev/null | tee fuzz_stdout.log || true
     if grep -qa "corpus: " fuzz_stdout.log; then
         echo "Fuzzer is working"

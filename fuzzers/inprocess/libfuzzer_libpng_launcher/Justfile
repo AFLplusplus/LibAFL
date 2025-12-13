@@ -102,7 +102,7 @@ test: fuzzer test-statsd test-tcp-fork test-tcp-no-fork test-tui test-all
     rm -rf out_fork_crash || true
     # Run with crash_after. It should crash and restart repeatedly.
     # We check if it still produces output/runs.
-    timeout 31s ./{{FUZZER_NAME}} --broker-port 21339 --cores 0 --input ./corpus --output ./out_fork_crash --fork --crash-after 100 2>&1 | tee fuzz_fork_crash_stdout.log || true
+    timeout 31s ./{{FUZZER_NAME}} --broker-port 21343 --cores 0 --input ./corpus --output ./out_fork_crash --fork --crash-after 100 2>&1 | tee fuzz_fork_crash_stdout.log || true
     # Check for objectives (crashes are recorded as objectives in the stats)
     # Note: forked child's stderr may not propagate, so we check stats output
     if grep -qa "objectives: [1-9]" fuzz_fork_crash_stdout.log; then
@@ -240,7 +240,7 @@ test-tui: fuzzer-tui
     rm -rf libafl_unix_shmem_server || true
     # Run fuzzer with TUI for a few seconds
     # verify it doesn't crash immediately
-    timeout 5s ./{{FUZZER_NAME}}-tui --broker-port 21339 --cores 0 --input ./corpus --tui > fuzzer_tui.log 2>&1 || true
+    timeout 5s ./{{FUZZER_NAME}}-tui --broker-port 21344 --cores 0 --input ./corpus --tui > fuzzer_tui.log 2>&1 || true
     if grep -q "panic" fuzzer_tui.log; then
         echo "Fuzzer panicked"
         cat fuzzer_tui.log
