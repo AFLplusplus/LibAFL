@@ -435,8 +435,9 @@ pub extern "C" fn libafl_main() {
         .run_client(|s, m, c| run_client(s, m, c, &opt))
         .cores(&cores)
         .overcommit(opt.overcommit)
-        .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"));
+        .broker_port(broker_port)
+        .remote_broker_addr(opt.remote_broker_addr);
+        //.stdout_file(Some("/dev/null"));
 
     #[cfg(unix)]
     let builder = builder.fork(opt.fork);
