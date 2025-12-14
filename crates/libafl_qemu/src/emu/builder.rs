@@ -9,7 +9,7 @@ use crate::FastSnapshotManager;
 use crate::config::QemuConfig;
 use crate::{
     Emulator, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError, QemuParams,
-    StdEmulatorDriver, StdSnapshotManager,
+    StdEmulatorDriver,
     command::{NopCommandManager, StdCommandManager},
     config::QemuConfigBuilder,
     modules::{EmulatorModule, EmulatorModuleTuple},
@@ -58,7 +58,7 @@ impl<C, I, S>
     }
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
 impl<C, I, S>
     EmulatorBuilder<
         C,
@@ -68,7 +68,7 @@ impl<C, I, S>
         QemuConfigBuilder,
         I,
         S,
-        StdSnapshotManager,
+        super::StdSnapshotManager,
     >
 where
     S: HasExecutions + Unpin,
@@ -80,7 +80,7 @@ where
         Self {
             modules: tuple_list!(),
             command_manager: StdCommandManager::default(),
-            snapshot_manager: StdSnapshotManager::default(),
+            snapshot_manager: super::StdSnapshotManager::default(),
             driver: StdEmulatorDriver::builder().build(),
             qemu_parameters: None,
             phantom: PhantomData,
@@ -98,7 +98,7 @@ impl<C, I, S>
         QemuConfigBuilder,
         I,
         S,
-        StdSnapshotManager,
+        super::systemmode::StdSnapshotManager,
     >
 where
     S: HasExecutions + Unpin,

@@ -8,12 +8,15 @@ use std::{cell::OnceCell, fmt::Debug};
 use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::ObserversTuple};
 use libafl_bolts::os::{CTRL_C_EXIT, unix_signals::Signal};
 
+#[cfg(not(feature = "systemmode"))]
+use crate::InputLocation;
 #[cfg(feature = "systemmode")]
 use crate::PhysMemoryChunk;
+#[cfg(feature = "systemmode")]
+use crate::emu::systemmode::SystemInputLocation as InputLocation;
 use crate::{
-    Emulator, EmulatorExitError, EmulatorExitResult, InputLocation, IsSnapshotManager, Qemu,
-    QemuError, QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError,
-    SnapshotManagerError,
+    Emulator, EmulatorExitError, EmulatorExitResult, IsSnapshotManager, Qemu, QemuError,
+    QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError, SnapshotManagerError,
     command::{CommandError, CommandManager, IsCommand},
     modules::EmulatorModuleTuple,
 };
@@ -178,6 +181,7 @@ pub enum MapKind {
     Cmp,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 pub struct StdEmulatorDriverBuilder<IS> {
     input_setter: IS,
     hooks_locked: bool,
@@ -206,6 +210,7 @@ where
 }
 
 impl<IS> StdEmulatorDriverBuilder<IS> {
+    #[allow(clippy::fn_params_excessive_bools)]
     pub fn new(
         input_setter: IS,
         hooks_locked: bool,
@@ -250,6 +255,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
     }
 
     #[cfg(feature = "systemmode")]
+    #[must_use]
     pub fn allow_page_on_start(self, allow_page_on_start: bool) -> Self {
         Self::new(
             self.input_setter,
@@ -262,6 +268,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
     }
 
     #[cfg(feature = "x86_64")]
+    #[must_use]
     pub fn process_only(self, process_only: bool) -> Self {
         Self::new(
             self.input_setter,

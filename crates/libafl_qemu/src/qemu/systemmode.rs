@@ -142,7 +142,7 @@ impl CPU {
                     libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_R
                 },
             );
-            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr as u64);
+            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr.into());
             if phwaddr.is_null() {
                 None
             } else {
@@ -198,6 +198,7 @@ impl CPU {
         }
     }
 
+    #[must_use]
     pub fn host_addr(&self, addr: GuestPhysAddr) -> *const u8 {
         unsafe { libafl_qemu_sys::libafl_paddr2host(self.cpu_ptr, addr, false) }
     }
@@ -282,7 +283,7 @@ impl Qemu {
                 track,
                 true,
                 device_filter.enum_id(),
-                device_filter.devices(&mut v) as *mut *mut _,
+                device_filter.devices(&mut v),
             )
         }
     }
@@ -339,19 +340,24 @@ impl Qemu {
     /// not the offset.
     #[must_use]
     pub fn target_page_mask(&self) -> usize {
-        unsafe { libafl_qemu_sys::libafl_target_page_mask() as usize }
+        #[expect(clippy::cast_sign_loss)]
+        unsafe {
+            libafl_qemu_sys::libafl_target_page_mask() as usize
+        }
     }
 
     /// Get the mask of a guest page's offset.
     /// This will return the mask for the offset part of the address.
     #[must_use]
     pub fn target_page_offset_mask(&self) -> usize {
-        unsafe { libafl_qemu_sys::libafl_target_page_offset_mask() as usize }
+        #[expect(clippy::cast_sign_loss)]
+        unsafe {
+            libafl_qemu_sys::libafl_target_page_offset_mask() as usize
+        }
     }
 }
 
 impl QemuMemoryChunk {
-    #[must_use]
     pub fn phys_iter(&self, qemu: Qemu) -> impl Iterator<Item = PhysMemoryChunk> {
         PhysMemoryIter {
             addr: self.addr,
@@ -362,7 +368,6 @@ impl QemuMemoryChunk {
     }
 
     #[expect(clippy::map_flatten)]
-    #[must_use]
     pub fn host_iter(&self, qemu: Qemu) -> impl Iterator<Item = HostMemoryChunk> {
         Box::new(
             self.phys_iter(qemu)
@@ -372,14 +377,14 @@ impl QemuMemoryChunk {
                     qemu,
                     cpu: phys_mem_chunk.cpu,
                 })
-                .flatten()
-                .into_iter(),
+                .flatten(),
         )
     }
 
     /// Interpret the VM memory chunk as multiple host memory segments.
     ///
     /// This will take into account possible physical memory fragmentation.
+    #[must_use]
     pub fn to_host_segments(&self, qemu: Qemu) -> HostMemorySegments {
         let segments: Vec<HostMemoryChunk> = self.host_iter(qemu).collect();
 
@@ -388,6 +393,7 @@ impl QemuMemoryChunk {
 }
 
 impl HostMemoryChunk {
+    #[must_use]
     pub fn write(&self, buf: &[u8]) -> usize {
         let write_len = min(buf.len(), self.size);
 
@@ -402,6 +408,7 @@ impl HostMemoryChunk {
 }
 
 impl HostMemorySegments {
+    #[must_use]
     pub fn new(segments: Vec<HostMemoryChunk>) -> Self {
         Self { segments }
     }
@@ -415,6 +422,7 @@ impl HostMemorySegments {
     /// Also, the VM must not assume the memory location is "private" (meaning
     /// is can only be touched by the program itself). In most cases it means
     /// the memory must be considered as *volatile*, as if it was a DMA region.
+    #[must_use]
     pub unsafe fn write(&self, buf: &[u8]) -> usize {
         let mut total_written = 0;
 
@@ -442,6 +450,7 @@ impl PhysMemoryChunk {
 
     /// Convert a physical memory chunk into a host memory chunk.
     // TODO: allow multiple host chunks
+    #[must_use]
     pub fn to_host_chunk(&self) -> Option<HostMemoryChunk> {
         let addr = self.addr_host_ptr_mut()?;
 
@@ -451,6 +460,7 @@ impl PhysMemoryChunk {
         })
     }
 
+    #[must_use]
     pub fn addr_host_ptr(&self) -> Option<*const u8> {
         let host_addr: *const u8 =
             unsafe { libafl_qemu_sys::libafl_paddr2host(self.cpu.cpu_ptr, self.addr, false) };
@@ -458,6 +468,7 @@ impl PhysMemoryChunk {
         Some(host_addr)
     }
 
+    #[must_use]
     pub fn addr_host_ptr_mut(&self) -> Option<NonNull<u8>> {
         let host_addr: *mut u8 =
             unsafe { libafl_qemu_sys::libafl_paddr2host(self.cpu.cpu_ptr, self.addr, true) };
@@ -465,16 +476,20 @@ impl PhysMemoryChunk {
         NonNull::new(host_addr)
     }
 
+    #[must_use]
     pub fn as_host_slice(&self) -> Option<&[u8]> {
         let host_ptr = self.addr_host_ptr()?;
         Some(unsafe { slice::from_raw_parts(host_ptr, self.size) })
     }
 
+    #[must_use]
+    #[allow(clippy::mut_from_ref)]
     pub fn as_host_slice_mut(&self) -> Option<&mut [u8]> {
         let mut host_ptr = self.addr_host_ptr_mut()?;
         Some(unsafe { slice::from_raw_parts_mut(host_ptr.as_mut(), self.size) })
     }
 
+    #[must_use]
     pub fn size(&self) -> usize {
         self.size
     }
@@ -547,9 +562,9 @@ impl Iterator for PhysMemoryIter {
                     return Some(PhysMemoryChunk::new(*paddr, sz, self.qemu, self.cpu));
                 }
             };
-            let start_phys_addr: GuestPhysAddr = self.cpu.get_phys_addr(*vaddr).expect(format!(
+            let start_phys_addr: GuestPhysAddr = self.cpu.get_phys_addr(*vaddr).unwrap_or_else(|| panic!(
                 "Could not translate the virtual address {vaddr:#x} into a valid physical address."
-            ).as_str());
+            ));
             let phys_page_size = self.qemu.target_page_size();
 
             // TODO: Turn this into a generic function
@@ -563,9 +578,9 @@ impl Iterator for PhysMemoryIter {
 
             // Now self.addr is host-page aligned
             while self.remaining_len > 0 {
-                let next_page_phys_addr: GuestPhysAddr = self.cpu.get_phys_addr(*vaddr).expect(format!(
+                let next_page_phys_addr: GuestPhysAddr = self.cpu.get_phys_addr(*vaddr).unwrap_or_else(|| panic!(
                     "Could not translate the virtual address {vaddr:#x} into a valid physical address."
-                ).as_str());
+                ));
 
                 // Non-contiguous, we stop here for the slice
                 if next_page_phys_addr != start_phys_addr {

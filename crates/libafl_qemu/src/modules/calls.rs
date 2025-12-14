@@ -317,7 +317,7 @@ where
         if let Some(h) = emulator_modules.modules().match_first_type::<Self>() {
             #[allow(unused_mut)] // cfg dependent
             let mut code = {
-                #[cfg(feature = "usermode")]
+                #[cfg(all(feature = "usermode", not(feature = "systemmode")))]
                 unsafe {
                     std::slice::from_raw_parts(qemu.g2h(pc), 512)
                 }
@@ -361,7 +361,7 @@ where
 
                 iaddr += insn.bytes().len() as GuestAddr;
 
-                #[cfg(feature = "usermode")]
+                #[cfg(all(feature = "usermode", not(feature = "systemmode")))]
                 {
                     code = unsafe { std::slice::from_raw_parts(qemu.g2h(iaddr), 512) };
                 }
@@ -521,7 +521,7 @@ impl<'a> CallTraceCollector for OnCrashBacktraceCollector<'a>
 where
     'a: 'static,
 {
-    #[expect(clippy::unnecessary_cast)]
+    #[allow(clippy::unnecessary_cast)]
     fn on_call<ET, I, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, I, S>,
@@ -533,10 +533,10 @@ where
         I: Unpin,
         S: Unpin,
     {
-        self.callstack_hash ^= pc as u64 + call_len as u64;
+        self.callstack_hash ^= u64::from(pc) + call_len as u64;
     }
 
-    #[expect(clippy::unnecessary_cast)]
+    #[allow(clippy::unnecessary_cast)]
     fn on_ret<ET, I, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, I, S>,
@@ -548,7 +548,7 @@ where
         I: Unpin,
         S: Unpin,
     {
-        self.callstack_hash ^= ret_addr as u64;
+        self.callstack_hash ^= u64::from(ret_addr);
     }
 
     fn pre_exec<I>(&mut self, _qemu: Qemu, _input: &I)

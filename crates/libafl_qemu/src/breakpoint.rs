@@ -123,7 +123,7 @@ impl<C> Breakpoint<C> {
 
     pub fn disable(&mut self, qemu: Qemu) {
         if self.enabled {
-            qemu.remove_breakpoint(self.addr.into());
+            qemu.remove_breakpoint(self.addr);
             self.enabled = false;
         }
     }

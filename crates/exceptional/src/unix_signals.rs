@@ -29,7 +29,7 @@ pub const CTRL_C_EXIT: i32 = 100;
 /// ARMv7-specific representation of a saved context
 #[cfg(target_arch = "arm")]
 #[derive(Debug)]
-#[expect(non_camel_case_types)]
+#[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct mcontext_t {
     /// Signal Number
@@ -79,7 +79,7 @@ pub struct mcontext_t {
 /// User Context Struct on `arm` `linux`
 #[cfg(all(target_os = "linux", target_arch = "arm"))]
 #[derive(Debug)]
-#[expect(non_camel_case_types)]
+#[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct ucontext_t {
     /// Flags
