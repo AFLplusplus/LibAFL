@@ -1,8 +1,7 @@
 //! A binary-only testcase minimizer using qemu, similar to AFL++ afl-tmin
 #[cfg(feature = "i386")]
 use core::mem::size_of;
-use core::str::from_utf8;
-use core::time::Duration;
+use core::{str::from_utf8, time::Duration};
 use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 
 use clap::{builder::Str, Parser};
@@ -33,12 +32,11 @@ use libafl_bolts::{
 };
 #[cfg(feature = "snapshot")]
 use libafl_qemu::modules::SnapshotModule;
-use libafl_qemu::QemuExecutor;
 use libafl_qemu::{
     elf::EasyElf,
     modules::{edges::StdEdgeCoverageChildModule, RedirectStdoutModule},
-    ArchExtras, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason,
-    QemuShutdownCause, Regs,
+    ArchExtras, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExecutor, QemuExitError,
+    QemuExitReason, QemuShutdownCause, Regs,
 };
 #[cfg(feature = "snapshot")]
 use libafl_qemu::{modules::SnapshotModule, QemuExecutor};
