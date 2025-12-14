@@ -402,6 +402,7 @@ pub extern "C" fn libafl_main() {
         let result = fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr);
         println!("fuzz_loop returned {:?}", result);
         result?;
+        restarting_mgr.on_restart(&mut state)?;
         Ok(())
     }
 

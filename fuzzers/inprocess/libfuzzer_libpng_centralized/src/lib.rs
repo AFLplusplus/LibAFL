@@ -242,10 +242,14 @@ pub extern "C" fn libafl_main() {
                 println!("We imported {} inputs from disk.", state.corpus().count());
             }
             if !mgr.is_main() {
+                println!("Running client fuzz_loop");
                 fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                println!("Client fuzz_loop finished");
             } else {
+                println!("Running main fuzz_loop");
                 let mut empty_stages = tuple_list!();
                 fuzzer.fuzz_loop(&mut empty_stages, &mut executor, &mut state, &mut mgr)?;
+                println!("Main fuzz_loop finished");
             }
             Ok(())
         };
