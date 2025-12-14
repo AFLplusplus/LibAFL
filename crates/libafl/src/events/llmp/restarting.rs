@@ -879,7 +879,23 @@ where
                             libc::signal(libc::SIGINT, libc::SIG_IGN);
                         }
                         let status = startable_self()?.status()?;
-                        status.code().unwrap_or_default()
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::process::ExitStatusExt;
+                            if let Some(signal) = status.signal() {
+                                if signal == 15 || signal == 2 {
+                                    CTRL_C_EXIT
+                                } else {
+                                    status.code().unwrap_or_default()
+                                }
+                            } else {
+                                status.code().unwrap_or_default()
+                            }
+                        }
+                        #[cfg(not(unix))]
+                        {
+                            status.code().unwrap_or_default()
+                        }
                     }
                 };
 
