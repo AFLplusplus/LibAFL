@@ -1,7 +1,6 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
 #[cfg(feature = "sancov_pcguard_dump_cov")]
-use core::ffi::c_void;
 #[rustversion::nightly]
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 use core::simd::num::SimdUint;
@@ -74,13 +73,14 @@ pub type PcGuardHook = unsafe extern "C" fn(*mut u32);
 #[cfg(feature = "sancov_pcguard_dump_cov")]
 pub type TargetPcGuardHook = unsafe extern "C" fn(*mut u32, usize);
 
+/// Function ptr that does nothing.
 #[cfg(feature = "sancov_pcguard_dump_cov")]
 pub(crate) unsafe extern "C" fn nop_target_pc_guard(_guard: *mut u32, _pc: usize) {}
 
 /// The global hook for `__libafl_targets_trace_pc_guard`
 #[cfg(feature = "sancov_pcguard_dump_cov")]
-pub static LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK: AtomicPtr<c_void> =
-    AtomicPtr::new(nop_target_pc_guard as *mut c_void);
+pub static LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK: AtomicPtr<()> =
+    AtomicPtr::new(nop_target_pc_guard as *mut ());
 
 use alloc::vec::Vec;
 #[cfg(any(
@@ -221,7 +221,7 @@ unsafe extern "C" {
 #[allow(clippy::inline_always)]
 #[inline(always)]
 #[allow(unused_assignments)]
-pub(crate) unsafe fn sancov_pcguard_hook_impl(guard: *mut u32) {
+pub(crate) unsafe fn sanitizer_cov_pcguard_impl(guard: *mut u32) {
     unsafe {
         #[allow(unused_variables, unused_mut)] // cfg dependent
         let mut pos = *guard as usize;
@@ -279,7 +279,7 @@ pub(crate) unsafe fn sancov_pcguard_hook_impl(guard: *mut u32) {
 #[cfg(not(feature = "sancov_pcguard_dump_cov"))]
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     unsafe {
-        sancov_pcguard_hook_impl(guard);
+        sanitizer_cov_pcguard_impl(guard);
     }
 }
 
@@ -288,14 +288,14 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 /// # Safety
 /// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
 /// Should usually not be called directly.
-#[unsafe(no_mangle)]
-#[allow(unused_assignments)] // cfg dependent
 #[cfg(feature = "sancov_pcguard_dump_cov")]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __libafl_targets_trace_pc_guard(guard: *mut u32, pc: usize) {
     unsafe {
-        let hook_ptr = LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.load(Ordering::Acquire);
+        sanitizer_cov_pcguard_impl(guard);
+        let hook_ptr = LIBAFL_TARGETS_TRACE_PC_GUARD_HOOK.load(Ordering::Relaxed);
         let hook: TargetPcGuardHook = core::mem::transmute(hook_ptr);
-        hook(guard, pc);
+        (hook)(guard, pc);
     }
 }
 

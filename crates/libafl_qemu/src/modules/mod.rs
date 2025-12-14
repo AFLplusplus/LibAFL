@@ -374,3 +374,87 @@ where
         }
     }
 }
+
+impl<I, S, M> EmulatorModule<I, S> for Option<M>
+where
+    M: EmulatorModule<I, S>,
+{
+    const HOOKS_DO_SIDE_EFFECTS: bool = M::HOOKS_DO_SIDE_EFFECTS;
+
+    fn pre_qemu_init<ET>(
+        &mut self,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        qemu_params: &mut QemuParams,
+    ) where
+        ET: EmulatorModuleTuple<I, S>,
+    {
+        if let Some(m) = self {
+            m.pre_qemu_init(emulator_modules, qemu_params);
+        }
+    }
+
+    fn post_qemu_init<ET>(&mut self, qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
+    where
+        ET: EmulatorModuleTuple<I, S>,
+    {
+        if let Some(m) = self {
+            m.post_qemu_init(qemu, emulator_modules);
+        }
+    }
+
+    fn first_exec<ET>(
+        &mut self,
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        state: &mut S,
+    ) where
+        ET: EmulatorModuleTuple<I, S>,
+    {
+        if let Some(m) = self {
+            m.first_exec(qemu, emulator_modules, state);
+        }
+    }
+
+    fn pre_exec<ET>(
+        &mut self,
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        state: &mut S,
+        input: &I,
+    ) where
+        ET: EmulatorModuleTuple<I, S>,
+    {
+        if let Some(m) = self {
+            m.pre_exec(qemu, emulator_modules, state, input);
+        }
+    }
+
+    fn post_exec<OT, ET>(
+        &mut self,
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        state: &mut S,
+        input: &I,
+        observers: &mut OT,
+        exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<I, S>,
+        ET: EmulatorModuleTuple<I, S>,
+    {
+        if let Some(m) = self {
+            m.post_exec(qemu, emulator_modules, state, input, observers, exit_kind);
+        }
+    }
+
+    unsafe fn on_crash(&mut self) {
+        if let Some(m) = self {
+            unsafe { m.on_crash() };
+        }
+    }
+
+    unsafe fn on_timeout(&mut self) {
+        if let Some(m) = self {
+            unsafe { m.on_timeout() };
+        }
+    }
+}

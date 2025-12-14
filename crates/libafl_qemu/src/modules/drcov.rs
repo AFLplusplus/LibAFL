@@ -267,15 +267,9 @@ where
             // Path -> pc_start..pc_end, where pc_start is the smallest pc for the path and pc_end the biggest pc.
             let mut i = 0;
             for ((map_start, map_end), map_path) in qemu.mappings().filter_map(|m| {
-                m.path().filter(|p| !p.is_empty()).map(|p| {
-                    (
-                        (
-                            u64::try_from(m.start()).unwrap(),
-                            u64::try_from(m.end()).unwrap(),
-                        ),
-                        p.clone(),
-                    )
-                })
+                m.path()
+                    .filter(|p| !p.is_empty())
+                    .map(|p| ((m.start(), m.end()), p.clone()))
             }) {
                 // Check if path is already present
                 match module_path_map.entry(map_path) {
@@ -364,7 +358,7 @@ where
                 Hook::Function(gen_block_lengths::<ET, F, I, S>),
                 Hook::Empty,
             );
-        };
+        }
     }
 
     fn post_exec<OT, ET>(
@@ -453,7 +447,7 @@ impl<F> DrCovModule<F> {
                         unsafe {
                             for module in self.module_mapping.as_ref().unwrap_unchecked().iter() {
                                 let (range, (_, _)) = module;
-                                if range.contains(&u64::try_from(*pc).unwrap()) {
+                                if range.contains(&u64::from(*pc)) {
                                     module_found = true;
                                     break;
                                 }
@@ -463,12 +457,12 @@ impl<F> DrCovModule<F> {
                             continue 'pcs_full;
                         }
                         if *idm == *id {
-                            #[expect(clippy::unnecessary_cast)] // for GuestAddr -> u64
+                            #[allow(clippy::unnecessary_cast)] // for GuestAddr -> u64
                             match lengths.get(pc) {
                                 Some(block_length) => {
                                     drcov_vec.push(DrCovBasicBlock::new(
-                                        *pc as u64,
-                                        *pc as u64 + *block_length as u64,
+                                        u64::from(*pc),
+                                        u64::from(*pc) + u64::from(*block_length),
                                     ));
                                 }
                                 None => {
@@ -516,13 +510,12 @@ impl<F> DrCovModule<F> {
                         continue 'pcs;
                     }
 
-                    #[expect(clippy::unnecessary_cast)] // for GuestAddr -> u64
+                    #[allow(clippy::unnecessary_cast)] // for GuestAddr -> u64
                     match lengths.get(pc) {
                         Some(block_length) => {
                             drcov_vec.push(DrCovBasicBlock::new(
-                                u64::try_from(*pc).unwrap(),
-                                u64::try_from(*pc).unwrap() as u64
-                                    + u64::try_from(*block_length).unwrap(),
+                                u64::from(*pc),
+                                u64::from(*pc) + u64::from(*block_length),
                             ));
                         }
                         None => {

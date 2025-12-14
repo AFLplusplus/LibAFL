@@ -2,3 +2,16 @@ test/out-cmplog
 test/out-instr
 test/output-cmplog/
 test/output/
+test/out-frida
+test/out-frida-cmpcov
+test/out-qemu
+test/out-qemu-cmpcov
+test/output-frida-cmpcov/
+test/output-frida-persistent/
+test/output-frida/
+test/output-fuzzbench/
+test/output-qemu-cmpcov/
+test/output-qemu-entrypoint/
+test/output-qemu/
+test/output-unicorn-cmpcov/
+test/output-unicorn-python/

@@ -123,8 +123,8 @@ mod generators {
             {
                 let paging_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
-                if !module.must_instrument(src, paging_id)
-                    && !module.must_instrument(dest, paging_id)
+                if !module.must_instrument_with_page_id(src, paging_id)
+                    && !module.must_instrument_with_page_id(dest, paging_id)
                 {
                     return None;
                 }
@@ -159,7 +159,7 @@ mod generators {
                     }
                 }
                 // GuestAddress is u32 for 32 bit guests
-                #[expect(clippy::unnecessary_cast)]
+                #[allow(clippy::unnecessary_cast)]
                 Some(id as u64)
             }
         }
@@ -203,8 +203,8 @@ mod generators {
             {
                 let paging_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
-                if !module.must_instrument(src, paging_id)
-                    && !module.must_instrument(dest, paging_id)
+                if !module.must_instrument_with_page_id(src, paging_id)
+                    && !module.must_instrument_with_page_id(dest, paging_id)
                 {
                     return None;
                 }
@@ -212,8 +212,8 @@ mod generators {
 
             let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
-            #[expect(clippy::unnecessary_cast)]
-            let id = (hash_64_fast(src as u64) ^ hash_64_fast(dest as u64)) & mask;
+            #[allow(clippy::unnecessary_cast)]
+            let id = (hash_64_fast(u64::from(src)) ^ hash_64_fast(u64::from(dest))) & mask;
 
             if !IS_CONST_MAP {
                 unsafe {
@@ -228,7 +228,7 @@ mod generators {
         }
     }
 
-    #[expect(clippy::unnecessary_cast)]
+    #[allow(clippy::unnecessary_cast)]
     #[allow(unused_variables)]
     #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
     pub fn gen_hashed_block_ids<
@@ -268,7 +268,7 @@ mod generators {
             {
                 let page_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
-                if !module.must_instrument(pc, page_id) {
+                if !module.must_instrument_with_page_id(pc, page_id) {
                     return None;
                 }
             }
@@ -276,7 +276,7 @@ mod generators {
 
         let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
-        let id = hash_64_fast(pc as u64) & mask;
+        let id = hash_64_fast(u64::from(pc)) & mask;
 
         if !IS_CONST_MAP {
             unsafe {

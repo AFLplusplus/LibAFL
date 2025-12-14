@@ -340,7 +340,7 @@ impl CPU {
                 return Ok(GuestReg::from_be(val.assume_init()).into());
 
                 #[cfg(not(feature = "be"))]
-                return Ok(GuestReg::from_le(val.assume_init()).into());
+                return Ok(GuestReg::from_le(val.assume_init()));
             }
         }
     }
@@ -897,7 +897,7 @@ impl Qemu {
         let addr = { addr & !1 };
 
         unsafe {
-            libafl_qemu_set_breakpoint(addr.into());
+            libafl_qemu_set_breakpoint(addr);
         }
     }
 
@@ -910,7 +910,7 @@ impl Qemu {
         let addr = { addr & !1 };
 
         unsafe {
-            libafl_qemu_remove_breakpoint(addr.into());
+            libafl_qemu_remove_breakpoint(addr);
         }
     }
 
@@ -1170,7 +1170,7 @@ impl QemuMemoryChunk {
         let new_addr = self.addr + range.start;
         let slice_size = range.clone().count();
 
-        if new_addr + (slice_size as GuestUsize) >= self.addr + self.size.into() {
+        if new_addr + (slice_size as GuestUsize) >= self.addr + self.size {
             return None;
         }
 
@@ -1219,6 +1219,7 @@ impl QemuMemoryChunk {
     /// (for example, if the memory is fragmented in the host address space),
     /// [`None`] is returned.
     #[cfg(feature = "systemmode")]
+    #[must_use]
     pub fn to_phys_mem_chunk(&self, qemu: Qemu) -> Option<PhysMemoryChunk> {
         match self.addr {
             GuestAddrKind::Physical(paddr) => Some(PhysMemoryChunk::new(
