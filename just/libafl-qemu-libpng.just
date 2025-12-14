@@ -70,7 +70,7 @@ libpng: arch_dir zlib libpng_wget
     mkdir {{TARGET_DIR}}/build-png/
 
     cd {{ TARGET_DIR }}/build-png/ && \
-        AFL_NO_INSTRUMENT=1 CC=$CROSS_CC \
+        CC=$CROSS_CC \
         CFLAGS="$CROSS_CFLAGS -I"{{ TARGET_DIR }}/build-zlib/zlib/lib"" \
         LDFLAGS=-L"{{ TARGET_DIR }}/build-zlib/zlib/lib" \
         {{ DEPS_DIR }}/libpng-1.6.37/configure \

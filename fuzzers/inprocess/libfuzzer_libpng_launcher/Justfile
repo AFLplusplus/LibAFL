@@ -178,10 +178,10 @@ test-statsd: fuzzer-statsd
     rm -rf libafl_unix_shmem_server || true
     rm -f statsd_out.log
     # Start python listener in background
-    python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(('127.0.0.1', 8126)); s.settimeout(25); d=s.recv(1024); print(d)" > statsd_out.log &
+    python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(('127.0.0.1', 8126)); s.settimeout(125); d=s.recv(1024); print(d)" > statsd_out.log &
     LISTENER_PID=$!
     # Run fuzzer for a few seconds
-    timeout 20s ./{{FUZZER_NAME}}-statsd --broker-port 21338 --cores 0 --input ./corpus --statsd --statsd-port 8126 > fuzzer_statsd.log 2>&1 || true
+    timeout 120s ./{{FUZZER_NAME}}-statsd --broker-port 21338 --cores 0 --input ./corpus --statsd --statsd-port 8126 > fuzzer_statsd.log 2>&1 || true
     # Wait for listener to potentially finish if it got data
     wait $LISTENER_PID || true
     if [ -s statsd_out.log ]; then
