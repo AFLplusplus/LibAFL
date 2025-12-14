@@ -851,7 +851,20 @@ where
                                         libc::signal(libc::SIGINT, libc::SIG_IGN);
                                     }
                                     self.shmem_provider.post_fork(false)?;
-                                    handle.status()
+                                    unsafe {
+                                        let mut status = 0;
+                                        libc::waitpid(handle.pid, &mut status, 0);
+                                        if libc::WIFSIGNALED(status) {
+                                            let sig = libc::WTERMSIG(status);
+                                            if sig == 15 || sig == 2 {
+                                                CTRL_C_EXIT
+                                            } else {
+                                                libc::WEXITSTATUS(status)
+                                            }
+                                        } else {
+                                            libc::WEXITSTATUS(status)
+                                        }
+                                    }
                                 }
                                 ForkResult::Child => {
                                     log::debug!(
