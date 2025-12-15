@@ -127,7 +127,7 @@ bitbybit = "1.4.0" # bitfields, use this for bit fields and bit enums
 capstone = "0.13.0" # Disassembler used in libafl_unicorn to provide disassembly on crash
 clap = "4.5.52"
 cc = "1.2.49"
-cmake = "0.1.55"
+cmake = "0.1.56"
 ctor = "0.6.3"
 document-features = "0.2.11"
 erased-serde = { version = "0.4.5", default-features = false } # erased serde
