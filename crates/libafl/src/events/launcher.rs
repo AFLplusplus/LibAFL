@@ -865,7 +865,16 @@ where
                 unsafe {
                     libc::waitpid(*handle, &raw mut status, 0);
                     if status != 0 {
-                        log::info!("Client with pid {handle} exited with status {status}");
+                        if libc::WIFSIGNALED(status) {
+                            let sig = libc::WTERMSIG(status);
+                            if sig == 15 || sig == 2 {
+                                log::info!("Client with pid {handle} exited with signal {sig} (graceful shutdown)");
+                            } else {
+                                log::info!("Client with pid {handle} exited with signal {sig}");
+                            }
+                        } else {
+                            log::info!("Client with pid {handle} exited with status {}", libc::WEXITSTATUS(status));
+                        }
                     }
                 }
             }
