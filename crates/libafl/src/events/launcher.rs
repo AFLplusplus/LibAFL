@@ -140,8 +140,6 @@ pub struct Launcher<'a, CF, MT, SP> {
     run_client: Option<CF>,
     /// The broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
     broker_port: u16,
-    /// The centralized broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
-    centralized_broker_port: u16,
     /// The list of cores to run on
     cores: &'a Cores,
     /// The number of clients to spawn on each core
@@ -194,7 +192,6 @@ pub struct LauncherBuilder<'a, CF, MT, SP> {
     configuration: Option<EventConfig>,
     run_client: Option<CF>,
     broker_port: u16,
-    centralized_broker_port: u16,
     cores: Option<&'a Cores>,
     overcommit: usize,
     #[cfg(unix)]
@@ -221,7 +218,6 @@ impl LauncherBuilder<'_, (), (), ()> {
             configuration: None,
             run_client: None,
             broker_port: 1337,
-            centralized_broker_port: 1338,
             cores: None,
             overcommit: 1,
             #[cfg(unix)]
@@ -259,7 +255,6 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             configuration: self.configuration,
             run_client: self.run_client,
             broker_port: self.broker_port,
-            centralized_broker_port: self.centralized_broker_port,
             cores: self.cores,
             overcommit: self.overcommit,
             #[cfg(unix)]
@@ -286,7 +281,6 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             configuration: self.configuration,
             run_client: self.run_client,
             broker_port: self.broker_port,
-            centralized_broker_port: self.centralized_broker_port,
             cores: self.cores,
             overcommit: self.overcommit,
             #[cfg(unix)]
@@ -320,7 +314,6 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             configuration: self.configuration,
             run_client: Some(run_client),
             broker_port: self.broker_port,
-            centralized_broker_port: self.centralized_broker_port,
             cores: self.cores,
             overcommit: self.overcommit,
             #[cfg(unix)]
@@ -342,13 +335,6 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
     #[must_use]
     pub fn broker_port(mut self, broker_port: u16) -> Self {
         self.broker_port = broker_port;
-        self
-    }
-
-    /// The centralized broker port to use (or to attach to, in case [`Self::spawn_broker`] is `false`)
-    #[must_use]
-    pub fn centralized_broker_port(mut self, centralized_broker_port: u16) -> Self {
-        self.centralized_broker_port = centralized_broker_port;
         self
     }
 
@@ -439,7 +425,6 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             configuration: self.configuration.expect("configuration not set"),
             run_client: self.run_client,
             broker_port: self.broker_port,
-            centralized_broker_port: self.centralized_broker_port,
             cores: self.cores.expect("cores not set"),
             overcommit: self.overcommit,
             #[cfg(unix)]
@@ -470,7 +455,6 @@ impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
         dbg_struct
             .field("configuration", &self.configuration)
             .field("broker_port", &self.broker_port)
-            .field("centralized_broker_port", &self.centralized_broker_port)
             .field("core", &self.cores)
             .field("spawn_broker", &self.spawn_broker)
             .field("remote_broker_addr", &self.remote_broker_addr);
@@ -893,7 +877,11 @@ where
 
     /// Launch the common broker logic
     #[cfg(unix)]
-    pub fn launch_common_broker<I, S>(self, handles: &[libc::pid_t]) -> Result<(), Error>
+    pub fn launch_common_broker<I, S>(
+        self,
+        handles: &[libc::pid_t],
+        centralized_broker_port: Option<u16>,
+    ) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
         S: DeserializeOwned + Serialize,
@@ -919,26 +907,28 @@ where
         let exit_cleanly_after = NonZeroUsize::try_from(self.cores.ids.len()).unwrap();
 
         // Add centralized broker
-        brokers.add(Box::new({
-            #[cfg(feature = "multi_machine")]
-            let centralized_hooks = tuple_list!(
-                CentralizedLlmpHook::<I>::new()?,
-                multi_machine_receiver_hook,
-            );
+        if let Some(centralized_broker_port) = centralized_broker_port {
+            brokers.add(Box::new({
+                #[cfg(feature = "multi_machine")]
+                let centralized_hooks = tuple_list!(
+                    CentralizedLlmpHook::<I>::new()?,
+                    multi_machine_receiver_hook,
+                );
 
-            #[cfg(not(feature = "multi_machine"))]
-            let centralized_hooks = tuple_list!(CentralizedLlmpHook::<I>::new()?);
+                #[cfg(not(feature = "multi_machine"))]
+                let centralized_hooks = tuple_list!(CentralizedLlmpHook::<I>::new()?);
 
-            // TODO switch to false after solving the bug
-            let mut broker = LlmpBroker::with_keep_pages_attach_to_tcp(
-                self.shmem_provider.clone(),
-                centralized_hooks,
-                self.centralized_broker_port,
-                true,
-            )?;
-            broker.set_exit_after(exit_cleanly_after);
-            broker
-        }));
+                // TODO switch to false after solving the bug
+                let mut broker = LlmpBroker::with_keep_pages_attach_to_tcp(
+                    self.shmem_provider.clone(),
+                    centralized_hooks,
+                    centralized_broker_port,
+                    true,
+                )?;
+                broker.set_exit_after(exit_cleanly_after);
+                broker
+            }));
+        }
 
         #[cfg(feature = "multi_machine")]
         assert!(
@@ -1016,6 +1006,7 @@ pub type StdCentralizedInnerMgr<I, S, SHM, SP> = LlmpRestartingEventManager<(), 
 pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     launcher: Launcher<'a, CF, MT, SP>,
     main_run_client: Option<MF>,
+    centralized_broker_port: u16,
 }
 
 #[cfg(unix)]
@@ -1023,6 +1014,7 @@ impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CentralizedLauncher")
             .field("launcher", &self.launcher)
+            .field("centralized_broker_port", &self.centralized_broker_port)
             .finish_non_exhaustive()
     }
 }
@@ -1213,7 +1205,7 @@ where
                                     mgr,
                                     // tuple_list!(multi_machine_event_manager_hook.take().unwrap()),
                                     self.launcher.shmem_provider.clone(),
-                                    self.launcher.centralized_broker_port,
+                                    self.centralized_broker_port,
                                 )?;
 
                                 self.main_run_client.take().unwrap()(
@@ -1238,7 +1230,7 @@ where
                                 let c_mgr = centralized_builder.build_on_port(
                                     mgr,
                                     self.launcher.shmem_provider.clone(),
-                                    self.launcher.centralized_broker_port,
+                                    self.centralized_broker_port,
                                 )?;
 
                                 self.launcher.run_client.take().unwrap()(
@@ -1254,7 +1246,8 @@ where
             }
         }
 
-        self.launcher.launch_common_broker::<I, S>(&handles)
+        self.launcher
+            .launch_common_broker::<I, S>(&handles, Some(self.centralized_broker_port))
     }
 }
 
@@ -1264,6 +1257,7 @@ where
 pub struct CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
     builder: LauncherBuilder<'a, CF, MT, SP>,
     main_run_client: Option<MF>,
+    centralized_broker_port: u16,
 }
 
 #[cfg(unix)]
@@ -1274,6 +1268,7 @@ impl CentralizedLauncherBuilder<'_, (), (), (), ()> {
         Self {
             builder: LauncherBuilder::new(),
             main_run_client: None,
+            centralized_broker_port: 1338,
         }
     }
 }
@@ -1296,6 +1291,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.shmem_provider(shmem_provider),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1308,6 +1304,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.monitor(monitor),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1317,6 +1314,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.configuration(configuration),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1329,6 +1327,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.run_client(run_client),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1350,6 +1349,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder,
             main_run_client: Some(main_run_client),
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1359,18 +1359,15 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.broker_port(broker_port),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
     /// The centralized broker port to use
     #[must_use]
-    pub fn centralized_broker_port(self, centralized_broker_port: u16) -> Self {
-        CentralizedLauncherBuilder {
-            builder: self
-                .builder
-                .centralized_broker_port(centralized_broker_port),
-            main_run_client: self.main_run_client,
-        }
+    pub fn centralized_broker_port(mut self, centralized_broker_port: u16) -> Self {
+        self.centralized_broker_port = centralized_broker_port;
+        self
     }
 
     /// The list of cores to run on
@@ -1379,6 +1376,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.cores(cores),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1388,6 +1386,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.overcommit(overcommit),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1397,6 +1396,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.stdout_file(stdout_file),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1406,6 +1406,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.launch_delay(launch_delay),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1415,6 +1416,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.stderr_file(stderr_file),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1424,6 +1426,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.remote_broker_addr(remote_broker_addr),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1439,6 +1442,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
                 .builder
                 .multi_machine_node_descriptor(multi_machine_node_descriptor),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1448,6 +1452,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.spawn_broker(spawn_broker),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1457,6 +1462,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.serialize_state(serialize_state),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1466,6 +1472,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.fork(fork),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 
@@ -1474,6 +1481,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         CentralizedLauncher {
             launcher: self.builder.build(),
             main_run_client: self.main_run_client,
+            centralized_broker_port: self.centralized_broker_port,
         }
     }
 }

@@ -254,12 +254,6 @@ pub(crate) unsafe fn sanitizer_cov_pcguard_impl(guard: *mut u32) {
         #[cfg(not(feature = "pointer_maps"))]
         #[cfg(any(feature = "sancov_pcguard_hitcounts", feature = "sancov_pcguard_edges"))]
         {
-            // optimization: we can avoid the check for the first run
-            // unsafe {
-            //    if !EDGES_MAP_PTR.is_null() {
-            //        *EDGES_MAP_PTR.add(pos) = 1;
-            //    }
-            // }
             #[cfg(feature = "sancov_pcguard_edges")]
             {
                 let p = (core::ptr::addr_of_mut!(EDGES_MAP) as *mut u8).add(pos);
