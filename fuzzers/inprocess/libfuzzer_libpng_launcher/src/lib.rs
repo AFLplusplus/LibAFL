@@ -271,11 +271,14 @@ pub extern "C" fn libafl_main() {
             + EventReceiver<BytesInput, FuzzerState>
             + SendExiting,
     {
-        println!("DEBUG: run_client started for client {:?}", client_description);
+        println!(
+            "DEBUG: run_client started for client {:?}",
+            client_description
+        );
         // Send the core_id to the monitor
         let core_id = client_description.core_id();
 
-            // Create an observation channel using the signals map
+        // Create an observation channel using the signals map
         let map_observer = unsafe { std_edges_map_observer("edges") };
         let map_ptr = map_observer.as_slice().as_ptr();
         let map_len = map_observer.as_slice().len();
