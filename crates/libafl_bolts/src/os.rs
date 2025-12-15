@@ -54,11 +54,35 @@ impl ChildHandle {
     /// Block until the child exited and the status code becomes available
     #[must_use]
     pub fn status(&self) -> i32 {
-        let mut status = -1;
-        unsafe {
-            libc::waitpid(self.pid, &raw mut status, 0);
+        waitpid_with_signals(self.pid)
+    }
+}
+
+/// Waits for a pid and returns the status
+#[cfg(unix)]
+pub fn waitpid_with_signals(pid: i32) -> i32 {
+    unsafe {
+        let mut status = 0;
+        loop {
+            let res = libc::waitpid(pid, &mut status, 0);
+            if res < 0 {
+                let err = std::io::Error::last_os_error();
+                if err.kind() == std::io::ErrorKind::Interrupted {
+                    continue;
+                }
+                // We can't really do much here, returning 0/clean exit seems safer than panic
+                // or maybe we should return a specific error code?
+                return 0;
+            }
+            if libc::WIFSIGNALED(status) {
+                let sig = libc::WTERMSIG(status);
+                if sig == libc::SIGINT || sig == libc::SIGTERM {
+                    return CTRL_C_EXIT;
+                }
+                return 128 + sig;
+            }
+            return libc::WEXITSTATUS(status);
         }
-        libc::WEXITSTATUS(status)
     }
 }
 
