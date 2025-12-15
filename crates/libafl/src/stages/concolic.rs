@@ -168,9 +168,17 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
     }
 
     macro_rules! bv_binop {
-        ($a:ident $op:tt $b:ident) => {
-            Some(bv!($a).$op(&bv!($b)).into())
-        };
+        ($a:ident $op:tt $b:ident) => {{
+            let a = bv!($a);
+            let b = bv!($b);
+            if a.get_size() == b.get_size() {
+                Some(a.$op(&b).into())
+            } else if a.get_size() < b.get_size() {
+                Some(a.zero_ext(b.get_size() - a.get_size()).$op(&b).into())
+            } else {
+                Some(a.$op(&b.zero_ext(a.get_size() - b.get_size())).into())
+            }
+        }};
     }
 
     for (id, msg) in iter {

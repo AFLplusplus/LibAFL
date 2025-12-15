@@ -5,7 +5,7 @@ default: build
 build: build-runtime build-fuzzer
 
 # Test both projects
-test: test-runtime test-fuzzer
+test: test-runtime test-fuzzer test-concolic
 
 # Clean both projects
 clean: clean-runtime clean-fuzzer
@@ -44,3 +44,20 @@ test-fuzzer: build-fuzzer
 clean-fuzzer:
     @echo "Cleaning fuzzer project..."
     @cargo clean --manifest-path fuzzer/Cargo.toml
+
+# Test the concolic fuzzer
+test-concolic: build-fuzzer
+    @echo "Running concolic fuzzer reproduction..."
+    rm -f concolic_test.log
+    @# Run with a timeout and tee output to a log file.
+    @timeout -s SIGINT 15s ./fuzzer/target/debug/libfuzzer_stb_image_concolic --concolic > concolic_test.log 2>&1 || [ $? -eq 124 ]
+    @# Check if any objectives (crashes) were found in the log.
+    @if grep -q '"objectives": [1-9]' concolic_test.log; then \
+        echo "Success: Concolic fuzzer found crashes."; \
+        rm -f concolic_test.log; \
+    else \
+        echo "Error: No crashes found by concolic fuzzer!"; \
+        cat concolic_test.log; \
+        exit 1; \
+    fi
+
