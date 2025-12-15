@@ -136,56 +136,59 @@ fn main() {
     // This will also not work if we use core 1-8 and then later, 16-24
     // since fuzzer names are using core_ids
     #[cfg(not(feature = "fuzzbench"))]
-    let res = CentralizedLauncher::builder()
-        .shmem_provider(shmem_provider)
-        .configuration(EventConfig::from_name("default"))
-        .monitor(monitor)
-        .main_run_client(
-            |state: Option<_>, mgr: _, client_description: ClientDescription| {
-                println!(
-                    "run primary client with id {} on core {}",
-                    client_description.id(),
-                    client_description.core_id().0
-                );
-                let fuzzer_dir = opt.output_dir.join("fuzzer_main");
-                let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
-                let res = run_client(
-                    state,
-                    mgr,
-                    &fuzzer_dir,
-                    client_description.core_id(),
-                    &opt,
-                    true,
-                );
-                let _ = remove_main_node_file(&fuzzer_dir);
-                res
-            },
-        )
-        .secondary_run_client(
-            |state: Option<_>, mgr: _, client_description: ClientDescription| {
-                println!(
-                    "run secondary client with id {} on core {}",
-                    client_description.id(),
-                    client_description.core_id().0
-                );
-                let fuzzer_dir = opt
-                    .output_dir
-                    .join(format!("fuzzer_secondary_{}", client_description.id()));
-                let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
-                run_client(
-                    state,
-                    mgr,
-                    &fuzzer_dir,
-                    client_description.core_id(),
-                    &opt,
-                    false,
-                )
-            },
-        )
-        .cores(&opt.cores.clone().expect("invariant; should never occur"))
-        .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))
-        .build()
-        .launch();
+    let res = {
+        let cores = opt.cores.clone().expect("invariant; should never occur");
+        CentralizedLauncher::builder()
+            .shmem_provider(shmem_provider)
+            .broker_port(opt.broker_port.unwrap_or(1337))
+            .configuration(EventConfig::from_name("default"))
+            .monitor(monitor)
+            .main_run_client(
+                |state: Option<_>, mgr: _, client_description: ClientDescription| {
+                    println!(
+                        "run primary client with id {} on core {}",
+                        client_description.id(),
+                        client_description.core_id().0
+                    );
+                    let fuzzer_dir = opt.output_dir.join("fuzzer_main");
+                    let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
+                    let res = run_client(
+                        state,
+                        mgr,
+                        &fuzzer_dir,
+                        client_description.core_id(),
+                        &opt,
+                        true,
+                    );
+                    let _ = remove_main_node_file(&fuzzer_dir);
+                    res
+                },
+            )
+            .secondary_run_client(
+                |state: Option<_>, mgr: _, client_description: ClientDescription| {
+                    println!(
+                        "run secondary client with id {} on core {}",
+                        client_description.id(),
+                        client_description.core_id().0
+                    );
+                    let fuzzer_dir = opt
+                        .output_dir
+                        .join(format!("fuzzer_secondary_{}", client_description.id()));
+                    let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
+                    run_client(
+                        state,
+                        mgr,
+                        &fuzzer_dir,
+                        client_description.core_id(),
+                        &opt,
+                        false,
+                    )
+                },
+            )
+            .cores(&cores)
+            .build()
+            .launch_centralized()
+    };
     #[cfg(feature = "fuzzbench")]
     let res = {
         let fuzzer_dir = opt.output_dir.join("fuzzer_main");

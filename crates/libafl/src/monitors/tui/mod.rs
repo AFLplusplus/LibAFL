@@ -267,7 +267,11 @@ impl TuiMonitor {
     fn with_time(tui_ui: TuiUi, start_time: Duration) -> Self {
         let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
 
-        enable_raw_mode().unwrap();
+        if let Err(e) = enable_raw_mode() {
+            println!("Could not enable raw mode, TUI will be disabled: {e:?}");
+            return Self { context };
+        }
+
         #[cfg(unix)]
         {
             #[cfg(feature = "std")]

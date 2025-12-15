@@ -18,11 +18,9 @@ use std::net::TcpStream;
 
 #[cfg(feature = "std")]
 use libafl_bolts::llmp::{TcpRequest, TcpResponse, recv_tcp_msg, send_tcp_msg};
-#[cfg(any(windows, not(feature = "fork")))]
-use libafl_bolts::os::startable_self;
 #[cfg(all(unix, not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
-#[cfg(all(feature = "fork", unix))]
+#[cfg(unix)]
 use libafl_bolts::os::{ForkResult, fork};
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
@@ -35,7 +33,7 @@ use libafl_bolts::{
     llmp::{
         Broker, LLMP_FLAG_FROM_MM, LlmpBroker, LlmpClient, LlmpClientDescription, LlmpConnection,
     },
-    os::CTRL_C_EXIT,
+    os::{CTRL_C_EXIT, startable_self},
     shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     staterestore::StateRestorer,
     tuples::tuple_list,
@@ -695,6 +693,10 @@ pub struct RestartingMgr<EMH, I, MT, S, SP> {
     serialize_state: LlmpShouldSaveState,
     /// The hooks passed to event manager:
     hooks: EMH,
+    /// If this manager should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
+    #[cfg(unix)]
+    #[builder(default = true)]
+    fork: bool,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(EMH, I, S)>,
 }
@@ -833,48 +835,69 @@ where
             loop {
                 log::info!("Spawning next client (id {ctr})");
 
-                // On Unix, we fork (when fork feature is enabled)
-                #[cfg(all(unix, feature = "fork"))]
                 let child_status = {
-                    self.shmem_provider.pre_fork()?;
-                    match unsafe { fork() }? {
-                        ForkResult::Parent(handle) => {
-                            unsafe {
-                                libc::signal(libc::SIGINT, libc::SIG_IGN);
+                    #[cfg(unix)]
+                    let use_fork = self.fork;
+                    #[cfg(not(unix))]
+                    let use_fork = false;
+
+                    if use_fork {
+                        #[cfg(unix)]
+                        {
+                            self.shmem_provider.pre_fork()?;
+                            match unsafe { fork() }? {
+                                ForkResult::Parent(handle) => {
+                                    unsafe {
+                                        libc::signal(libc::SIGINT, libc::SIG_IGN);
+                                    }
+                                    self.shmem_provider.post_fork(false)?;
+                                    handle.status()
+                                }
+                                ForkResult::Child => {
+                                    log::debug!(
+                                        "{} has been forked into {}",
+                                        std::os::unix::process::parent_id(),
+                                        std::process::id()
+                                    );
+                                    self.shmem_provider.post_fork(true)?;
+                                    break (staterestorer, self.shmem_provider.clone(), core_id);
+                                }
                             }
-                            self.shmem_provider.post_fork(false)?;
-                            handle.status()
                         }
-                        ForkResult::Child => {
-                            log::debug!(
-                                "{} has been forked into {}",
-                                std::os::unix::process::parent_id(),
-                                std::process::id()
+                        #[cfg(not(unix))]
+                        unreachable!("Forking not supported")
+                    } else {
+                        // spawn
+                        unsafe {
+                            #[cfg(windows)]
+                            libafl_bolts::os::windows_exceptions::signal(
+                                libafl_bolts::os::windows_exceptions::SIGINT,
+                                libafl_bolts::os::windows_exceptions::sig_ign(),
                             );
-                            self.shmem_provider.post_fork(true)?;
-                            break (staterestorer, self.shmem_provider.clone(), core_id);
+
+                            #[cfg(unix)]
+                            libc::signal(libc::SIGINT, libc::SIG_IGN);
+                        }
+                        let status = startable_self()?.status()?;
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::process::ExitStatusExt;
+                            if let Some(signal) = status.signal() {
+                                if signal == 15 || signal == 2 {
+                                    CTRL_C_EXIT
+                                } else {
+                                    status.code().unwrap_or_default()
+                                }
+                            } else {
+                                status.code().unwrap_or_default()
+                            }
+                        }
+                        #[cfg(not(unix))]
+                        {
+                            status.code().unwrap_or_default()
                         }
                     }
                 };
-
-                // If this guy wants to fork, then ignore sigint
-                #[cfg(any(windows, not(feature = "fork")))]
-                unsafe {
-                    #[cfg(windows)]
-                    libafl_bolts::os::windows_exceptions::signal(
-                        libafl_bolts::os::windows_exceptions::SIGINT,
-                        libafl_bolts::os::windows_exceptions::sig_ign(),
-                    );
-
-                    #[cfg(unix)]
-                    libc::signal(libc::SIGINT, libc::SIG_IGN);
-                }
-
-                // On Windows (or in any case without fork), we spawn ourself again
-                #[cfg(any(windows, not(feature = "fork")))]
-                let child_status = startable_self()?.status()?;
-                #[cfg(any(windows, not(feature = "fork")))]
-                let child_status = child_status.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst); // really useful?
 

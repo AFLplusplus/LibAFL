@@ -218,6 +218,8 @@ pub mod unix_signal_handler {
         I: Input + Clone,
     {
         unsafe {
+            let msg = "DEBUG: inproc_crash_handler enter\n";
+            libc::write(2, msg.as_ptr() as *const _, msg.len());
             #[cfg(all(target_os = "android", target_arch = "aarch64"))]
             let _context = _context.map(|p| {
                 &mut *(((core::ptr::from_mut(p) as *mut libc::c_void as usize) + 128)

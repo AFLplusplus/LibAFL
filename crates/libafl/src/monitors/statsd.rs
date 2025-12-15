@@ -13,6 +13,7 @@
 use alloc::{
     borrow::Cow,
     string::{String, ToString},
+    sync::Arc,
     vec::Vec,
 };
 use std::net::UdpSocket;
@@ -28,7 +29,7 @@ use super::{
 const METRIC_PREFIX: &str = "fuzzing";
 
 /// Flavor of StatsD tag
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StatsdMonitorTagFlavor {
     /// [Datadog](https://docs.datadoghq.com/developers/dogstatsd/) style tag
     DogStatsd {
@@ -54,12 +55,12 @@ impl Default for StatsdMonitorTagFlavor {
 }
 
 /// StatsD monitor
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StatsdMonitor {
     target_host: String,
     target_port: u16,
     tag_flavor: StatsdMonitorTagFlavor,
-    statsd_client: Option<StatsdClient>,
+    statsd_client: Option<Arc<StatsdClient>>,
     enable_per_client_stats: bool,
 }
 
@@ -130,7 +131,7 @@ impl StatsdMonitor {
             }
         }
         let client = client_builder.build();
-        self.statsd_client = Some(client);
+        self.statsd_client = Some(Arc::new(client));
     }
 
     #[expect(clippy::cast_precision_loss)]

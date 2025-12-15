@@ -9,10 +9,10 @@ pub use combined::CombinedExecutor;
 #[cfg(feature = "std")]
 pub use command::CommandExecutor;
 pub use differential::DiffExecutor;
-#[cfg(all(feature = "std", feature = "fork", unix))]
+#[cfg(all(feature = "std", unix))]
 pub use forkserver::{Forkserver, ForkserverExecutor};
 pub use inprocess::InProcessExecutor;
-#[cfg(all(feature = "std", feature = "fork", unix))]
+#[cfg(all(feature = "std", unix))]
 pub use inprocess_fork::InProcessForkExecutor;
 #[cfg(unix)]
 use libafl_bolts::os::unix_signals::Signal;
@@ -31,7 +31,7 @@ pub mod combined;
 #[cfg(feature = "std")]
 pub mod command;
 pub mod differential;
-#[cfg(all(feature = "std", feature = "fork", unix))]
+#[cfg(all(feature = "std", unix))]
 pub mod forkserver;
 pub mod inprocess;
 pub mod nop;

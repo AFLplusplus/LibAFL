@@ -119,6 +119,14 @@ typedef uint128_t         u128;
     #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
       RETURN_TYPE(*NAME##Def) FUNC_SIG = NULL;          \
       EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
+  #elif defined(__MINGW32__)
+    #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+      EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
+
+    #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+      __attribute__((weak)) RETURN_TYPE NAME FUNC_SIG
+
+    #define CHECK_WEAK_FN(Name) ((void *)Name != NULL)
   #else
     // Declare external functions as weak to allow them to default to a
     // specified function if not defined explicitly. We must use weak symbols
