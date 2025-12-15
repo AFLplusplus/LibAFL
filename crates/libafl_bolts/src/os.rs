@@ -58,6 +58,59 @@ impl ChildHandle {
     }
 }
 
+/// Returns the last OS error (errno).
+#[must_use]
+#[cfg(feature = "std")]
+pub fn last_os_error() -> i32 {
+    std::io::Error::last_os_error().raw_os_error().unwrap_or(0)
+}
+
+/// Returns the last OS error (errno).
+///
+/// Currently supported on `no_std`:
+/// * Linux
+/// * Android
+/// * macOS
+/// * FreeBSD
+/// * Dragonfly
+/// * OpenBSD
+/// * NetBSD
+#[must_use]
+#[cfg(all(
+    not(feature = "std"),
+    any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+        target_os = "openbsd",
+        target_os = "netbsd"
+    )
+))]
+pub fn last_os_error() -> i32 {
+    unsafe {
+        #[cfg(target_os = "linux")]
+        {
+            *libc::__errno_location()
+        }
+        #[cfg(target_os = "android")]
+        {
+            *libc::__errno()
+        }
+        #[cfg(any(
+            target_os = "macos",
+            target_os = "freebsd",
+            target_os = "dragonfly",
+            target_os = "openbsd",
+            target_os = "netbsd"
+        ))]
+        {
+            *libc::__error()
+        }
+    }
+}
+
 /// Waits for a pid and returns the status
 #[must_use]
 #[cfg(unix)]
@@ -76,39 +129,7 @@ pub fn waitpid_with_signals(pid: i32) -> i32 {
                 }
                 #[cfg(not(feature = "std"))]
                 {
-                    let errno = unsafe {
-                        #[cfg(target_os = "linux")]
-                        {
-                            *libc::__errno_location()
-                        }
-                        #[cfg(target_os = "android")]
-                        {
-                            *libc::__errno()
-                        }
-                        #[cfg(any(
-                            target_os = "macos",
-                            target_os = "freebsd",
-                            target_os = "dragonfly",
-                            target_os = "openbsd",
-                            target_os = "netbsd"
-                        ))]
-                        {
-                            *libc::__error()
-                        }
-                        #[cfg(not(any(
-                            target_os = "linux",
-                            target_os = "android",
-                            target_os = "macos",
-                            target_os = "freebsd",
-                            target_os = "dragonfly",
-                            target_os = "openbsd",
-                            target_os = "netbsd"
-                        )))]
-                        {
-                            0
-                        }
-                    };
-                    if errno == libc::EINTR {
+                    if last_os_error() == libc::EINTR {
                         continue;
                     }
                 }
