@@ -76,10 +76,41 @@ pub fn waitpid_with_signals(pid: i32) -> i32 {
                 }
                 #[cfg(not(feature = "std"))]
                 {
-                    // If we can't check the error safely without std, we assume it *might* be EINTR if we want to be safe,
-                    // but checking errno manually is painful.
-                    // For now, let's just return 0 if it fails, or maybe check errno via libc if we really must.
-                    // But simplified: just break and return 0.
+                    let errno = unsafe {
+                        #[cfg(target_os = "linux")]
+                        {
+                            *libc::__errno_location()
+                        }
+                        #[cfg(target_os = "android")]
+                        {
+                            *libc::__errno()
+                        }
+                        #[cfg(any(
+                            target_os = "macos",
+                            target_os = "freebsd",
+                            target_os = "dragonfly",
+                            target_os = "openbsd",
+                            target_os = "netbsd"
+                        ))]
+                        {
+                            *libc::__error()
+                        }
+                        #[cfg(not(any(
+                            target_os = "linux",
+                            target_os = "android",
+                            target_os = "macos",
+                            target_os = "freebsd",
+                            target_os = "dragonfly",
+                            target_os = "openbsd",
+                            target_os = "netbsd"
+                        )))]
+                        {
+                            0
+                        }
+                    };
+                    if errno == libc::EINTR {
+                        continue;
+                    }
                 }
                 return 0;
             }
