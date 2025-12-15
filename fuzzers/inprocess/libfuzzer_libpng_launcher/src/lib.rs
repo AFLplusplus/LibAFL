@@ -271,13 +271,16 @@ pub extern "C" fn libafl_main() {
             + EventReceiver<BytesInput, FuzzerState>
             + SendExiting,
     {
+        println!("DEBUG: run_client started for client {:?}", client_description);
         // Send the core_id to the monitor
         let core_id = client_description.core_id();
 
-        // Create an observation channel using the coverage map
-        let edges_observer =
-            HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
-
+            // Create an observation channel using the signals map
+        let map_observer = unsafe { std_edges_map_observer("edges") };
+        let map_ptr = map_observer.as_slice().as_ptr();
+        let map_len = map_observer.as_slice().len();
+        println!("DEBUG: Edges map ptr: {:p}, len: {}", map_ptr, map_len);
+        let edges_observer = HitcountsMapObserver::new(map_observer).track_indices();
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
 
@@ -398,9 +401,7 @@ pub extern "C" fn libafl_main() {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        println!("Starting fuzz_loop");
         let result = fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr);
-        println!("fuzz_loop returned {:?}", result);
         result?;
         restarting_mgr.on_restart(&mut state)?;
         Ok(())
