@@ -262,12 +262,12 @@ pub(crate) unsafe fn sanitizer_cov_pcguard_impl(guard: *mut u32) {
             // }
             #[cfg(feature = "sancov_pcguard_edges")]
             {
-                let p = (std::ptr::addr_of_mut!(EDGES_MAP) as *mut u8).add(pos);
+                let p = (core::ptr::addr_of_mut!(EDGES_MAP) as *mut u8).add(pos);
                 *p = 1;
             }
             #[cfg(feature = "sancov_pcguard_hitcounts")]
             {
-                let p = (std::ptr::addr_of_mut!(EDGES_MAP) as *mut u8).add(pos);
+                let p = (core::ptr::addr_of_mut!(EDGES_MAP) as *mut u8).add(pos);
                 let val = (*p).wrapping_add(1);
                 *p = val;
             }
