@@ -237,7 +237,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                         )
                     } else {
                         Some(
-                            a_bv.eq(&b_bv.zero_ext(a_bv.get_size() - b_bv.get_size()))
+                            a_bv.eq(b_bv.zero_ext(a_bv.get_size() - b_bv.get_size()))
                                 .into(),
                         )
                     }
@@ -260,7 +260,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                         )
                     } else {
                         Some(
-                            a_bv.eq(&b_bv.zero_ext(a_bv.get_size() - b_bv.get_size()))
+                            a_bv.eq(b_bv.zero_ext(a_bv.get_size() - b_bv.get_size()))
                                 .not()
                                 .into(),
                         )

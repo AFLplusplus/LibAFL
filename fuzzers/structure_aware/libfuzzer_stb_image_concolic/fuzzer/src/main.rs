@@ -1,19 +1,22 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for `stb_image`.
-use std::io::{self, Write};
 use std::{
     env, fs,
+    io::{self, Write},
     path::PathBuf,
     process::{Child, Command, Stdio},
     time::Duration,
 };
 
 use clap::{self, Parser};
+#[cfg(not(feature = "restarting"))]
+use libafl::events::SimpleEventManager;
+#[cfg(feature = "restarting")]
+use libafl::events::{EventConfig, Launcher};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
-        EventFirer, EventReceiver, EventRestarter, HasEventManagerId,
-        ProgressReporter, SendExiting,
+        EventFirer, EventReceiver, EventRestarter, HasEventManagerId, ProgressReporter, SendExiting,
     },
     executors::{
         command::CommandConfigurator, inprocess::InProcessExecutor, ExitKind, HasTimeout,
@@ -43,12 +46,6 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error,
 };
-
-#[cfg(feature = "restarting")]
-use libafl::events::{EventConfig, Launcher};
-#[cfg(not(feature = "restarting"))]
-use libafl::events::SimpleEventManager;
-
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
