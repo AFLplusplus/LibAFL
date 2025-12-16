@@ -292,9 +292,9 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "cmake"
-version = "0.1.54"
+version = "0.1.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7caa3f9de89ddbe2c607f4101924c5abec803763ae9534e4f4d7d8f84aa81f0"
+checksum = "b042e5d8a74ae91bb0961acd039822472ec99f8ab0948cbf6d1369588f8be586"
 dependencies = [
  "cc",
 ]
@@ -1611,9 +1611,9 @@ dependencies = [
 
 [[package]]
 name = "wide"
-version = "1.0.2"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbace5de6cfc4866f684318ad85761c89380cfb191982ae96aa65c295bf5897e"
+checksum = "8afd0e867c652e7c27e88620e1fbf073ad060a919235f50b64f273d9d4092931"
 dependencies = [
  "bytemuck",
  "safe_arch",
@@ -1911,9 +1911,9 @@ checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 
 [[package]]
 name = "z3"
-version = "0.19.5"
+version = "0.19.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d7a9fcfcb5b9933836cddb76833c9f397c508caf9b91f5cbcb66eac7ce78196"
+checksum = "b2f393c9bc12e0a32ce65e9a0cbec296df1c7f506291db5b8237e7a9a1cc9ebe"
 dependencies = [
  "log",
  "num",

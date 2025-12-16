@@ -10,8 +10,9 @@ edition = "2021"
 build = "build.rs"
 
 [features]
-default = ["std"]
+default = ["std", "restarting"]
 std = []
+restarting = []
 
 [profile.release]
 lto = true
