@@ -12,7 +12,7 @@ use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
-        EventConfig, EventFirer, EventReceiver, EventRestarter, HasEventManagerId,
+        EventFirer, EventReceiver, EventRestarter, HasEventManagerId,
         ProgressReporter, SendExiting,
     },
     executors::{
@@ -45,7 +45,7 @@ use libafl::{
 };
 
 #[cfg(feature = "restarting")]
-use libafl::events::Launcher;
+use libafl::events::{EventConfig, Launcher};
 #[cfg(not(feature = "restarting"))]
 use libafl::events::SimpleEventManager;
 
@@ -245,7 +245,7 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
     io::stdout().flush().unwrap();
-    let port = env::var("BROKER_PORT")
+    let _port = env::var("BROKER_PORT")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(1337);
@@ -256,15 +256,15 @@ pub fn main() {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    let cores = Cores::from(vec![0]);
+    let _cores = Cores::from(vec![0]);
 
     #[cfg(feature = "restarting")]
     match Launcher::builder()
         .shmem_provider(StdShMemProvider::new().expect("Failed to init shared memory"))
-        .broker_port(port)
+        .broker_port(_port)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
-        .cores(&cores)
+        .cores(&_cores)
         .run_client(|state: Option<FuzzerState>, mgr, _client_desc| {
             fuzz_task(
                 state,
