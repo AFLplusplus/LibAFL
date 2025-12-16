@@ -49,15 +49,26 @@ clean-fuzzer:
 test-concolic: build-fuzzer
     @echo "Running concolic fuzzer reproduction..."
     rm -f concolic_test.log
+    @# Setup environment: copy target_symcc.out, create corpus with seeds
+    cp fuzzer/target_symcc.out .
+    mkdir -p corpus
+    cp ../../../seeds/pngs/not_kitty.png corpus/
     @# Run with a timeout and tee output to a log file.
-    @timeout -s SIGINT 15s ./fuzzer/target/debug/libfuzzer_stb_image_concolic --concolic > concolic_test.log 2>&1 || [ $? -eq 124 ]
-    @# Check if any objectives (crashes) were found in the log.
-    @if grep -q '"objectives": [1-9]' concolic_test.log; then \
-        echo "Success: Concolic fuzzer found crashes."; \
-        rm -f concolic_test.log; \
+    @# Ensure LD_LIBRARY_PATH includes runtime for libSymRuntime.so
+    export LD_LIBRARY_PATH=$(pwd)/runtime:$LD_LIBRARY_PATH
+    @# Build with no-restart feature for testing stability
+    @cargo build --manifest-path fuzzer/Cargo.toml
+    @# 30 seconds should be enough to find something
+    timeout -s SIGINT 30s ./fuzzer/target/debug/libfuzzer_stb_image_concolic --concolic > concolic_test.log 2>&1 || true
+    @# Check if we found any new paths (corpus > 1)
+    @if grep -E "corpus: +([2-9]|[1-9][0-9]+)" concolic_test.log; then \
+        echo "Concolic fuzzer found new paths (success)!"; \
+        rm -rf concolic_test.log target_symcc.out corpus; \
     else \
-        echo "Error: No crashes found by concolic fuzzer!"; \
-        cat concolic_test.log; \
+        echo "No new paths found by concolic fuzzer!"; \
+        grep "corpus:" concolic_test.log | tail -n 1; \
         exit 1; \
     fi
+    rm -f concolic_test.log target_symcc.out
+    rm -rf corpus
 

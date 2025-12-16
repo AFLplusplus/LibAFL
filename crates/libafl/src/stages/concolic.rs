@@ -223,8 +223,52 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                     )
                 })
             }
-            SymExpr::Equal { a, b } => Some(translation[&a].eq(&translation[&b]).into()),
-            SymExpr::NotEqual { a, b } => Some(translation[&a].eq(&translation[&b]).not().into()),
+            SymExpr::Equal { a, b } => {
+                let a_node = &translation[&a];
+                let b_node = &translation[&b];
+                if let (Some(a_bv), Some(b_bv)) = (a_node.as_bv(), b_node.as_bv()) {
+                    if a_bv.get_size() == b_bv.get_size() {
+                        Some(a_bv.eq(&b_bv).into())
+                    } else if a_bv.get_size() < b_bv.get_size() {
+                        Some(
+                            a_bv.zero_ext(b_bv.get_size() - a_bv.get_size())
+                                .eq(&b_bv)
+                                .into(),
+                        )
+                    } else {
+                        Some(
+                            a_bv.eq(&b_bv.zero_ext(a_bv.get_size() - b_bv.get_size()))
+                                .into(),
+                        )
+                    }
+                } else {
+                    Some(a_node.eq(b_node).into())
+                }
+            }
+            SymExpr::NotEqual { a, b } => {
+                let a_node = &translation[&a];
+                let b_node = &translation[&b];
+                if let (Some(a_bv), Some(b_bv)) = (a_node.as_bv(), b_node.as_bv()) {
+                    if a_bv.get_size() == b_bv.get_size() {
+                        Some(a_bv.eq(&b_bv).not().into())
+                    } else if a_bv.get_size() < b_bv.get_size() {
+                        Some(
+                            a_bv.zero_ext(b_bv.get_size() - a_bv.get_size())
+                                .eq(&b_bv)
+                                .not()
+                                .into(),
+                        )
+                    } else {
+                        Some(
+                            a_bv.eq(&b_bv.zero_ext(a_bv.get_size() - b_bv.get_size()))
+                                .not()
+                                .into(),
+                        )
+                    }
+                } else {
+                    Some(a_node.eq(b_node).not().into())
+                }
+            }
             SymExpr::BoolAnd { a, b } => Some(Bool::and(&[&bool!(a), &bool!(b)]).into()),
             SymExpr::BoolOr { a, b } => Some(Bool::or(&[&bool!(a), &bool!(b)]).into()),
             SymExpr::BoolXor { a, b } => Some(bool!(a).xor(bool!(b)).into()),
