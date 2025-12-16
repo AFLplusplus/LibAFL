@@ -1,32 +1,22 @@
 //! TCP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{sync::Arc, vec::Vec};
-use core::{
-    marker::PhantomData,
-    net::SocketAddr,
-    num::NonZeroUsize,
-    sync::atomic::{Ordering, compiler_fence},
-    time::Duration,
-};
+use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 use std::{
     env,
     io::{ErrorKind, Read, Write},
-    net::{TcpListener, TcpStream, ToSocketAddrs},
+    net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
 };
 
 #[cfg(feature = "tcp_compression")]
 use libafl_bolts::compress::GzipCompressor;
 #[cfg(any(windows, unix))]
-use libafl_bolts::os::startable_self;
 #[cfg(all(unix, not(miri)))]
-use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
-use libafl_bolts::os::{ForkResult, dup_and_mute_outputs, fork};
 use libafl_bolts::{
     ClientId,
     core_affinity::CoreId,
-    os::CTRL_C_EXIT,
-    shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
+    shmem::{ShMemProvider, StdShMemProvider},
     staterestore::StateRestorer,
     tuples::tuple_list,
 };
@@ -39,8 +29,12 @@ use tokio::{
 use typed_builder::TypedBuilder;
 
 use super::{AwaitRestartSafe, SendExiting, std_maybe_report_progress, std_report_progress};
-#[cfg(all(unix, not(miri)))]
-use crate::events::EVENTMGR_SIGHANDLER_STATE;
+
+/// The env var that tells the client that it is the initial client
+pub const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT_INITIAL";
+/// The env var that tells the client that it is a sender
+pub const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
+
 use crate::{
     Error, HasMetadata,
     events::{
@@ -441,6 +435,8 @@ pub struct TcpEventManager<EMH, I, S> {
     /// A node will not re-use the observer values sent over TCP
     /// from nodes with other configurations.
     configuration: EventConfig,
+    /// If the state should be saved on restart
+    save_state: bool,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -457,6 +453,7 @@ impl<I, S> TcpEventManager<(), I, S> {
 pub struct TcpEventManagerBuilder<EMH, I, S> {
     throttle: Option<Duration>,
     hooks: EMH,
+    save_state: bool,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -473,6 +470,7 @@ impl<I, S> TcpEventManagerBuilder<(), I, S> {
         Self {
             throttle: None,
             hooks: (),
+            save_state: false,
             phantom: PhantomData,
         }
     }
@@ -483,6 +481,7 @@ impl<I, S> TcpEventManagerBuilder<(), I, S> {
         TcpEventManagerBuilder {
             throttle: self.throttle,
             hooks,
+            save_state: self.save_state,
             phantom: PhantomData,
         }
     }
@@ -493,6 +492,13 @@ impl<EMH, I, S> TcpEventManagerBuilder<EMH, I, S> {
     #[must_use]
     pub fn throttle(mut self, throttle: Duration) -> Self {
         self.throttle = Some(throttle);
+        self
+    }
+
+    /// Set if the state must be saved on restart
+    #[must_use]
+    pub fn save_state(mut self, save_state: bool) -> Self {
+        self.save_state = save_state;
         self
     }
 
@@ -524,6 +530,7 @@ impl<EMH, I, S> TcpEventManagerBuilder<EMH, I, S> {
             #[cfg(feature = "tcp_compression")]
             compressor: GzipCompressor::new(),
             configuration,
+            save_state: self.save_state,
             phantom: PhantomData,
         })
     }
@@ -585,11 +592,37 @@ where
     /// Write the client id for a client `EventManager` to env vars
     ///
     /// # Safety
-    /// This writes to env variables, and may only be done single-threaded
+    /// Writes to env variables and may only be done single-threaded.
     pub unsafe fn to_env(&self, env_name: &str) {
         unsafe {
             env::set_var(env_name, format!("{}", self.client_id.0));
         }
+    }
+}
+
+impl<EMH, I, S, SP> crate::events::Restorable<S, SP> for TcpEventManager<EMH, I, S>
+where
+    EMH: EventManagerHooksTuple<I, S>,
+    S: HasExecutions + HasCurrentStageId + Serialize,
+    SP: ShMemProvider,
+{
+    fn on_restart(
+        &mut self,
+        state: &mut S,
+        staterestorer: &mut StateRestorer<SP::ShMem, SP>,
+    ) -> Result<(), Error> {
+        state.on_restart()?;
+
+        // First, reset the page to 0 so the next iteration can read read from the beginning of this page
+        staterestorer.reset();
+        staterestorer.save(&if self.save_state {
+            Some((state, self.client_id))
+        } else {
+            None
+        })?;
+
+        self.await_restart_safe();
+        Ok(())
     }
 }
 
@@ -794,177 +827,8 @@ impl<EMH, I, S> HasEventManagerId for TcpEventManager<EMH, I, S> {
 }
 
 /// A manager that can restart on the fly, storing states in-between (in `on_restart`)
-#[derive(Debug)]
-pub struct TcpRestartingEventManager<EMH, I, S, SHM, SP> {
-    /// The embedded TCP event manager
-    tcp_mgr: TcpEventManager<EMH, I, S>,
-    /// The staterestorer to serialize the state for the next runner
-    staterestorer: StateRestorer<SHM, SP>,
-    /// Decide if the state restorer must save the serialized state
-    save_state: bool,
-}
-
-impl<EMH, I, S, SHM, SP> ProgressReporter<S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
-where
-    EMH: EventManagerHooksTuple<I, S>,
-    S: HasMetadata + HasExecutions + HasLastReportTime + MaybeHasClientPerfMonitor,
-    I: Serialize,
-{
-    fn maybe_report_progress(
-        &mut self,
-        state: &mut S,
-        monitor_timeout: Duration,
-    ) -> Result<(), Error> {
-        std_maybe_report_progress(self, state, monitor_timeout)
-    }
-
-    fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        std_report_progress(self, state)
-    }
-}
-
-impl<EMH, I, S, SHM, SP> EventFirer<I, S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
-where
-    EMH: EventManagerHooksTuple<I, S>,
-    I: Serialize,
-{
-    fn should_send(&self) -> bool {
-        self.tcp_mgr.should_send()
-    }
-
-    fn fire(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
-        // Check if we are going to crash in the event, in which case we store our current state for the next runner
-        self.tcp_mgr.fire(state, event)
-    }
-
-    fn configuration(&self) -> EventConfig {
-        self.tcp_mgr.configuration()
-    }
-}
-
-impl<EMH, I, S, SHM, SP> SendExiting for TcpRestartingEventManager<EMH, I, S, SHM, SP>
-where
-    SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
-{
-    fn send_exiting(&mut self) -> Result<(), Error> {
-        self.staterestorer.send_exiting();
-        // Also inform the broker that we are about to exit.
-        // This way, the broker can clean up the pages, and eventually exit.
-        self.tcp_mgr.send_exiting()
-    }
-
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
-    }
-}
-
-impl<EMH, I, S, SHM, SP> AwaitRestartSafe for TcpRestartingEventManager<EMH, I, S, SHM, SP>
-where
-    SHM: ShMem,
-{
-    /// The tcp client needs to wait until a broker mapped all pages, before shutting down.
-    /// Otherwise, the OS may already have removed the shared maps,
-    #[inline]
-    fn await_restart_safe(&mut self) {
-        self.tcp_mgr.await_restart_safe();
-    }
-}
-
-impl<EMH, I, S, SHM, SP> EventRestarter<S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
-where
-    EMH: EventManagerHooksTuple<I, S>,
-    S: HasExecutions + HasCurrentStageId + Serialize,
-    SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
-{
-    /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
-    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
-        state.on_restart()?;
-
-        // First, reset the page to 0 so the next iteration can read read from the beginning of this page
-        self.staterestorer.reset();
-        self.staterestorer.save(&if self.save_state {
-            Some((state, self.tcp_mgr.client_id))
-        } else {
-            None
-        })?;
-
-        self.await_restart_safe();
-        Ok(())
-    }
-}
-
-impl<EMH, I, S, SHM, SP> EventReceiver<I, S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
-where
-    EMH: EventManagerHooksTuple<I, S>,
-    I: DeserializeOwned,
-    S: HasExecutions
-        + HasMetadata
-        + HasImported
-        + HasSolutions<I>
-        + HasCurrentTestcase<I>
-        + Stoppable,
-    SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
-{
-    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
-        self.tcp_mgr.try_receive(state)
-    }
-
-    fn on_interesting(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
-        self.tcp_mgr.on_interesting(state, event)
-    }
-}
-
-impl<EMH, I, S, SHM, SP> HasEventManagerId for TcpRestartingEventManager<EMH, I, S, SHM, SP> {
-    fn mgr_id(&self) -> EventManagerId {
-        self.tcp_mgr.mgr_id()
-    }
-}
-
-/// The tcp connection from the actual fuzzer to the process supervising it
-const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
-const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
-/// The tcp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
-const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
-
-impl<EMH, I, S, SHM, SP> TcpRestartingEventManager<EMH, I, S, SHM, SP>
-where
-    EMH: EventManagerHooksTuple<I, S>,
-{
-    /// Create a new runner, the executed child doing the actual fuzzing.
-    pub fn new(tcp_mgr: TcpEventManager<EMH, I, S>, staterestorer: StateRestorer<SHM, SP>) -> Self {
-        Self {
-            tcp_mgr,
-            staterestorer,
-            save_state: true,
-        }
-    }
-
-    /// Create a new runner specifying if it must save the serialized state on restart.
-    pub fn with_save_state(
-        tcp_mgr: TcpEventManager<EMH, I, S>,
-        staterestorer: StateRestorer<SHM, SP>,
-        save_state: bool,
-    ) -> Self {
-        Self {
-            tcp_mgr,
-            staterestorer,
-            save_state,
-        }
-    }
-
-    /// Get the staterestorer
-    pub fn staterestorer(&self) -> &StateRestorer<SHM, SP> {
-        &self.staterestorer
-    }
-
-    /// Get the staterestorer (mutable)
-    pub fn staterestorer_mut(&mut self) -> &mut StateRestorer<SHM, SP> {
-        &mut self.staterestorer
-    }
-}
+pub type TcpRestartingEventManager<EMH, I, S, SP> =
+    crate::events::RestartingEventManager<TcpEventManager<EMH, I, S>, SP>;
 
 /// The kind of manager we're creating right now
 #[derive(Debug, Copy, Clone)]
@@ -992,7 +856,7 @@ pub fn setup_restarting_mgr_tcp<I, MT, S>(
 ) -> Result<
     (
         Option<S>,
-        TcpRestartingEventManager<(), I, S, StdShMem, StdShMemProvider>,
+        TcpRestartingEventManager<(), I, S, StdShMemProvider>,
     ),
     Error,
 >
@@ -1004,6 +868,7 @@ where
         + HasSolutions<I>
         + HasCurrentTestcase<I>
         + DeserializeOwned
+        + Serialize
         + Stoppable,
     I: Input,
 {
@@ -1074,22 +939,16 @@ where
         + HasSolutions<I>
         + HasCurrentTestcase<I>
         + DeserializeOwned
+        + Serialize
         + Stoppable,
     SP: ShMemProvider,
 {
     /// Launch the restarting manager
     pub fn launch(
         &mut self,
-    ) -> Result<
-        (
-            Option<S>,
-            TcpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
-        ),
-        Error,
-    > {
+    ) -> Result<(Option<S>, TcpRestartingEventManager<EMH, I, S, SP>), Error> {
         // We start ourself as child process to actually fuzz
-        let (staterestorer, _new_shmem_provider, core_id) = if env::var(_ENV_FUZZER_SENDER).is_err()
-        {
+        let (_mgr, _core_id) = if env::var(_ENV_FUZZER_SENDER).is_err() {
             let broker_things = |mut broker: TcpEventBroker<I, MT>, _remote_broker_addr| {
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
                     broker.set_exit_cleanly_after(exit_cleanly_after);
@@ -1099,7 +958,7 @@ where
             };
 
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
-            let (mgr, core_id) = match self.kind {
+            let (_mgr, _core_id) = match self.kind {
                 TcpManagerKind::Any => {
                     let connection = create_nonblocking_listener(("127.0.0.1", self.broker_port));
                     match connection {
@@ -1155,7 +1014,7 @@ where
                 }
             };
 
-            if let Some(core_id) = core_id {
+            if let Some(core_id) = _core_id {
                 let core_id: CoreId = core_id;
                 log::info!("Setting core affinity to {core_id:?}");
                 core_id.set_affinity()?;
@@ -1165,138 +1024,15 @@ where
             // # Safety
             // There should only ever be one thread doing launcher things.
             unsafe {
-                mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+                _mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
             }
 
-            // First, create a channel from the current fuzzer to the next to store state between restarts.
-            #[cfg(unix)]
-            let staterestorer: StateRestorer<SP::ShMem, SP> =
-                StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
-
-            #[cfg(not(unix))]
-            let staterestorer: StateRestorer<SP::ShMem, SP> =
-                StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
-
-            // Store the information to a map.
-            // # Safety
-            // It's reasonable to assume launcher only gets called on a single thread.
-            // If not, nothing too bad will happen.
-            unsafe {
-                staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
-            }
-
-            let mut ctr: u64 = 0;
-            // Client->parent loop
-            loop {
-                log::info!("Spawning next client (id {ctr})");
-                println!("Spawning next client (id {ctr}) {core_id:?}");
-
-                // On Unix, we fork (when fork feature is enabled)
-                #[cfg(unix)]
-                let child_status = if self.fork {
-                    self.shmem_provider.pre_fork()?;
-                    match unsafe { fork() }? {
-                        ForkResult::Parent(handle) => {
-                            unsafe {
-                                libc::signal(libc::SIGINT, libc::SIG_IGN);
-                            }
-                            self.shmem_provider.post_fork(false)?;
-                            handle.status()
-                        }
-                        ForkResult::Child => {
-                            self.shmem_provider.post_fork(true)?;
-                            if env::var("LIBAFL_DEBUG_OUTPUT").is_err() {
-                                unsafe {
-                                    let _ = dup_and_mute_outputs()?;
-                                }
-                            }
-                            break (staterestorer, self.shmem_provider.clone(), core_id);
-                        }
-                    }
-                } else {
-                    unsafe {
-                        libc::signal(libc::SIGINT, libc::SIG_IGN);
-                    }
-                    startable_self()?.status()?.code().unwrap_or_default()
-                };
-
-                // On Windows (or in any case without fork), we spawn ourself again
-                #[cfg(windows)]
-                let child_status = {
-                    unsafe {
-                        libafl_bolts::os::windows_exceptions::signal(
-                            libafl_bolts::os::windows_exceptions::SIGINT,
-                            libafl_bolts::os::windows_exceptions::sig_ign(),
-                        );
-                    }
-                    startable_self()?.status()?.code().unwrap_or_default()
-                };
-
-                compiler_fence(Ordering::SeqCst);
-
-                if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
-                    return Err(Error::shutting_down());
-                }
-
-                #[expect(clippy::manual_assert)]
-                if !staterestorer.has_content() && self.serialize_state {
-                    #[cfg(unix)]
-                    if child_status == 137 {
-                        // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
-                        // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
-                        panic!(
-                            "Fuzzer-respawner: The fuzzed target crashed with an out of memory error! Fix your harness, or switch to another executor (for example, a forkserver)."
-                        );
-                    }
-
-                    // Storing state in the last round did not work
-                    panic!(
-                        "Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})"
-                    );
-                }
-
-                ctr = ctr.wrapping_add(1);
-            }
+            (_mgr, _core_id)
         } else {
             // We are the newly started fuzzing instance (i.e. on Windows), first, connect to our own restore map.
             // We get here *only on Windows*, if we were started by a restarting fuzzer.
             // A staterestorer and a receiver for single communication
-            (
-                StateRestorer::from_env(&mut self.shmem_provider, _ENV_FUZZER_SENDER)?,
-                self.shmem_provider.clone(),
-                None,
-            )
-        };
-
-        // At this point we are the fuzzer *NOT* the restarter.
-        // We setup signal handlers to clean up shmem segments used by state restorer
-        #[cfg(all(unix, not(miri)))]
-        if let Err(_e) = unsafe { setup_signal_handler(&raw mut EVENTMGR_SIGHANDLER_STATE) } {
-            // We can live without a proper ctrl+c signal handler. Print and ignore.
-            log::error!("Failed to setup signal handlers: {_e}");
-        }
-
-        if let Some(core_id) = core_id {
-            let core_id: CoreId = core_id;
-            core_id.set_affinity()?;
-        }
-
-        // If we're restarting, deserialize the old state.
-        let (state, mut mgr) = if let Some((state_opt, this_id)) = staterestorer.restore()? {
-            (
-                state_opt,
-                TcpRestartingEventManager::with_save_state(
-                    TcpEventManagerBuilder::new()
-                        .hooks(self.hooks)
-                        .build_on_port(self.broker_port, this_id, self.configuration)?,
-                    staterestorer,
-                    self.serialize_state,
-                ),
-            )
-        } else {
-            log::info!("First run. Let's set it all up");
-            // Mgr to send and receive msgs from/to all other fuzzer instances
-            let mgr = TcpEventManagerBuilder::new()
+            let _mgr = TcpEventManagerBuilder::new()
                 .hooks(self.hooks)
                 .build_existing_from_env(
                     &("127.0.0.1", self.broker_port),
@@ -1304,24 +1040,65 @@ where
                     self.configuration,
                 )?;
 
-            (
-                None,
-                TcpRestartingEventManager::with_save_state(
-                    mgr,
-                    staterestorer,
-                    self.serialize_state,
-                ),
-            )
+            (_mgr, None)
         };
-        // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
-        mgr.staterestorer.reset();
 
-        /* TODO: Not sure if this is needed
-        // We commit an empty NO_RESTART message to this buf, against infinite loops,
-        // in case something crashes in the fuzzer.
-        staterestorer.send_buf(_TCP_TAG_NO_RESTART, []);
-        */
+        let mut restarting_mgr = crate::events::RestartingMgr::new(self.shmem_provider.clone());
+        #[cfg(unix)]
+        restarting_mgr.fork(self.fork);
 
-        Ok((state, mgr))
+        restarting_mgr.launch(|mut staterestorer, _new_shmem_provider, _core_id| {
+            // If we're restarting, deserialize the old state.
+            let (state, mgr) = if let Some((state_opt, this_id)) =
+                staterestorer.restore::<(Option<S>, ClientId)>()?
+            {
+                let mgr = TcpEventManagerBuilder::new()
+                    .hooks(self.hooks)
+                    .build_on_port(self.broker_port, this_id, self.configuration)?;
+
+                if self.serialize_state {
+                    staterestorer.reset();
+                    staterestorer.save(&(
+                        if let Some(state) = &state_opt {
+                            Some(state)
+                        } else {
+                            None
+                        },
+                        this_id,
+                    ))?;
+                }
+
+                (
+                    if let Some(state) = state_opt {
+                        log::info!("Restoring state...");
+                        Some(state)
+                    } else {
+                        log::info!("First run. Let's set it all up");
+                        None
+                    },
+                    mgr,
+                )
+            } else {
+                log::info!("First run. Let's set it all up");
+                // Mgr to send and receive msgs from/to all other fuzzer instances
+                let mgr = TcpEventManagerBuilder::new()
+                    .hooks(self.hooks)
+                    .build_existing_from_env(
+                        &("127.0.0.1", self.broker_port),
+                        _ENV_FUZZER_BROKER_CLIENT_INITIAL,
+                        self.configuration,
+                    )?;
+
+                (None, mgr)
+            };
+
+            // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
+            staterestorer.reset();
+
+            Ok((
+                state,
+                crate::events::RestartingEventManager::new(mgr, staterestorer),
+            ))
+        })
     }
 }

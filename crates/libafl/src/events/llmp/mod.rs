@@ -1,5 +1,6 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
+use alloc::vec::Vec;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use libafl_bolts::{
@@ -15,11 +16,17 @@ use libafl_bolts::{
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    Error,
-    events::{Event, EventFirer, EventWithStats},
+    Error, HasMetadata,
+    events::{
+        AwaitRestartSafe, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventRestarter,
+        EventWithStats, ProgressReporter, SendExiting,
+    },
     fuzzer::EvaluatorObservers,
     inputs::{Input, InputConverter, NopInput},
-    state::{HasCurrentTestcase, HasSolutions, NopState},
+    state::{
+        HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime,
+        HasSolutions, MaybeHasClientPerfMonitor, NopState, Stoppable,
+    },
 };
 
 /// The llmp restarting manager
@@ -242,7 +249,450 @@ where
             self.llmp.to_env(env_name).unwrap();
         }
     }
+}
 
+/// LLMP event manager for scalable multi-processed fuzzing
+#[derive(Debug)]
+pub struct LlmpEventManager<EMH, I, S, SHM, SP> {
+    pub(crate) throttle: Option<Duration>,
+    /// We sent last message at `last_sent`
+    last_sent: Duration,
+    hooks: EMH,
+    /// The LLMP client for inter process communication
+    pub llmp: LlmpClient<SHM, SP>,
+    #[cfg(feature = "llmp_compression")]
+    compressor: GzipCompressor,
+    /// The configuration defines this specific fuzzer.
+    /// A node will not re-use the observer values sent over LLMP
+    /// from nodes with other configurations.
+    configuration: EventConfig,
+    event_buffer: Vec<u8>,
+    /// Decide if the state restorer must save the serialized state
+    save_state: LlmpShouldSaveState,
+    phantom: PhantomData<(I, S)>,
+}
+
+impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
+    /// Create a new [`LlmpEventManager`]
+    pub fn new(
+        llmp: LlmpClient<SHM, SP>,
+        hooks: EMH,
+        configuration: EventConfig,
+        save_state: LlmpShouldSaveState,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            throttle: None,
+            last_sent: Duration::from_secs(0),
+            hooks,
+            llmp,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            configuration,
+            event_buffer: Vec::with_capacity(1024),
+            save_state,
+            phantom: PhantomData,
+        })
+    }
+
+    /// Get the `save_state` policy
+    pub fn save_state(&self) -> LlmpShouldSaveState {
+        self.save_state
+    }
+
+    /// Describe the client event mgr's llmp parts in a restorable fashion
+    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
+        self.llmp.describe()
+    }
+
+    /// Write the config for a client `EventManager` to env vars, a new
+    /// client can reattach using [`LlmpEventManagerBuilder::build_existing_client_from_env()`].
+    ///
+    /// # Safety
+    /// This will write to process env. Should only be called from a single thread at a time.
+    #[cfg(feature = "std")]
+    pub unsafe fn to_env(&self, env_name: &str) {
+        unsafe {
+            self.llmp.to_env(env_name).unwrap();
+        }
+    }
+}
+
+impl<EMH, I, S, SHM, SP> ProgressReporter<S> for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    I: Serialize,
+    S: HasExecutions + HasLastReportTime + HasMetadata + Serialize + MaybeHasClientPerfMonitor,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
+    fn maybe_report_progress(
+        &mut self,
+        state: &mut S,
+        monitor_timeout: Duration,
+    ) -> Result<(), Error> {
+        crate::events::std_maybe_report_progress(self, state, monitor_timeout)
+    }
+
+    fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        crate::events::std_report_progress(self, state)
+    }
+}
+
+impl<EMH, I, S, SHM, SP> EventFirer<I, S> for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    I: Serialize,
+    S: Serialize,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
+    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
+        // Check if we are going to crash in the event, in which case we store our current state for the next runner
+        #[cfg(feature = "llmp_compression")]
+        let flags = LLMP_FLAG_INITIALIZED;
+
+        self.event_buffer.resize(self.event_buffer.capacity(), 0);
+
+        // Serialize the event, reallocating event_buffer if needed
+        let written_len = match postcard::to_slice(&event, &mut self.event_buffer) {
+            Ok(written) => written.len(),
+            Err(postcard::Error::SerializeBufferFull) => {
+                let serialized = postcard::to_allocvec(&event)?;
+                self.event_buffer = serialized;
+                self.event_buffer.len()
+            }
+            Err(e) => return Err(Error::from(e)),
+        };
+
+        #[cfg(feature = "llmp_compression")]
+        {
+            match self
+                .compressor
+                .maybe_compress(&self.event_buffer[..written_len])
+            {
+                Some(comp_buf) => {
+                    self.llmp.send_buf_with_flags(
+                        LLMP_TAG_EVENT_TO_BOTH,
+                        flags | LLMP_FLAG_COMPRESSED,
+                        &comp_buf,
+                    )?;
+                }
+                None => {
+                    self.llmp
+                        .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len])?;
+                }
+            }
+        }
+
+        #[cfg(not(feature = "llmp_compression"))]
+        {
+            self.llmp
+                .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len])?;
+        }
+
+        self.last_sent = libafl_bolts::current_time();
+        Ok(())
+    }
+
+    fn configuration(&self) -> EventConfig {
+        self.configuration
+    }
+
+    fn should_send(&self) -> bool {
+        if let Some(throttle) = self.throttle {
+            libafl_bolts::current_time()
+                .checked_sub(self.last_sent)
+                .unwrap_or(throttle)
+                >= throttle
+        } else {
+            true
+        }
+    }
+}
+
+impl<EMH, I, S, SHM, SP> crate::events::Restorable<S, SP> for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    S: Serialize + HasCurrentStageId,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
+    fn on_restart(
+        &mut self,
+        state: &mut S,
+        staterestorer: &mut libafl_bolts::staterestore::StateRestorer<SHM, SP>,
+    ) -> Result<(), Error> {
+        state.on_restart()?;
+
+        // First, reset the page to 0 so the next iteration can read from the beginning of this page
+        staterestorer.reset();
+        staterestorer.save(&(
+            if self.save_state.on_restart() {
+                Some(state)
+            } else {
+                None
+            },
+            &self.llmp.describe()?,
+        ))?;
+
+        log::info!("Waiting for broker...");
+
+        self.await_restart_safe();
+        Ok(())
+    }
+
+    fn on_fire(
+        &mut self,
+        staterestorer: &mut libafl_bolts::staterestore::StateRestorer<SHM, SP>,
+    ) -> Result<(), Error> {
+        if self.save_state.oom_safe() {
+            staterestorer.reset();
+            staterestorer.save(&(None::<S>, &self.llmp.describe()?))?;
+        }
+        Ok(())
+    }
+}
+
+impl<EMH, I, S, SHM, SP> AwaitRestartSafe for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+{
+    /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
+    /// Otherwise, the OS may already have removed the shared maps,
+    #[inline]
+    fn await_restart_safe(&mut self) {
+        self.llmp.await_safe_to_unmap_blocking();
+    }
+}
+
+impl<EMH, I, S, SHM, SP> SendExiting for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        self.llmp.sender_mut().send_exiting()
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<EMH, I, S, SHM, SP> EventRestarter<S> for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    S: HasCurrentStageId,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
+    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        state.on_restart()?;
+        Ok(())
+    }
+}
+
+impl<EMH, I, S, SHM, SP> crate::events::EventReceiver<I, S> for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    EMH: EventManagerHooksTuple<I, S>,
+    I: DeserializeOwned + Input,
+    S: HasImported + HasCurrentTestcase<I> + HasSolutions<I> + Stoppable + Serialize,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
+        // TODO: Get around local event copy by moving handle_in_client
+        let self_id = self.llmp.sender().id();
+        while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
+            assert_ne!(
+                tag, _LLMP_TAG_EVENT_TO_BROKER,
+                "EVENT_TO_BROKER parcel should not have arrived in the client!"
+            );
+
+            if client_id == self_id {
+                continue;
+            }
+
+            #[cfg(not(feature = "llmp_compression"))]
+            let event_bytes = msg;
+            #[cfg(feature = "llmp_compression")]
+            let compressed;
+            #[cfg(feature = "llmp_compression")]
+            let event_bytes = if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                compressed = self.compressor.decompress(msg)?;
+                &compressed
+            } else {
+                msg
+            };
+
+            let event: EventWithStats<I> = postcard::from_bytes(event_bytes)?;
+            log::debug!(
+                "Received event in normal llmp {}",
+                event.event().name_detailed()
+            );
+
+            // If the message comes from another machine, do not
+            // consider other events than new testcase.
+            if !event.event().is_new_testcase()
+                && (flags & libafl_bolts::llmp::LLMP_FLAG_FROM_MM
+                    == libafl_bolts::llmp::LLMP_FLAG_FROM_MM)
+            {
+                continue;
+            }
+
+            log::trace!(
+                "Got event in client: {} from {client_id:?}",
+                event.event().name()
+            );
+            if !self.hooks.pre_receive_all(state, client_id, &event)? {
+                continue;
+            }
+
+            let has_observers = match event.event() {
+                Event::NewTestcase { observers_buf, .. } => observers_buf.is_some(),
+                _ => false,
+            };
+
+            return Ok(Some((event, has_observers)));
+        }
+        Ok(None)
+    }
+
+    fn on_interesting(&mut self, _state: &mut S, _event: EventWithStats<I>) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<EMH, I, S, SHM, SP> crate::events::HasEventManagerId for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
+    fn mgr_id(&self) -> crate::events::EventManagerId {
+        crate::events::EventManagerId(self.llmp.sender().id().0 as usize)
+    }
+}
+
+/// Builder for `LlmpEventManager`
+#[derive(Debug)]
+pub struct LlmpEventManagerBuilder<EMH> {
+    throttle: Option<Duration>,
+    save_state: LlmpShouldSaveState,
+    hooks: EMH,
+}
+
+impl Default for LlmpEventManagerBuilder<()> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LlmpEventManagerBuilder<()> {
+    /// Create a new `LlmpEventManagerBuilder`
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            throttle: None,
+            save_state: LlmpShouldSaveState::OnRestart,
+            hooks: (),
+        }
+    }
+}
+
+impl LlmpEventManagerBuilder<()> {
+    /// Add hooks to it
+    pub fn hooks<EMH>(self, hooks: EMH) -> LlmpEventManagerBuilder<EMH> {
+        LlmpEventManagerBuilder {
+            throttle: self.throttle,
+            save_state: self.save_state,
+            hooks,
+        }
+    }
+}
+
+impl<EMH> LlmpEventManagerBuilder<EMH> {
+    /// Change the sampling rate
+    #[must_use]
+    pub fn throttle(mut self, throttle: Duration) -> Self {
+        self.throttle = Some(throttle);
+        self
+    }
+
+    /// Change save state policy
+    #[must_use]
+    pub fn save_state(mut self, save_state: LlmpShouldSaveState) -> Self {
+        self.save_state = save_state;
+        self
+    }
+
+    /// Create a manager from a raw LLMP client
+    pub fn build_from_client<I, S, SHM, SP>(
+        self,
+        llmp: LlmpClient<SHM, SP>,
+        configuration: EventConfig,
+    ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
+    where
+        SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
+    {
+        LlmpEventManager::new(llmp, self.hooks, configuration, self.save_state)
+    }
+
+    /// Create an LLMP event manager on a port.
+    /// It expects a broker to exist on this port.
+    #[cfg(feature = "std")]
+    pub fn build_on_port<I, S, SHM, SP>(
+        self,
+        shmem_provider: SP,
+        port: u16,
+        configuration: EventConfig,
+    ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
+    where
+        SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
+    {
+        let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
+        Self::build_from_client(self, llmp, configuration)
+    }
+
+    /// If a client respawns, it may reuse the existing connection, previously
+    /// stored by [`LlmpClient::to_env()`].
+    #[cfg(feature = "std")]
+    pub fn build_existing_client_from_env<I, S, SHM, SP>(
+        self,
+        shmem_provider: SP,
+        env_name: &str,
+        configuration: EventConfig,
+    ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
+    where
+        SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
+    {
+        let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
+        Self::build_from_client(self, llmp, configuration)
+    }
+
+    /// Create an existing client from description
+    pub fn build_existing_client_from_description<I, S, SHM, SP>(
+        self,
+        shmem_provider: SP,
+        description: &LlmpClientDescription,
+        configuration: EventConfig,
+    ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
+    where
+        SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
+    {
+        let llmp = LlmpClient::existing_client_from_description(shmem_provider, description)?;
+        Self::build_from_client(self, llmp, configuration)
+    }
+}
+
+impl<I, IC, ICB, S, SHM, SP> LlmpEventConverter<I, IC, ICB, S, SHM, SP>
+where
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
     // Handle arriving events in the client
     fn handle_in_client<DI, E, EM, Z>(
         &mut self,
@@ -305,11 +755,7 @@ where
                 }
                 Ok(())
             }
-            Event::Stop => Ok(()),
-            _ => Err(Error::unknown(format!(
-                "Received illegal message that message should not have arrived: {:?}.",
-                event.name()
-            ))),
+            _ => Ok(()),
         }
     }
 

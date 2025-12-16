@@ -19,6 +19,10 @@ pub use llmp::*;
 #[cfg(feature = "tcp_manager")]
 pub mod tcp;
 
+/// The restarting event manager, capable of resetting the state of the fuzzer
+pub mod restarting;
+pub use restarting::*;
+
 pub mod broker_hooks;
 #[cfg(feature = "introspection")]
 use alloc::boxed::Box;

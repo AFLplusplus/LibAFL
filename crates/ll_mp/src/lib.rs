@@ -1413,6 +1413,11 @@ where
         self.id
     }
 
+    /// Set the ID of this sender.
+    pub fn set_id(&mut self, id: ClientId) {
+        self.id = id;
+    }
+
     /// Completely reset the current sender map.
     /// Afterwards, no receiver should read from it at a different location.
     /// This is only useful if all connected llmp parties start over, for example after a crash.
@@ -2590,10 +2595,10 @@ where
     /// Create a new [`LlmpBroker`] attaching to a TCP port
     #[cfg(feature = "std")]
     pub fn create_attach_to_tcp(shmem_provider: SP, hooks: HT, port: u16) -> Result<Self, Error> {
-        Ok(LlmpBroker {
-            inner: LlmpBrokerInner::create_attach_to_tcp(shmem_provider, port)?,
-            hooks,
-        })
+        log::info!("LlmpBroker: creating on port {port}");
+        let inner = LlmpBrokerInner::create_attach_to_tcp(shmem_provider, port)?;
+        log::info!("LlmpBroker: created inner on port {port}");
+        Ok(LlmpBroker { inner, hooks })
     }
 
     /// Create a new [`LlmpBroker`] attaching to a TCP port and telling if it has to keep pages forever

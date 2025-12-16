@@ -48,17 +48,17 @@ use crate::HasMetadata;
 use crate::events::multi_machine::NodeDescriptor;
 #[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::TcpMultiMachineHooks;
-#[cfg(any(unix, feature = "tcp_manager"))]
-use crate::inputs::Input;
 #[cfg(feature = "tcp_manager")]
 use crate::state::{HasCurrentTestcase, HasExecutions, HasImported, HasSolutions, Stoppable};
 use crate::{
     Error,
     events::{
-        EventConfig, EventManagerHooksTuple, LlmpRestartingEventManager, LlmpShouldSaveState,
-        ManagerKind, RestartingMgr,
+        EventConfig, EventManagerHooksTuple, LlmpRestartingEventManager, LlmpRestartingMgr,
+        LlmpShouldSaveState, ManagerKind,
     },
+    inputs::Input,
     monitors::Monitor,
+    state::HasCurrentStageId,
 };
 
 /// The (internal) `env` that indicates we're running as client.
@@ -482,10 +482,11 @@ where
             LlmpRestartingEventManager<(), I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
-        I: DeserializeOwned,
-        S: DeserializeOwned + Serialize,
+        I: DeserializeOwned + Input,
+        S: DeserializeOwned + Serialize + HasCurrentStageId,
+        MT: Clone,
     {
-        Self::launch_with_hooks(self, tuple_list!())
+        self.launch_with_hooks(tuple_list!())
     }
 
     /// Set the `run_client` callback
@@ -526,14 +527,14 @@ where
             ClientDescription,
         ) -> Result<(), Error>,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
-        I: DeserializeOwned,
-        S: DeserializeOwned + Serialize,
+        I: DeserializeOwned + Input,
+        S: DeserializeOwned + Serialize + HasCurrentStageId,
     {
         let spawn_mgr = |launcher: &Self,
                          client_description: Option<ClientDescription>,
                          monitor: Option<MT>| {
             if let Some(client_description) = client_description {
-                let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
+                let builder = LlmpRestartingMgr::<EMH, I, MT, S, SP>::builder()
                     .shmem_provider(launcher.shmem_provider.clone())
                     .broker_port(launcher.broker_port)
                     .kind(ManagerKind::Client { client_description })
@@ -544,7 +545,7 @@ where
                 let builder = builder.fork(launcher.fork);
                 builder.build().launch()
             } else {
-                let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
+                let builder = LlmpRestartingMgr::<EMH, I, MT, S, SP>::builder()
                     .shmem_provider(launcher.shmem_provider.clone())
                     .monitor(monitor)
                     .broker_port(launcher.broker_port)
@@ -572,7 +573,7 @@ where
     where
         CF: FnOnce(
             Option<S>,
-            crate::events::tcp::TcpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
+            crate::events::tcp::TcpRestartingEventManager<EMH, I, S, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
@@ -764,6 +765,24 @@ where
                     // I am a broker
                     // before going to the broker loop, spawn n clients
 
+                    if std::env::var(crate::events::restarting::_ENV_FUZZER_SENDER).is_ok() {
+                        // We are the child of a restarting manager (e.g. the Broker child)
+                        // We should not spawn clients again, but just run the broker logic
+                        if self.spawn_broker {
+                            let monitor = self.monitor.take();
+                            match spawn_mgr(&self, None, monitor) {
+                                Ok(_) => {}
+                                Err(Error::ShuttingDown) => {
+                                    log::info!("Broker shutting down");
+                                }
+                                Err(e) => {
+                                    log::error!("Broker exited with error: {e:?}");
+                                }
+                            }
+                        }
+                        return Ok(());
+                    }
+
                     let core_ids = get_core_ids().unwrap();
                     let mut handles = vec![];
 
@@ -817,15 +836,9 @@ where
 
                                 let client_description =
                                     ClientDescription::new(index, overcommit_i, core_id);
-                                // # Safety
-                                // This is set only once, in here, for the child.
-                                unsafe {
-                                    std::env::set_var(
-                                        _AFL_LAUNCHER_CLIENT,
-                                        client_description.to_safe_string(),
-                                    );
-                                }
                                 let mut child = startable_self()?;
+                                child
+                                    .env(_AFL_LAUNCHER_CLIENT, client_description.to_safe_string());
                                 let child = (if debug_output {
                                     &mut child
                                 } else {
@@ -1076,7 +1089,7 @@ where
     pub fn launch_centralized<I, S>(self) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
-        S: DeserializeOwned + Serialize,
+        S: DeserializeOwned + Serialize + HasCurrentStageId,
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<
@@ -1103,7 +1116,7 @@ where
         let restarting_mgr_builder =
             |launcher: &Launcher<'a, CF, MT, SP>, client_description: ClientDescription| {
                 // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                let builder = RestartingMgr::<(), I, MT, S, SP>::builder()
+                let builder = LlmpRestartingMgr::<(), I, MT, S, SP>::builder()
                     .shmem_provider(launcher.shmem_provider.clone())
                     .broker_port(launcher.broker_port)
                     .kind(ManagerKind::Client { client_description })
@@ -1129,7 +1142,7 @@ where
     ) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
-        S: DeserializeOwned + Serialize,
+        S: DeserializeOwned + Serialize + HasCurrentStageId,
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<EM, I, S, SP::ShMem, SP>,
