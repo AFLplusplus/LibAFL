@@ -103,7 +103,6 @@ macro_rules! impl_from_target_bytes_for_primitive {
     ($($t:ty),+ $(,)?) => {
         $(
             impl FromTargetBytes<ValueInput<$t>> for PrimitiveInputConverter<$t> {
-                #[expect(clippy::wrong_self_convention)]
                 fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<ValueInput<$t>, Error> {
                     if bytes.len() != size_of::<$t>() {
                         return Err(Error::illegal_argument(format!(

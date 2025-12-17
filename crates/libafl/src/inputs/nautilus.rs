@@ -119,12 +119,16 @@ impl ToTargetBytes<NautilusInput> for NautilusInputConverter<'_> {
     }
 }
 
+type ParseResultInternal = Option<(Vec<RuleIdOrCustom>, usize)>;
+
 struct NautilusParser<'a> {
     ctx: &'a Context,
     input: &'a [u8],
-    memo: HashMap<(NTermId, usize), Option<(Vec<RuleIdOrCustom>, usize)>>,
+    memo: HashMap<(NTermId, usize), ParseResultInternal>,
     stack: HashSet<(NTermId, usize)>,
 }
+
+type ParseResult = Result<Option<(Vec<RuleIdOrCustom>, usize)>, libafl_bolts::Error>;
 
 impl<'a> NautilusParser<'a> {
     fn new(ctx: &'a Context, input: &'a [u8]) -> Self {
@@ -136,36 +140,35 @@ impl<'a> NautilusParser<'a> {
         }
     }
 
-    fn parse_nt(&mut self, nt: NTermId, offset: usize) -> Option<(Vec<RuleIdOrCustom>, usize)> {
+    fn parse_nt(&mut self, nt: NTermId, offset: usize) -> ParseResult {
         if let Some(res) = self.memo.get(&(nt, offset)) {
-            return res.clone();
+            return Ok(res.clone());
         }
         if self.stack.contains(&(nt, offset)) {
-            return None;
+            return Ok(None);
         }
         self.stack.insert((nt, offset));
 
         for rule_id in self.ctx.get_rules_for_nt(nt) {
             let rule = self.ctx.get_rule(*rule_id);
-            if let Some((nodes, consumed)) = self.parse_rule(rule, *rule_id, offset) {
-                self.stack.remove(&(nt, offset));
-                self.memo
-                    .insert((nt, offset), Some((nodes.clone(), consumed)));
-                return Some((nodes, consumed));
+            match self.parse_rule(rule, *rule_id, offset) {
+                Ok(Some((nodes, consumed))) => {
+                    self.stack.remove(&(nt, offset));
+                    self.memo
+                        .insert((nt, offset), Some((nodes.clone(), consumed)));
+                    return Ok(Some((nodes, consumed)));
+                }
+                Ok(None) => {}
+                Err(e) => return Err(e),
             }
         }
 
         self.stack.remove(&(nt, offset));
         self.memo.insert((nt, offset), None);
-        None
+        Ok(None)
     }
 
-    fn parse_rule(
-        &mut self,
-        rule: &Rule,
-        rule_id: RuleId,
-        offset: usize,
-    ) -> Option<(Vec<RuleIdOrCustom>, usize)> {
+    fn parse_rule(&mut self, rule: &Rule, rule_id: RuleId, offset: usize) -> ParseResult {
         match rule {
             Rule::Plain(r) => {
                 let mut current_offset = offset;
@@ -179,39 +182,46 @@ impl<'a> NautilusParser<'a> {
                             {
                                 current_offset += t.len();
                             } else {
-                                return None;
+                                return Ok(None);
                             }
                         }
                         RuleChild::NTerm(nt) => {
-                            if let Some((sub_nodes, consumed)) = self.parse_nt(*nt, current_offset)
+                            if let Some((sub_nodes, consumed)) =
+                                self.parse_nt(*nt, current_offset)?
                             {
                                 nodes.extend(sub_nodes);
                                 current_offset += consumed;
                             } else {
-                                return None;
+                                return Ok(None);
                             }
                         }
                     }
                 }
-                Some((nodes, current_offset - offset))
+                Ok(Some((nodes, current_offset - offset)))
             }
             #[cfg(feature = "regex")]
             Rule::RegExp(r) => {
                 let re_str = r.hir.to_string();
-                let re = regex::bytes::Regex::new(&re_str).ok()?;
-                if let Some(m) = re.find_at(self.input, offset) {
-                    if m.start() == offset {
-                        let len = m.len();
-                        let data = self.input[offset..offset + len].to_vec();
-                        return Some((vec![RuleIdOrCustom::Custom(rule_id, data)], len));
-                    }
+                let re = regex::bytes::Regex::new(&re_str).map_err(|e| {
+                    libafl_bolts::Error::illegal_argument(format!("Invalid regex: {e}"))
+                })?;
+                if let Some(m) = re.find_at(self.input, offset)
+                    && m.start() == offset
+                {
+                    let len = m.len();
+                    let data = self.input[offset..offset + len].to_vec();
+                    return Ok(Some((vec![RuleIdOrCustom::Custom(rule_id, data)], len)));
                 }
-                None
+                Ok(None)
             }
             #[cfg(not(feature = "regex"))]
-            Rule::RegExp(_) => None,
+            Rule::RegExp(_) => Err(libafl_bolts::Error::unsupported(
+                "Nautilus grammar contains RegExp rules but the 'regex' feature is disabled",
+            )),
             #[cfg(feature = "nautilus_py")]
-            Rule::Script(_) => None,
+            Rule::Script(_) => Err(libafl_bolts::Error::unsupported(
+                "Nautilus Python script rules are not supported for reverse parsing",
+            )),
         }
     }
 }
@@ -220,13 +230,13 @@ impl crate::inputs::FromTargetBytes<NautilusInput> for NautilusInputConverter<'_
     fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<NautilusInput, libafl_bolts::Error> {
         let start_nt = self.ctx.ctx.nt_id("START");
         let mut parser = NautilusParser::new(&self.ctx.ctx, bytes);
-        if let Some((rules, consumed)) = parser.parse_nt(start_nt, 0) {
-            if consumed == bytes.len() {
-                return Ok(NautilusInput::new(Tree::from_rule_vec(
-                    rules,
-                    &self.ctx.ctx,
-                )));
-            }
+        if let Some((rules, consumed)) = parser.parse_nt(start_nt, 0)?
+            && consumed == bytes.len()
+        {
+            return Ok(NautilusInput::new(Tree::from_rule_vec(
+                rules,
+                &self.ctx.ctx,
+            )));
         }
         Err(libafl_bolts::Error::illegal_argument(
             "Failed to parse bytes into NautilusInput",
