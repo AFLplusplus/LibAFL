@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::CorpusId,
-    inputs::{Input, ToTargetBytes},
+    inputs::{FromTargetBytes, Input, ToTargetBytes},
 };
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
@@ -32,6 +32,38 @@ where
 {
     /// Encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
     fn encode(&mut self, bytes: &[u8], tokenizer: &mut T) -> Result<EncodedInput, Error>;
+}
+
+/// A wrapper that implements [`FromTargetBytes`] for [`EncodedInput`] using the given [`Tokenizer`]
+#[derive(Debug, Clone)]
+pub struct EncodedInputConverter<T> {
+    encoder_decoder: TokenInputEncoderDecoder,
+    tokenizer: T,
+}
+
+impl<T> EncodedInputConverter<T> {
+    /// Creates a new [`EncodedInputConverter`]
+    pub fn new(encoder_decoder: TokenInputEncoderDecoder, tokenizer: T) -> Self {
+        Self {
+            encoder_decoder,
+            tokenizer,
+        }
+    }
+}
+
+impl<T> FromTargetBytes<EncodedInput> for EncodedInputConverter<T>
+where
+    T: Tokenizer,
+{
+    fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<EncodedInput, Error> {
+        self.encoder_decoder.encode(bytes, &mut self.tokenizer)
+    }
+}
+
+impl<T> ToTargetBytes<EncodedInput> for EncodedInputConverter<T> {
+    fn to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
+        self.encoder_decoder.to_target_bytes(input)
+    }
 }
 
 /// Trait to decode encoded input to bytes
@@ -374,5 +406,23 @@ mod tests {
                 1,
             )
             .unwrap();
+    }
+
+    #[test]
+    fn test_from_target_bytes() {
+        use crate::inputs::{BytesTargetInputConverter, EncodedInputConverter, InputConverter};
+
+        let (encoder_decoder, expected_input) = setup_encoder_decoder();
+        let tokenizer = NaiveTokenizer::default();
+        let mut bytes = vec![];
+        encoder_decoder.decode(&expected_input, &mut bytes).unwrap();
+
+        let mut converter =
+            BytesTargetInputConverter::new(EncodedInputConverter::new(encoder_decoder, tokenizer));
+        let encoded_input = converter
+            .convert(bytes.into())
+            .expect("Failed to convert bytes to encoded input");
+
+        assert_eq!(encoded_input, expected_input);
     }
 }

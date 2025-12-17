@@ -48,7 +48,7 @@ use std::{fs::File, io::Read, path::Path};
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
 use libafl_bolts::{
-    Error, HasLen, generic_hash_std,
+    AsSlice, Error, HasLen, generic_hash_std,
     ownedref::{OwnedMutSlice, OwnedSlice},
     subrange::{SubRangeMutSlice, SubRangeSlice},
 };
@@ -400,5 +400,93 @@ where
 {
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8> {
         input.target_bytes()
+    }
+}
+
+/// Trait that can transform/parse target bytes (`BytesInput`) back to an input `I`.
+/// Converters that implement this trait auto-implement [`InputConverter`] for [`BytesInput`] to this `I`.
+pub trait FromTargetBytes<I> {
+    /// Convert from target bytes
+    #[expect(clippy::wrong_self_convention)]
+    fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<I, Error>;
+}
+
+/// An [`InputConverter`] wrapper that converts a [`BytesInput`] to anything implementing [`FromTargetBytes`].
+#[derive(Debug)]
+pub struct BytesTargetInputConverter<I, T> {
+    from_bytes_converter: T,
+    phantom: PhantomData<I>,
+}
+
+impl<I, T> InputConverter for BytesTargetInputConverter<I, T>
+where
+    T: FromTargetBytes<I>,
+{
+    type From = BytesInput;
+    type To = I;
+
+    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
+        self.from_bytes_converter
+            .from_target_bytes(input.target_bytes().as_slice())
+    }
+}
+
+impl<I, T> BytesTargetInputConverter<I, T> {
+    /// Create a new [`BytesTargetInputConverter`] from the given [`FromTargetBytes`] fn, that will convert a [`BytesInput`] to target bytes.
+    pub fn new(from_target_bytes_converter: T) -> Self {
+        Self {
+            from_bytes_converter: from_target_bytes_converter,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I, T> From<T> for BytesTargetInputConverter<I, T> {
+    fn from(from_bytes_converter: T) -> Self {
+        Self::new(from_bytes_converter)
+    }
+}
+
+#[derive(Debug, Copy, Clone, Default)]
+/// Basic `NopFromTargetBytes` with just one type that is not converting
+pub struct NopFromTargetBytes;
+
+impl NopFromTargetBytes {
+    /// Creates a new [`NopFromTargetBytes`]
+    #[must_use]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl<I> FromTargetBytes<I> for NopFromTargetBytes
+where
+    I: From<BytesInput>,
+{
+    fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<I, Error> {
+        Ok(I::from(BytesInput::new(bytes.to_vec())))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use libafl_bolts::AsSlice;
+
+    use crate::inputs::{
+        BytesInput, BytesTargetInputConverter, FromTargetBytes, HasTargetBytes, InputConverter,
+        NopFromTargetBytes,
+    };
+
+    #[test]
+    fn test_from_target_bytes() {
+        let bytes = vec![1, 2, 3, 4];
+        let mut nop = NopFromTargetBytes::new();
+        let res: BytesInput = nop.from_target_bytes(&bytes).unwrap();
+        assert_eq!(res.target_bytes().as_slice(), &bytes);
+
+        let mut converter = BytesTargetInputConverter::<BytesInput, _>::new(nop);
+        let start_input = BytesInput::new(bytes.clone());
+        let res2 = converter.convert(start_input).unwrap();
+        assert_eq!(res2.target_bytes().as_slice(), &bytes);
     }
 }
