@@ -2,17 +2,36 @@
 //! This allows us to wrap common types as [`Input`], such as [`alloc::vec::Vec<u8>`] as [`crate::inputs::BytesInput`] and use those for mutations.
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, hash::Hash};
+use core::{fmt::Debug, hash::Hash, marker::PhantomData, mem::size_of};
 
-use libafl_bolts::rands::Rand;
+use libafl_bolts::{Error, ownedref::OwnedSlice, rands::Rand};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use {
-    libafl_bolts::{Error, fs::write_file_atomic},
+    libafl_bolts::fs::write_file_atomic,
     std::{fs::File, io::Read, path::Path},
 };
 
-use crate::{inputs::Input, mutators::numeric::Numeric};
+use crate::{
+    inputs::{FromTargetBytes, Input, ToTargetBytes},
+    mutators::numeric::Numeric,
+};
+
+/// A wrapper that implements [`FromTargetBytes`] for [`ValueInput`] of primitives
+#[derive(Debug, Clone, Default)]
+pub struct PrimitiveInputConverter<T> {
+    phantom: PhantomData<T>,
+}
+
+impl<T> PrimitiveInputConverter<T> {
+    /// Creates a new [`PrimitiveInputConverter`]
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
 
 /// Newtype pattern wrapper around an underlying structure to implement inputs
 ///
@@ -78,6 +97,38 @@ impl_input_for_value_input!(
     i64 => I64Input,
     i128 => I128Input,
     isize => IsizeInput,
+);
+
+macro_rules! impl_from_target_bytes_for_primitive {
+    ($($t:ty),+ $(,)?) => {
+        $(
+            impl FromTargetBytes<ValueInput<$t>> for PrimitiveInputConverter<$t> {
+                fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<ValueInput<$t>, Error> {
+                    if bytes.len() != size_of::<$t>() {
+                        return Err(Error::illegal_argument(format!(
+                            "Expected {} bytes for {}, got {}",
+                            size_of::<$t>(),
+                            stringify!($t),
+                            bytes.len()
+                        )));
+                    }
+                    // Safety: We checked the length above
+                    let bytes: [u8; size_of::<$t>()] = bytes.try_into().unwrap();
+                    Ok(ValueInput::new(<$t>::from_le_bytes(bytes)))
+                }
+            }
+
+            impl ToTargetBytes<ValueInput<$t>> for PrimitiveInputConverter<$t> {
+                fn to_target_bytes<'a>(&mut self, input: &'a ValueInput<$t>) -> OwnedSlice<'a, u8> {
+                    OwnedSlice::from(input.into_inner().to_le_bytes().to_vec())
+                }
+            }
+        )*
+    };
+}
+
+impl_from_target_bytes_for_primitive!(
+    u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
 );
 
 /// manually implemented because files can be written more efficiently
@@ -231,5 +282,24 @@ mod tests {
         take_numeric(&i64::MAX, true);
         take_numeric(&i128::MAX, true);
         take_numeric(&isize::MAX, true);
+    }
+
+    #[test]
+    fn test_primitive_input_converter() {
+        use super::PrimitiveInputConverter;
+        use crate::inputs::{BytesTargetInputConverter, InputConverter, ValueInput};
+
+        let expected_val: u32 = 0xdeadbeef;
+        let bytes = expected_val.to_le_bytes();
+        let mut converter: BytesTargetInputConverter<
+            ValueInput<u32>,
+            PrimitiveInputConverter<u32>,
+        > = BytesTargetInputConverter::new(PrimitiveInputConverter::new());
+        let val_input = converter.convert(bytes.as_slice().into()).unwrap();
+        assert_eq!(*val_input.as_ref(), expected_val);
+
+        // Test invalid length
+        let invalid_bytes = vec![0; 3];
+        assert!(converter.convert(invalid_bytes.as_slice().into()).is_err());
     }
 }
