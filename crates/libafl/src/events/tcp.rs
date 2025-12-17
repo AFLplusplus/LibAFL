@@ -616,8 +616,6 @@ where
     type RestartState = Option<ClientId>;
 
     fn on_restart(&mut self, _state: &mut S) -> Result<(bool, Self::RestartState), Error> {
-        // state.on_restart()?;
-
         let should_save = self.save_state;
         let inner_state = Some(self.client_id);
 
@@ -630,8 +628,6 @@ impl<EMH, I, S> TcpEventManager<EMH, I, S> {
     /// The other side may free up all allocated memory.
     /// We are no longer allowed to send anything afterwards.
     pub fn send_exiting(&mut self) -> Result<(), Error> {
-        //TODO: Should not be needed since TCP does that for us
-        //self.tcp.sender.send_exiting()
         Ok(())
     }
 
