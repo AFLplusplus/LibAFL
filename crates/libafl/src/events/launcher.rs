@@ -42,23 +42,23 @@ use {
     std::{fs::File, os::unix::io::AsRawFd},
 };
 
-#[cfg(feature = "tcp_manager")]
-use crate::HasMetadata;
 #[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::NodeDescriptor;
 #[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::TcpMultiMachineHooks;
-#[cfg(feature = "tcp_manager")]
-use crate::state::{HasCurrentTestcase, HasExecutions, HasImported, HasSolutions, Stoppable};
 use crate::{
-    Error,
+    Error, HasMetadata,
+    corpus::HasCurrentCorpusId,
     events::{
-        EventConfig, EventManagerHooksTuple, LlmpRestartingEventManager, LlmpShouldSaveState,
-        ManagerKind,
+        EventConfig, EventManagerHooksTuple, LlmpRestartingEventManager, ManagerKind,
+        restarting::ShouldSaveState,
     },
     inputs::Input,
     monitors::Monitor,
-    state::HasCurrentStageId,
+    state::{
+        HasCorpus, HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported,
+        HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
+    },
 };
 
 /// The (internal) `env` that indicates we're running as client.
@@ -170,7 +170,7 @@ pub struct Launcher<'a, CF, MT, SP> {
     /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
     spawn_broker: bool,
     /// Tell the manager to serialize or not the state on restart
-    serialize_state: LlmpShouldSaveState,
+    serialize_state: ShouldSaveState,
     /// If this launcher should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
     #[cfg(unix)]
     fork: bool,
@@ -203,7 +203,7 @@ pub struct LauncherBuilder<'a, CF, MT, SP> {
     #[cfg(all(unix, feature = "multi_machine"))]
     multi_machine_node_descriptor: Option<NodeDescriptor<SocketAddr>>,
     spawn_broker: bool,
-    serialize_state: LlmpShouldSaveState,
+    serialize_state: ShouldSaveState,
     #[cfg(unix)]
     fork: bool,
 }
@@ -227,9 +227,11 @@ impl LauncherBuilder<'_, (), (), ()> {
             stderr_file: None,
             remote_broker_addr: None,
             #[cfg(all(unix, feature = "multi_machine"))]
-            multi_machine_node_descriptor: None,
+            multi_machine_node_descriptor: Some(
+                NodeDescriptor::builder().parent_addr(None).build(),
+            ),
             spawn_broker: true,
-            serialize_state: LlmpShouldSaveState::OnRestart,
+            serialize_state: ShouldSaveState::OnRestart,
             #[cfg(unix)]
             fork: true,
         }
@@ -404,7 +406,7 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
 
     /// Tell the manager to serialize or not the state on restart
     #[must_use]
-    pub fn serialize_state(mut self, serialize_state: LlmpShouldSaveState) -> Self {
+    pub fn serialize_state(mut self, serialize_state: ShouldSaveState) -> Self {
         self.serialize_state = serialize_state;
         self
     }
@@ -483,7 +485,19 @@ where
             ClientDescription,
         ) -> Result<(), Error>,
         I: DeserializeOwned + Input,
-        S: DeserializeOwned + Serialize + HasCurrentStageId,
+        S: DeserializeOwned
+            + Serialize
+            + HasCurrentStageId
+            + HasImported
+            + HasCurrentTestcase<I>
+            + HasSolutions<I>
+            + Stoppable
+            + HasMetadata
+            + HasExecutions
+            + HasLastReportTime
+            + MaybeHasClientPerfMonitor
+            + HasCurrentCorpusId
+            + HasCorpus<I>,
         MT: Clone,
     {
         self.launch_with_hooks(tuple_list!())
@@ -528,7 +542,19 @@ where
         ) -> Result<(), Error>,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
         I: DeserializeOwned + Input,
-        S: DeserializeOwned + Serialize + HasCurrentStageId,
+        S: DeserializeOwned
+            + Serialize
+            + HasCurrentStageId
+            + HasImported
+            + HasCurrentTestcase<I>
+            + HasSolutions<I>
+            + Stoppable
+            + HasMetadata
+            + HasExecutions
+            + HasLastReportTime
+            + MaybeHasClientPerfMonitor
+            + HasCurrentCorpusId
+            + HasCorpus<I>,
     {
         let spawn_mgr = |launcher: &Self,
                          client_description: Option<ClientDescription>,
@@ -579,7 +605,11 @@ where
             + HasImported
             + HasSolutions<I>
             + HasCurrentTestcase<I>
-            + Stoppable,
+            + Stoppable
+            + HasLastReportTime
+            + MaybeHasClientPerfMonitor
+            + HasCorpus<I>
+            + HasCurrentStageId,
         MT: Clone,
     {
         let spawn_mgr = |launcher: &Self,
@@ -1078,7 +1108,19 @@ where
     pub fn launch_centralized<I, S>(self) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
-        S: DeserializeOwned + Serialize + HasCurrentStageId,
+        S: DeserializeOwned
+            + Serialize
+            + HasCurrentStageId
+            + HasImported
+            + HasCurrentTestcase<I>
+            + HasSolutions<I>
+            + Stoppable
+            + HasMetadata
+            + HasExecutions
+            + HasLastReportTime
+            + MaybeHasClientPerfMonitor
+            + HasCurrentCorpusId
+            + HasCorpus<I>,
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<
@@ -1130,7 +1172,19 @@ where
     ) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
-        S: DeserializeOwned + Serialize + HasCurrentStageId,
+        S: DeserializeOwned
+            + Serialize
+            + HasCurrentStageId
+            + HasImported
+            + HasCurrentTestcase<I>
+            + HasSolutions<I>
+            + Stoppable
+            + HasMetadata
+            + HasExecutions
+            + HasLastReportTime
+            + MaybeHasClientPerfMonitor
+            + HasCurrentCorpusId
+            + HasCorpus<I>,
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<EM, I, S, SP::ShMem, SP>,
@@ -1467,7 +1521,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
 
     /// Tell the manager to serialize or not the state on restart
     #[must_use]
-    pub fn serialize_state(self, serialize_state: LlmpShouldSaveState) -> Self {
+    pub fn serialize_state(self, serialize_state: ShouldSaveState) -> Self {
         CentralizedLauncherBuilder {
             builder: self.builder.serialize_state(serialize_state),
             main_run_client: self.main_run_client,

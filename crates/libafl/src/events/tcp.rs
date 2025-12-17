@@ -1,11 +1,11 @@
 //! TCP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{sync::Arc, vec::Vec};
-use core::{marker::PhantomData, num::NonZeroUsize, time::Duration};
+use core::{marker::PhantomData, net::SocketAddr, num::NonZeroUsize, time::Duration};
 use std::{
     env,
     io::{ErrorKind, Read, Write},
-    net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
+    net::{TcpListener, TcpStream, ToSocketAddrs},
 };
 
 #[cfg(feature = "tcp_compression")]
@@ -17,7 +17,6 @@ use libafl_bolts::{
     ClientId,
     core_affinity::CoreId,
     shmem::{ShMemProvider, StdShMemProvider},
-    staterestore::StateRestorer,
     tuples::tuple_list,
 };
 use serde::{Serialize, de::DeserializeOwned};
@@ -44,8 +43,8 @@ use crate::{
     inputs::Input,
     monitors::{Monitor, stats::ClientStatsManager},
     state::{
-        HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime,
-        HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
+        HasCorpus, HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported,
+        HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
 };
 
@@ -242,6 +241,11 @@ where
                                 "TCP Manager - Not forwarding message from this very client ({this_client_id:?})."
                             );
                             continue;
+                        } else {
+                            log::info!(
+                                "TCP Manager - Forwarding message from {this_client_id:?} (buf starts with {:?})",
+                                &buf[..4]
+                            );
                         }
 
                         // subtract 4 since the client_id isn't part of the actual message.
@@ -518,9 +522,11 @@ impl<EMH, I, S> TcpEventManagerBuilder<EMH, I, S> {
             .expect("Cannot read from the broker");
         let client_id = ClientId(u32::from_le_bytes(our_client_id_buf));
 
-        log::info!("Our client id: {client_id:?}");
+        if client_id.0 == 0xffffffff {
+            log::error!("Client ID is UNDEFINED in build_from_client!");
+        }
 
-        Ok(TcpEventManager {
+        let mgr = TcpEventManager {
             throttle: self.throttle,
             last_sent: Duration::from_secs(0),
             hooks: self.hooks,
@@ -531,7 +537,9 @@ impl<EMH, I, S> TcpEventManagerBuilder<EMH, I, S> {
             configuration,
             save_state: self.save_state,
             phantom: PhantomData,
-        })
+        };
+
+        Ok(mgr)
     }
 
     /// Create an TCP event manager on a port specifying the client id with hooks
@@ -605,23 +613,15 @@ where
     S: HasExecutions + HasCurrentStageId + Serialize,
     SP: ShMemProvider,
 {
-    fn on_restart(
-        &mut self,
-        state: &mut S,
-        staterestorer: &mut StateRestorer<SP::ShMem, SP>,
-    ) -> Result<(), Error> {
-        state.on_restart()?;
+    type RestartState = Option<ClientId>;
 
-        // First, reset the page to 0 so the next iteration can read read from the beginning of this page
-        staterestorer.reset();
-        staterestorer.save(&if self.save_state {
-            Some((state, self.client_id))
-        } else {
-            None
-        })?;
+    fn on_restart(&mut self, _state: &mut S) -> Result<(bool, Self::RestartState), Error> {
+        // state.on_restart()?;
 
-        self.await_restart_safe();
-        Ok(())
+        let should_save = self.save_state;
+        let inner_state = Some(self.client_id);
+
+        Ok((should_save, inner_state))
     }
 }
 
@@ -632,6 +632,19 @@ impl<EMH, I, S> TcpEventManager<EMH, I, S> {
     pub fn send_exiting(&mut self) -> Result<(), Error> {
         //TODO: Should not be needed since TCP does that for us
         //self.tcp.sender.send_exiting()
+        Ok(())
+    }
+
+    /// Restore the state from the restart state
+    pub fn on_restore(
+        &mut self,
+        _state: &mut S,
+        restart_state: &Option<ClientId>,
+    ) -> Result<(), Error> {
+        // TODO: Don't ignore state
+        if let Some(client_id) = restart_state {
+            self.client_id = *client_id;
+        }
         Ok(())
     }
 }
@@ -715,8 +728,6 @@ where
                     if self_id == other_client_id {
                         panic!("Own ID should never have been sent by the broker");
                     } else {
-                        log::info!("{self_id:?} (from {other_client_id:?}) Received: {buf:?}");
-
                         let buf = &buf[4..];
                         #[cfg(feature = "tcp_compression")]
                         let buf = &self.compressor.decompress(buf)?;
@@ -847,12 +858,7 @@ pub enum TcpManagerKind {
 ///
 /// The [`TcpRestartingEventManager`] is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
-#[expect(clippy::type_complexity)]
-/// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
-///
-/// The [`TcpRestartingEventManager`] is a combination of restarter and runner, that can be used on systems with and without `fork` support.
-/// The restarter will spawn a new process each time the child crashes or timeouts.
-#[expect(clippy::type_complexity)]
+#[allow(clippy::type_complexity)]
 pub fn setup_restarting_mgr_tcp<I, MT, S>(
     monitor: MT,
     broker_port: u16,
@@ -873,7 +879,11 @@ where
         + HasCurrentTestcase<I>
         + DeserializeOwned
         + Serialize
-        + Stoppable,
+        + Stoppable
+        + HasLastReportTime
+        + MaybeHasClientPerfMonitor
+        + HasCorpus<I>
+        + HasCurrentStageId,
     I: Input,
 {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
@@ -891,7 +901,9 @@ where
 }
 
 /// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
-#[expect(clippy::type_complexity, clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity)]
+#[allow(clippy::needless_pass_by_value)]
 pub fn setup_restarting_mgr_tcp_internal<EMH, I, MT, S, SP>(
     shmem_provider: SP,
     configuration: EventConfig,
@@ -913,7 +925,11 @@ where
         + HasCurrentTestcase<I>
         + DeserializeOwned
         + Serialize
-        + Stoppable,
+        + Stoppable
+        + HasLastReportTime
+        + MaybeHasClientPerfMonitor
+        + HasCorpus<I>
+        + HasCurrentStageId,
     SP: ShMemProvider,
 {
     // We start ourself as child process to actually fuzz
@@ -964,7 +980,7 @@ where
             }
             TcpManagerKind::Broker => {
                 let event_broker = TcpEventBroker::<I, MT>::new(
-                    format!("127.0.0.1:{}", broker_port),
+                    format!("127.0.0.1:{broker_port}"),
                     monitor.take().unwrap(),
                 )?;
 
@@ -1014,62 +1030,122 @@ where
         (_mgr, None)
     };
 
-    let mut restarting_mgr = crate::events::RestartingMgr::new(shmem_provider.clone());
+    // We start ourself as child process to actually fuzz
+    let restarting_mgr = crate::events::RestartingMgr::new(shmem_provider.clone());
+    #[cfg(unix)]
+    let mut restarting_mgr = restarting_mgr;
     #[cfg(unix)]
     restarting_mgr.fork(true);
 
-    restarting_mgr.launch(|mut staterestorer, _new_shmem_provider, _core_id| {
-        // If we're restarting, deserialize the old state.
-        let (state, mgr) =
-            if let Some((state_opt, this_id)) = staterestorer.restore::<(Option<S>, ClientId)>()? {
-                let mgr = TcpEventManagerBuilder::new().hooks(hooks).build_on_port(
-                    broker_port,
-                    this_id,
-                    configuration,
-                )?;
+    crate::events::restarting::setup_generic_restarting_mgr(
+        restarting_mgr,
+        |state: Option<Option<ClientId>>| {
+            let this_id = state.flatten().unwrap_or(UNDEFINED_CLIENT_ID);
 
-                if serialize_state {
-                    staterestorer.reset();
-                    staterestorer.save(&(
-                        if let Some(state) = &state_opt {
-                            Some(state)
-                        } else {
-                            None
-                        },
-                        this_id,
-                    ))?;
+            let (_mgr, _core_id) = if env::var(_ENV_FUZZER_SENDER).is_err() {
+                let broker_things =
+                    |mut broker: TcpEventBroker<I, MT>, _remote_broker_addr: Option<SocketAddr>| {
+                        if let Some(exit_cleanly_after) = exit_cleanly_after {
+                            broker.set_exit_cleanly_after(exit_cleanly_after);
+                        }
+                        broker.broker_loop()
+                    };
+
+                // We get here if we are on Unix, or we are a broker on Windows (or without forks).
+                let (_mgr, _core_id) = match kind {
+                    TcpManagerKind::Any => {
+                        let connection = create_nonblocking_listener(("127.0.0.1", broker_port));
+                        match connection {
+                            Ok(listener) => {
+                                let event_broker = TcpEventBroker::<I, MT>::with_listener(
+                                    listener,
+                                    monitor.take().unwrap(),
+                                );
+
+                                // Yep, broker. Just loop here.
+                                log::info!(
+                                    "Doing broker things. Run this tool again to start fuzzing in a client."
+                                );
+
+                                broker_things(event_broker, None)?;
+
+                                return Err(Error::shutting_down());
+                            }
+                            Err(Error::OsError(..)) => {
+                                // port was likely already bound
+                                let mgr = TcpEventManagerBuilder::new()
+                                    .hooks(hooks)
+                                    .save_state(serialize_state)
+                                    .build_from_client(
+                                        &("127.0.0.1", broker_port),
+                                        this_id,
+                                        configuration,
+                                    )?;
+
+                                (mgr, None)
+                            }
+                            Err(e) => {
+                                return Err(e);
+                            }
+                        }
+                    }
+                    TcpManagerKind::Broker => {
+                        let event_broker = TcpEventBroker::<I, MT>::new(
+                            format!("127.0.0.1:{broker_port}"),
+                            monitor.take().unwrap(),
+                        )?;
+
+                        broker_things(event_broker, None)?;
+                        unreachable!(
+                            "The broker may never return normally, only on errors or when shutting down."
+                        );
+                    }
+                    TcpManagerKind::Client { cpu_core } => {
+                        // We are a client
+                        let mgr = TcpEventManagerBuilder::new()
+                            .hooks(hooks)
+                            .save_state(serialize_state)
+                            .build_on_port(broker_port, this_id, configuration)?;
+
+                        (mgr, cpu_core)
+                    }
+                };
+
+                if let Some(core_id) = _core_id {
+                    let core_id: CoreId = core_id;
+                    log::info!("Setting core affinity to {core_id:?}");
+                    core_id.set_affinity()?;
                 }
 
-                (
-                    if let Some(state) = state_opt {
-                        log::info!("Restoring state...");
-                        Some(state)
-                    } else {
-                        log::info!("First run. Let's set it all up");
-                        None
-                    },
-                    mgr,
-                )
+                // We are the fuzzer respawner in a tcp client
+                // # Safety
+                // There should only ever be one thread doing launcher things.
+                unsafe {
+                    _mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
+                }
+
+                (_mgr, _core_id)
             } else {
-                log::info!("First run. Let's set it all up");
-                // Mgr to send and receive msgs from/to all other fuzzer instances
-                let mgr = TcpEventManagerBuilder::new()
+                // We are the newly started fuzzing instance (i.e. on Windows), first, connect to our own restore map.
+                // We get here *only on Windows*, if we were started by a restarting fuzzer.
+                // A staterestorer and a receiver for single communication
+                let mut _mgr = TcpEventManagerBuilder::new()
                     .hooks(hooks)
+                    .save_state(serialize_state)
                     .build_existing_from_env(
                         &("127.0.0.1", broker_port),
                         _ENV_FUZZER_BROKER_CLIENT_INITIAL,
                         configuration,
                     )?;
 
-                (None, mgr)
+                if this_id.0 != 0 {
+                    _mgr.client_id = ClientId(this_id.0);
+                }
+
+                (_mgr, None)
             };
 
-        // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
-        staterestorer.reset();
-
-        Ok((
-            state,
-            crate::events::RestartingEventManager::new(mgr, staterestorer),
-        ))
-    })
+            Ok(_mgr)
+        },
+    )
 }

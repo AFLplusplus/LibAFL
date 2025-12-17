@@ -8,37 +8,47 @@ use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::Parser;
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, InMemoryOnDiskCorpus},
     events::{
-        launcher::{ClientDescription, Launcher},
-        llmp::LlmpShouldSaveState,
-        EventConfig, EventRestarter, LlmpRestartingEventManager,
+        llmp::restarting::setup_restarting_mgr_std_adaptive,
+        restarting::ShouldSaveState,
+        EventConfig,
+        Launcher,
+        LlmpRestartingEventManager,
+        ClientDescription,
+        EventRestarter,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::{MultiMonitor, OnDiskTomlMonitor},
     mutators::{
-        havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, HavocScheduledMutator},
+        scheduled::{HavocScheduledMutator, tokens_mutations},
         token_mutations::Tokens,
+        havoc_mutations,
     },
-    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver, CanTrack},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
-    Error, HasMetadata,
+    Error,
+    feedback_or, feedback_or_fast,
+    HasMetadata,
 };
 use libafl_bolts::{
-    core_affinity::Cores,
+    current_nanos,
     rands::StdRand,
-    shmem::{MmapShMemProvider, ShMemProvider},
+    shmem::{ShMemProvider, StdShMemProvider, MmapShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,
+    core_affinity::Cores,
 };
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
+use libafl_targets::{
+    std_edges_map_observer,
+    libfuzzer_test_one_input,
+    libfuzzer_initialize,
+};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
@@ -289,9 +299,9 @@ pub extern "C" fn libafl_main() {
         .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"))
         .serialize_state(if opt.reload_corpus {
-            LlmpShouldSaveState::OOMSafeNever
+            ShouldSaveState::OOMSafeNever
         } else {
-            LlmpShouldSaveState::OOMSafeOnRestart
+            ShouldSaveState::OOMSafeOnRestart
         })
         .build()
         .launch()

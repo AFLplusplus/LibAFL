@@ -100,7 +100,9 @@ impl SignalHandler for ShutdownSignalData {
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManagers`, such as [`LlmpRestartingEventManager`].
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[repr(transparent)]
 pub struct EventManagerId(
     /// The id

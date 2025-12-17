@@ -7,7 +7,7 @@ use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use hashbrown::HashMap;
 use libafl_bolts::ClientId;
 #[cfg(feature = "std")]
-use libafl_bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
+use libafl_bolts::shmem::ShMemProvider;
 #[cfg(feature = "std")]
 use serde::Serialize;
 #[cfg(feature = "std")]
@@ -288,20 +288,17 @@ where
     S: HasCurrentStageId + Serialize,
     SP: ShMemProvider,
 {
-    fn on_restart(
-        &mut self,
-        state: &mut S,
-        staterestorer: &mut StateRestorer<SP::ShMem, SP>,
-    ) -> Result<(), Error> {
+    type RestartState = (Duration, HashMap<ClientId, ClientStats>);
+
+    fn on_restart(&mut self, state: &mut S) -> Result<(bool, Self::RestartState), Error> {
         state.on_restart()?;
 
-        // First, reset the page to 0 so the next iteration can read read from the beginning of this page
-        staterestorer.reset();
-        staterestorer.save(&(
-            state,
+        let inner_state = (
             self.client_stats_manager.start_time(),
-            self.client_stats_manager.client_stats(),
-        ))
+            self.client_stats_manager.client_stats().clone(),
+        );
+
+        Ok((true, inner_state))
     }
 }
 
@@ -339,38 +336,39 @@ where
 
         restarting_mgr.launch(|mut staterestorer, _new_shmem_provider, _core_id| {
             // If we're restarting, deserialize the old state.
-            let (state, mgr) =
-                match staterestorer.restore::<(S, Duration, HashMap<ClientId, ClientStats>)>()? {
-                    None => {
-                        log::info!("First run. Let's set it all up");
-                        // Mgr to send and receive msgs from/to all other fuzzer instances
-                        (
-                            None::<S>,
-                            SimpleRestartingEventManager::new(
-                                SimpleEventManager::<I, MT, S>::new(monitor),
-                                staterestorer,
-                            ),
-                        )
-                    }
-                    // Restoring from a previous run, deserialize state and corpus.
-                    Some((state, start_time, clients_stats)) => {
-                        log::info!("Subsequent run. Loaded previous state.");
-                        // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
-                        staterestorer.reset();
+            let (state, mgr) = match staterestorer
+                .restore::<(Option<S>, (Duration, HashMap<ClientId, ClientStats>))>()?
+            {
+                None => {
+                    log::info!("First run. Let's set it all up");
+                    // Mgr to send and receive msgs from/to all other fuzzer instances
+                    (
+                        None::<S>,
+                        SimpleRestartingEventManager::new(
+                            SimpleEventManager::<I, MT, S>::new(monitor),
+                            staterestorer,
+                        ),
+                    )
+                }
+                // Restoring from a previous run, deserialize state and corpus.
+                Some((state_opt, (start_time, clients_stats))) => {
+                    log::info!("Subsequent run. Loaded previous state.");
+                    // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
+                    staterestorer.reset();
 
-                        // reload the state of the monitor to display the correct stats after restarts
-                        let mut inner = SimpleEventManager::<I, MT, S>::new(monitor);
-                        inner.client_stats_manager.set_start_time(start_time);
-                        inner
-                            .client_stats_manager
-                            .update_all_client_stats(clients_stats);
+                    // reload the state of the monitor to display the correct stats after restarts
+                    let mut inner = SimpleEventManager::<I, MT, S>::new(monitor);
+                    inner.client_stats_manager.set_start_time(start_time);
+                    inner
+                        .client_stats_manager
+                        .update_all_client_stats(clients_stats);
 
-                        (
-                            Some(state),
-                            SimpleRestartingEventManager::new(inner, staterestorer),
-                        )
-                    }
-                };
+                    (
+                        state_opt,
+                        SimpleRestartingEventManager::new(inner, staterestorer),
+                    )
+                }
+            };
 
             Ok((state, mgr))
         })

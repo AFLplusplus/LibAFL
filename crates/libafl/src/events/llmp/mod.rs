@@ -47,41 +47,7 @@ pub(crate) const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
 /// The minimum buffer size at which to compress LLMP IPC messages.
 #[cfg(feature = "llmp_compression")]
 pub const COMPRESS_THRESHOLD: usize = 1024;
-
-/// Specify if the State must be persistent over restarts
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum LlmpShouldSaveState {
-    /// Always save and restore the state on restart (not OOM resistant)
-    OnRestart,
-    /// Never save the state (not OOM resistant)
-    Never,
-    /// Best-effort save and restore the state on restart (OOM safe)
-    /// This adds additional runtime costs when processing events
-    OOMSafeOnRestart,
-    /// Never save the state (OOM safe)
-    /// This adds additional runtime costs when processing events
-    OOMSafeNever,
-}
-
-impl LlmpShouldSaveState {
-    /// Check if the state must be saved `on_restart()`
-    #[must_use]
-    pub fn on_restart(&self) -> bool {
-        matches!(
-            self,
-            LlmpShouldSaveState::OnRestart | LlmpShouldSaveState::OOMSafeOnRestart
-        )
-    }
-
-    /// Check if the policy is OOM safe
-    #[must_use]
-    pub fn oom_safe(&self) -> bool {
-        matches!(
-            self,
-            LlmpShouldSaveState::OOMSafeOnRestart | LlmpShouldSaveState::OOMSafeNever
-        )
-    }
-}
+use crate::events::restarting::ShouldSaveState;
 
 /// A manager-like llmp client that converts between input types
 pub struct LlmpEventConverter<I, IC, ICB, S, SHM, SP> {
@@ -153,6 +119,8 @@ impl LlmpEventConverterBuilder {
         converter_back: Option<ICB>,
     ) -> Result<LlmpEventConverter<I, IC, ICB, S, SHM, SP>, Error>
     where
+        I: Input,
+        S: HasExecutions + HasMetadata + HasImported + HasSolutions<I> + HasCurrentTestcase<I>,
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
@@ -179,6 +147,8 @@ impl LlmpEventConverterBuilder {
         converter_back: Option<ICB>,
     ) -> Result<LlmpEventConverter<I, IC, ICB, S, SHM, SP>, Error>
     where
+        I: Input,
+        S: HasExecutions + HasMetadata + HasImported + HasSolutions<I> + HasCurrentTestcase<I>,
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
@@ -268,12 +238,15 @@ pub struct LlmpEventManager<EMH, I, S, SHM, SP> {
     configuration: EventConfig,
     event_buffer: Vec<u8>,
     /// Decide if the state restorer must save the serialized state
-    save_state: LlmpShouldSaveState,
+    save_state: ShouldSaveState,
     phantom: PhantomData<(I, S)>,
 }
 
 impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
 where
+    I: Input,
+    EMH: EventManagerHooksTuple<I, S>,
+    S: HasExecutions + HasMetadata + HasImported + HasSolutions<I> + HasCurrentTestcase<I>,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
@@ -282,7 +255,7 @@ where
         llmp: LlmpClient<SHM, SP>,
         hooks: EMH,
         configuration: EventConfig,
-        save_state: LlmpShouldSaveState,
+        save_state: ShouldSaveState,
     ) -> Result<Self, Error> {
         Ok(Self {
             throttle: None,
@@ -298,11 +271,31 @@ where
         })
     }
 
-    /// Get the `save_state` policy
-    pub fn save_state(&self) -> LlmpShouldSaveState {
-        self.save_state
+    /// Create a new [`LlmpEventManager`] from a `LlmpClient`
+    pub fn with_client(
+        llmp: LlmpClient<SHM, SP>,
+        hooks: EMH,
+        configuration: EventConfig,
+        save_state: ShouldSaveState,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            throttle: None,
+            last_sent: Duration::from_secs(0),
+            hooks,
+            llmp,
+            #[cfg(feature = "llmp_compression")]
+            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
+            configuration,
+            event_buffer: Vec::with_capacity(1024),
+            save_state,
+            phantom: PhantomData,
+        })
     }
 
+    /// Check if we should save the state
+    pub fn save_state(&self) -> ShouldSaveState {
+        self.save_state
+    }
     /// Describe the client event mgr's llmp parts in a restorable fashion
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         self.llmp.describe()
@@ -418,28 +411,17 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn on_restart(
-        &mut self,
-        state: &mut S,
-        staterestorer: &mut libafl_bolts::staterestore::StateRestorer<SHM, SP>,
-    ) -> Result<(), Error> {
+    type RestartState = LlmpClientDescription;
+
+    fn on_restart(&mut self, state: &mut S) -> Result<(bool, Self::RestartState), Error> {
         state.on_restart()?;
 
-        // First, reset the page to 0 so the next iteration can read from the beginning of this page
-        staterestorer.reset();
-        staterestorer.save(&(
-            if self.save_state.on_restart() {
-                Some(state)
-            } else {
-                None
-            },
-            &self.llmp.describe()?,
-        ))?;
+        let should_save = self.save_state.on_restart();
+        let desc = self.llmp.describe()?;
 
         log::info!("Waiting for broker...");
 
-        self.await_restart_safe();
-        Ok(())
+        Ok((should_save, desc))
     }
 
     fn on_fire(
@@ -577,7 +559,7 @@ where
 #[derive(Debug)]
 pub struct LlmpEventManagerBuilder<EMH> {
     throttle: Option<Duration>,
-    save_state: LlmpShouldSaveState,
+    save_state: ShouldSaveState,
     hooks: EMH,
 }
 
@@ -593,7 +575,7 @@ impl LlmpEventManagerBuilder<()> {
     pub fn new() -> Self {
         Self {
             throttle: None,
-            save_state: LlmpShouldSaveState::OnRestart,
+            save_state: ShouldSaveState::OnRestart,
             hooks: (),
         }
     }
@@ -620,7 +602,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
 
     /// Change save state policy
     #[must_use]
-    pub fn save_state(mut self, save_state: LlmpShouldSaveState) -> Self {
+    pub fn save_state(mut self, save_state: ShouldSaveState) -> Self {
         self.save_state = save_state;
         self
     }
@@ -632,6 +614,9 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         configuration: EventConfig,
     ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
+        I: Input,
+        EMH: EventManagerHooksTuple<I, S>,
+        S: HasExecutions + HasMetadata + HasImported + HasSolutions<I> + HasCurrentTestcase<I>,
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
@@ -648,6 +633,9 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         configuration: EventConfig,
     ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
+        I: Input,
+        EMH: EventManagerHooksTuple<I, S>,
+        S: HasExecutions + HasMetadata + HasImported + HasSolutions<I> + HasCurrentTestcase<I>,
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
@@ -665,6 +653,9 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         configuration: EventConfig,
     ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
+        I: Input,
+        EMH: EventManagerHooksTuple<I, S>,
+        S: HasExecutions + HasMetadata + HasImported + HasSolutions<I> + HasCurrentTestcase<I>,
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
@@ -680,6 +671,9 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         configuration: EventConfig,
     ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
+        I: Input,
+        EMH: EventManagerHooksTuple<I, S>,
+        S: HasExecutions + HasMetadata + HasImported + HasSolutions<I> + HasCurrentTestcase<I>,
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {

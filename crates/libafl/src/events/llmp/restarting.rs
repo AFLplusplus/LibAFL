@@ -12,9 +12,8 @@ use std::net::TcpStream;
 #[cfg(feature = "std")]
 use libafl_bolts::llmp::{TcpRequest, TcpResponse, recv_tcp_msg, send_tcp_msg};
 use libafl_bolts::{
-    ClientId,
     core_affinity::CoreId,
-    llmp::{Broker, LlmpBroker, LlmpConnection},
+    llmp::{Broker, LlmpBroker, LlmpClientDescription, LlmpConnection},
     shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     tuples::tuple_list,
 };
@@ -23,14 +22,15 @@ use libafl_core::IP_LOCALHOST;
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
-    Error,
-    events::{
-        EventConfig, EventManagerHooksTuple, LlmpShouldSaveState, StdLlmpEventHook,
-        launcher::ClientDescription,
-    },
+    Error, HasMetadata,
+    corpus::HasCurrentCorpusId,
+    events::{EventConfig, EventManagerHooksTuple, StdLlmpEventHook, launcher::ClientDescription},
     inputs::Input,
     monitors::Monitor,
-    state::HasCurrentStageId,
+    state::{
+        HasCorpus, HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported,
+        HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
+    },
 };
 /// A manager that can restart on the fly, storing states in-between (in `on_restart`)
 pub type LlmpRestartingEventManager<EMH, I, S, SHM, SP> =
@@ -75,6 +75,8 @@ where
     }
 }
 
+use crate::events::restarting::ShouldSaveState;
+
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
 const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
@@ -114,7 +116,19 @@ pub fn setup_restarting_mgr_std<I, MT, S>(
 where
     I: DeserializeOwned + Input,
     MT: Monitor,
-    S: Serialize + DeserializeOwned + HasCurrentStageId,
+    S: Serialize
+        + DeserializeOwned
+        + HasCurrentStageId
+        + HasImported
+        + HasCurrentTestcase<I>
+        + HasSolutions<I>
+        + Stoppable
+        + HasMetadata
+        + HasExecutions
+        + HasLastReportTime
+        + MaybeHasClientPerfMonitor
+        + HasCurrentCorpusId
+        + HasCorpus<I>,
 {
     setup_restarting_mgr_llmp(
         StdShMemProvider::new()?,
@@ -123,7 +137,7 @@ where
         broker_port,
         ManagerKind::Any,
         None,
-        LlmpShouldSaveState::OnRestart,
+        ShouldSaveState::OnRestart,
         tuple_list!(),
     )
 }
@@ -147,7 +161,19 @@ pub fn setup_restarting_mgr_std_adaptive<I, MT, S>(
 >
 where
     MT: Monitor,
-    S: Serialize + DeserializeOwned + HasCurrentStageId,
+    S: Serialize
+        + DeserializeOwned
+        + HasCurrentStageId
+        + HasImported
+        + HasCurrentTestcase<I>
+        + HasSolutions<I>
+        + Stoppable
+        + HasMetadata
+        + HasExecutions
+        + HasLastReportTime
+        + MaybeHasClientPerfMonitor
+        + HasCurrentCorpusId
+        + HasCorpus<I>,
     I: DeserializeOwned + Input,
 {
     setup_restarting_mgr_llmp(
@@ -157,7 +183,7 @@ where
         broker_port,
         ManagerKind::Any,
         None,
-        LlmpShouldSaveState::OnRestart,
+        ShouldSaveState::OnRestart,
         tuple_list!(),
     )
 }
@@ -175,7 +201,7 @@ pub fn setup_restarting_mgr_llmp<EMH, I, MT, S, SP>(
     broker_port: u16,
     kind: ManagerKind,
     exit_cleanly_after: Option<NonZeroUsize>,
-    serialize_state: LlmpShouldSaveState,
+    serialize_state: ShouldSaveState,
     hooks: EMH,
 ) -> Result<
     (
@@ -188,163 +214,131 @@ where
     EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     I: DeserializeOwned + Input,
     MT: Monitor,
-    S: Serialize + DeserializeOwned + HasCurrentStageId,
+    S: Serialize
+        + DeserializeOwned
+        + HasCurrentStageId
+        + HasImported
+        + HasCurrentTestcase<I>
+        + HasSolutions<I>
+        + Stoppable
+        + HasMetadata
+        + HasExecutions
+        + HasLastReportTime
+        + MaybeHasClientPerfMonitor
+        + HasCurrentCorpusId
+        + HasCorpus<I>,
     SP: ShMemProvider,
 {
     // We start ourselves as child process to actually fuzz
-    let mut restarting_mgr = crate::events::RestartingMgr::new(shmem_provider.clone());
+    let restarting_mgr = crate::events::RestartingMgr::new(shmem_provider.clone());
+    #[cfg(unix)]
+    let mut restarting_mgr = restarting_mgr;
     #[cfg(unix)]
     restarting_mgr.fork(true);
 
-    restarting_mgr.launch(|staterestorer, _new_shmem_provider, _core_id| {
-        let broker_things = |mut broker: LlmpBroker<_, SP::ShMem, SP>,
-                             remote_broker_addr: Option<SocketAddr>| {
-            if let Some(remote_broker_addr) = remote_broker_addr {
-                log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
-                broker.inner_mut().connect_b2b(remote_broker_addr)?;
-            }
+    crate::events::restarting::setup_generic_restarting_mgr(
+        restarting_mgr,
+        |state: Option<LlmpClientDescription>| {
+            let broker_things =
+                |mut broker: LlmpBroker<_, SP::ShMem, SP>,
+                 remote_broker_addr: Option<SocketAddr>| {
+                    if let Some(remote_broker_addr) = remote_broker_addr {
+                        log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
+                        broker.inner_mut().connect_b2b(remote_broker_addr)?;
+                    }
 
-            if let Some(exit_cleanly_after) = exit_cleanly_after {
-                broker.set_exit_after(exit_cleanly_after);
-            }
+                    if let Some(exit_cleanly_after) = exit_cleanly_after {
+                        broker.set_exit_after(exit_cleanly_after);
+                    }
 
-            broker.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));
+                    broker.loop_with_timeouts(
+                        Duration::from_secs(30),
+                        Some(Duration::from_millis(5)),
+                    );
 
-            #[cfg(feature = "llmp_debug")]
-            log::info!("The last client quit. Exiting.");
+                    #[cfg(feature = "llmp_debug")]
+                    log::info!("The last client quit. Exiting.");
 
-            Err(Error::shutting_down())
-        };
+                    Err(Error::shutting_down())
+                };
 
-        // We get here if we are on Unix, or we are a broker on Windows (or without forks).
-        let (mgr, core_id) = match &kind {
-            ManagerKind::Any => {
-                let connection = LlmpConnection::on_port(shmem_provider.clone(), broker_port)?;
-                match connection {
-                    LlmpConnection::IsBroker { broker } => {
+            // We get here if we are on Unix, or we are a broker on Windows (or without forks).
+            let (mgr, core_id) = if let Some(desc) = state {
+                let mgr = super::LlmpEventManagerBuilder::new()
+                    .hooks(hooks)
+                    .save_state(serialize_state)
+                    .build_existing_client_from_description(
+                        shmem_provider.clone(),
+                        &desc,
+                        configuration,
+                    )?;
+
+                (mgr, None)
+            } else {
+                match &kind {
+                    ManagerKind::Any => {
+                        let connection =
+                            LlmpConnection::on_port(shmem_provider.clone(), broker_port)?;
+                        match connection {
+                            LlmpConnection::IsBroker { broker } => {
+                                let llmp_hook =
+                                    StdLlmpEventHook::<I, MT>::new(monitor.take().unwrap())?;
+
+                                // Yep, broker. Just loop here.
+                                log::info!(
+                                    "Doing broker things. Run this tool again to start fuzzing in a client."
+                                );
+
+                                broker_things(
+                                    broker.add_hooks(tuple_list!(llmp_hook)),
+                                    None, // remote_broker_addr
+                                )?;
+
+                                return Err(Error::shutting_down());
+                            }
+                            LlmpConnection::IsClient { client } => {
+                                let mgr: super::LlmpEventManager<EMH, I, S, SP::ShMem, SP> =
+                                    super::LlmpEventManagerBuilder::new()
+                                        .hooks(hooks)
+                                        .save_state(serialize_state)
+                                        .build_from_client(client, configuration)?;
+
+                                (mgr, None::<CoreId>)
+                            }
+                        }
+                    }
+                    ManagerKind::Broker => {
                         let llmp_hook = StdLlmpEventHook::<I, MT>::new(monitor.take().unwrap())?;
 
-                        // Yep, broker. Just loop here.
-                        log::info!(
-                            "Doing broker things. Run this tool again to start fuzzing in a client."
-                        );
-
-                        broker_things(
-                            broker.add_hooks(tuple_list!(llmp_hook)),
-                            None, // remote_broker_addr
+                        let broker = LlmpBroker::create_attach_to_tcp(
+                            shmem_provider.clone(),
+                            tuple_list!(llmp_hook),
+                            broker_port,
                         )?;
+
+                        broker_things(broker, None)?;
 
                         return Err(Error::shutting_down());
                     }
-                    LlmpConnection::IsClient { client } => {
-                        let mgr: super::LlmpEventManager<EMH, I, S, SP::ShMem, SP> =
-                            super::LlmpEventManagerBuilder::new()
-                                .hooks(hooks)
-                                .build_from_client(client, configuration)?;
-                        (
-                            crate::events::RestartingEventManager::new(mgr, staterestorer),
-                            None::<CoreId>,
-                        )
+                    ManagerKind::Client { client_description } => {
+                        // We are a client
+                        let mgr = super::LlmpEventManagerBuilder::new()
+                            .hooks(hooks)
+                            .save_state(serialize_state)
+                            .build_on_port(shmem_provider.clone(), broker_port, configuration)?;
+
+                        (mgr, Some(client_description.core_id()))
                     }
                 }
-            }
-            ManagerKind::Broker => {
-                let llmp_hook = StdLlmpEventHook::<I, MT>::new(monitor.take().unwrap())?;
+            };
 
-                let broker = LlmpBroker::create_attach_to_tcp(
-                    shmem_provider.clone(),
-                    tuple_list!(llmp_hook),
-                    broker_port,
-                )?;
-
-                broker_things(broker, None)?;
-
-                return Err(Error::shutting_down());
-            }
-            ManagerKind::Client {
-                client_description: _,
-            } => {
-                // We are a client, we connect to the broker
-                // First, check if we can restore from env
-                if std::env::var(_ENV_FUZZER_BROKER_CLIENT_INITIAL).is_ok() {
-                    log::info!("Restoring client from env");
-                    let mgr: super::LlmpEventManager<EMH, I, S, SP::ShMem, SP> =
-                        super::LlmpEventManagerBuilder::new()
-                            .hooks(hooks)
-                            .build_existing_client_from_env(
-                                shmem_provider.clone(),
-                                _ENV_FUZZER_BROKER_CLIENT_INITIAL,
-                                configuration,
-                            )?;
-
-                    (
-                        crate::events::RestartingEventManager::new(mgr, staterestorer),
-                        None,
-                    )
-                } else {
-                    log::info!("Connecting to broker on port {broker_port}");
-                    // If not, we try to connect to the broker
-                    let client = libafl_bolts::llmp::LlmpClient::create_attach_to_tcp(
-                        shmem_provider.clone(),
-                        broker_port,
-                    )?;
-                    log::info!("Connected to broker");
-                    let mgr: super::LlmpEventManager<EMH, I, S, SP::ShMem, SP> =
-                        super::LlmpEventManagerBuilder::new()
-                            .hooks(hooks)
-                            .build_from_client(client, configuration)?;
-
-                    (
-                        crate::events::RestartingEventManager::new(mgr, staterestorer),
-                        None,
-                    )
-                }
-            }
-        };
-
-        if let Some(core_id) = core_id {
-            let _ = core_id.set_affinity();
-        }
-
-        // We are the fuzzer respawner in a llmp client
-        let mut mgr = mgr;
-
-        if serialize_state == LlmpShouldSaveState::OnRestart && !mgr.staterestorer.has_content() {
-            mgr.staterestorer.reset();
-            mgr.staterestorer
-                .save(&(None::<S>, mgr.inner.llmp.sender().id()))?;
-        }
-
-        let state = if let Some(state) = mgr.staterestorer.restore::<(Option<S>, ClientId)>()? {
-            let (state, client_id) = state;
-
-            if serialize_state == LlmpShouldSaveState::OnRestart {
-                mgr.staterestorer.reset();
-                mgr.staterestorer.save(&(
-                    if let Some(state) = &state {
-                        Some(state)
-                    } else {
-                        None
-                    },
-                    client_id,
-                ))?;
+            if let Some(core_id) = core_id {
+                let _ = core_id.set_affinity();
             }
 
-            mgr.inner.llmp.sender_mut().set_id(client_id);
-            if let Some(state) = state {
-                log::info!("Restoring state...");
-                Some(state)
-            } else {
-                log::info!("First run. Let's set it all up");
-                None
-            }
-        } else {
-            log::info!("First run. Let's set it all up");
-            None
-        };
-
-        Ok((state, mgr))
-    })
+            Ok(mgr)
+        },
+    )
 }
 
 #[cfg(test)]

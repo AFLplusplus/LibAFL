@@ -11,6 +11,7 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     staterestore::StateRestorer,
 };
+use serde::{Serialize, de::DeserializeOwned};
 
 #[cfg(all(unix, not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
@@ -30,12 +31,12 @@ pub trait Restorable<S, SP>
 where
     SP: ShMemProvider,
 {
+    /// The state to be saved
+    type RestartState: Serialize + DeserializeOwned;
+
     /// Called when the event manager is restarted
-    fn on_restart(
-        &mut self,
-        state: &mut S,
-        staterestorer: &mut StateRestorer<SP::ShMem, SP>,
-    ) -> Result<(), Error>;
+    /// Returns a tuple: (`should_save_state`, `inner_state`)
+    fn on_restart(&mut self, state: &mut S) -> Result<(bool, Self::RestartState), Error>;
 
     /// Called when the event manager fires an event
     fn on_fire(&mut self, staterestorer: &mut StateRestorer<SP::ShMem, SP>) -> Result<(), Error> {
@@ -87,11 +88,20 @@ where
 
 impl<EM, S, SP> EventRestarter<S> for RestartingEventManager<EM, SP>
 where
-    EM: Restorable<S, SP>,
+    EM: Restorable<S, SP> + AwaitRestartSafe,
     SP: ShMemProvider,
+    S: Serialize,
 {
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
-        self.inner.on_restart(state, &mut self.staterestorer)
+        let (should_save, inner_state) = self.inner.on_restart(state)?;
+
+        // First, reset the page to 0 so the next iteration can read from the beginning of this page
+        self.staterestorer.reset();
+        self.staterestorer
+            .save(&(if should_save { Some(state) } else { None }, inner_state))?;
+
+        self.inner.await_restart_safe();
+        Ok(())
     }
 }
 
@@ -101,6 +111,7 @@ where
     SP: ShMemProvider,
 {
     fn try_receive(&mut self, state: &mut S) -> Result<Option<(EventWithStats<I>, bool)>, Error> {
+        // log::info!("RestartingEventManager::try_receive inner addr: {:p}", &self.inner);
         self.inner.try_receive(state)
     }
 
@@ -308,4 +319,78 @@ where
 
         do_in_child(staterestorer, new_shmem_provider, core_id)
     }
+}
+
+/// Specify if the State must be persistent over restarts
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ShouldSaveState {
+    /// Always save and restore the state on restart (not OOM resistant)
+    OnRestart,
+    /// Never save the state (not OOM resistant)
+    Never,
+    /// Best-effort save and restore the state on restart (OOM safe)
+    /// This adds additional runtime costs when processing events
+    OOMSafeOnRestart,
+    /// Never save the state (OOM safe)
+    /// This adds additional runtime costs when processing events
+    OOMSafeNever,
+}
+
+impl ShouldSaveState {
+    /// Check if the state must be saved `on_restart()`
+    #[must_use]
+    pub fn on_restart(&self) -> bool {
+        matches!(
+            self,
+            ShouldSaveState::OnRestart | ShouldSaveState::OOMSafeOnRestart
+        )
+    }
+
+    /// Check if the policy is OOM safe
+    #[must_use]
+    pub fn oom_safe(&self) -> bool {
+        matches!(
+            self,
+            ShouldSaveState::OOMSafeOnRestart | ShouldSaveState::OOMSafeNever
+        )
+    }
+}
+
+/// Sets up a restarting fuzzer, using the [`ShMemProvider`], and standard features.
+///
+/// The [`RestartingEventManager`] is a combination of restarter and runner, that can be used on systems with and without `fork` support.
+/// The restarter will spawn a new process each time the child crashes or timeouts.
+pub fn setup_generic_restarting_mgr<EM, F, I, S, SP>(
+    mut restarting_mgr: RestartingMgr<SP>,
+    mgr_constructor: F,
+) -> Result<(Option<S>, RestartingEventManager<EM, SP>), Error>
+where
+    EM: Restorable<S, SP> + EventFirer<I, S> + EventReceiver<I, S> + ProgressReporter<S>,
+    F: FnOnce(Option<EM::RestartState>) -> Result<EM, Error>,
+    S: Serialize + DeserializeOwned,
+    SP: ShMemProvider,
+{
+    restarting_mgr.launch(|mut staterestorer, _new_shmem_provider, _core_id| {
+        // If we're restarting, deserialize the old state.
+        let (state, mgr) = match staterestorer.restore::<(Option<S>, EM::RestartState)>()? {
+            None => {
+                log::info!("First run. Let's set it all up");
+                // Mgr to send and receive msgs from/to all other fuzzer instances
+                (None::<S>, mgr_constructor(None)?)
+            }
+            // Restoring from a previous run, deserialize state and corpus.
+            Some((state, inner_state)) => {
+                log::info!("Subsequent run. Loaded previous state.");
+                // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
+                staterestorer.reset();
+
+                let mgr = mgr_constructor(Some(inner_state))?;
+                (state, mgr)
+            }
+        };
+
+        staterestorer.reset();
+
+        Ok((state, RestartingEventManager::new(mgr, staterestorer)))
+    })
 }

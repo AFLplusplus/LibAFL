@@ -9,6 +9,7 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
         tcp::TcpEventManager, EventConfig, EventRestarter, Launcher, RestartingEventManager,
+        ShouldSaveState,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -193,6 +194,7 @@ pub extern "C" fn libafl_main() {
         .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&libafl_bolts::core_affinity::Cores::from_cmdline("0-1").unwrap())
+        .serialize_state(ShouldSaveState::OOMSafeNever)
         .build()
         .launch_tcp(tuple_list!())
         .expect("Failed to launch TCP manager");
