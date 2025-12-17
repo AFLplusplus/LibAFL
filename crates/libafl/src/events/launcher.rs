@@ -53,8 +53,8 @@ use crate::state::{HasCurrentTestcase, HasExecutions, HasImported, HasSolutions,
 use crate::{
     Error,
     events::{
-        EventConfig, EventManagerHooksTuple, LlmpRestartingEventManager, LlmpRestartingMgr,
-        LlmpShouldSaveState, ManagerKind,
+        EventConfig, EventManagerHooksTuple, LlmpRestartingEventManager, LlmpShouldSaveState,
+        ManagerKind,
     },
     inputs::Input,
     monitors::Monitor,
@@ -534,33 +534,27 @@ where
                          client_description: Option<ClientDescription>,
                          monitor: Option<MT>| {
             if let Some(client_description) = client_description {
-                let builder = LlmpRestartingMgr::<EMH, I, MT, S, SP>::builder()
-                    .shmem_provider(launcher.shmem_provider.clone())
-                    .broker_port(launcher.broker_port)
-                    .kind(ManagerKind::Client { client_description })
-                    .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state)
-                    .hooks(hooks);
-                #[cfg(unix)]
-                let builder = builder.fork(launcher.fork);
-                builder.build().launch()
+                crate::events::llmp::setup_restarting_mgr_llmp(
+                    launcher.shmem_provider.clone(),
+                    launcher.configuration,
+                    None::<MT>, // monitor
+                    launcher.broker_port,
+                    ManagerKind::Client { client_description },
+                    None, // exit_cleanly_after
+                    launcher.serialize_state,
+                    hooks,
+                )
             } else {
-                let builder = LlmpRestartingMgr::<EMH, I, MT, S, SP>::builder()
-                    .shmem_provider(launcher.shmem_provider.clone())
-                    .monitor(monitor)
-                    .broker_port(launcher.broker_port)
-                    .kind(ManagerKind::Broker)
-                    .remote_broker_addr(launcher.remote_broker_addr)
-                    .exit_cleanly_after(Some(
-                        NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap(),
-                    ))
-                    .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state)
-                    .hooks(hooks);
-                #[cfg(unix)]
-                let builder = builder.fork(launcher.fork);
-
-                builder.build().launch()
+                crate::events::llmp::setup_restarting_mgr_llmp(
+                    launcher.shmem_provider.clone(),
+                    launcher.configuration,
+                    monitor,
+                    launcher.broker_port,
+                    ManagerKind::Broker,
+                    Some(NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap()),
+                    launcher.serialize_state,
+                    hooks,
+                )
             }
         };
 
@@ -592,34 +586,29 @@ where
                          client_description: Option<ClientDescription>,
                          monitor: Option<MT>| {
             if let Some(client_description) = client_description {
-                let builder = crate::events::tcp::TcpRestartingMgr::<EMH, I, MT, S, SP>::builder()
-                    .shmem_provider(launcher.shmem_provider.clone())
-                    .broker_port(launcher.broker_port)
-                    .kind(crate::events::tcp::TcpManagerKind::Client {
+                crate::events::tcp::setup_restarting_mgr_tcp_internal(
+                    launcher.shmem_provider.clone(),
+                    launcher.configuration,
+                    None::<MT>, // monitor
+                    launcher.broker_port,
+                    crate::events::tcp::TcpManagerKind::Client {
                         cpu_core: Some(client_description.core_id()),
-                    })
-                    .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state.on_restart())
-                    .hooks(hooks);
-                #[cfg(unix)]
-                let builder = builder.fork(launcher.fork);
-                builder.build().launch()
+                    },
+                    None, // exit_cleanly_after
+                    launcher.serialize_state.on_restart(),
+                    hooks,
+                )
             } else {
-                let builder = crate::events::tcp::TcpRestartingMgr::<EMH, I, MT, S, SP>::builder()
-                    .shmem_provider(launcher.shmem_provider.clone())
-                    .monitor(monitor)
-                    .broker_port(launcher.broker_port)
-                    .kind(crate::events::tcp::TcpManagerKind::Broker)
-                    .remote_broker_addr(launcher.remote_broker_addr)
-                    .exit_cleanly_after(Some(
-                        NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap(),
-                    ))
-                    .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state.on_restart())
-                    .hooks(hooks);
-                #[cfg(unix)]
-                let builder = builder.fork(launcher.fork);
-                builder.build().launch()
+                crate::events::tcp::setup_restarting_mgr_tcp_internal(
+                    launcher.shmem_provider.clone(),
+                    launcher.configuration,
+                    monitor,
+                    launcher.broker_port,
+                    crate::events::tcp::TcpManagerKind::Broker,
+                    Some(NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap()),
+                    launcher.serialize_state.on_restart(),
+                    hooks,
+                )
             }
         };
 
@@ -1116,17 +1105,16 @@ where
         let restarting_mgr_builder =
             |launcher: &Launcher<'a, CF, MT, SP>, client_description: ClientDescription| {
                 // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                let builder = LlmpRestartingMgr::<(), I, MT, S, SP>::builder()
-                    .shmem_provider(launcher.shmem_provider.clone())
-                    .broker_port(launcher.broker_port)
-                    .kind(ManagerKind::Client { client_description })
-                    .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state)
-                    .hooks(tuple_list!());
-                #[cfg(unix)]
-                let builder = builder.fork(launcher.fork);
-
-                builder.build().launch()
+                crate::events::llmp::setup_restarting_mgr_llmp(
+                    launcher.shmem_provider.clone(),
+                    launcher.configuration,
+                    None::<MT>, // monitor
+                    launcher.broker_port,
+                    ManagerKind::Client { client_description },
+                    None, // exit_cleanly_after
+                    launcher.serialize_state,
+                    tuple_list!(),
+                )
             };
 
         self.launch_centralized_custom(restarting_mgr_builder, restarting_mgr_builder)
