@@ -51,7 +51,7 @@ use crate::{
     corpus::HasCurrentCorpusId,
     events::{
         EventConfig, EventManagerHooksTuple, LlmpRestartingEventManager, ManagerKind,
-        restarting::ShouldSaveState,
+        ShouldSaveState,
     },
     inputs::Input,
     monitors::Monitor,

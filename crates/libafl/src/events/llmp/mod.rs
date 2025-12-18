@@ -47,7 +47,7 @@ pub(crate) const _LLMP_TAG_NO_RESTART: Tag = Tag(0x57A7EE71);
 /// The minimum buffer size at which to compress LLMP IPC messages.
 #[cfg(feature = "llmp_compression")]
 pub const COMPRESS_THRESHOLD: usize = 1024;
-use crate::events::restarting::ShouldSaveState;
+use crate::events::ShouldSaveState;
 
 /// A manager-like llmp client that converts between input types
 pub struct LlmpEventConverter<I, IC, ICB, S, SHM, SP> {
@@ -405,6 +405,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<EMH, I, S, SHM, SP> crate::events::Restorable<S, SP> for LlmpEventManager<EMH, I, S, SHM, SP>
 where
     S: Serialize + HasCurrentStageId,

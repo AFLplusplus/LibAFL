@@ -241,12 +241,11 @@ where
                                 "TCP Manager - Not forwarding message from this very client ({this_client_id:?})."
                             );
                             continue;
-                        } else {
-                            log::info!(
-                                "TCP Manager - Forwarding message from {this_client_id:?} (buf starts with {:?})",
-                                &buf[..4]
-                            );
                         }
+                        log::info!(
+                            "TCP Manager - Forwarding message from {this_client_id:?} (buf starts with {:?})",
+                            &buf[..4]
+                        );
 
                         // subtract 4 since the client_id isn't part of the actual message.
                         let len = u32::try_from(buf.len() - 4).unwrap();

@@ -75,7 +75,7 @@ where
     }
 }
 
-use crate::events::restarting::ShouldSaveState;
+use crate::events::ShouldSaveState;
 
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
