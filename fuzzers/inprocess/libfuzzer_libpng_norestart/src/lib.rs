@@ -8,47 +8,36 @@ use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::Parser;
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, InMemoryOnDiskCorpus},
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
-        llmp::restarting::setup_restarting_mgr_std_adaptive,
-        restarting::ShouldSaveState,
-        EventConfig,
-        Launcher,
-        LlmpRestartingEventManager,
-        ClientDescription,
-        EventRestarter,
+        ClientDescription, EventConfig, EventRestarter, Launcher, LlmpRestartingEventManager,
+        ShouldSaveState,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
+    feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::{MultiMonitor, OnDiskTomlMonitor},
     mutators::{
-        scheduled::{HavocScheduledMutator, tokens_mutations},
-        token_mutations::Tokens,
         havoc_mutations,
+        scheduled::{tokens_mutations, HavocScheduledMutator},
+        token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver, CanTrack},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
-    Error,
-    feedback_or, feedback_or_fast,
-    HasMetadata,
+    Error, HasMetadata,
 };
 use libafl_bolts::{
-    current_nanos,
+    core_affinity::Cores,
     rands::StdRand,
-    shmem::{ShMemProvider, StdShMemProvider, MmapShMemProvider},
+    shmem::{MmapShMemProvider, ShMemProvider},
     tuples::{tuple_list, Merge},
     AsSlice,
-    core_affinity::Cores,
 };
-use libafl_targets::{
-    std_edges_map_observer,
-    libfuzzer_test_one_input,
-    libfuzzer_initialize,
-};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
