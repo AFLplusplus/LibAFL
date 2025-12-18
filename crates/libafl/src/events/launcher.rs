@@ -1580,9 +1580,12 @@ mod tests {
                 },
             )
             .cores(&cores)
-            .broker_port(1337)
-            .stdout_file(Some("/dev/null"))
-            .build();
+            .broker_port(1337);
+
+        #[cfg(unix)]
+        let launcher = launcher.stdout_file(Some("/dev/null"));
+
+        let launcher = launcher.build();
 
         launcher
             .launch_with_manager(|_launcher, _desc, _monitor| {
