@@ -214,11 +214,6 @@ where
             .is_err()
         {
             // First, create a channel from the current fuzzer to the next to store state between restarts.
-            #[cfg(unix)]
-            let staterestorer: StateRestorer<SP::ShMem, SP> =
-                StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
-
-            #[cfg(not(unix))]
             let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
