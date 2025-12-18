@@ -15,13 +15,14 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
-    inputs::{NautilusBytesConverter, NautilusInput, TargetBytesInputConverter},
+    inputs::{
+        BytesTargetInputConverter, NautilusBytesConverter, NautilusInput, TargetBytesInputConverter,
+    },
     monitors::SimpleMonitor,
     mutators::{
         HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
         NautilusSpliceMutator,
     },
-    none_input_converter,
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, sync::SyncFromBrokerStage},
     state::StdState,
@@ -129,7 +130,9 @@ pub extern "C" fn libafl_main() {
                 Some(TargetBytesInputConverter::from(
                     NautilusBytesConverter::new(&context),
                 )),
-                none_input_converter!(),
+                Some(BytesTargetInputConverter::new(
+                    NautilusBytesConverter::new(&context).on_error_return_empty(true),
+                )),
             )
             .unwrap()
     });

@@ -101,13 +101,24 @@ impl Hash for NautilusInput {
 #[derive(Debug)]
 pub struct NautilusBytesConverter<'a> {
     ctx: &'a NautilusContext,
+    on_error_return_empty: bool,
 }
 
 impl<'a> NautilusBytesConverter<'a> {
     #[must_use]
     /// Create a new `NautilusBytesConverter` from a context
     pub fn new(ctx: &'a NautilusContext) -> Self {
-        Self { ctx }
+        Self {
+            ctx,
+            on_error_return_empty: false,
+        }
+    }
+
+    #[must_use]
+    /// If true, return an empty `NautilusInput` instead of an error if parsing fails
+    pub fn on_error_return_empty(mut self, on_error_return_empty: bool) -> Self {
+        self.on_error_return_empty = on_error_return_empty;
+        self
     }
 }
 
@@ -230,17 +241,22 @@ impl crate::inputs::FromTargetBytes<NautilusInput> for NautilusBytesConverter<'_
     fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<NautilusInput, libafl_bolts::Error> {
         let start_nt = self.ctx.ctx.nt_id("START");
         let mut parser = NautilusParser::new(&self.ctx.ctx, bytes);
-        if let Some((rules, consumed)) = parser.parse_nt(start_nt, 0)?
-            && consumed == bytes.len()
-        {
-            return Ok(NautilusInput::new(Tree::from_rule_vec(
-                rules,
-                &self.ctx.ctx,
-            )));
+        let res = parser.parse_nt(start_nt, 0);
+        match res {
+            Ok(Some((rules, consumed))) if consumed == bytes.len() => Ok(NautilusInput::new(
+                Tree::from_rule_vec(rules, &self.ctx.ctx),
+            )),
+            Err(e) if !self.on_error_return_empty => Err(e),
+            _ => {
+                if self.on_error_return_empty {
+                    Ok(NautilusInput::empty())
+                } else {
+                    Err(libafl_bolts::Error::illegal_argument(
+                        "Failed to parse bytes into NautilusInput",
+                    ))
+                }
+            }
         }
-        Err(libafl_bolts::Error::illegal_argument(
-            "Failed to parse bytes into NautilusInput",
-        ))
     }
 }
 
