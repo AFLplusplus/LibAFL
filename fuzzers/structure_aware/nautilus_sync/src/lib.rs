@@ -15,7 +15,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
-    inputs::{NautilusInput, NautilusInputConverter, TargetBytesInputConverter},
+    inputs::{NautilusBytesConverter, NautilusInput, TargetBytesInputConverter},
     monitors::SimpleMonitor,
     mutators::{
         HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
@@ -127,7 +127,7 @@ pub extern "C" fn libafl_main() {
                 shmem_provider.clone(),
                 port,
                 Some(TargetBytesInputConverter::from(
-                    NautilusInputConverter::new(&context),
+                    NautilusBytesConverter::new(&context),
                 )),
                 none_input_converter!(),
             )

@@ -13,7 +13,7 @@ use libafl::{
     },
     fuzzer::Fuzzer,
     generators::{NautilusContext, NautilusGenerator},
-    inputs::{NautilusInput, NautilusInputConverter},
+    inputs::{NautilusBytesConverter, NautilusInput},
     monitors::SimpleMonitor,
     mutators::{
         HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
@@ -178,7 +178,7 @@ pub fn main() {
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let converter = NautilusInputConverter::new(&context);
+    let converter = NautilusBytesConverter::new(&context);
     let mut fuzzer = StdFuzzerBuilder::new()
         .input_filter(BloomInputFilter::default())
         .target_bytes_converter(converter)

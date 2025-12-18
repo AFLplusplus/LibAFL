@@ -10,7 +10,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
-    inputs::{NautilusInput, NautilusInputConverter},
+    inputs::{NautilusBytesConverter, NautilusInput},
     monitors::SimpleMonitor,
     mutators::{
         HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
@@ -96,7 +96,7 @@ pub fn main() {
         .scheduler(scheduler)
         .feedback(feedback)
         .objective(objective)
-        .target_bytes_converter(NautilusInputConverter::new(&ctx))
+        .target_bytes_converter(NautilusBytesConverter::new(&ctx))
         .build();
 
     // Create the executor for an in-process function with just one observer

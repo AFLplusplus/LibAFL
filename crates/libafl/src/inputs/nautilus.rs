@@ -99,19 +99,19 @@ impl Hash for NautilusInput {
 
 /// Convert from `NautilusInput` to `BytesInput`
 #[derive(Debug)]
-pub struct NautilusInputConverter<'a> {
+pub struct NautilusBytesConverter<'a> {
     ctx: &'a NautilusContext,
 }
 
-impl<'a> NautilusInputConverter<'a> {
+impl<'a> NautilusBytesConverter<'a> {
     #[must_use]
-    /// Create a new `NautilusInputConverter` from a context
+    /// Create a new `NautilusBytesConverter` from a context
     pub fn new(ctx: &'a NautilusContext) -> Self {
         Self { ctx }
     }
 }
 
-impl ToTargetBytes<NautilusInput> for NautilusInputConverter<'_> {
+impl ToTargetBytes<NautilusInput> for NautilusBytesConverter<'_> {
     fn to_target_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
         let mut bytes = vec![];
         input.unparse(self.ctx, &mut bytes);
@@ -226,7 +226,7 @@ impl<'a> NautilusParser<'a> {
     }
 }
 
-impl crate::inputs::FromTargetBytes<NautilusInput> for NautilusInputConverter<'_> {
+impl crate::inputs::FromTargetBytes<NautilusInput> for NautilusBytesConverter<'_> {
     fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<NautilusInput, libafl_bolts::Error> {
         let start_nt = self.ctx.ctx.nt_id("START");
         let mut parser = NautilusParser::new(&self.ctx.ctx, bytes);
@@ -250,7 +250,7 @@ mod tests {
 
     use libafl_bolts::AsSlice;
 
-    use super::{NautilusContext, NautilusInputConverter};
+    use super::{NautilusBytesConverter, NautilusContext};
     use crate::inputs::{FromTargetBytes, ToTargetBytes};
 
     #[test]
@@ -263,7 +263,7 @@ mod tests {
             vec!["A".to_string(), "b".to_string()],
         ];
         let ctx = NautilusContext::new(10, &rules);
-        let mut converter = NautilusInputConverter::new(&ctx);
+        let mut converter = NautilusBytesConverter::new(&ctx);
 
         // Test roundtrip
         let bytes = b"aab";
