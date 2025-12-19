@@ -863,7 +863,7 @@ pub fn setup_restarting_mgr_tcp<I, MT, S>(
     Error,
 >
 where
-    MT: Monitor + Clone,
+    MT: Monitor,
     S: HasExecutions
         + HasMetadata
         + HasImported
@@ -909,7 +909,7 @@ pub fn setup_restarting_mgr_tcp_internal<EMH, I, MT, S, SP>(
 where
     EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     I: Input,
-    MT: Monitor + Clone,
+    MT: Monitor,
     S: HasExecutions
         + HasMetadata
         + HasImported

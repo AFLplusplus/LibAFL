@@ -173,7 +173,7 @@ fuzzer-tcp: lib cxx-tcp
 [macos]
 fuzzer-tcp: lib cxx-tcp
     cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tcp -lm -lz -framework CoreFoundation -framework Security --libafl-ignore-configurations -Wl,--allow-multiple-definition -fsanitize=undefined
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tcp -lm -lz -framework CoreFoundation -framework Security --libafl-ignore-configurations -fsanitize=undefined
 
 [linux]
 [macos]
@@ -266,10 +266,14 @@ cxx-all:
     cargo build --profile {{PROFILE}} --features tui,tcp_manager,statsd
 
 [linux]
-[macos]
 fuzzer-all: lib cxx-all
     cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
     {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,--whole-archive {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -Wl,--no-whole-archive -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-all -lm -lz --libafl-ignore-configurations -Wl,--allow-multiple-definition -fsanitize=undefined
+
+[macos]
+fuzzer-all: lib cxx-all
+    cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-all -lm -lz -framework CoreFoundation -framework Security --libafl-ignore-configurations -fsanitize=undefined
 
 [linux]
 [macos]
@@ -285,6 +289,7 @@ test-all: fuzzer-all
         echo "Fuzzer (All+TCP) failed"
         exit 1
     fi
+    rm -rf libafl_unix_shmem_server || true
     echo "Testing all features (TUI mode)..."
     timeout 5s ./{{FUZZER_NAME}}-all --broker-port 21351 --cores 0 --input ./corpus --tui > fuzzer_all_tui.log 2>&1 || true
     if grep -q "panic" fuzzer_all_tui.log; then

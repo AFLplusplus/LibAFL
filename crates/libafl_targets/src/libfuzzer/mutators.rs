@@ -174,14 +174,14 @@ where
 
                 if succeeded {
                     let target = intermediary.mutator_bytes();
-                    if target.as_slice().len() > max_size {
+                    if target.len() > max_size {
                         self.result
                             .replace(Err(Error::illegal_state("Mutation result was too long!")))
                             .ok();
                     } else {
                         let actual = unsafe { core::slice::from_raw_parts_mut(data, max_size) };
-                        actual[..target.as_slice().len()].copy_from_slice(target.as_slice());
-                        new_size = target.as_slice().len();
+                        actual[..target.len()].copy_from_slice(target.as_slice());
+                        new_size = target.len();
                     }
                 }
                 return;
