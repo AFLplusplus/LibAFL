@@ -11,8 +11,6 @@ use std::{
 #[cfg(feature = "tcp_compression")]
 use libafl_bolts::compress::GzipCompressor;
 #[cfg(any(windows, unix))]
-#[cfg(all(unix, not(miri)))]
-#[cfg(unix)]
 use libafl_bolts::{
     ClientId,
     core_affinity::CoreId,
