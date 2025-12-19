@@ -10,7 +10,6 @@ use std::{
 
 #[cfg(feature = "tcp_compression")]
 use libafl_bolts::compress::GzipCompressor;
-#[cfg(any(windows, unix))]
 use libafl_bolts::{
     ClientId,
     core_affinity::CoreId,
