@@ -55,7 +55,7 @@ impl Default for StatsdMonitorTagFlavor {
 }
 
 /// StatsD monitor
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct StatsdMonitor {
     target_host: String,
     target_port: u16,

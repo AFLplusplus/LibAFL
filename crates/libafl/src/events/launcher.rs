@@ -498,7 +498,7 @@ where
             + MaybeHasClientPerfMonitor
             + HasCurrentCorpusId
             + HasCorpus<I>,
-        MT: Clone,
+        MT: Monitor,
     {
         self.launch_with_hooks(tuple_list!())
     }
@@ -610,7 +610,7 @@ where
             + MaybeHasClientPerfMonitor
             + HasCorpus<I>
             + HasCurrentStageId,
-        MT: Clone,
+        MT: Monitor,
     {
         let spawn_mgr = |launcher: &Self,
                          client_description: Option<ClientDescription>,
@@ -948,14 +948,14 @@ where
     /// Launch the common broker logic
     #[cfg(unix)]
     pub fn launch_common_broker<I, S>(
-        self,
+        mut self,
         handles: &[libc::pid_t],
         centralized_broker_port: Option<u16>,
     ) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
         S: DeserializeOwned + Serialize,
-        MT: Monitor + Clone + 'static,
+        MT: Monitor + 'static,
         SP: ShMemProvider + 'static,
     {
         // Create this after forks, to avoid problems with tokio runtime
@@ -1013,7 +1013,7 @@ where
             #[cfg(not(feature = "multi_machine"))]
             let llmp_hook = tuple_list!(StdLlmpEventHook::<I, MT>::new(
                 self.monitor
-                    .clone()
+                    .take()
                     .expect("Monitor must be provided when spawning a broker")
             )?);
 
@@ -1021,7 +1021,7 @@ where
             let llmp_hook = tuple_list!(
                 StdLlmpEventHook::<I, MT>::new(
                     self.monitor
-                        .clone()
+                        .take()
                         .expect("Monitor must be provided when spawning a broker")
                 )?,
                 multi_machine_sender_hook,
@@ -1101,7 +1101,7 @@ impl<'a> CentralizedLauncher<'a, (), (), (), ()> {
 #[cfg(unix)]
 impl<'a, CF, MF, MT, SP> CentralizedLauncher<'a, CF, MF, MT, SP>
 where
-    MT: Monitor + Clone + 'static,
+    MT: Monitor + 'static,
     SP: ShMemProvider + 'static,
 {
     /// Launch a Centralized-based fuzzer
