@@ -180,7 +180,7 @@ where
                             .ok();
                     } else {
                         let actual = unsafe { core::slice::from_raw_parts_mut(data, max_size) };
-                        actual[..target.len()].copy_from_slice(target.as_slice());
+                        actual[..target.len()].copy_from_slice(target);
                         new_size = target.len();
                     }
                 }
