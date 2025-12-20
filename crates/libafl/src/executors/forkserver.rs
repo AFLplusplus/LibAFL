@@ -832,9 +832,7 @@ where
             // Extend like AFL++ does
             input_size = self.min_input_size;
             let mut input_bytes_copy = Vec::with_capacity(input_size);
-            input_bytes_copy
-                .as_slice_mut()
-                .copy_from_slice(input.as_slice());
+            input_bytes_copy.as_slice_mut().copy_from_slice(input);
             self.map_input_to_shmem(&input_bytes_copy, input_size)?;
         } else {
             self.map_input_to_shmem(input, input_size)?;

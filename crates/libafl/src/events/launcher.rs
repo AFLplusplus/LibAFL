@@ -42,23 +42,23 @@ use {
     std::{fs::File, os::unix::io::AsRawFd},
 };
 
-#[cfg(feature = "tcp_manager")]
-use crate::HasMetadata;
 #[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::NodeDescriptor;
 #[cfg(all(unix, feature = "multi_machine"))]
 use crate::events::multi_machine::TcpMultiMachineHooks;
-#[cfg(any(unix, feature = "tcp_manager"))]
-use crate::inputs::Input;
-#[cfg(feature = "tcp_manager")]
-use crate::state::{HasCurrentTestcase, HasExecutions, HasImported, HasSolutions, Stoppable};
 use crate::{
-    Error,
+    Error, HasMetadata,
+    corpus::HasCurrentCorpusId,
     events::{
-        EventConfig, EventManagerHooksTuple, LlmpRestartingEventManager, LlmpShouldSaveState,
-        ManagerKind, RestartingMgr,
+        EventConfig, EventManagerHooksTuple, LlmpRestartingEventManager, ManagerKind,
+        ShouldSaveState,
     },
+    inputs::Input,
     monitors::Monitor,
+    state::{
+        HasCorpus, HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported,
+        HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
+    },
 };
 
 /// The (internal) `env` that indicates we're running as client.
@@ -170,7 +170,7 @@ pub struct Launcher<'a, CF, MT, SP> {
     /// Then, clients launched by this [`Launcher`] can connect to the original `broker`.
     spawn_broker: bool,
     /// Tell the manager to serialize or not the state on restart
-    serialize_state: LlmpShouldSaveState,
+    serialize_state: ShouldSaveState,
     /// If this launcher should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
     #[cfg(unix)]
     fork: bool,
@@ -203,7 +203,7 @@ pub struct LauncherBuilder<'a, CF, MT, SP> {
     #[cfg(all(unix, feature = "multi_machine"))]
     multi_machine_node_descriptor: Option<NodeDescriptor<SocketAddr>>,
     spawn_broker: bool,
-    serialize_state: LlmpShouldSaveState,
+    serialize_state: ShouldSaveState,
     #[cfg(unix)]
     fork: bool,
 }
@@ -227,9 +227,11 @@ impl LauncherBuilder<'_, (), (), ()> {
             stderr_file: None,
             remote_broker_addr: None,
             #[cfg(all(unix, feature = "multi_machine"))]
-            multi_machine_node_descriptor: None,
+            multi_machine_node_descriptor: Some(
+                NodeDescriptor::builder().parent_addr(None).build(),
+            ),
             spawn_broker: true,
-            serialize_state: LlmpShouldSaveState::OnRestart,
+            serialize_state: ShouldSaveState::OnRestart,
             #[cfg(unix)]
             fork: true,
         }
@@ -307,7 +309,7 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
 
     /// The 'main' function to run for each client forked. This probably shouldn't return
     #[must_use]
-    pub fn run_client<NewCF>(self, run_client: NewCF) -> LauncherBuilder<'a, NewCF, MT, SP> {
+    pub fn run_client<CF2>(self, run_client: CF2) -> LauncherBuilder<'a, CF2, MT, SP> {
         LauncherBuilder {
             shmem_provider: self.shmem_provider,
             monitor: self.monitor,
@@ -404,7 +406,7 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
 
     /// Tell the manager to serialize or not the state on restart
     #[must_use]
-    pub fn serialize_state(mut self, serialize_state: LlmpShouldSaveState) -> Self {
+    pub fn serialize_state(mut self, serialize_state: ShouldSaveState) -> Self {
         self.serialize_state = serialize_state;
         self
     }
@@ -469,7 +471,7 @@ impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
     }
 }
 
-impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
+impl<'a, CF, MT, SP> Launcher<'a, CF, MT, SP>
 where
     MT: Monitor,
     SP: ShMemProvider,
@@ -482,10 +484,52 @@ where
             LlmpRestartingEventManager<(), I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
-        I: DeserializeOwned,
-        S: DeserializeOwned + Serialize,
+        I: DeserializeOwned + Input,
+        S: DeserializeOwned
+            + Serialize
+            + HasCurrentStageId
+            + HasImported
+            + HasCurrentTestcase<I>
+            + HasSolutions<I>
+            + Stoppable
+            + HasMetadata
+            + HasExecutions
+            + HasLastReportTime
+            + MaybeHasClientPerfMonitor
+            + HasCurrentCorpusId
+            + HasCorpus<I>,
+        MT: Monitor,
     {
-        Self::launch_with_hooks(self, tuple_list!())
+        self.launch_with_hooks(tuple_list!())
+    }
+
+    /// Set the `run_client` callback
+    pub fn run_client<CF2>(self, run_client: CF2) -> Launcher<'a, CF2, MT, SP> {
+        Launcher {
+            shmem_provider: self.shmem_provider,
+            monitor: self.monitor,
+            configuration: self.configuration,
+            run_client: Some(run_client),
+            broker_port: self.broker_port,
+            cores: self.cores,
+            overcommit: self.overcommit,
+            #[cfg(unix)]
+            stdout_file: self.stdout_file,
+            launch_delay: self.launch_delay,
+            #[cfg(unix)]
+            opened_stdout_file: self.opened_stdout_file,
+            #[cfg(unix)]
+            stderr_file: self.stderr_file,
+            #[cfg(unix)]
+            opened_stderr_file: self.opened_stderr_file,
+            remote_broker_addr: self.remote_broker_addr,
+            #[cfg(all(unix, feature = "multi_machine"))]
+            multi_machine_node_descriptor: self.multi_machine_node_descriptor,
+            spawn_broker: self.spawn_broker,
+            serialize_state: self.serialize_state,
+            #[cfg(unix)]
+            fork: self.fork,
+        }
     }
 
     /// Launch the broker and the clients and fuzz with a user-supplied hook
@@ -497,44 +541,50 @@ where
             ClientDescription,
         ) -> Result<(), Error>,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
-        I: DeserializeOwned,
-        S: DeserializeOwned + Serialize,
+        I: DeserializeOwned + Input,
+        S: DeserializeOwned
+            + Serialize
+            + HasCurrentStageId
+            + HasImported
+            + HasCurrentTestcase<I>
+            + HasSolutions<I>
+            + Stoppable
+            + HasMetadata
+            + HasExecutions
+            + HasLastReportTime
+            + MaybeHasClientPerfMonitor
+            + HasCurrentCorpusId
+            + HasCorpus<I>,
     {
         let spawn_mgr = |launcher: &Self,
                          client_description: Option<ClientDescription>,
                          monitor: Option<MT>| {
             if let Some(client_description) = client_description {
-                let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
-                    .shmem_provider(launcher.shmem_provider.clone())
-                    .broker_port(launcher.broker_port)
-                    .kind(ManagerKind::Client { client_description })
-                    .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state)
-                    .hooks(hooks);
-                #[cfg(unix)]
-                let builder = builder.fork(launcher.fork);
-                builder.build().launch()
+                crate::events::llmp::setup_restarting_mgr_llmp(
+                    launcher.shmem_provider.clone(),
+                    launcher.configuration,
+                    None::<MT>, // monitor
+                    launcher.broker_port,
+                    ManagerKind::Client { client_description },
+                    None, // exit_cleanly_after
+                    launcher.serialize_state,
+                    hooks,
+                )
             } else {
-                let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
-                    .shmem_provider(launcher.shmem_provider.clone())
-                    .monitor(monitor)
-                    .broker_port(launcher.broker_port)
-                    .kind(ManagerKind::Broker)
-                    .remote_broker_addr(launcher.remote_broker_addr)
-                    .exit_cleanly_after(Some(
-                        NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap(),
-                    ))
-                    .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state)
-                    .hooks(hooks);
-                #[cfg(unix)]
-                let builder = builder.fork(launcher.fork);
-
-                builder.build().launch()
+                crate::events::llmp::setup_restarting_mgr_llmp(
+                    launcher.shmem_provider.clone(),
+                    launcher.configuration,
+                    monitor,
+                    launcher.broker_port,
+                    ManagerKind::Broker,
+                    Some(NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap()),
+                    launcher.serialize_state,
+                    hooks,
+                )
             }
         };
 
-        self.launch_common(spawn_mgr)
+        self.launch_with_manager(spawn_mgr)
     }
 
     /// Launch the broker and the clients and fuzz with a user-supplied hook
@@ -543,7 +593,7 @@ where
     where
         CF: FnOnce(
             Option<S>,
-            crate::events::tcp::TcpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
+            crate::events::tcp::TcpRestartingEventManager<EMH, I, S, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
@@ -555,51 +605,51 @@ where
             + HasImported
             + HasSolutions<I>
             + HasCurrentTestcase<I>
-            + Stoppable,
-        MT: Clone,
+            + Stoppable
+            + HasLastReportTime
+            + MaybeHasClientPerfMonitor
+            + HasCorpus<I>
+            + HasCurrentStageId,
+        MT: Monitor,
     {
         let spawn_mgr = |launcher: &Self,
                          client_description: Option<ClientDescription>,
                          monitor: Option<MT>| {
             if let Some(client_description) = client_description {
-                let builder = crate::events::tcp::TcpRestartingMgr::<EMH, I, MT, S, SP>::builder()
-                    .shmem_provider(launcher.shmem_provider.clone())
-                    .broker_port(launcher.broker_port)
-                    .kind(crate::events::tcp::TcpManagerKind::Client {
+                crate::events::tcp::setup_restarting_mgr_tcp_internal(
+                    launcher.shmem_provider.clone(),
+                    launcher.configuration,
+                    None::<MT>, // monitor
+                    launcher.broker_port,
+                    crate::events::tcp::TcpManagerKind::Client {
                         cpu_core: Some(client_description.core_id()),
-                    })
-                    .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state.on_restart())
-                    .hooks(hooks);
-                #[cfg(unix)]
-                let builder = builder.fork(launcher.fork);
-                builder.build().launch()
+                    },
+                    None, // exit_cleanly_after
+                    launcher.serialize_state.on_restart(),
+                    hooks,
+                )
             } else {
-                let builder = crate::events::tcp::TcpRestartingMgr::<EMH, I, MT, S, SP>::builder()
-                    .shmem_provider(launcher.shmem_provider.clone())
-                    .monitor(monitor)
-                    .broker_port(launcher.broker_port)
-                    .kind(crate::events::tcp::TcpManagerKind::Broker)
-                    .remote_broker_addr(launcher.remote_broker_addr)
-                    .exit_cleanly_after(Some(
-                        NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap(),
-                    ))
-                    .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state.on_restart())
-                    .hooks(hooks);
-                #[cfg(unix)]
-                let builder = builder.fork(launcher.fork);
-                builder.build().launch()
+                crate::events::tcp::setup_restarting_mgr_tcp_internal(
+                    launcher.shmem_provider.clone(),
+                    launcher.configuration,
+                    monitor,
+                    launcher.broker_port,
+                    crate::events::tcp::TcpManagerKind::Broker,
+                    Some(NonZeroUsize::try_from(launcher.cores.ids.len()).unwrap()),
+                    launcher.serialize_state.on_restart(),
+                    hooks,
+                )
             }
         };
 
-        self.launch_common(spawn_mgr)
+        self.launch_with_manager(spawn_mgr)
     }
 
+    /// Launch the broker and the clients and fuzz with a user-supplied manager creator
     #[expect(clippy::too_many_lines, clippy::match_wild_err_arm)]
-    fn launch_common<EM, F, S>(mut self, spawn_mgr: F) -> Result<(), Error>
+    pub fn launch_with_manager<EM, F, S>(mut self, mut spawn_mgr: F) -> Result<(), Error>
     where
-        F: Fn(&Self, Option<ClientDescription>, Option<MT>) -> Result<(Option<S>, EM), Error>,
+        F: FnMut(&Self, Option<ClientDescription>, Option<MT>) -> Result<(Option<S>, EM), Error>,
         CF: FnOnce(Option<S>, EM, ClientDescription) -> Result<(), Error>,
     {
         #[cfg(unix)]
@@ -699,7 +749,15 @@ where
                 if self.spawn_broker {
                     log::info!("I am broker!!.");
                     let monitor = self.monitor.take();
-                    spawn_mgr(&self, None, monitor)?;
+                    match spawn_mgr(&self, None, monitor) {
+                        Ok(_) => {}
+                        Err(Error::ShuttingDown) => {
+                            log::info!("Broker shutting down");
+                        }
+                        Err(e) => {
+                            log::error!("Broker exited with error: {e:?}");
+                        }
+                    }
                 }
 
                 Self::wait_for_pids(&handles, self.spawn_broker);
@@ -725,6 +783,24 @@ where
                 Err(std::env::VarError::NotPresent) => {
                     // I am a broker
                     // before going to the broker loop, spawn n clients
+
+                    if std::env::var(crate::events::restarting::_ENV_FUZZER_SENDER).is_ok() {
+                        // We are the child of a restarting manager (e.g. the Broker child)
+                        // We should not spawn clients again, but just run the broker logic
+                        if self.spawn_broker {
+                            let monitor = self.monitor.take();
+                            match spawn_mgr(&self, None, monitor) {
+                                Ok(_) => {}
+                                Err(Error::ShuttingDown) => {
+                                    log::info!("Broker shutting down");
+                                }
+                                Err(e) => {
+                                    log::error!("Broker exited with error: {e:?}");
+                                }
+                            }
+                        }
+                        return Ok(());
+                    }
 
                     let core_ids = get_core_ids().unwrap();
                     let mut handles = vec![];
@@ -779,15 +855,9 @@ where
 
                                 let client_description =
                                     ClientDescription::new(index, overcommit_i, core_id);
-                                // # Safety
-                                // This is set only once, in here, for the child.
-                                unsafe {
-                                    std::env::set_var(
-                                        _AFL_LAUNCHER_CLIENT,
-                                        client_description.to_safe_string(),
-                                    );
-                                }
                                 let mut child = startable_self()?;
+                                child
+                                    .env(_AFL_LAUNCHER_CLIENT, client_description.to_safe_string());
                                 let child = (if debug_output {
                                     &mut child
                                 } else {
@@ -878,14 +948,14 @@ where
     /// Launch the common broker logic
     #[cfg(unix)]
     pub fn launch_common_broker<I, S>(
-        self,
+        mut self,
         handles: &[libc::pid_t],
         centralized_broker_port: Option<u16>,
     ) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
         S: DeserializeOwned + Serialize,
-        MT: Monitor + Clone + 'static,
+        MT: Monitor + 'static,
         SP: ShMemProvider + 'static,
     {
         // Create this after forks, to avoid problems with tokio runtime
@@ -943,7 +1013,7 @@ where
             #[cfg(not(feature = "multi_machine"))]
             let llmp_hook = tuple_list!(StdLlmpEventHook::<I, MT>::new(
                 self.monitor
-                    .clone()
+                    .take()
                     .expect("Monitor must be provided when spawning a broker")
             )?);
 
@@ -951,7 +1021,7 @@ where
             let llmp_hook = tuple_list!(
                 StdLlmpEventHook::<I, MT>::new(
                     self.monitor
-                        .clone()
+                        .take()
                         .expect("Monitor must be provided when spawning a broker")
                 )?,
                 multi_machine_sender_hook,
@@ -1031,14 +1101,26 @@ impl<'a> CentralizedLauncher<'a, (), (), (), ()> {
 #[cfg(unix)]
 impl<'a, CF, MF, MT, SP> CentralizedLauncher<'a, CF, MF, MT, SP>
 where
-    MT: Monitor + Clone + 'static,
+    MT: Monitor + 'static,
     SP: ShMemProvider + 'static,
 {
     /// Launch a Centralized-based fuzzer
     pub fn launch_centralized<I, S>(self) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
-        S: DeserializeOwned + Serialize,
+        S: DeserializeOwned
+            + Serialize
+            + HasCurrentStageId
+            + HasImported
+            + HasCurrentTestcase<I>
+            + HasSolutions<I>
+            + Stoppable
+            + HasMetadata
+            + HasExecutions
+            + HasLastReportTime
+            + MaybeHasClientPerfMonitor
+            + HasCurrentCorpusId
+            + HasCorpus<I>,
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<
@@ -1065,17 +1147,16 @@ where
         let restarting_mgr_builder =
             |launcher: &Launcher<'a, CF, MT, SP>, client_description: ClientDescription| {
                 // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                let builder = RestartingMgr::<(), I, MT, S, SP>::builder()
-                    .shmem_provider(launcher.shmem_provider.clone())
-                    .broker_port(launcher.broker_port)
-                    .kind(ManagerKind::Client { client_description })
-                    .configuration(launcher.configuration)
-                    .serialize_state(launcher.serialize_state)
-                    .hooks(tuple_list!());
-                #[cfg(unix)]
-                let builder = builder.fork(launcher.fork);
-
-                builder.build().launch()
+                crate::events::llmp::setup_restarting_mgr_llmp(
+                    launcher.shmem_provider.clone(),
+                    launcher.configuration,
+                    None::<MT>, // monitor
+                    launcher.broker_port,
+                    ManagerKind::Client { client_description },
+                    None, // exit_cleanly_after
+                    launcher.serialize_state,
+                    tuple_list!(),
+                )
             };
 
         self.launch_centralized_custom(restarting_mgr_builder, restarting_mgr_builder)
@@ -1091,7 +1172,19 @@ where
     ) -> Result<(), Error>
     where
         I: Input + Send + Sync + 'static,
-        S: DeserializeOwned + Serialize,
+        S: DeserializeOwned
+            + Serialize
+            + HasCurrentStageId
+            + HasImported
+            + HasCurrentTestcase<I>
+            + HasSolutions<I>
+            + Stoppable
+            + HasMetadata
+            + HasExecutions
+            + HasLastReportTime
+            + MaybeHasClientPerfMonitor
+            + HasCurrentCorpusId
+            + HasCorpus<I>,
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<EM, I, S, SP::ShMem, SP>,
@@ -1113,141 +1206,111 @@ where
         let mut main_inner_mgr_builder = Some(main_inner_mgr_builder);
         let mut secondary_inner_mgr_builder = Some(secondary_inner_mgr_builder);
 
-        if self.launcher.cores.ids.is_empty() {
-            return Err(Error::illegal_argument(
-                "No cores to spawn on given, cannot launch anything.",
-            ));
-        }
+        // We need to wrap the run_client to handle the different types of clients (main vs secondary)
+        let main_run_client = self.main_run_client.take().unwrap();
+        let secondary_run_client = self.launcher.run_client.take().unwrap();
 
-        if self.launcher.run_client.is_none() {
-            return Err(Error::illegal_argument(
-                "No client callback provided".to_string(),
-            ));
-        }
+        let unified_run_client = move |state: Option<S>,
+                                       mgr: CentralizedEventManager<EM, I, S, SP::ShMem, SP>,
+                                       client_description: ClientDescription|
+              -> Result<(), Error> {
+            if client_description.id() == 1 {
+                main_run_client(state, mgr, client_description)
+            } else {
+                secondary_run_client(state, mgr, client_description)
+            }
+        };
 
-        let core_ids = get_core_ids().unwrap();
-        let mut handles = vec![];
+        let launcher = self.launcher.run_client(unified_run_client);
 
-        log::debug!("spawning on cores: {:?}", self.launcher.cores);
+        let spawn_mgr = |launcher: &Launcher<'a, _, MT, SP>,
+                         client_description: Option<ClientDescription>,
+                         monitor: Option<MT>| {
+            // Reconstruct the launcher with the original CF type to satisfy the builder signature
+            // This is safe because we are in the same module and have access to private fields.
+            // We set run_client to None as it was taken out earlier.
+            let old_launcher: Launcher<'a, CF, MT, SP> = Launcher {
+                shmem_provider: launcher.shmem_provider.clone(),
+                monitor,
+                configuration: launcher.configuration,
+                run_client: None::<CF>,
+                broker_port: launcher.broker_port,
+                cores: launcher.cores,
+                overcommit: launcher.overcommit,
+                #[cfg(unix)]
+                stdout_file: launcher.stdout_file,
+                launch_delay: launcher.launch_delay,
+                #[cfg(unix)]
+                opened_stdout_file: launcher
+                    .opened_stdout_file
+                    .as_ref()
+                    .map(|f| f.try_clone().unwrap()),
+                #[cfg(unix)]
+                stderr_file: launcher.stderr_file,
+                #[cfg(unix)]
+                opened_stderr_file: launcher
+                    .opened_stderr_file
+                    .as_ref()
+                    .map(|f| f.try_clone().unwrap()),
+                remote_broker_addr: launcher.remote_broker_addr,
+                #[cfg(all(unix, feature = "multi_machine"))]
+                multi_machine_node_descriptor: launcher.multi_machine_node_descriptor.clone(),
+                spawn_broker: launcher.spawn_broker,
+                serialize_state: launcher.serialize_state,
+                #[cfg(unix)]
+                fork: launcher.fork,
+            };
 
-        self.launcher.opened_stdout_file = self
-            .launcher
-            .stdout_file
-            .map(|filename| File::create(filename).unwrap());
-        self.launcher.opened_stderr_file = self
-            .launcher
-            .stderr_file
-            .map(|filename| File::create(filename).unwrap());
+            if let Some(client_description) = client_description {
+                if client_description.id() == 1 {
+                    let (state, mgr) = main_inner_mgr_builder.take().unwrap()(
+                        &old_launcher,
+                        client_description.clone(),
+                    )?;
 
-        let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
+                    let mut centralized_event_manager_builder = CentralizedEventManager::builder();
+                    centralized_event_manager_builder =
+                        centralized_event_manager_builder.is_main(true);
+
+                    let c_mgr = centralized_event_manager_builder.build_on_port(
+                        mgr,
+                        launcher.shmem_provider.clone(),
+                        self.centralized_broker_port,
+                    )?;
+
+                    Ok((state, c_mgr))
+                } else {
+                    let (state, mgr) = secondary_inner_mgr_builder.take().unwrap()(
+                        &old_launcher,
+                        client_description.clone(),
+                    )?;
+
+                    let centralized_builder = CentralizedEventManager::builder();
+
+                    let c_mgr = centralized_builder.build_on_port(
+                        mgr,
+                        launcher.shmem_provider.clone(),
+                        self.centralized_broker_port,
+                    )?;
+
+                    Ok((state, c_mgr))
+                }
+            } else {
+                // We are the broker
+                old_launcher.launch_common_broker::<I, S>(
+                    &[], // The launcher will clean up the handles
+                    Some(self.centralized_broker_port),
+                )?;
+                Err(Error::shutting_down())
+            }
+        };
 
         // Force shmem server startup in the parent process before forking
         // This prevents a race condition where multiple children try to start the server.
         // We keep the shmem alive to ensure the server stays running.
-        let _dummy_shmem = self.launcher.shmem_provider.clone().new_shmem(4096)?;
+        let _dummy_shmem = launcher.shmem_provider.clone().new_shmem(4096)?;
 
-        // Spawn clients
-        let mut index = 0_usize;
-        for bind_to in core_ids {
-            if self.launcher.cores.ids.contains(&bind_to) {
-                for overcommit_id in 0..self.launcher.overcommit {
-                    index += 1;
-                    self.launcher.shmem_provider.pre_fork()?;
-                    match unsafe { fork() }? {
-                        ForkResult::Parent(child) => {
-                            self.launcher.shmem_provider.post_fork(false)?;
-                            handles.push(child.pid);
-                            log::info!(
-                                "child with client id {index} spawned and bound to core {bind_to:?}"
-                            );
-                        }
-                        ForkResult::Child => {
-                            log::info!("{:?} PostFork", unsafe { libc::getpid() });
-                            self.launcher.shmem_provider.post_fork(true)?;
-
-                            std::thread::sleep(Duration::from_millis(
-                                index as u64 * self.launcher.launch_delay,
-                            ));
-
-                            if !debug_output && let Some(file) = &self.launcher.opened_stdout_file {
-                                // # Safety
-                                // We assume the file descriptors are valid here
-                                unsafe {
-                                    dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                    match &self.launcher.opened_stderr_file {
-                                        Some(stderr) => {
-                                            dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                        }
-                                        _ => {
-                                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
-                                        }
-                                    }
-                                }
-                            }
-
-                            let client_description =
-                                ClientDescription::new(index, overcommit_id, bind_to);
-
-                            if index == 1 {
-                                // Main client
-                                log::debug!("Running main client on PID {}", std::process::id());
-                                let (state, mgr) = main_inner_mgr_builder.take().unwrap()(
-                                    &self.launcher,
-                                    client_description.clone(),
-                                )?;
-
-                                let mut centralized_event_manager_builder =
-                                    CentralizedEventManager::builder();
-                                centralized_event_manager_builder =
-                                    centralized_event_manager_builder.is_main(true);
-
-                                let c_mgr = centralized_event_manager_builder.build_on_port(
-                                    mgr,
-                                    // tuple_list!(multi_machine_event_manager_hook.take().unwrap()),
-                                    self.launcher.shmem_provider.clone(),
-                                    self.centralized_broker_port,
-                                )?;
-
-                                self.main_run_client.take().unwrap()(
-                                    state,
-                                    c_mgr,
-                                    client_description,
-                                )?;
-                                Err(Error::shutting_down())
-                            } else {
-                                // Secondary clients
-                                log::debug!(
-                                    "Running secondary client on PID {}",
-                                    std::process::id()
-                                );
-                                let (state, mgr) = secondary_inner_mgr_builder.take().unwrap()(
-                                    &self.launcher,
-                                    client_description.clone(),
-                                )?;
-
-                                let centralized_builder = CentralizedEventManager::builder();
-
-                                let c_mgr = centralized_builder.build_on_port(
-                                    mgr,
-                                    self.launcher.shmem_provider.clone(),
-                                    self.centralized_broker_port,
-                                )?;
-
-                                self.launcher.run_client.take().unwrap()(
-                                    state,
-                                    c_mgr,
-                                    client_description,
-                                )?;
-                                Err(Error::shutting_down())
-                            }
-                        }?,
-                    }
-                }
-            }
-        }
-
-        self.launcher
-            .launch_common_broker::<I, S>(&handles, Some(self.centralized_broker_port))
+        launcher.launch_with_manager(spawn_mgr)
     }
 }
 
@@ -1320,10 +1383,10 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
 
     /// The 'main' function to run for each client forked. This probably shouldn't return
     #[must_use]
-    pub fn run_client<NewCF>(
+    pub fn run_client<CF2>(
         self,
-        run_client: NewCF,
-    ) -> CentralizedLauncherBuilder<'a, NewCF, MF, MT, SP> {
+        run_client: CF2,
+    ) -> CentralizedLauncherBuilder<'a, CF2, MF, MT, SP> {
         CentralizedLauncherBuilder {
             builder: self.builder.run_client(run_client),
             main_run_client: self.main_run_client,
@@ -1333,10 +1396,10 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
 
     /// The 'main' function to run for each client forked. This shouldn not return.
     #[must_use]
-    pub fn secondary_run_client<NewCF>(
+    pub fn secondary_run_client<CF2>(
         self,
-        run_client: NewCF,
-    ) -> CentralizedLauncherBuilder<'a, NewCF, MF, MT, SP> {
+        run_client: CF2,
+    ) -> CentralizedLauncherBuilder<'a, CF2, MF, MT, SP> {
         self.run_client(run_client)
     }
 
@@ -1458,7 +1521,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
 
     /// Tell the manager to serialize or not the state on restart
     #[must_use]
-    pub fn serialize_state(self, serialize_state: LlmpShouldSaveState) -> Self {
+    pub fn serialize_state(self, serialize_state: ShouldSaveState) -> Self {
         CentralizedLauncherBuilder {
             builder: self.builder.serialize_state(serialize_state),
             main_run_client: self.main_run_client,
@@ -1483,5 +1546,54 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
             main_run_client: self.main_run_client,
             centralized_broker_port: self.centralized_broker_port,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use libafl_bolts::{
+        core_affinity::Cores,
+        shmem::{ShMemProvider, StdShMemProvider},
+    };
+
+    use crate::{
+        events::{NopEventManager, SendExiting, launcher::Launcher},
+        inputs::BytesInput,
+        state::NopState,
+    };
+
+    #[test]
+    fn test_launch_with_manager() {
+        let shmem_provider = StdShMemProvider::new().unwrap();
+        let mon = crate::monitors::SimpleMonitor::new(|s| println!("{s}"));
+        let cores = Cores::from(vec![0]);
+
+        let launcher = Launcher::builder()
+            .shmem_provider(shmem_provider)
+            .configuration(crate::events::EventConfig::AlwaysUnique)
+            .monitor(mon)
+            .run_client(
+                |_state: Option<NopState<BytesInput>>, mut mgr: NopEventManager, _client_id| {
+                    println!("I am a client");
+                    mgr.send_exiting()?;
+                    Ok(())
+                },
+            )
+            .cores(&cores)
+            .broker_port(1337);
+
+        #[cfg(unix)]
+        let launcher = launcher.stdout_file(Some("/dev/null"));
+
+        let launcher = launcher.build();
+
+        launcher
+            .launch_with_manager(|_launcher, _desc, _monitor| {
+                println!("Manager creator called");
+                let mgr = NopEventManager::new();
+                let state: NopState<BytesInput> = NopState::new();
+                Ok((Some(state), mgr))
+            })
+            .unwrap();
     }
 }

@@ -158,7 +158,7 @@ fuzzer-statsd: lib cxx-statsd
 
 [macos]
 fuzzer-statsd: lib cxx-statsd
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/{{PROFILE_DIR}}/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-statsd -lm -lz -framework CoreFoundation -framework Security --libafl-ignore-configurations -Wl,--allow-multiple-definition
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/{{PROFILE_DIR}}/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-statsd -lm -lz -framework CoreFoundation -framework Security --libafl-ignore-configurations
 
 [linux]
 [macos]
@@ -173,7 +173,7 @@ fuzzer-tcp: lib cxx-tcp
 [macos]
 fuzzer-tcp: lib cxx-tcp
     cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tcp -lm -lz -framework CoreFoundation -framework Security --libafl-ignore-configurations -Wl,--allow-multiple-definition -fsanitize=undefined
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tcp -lm -lz -framework CoreFoundation -framework Security --libafl-ignore-configurations -fsanitize=undefined
 
 [linux]
 [macos]
@@ -184,14 +184,17 @@ test-statsd: fuzzer-statsd
     # Start python listener in background
     python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(('127.0.0.1', 8126)); s.settimeout(125); d=s.recv(1024); print(d)" > statsd_out.log &
     LISTENER_PID=$!
-    # Run fuzzer for a few seconds
-    timeout 120s ./{{FUZZER_NAME}}-statsd --broker-port 21338 --cores 0 --input ./corpus --statsd --statsd-port 8126 > fuzzer_statsd.log 2>&1 || true
+    # Run fuzzer in background (timeout causes crash on macOS)
+    ./{{FUZZER_NAME}}-statsd --broker-port 21338 --cores 0 --input ./corpus --statsd --statsd-port 8126 > fuzzer_statsd.log 2>&1 &
+    FUZZER_PID=$!
     # Wait for listener to potentially finish if it got data
     wait $LISTENER_PID || true
+    kill $FUZZER_PID || true
     if [ -s statsd_out.log ]; then
         echo "StatsD received data"
     else
         echo "StatsD failed to receive data"
+        cat fuzzer_statsd.log
         exit 1
     fi
 
@@ -232,10 +235,14 @@ cxx-tui:
     cargo build --profile {{PROFILE}} --features tui
 
 [linux]
-[macos]
 fuzzer-tui: lib cxx-tui
     cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
     {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,--whole-archive {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -Wl,--no-whole-archive -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tui -lm -lz --libafl-ignore-configurations -Wl,--allow-multiple-definition -fsanitize=undefined
+
+[macos]
+fuzzer-tui: lib cxx-tui
+    cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-tui -lm -lz -framework CoreFoundation -framework Security --libafl-ignore-configurations -fsanitize=undefined
 
 [linux]
 [macos]
@@ -259,10 +266,14 @@ cxx-all:
     cargo build --profile {{PROFILE}} --features tui,tcp_manager,statsd
 
 [linux]
-[macos]
 fuzzer-all: lib cxx-all
     cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
     {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,--whole-archive {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -Wl,--no-whole-archive -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-all -lm -lz --libafl-ignore-configurations -Wl,--allow-multiple-definition -fsanitize=undefined
+
+[macos]
+fuzzer-all: lib cxx-all
+    cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -L {{PROJECT_DIR}}/target/{{PROFILE_DIR}} -llibfuzzer_libpng -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}-all -lm -lz -framework CoreFoundation -framework Security --libafl-ignore-configurations -fsanitize=undefined
 
 [linux]
 [macos]
@@ -278,6 +289,7 @@ test-all: fuzzer-all
         echo "Fuzzer (All+TCP) failed"
         exit 1
     fi
+    rm -rf libafl_unix_shmem_server || true
     echo "Testing all features (TUI mode)..."
     timeout 5s ./{{FUZZER_NAME}}-all --broker-port 21351 --cores 0 --input ./corpus --tui > fuzzer_all_tui.log 2>&1 || true
     if grep -q "panic" fuzzer_all_tui.log; then
