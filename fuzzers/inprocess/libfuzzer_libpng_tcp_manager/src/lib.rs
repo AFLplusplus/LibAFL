@@ -72,6 +72,7 @@ pub extern "C" fn libafl_main() {
         };
 
     // Create an observation channel using the coverage map
+    // TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
     #[allow(static_mut_refs)] // only a problem on nightly
     let edges_observer = unsafe {
         HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -97,10 +98,11 @@ pub extern "C" fn libafl_main() {
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
+        let objective_dir = PathBuf::from("./crashes");
         StdState::new(
             StdRand::new(),
             InMemoryCorpus::new(),
-            OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
+            OnDiskCorpus::new(objective_dir).unwrap(),
             &mut feedback,
             &mut objective,
         )
