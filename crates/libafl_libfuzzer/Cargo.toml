@@ -24,7 +24,7 @@ include = [
 [build-dependencies]
 cc = "1.2.49"
 rustversion = "1.0.22"
-toml = { version = "0.9.9", features = ["preserve_order"] }
+toml = { version = "0.9.10", features = ["preserve_order"] }
 
 [features]
 default = ["fork"]
