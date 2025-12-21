@@ -383,23 +383,32 @@ impl ResizableMutator<u8> for &mut Vec<u8> {
 }
 
 #[derive(Debug, Copy, Clone, Default)]
-/// Basic `NopToTargetBytes` with just one type that is not converting
-pub struct NopToTargetBytes;
+/// Basic `NopInputConverter` with just one type that is not converting
+pub struct NopInputConverter;
 
-impl NopToTargetBytes {
-    /// Creates a new [`NopToTargetBytes`]
+impl NopInputConverter {
+    /// Creates a new [`NopInputConverter`]
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 }
 
-impl<I> ToTargetBytes<I> for NopToTargetBytes
+impl<I> ToTargetBytes<I> for NopInputConverter
 where
     I: HasTargetBytes + Debug,
 {
     fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8> {
         input.target_bytes()
+    }
+}
+
+impl<I> FromTargetBytes<I> for NopInputConverter
+where
+    I: From<BytesInput>,
+{
+    fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<I, Error> {
+        Ok(I::from(BytesInput::new(bytes.to_vec())))
     }
 }
 
@@ -447,40 +456,19 @@ impl<I, T> From<T> for BytesTargetInputConverter<I, T> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Default)]
-/// Basic `NopFromTargetBytes` with just one type that is not converting
-pub struct NopFromTargetBytes;
-
-impl NopFromTargetBytes {
-    /// Creates a new [`NopFromTargetBytes`]
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl<I> FromTargetBytes<I> for NopFromTargetBytes
-where
-    I: From<BytesInput>,
-{
-    fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<I, Error> {
-        Ok(I::from(BytesInput::new(bytes.to_vec())))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use libafl_bolts::AsSlice;
 
     use crate::inputs::{
         BytesInput, BytesTargetInputConverter, FromTargetBytes, HasTargetBytes, InputConverter,
-        NopFromTargetBytes,
+        NopInputConverter,
     };
 
     #[test]
     fn test_from_target_bytes() {
         let bytes = vec![1, 2, 3, 4];
-        let mut nop = NopFromTargetBytes::new();
+        let mut nop = NopInputConverter::new();
         let res: BytesInput = nop.from_target_bytes(&bytes).unwrap();
         assert_eq!(res.target_bytes().as_slice(), &bytes);
 
