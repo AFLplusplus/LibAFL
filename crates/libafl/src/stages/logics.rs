@@ -313,7 +313,9 @@ mod test {
         HasMetadata, NopFuzzer,
         events::NopEventManager,
         executors::nop::NopExecutor,
-        inputs::{NopInput, NopToTargetBytes, ToBytesInputConverter},
+        inputs::{
+            ConvertToTargetBytes, NopInput, SimpleTargetBytesConverter, ToBytesInputConverter,
+        },
         stages::{
             ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage, Restartable, Stage,
             StagesTuple, WhileStage,
@@ -461,7 +463,7 @@ mod test {
                 NopExecutor,
                 NopEventManager,
                 S,
-                NopFuzzer<ToBytesInputConverter<NopInput, NopToTargetBytes>, NopInput>,
+                NopFuzzer<ToBytesInputConverter<NopInput, SimpleTargetBytesConverter>, NopInput>,
             >,
         S: HasCurrentStageId + HasCurrentCorpusId,
     {

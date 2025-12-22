@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::CorpusId,
-    inputs::{FromTargetBytes, Input, ToTargetBytes},
+    inputs::{ConvertFromTargetBytes, ConvertToTargetBytes, Input},
 };
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
@@ -34,7 +34,7 @@ where
     fn encode(&mut self, bytes: &[u8], tokenizer: &mut T) -> Result<EncodedInput, Error>;
 }
 
-/// A wrapper that implements [`FromTargetBytes`] for [`EncodedInput`] using the given [`Tokenizer`]
+/// A wrapper that implements [`ConvertFromTargetBytes`] for [`EncodedInput`] using the given [`Tokenizer`]
 #[derive(Debug, Clone)]
 pub struct EncodedInputConverter<T> {
     encoder_decoder: TokenInputEncoderDecoder,
@@ -51,18 +51,18 @@ impl<T> EncodedInputConverter<T> {
     }
 }
 
-impl<T> FromTargetBytes<EncodedInput> for EncodedInputConverter<T>
+impl<T> ConvertFromTargetBytes<EncodedInput> for EncodedInputConverter<T>
 where
     T: Tokenizer,
 {
-    fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<EncodedInput, Error> {
+    fn convert_from_target_bytes(&mut self, bytes: &[u8]) -> Result<EncodedInput, Error> {
         self.encoder_decoder.encode(bytes, &mut self.tokenizer)
     }
 }
 
-impl<T> ToTargetBytes<EncodedInput> for EncodedInputConverter<T> {
-    fn to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
-        self.encoder_decoder.to_target_bytes(input)
+impl<T> ConvertToTargetBytes<EncodedInput> for EncodedInputConverter<T> {
+    fn convert_to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
+        self.encoder_decoder.convert_to_target_bytes(input)
     }
 }
 
@@ -142,9 +142,9 @@ impl Default for TokenInputEncoderDecoder {
     }
 }
 
-impl ToTargetBytes<EncodedInput> for TokenInputEncoderDecoder {
+impl ConvertToTargetBytes<EncodedInput> for TokenInputEncoderDecoder {
     /// Transform to bytes
-    fn to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
+    fn convert_to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
         let mut bytes = vec![];
         self.decode(input, &mut bytes).unwrap();
         bytes.into()

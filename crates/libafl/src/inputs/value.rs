@@ -13,11 +13,11 @@ use {
 };
 
 use crate::{
-    inputs::{FromTargetBytes, Input, ToTargetBytes},
+    inputs::{ConvertFromTargetBytes, ConvertToTargetBytes, Input},
     mutators::numeric::Numeric,
 };
 
-/// A wrapper that implements [`FromTargetBytes`] for [`ValueInput`] of primitives
+/// A wrapper that implements [`ConvertFromTargetBytes`] for [`ValueInput`] of primitives
 #[derive(Debug, Clone, Default)]
 pub struct PrimitiveInputConverter<T> {
     phantom: PhantomData<T>,
@@ -102,8 +102,8 @@ impl_input_for_value_input!(
 macro_rules! impl_from_target_bytes_for_primitive {
     ($($t:ty),+ $(,)?) => {
         $(
-            impl FromTargetBytes<ValueInput<$t>> for PrimitiveInputConverter<$t> {
-                fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<ValueInput<$t>, Error> {
+            impl ConvertFromTargetBytes<ValueInput<$t>> for PrimitiveInputConverter<$t> {
+                fn convert_from_target_bytes(&mut self, bytes: &[u8]) -> Result<ValueInput<$t>, Error> {
                     if bytes.len() != size_of::<$t>() {
                         return Err(Error::illegal_argument(format!(
                             "Expected {} bytes for {}, got {}",
@@ -118,8 +118,8 @@ macro_rules! impl_from_target_bytes_for_primitive {
                 }
             }
 
-            impl ToTargetBytes<ValueInput<$t>> for PrimitiveInputConverter<$t> {
-                fn to_target_bytes<'a>(&mut self, input: &'a ValueInput<$t>) -> OwnedSlice<'a, u8> {
+            impl ConvertToTargetBytes<ValueInput<$t>> for PrimitiveInputConverter<$t> {
+                fn convert_to_target_bytes<'a>(&mut self, input: &'a ValueInput<$t>) -> OwnedSlice<'a, u8> {
                     OwnedSlice::from(input.into_inner().to_le_bytes().to_vec())
                 }
             }

@@ -19,7 +19,7 @@ use crate::{
     common::HasMetadata,
     corpus::{Corpus, CorpusId, Testcase},
     fuzzer::HasTargetBytesConverter,
-    inputs::{Input, ToTargetBytes},
+    inputs::{ConvertToTargetBytes, Input},
     stages::{Restartable, Stage},
     state::{HasCorpus, HasRand, HasSolutions},
 };
@@ -257,7 +257,7 @@ where
     S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
     P: AsRef<Path>,
     Z: HasTargetBytesConverter,
-    Z::Converter: ToTargetBytes<I>,
+    Z::Converter: ConvertToTargetBytes<I>,
     I: Input,
 {
     #[inline]
@@ -280,7 +280,7 @@ where
 
         let mut get_bytes = |tc: &mut Testcase<I>| {
             let input = tc.input().as_ref().unwrap();
-            Ok(fuzzer.to_target_bytes(input).to_vec())
+            Ok(fuzzer.convert_to_target_bytes(input).to_vec())
         };
 
         dump_from_corpus(

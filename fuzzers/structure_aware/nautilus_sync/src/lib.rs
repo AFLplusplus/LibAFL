@@ -15,10 +15,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
-    inputs::{
-        FromBytesInputConverter, FromTargetBytes, NautilusBytesConverter, NautilusInput,
-        ToBytesInputConverter, ToTargetBytes,
-    },
+    inputs::{ConvertFromTargetBytes, ConvertToTargetBytes, NautilusBytesConverter, NautilusInput},
     monitors::SimpleMonitor,
     mutators::{
         nautilus::{NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator},
@@ -26,15 +23,14 @@ use libafl::{
     },
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, sync::SyncFromBrokerStage},
-    state::{HasCorpus, StdState},
+    state::StdState,
     Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
-    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
+    tuples::tuple_list,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
