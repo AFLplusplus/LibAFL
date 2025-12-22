@@ -154,7 +154,6 @@ where
 
 impl<I, S, T> ToTargetBytesConverter<I, S> for ToBytesInputConverter<I, T>
 where
-    I: HasTargetBytes,
     T: ToTargetBytesConverter<I, S>,
 {
     fn convert_to_target_bytes<'a>(&mut self, state: &mut S, input: &'a I) -> OwnedSlice<'a, u8> {

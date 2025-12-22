@@ -784,7 +784,7 @@ impl CommandExecutorBuilder {
 /// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
 ///     S: HasExecutions,
-///     Z: ToTargetBytesConverter<BytesInput>,
+///     Z: ToTargetBytesConverter<BytesInput, S>,
 /// {
 ///     MyExecutor.into_executor((), None, None)
 /// }
