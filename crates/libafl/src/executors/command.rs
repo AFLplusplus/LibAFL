@@ -479,7 +479,7 @@ where
     OT: MatchName + ObserversTuple<I, S>,
     S: HasExecutions,
     T: CommandConfigurator<Pid> + Debug,
-    Z: ToTargetBytesConverter<I>,
+    Z: ToTargetBytesConverter<I, S>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`
@@ -497,7 +497,7 @@ where
 
         let child = self
             .configurator
-            .spawn_child(fuzzer.convert_to_target_bytes(input))?;
+            .spawn_child(fuzzer.convert_to_target_bytes(state, input))?;
 
         let wait_status = waitpid_filtered(child, Some(WaitPidFlag::WUNTRACED))?;
         if !matches!(wait_status, Stopped(c, Signal::SIGSTOP) if c == child) {
