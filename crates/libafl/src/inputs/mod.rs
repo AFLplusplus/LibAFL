@@ -212,13 +212,16 @@ impl HasLen for NopInput {
     }
 }
 
+/// Callback for [`ClosureInputConverter`]
+pub type ClosureInputCallback<S, F, T> = Box<dyn FnMut(&mut S, F) -> Result<T, Error>>;
+
 /// `InputConverter` that uses a closure to convert
 pub struct ClosureInputConverter<S, F, T>
 where
     F: Input,
     T: Input,
 {
-    convert_cb: Box<dyn FnMut(&mut S, F) -> Result<T, Error>>,
+    convert_cb: ClosureInputCallback<S, F, T>,
 }
 
 impl<S, F, T> Debug for ClosureInputConverter<S, F, T>
@@ -239,7 +242,7 @@ where
 {
     /// Create a new converter using two closures, use None to forbid the conversion or the conversion back
     #[must_use]
-    pub fn new(convert_cb: Box<dyn FnMut(&mut S, F) -> Result<T, Error>>) -> Self {
+    pub fn new(convert_cb: ClosureInputCallback<S, F, T>) -> Self {
         Self { convert_cb }
     }
 }
