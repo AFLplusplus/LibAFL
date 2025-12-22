@@ -17,7 +17,7 @@ use crate::{
         tree::{Tree, TreeLike},
     },
     generators::nautilus::NautilusContext,
-    inputs::{ConvertToTargetBytes, Input},
+    inputs::{Input, ToTargetBytesConverter},
 };
 
 /// An [`Input`] implementation for `Nautilus` grammar.
@@ -122,8 +122,12 @@ impl<'a> NautilusBytesConverter<'a> {
     }
 }
 
-impl ConvertToTargetBytes<NautilusInput> for NautilusBytesConverter<'_> {
-    fn convert_to_target_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
+impl<S> ToTargetBytesConverter<NautilusInput, S> for NautilusBytesConverter<'_> {
+    fn convert_to_target_bytes<'a>(
+        &mut self,
+        _state: &mut S,
+        input: &'a NautilusInput,
+    ) -> OwnedSlice<'a, u8> {
         let mut bytes = vec![];
         input.unparse(self.ctx, &mut bytes);
         OwnedSlice::from(bytes)
@@ -237,9 +241,10 @@ impl<'a> NautilusParser<'a> {
     }
 }
 
-impl crate::inputs::ConvertFromTargetBytes<NautilusInput> for NautilusBytesConverter<'_> {
+impl<S> crate::inputs::FromTargetBytesConverter<NautilusInput, S> for NautilusBytesConverter<'_> {
     fn convert_from_target_bytes(
         &mut self,
+        _state: &mut S,
         bytes: &[u8],
     ) -> Result<NautilusInput, libafl_bolts::Error> {
         let start_nt = self.ctx.ctx.nt_id("START");
@@ -270,7 +275,7 @@ mod tests {
     use libafl_bolts::AsSlice;
 
     use super::{NautilusBytesConverter, NautilusContext};
-    use crate::inputs::{ConvertFromTargetBytes, ConvertToTargetBytes};
+    use crate::inputs::{FromTargetBytesConverter, ToTargetBytesConverter};
 
     #[test]
     #[cfg(feature = "nautilus")] // Nautilus parser requires nautilus feature (and regex)

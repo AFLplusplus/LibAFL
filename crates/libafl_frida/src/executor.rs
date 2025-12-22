@@ -17,7 +17,7 @@ use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProces
 use libafl::{
     Error,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{ConvertToTargetBytes, Input},
+    inputs::{Input, ToTargetBytesConverter},
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
 };
@@ -63,7 +63,7 @@ where
     S: HasExecutions + HasCurrentTestcase<I> + HasSolutions<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
-    Z: ConvertToTargetBytes<I>,
+    Z: ToTargetBytesConverter<I, S>,
 {
     /// Instruct the target about the input and run
     #[inline]
@@ -74,7 +74,7 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        let target_bytes = fuzzer.convert_to_target_bytes(input);
+        let target_bytes = fuzzer.convert_to_target_bytes(state, input);
         self.helper.borrow_mut().pre_exec(target_bytes.as_slice())?;
         if self.helper.borrow_mut().stalker_enabled() {
             if !(self.followed) {

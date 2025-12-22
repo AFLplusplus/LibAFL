@@ -63,7 +63,7 @@ use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
     Error,
     executors::{Executor, ExitKind, HasObservers, HasTimeout, SetTimeout},
-    inputs::{ConvertToTargetBytes, HasTargetBytes},
+    inputs::{HasTargetBytes, ToTargetBytesConverter},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::HasExecutions,
 };
@@ -380,7 +380,7 @@ where
     T: CommandConfigurator<Child> + HasTimeout + Debug,
     OT: ObserversTuple<I, S>,
 {
-    fn execute_input_with_command<TB: ConvertToTargetBytes<I>>(
+    fn execute_input_with_command<TB: ToTargetBytesConverter<I, S>>(
         &mut self,
         target_bytes_converter: &mut TB,
         state: &mut S,
@@ -392,7 +392,7 @@ where
         *state.executions_mut() += 1;
         let mut child = self
             .configurator
-            .spawn_child(target_bytes_converter.convert_to_target_bytes(input))?;
+            .spawn_child(target_bytes_converter.convert_to_target_bytes(state, input))?;
 
         let exit_kind = child
             .wait_timeout(self.configurator.timeout())
@@ -438,7 +438,7 @@ where
     S: HasExecutions,
     T: CommandConfigurator<Child> + HasTimeout + Debug,
     OT: MatchName + ObserversTuple<I, S>,
-    Z: ConvertToTargetBytes<I>,
+    Z: ToTargetBytesConverter<I, S>,
 {
     fn run_target(
         &mut self,
@@ -479,7 +479,7 @@ where
     OT: MatchName + ObserversTuple<I, S>,
     S: HasExecutions,
     T: CommandConfigurator<Pid> + Debug,
-    Z: ConvertToTargetBytes<I>,
+    Z: ToTargetBytesConverter<I>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`
@@ -750,10 +750,10 @@ impl CommandExecutorBuilder {
 /// };
 ///
 /// use libafl::{
-///     Error, HasTargetBytesConverter,
+///     Error, HasToTargetBytesConverter,
 ///     corpus::Corpus,
 ///     executors::{Executor, HasTimeout, command::CommandConfigurator},
-///     inputs::{BytesInput, ConvertToTargetBytes, HasTargetBytes, Input},
+///     inputs::{BytesInput, HasTargetBytes, Input, ToTargetBytesConverter},
 ///     state::HasExecutions,
 /// };
 /// use libafl_bolts::ownedref::OwnedSlice;
@@ -784,7 +784,7 @@ impl CommandExecutorBuilder {
 /// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
 ///     S: HasExecutions,
-///     Z: ConvertToTargetBytes<BytesInput>,
+///     Z: ToTargetBytesConverter<BytesInput>,
 /// {
 ///     MyExecutor.into_executor((), None, None)
 /// }

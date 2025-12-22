@@ -15,7 +15,9 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
-    inputs::{ConvertFromTargetBytes, ConvertToTargetBytes, NautilusBytesConverter, NautilusInput},
+    inputs::{
+        FromBytesInputConverter, NautilusBytesConverter, NautilusInput, ToBytesInputConverter,
+    },
     monitors::SimpleMonitor,
     mutators::{
         nautilus::{NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator},
@@ -125,12 +127,12 @@ pub extern "C" fn libafl_main() {
             .build_on_port(
                 shmem_provider.clone(),
                 port,
-                Some(NautilusBytesConverter::new(&context).into_to_bytes_input_converter()),
-                Some(
-                    NautilusBytesConverter::new(&context)
-                        .on_error_return_empty(true)
-                        .into_from_bytes_input_converter(),
-                ),
+                Some(ToBytesInputConverter::new(NautilusBytesConverter::new(
+                    &context,
+                ))),
+                Some(FromBytesInputConverter::new(
+                    NautilusBytesConverter::new(&context).on_error_return_empty(true),
+                )),
             )
             .unwrap()
     });
@@ -198,9 +200,7 @@ pub extern "C" fn libafl_main() {
             .scheduler(scheduler)
             .feedback(feedback)
             .objective(objective)
-            .target_bytes_converter(
-                NautilusBytesConverter::new(&context).into_to_bytes_input_converter(),
-            )
+            .target_bytes_converter::<NautilusInput, _>(NautilusBytesConverter::new(&context))
             .build();
 
         // Create the executor for an in-process function with just one observer
