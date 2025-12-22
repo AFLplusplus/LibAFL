@@ -382,7 +382,7 @@ mod tests {
             },
         };
         let input = NopInput {};
-        let mut fuzzer = NopFuzzer::new();
+        let mut fuzzer: NopFuzzer = NopFuzzer::new();
         let mut state = NopState::new();
         let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
             SimpleEventManager::printing();

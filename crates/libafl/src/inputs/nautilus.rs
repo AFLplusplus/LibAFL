@@ -17,7 +17,7 @@ use crate::{
         tree::{Tree, TreeLike},
     },
     generators::nautilus::NautilusContext,
-    inputs::{Input, ToTargetBytes},
+    inputs::{Input, ToTargetBytesConverter},
 };
 
 /// An [`Input`] implementation for `Nautilus` grammar.
@@ -98,7 +98,7 @@ impl Hash for NautilusInput {
 }
 
 /// Convert from `NautilusInput` to `BytesInput`
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct NautilusBytesConverter<'a> {
     ctx: &'a NautilusContext,
     on_error_return_empty: bool,
@@ -122,8 +122,12 @@ impl<'a> NautilusBytesConverter<'a> {
     }
 }
 
-impl ToTargetBytes<NautilusInput> for NautilusBytesConverter<'_> {
-    fn to_target_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
+impl<S> ToTargetBytesConverter<NautilusInput, S> for NautilusBytesConverter<'_> {
+    fn convert_to_target_bytes<'a>(
+        &mut self,
+        _state: &mut S,
+        input: &'a NautilusInput,
+    ) -> OwnedSlice<'a, u8> {
         let mut bytes = vec![];
         input.unparse(self.ctx, &mut bytes);
         OwnedSlice::from(bytes)
@@ -237,8 +241,12 @@ impl<'a> NautilusParser<'a> {
     }
 }
 
-impl crate::inputs::FromTargetBytes<NautilusInput> for NautilusBytesConverter<'_> {
-    fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<NautilusInput, libafl_bolts::Error> {
+impl<S> crate::inputs::FromTargetBytesConverter<NautilusInput, S> for NautilusBytesConverter<'_> {
+    fn convert_from_target_bytes(
+        &mut self,
+        _state: &mut S,
+        bytes: &[u8],
+    ) -> Result<NautilusInput, libafl_bolts::Error> {
         let start_nt = self.ctx.ctx.nt_id("START");
         let mut parser = NautilusParser::new(&self.ctx.ctx, bytes);
         let res = parser.parse_nt(start_nt, 0);
@@ -267,7 +275,7 @@ mod tests {
     use libafl_bolts::AsSlice;
 
     use super::{NautilusBytesConverter, NautilusContext};
-    use crate::inputs::{FromTargetBytes, ToTargetBytes};
+    use crate::inputs::{FromTargetBytesConverter, ToTargetBytesConverter};
 
     #[test]
     #[cfg(feature = "nautilus")] // Nautilus parser requires nautilus feature (and regex)
@@ -283,13 +291,15 @@ mod tests {
 
         // Test roundtrip
         let bytes = b"aab";
-        let input = converter.from_target_bytes(bytes).expect("Failed to parse");
+        let input = converter
+            .convert_from_target_bytes(&mut (), bytes)
+            .expect("Failed to parse");
 
-        let out_bytes = converter.to_target_bytes(&input);
+        let out_bytes = converter.convert_to_target_bytes(&mut (), &input);
         assert_eq!(out_bytes.as_slice(), bytes.as_slice());
 
         // Test invalid
         let bytes = b"aac";
-        assert!(converter.from_target_bytes(bytes).is_err());
+        assert!(converter.convert_from_target_bytes(&mut (), bytes).is_err());
     }
 }

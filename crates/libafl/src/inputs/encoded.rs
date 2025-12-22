@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::CorpusId,
-    inputs::{FromTargetBytes, Input, ToTargetBytes},
+    inputs::{FromTargetBytesConverter, Input, ToTargetBytesConverter},
 };
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
@@ -34,7 +34,7 @@ where
     fn encode(&mut self, bytes: &[u8], tokenizer: &mut T) -> Result<EncodedInput, Error>;
 }
 
-/// A wrapper that implements [`FromTargetBytes`] for [`EncodedInput`] using the given [`Tokenizer`]
+/// A wrapper that implements [`FromTargetBytesConverter`] for [`EncodedInput`] using the given [`Tokenizer`]
 #[derive(Debug, Clone)]
 pub struct EncodedInputConverter<T> {
     encoder_decoder: TokenInputEncoderDecoder,
@@ -51,18 +51,26 @@ impl<T> EncodedInputConverter<T> {
     }
 }
 
-impl<T> FromTargetBytes<EncodedInput> for EncodedInputConverter<T>
+impl<T, S> FromTargetBytesConverter<EncodedInput, S> for EncodedInputConverter<T>
 where
     T: Tokenizer,
 {
-    fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<EncodedInput, Error> {
+    fn convert_from_target_bytes(
+        &mut self,
+        _state: &mut S,
+        bytes: &[u8],
+    ) -> Result<EncodedInput, Error> {
         self.encoder_decoder.encode(bytes, &mut self.tokenizer)
     }
 }
 
-impl<T> ToTargetBytes<EncodedInput> for EncodedInputConverter<T> {
-    fn to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
-        self.encoder_decoder.to_target_bytes(input)
+impl<T, S> ToTargetBytesConverter<EncodedInput, S> for EncodedInputConverter<T> {
+    fn convert_to_target_bytes<'a>(
+        &mut self,
+        _state: &mut S,
+        input: &'a EncodedInput,
+    ) -> OwnedSlice<'a, u8> {
+        self.encoder_decoder.convert_to_target_bytes(_state, input)
     }
 }
 
@@ -142,9 +150,13 @@ impl Default for TokenInputEncoderDecoder {
     }
 }
 
-impl ToTargetBytes<EncodedInput> for TokenInputEncoderDecoder {
+impl<S> ToTargetBytesConverter<EncodedInput, S> for TokenInputEncoderDecoder {
     /// Transform to bytes
-    fn to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
+    fn convert_to_target_bytes<'a>(
+        &mut self,
+        _state: &mut S,
+        input: &'a EncodedInput,
+    ) -> OwnedSlice<'a, u8> {
         let mut bytes = vec![];
         self.decode(input, &mut bytes).unwrap();
         bytes.into()
@@ -318,7 +330,7 @@ mod tests {
         executors::{ExitKind, InProcessExecutor, nop::NopExecutor},
         feedbacks::BoolValueFeedback,
         inputs::{
-            EncodedInput, ToTargetBytes,
+            EncodedInput, ToTargetBytesConverter,
             encoded::{InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
         },
         observers::ValueObserver,
@@ -394,7 +406,7 @@ mod tests {
             .add_input(&mut state, &mut executor, &mut event_mgr, input)
             .unwrap();
 
-        let input_bytes = fuzzer.to_target_bytes(&input_clone);
+        let input_bytes = fuzzer.convert_to_target_bytes(&mut state, &input_clone);
         assert!(!input_bytes.is_empty());
 
         fuzzer
@@ -410,7 +422,8 @@ mod tests {
 
     #[test]
     fn test_from_target_bytes() {
-        use crate::inputs::{BytesTargetInputConverter, EncodedInputConverter, InputConverter};
+        use super::EncodedInputConverter;
+        use crate::inputs::{FromBytesInputConverter, InputConverter};
 
         let (encoder_decoder, expected_input) = setup_encoder_decoder();
         let tokenizer = NaiveTokenizer::default();
@@ -418,9 +431,9 @@ mod tests {
         encoder_decoder.decode(&expected_input, &mut bytes).unwrap();
 
         let mut converter =
-            BytesTargetInputConverter::new(EncodedInputConverter::new(encoder_decoder, tokenizer));
+            FromBytesInputConverter::new(EncodedInputConverter::new(encoder_decoder, tokenizer));
         let encoded_input = converter
-            .convert(bytes.into())
+            .convert(&mut (), bytes.into())
             .expect("Failed to convert bytes to encoded input");
 
         assert_eq!(encoded_input, expected_input);

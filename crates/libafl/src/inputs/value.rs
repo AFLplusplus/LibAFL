@@ -13,11 +13,11 @@ use {
 };
 
 use crate::{
-    inputs::{FromTargetBytes, Input, ToTargetBytes},
+    inputs::{FromTargetBytesConverter, Input, ToTargetBytesConverter},
     mutators::numeric::Numeric,
 };
 
-/// A wrapper that implements [`FromTargetBytes`] for [`ValueInput`] of primitives
+/// A wrapper that implements [`FromTargetBytesConverter`] for [`ValueInput`] of primitives
 #[derive(Debug, Clone, Default)]
 pub struct PrimitiveInputConverter<T> {
     phantom: PhantomData<T>,
@@ -102,8 +102,8 @@ impl_input_for_value_input!(
 macro_rules! impl_from_target_bytes_for_primitive {
     ($($t:ty),+ $(,)?) => {
         $(
-            impl FromTargetBytes<ValueInput<$t>> for PrimitiveInputConverter<$t> {
-                fn from_target_bytes(&mut self, bytes: &[u8]) -> Result<ValueInput<$t>, Error> {
+            impl<S> FromTargetBytesConverter<ValueInput<$t>, S> for PrimitiveInputConverter<$t> {
+                fn convert_from_target_bytes(&mut self, _state: &mut S, bytes: &[u8]) -> Result<ValueInput<$t>, Error> {
                     if bytes.len() != size_of::<$t>() {
                         return Err(Error::illegal_argument(format!(
                             "Expected {} bytes for {}, got {}",
@@ -118,8 +118,8 @@ macro_rules! impl_from_target_bytes_for_primitive {
                 }
             }
 
-            impl ToTargetBytes<ValueInput<$t>> for PrimitiveInputConverter<$t> {
-                fn to_target_bytes<'a>(&mut self, input: &'a ValueInput<$t>) -> OwnedSlice<'a, u8> {
+            impl<S> ToTargetBytesConverter<ValueInput<$t>, S> for PrimitiveInputConverter<$t> {
+                fn convert_to_target_bytes<'a>(&mut self, _state: &mut S, input: &'a ValueInput<$t>) -> OwnedSlice<'a, u8> {
                     OwnedSlice::from(input.into_inner().to_le_bytes().to_vec())
                 }
             }
@@ -286,20 +286,22 @@ mod tests {
 
     #[test]
     fn test_primitive_input_converter() {
-        use super::PrimitiveInputConverter;
-        use crate::inputs::{BytesTargetInputConverter, InputConverter, ValueInput};
+        use super::{PrimitiveInputConverter, ValueInput};
+        use crate::inputs::{FromBytesInputConverter, InputConverter};
 
         let expected_val: u32 = 0xdeadbeef;
         let bytes = expected_val.to_le_bytes();
-        let mut converter: BytesTargetInputConverter<
-            ValueInput<u32>,
-            PrimitiveInputConverter<u32>,
-        > = BytesTargetInputConverter::new(PrimitiveInputConverter::new());
-        let val_input = converter.convert(bytes.as_slice().into()).unwrap();
+        let mut converter = FromBytesInputConverter::new(PrimitiveInputConverter::default());
+        let val_input: ValueInput<u32> =
+            converter.convert(&mut (), bytes.as_slice().into()).unwrap();
         assert_eq!(*val_input.as_ref(), expected_val);
 
         // Test invalid length
         let invalid_bytes = vec![0; 3];
-        assert!(converter.convert(invalid_bytes.as_slice().into()).is_err());
+        assert!(
+            converter
+                .convert(&mut (), invalid_bytes.as_slice().into())
+                .is_err()
+        );
     }
 }

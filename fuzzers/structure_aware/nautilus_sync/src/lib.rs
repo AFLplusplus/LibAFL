@@ -16,12 +16,12 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
     inputs::{
-        BytesTargetInputConverter, NautilusBytesConverter, NautilusInput, TargetBytesInputConverter,
+        FromBytesInputConverter, NautilusBytesConverter, NautilusInput, ToBytesInputConverter,
     },
     monitors::SimpleMonitor,
     mutators::{
-        HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
-        NautilusSpliceMutator,
+        nautilus::{NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator},
+        HavocScheduledMutator,
     },
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, sync::SyncFromBrokerStage},
@@ -123,15 +123,14 @@ pub extern "C" fn libafl_main() {
     let context = NautilusContext::from_file(15, "grammar.json").unwrap();
 
     let mut event_converter = opt.bytes_broker_port.map(|port| {
+        let converter = NautilusBytesConverter::new(&context);
         LlmpEventConverter::builder()
             .build_on_port(
                 shmem_provider.clone(),
                 port,
-                Some(TargetBytesInputConverter::from(
-                    NautilusBytesConverter::new(&context),
-                )),
-                Some(BytesTargetInputConverter::new(
-                    NautilusBytesConverter::new(&context).on_error_return_empty(true),
+                Some(ToBytesInputConverter::new(converter)),
+                Some(FromBytesInputConverter::new(
+                    converter.on_error_return_empty(true),
                 )),
             )
             .unwrap()
@@ -195,7 +194,13 @@ pub extern "C" fn libafl_main() {
         let scheduler = QueueScheduler::new();
 
         // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        // A fuzzer with feedbacks and a corpus scheduler
+        let mut fuzzer = StdFuzzer::builder()
+            .scheduler(scheduler)
+            .feedback(feedback)
+            .objective(objective)
+            .target_bytes_converter::<NautilusInput, _>(NautilusBytesConverter::new(&context))
+            .build();
 
         // Create the executor for an in-process function with just one observer
         let mut executor = InProcessExecutor::new(

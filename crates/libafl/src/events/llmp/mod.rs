@@ -699,7 +699,7 @@ where
         event: Event<DI>,
     ) -> Result<(), Error>
     where
-        ICB: InputConverter<From = DI, To = I>,
+        ICB: InputConverter<S, From = DI, To = I>,
         Z: EvaluatorObservers<E, EM, I, S>,
     {
         match event {
@@ -714,11 +714,12 @@ where
                     return Ok(());
                 };
 
+                let converted_input = converter.convert(state, input)?;
                 let res = fuzzer.evaluate_input_with_observers(
                     state,
                     executor,
                     manager,
-                    &converter.convert(input)?,
+                    &converted_input,
                     false,
                 )?;
 
@@ -737,11 +738,12 @@ where
                     return Ok(());
                 };
 
+                let converted_input = converter.convert(state, unwrapped_input)?;
                 let res = fuzzer.evaluate_input_with_observers(
                     state,
                     executor,
                     manager,
-                    &converter.convert(unwrapped_input)?,
+                    &converted_input,
                     false,
                 )?;
 
@@ -763,7 +765,7 @@ where
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
-        ICB: InputConverter<From = DI, To = I>,
+        ICB: InputConverter<S, From = DI, To = I>,
         DI: DeserializeOwned + Input,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
         Z: EvaluatorObservers<E, EM, I, S>,
@@ -803,7 +805,7 @@ where
 
 impl<I, IC, ICB, S, SHM, SP> EventFirer<I, S> for LlmpEventConverter<I, IC, ICB, S, SHM, SP>
 where
-    IC: InputConverter<From = I>,
+    IC: InputConverter<S, From = I>,
     IC::To: Serialize,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
@@ -820,7 +822,7 @@ where
     }
 
     #[cfg(feature = "llmp_compression")]
-    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         if self.converter.is_none() {
             return Ok(());
         }
@@ -838,7 +840,7 @@ where
                     #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                     node_id,
                 } => Event::NewTestcase {
-                    input: self.converter.as_mut().unwrap().convert(input)?,
+                    input: self.converter.as_mut().unwrap().convert(state, input)?,
                     client_config,
                     exit_kind,
                     corpus_size,
@@ -874,7 +876,7 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn fire(&mut self, _state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, event: EventWithStats<I>) -> Result<(), Error> {
         if self.converter.is_none() {
             return Ok(());
         }
@@ -892,7 +894,7 @@ where
                     #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                     node_id,
                 } => Event::NewTestcase {
-                    input: self.converter.as_mut().unwrap().convert(input)?,
+                    input: self.converter.as_mut().unwrap().convert(state, input)?,
                     client_config,
                     exit_kind,
                     corpus_size,

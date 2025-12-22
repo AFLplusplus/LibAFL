@@ -344,7 +344,7 @@ pub mod test {
     fn nop_executor() {
         let empty_input = BytesInput::new(vec![]);
         let mut executor = NopExecutor::ok();
-        let mut fuzzer = NopFuzzer::new();
+        let mut fuzzer: NopFuzzer = NopFuzzer::new();
         let mut mgr: NopEventManager = NopEventManager::new();
         let mut state: NopState<BytesInput> = NopState::new();
 
