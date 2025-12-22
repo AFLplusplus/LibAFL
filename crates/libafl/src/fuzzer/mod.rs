@@ -29,7 +29,9 @@ use crate::{
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
-    inputs::{Input, NopInputConverter, ToTargetBytes},
+    inputs::{
+        HasTargetBytes, Input, NopInput, NopToTargetBytes, ToBytesInputConverter, ToTargetBytes,
+    },
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
@@ -1127,12 +1129,14 @@ pub struct StdFuzzerBuilder<CS, F, IC, IF, OF> {
     share_objectives: bool,
 }
 
-impl StdFuzzerBuilder<(), (), NopInputConverter, NopInputFilter, ()> {
+impl
+    StdFuzzerBuilder<(), (), ToBytesInputConverter<NopInput, NopToTargetBytes>, NopInputFilter, ()>
+{
     /// Creates a new [`StdFuzzerBuilder`] with default (nop) types.
     #[must_use]
     pub fn new() -> Self {
         Self {
-            target_bytes_converter: NopInputConverter,
+            target_bytes_converter: ToBytesInputConverter::new(NopToTargetBytes),
             input_filter: NopInputFilter,
             scheduler: (),
             feedback: (),
@@ -1142,7 +1146,15 @@ impl StdFuzzerBuilder<(), (), NopInputConverter, NopInputFilter, ()> {
     }
 }
 
-impl Default for StdFuzzerBuilder<(), (), NopInputConverter, NopInputFilter, ()> {
+impl Default
+    for StdFuzzerBuilder<
+        (),
+        (),
+        ToBytesInputConverter<NopInput, NopToTargetBytes>,
+        NopInputFilter,
+        (),
+    >
+{
     fn default() -> Self {
         Self::new()
     }
@@ -1269,21 +1281,35 @@ impl<CS, F, IC, IF, OF> HasTargetBytesConverter for StdFuzzer<CS, F, IC, IF, OF>
     }
 }
 
-impl<CS, F, OF> StdFuzzer<CS, F, NopInputConverter, NopInputFilter, OF> {
-    /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
-    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
-        StdFuzzer::builder()
+impl<CS, F, I, OF> StdFuzzer<CS, F, ToBytesInputConverter<I, NopToTargetBytes>, NopInputFilter, OF>
+where
+    I: Input + HasTargetBytes,
+{
+    /// Create a new [`StdFuzzer`] with a [`ToBytesInputConverter`].
+    pub fn with_default_input_converter(
+        scheduler: CS,
+        feedback: F,
+        objective: OF,
+    ) -> StdFuzzer<CS, F, ToBytesInputConverter<I, NopToTargetBytes>, NopInputFilter, OF> {
+        StdFuzzerBuilder::new()
             .scheduler(scheduler)
             .feedback(feedback)
             .objective(objective)
+            .target_bytes_converter(ToBytesInputConverter::new(NopToTargetBytes))
             .build()
     }
 }
 
-impl StdFuzzer<(), (), NopInputConverter, NopInputFilter, ()> {
-    /// Creates a [`StdFuzzerBuilder`] that allows us to specify additional [`ToTargetBytes`] and [`InputFilter`] fields.
+impl StdFuzzer<(), (), ToBytesInputConverter<NopInput, NopToTargetBytes>, NopInputFilter, ()> {
+    /// Creates a new [`StdFuzzerBuilder`] with default (nop) types.
     #[must_use]
-    pub fn builder() -> StdFuzzerBuilder<(), (), NopInputConverter, NopInputFilter, ()> {
+    pub fn builder() -> StdFuzzerBuilder<
+        (),
+        (),
+        ToBytesInputConverter<NopInput, NopToTargetBytes>,
+        NopInputFilter,
+        (),
+    > {
         StdFuzzerBuilder::new()
     }
 }
@@ -1335,38 +1361,49 @@ where
 
 /// A [`NopFuzzer`] that does nothing
 #[derive(Debug, Copy, Clone)]
-pub struct NopFuzzer {
-    converter: NopInputConverter,
+pub struct NopFuzzer<IC, I> {
+    input_converter: IC,
+    phantom: PhantomData<I>,
 }
 
-impl NopFuzzer {
+impl<I> NopFuzzer<ToBytesInputConverter<I, NopToTargetBytes>, I>
+where
+    I: HasTargetBytes,
+{
     /// Creates a new [`NopFuzzer`]
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new() -> NopFuzzer<ToBytesInputConverter<I, NopToTargetBytes>, I> {
         Self {
-            converter: NopInputConverter,
+            input_converter: ToBytesInputConverter::new(NopToTargetBytes),
+            phantom: PhantomData,
         }
     }
 }
 
-impl Default for NopFuzzer {
+impl<I> Default for NopFuzzer<ToBytesInputConverter<I, NopToTargetBytes>, I>
+where
+    I: HasTargetBytes,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl HasTargetBytesConverter for NopFuzzer {
-    type Converter = NopInputConverter;
+impl<I> HasTargetBytesConverter for NopFuzzer<ToBytesInputConverter<I, NopToTargetBytes>, I>
+where
+    I: HasTargetBytes,
+{
+    type Converter = ToBytesInputConverter<I, NopToTargetBytes>;
     fn target_bytes_converter(&self) -> &Self::Converter {
-        &self.converter
+        &self.input_converter
     }
 
     fn target_bytes_converter_mut(&mut self) -> &mut Self::Converter {
-        &mut self.converter
+        &mut self.input_converter
     }
 }
 
-impl<E, EM, I, S, ST> Fuzzer<E, EM, I, S, ST> for NopFuzzer
+impl<E, EM, I, IC, S, ST> Fuzzer<E, EM, I, S, ST> for NopFuzzer<IC, I>
 where
     EM: ProgressReporter<S>,
     ST: StagesTuple<E, EM, S, Self>,

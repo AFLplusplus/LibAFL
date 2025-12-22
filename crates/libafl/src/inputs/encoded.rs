@@ -410,7 +410,8 @@ mod tests {
 
     #[test]
     fn test_from_target_bytes() {
-        use crate::inputs::{BytesTargetInputConverter, EncodedInputConverter, InputConverter};
+        use super::EncodedInputConverter;
+        use crate::inputs::{FromBytesInputConverter, InputConverter};
 
         let (encoder_decoder, expected_input) = setup_encoder_decoder();
         let tokenizer = NaiveTokenizer::default();
@@ -418,7 +419,7 @@ mod tests {
         encoder_decoder.decode(&expected_input, &mut bytes).unwrap();
 
         let mut converter =
-            BytesTargetInputConverter::new(EncodedInputConverter::new(encoder_decoder, tokenizer));
+            FromBytesInputConverter::new(EncodedInputConverter::new(encoder_decoder, tokenizer));
         let encoded_input = converter
             .convert(bytes.into())
             .expect("Failed to convert bytes to encoded input");

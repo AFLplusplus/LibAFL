@@ -286,16 +286,13 @@ mod tests {
 
     #[test]
     fn test_primitive_input_converter() {
-        use super::PrimitiveInputConverter;
-        use crate::inputs::{BytesTargetInputConverter, InputConverter, ValueInput};
+        use super::{PrimitiveInputConverter, ValueInput};
+        use crate::inputs::{FromBytesInputConverter, InputConverter};
 
         let expected_val: u32 = 0xdeadbeef;
         let bytes = expected_val.to_le_bytes();
-        let mut converter: BytesTargetInputConverter<
-            ValueInput<u32>,
-            PrimitiveInputConverter<u32>,
-        > = BytesTargetInputConverter::new(PrimitiveInputConverter::new());
-        let val_input = converter.convert(bytes.as_slice().into()).unwrap();
+        let mut converter = FromBytesInputConverter::new(PrimitiveInputConverter::default());
+        let val_input: ValueInput<u32> = converter.convert(bytes.as_slice().into()).unwrap();
         assert_eq!(*val_input.as_ref(), expected_val);
 
         // Test invalid length

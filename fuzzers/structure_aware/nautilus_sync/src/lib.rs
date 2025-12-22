@@ -16,23 +16,25 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
     inputs::{
-        BytesTargetInputConverter, NautilusBytesConverter, NautilusInput, TargetBytesInputConverter,
+        FromBytesInputConverter, FromTargetBytes, NautilusBytesConverter, NautilusInput,
+        ToBytesInputConverter, ToTargetBytes,
     },
     monitors::SimpleMonitor,
     mutators::{
-        HavocScheduledMutator, NautilusRandomMutator, NautilusRecursionMutator,
-        NautilusSpliceMutator,
+        nautilus::{NautilusRandomMutator, NautilusRecursionMutator, NautilusSpliceMutator},
+        HavocScheduledMutator,
     },
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, sync::SyncFromBrokerStage},
-    state::StdState,
+    state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
 use libafl_bolts::{
     core_affinity::Cores,
+    current_nanos,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::tuple_list,
+    tuples::{tuple_list, Merge},
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
@@ -127,12 +129,12 @@ pub extern "C" fn libafl_main() {
             .build_on_port(
                 shmem_provider.clone(),
                 port,
-                Some(TargetBytesInputConverter::from(
-                    NautilusBytesConverter::new(&context),
-                )),
-                Some(BytesTargetInputConverter::new(
-                    NautilusBytesConverter::new(&context).on_error_return_empty(true),
-                )),
+                Some(NautilusBytesConverter::new(&context).into_to_bytes_input_converter()),
+                Some(
+                    NautilusBytesConverter::new(&context)
+                        .on_error_return_empty(true)
+                        .into_from_bytes_input_converter(),
+                ),
             )
             .unwrap()
     });
@@ -195,7 +197,15 @@ pub extern "C" fn libafl_main() {
         let scheduler = QueueScheduler::new();
 
         // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        // A fuzzer with feedbacks and a corpus scheduler
+        let mut fuzzer = StdFuzzer::builder()
+            .scheduler(scheduler)
+            .feedback(feedback)
+            .objective(objective)
+            .target_bytes_converter(
+                NautilusBytesConverter::new(&context).into_to_bytes_input_converter(),
+            )
+            .build();
 
         // Create the executor for an in-process function with just one observer
         let mut executor = InProcessExecutor::new(

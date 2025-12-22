@@ -313,6 +313,7 @@ mod test {
         HasMetadata, NopFuzzer,
         events::NopEventManager,
         executors::nop::NopExecutor,
+        inputs::{NopInput, NopToTargetBytes, ToBytesInputConverter},
         stages::{
             ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage, Restartable, Stage,
             StagesTuple, WhileStage,
@@ -456,7 +457,12 @@ mod test {
 
     pub fn test_resume<ST, S>(completed: &Rc<RefCell<bool>>, state: &mut S, mut stages: ST)
     where
-        ST: StagesTuple<NopExecutor, NopEventManager, S, NopFuzzer>,
+        ST: StagesTuple<
+                NopExecutor,
+                NopEventManager,
+                S,
+                NopFuzzer<ToBytesInputConverter<NopInput, NopToTargetBytes>, NopInput>,
+            >,
         S: HasCurrentStageId + HasCurrentCorpusId,
     {
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
