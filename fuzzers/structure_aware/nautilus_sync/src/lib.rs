@@ -123,15 +123,14 @@ pub extern "C" fn libafl_main() {
     let context = NautilusContext::from_file(15, "grammar.json").unwrap();
 
     let mut event_converter = opt.bytes_broker_port.map(|port| {
+        let converter = NautilusBytesConverter::new(&context);
         LlmpEventConverter::builder()
             .build_on_port(
                 shmem_provider.clone(),
                 port,
-                Some(ToBytesInputConverter::new(NautilusBytesConverter::new(
-                    &context,
-                ))),
+                Some(ToBytesInputConverter::new(converter)),
                 Some(FromBytesInputConverter::new(
-                    NautilusBytesConverter::new(&context).on_error_return_empty(true),
+                    converter.on_error_return_empty(true),
                 )),
             )
             .unwrap()

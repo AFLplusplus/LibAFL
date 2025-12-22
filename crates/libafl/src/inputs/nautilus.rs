@@ -98,7 +98,7 @@ impl Hash for NautilusInput {
 }
 
 /// Convert from `NautilusInput` to `BytesInput`
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct NautilusBytesConverter<'a> {
     ctx: &'a NautilusContext,
     on_error_return_empty: bool,
@@ -292,14 +292,14 @@ mod tests {
         // Test roundtrip
         let bytes = b"aab";
         let input = converter
-            .convert_from_target_bytes(bytes)
+            .convert_from_target_bytes(&mut (), bytes)
             .expect("Failed to parse");
 
-        let out_bytes = converter.convert_to_target_bytes(&input);
+        let out_bytes = converter.convert_to_target_bytes(&mut (), &input);
         assert_eq!(out_bytes.as_slice(), bytes.as_slice());
 
         // Test invalid
         let bytes = b"aac";
-        assert!(converter.convert_from_target_bytes(bytes).is_err());
+        assert!(converter.convert_from_target_bytes(&mut (), bytes).is_err());
     }
 }
