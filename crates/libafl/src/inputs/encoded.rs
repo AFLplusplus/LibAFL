@@ -318,7 +318,7 @@ mod tests {
         executors::{ExitKind, InProcessExecutor, nop::NopExecutor},
         feedbacks::BoolValueFeedback,
         inputs::{
-            EncodedInput, ToTargetBytes,
+            ConvertToTargetBytes, EncodedInput,
             encoded::{InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
         },
         observers::ValueObserver,
@@ -394,7 +394,7 @@ mod tests {
             .add_input(&mut state, &mut executor, &mut event_mgr, input)
             .unwrap();
 
-        let input_bytes = fuzzer.to_target_bytes(&input_clone);
+        let input_bytes = fuzzer.convert_to_target_bytes(&input_clone);
         assert!(!input_bytes.is_empty());
 
         fuzzer

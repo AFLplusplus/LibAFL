@@ -313,9 +313,7 @@ mod test {
         HasMetadata, NopFuzzer,
         events::NopEventManager,
         executors::nop::NopExecutor,
-        inputs::{
-            ConvertToTargetBytes, NopInput, SimpleTargetBytesConverter, ToBytesInputConverter,
-        },
+        inputs::BytesInputConverter,
         stages::{
             ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage, Restartable, Stage,
             StagesTuple, WhileStage,
@@ -459,12 +457,7 @@ mod test {
 
     pub fn test_resume<ST, S>(completed: &Rc<RefCell<bool>>, state: &mut S, mut stages: ST)
     where
-        ST: StagesTuple<
-                NopExecutor,
-                NopEventManager,
-                S,
-                NopFuzzer<ToBytesInputConverter<NopInput, SimpleTargetBytesConverter>, NopInput>,
-            >,
+        ST: StagesTuple<NopExecutor, NopEventManager, S, NopFuzzer<BytesInputConverter>>,
         S: HasCurrentStageId + HasCurrentCorpusId,
     {
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
@@ -473,7 +466,7 @@ mod test {
             RetryCountRestartHelper::register();
         }
 
-        let mut fuzzer = NopFuzzer::new();
+        let mut fuzzer: NopFuzzer<BytesInputConverter> = NopFuzzer::new();
         let mut executor = NopExecutor::ok();
         let mut manager = NopEventManager::new();
         for _ in 0..2 {

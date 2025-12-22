@@ -914,9 +914,10 @@ mod tests {
         let executor = executor.build(());
         let mut executor = executor.unwrap();
 
+        let mut fuzzer: NopFuzzer = NopFuzzer::new();
         executor
             .run_target(
-                &mut NopFuzzer::new(),
+                &mut fuzzer,
                 &mut NopState::<NopInput>::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
@@ -942,9 +943,10 @@ mod tests {
         let executor = executor.build(tuple_list!(stdout));
         let mut executor = executor.unwrap();
 
+        let mut fuzzer: NopFuzzer = NopFuzzer::new();
         executor
             .run_target(
-                &mut NopFuzzer::new(),
+                &mut fuzzer,
                 &mut NopState::<NopInput>::new(),
                 &mut mgr,
                 &BytesInput::new(b".".to_vec()),

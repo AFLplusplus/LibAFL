@@ -17,7 +17,7 @@ use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProces
 use libafl::{
     Error,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{Input, ToTargetBytes},
+    inputs::{ConvertToTargetBytes, Input},
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
 };
@@ -63,7 +63,7 @@ where
     S: HasExecutions + HasCurrentTestcase<I> + HasSolutions<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
-    Z: ToTargetBytes<I>,
+    Z: ConvertToTargetBytes<I>,
 {
     /// Instruct the target about the input and run
     #[inline]
