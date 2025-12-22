@@ -74,7 +74,7 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        let target_bytes = fuzzer.to_target_bytes(input);
+        let target_bytes = fuzzer.convert_to_target_bytes(input);
         self.helper.borrow_mut().pre_exec(target_bytes.as_slice())?;
         if self.helper.borrow_mut().stalker_enabled() {
             if !(self.followed) {
