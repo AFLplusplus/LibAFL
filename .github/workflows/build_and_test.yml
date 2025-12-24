@@ -56,9 +56,9 @@ jobs:
         if: runner.os != 'Linux'
       - name: Check for binary blobs
         if: runner.os == 'Linux'
-        run: ./scripts/check_for_blobs.sh
+        run: just check-blobs
       - name: Build libafl debug
-        run: cargo build -p libafl
+        run: just build-libafl
       - name: Test the book (Linux)
         # TODO: fix books test fail with updated windows-rs
         if: runner.os == 'Linux'
@@ -69,18 +69,16 @@ jobs:
       - name: Build individual libafl book examples (linux)
         if: runner.os == 'Linux'
         run: cd docs/listings/baby_fuzzer/ && just build-all
+      - name: Doc
+        if: runner.os == 'Linux'
+        run: just doc
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
-        run: cargo test -- --test-threads 1
+        run: just test-serial
       - name: Run tests (Linux)
         if: runner.os != 'Windows'
-        run: cargo test -- --test-threads 1
-      - name: Test libafl no_std
-        run: cd crates/libafl && cargo test --no-default-features
-      - name: Test libafl_bolts no_std no_alloc
-        run: cd crates/libafl_bolts && cargo test --no-default-features
-      - name: Test libafl_targets no_std
-        run: cd crates/libafl_targets && cargo test --no-default-features
+        run: just test-serial
+
 
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
@@ -90,7 +88,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Build Docs
-        run: cargo doc --all-features --no-deps
+        run: just doc
 
   ubuntu-doc-test:
     runs-on: ubuntu-24.04
@@ -100,7 +98,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Test Docs
-        run: cargo test --doc --all-features
+        run: just test-docs
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
@@ -117,7 +115,7 @@ jobs:
           shared-key: ubuntu-miri
       # --- miri undefined behavior test --
       - name: Run miri tests
-        run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo miri test
+        run: just test-miri
 
   ubuntu:
     runs-on: ubuntu-24.04
@@ -130,18 +128,18 @@ jobs:
         with: { shared-key: "ubuntu" }
       # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
       - name: Check pcguard edges
-        run: cargo check --features=sancov_pcguard_edges
+        run: just check-sancov-edges
       - name: run shellcheck
-        run: shellcheck ./scripts/*.sh
+        run: just shellcheck
       # ---- build normal and examples ----
       - name: Run a normal build
-        run: cargo build --verbose
+        run: just build
       # - name: Run libafl_qemu usermode tests
       #   run: cd crates/libafl_qemu && cargo test
       # - name: Run libafl_qemu systemmode tests
       #   run: cd crates/libafl_qemu && cargo test --no-default-features --features x86_64,systemmode
       - name: Build examples
-        run: cargo build --examples --verbose
+        run: just examples
 
   ubuntu-clippy:
     runs-on: ubuntu-24.04
@@ -187,7 +185,7 @@ jobs:
       - name: Check each feature
         # Skipping `python` as it has to be built with the `maturin` tool
         # `sancov_pcguard_edges` is tested seperatelyc
-        run: LLVM_VERSION=18 CI_INSTANCES=18 cargo run --manifest-path ./utils/ci_splitter/Cargo.toml -- ${{ matrix.instance_idx }}
+        run: just check-features ${{ matrix.instance_idx }}
 
 #  idk why bindgen generates a corrupted file only on CI.
 #  ubuntu-concolic:
@@ -215,7 +213,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Run a maturin build
-        run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
+        run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && just build-python
       - name: Run python test
         run: . ./bindings/pylibafl/.env/bin/activate # && cd fuzzers/binary_only/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
 
@@ -233,7 +231,7 @@ jobs:
       - name: Installing black
         run: python3 -m pip install black
       - name: Format Check
-        run: ./scripts/fmt_all.sh check
+        run: just check-fmt
 
   check-md-links:
     runs-on: ubuntu-latest
@@ -252,14 +250,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-hack
       # Note: We currently only specify minimum rust versions for the default workspace members
-      - run: cargo hack check --rust-version -p libafl -p libafl_bolts -p libafl_derive -p libafl_cc -p libafl_targets
+      - run: just msrv
 
   fuzzers-preflight:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Fuzzer in CI Check
-        run: ./scripts/check_tested_fuzzers.sh
+        run: just fuzzers-preflight
 
   fuzzers:
     name: 🚀 ${{ matrix.fuzzer }}
@@ -386,13 +384,8 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          RUN_ON_CI=1 \
           LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
-          cargo \
-            run \
-            --manifest-path ./utils/ci_runner/Cargo.toml \
-            -- \
-            fuzzers/${{ matrix.fuzzer }}
+          just test-fuzzer fuzzers/${{ matrix.fuzzer }}
 
   # This job checks whether any changes have been made to the QEMU code to avoid
   # rebuilding and testing the QEMU related fuzzers unnecessarily as they are
@@ -440,7 +433,7 @@ jobs:
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} cargo run --manifest-path ./utils/ci_runner/Cargo.toml -- ${{ matrix.fuzzer }}
+        run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} just test-fuzzer ${{ matrix.fuzzer }}
 
   # Job to build and test the QEMU fuzzers
   qemu-user:
@@ -491,13 +484,8 @@ jobs:
         run: |
           unset RUSTC && \
           ARCH=x86_64 \
-          RUN_ON_CI=1 \
           LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
-          cargo \
-            run \
-            --manifest-path ./utils/ci_runner/Cargo.toml \
-            --  \
-            fuzzers/${{ matrix.fuzzer }}
+          just test-fuzzer fuzzers/${{ matrix.fuzzer }}
 
 
   # Job to build and test the QEMU fuzzers
@@ -546,13 +534,8 @@ jobs:
         run: |
           unset RUSTC && \
           ARCH=arm \
-          RUN_ON_CI=1 \
           LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
-          cargo \
-            run \
-            --manifest-path ./utils/ci_runner/Cargo.toml \
-            --  \
-            fuzzers/${{ matrix.fuzzer }}
+          just test-fuzzer fuzzers/${{ matrix.fuzzer }}
 
   # Job to build and test the QEMU fuzzers
   qemu-system-i386:
@@ -709,12 +692,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: no-std
+      - name: Test no-std
+        run: just test-no-std
       - name: Build aarch64-unknown-none
-        run: cd fuzzers/fuzz_anything/baby_no_std && cargo build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
-      - name: run x86_64 until panic!
-        run: cd fuzzers/fuzz_anything/baby_no_std && cargo run || test $? -ne 0 || exit 1
-      - name: no_std tests
-        run: cd ./crates/libafl && cargo test --no-default-features
+        run: just build-aarch64-unknown-none
   
   x86-i686-build:
     runs-on: ubuntu-24.04
@@ -732,7 +713,7 @@ jobs:
         with:
           shared-key: x86-i686
       - name: test
-        run: cargo check --target=i686-unknown-linux-gnu
+        run: just check-i686
         
 
   nostd-clippy:
@@ -747,10 +728,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: no-std-clippy
-      - name: libafl armv6m-none-eabi (32 bit no_std) clippy
-        run: cd ./crates/libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
-      - name: libafl_bolts armv6m-none-eabi (32 bit no_std) clippy
-        run: cd ./crates/libafl_bolts && cargo clippy --target thumbv6m-none-eabi --no-default-features
+      - name: Clippy thumbv6m-none-eabi
+        run: just clippy-thumbv6m-none-eabi
 
   format-toml:
     runs-on: ubuntu-24.04
@@ -759,7 +738,7 @@ jobs:
         run: curl -fsSL https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
       - uses: actions/checkout@v4
       - name: Run taplo
-        run: taplo format --check
+        run: just check-toml
 
   build-docker:
     runs-on: ubuntu-24.04
@@ -922,11 +901,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: MacOS Build
-        run: cargo build --verbose
+        run: just build
       - name: Increase map sizes
-        run: ./scripts/shmem_limits_macos.sh
+        run: just increase-mem-limits
       - name: Clippy
-        run: cargo clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test --exclude libvharness_sys --exclude libafl_qemu_sys --exclude libafl_qemu --exclude libafl_qemu_build
+        run: just clippy
 
   ubuntu-cross-android-arm64:
     runs-on: ubuntu-24.04
@@ -942,7 +921,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build Android
-        run: PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo ndk -t arm64-v8a build --release
+        run: just build-android
 
   ubuntu-cross-android-x86_64:
     runs-on: ubuntu-24.04
@@ -964,7 +943,7 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
-        run: cargo ndk -t x86_64 build
+        run: just build-android-x86_64
     #run: cargo build --target aarch64-linux-android
     # TODO: Figure out how to properly build stuff with clang
     #- name: Add clang path to $PATH env
