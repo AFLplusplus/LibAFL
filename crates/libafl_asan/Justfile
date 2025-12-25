@@ -139,10 +139,15 @@ test_arm:
 
 test_aarch64:
   #!/bin/sh
+  # libafl_asan assumes 48-bit address space,
+  # but newest qemu-user (ARMv8.2) supports architectures with 52-bit.
+  # We hard-code an older CPU to avoid this issue.
+  # Addressing this properly is possible but painful.
   ARCH=aarch64 \
   PROFILE=dev \
   RUSTLOG=debug \
   RUST_BACKTRACE=full \
+  QEMU_CPU=cortex-a57 \
   just test
 
 test_x86_64:

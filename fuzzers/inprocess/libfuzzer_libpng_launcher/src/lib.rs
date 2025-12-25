@@ -183,10 +183,6 @@ pub extern "C" fn libafl_main() {
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
     let opt = Opt::parse();
-    println!(
-        "AFL_SHMEM_SERVICE_STARTED: {:?}",
-        env::var("AFL_SHMEM_SERVICE_STARTED")
-    );
     use std::io::Write;
     std::io::stdout().flush().unwrap();
     libafl_bolts::SimpleStdoutLogger::set_logger().unwrap();
@@ -442,7 +438,6 @@ pub extern "C" fn libafl_main() {
         .overcommit(opt.overcommit)
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr);
-    //.stdout_file(Some("/dev/null"));
 
     #[cfg(unix)]
     let builder = builder.fork(opt.fork);

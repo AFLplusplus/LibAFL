@@ -55,7 +55,7 @@ impl Default for StatsdMonitorTagFlavor {
 }
 
 /// StatsD monitor
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct StatsdMonitor {
     target_host: String,
     target_port: u16,
@@ -72,15 +72,13 @@ impl StatsdMonitor {
     /// not crash or throw, so use this freely. :)
     #[must_use]
     pub fn new(target_host: String, target_port: u16, tag_flavor: StatsdMonitorTagFlavor) -> Self {
-        let mut this = Self {
+        Self {
             target_host,
             target_port,
             tag_flavor,
             statsd_client: None,
             enable_per_client_stats: false,
-        };
-        this.setup_statsd_client();
-        this
+        }
     }
 
     /// Set if we want to report per-client metrics (default: false)

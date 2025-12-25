@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::CorpusId,
-    inputs::{Input, ToTargetBytes},
+    inputs::{FromTargetBytesConverter, Input, ToTargetBytesConverter},
 };
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
@@ -32,6 +32,46 @@ where
 {
     /// Encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
     fn encode(&mut self, bytes: &[u8], tokenizer: &mut T) -> Result<EncodedInput, Error>;
+}
+
+/// A wrapper that implements [`FromTargetBytesConverter`] for [`EncodedInput`] using the given [`Tokenizer`]
+#[derive(Debug, Clone)]
+pub struct EncodedInputConverter<T> {
+    encoder_decoder: TokenInputEncoderDecoder,
+    tokenizer: T,
+}
+
+impl<T> EncodedInputConverter<T> {
+    /// Creates a new [`EncodedInputConverter`]
+    pub fn new(encoder_decoder: TokenInputEncoderDecoder, tokenizer: T) -> Self {
+        Self {
+            encoder_decoder,
+            tokenizer,
+        }
+    }
+}
+
+impl<T, S> FromTargetBytesConverter<EncodedInput, S> for EncodedInputConverter<T>
+where
+    T: Tokenizer,
+{
+    fn convert_from_target_bytes(
+        &mut self,
+        _state: &mut S,
+        bytes: &[u8],
+    ) -> Result<EncodedInput, Error> {
+        self.encoder_decoder.encode(bytes, &mut self.tokenizer)
+    }
+}
+
+impl<T, S> ToTargetBytesConverter<EncodedInput, S> for EncodedInputConverter<T> {
+    fn convert_to_target_bytes<'a>(
+        &mut self,
+        _state: &mut S,
+        input: &'a EncodedInput,
+    ) -> OwnedSlice<'a, u8> {
+        self.encoder_decoder.convert_to_target_bytes(_state, input)
+    }
 }
 
 /// Trait to decode encoded input to bytes
@@ -110,9 +150,13 @@ impl Default for TokenInputEncoderDecoder {
     }
 }
 
-impl ToTargetBytes<EncodedInput> for TokenInputEncoderDecoder {
+impl<S> ToTargetBytesConverter<EncodedInput, S> for TokenInputEncoderDecoder {
     /// Transform to bytes
-    fn to_target_bytes<'a>(&mut self, input: &'a EncodedInput) -> OwnedSlice<'a, u8> {
+    fn convert_to_target_bytes<'a>(
+        &mut self,
+        _state: &mut S,
+        input: &'a EncodedInput,
+    ) -> OwnedSlice<'a, u8> {
         let mut bytes = vec![];
         self.decode(input, &mut bytes).unwrap();
         bytes.into()
@@ -286,7 +330,7 @@ mod tests {
         executors::{ExitKind, InProcessExecutor, nop::NopExecutor},
         feedbacks::BoolValueFeedback,
         inputs::{
-            EncodedInput, ToTargetBytes,
+            EncodedInput, ToTargetBytesConverter,
             encoded::{InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
         },
         observers::ValueObserver,
@@ -362,7 +406,7 @@ mod tests {
             .add_input(&mut state, &mut executor, &mut event_mgr, input)
             .unwrap();
 
-        let input_bytes = fuzzer.to_target_bytes(&input_clone);
+        let input_bytes = fuzzer.convert_to_target_bytes(&mut state, &input_clone);
         assert!(!input_bytes.is_empty());
 
         fuzzer
@@ -374,5 +418,24 @@ mod tests {
                 1,
             )
             .unwrap();
+    }
+
+    #[test]
+    fn test_from_target_bytes() {
+        use super::EncodedInputConverter;
+        use crate::inputs::{FromBytesInputConverter, InputConverter};
+
+        let (encoder_decoder, expected_input) = setup_encoder_decoder();
+        let tokenizer = NaiveTokenizer::default();
+        let mut bytes = vec![];
+        encoder_decoder.decode(&expected_input, &mut bytes).unwrap();
+
+        let mut converter =
+            FromBytesInputConverter::new(EncodedInputConverter::new(encoder_decoder, tokenizer));
+        let encoded_input = converter
+            .convert(&mut (), bytes.into())
+            .expect("Failed to convert bytes to encoded input");
+
+        assert_eq!(encoded_input, expected_input);
     }
 }

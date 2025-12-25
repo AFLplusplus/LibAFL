@@ -48,7 +48,7 @@ use std::{fs::File, io::Read, path::Path};
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
 use libafl_bolts::{
-    Error, HasLen, generic_hash_std,
+    AsSlice, Error, HasLen, generic_hash_std,
     ownedref::{OwnedMutSlice, OwnedSlice},
     subrange::{SubRangeMutSlice, SubRangeSlice},
 };
@@ -106,46 +106,64 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash 
 }
 
 /// Convert between two input types using the given state
-pub trait InputConverter {
+pub trait InputConverter<S> {
     /// What to convert from
     type From;
     /// Destination type
     type To;
 
     /// Convert the src type to the dest
-    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error>;
+    fn convert(&mut self, state: &mut S, input: Self::From) -> Result<Self::To, Error>;
+}
+
+/// This trait can transform any input to bytes, which can be sent to the target from a harness.
+pub trait FromTargetBytesConverter<I, S> {
+    /// Convert a slice of bytes to an input
+    fn convert_from_target_bytes(&mut self, state: &mut S, bytes: &[u8]) -> Result<I, Error>;
 }
 
 /// This trait can transform any input to bytes, which can be sent to the target from a harness.
 /// Converters that implement this trait auto-implement [`InputConverter`] for this `I` to [`BytesInput`].
-pub trait ToTargetBytes<I> {
+pub trait ToTargetBytesConverter<I, S> {
     /// Transform to bytes
-    fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
+    fn convert_to_target_bytes<'a>(&mut self, state: &mut S, input: &'a I) -> OwnedSlice<'a, u8>;
 }
 
-/// An [`InputConverter`] wrapper that converts anything implementing [`ToTargetBytes`] to a [`BytesInput`].
+/// An [`InputConverter`] wrapper that converts anything implementing [`ToTargetBytesConverter`] to a [`BytesInput`].
 #[derive(Debug)]
-pub struct TargetBytesInputConverter<I, T> {
+pub struct ToBytesInputConverter<I, T = BytesInputConverter> {
     to_bytes_converter: T,
     phantom: PhantomData<I>,
 }
 
-impl<I, T> InputConverter for TargetBytesInputConverter<I, T>
+impl<I, S, T> InputConverter<S> for ToBytesInputConverter<I, T>
 where
-    T: ToTargetBytes<I>,
+    T: ToTargetBytesConverter<I, S>,
 {
     type From = I;
     type To = BytesInput;
 
-    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
+    fn convert(&mut self, state: &mut S, input: Self::From) -> Result<Self::To, Error> {
         Ok(BytesInput::new(
-            self.to_bytes_converter.to_target_bytes(&input).to_vec(),
+            self.to_bytes_converter
+                .convert_to_target_bytes(state, &input)
+                .to_vec(),
         ))
     }
 }
 
-impl<I, T> TargetBytesInputConverter<I, T> {
-    /// Create a new [`TargetBytesInputConverter`] from the given [`ToTargetBytes`] fn, that will convert target bytes to a [`BytesInput`].
+impl<I, S, T> ToTargetBytesConverter<I, S> for ToBytesInputConverter<I, T>
+where
+    T: ToTargetBytesConverter<I, S>,
+{
+    fn convert_to_target_bytes<'a>(&mut self, state: &mut S, input: &'a I) -> OwnedSlice<'a, u8> {
+        self.to_bytes_converter
+            .convert_to_target_bytes(state, input)
+    }
+}
+
+impl<I, T> ToBytesInputConverter<I, T> {
+    /// Create a new [`ToBytesInputConverter`] from the given [`ToTargetBytesConverter`] fn, that will convert target bytes to a [`BytesInput`].
     pub fn new(to_target_bytes_converter: T) -> Self {
         Self {
             to_bytes_converter: to_target_bytes_converter,
@@ -154,7 +172,7 @@ impl<I, T> TargetBytesInputConverter<I, T> {
     }
 }
 
-impl<I, T> From<T> for TargetBytesInputConverter<I, T> {
+impl<I, T> From<T> for ToBytesInputConverter<I, T> {
     fn from(to_bytes_converter: T) -> Self {
         Self::new(to_bytes_converter)
     }
@@ -164,7 +182,7 @@ impl<I, T> From<T> for TargetBytesInputConverter<I, T> {
 #[macro_export]
 macro_rules! none_input_converter {
     () => {
-        None::<$crate::inputs::ClosureInputConverter<_, _>>
+        None::<$crate::inputs::ClosureInputConverter<_, _, _>>
     };
 }
 
@@ -193,16 +211,19 @@ impl HasLen for NopInput {
     }
 }
 
+/// Callback for [`ClosureInputConverter`]
+pub type ClosureInputCallback<S, F, T> = Box<dyn FnMut(&mut S, F) -> Result<T, Error>>;
+
 /// `InputConverter` that uses a closure to convert
-pub struct ClosureInputConverter<F, T>
+pub struct ClosureInputConverter<S, F, T>
 where
     F: Input,
     T: Input,
 {
-    convert_cb: Box<dyn FnMut(F) -> Result<T, Error>>,
+    convert_cb: ClosureInputCallback<S, F, T>,
 }
 
-impl<F, T> Debug for ClosureInputConverter<F, T>
+impl<S, F, T> Debug for ClosureInputConverter<S, F, T>
 where
     F: Input,
     T: Input,
@@ -213,19 +234,19 @@ where
     }
 }
 
-impl<F, T> ClosureInputConverter<F, T>
+impl<S, F, T> ClosureInputConverter<S, F, T>
 where
     F: Input,
     T: Input,
 {
     /// Create a new converter using two closures, use None to forbid the conversion or the conversion back
     #[must_use]
-    pub fn new(convert_cb: Box<dyn FnMut(F) -> Result<T, Error>>) -> Self {
+    pub fn new(convert_cb: ClosureInputCallback<S, F, T>) -> Self {
         Self { convert_cb }
     }
 }
 
-impl<F, T> InputConverter for ClosureInputConverter<F, T>
+impl<S, F, T> InputConverter<S> for ClosureInputConverter<S, F, T>
 where
     F: Input,
     T: Input,
@@ -233,12 +254,11 @@ where
     type From = F;
     type To = T;
 
-    fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
-        (self.convert_cb)(input)
+    fn convert(&mut self, state: &mut S, input: Self::From) -> Result<Self::To, Error> {
+        (self.convert_cb)(state, input)
     }
 }
 
-// TODO change this to fn target_bytes(&self, buffer: &mut Vec<u8>) -> &[u8];
 /// Has a byte representation intended for the target.
 /// Can be represented with a vector of bytes.
 /// This representation is not necessarily deserializable.
@@ -382,23 +402,109 @@ impl ResizableMutator<u8> for &mut Vec<u8> {
     }
 }
 
+/// Basic [`BytesInputConverter`] with just one type that is not converting
 #[derive(Debug, Copy, Clone, Default)]
-/// Basic `NopToTargetBytes` with just one type that is not converting
-pub struct NopToTargetBytes;
+pub struct BytesInputConverter;
 
-impl NopToTargetBytes {
-    /// Creates a new [`NopToTargetBytes`]
+impl BytesInputConverter {
+    /// Creates a new [`BytesInputConverter`]
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 }
 
-impl<I> ToTargetBytes<I> for NopToTargetBytes
+impl<I, S> ToTargetBytesConverter<I, S> for BytesInputConverter
 where
-    I: HasTargetBytes + Debug,
+    I: HasTargetBytes,
 {
-    fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8> {
+    fn convert_to_target_bytes<'a>(&mut self, _state: &mut S, input: &'a I) -> OwnedSlice<'a, u8> {
         input.target_bytes()
+    }
+}
+
+impl<I, S> FromTargetBytesConverter<I, S> for BytesInputConverter
+where
+    I: From<BytesInput>,
+{
+    fn convert_from_target_bytes(&mut self, _state: &mut S, bytes: &[u8]) -> Result<I, Error> {
+        Ok(I::from(BytesInput::new(bytes.to_vec())))
+    }
+}
+
+/// An [`InputConverter`] wrapper that converts a [`BytesInput`] to anything implementing [`FromTargetBytesConverter`].
+#[derive(Debug, Clone, Copy)]
+pub struct FromBytesInputConverter<I, T = BytesInputConverter> {
+    from_bytes_converter: T,
+    phantom: PhantomData<I>,
+}
+
+impl<I, S, T> InputConverter<S> for FromBytesInputConverter<I, T>
+where
+    T: FromTargetBytesConverter<I, S>,
+{
+    type From = BytesInput;
+    type To = I;
+
+    fn convert(&mut self, state: &mut S, input: Self::From) -> Result<Self::To, Error> {
+        self.from_bytes_converter
+            .convert_from_target_bytes(state, input.target_bytes().as_slice())
+    }
+}
+
+impl<I, S> ToTargetBytesConverter<I, S> for FromBytesInputConverter<(), ()>
+where
+    I: HasTargetBytes,
+{
+    fn convert_to_target_bytes<'a>(&mut self, _state: &mut S, input: &'a I) -> OwnedSlice<'a, u8> {
+        input.target_bytes()
+    }
+}
+
+impl<I, S, T> FromTargetBytesConverter<I, S> for FromBytesInputConverter<I, T>
+where
+    T: FromTargetBytesConverter<I, S>,
+{
+    fn convert_from_target_bytes(&mut self, state: &mut S, bytes: &[u8]) -> Result<I, Error> {
+        self.from_bytes_converter
+            .convert_from_target_bytes(state, bytes)
+    }
+}
+
+impl<I, T> FromBytesInputConverter<I, T> {
+    /// Create a new [`FromBytesInputConverter`] from the given [`FromTargetBytesConverter`] fn, that will convert a [`BytesInput`] to target bytes.
+    pub fn new(from_target_bytes_converter: T) -> Self {
+        Self {
+            from_bytes_converter: from_target_bytes_converter,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I, T> From<T> for FromBytesInputConverter<I, T> {
+    fn from(from_bytes_converter: T) -> Self {
+        Self::new(from_bytes_converter)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use libafl_bolts::AsSlice;
+
+    use crate::inputs::{
+        BytesInput, BytesInputConverter, FromBytesInputConverter, FromTargetBytesConverter,
+        HasTargetBytes, InputConverter,
+    };
+
+    #[test]
+    fn test_from_target_bytes() {
+        let bytes = vec![1, 2, 3, 4];
+        let mut nop = FromBytesInputConverter::new(BytesInputConverter::new());
+        let res: BytesInput = nop.convert_from_target_bytes(&mut (), &bytes).unwrap();
+        assert_eq!(res.target_bytes().as_slice(), &bytes);
+
+        let start_input = BytesInput::new(bytes.clone());
+        let res2 = nop.convert(&mut (), start_input).unwrap();
+        assert_eq!(res2.target_bytes().as_slice(), &bytes);
     }
 }
