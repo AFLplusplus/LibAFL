@@ -272,7 +272,7 @@ test-python-fuzzer:
 
 # Builds the python bindings
 build-python:
-    sh -C "cd {{ROOT_DIR}}/bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh"
+    sh -c "cd {{ROOT_DIR}}/bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh"
 
 # Task to run clippy, rustfmt, and audit on all crates
 cleanliness: clippy check-fmt
