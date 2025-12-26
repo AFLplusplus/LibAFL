@@ -40,7 +40,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "baby_no_std"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "libafl",
  "libafl_bolts",
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "exceptional"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "libafl_core",
  "libc",
@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "fast_rands"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "rustversion",
  "serde",
@@ -153,17 +153,18 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "hashbrown"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
+checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 dependencies = [
  "foldhash",
  "serde",
+ "serde_core",
 ]
 
 [[package]]
 name = "libafl"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "ahash",
  "arbitrary-int 2.0.0",
@@ -191,7 +192,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_bolts"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "ahash",
  "erased-serde",
@@ -222,7 +223,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_core"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "postcard",
  "rustversion",
@@ -232,9 +233,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.177"
+version = "0.2.178"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
+checksum = "37c93d8daa9d8a012fd8ab92f088405fb202ea0b6ab73ee2482ae66af4f42091"
 
 [[package]]
 name = "libm"
@@ -244,7 +245,7 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "ll_mp"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "exceptional",
  "libafl_core",
@@ -259,18 +260,15 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.28"
+version = "0.4.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
+checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "mach2"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a1b95cd5421ec55b445b5ae102f5ea0e768de1f82bd3001e11f426c269c3aea"
-dependencies = [
- "libc",
-]
+checksum = "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
 
 [[package]]
 name = "meminterval"
@@ -284,7 +282,7 @@ dependencies = [
 
 [[package]]
 name = "no_std_time"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "rustversion",
 ]
@@ -327,7 +325,7 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "ownedref"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "libafl_core",
  "rustversion",
@@ -382,7 +380,7 @@ dependencies = [
 
 [[package]]
 name = "serde_anymap"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "ahash",
  "erased-serde",
@@ -416,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "shmem_providers"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "fast_rands",
  "hashbrown",
@@ -483,7 +481,7 @@ checksum = "141fb9f71ee586d956d7d6e4d5a9ef8e946061188520140f7591b668841d502e"
 
 [[package]]
 name = "tuple_list_ex"
-version = "0.15.4"
+version = "0.16.0"
 dependencies = [
  "libafl_core",
  "ownedref",

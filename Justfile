@@ -43,7 +43,7 @@ test-no-std:
 
 # Build the fuzzer on aarch64 none
 build-aarch64-unknown-none:
-    cd {{LIBAFL_BOLTS_DIR}} && cargo +nightly build -Zbuild-std=core --target aarch64-unknown-none --no-default-features -v --release
+    cd {{LIBAFL_BOLTS_DIR}} && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none --no-default-features -v --release
     cd {{FUZZERS_DIR}}/fuzz_anything/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release
 
 clippy-thumbv6m-none-eabi:
