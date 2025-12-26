@@ -247,6 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-hack
       # Note: We currently only specify minimum rust versions for the default workspace members
@@ -256,6 +257,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - name: Fuzzer in CI Check
         run: just fuzzers-preflight
 
@@ -689,6 +691,7 @@ jobs:
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: no-std
@@ -709,6 +712,7 @@ jobs:
       - name: Install x86 build dependencies / multilib
         run: sudo apt update && sudo apt -y install gcc-multilib g++-multilib
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: x86-i686
@@ -725,6 +729,7 @@ jobs:
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: no-std-clippy
@@ -737,6 +742,7 @@ jobs:
       - name: Install taplo
         run: curl -fsSL https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - name: Run taplo
         run: just check-toml
 
@@ -899,6 +905,7 @@ jobs:
         # Needs to match version in tinyinst-rs
         run: cargo install cxxbridge-cmd@=1.0.190
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - uses: Swatinem/rust-cache@v2
       - name: MacOS Build
         run: just build
@@ -919,6 +926,7 @@ jobs:
       - name: install cargo ndk
         run: cargo install cargo-ndk
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - uses: Swatinem/rust-cache@v2
       - name: Build Android
         run: just build-android
