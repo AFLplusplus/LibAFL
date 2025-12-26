@@ -22,7 +22,6 @@ examples: (default "--examples")
 no-default-features: (default "--no-default-features")
 
 # Run check on all projects in the workspace
-# Run check on all projects in the workspace
 check feature='' ignore='':
     cargo {{MSRV}} check --workspace --locked --all-targets {{feature}}
     cargo {{MSRV}} check --manifest-path fuzz/Cargo.toml --locked --all-targets
@@ -53,7 +52,7 @@ clippy-thumbv6m-none-eabi:
 
 # Builds the docs
 doc feature='':
-    cargo {{MSRV}} test --workspace --locked --doc {{feature}} --test-threads 1
+    cargo {{MSRV}} test --workspace --locked --doc {{feature}} -- --test-threads 1
     RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
 
 # Tests the code using miri
@@ -72,6 +71,11 @@ test-docs-internal: all-features
 test-docs-internal: all-features
     RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
     cd {{DOCS_DIR}} && mdbook test -L ../target/debug/deps
+
+[private]
+[windows]
+test-docs-internal:
+    @echo "Skipping docs test on Windows"
 
 # Tests all code in docs
 test-docs: test-docs-internal

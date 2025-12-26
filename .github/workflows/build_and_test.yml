@@ -224,6 +224,7 @@ jobs:
       MAIN_LLVM_VERSION: 21
     steps:
       - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v3
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
