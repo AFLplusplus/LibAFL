@@ -28,9 +28,8 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
     unsafe {
         env::set_var("PROFILE", "dev");
         env::set_var("PROFILE_DIR", "debug");
-        let target_dir = env::var("TARGET_DIR").unwrap_or_else(|_| {
-            project_dir.join("target").to_string_lossy().to_string()
-        });
+        let target_dir = env::var("TARGET_DIR")
+            .unwrap_or_else(|_| project_dir.join("target").to_string_lossy().to_string());
         env::set_var("TARGET_DIR", &target_dir);
         env::set_var("CARGO_TARGET_DIR", &target_dir);
     }
