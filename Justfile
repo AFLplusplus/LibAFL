@@ -22,17 +22,18 @@ examples: (default "--examples")
 no-default-features: (default "--no-default-features")
 
 # Run check on all projects in the workspace
+# Run check on all projects in the workspace
 check feature='' ignore='':
-    cargo ws exec {{ignore}} cargo {{MSRV}} check --locked --all-targets {{feature}}
+    cargo {{MSRV}} check --workspace --locked --all-targets {{feature}}
     cargo {{MSRV}} check --manifest-path fuzz/Cargo.toml --locked --all-targets
 
 # Run build on all projects in the workspace
 build feature='' ignore='':
-    cargo ws exec {{ignore}} cargo {{MSRV}} build --locked --all-targets {{feature}}
+    cargo {{MSRV}} build --workspace --locked --all-targets {{feature}}
 
 # Run tests on all projects in the workspace
 test feature='' ignore='':
-    cargo ws exec {{ignore}} cargo {{MSRV}} test --locked --all-targets {{feature}}
+    cargo {{MSRV}} test --workspace --locked --all-targets {{feature}}
 
 # Runs tests without default features (for no_std)
 test-no-std:
@@ -52,7 +53,7 @@ clippy-thumbv6m-none-eabi:
 
 # Builds the docs
 doc feature='':
-    cargo ws exec cargo {{MSRV}} test --locked --doc {{feature}} --test-threads 1
+    cargo {{MSRV}} test --workspace --locked --doc {{feature}} --test-threads 1
     RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
 
 # Tests the code using miri
@@ -74,12 +75,12 @@ test-docs-internal: all-features
 
 # Tests all code in docs
 test-docs: test-docs-internal
-    RUSTDOCFLAGS="-Dwarnings" cargo ws exec cargo doc --locked --all-features --no-deps --document-private-items
+    RUSTDOCFLAGS="-Dwarnings" cargo {{MSRV}} doc --workspace --locked --all-features --no-deps --document-private-items
 
 # Runs clippy on all crates
 [private]
 clippy-inner feature='':
-    cargo ws exec cargo {{MSRV}} clippy --locked --all-targets {{feature}} -- -D warnings
+    cargo {{MSRV}} clippy --workspace --locked --all-targets {{feature}} -- -D warnings
 
 # Run clippy on all targets and all sources
 [linux]
@@ -286,7 +287,7 @@ test-librasan:
 # Publish all crates
 [unix]
 publish:
-    cd {{ROOT_DIR}} && cargo ws publish --publish-as-is --no-remove-dev-deps --token $CRATES_IO_TOKEN
+    cd {{ROOT_DIR}} && cargo publish --workspace --publish-as-is --no-remove-dev-deps --token $CRATES_IO_TOKEN
 
 [unix]
 autofix:
