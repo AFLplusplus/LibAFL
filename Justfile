@@ -23,16 +23,16 @@ no-default-features: (default "--no-default-features")
 
 # Run check on all projects in the workspace
 check feature='' ignore='':
-    cargo {{MSRV}} check --workspace --locked --all-targets {{feature}}
+    cargo {{MSRV}} check --workspace --locked --all-targets --exclude libafl_asan_libc {{feature}}
     cargo {{MSRV}} check --manifest-path fuzz/Cargo.toml --locked --all-targets
 
 # Run build on all projects in the workspace
 build feature='' ignore='':
-    cargo {{MSRV}} build --workspace --locked --all-targets {{feature}}
+    cargo {{MSRV}} build --workspace --locked --all-targets --exclude libafl_asan_libc {{feature}}
 
 # Run tests on all projects in the workspace
 test feature='' ignore='':
-    cargo {{MSRV}} test --workspace --locked --all-targets {{feature}}
+    cargo {{MSRV}} test --workspace --locked --all-targets --exclude libafl_asan_libc {{feature}}
 
 # Runs tests without default features (for no_std)
 test-no-std:
@@ -84,7 +84,7 @@ test-docs: test-docs-internal
 # Runs clippy on all crates
 [private]
 clippy-inner feature='':
-    cargo {{MSRV}} clippy --workspace --locked --all-targets {{feature}} -- -D warnings
+    cargo {{MSRV}} clippy --workspace --locked --all-targets --exclude libafl_asan_libc {{feature}} -- -D warnings
 
 # Run clippy on all targets and all sources
 [linux]
