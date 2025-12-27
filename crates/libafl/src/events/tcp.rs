@@ -395,6 +395,7 @@ where
             Event::UpdateUserStatsMap {
                 ref stats,
                 phantom: _,
+                ..
             } => {
                 client_stats_manager.client_stats_insert(client_id)?;
                 // Collect keys to avoid borrowing stats while updating (if we needed to, but here we clone keys anyway)

@@ -224,7 +224,11 @@ where
                 monitor.display(client_stats_manager, event.name(), ClientId(0))?;
                 Ok(BrokerEventResult::Handled)
             }
-            Event::UpdateUserStatsMap { stats,curr_testcase_idx, .. } => {
+            Event::UpdateUserStatsMap {
+                stats,
+                curr_testcase_idx,
+                ..
+            } => {
                 client_stats_manager.client_stats_insert(ClientId(0))?;
                 client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     for (name, value) in stats {

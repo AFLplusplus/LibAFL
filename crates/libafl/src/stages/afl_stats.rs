@@ -480,7 +480,7 @@ where
                 Event::UpdateUserStatsMap {
                     stats: stats_map,
                     // Firing info about the current testcase
-                    curr_testcase_idx:Some(corpus_idx.into()),
+                    curr_testcase_idx: Some(corpus_idx.into()),
                     phantom: PhantomData,
                 },
                 *state.executions(),
