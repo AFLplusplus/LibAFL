@@ -282,8 +282,7 @@ impl TuiUi {
                         client
                             .client_stats
                             .current_testcase_idx
-                            .map(|v| v.to_string())
-                            .unwrap_or_else(|| "-".to_string()),
+                            .map_or_else(|| "-".to_string(), |v| v.to_string()),
                     ),
                 ],
             };
