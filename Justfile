@@ -53,7 +53,8 @@ clippy-thumbv6m-none-eabi:
 # Builds the docs
 doc feature='':
     cargo {{MSRV}} test --workspace --locked --doc {{feature}} -- --test-threads 1
-    RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
+    RUSTFLAGS="--cfg docsrs" cargo +nightly doc --workspace --all-features --no-deps --exclude libafl_qemu
+    RUSTFLAGS="--cfg docsrs" cargo +nightly doc -p libafl_qemu --features "document-features default python x86_64 usermode" --no-deps
 
 # Tests the code using miri
 test-miri:
