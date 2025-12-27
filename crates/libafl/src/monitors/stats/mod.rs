@@ -40,7 +40,7 @@ pub struct ClientStats {
     /// The number of executions of the previous state in case a client decrease the number of execution (e.g when restarting without saving the state)
     prev_state_executions: u64,
     /// The testcase index currently being fuzzed
-    current_testcase_idx: Option<usize>,
+    pub current_testcase_idx: Option<usize>,
     /// The size of the objectives corpus for this client
     objective_size: u64,
     /// The time for the last update of the objective size
