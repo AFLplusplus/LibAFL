@@ -380,10 +380,15 @@ impl<I> InMemoryOnDiskCorpus<I> {
     where
         I: Input,
     {
-        let file_name = testcase.filename_mut().take().unwrap_or_else(|| {
+        let base = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             testcase.input().as_ref().unwrap().generate_name(id)
         });
+
+        let file_name = match &self.prefix {
+            Some(pref) => format!("{pref}{base}"),
+            None => base,
+        };
 
         let mut ctr = 1;
         if self.locking {
