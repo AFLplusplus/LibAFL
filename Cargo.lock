@@ -5524,9 +5524,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.147"
+version = "1.0.148"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6af14725505314343e673e9ecb7cd7e8a36aa9791eb936235a3567cc31447ae4"
+checksum = "3084b546a1dd6289475996f182a22aba973866ea8e8b02c51d9f46b1336a22da"
 dependencies = [
  "itoa",
  "memchr",
@@ -7679,9 +7679,9 @@ dependencies = [
 
 [[package]]
 name = "z3"
-version = "0.19.6"
+version = "0.19.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2f393c9bc12e0a32ce65e9a0cbec296df1c7f506291db5b8237e7a9a1cc9ebe"
+checksum = "ea19bb0f83371b3279afd962fd5c6525024459615598ad328eb24d1713e28dd9"
 dependencies = [
  "log",
  "num",
@@ -7690,12 +7690,13 @@ dependencies = [
 
 [[package]]
 name = "z3-sys"
-version = "0.10.3"
+version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3940bd12746da62352129e4bf4087fd360919b1bb0b88c59550b9761199b04ae"
+checksum = "b18a464a6d3c31e6684906ca12e53c095ff625cd21fcbe09271a3aacb56a96f1"
 dependencies = [
  "bindgen 0.72.1",
  "pkg-config",
+ "reqwest",
 ]
 
 [[package]]
@@ -7780,6 +7781,6 @@ dependencies = [
 
 [[package]]
 name = "zmij"
-version = "0.1.7"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e404bcd8afdaf006e529269d3e85a743f9480c3cef60034d77860d02964f3ba"
+checksum = "0f4a4e8e9dc5c62d159f04fcdbe07f4c3fb710415aab4754bf11505501e3251d"
