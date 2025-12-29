@@ -170,7 +170,7 @@ uuid = { version = "1.19.0", features = ["serde", "v4"] }
 which = "8.0.0"
 windows = "0.62.1"
 windows-core = "0.62.1"
-z3 = { version = "0.19.6", default-features = false }
+z3 = { version = "0.19.7", default-features = false }
 
 [workspace.lints.rust]
 # Deny
