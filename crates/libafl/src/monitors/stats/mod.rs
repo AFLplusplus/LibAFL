@@ -312,10 +312,6 @@ impl ClientStats {
     ) -> Option<UserStats> {
         self.user_stats.insert(name, value)
     }
-    /// Update the current testcase index being fuzzed
-    pub fn update_current_testcase_idx(&mut self, corpus_idx: Option<usize>) {
-        self.current_testcase_idx = corpus_idx;
-    }
     /// Get a user-defined stat using the name
     #[must_use]
     pub fn get_user_stats(&self, name: &str) -> Option<&UserStats> {

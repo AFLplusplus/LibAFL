@@ -349,8 +349,6 @@ pub enum Event<I> {
     UpdateUserStatsMap {
         /// Custom user monitor name
         stats: HashMap<Cow<'static, str>, UserStats>,
-        /// Current fuzzed testcase index
-        curr_testcase_idx: Option<usize>,
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },

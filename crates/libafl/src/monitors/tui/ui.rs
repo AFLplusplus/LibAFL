@@ -281,7 +281,9 @@ impl TuiUi {
                         Span::raw("current testcase"),
                         client
                             .client_stats
-                            .current_testcase_idx
+                            .user_stats()
+                            .get("current_testcase_idx")
+                            .and_then(|s| s.value().as_u64())
                             .map_or_else(|| "-".to_string(), |v| v.to_string()),
                     ),
                 ],

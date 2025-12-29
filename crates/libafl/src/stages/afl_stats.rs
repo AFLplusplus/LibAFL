@@ -473,14 +473,18 @@ where
                 TAG_AFL_STATS_CYCLES_WO_FINDS,
             ),
         );
-
+        stats_map.insert(
+            Cow::Borrowed("current_testcase_idx"),
+            UserStats::new(
+                UserStatsValue::Number(corpus_idx.0 as u64),
+                AggregatorOps::None,
+            ),
+        );
         manager.fire(
             state,
             EventWithStats::with_current_time(
                 Event::UpdateUserStatsMap {
                     stats: stats_map,
-                    // Firing info about the current testcase
-                    curr_testcase_idx: Some(corpus_idx.into()),
                     phantom: PhantomData,
                 },
                 *state.executions(),
