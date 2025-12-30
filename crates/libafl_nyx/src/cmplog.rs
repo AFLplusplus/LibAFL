@@ -21,7 +21,7 @@ pub use libafl_targets::{
 };
 use serde::{Deserialize, Serialize};
 
-/// A [`CmpObserver`] observer for Nyx
+/// A [`libafl::observers::CmpObserver`] observer for Nyx
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NyxCmpObserver {
     /// Observer name

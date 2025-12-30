@@ -1,0 +1,3 @@
+# Requires cpio as a dependency
+doc:
+  cargo doc --no-deps --all-features
