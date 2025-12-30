@@ -51,9 +51,10 @@ clippy-thumbv6m-none-eabi:
     cd {{LIBAFL_BOLTS_DIR}} && cargo clippy --target thumbv6m-none-eabi --no-default-features
 
 # Builds the docs
+# Builds the docs
 doc feature='':
-    cargo {{MSRV}} test --workspace --locked --doc --exclude libafl_qemu --exclude libafl_asan_libc {{feature}} -- --test-threads 1
-    RUSTFLAGS="--cfg docsrs" cargo +nightly doc --workspace --all-features --no-deps --exclude libafl_qemu
+    cargo {{MSRV}} test --workspace --locked --doc --exclude libafl_qemu --exclude libafl_qemu_sys --exclude libafl_qemu_build --exclude libafl_qemu_runner --exclude libvharness_sys --exclude libafl_sugar --exclude libafl_asan_libc {{feature}} -- --test-threads 1
+    RUSTFLAGS="--cfg docsrs" cargo +nightly doc --workspace --all-features --no-deps --exclude libafl_qemu --exclude libafl_qemu_sys --exclude libafl_qemu_build --exclude libafl_qemu_runner --exclude libvharness_sys --exclude libafl_sugar
     RUSTFLAGS="--cfg docsrs" cargo +nightly doc -p libafl_qemu --features "document-features default python x86_64 usermode" --no-deps
 
 # Tests the code using miri

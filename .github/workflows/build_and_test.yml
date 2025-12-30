@@ -177,6 +177,7 @@ jobs:
       # Tracking: https://github.com/CensoredUsername/dynasm-rs/issues/114
       # One dep of libafl_frida fails on `DOCS_RS` for stable toolchain. Therefore, we _only_ run nightly for that.
       # For the rest of other crates, we still use stable toolchain.
+      - uses: extractions/setup-just@v3
       - name: "Setup nightly"
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -230,6 +231,7 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
+      - uses: extractions/setup-just@v3
       - name: Installing black
         run: python3 -m pip install black
       - name: Format Check
