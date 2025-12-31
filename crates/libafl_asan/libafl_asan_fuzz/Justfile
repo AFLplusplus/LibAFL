@@ -5,6 +5,9 @@ FUZZ_SOURCE_DIR := source_directory()
 FUZZ_MODE_FLAG := if PROFILE == "dev" { "--dev" } else { "--release" }
 FUZZ_JOBS := if PROFILE == "dev" { "" } else { "-jobs=8" }
 
+doc:
+  cargo doc --no-deps --all-features
+
 [unix]
 build_fuzz:
   #!/bin/sh

@@ -3,6 +3,9 @@ import "../fuzzer_name.just"
 
 libc_SOURCE_DIR := source_directory()
 
+doc:
+  cargo doc --no-deps --all-features
+
 [unix]
 compile_libc:
   #!/bin/sh

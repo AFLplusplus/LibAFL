@@ -21,6 +21,9 @@ mod serde_anymap 'crates/serde_anymap/Justfile'
 mod shmem_providers 'crates/shmem_providers/Justfile'
 mod tuple_list_ex 'crates/tuple_list_ex/Justfile'
 mod libafl_libfuzzer 'crates/libafl_libfuzzer/Justfile'
+mod libafl_asan 'crates/libafl_asan/Justfile'
+mod libafl_asan_fuzz 'crates/libafl_asan/libafl_asan_fuzz/Justfile'
+mod libafl_asan_libc 'crates/libafl_asan/libafl_asan_libc/Justfile'
 
 doc-all:
   just libafl_bolts doc
@@ -46,3 +49,6 @@ doc-all:
   just shmem_providers doc
   just tuple_list_ex doc
   just libafl_libfuzzer doc
+  just libafl_asan doc
+  just libafl_asan_fuzz doc
+  just libafl_asan_libc doc
