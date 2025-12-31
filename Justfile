@@ -33,6 +33,7 @@ mod libafl_qemu_build 'crates/libafl_qemu/libafl_qemu_build/Justfile'
 mod libafl_qemu_sys 'crates/libafl_qemu/libafl_qemu_sys/Justfile'
 mod libvharness_sys 'crates/libafl_qemu/libvharness_sys/Justfile'
 mod libafl_qemu 'crates/libafl_qemu/Justfile'
+mod libafl_frida 'crates/libafl_frida/Justfile'
 
 doc-all:
   just libafl_bolts doc
@@ -70,3 +71,4 @@ doc-all:
   just libafl_concolic_dump_constraints doc
   just libafl_concolic_runtime_test doc
   just libafl_concolic_symcc_libafl doc
+  just libafl_frida doc
