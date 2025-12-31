@@ -1,6 +1,6 @@
 import "../../just/libafl-qemu.just"
-mod fuzz "libafl_asan_fuzz/Justfile"
-mod libc "libafl_asan_libc/Justfile"
+import "libafl_asan_fuzz/Justfile"
+import "libafl_asan_libc/Justfile"
 import "fuzzer_name.just"
 
 ASAN_SOURCE_DIR := source_directory()
@@ -41,7 +41,7 @@ test_asan:
 [unix]
 build_asan: compile_asan
 
-build: build_asan libc::build_libc fuzz::build_fuzz
+build: build_asan build_libc build_fuzz
 
 test: test_asan
 
@@ -55,7 +55,7 @@ pretty_toml:
 
 pretty: pretty_rust pretty_toml
 
-fix: fix_asan libc::fix_libc fuzz::fix_fuzz
+fix: fix_asan fix_libc fix_fuzz
 
 clippy:
   #!/bin/sh

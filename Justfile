@@ -69,8 +69,8 @@ doc-crates:
   just tuple_list_ex doc
   just libafl_libfuzzer doc
   just libafl_asan doc
-  just libafl_asan_fuzz doc
-  just libafl_asan_libc doc
+  just libafl_asan_fuzz doc_fuzz
+  just libafl_asan_libc doc_libc
   just libafl_qemu_runner doc
   just libafl_qemu_build doc
   just libafl_qemu_sys doc

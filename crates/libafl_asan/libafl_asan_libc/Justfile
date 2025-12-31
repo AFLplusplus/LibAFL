@@ -3,7 +3,7 @@ import "../fuzzer_name.just"
 
 libc_SOURCE_DIR := source_directory()
 
-doc:
+doc_libc:
   cargo doc --no-deps --all-features
 
 [unix]
