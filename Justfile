@@ -35,7 +35,16 @@ mod libvharness_sys 'crates/libafl_qemu/libvharness_sys/Justfile'
 mod libafl_qemu 'crates/libafl_qemu/Justfile'
 mod libafl_frida 'crates/libafl_frida/Justfile'
 
-doc-all:
+mod build_and_test_fuzzers 'utils/build_and_test_fuzzers/Justfile'
+mod ci_runner 'utils/ci_runner/Justfile'
+mod ci_splitter 'utils/ci_splitter/Justfile'
+mod deexit 'utils/deexit/Justfile'
+mod drcov_utils 'utils/drcov_utils/Justfile'
+mod gramatron_construct_automata 'utils/gramatron/construct_automata/Justfile'
+mod libafl_benches 'utils/libafl_benches/Justfile'
+mod libafl_jumper 'utils/libafl_jumper/Justfile'
+
+doc-crates:
   just libafl_bolts doc
   just libafl doc
   just libafl_targets doc
@@ -72,3 +81,15 @@ doc-all:
   just libafl_concolic_runtime_test doc
   just libafl_concolic_symcc_libafl doc
   just libafl_frida doc
+
+doc-utils:
+  just build_and_test_fuzzers doc
+  just ci_runner doc
+  just ci_splitter doc
+  just deexit doc
+  just drcov_utils doc
+  just gramatron_construct_automata doc
+  just libafl_benches doc
+  just libafl_jumper doc
+
+doc-all: doc-crates doc-utils
