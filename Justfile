@@ -20,6 +20,7 @@ mod ownedref 'crates/ownedref/Justfile'
 mod serde_anymap 'crates/serde_anymap/Justfile'
 mod shmem_providers 'crates/shmem_providers/Justfile'
 mod tuple_list_ex 'crates/tuple_list_ex/Justfile'
+mod libafl_libfuzzer 'crates/libafl_libfuzzer/Justfile'
 
 doc-all:
   just libafl_bolts doc
@@ -44,3 +45,4 @@ doc-all:
   just serde_anymap doc
   just shmem_providers doc
   just tuple_list_ex doc
+  just libafl_libfuzzer doc
