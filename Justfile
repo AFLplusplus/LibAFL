@@ -28,6 +28,11 @@ mod libafl_concolic_symcc_libafl 'crates/libafl_concolic/symcc_libafl/Justfile'
 mod libafl_asan 'crates/libafl_asan/Justfile'
 mod libafl_asan_fuzz 'crates/libafl_asan/libafl_asan_fuzz/Justfile'
 mod libafl_asan_libc 'crates/libafl_asan/libafl_asan_libc/Justfile'
+mod libafl_qemu_runner 'crates/libafl_qemu/libafl_qemu_runner/Justfile'
+mod libafl_qemu_build 'crates/libafl_qemu/libafl_qemu_build/Justfile'
+mod libafl_qemu_sys 'crates/libafl_qemu/libafl_qemu_sys/Justfile'
+mod libvharness_sys 'crates/libafl_qemu/libvharness_sys/Justfile'
+mod libafl_qemu 'crates/libafl_qemu/Justfile'
 
 doc-all:
   just libafl_bolts doc
@@ -56,6 +61,11 @@ doc-all:
   just libafl_asan doc
   just libafl_asan_fuzz doc
   just libafl_asan_libc doc
+  just libafl_qemu_runner doc
+  just libafl_qemu_build doc
+  just libafl_qemu_sys doc
+  just libvharness_sys doc
+  just libafl_qemu doc
   just libafl_concolic_symcc_runtime doc
   just libafl_concolic_dump_constraints doc
   just libafl_concolic_runtime_test doc

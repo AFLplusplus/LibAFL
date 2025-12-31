@@ -1,0 +1,2 @@
+doc:
+  cargo doc -p libafl_qemu --no-deps --no-default-features --features x86_64,systemmode,python,slirp,document-features
