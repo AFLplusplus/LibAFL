@@ -21,6 +21,10 @@ mod serde_anymap 'crates/serde_anymap/Justfile'
 mod shmem_providers 'crates/shmem_providers/Justfile'
 mod tuple_list_ex 'crates/tuple_list_ex/Justfile'
 mod libafl_libfuzzer 'crates/libafl_libfuzzer/Justfile'
+mod libafl_concolic_symcc_runtime 'crates/libafl_concolic/symcc_runtime/Justfile'
+mod libafl_concolic_dump_constraints 'crates/libafl_concolic/test/dump_constraints/Justfile'
+mod libafl_concolic_runtime_test 'crates/libafl_concolic/test/runtime_test/Justfile'
+mod libafl_concolic_symcc_libafl 'crates/libafl_concolic/symcc_libafl/Justfile'
 mod libafl_asan 'crates/libafl_asan/Justfile'
 mod libafl_asan_fuzz 'crates/libafl_asan/libafl_asan_fuzz/Justfile'
 mod libafl_asan_libc 'crates/libafl_asan/libafl_asan_libc/Justfile'
@@ -52,3 +56,7 @@ doc-all:
   just libafl_asan doc
   just libafl_asan_fuzz doc
   just libafl_asan_libc doc
+  just libafl_concolic_symcc_runtime doc
+  just libafl_concolic_dump_constraints doc
+  just libafl_concolic_runtime_test doc
+  just libafl_concolic_symcc_libafl doc
