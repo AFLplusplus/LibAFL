@@ -10,6 +10,16 @@ mod exceptional 'crates/exceptional/Justfile'
 mod fast_rands 'crates/fast_rands/Justfile'
 mod libafl_core 'crates/libafl_core/Justfile'
 mod libafl_intelpt 'crates/libafl_intelpt/Justfile'
+mod libafl_sugar 'crates/libafl_sugar/Justfile'
+mod libafl_tinyinst 'crates/libafl_tinyinst/Justfile'
+mod libafl_unicorn 'crates/libafl_unicorn/Justfile'
+mod ll_mp 'crates/ll_mp/Justfile'
+mod minibsod 'crates/minibsod/Justfile'
+mod no_std_time 'crates/no_std_time/Justfile'
+mod ownedref 'crates/ownedref/Justfile'
+mod serde_anymap 'crates/serde_anymap/Justfile'
+mod shmem_providers 'crates/shmem_providers/Justfile'
+mod tuple_list_ex 'crates/tuple_list_ex/Justfile'
 
 doc-all:
   just libafl_bolts doc
@@ -24,3 +34,13 @@ doc-all:
   just fast_rands doc
   just libafl_core doc
   just libafl_intelpt doc
+  just libafl_sugar doc
+  just libafl_tinyinst doc
+  just libafl_unicorn doc
+  just ll_mp doc
+  just minibsod doc
+  just no_std_time doc
+  just ownedref doc
+  just serde_anymap doc
+  just shmem_providers doc
+  just tuple_list_ex doc
