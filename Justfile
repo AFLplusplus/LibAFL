@@ -7,6 +7,9 @@ mod libafl_nyx 'crates/libafl_nyx/Justfile'
 mod build_id2 'crates/build_id2/Justfile'
 mod core_affinity2 'crates/core_affinity2/Justfile'
 mod exceptional 'crates/exceptional/Justfile'
+mod fast_rands 'crates/fast_rands/Justfile'
+mod libafl_core 'crates/libafl_core/Justfile'
+mod libafl_intelpt 'crates/libafl_intelpt/Justfile'
 
 doc-all:
   just libafl_bolts doc
@@ -18,3 +21,6 @@ doc-all:
   just build_id2 doc
   just core_affinity2 doc
   just exceptional doc
+  just fast_rands doc
+  just libafl_core doc
+  just libafl_intelpt doc
