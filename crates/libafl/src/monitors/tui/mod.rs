@@ -36,7 +36,7 @@ use crate::monitors::{
     Monitor,
     stats::{
         ClientStats, EdgeCoverage, ItemGeometry, ProcessTiming, manager::ClientStatsManager,
-        user_stats::UserStats,
+        user_stats::{UserStats, UserStatsValue},
     },
 };
 
@@ -244,6 +244,9 @@ pub struct ClientTuiContext {
     /// Roughly: every testcase has been scheduled once, but highly fuzzer-specific.
     pub cycles_done: u64,
 
+    /// Currently fuzzed testcase index
+    pub current_testcase: Option<u64>,
+
     /// Times for processing
     pub process_timing: ProcessTiming,
     /// The individual entry geometry
@@ -269,8 +272,14 @@ impl ClientTuiContext {
         );
         self.item_geometry = client.item_geometry();
 
+        self.current_testcase = None;
         for (key, val) in client.user_stats() {
             self.user_stats.insert(key.clone(), val.clone());
+            if key.as_ref() == "current_testcase" {
+                if let UserStatsValue::Number(n) = val.value() {
+                    self.current_testcase = Some(*n);
+                }
+            }
         }
     }
 }
