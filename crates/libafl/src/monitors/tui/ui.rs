@@ -664,6 +664,16 @@ impl TuiUi {
                             .map_or(0, |x| x.objectives)
                     ))),
                 ]),
+                Row::new(vec![
+                    Cell::from(Span::raw("current testcase")),
+                    Cell::from(Span::raw(format!(
+                        "{}",
+                        app.clients
+                            .get(&self.client_idx)
+                            .and_then(|x| x.current_testcase)
+                            .map_or_else(|| String::from("-"), |v| v.to_string())
+                    ))),
+                ]),
             ]
         };
 
