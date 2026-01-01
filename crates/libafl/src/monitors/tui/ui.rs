@@ -671,7 +671,7 @@ impl TuiUi {
                         app.clients
                             .get(&self.client_idx)
                             .and_then(|x| x.current_testcase)
-                            .map_or_else(|| String::from("-"), |v| v.to_string())
+                            .map_or_else(|| String::from("-"), |v| format!("{}", v))
                     ))),
                 ]),
             ]
