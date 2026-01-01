@@ -273,6 +273,22 @@ where
                 "state is not currently processing a corpus index",
             ));
         };
+
+        manager.fire(
+            state,
+            EventWithStats::with_current_time(
+                Event::UpdateUserStats {
+                    name: Cow::Borrowed("current_testcase"),
+                    value: UserStats::new(
+                        UserStatsValue::Number(corpus_idx.0 as u64),
+                        AggregatorOps::None,
+                    ),
+                    phantom: PhantomData,
+                },
+                *state.executions(),
+            ),
+        )?;
+
         let testcase = state.corpus().get(corpus_idx)?.borrow();
         // NOTE: scheduled_count represents the amount of fuzz runs a
         // testcase has had. Since this stage is kept at the very end of stage list,
