@@ -1,5 +1,5 @@
 //! A fuzzer that uses a `PushStage`, generating input to be subsequently executed,
-//! instead of executing input iteslf in a loop.
+//! instead of executing input itself in a loop.
 //! Using this method, we can add `LibAFL`, for example, into an emulation loop
 //! or use its mutations for another fuzzer.
 //! This is a less hacky alternative to the `KloRoutines` based fuzzer, that will also work on non-`Unix`.
@@ -69,7 +69,7 @@ pub fn main() {
     // such as the notification of the addition of a new item to the corpus
     let mgr = SimpleEventManager::new(monitor);
 
-    // A queue policy to get testcasess from the corpus
+    // A queue policy to get testcases from the corpus
     let mut scheduler = QueueScheduler::new();
 
     // Create the executor for an in-process function with just one observer

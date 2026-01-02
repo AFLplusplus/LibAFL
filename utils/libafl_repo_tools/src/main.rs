@@ -263,7 +263,8 @@ async fn run_clang_fmt(
 /// extracts (major, minor, patch) version from `clang-format --version` output.
 #[must_use]
 pub fn parse_llvm_fmt_version(fmt_str: &str) -> Option<(u32, u32, u32)> {
-    let re = Regex::new(r"clang-format version (?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)").ok()?;
+    let re =
+        Regex::new(r"clang-format version (?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)").ok()?;
     let caps = re.captures(fmt_str)?;
 
     let major = caps.name("major")?.as_str().parse().ok()?;
