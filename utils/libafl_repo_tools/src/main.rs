@@ -87,9 +87,11 @@ use which::which;
 const REF_LLVM_VERSION: u32 = 20;
 
 fn is_workspace_toml(path: &Path) -> bool {
-    for line in read_to_string(path).unwrap().lines() {
-        if line.eq("[workspace]") {
-            return true;
+    if let Ok(contents) = read_to_string(path) {
+        for line in contents.lines() {
+            if line.eq("[workspace]") {
+                return true;
+            }
         }
     }
 
@@ -111,10 +113,12 @@ fn is_binary_crate(crate_path: &Path) -> Result<bool, io::Error> {
 
 async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) -> io::Result<()> {
     // Make sure we parse the correct file
-    assert_eq!(
-        cargo_file_path.file_name().unwrap().to_str().unwrap(),
-        "Cargo.toml"
-    );
+    if cargo_file_path.file_name().and_then(|s| s.to_str()) != Some("Cargo.toml") {
+        return Err(io::Error::new(
+            ErrorKind::InvalidInput,
+            "Expected a Cargo.toml manifest path",
+        ));
+    }
 
     let mut cargo_file_dir = cargo_file_path.clone();
     cargo_file_dir.pop();
@@ -146,8 +150,12 @@ async fn run_cargo_generate_lockfile(cargo_file_path: PathBuf, verbose: bool) ->
     let res = gen_lockfile_cmd.output().await?;
 
     if !res.status.success() {
-        let stdout = from_utf8(&res.stdout).unwrap();
-        let stderr = from_utf8(&res.stderr).unwrap();
+        let stdout = from_utf8(&res.stdout)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|_| format!("{:?}", &res.stdout));
+        let stderr = from_utf8(&res.stderr)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|_| format!("{:?}", &res.stderr));
         return Err(io::Error::other(format!(
             "Cargo generate-lockfile failed. Run cargo generate-lockfile for {}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {gen_lockfile_cmd:?}",
             cargo_file_path.display()
@@ -193,8 +201,12 @@ async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) 
     let res = fmt_command.output().await?;
 
     if !res.status.success() {
-        let stdout = from_utf8(&res.stdout).unwrap();
-        let stderr = from_utf8(&res.stderr).unwrap();
+        let stdout = from_utf8(&res.stdout)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|_| format!("{:?}", &res.stdout));
+        let stderr = from_utf8(&res.stderr)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|_| format!("{:?}", &res.stderr));
         return Err(io::Error::other(format!(
             "Cargo fmt failed. Run cargo fmt for \"{}\".\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}",
             cargo_file_path.display()
@@ -235,8 +247,12 @@ async fn run_clang_fmt(
     if res.status.success() {
         Ok(())
     } else {
-        let stdout = from_utf8(&res.stdout).unwrap();
-        let stderr = from_utf8(&res.stderr).unwrap();
+        let stdout = from_utf8(&res.stdout)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|_| format!("{:?}", &res.stdout));
+        let stderr = from_utf8(&res.stderr)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|_| format!("{:?}", &res.stderr));
         println!("{stderr}");
         Err(io::Error::other(format!(
             "{clang} failed.\nstdout:{stdout}\nstderr:{stderr}"
@@ -247,15 +263,14 @@ async fn run_clang_fmt(
 /// extracts (major, minor, patch) version from `clang-format --version` output.
 #[must_use]
 pub fn parse_llvm_fmt_version(fmt_str: &str) -> Option<(u32, u32, u32)> {
-    let re =
-        Regex::new(r"clang-format version (?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)").unwrap();
+    let re = Regex::new(r"clang-format version (?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)").ok()?;
     let caps = re.captures(fmt_str)?;
 
-    Some((
-        caps["major"].parse().unwrap(),
-        caps["minor"].parse().unwrap(),
-        caps["patch"].parse().unwrap(),
-    ))
+    let major = caps.name("major")?.as_str().parse().ok()?;
+    let minor = caps.name("minor")?.as_str().parse().ok()?;
+    let patch = caps.name("patch")?.as_str().parse().ok()?;
+
+    Some((major, minor, patch))
 }
 
 #[derive(Parser)]
@@ -442,11 +457,14 @@ async fn get_version_string(path: &str, args: &[&str]) -> Result<String, io::Err
         .arg("--version")
         .output()
         .await?;
-    assert!(
-        res.status.success(),
-        "Failed to run {path} {args:?}: {res:?}"
-    );
-    Ok(from_utf8(&res.stdout).unwrap().replace('\n', ""))
+    if !res.status.success() {
+        return Err(io::Error::new(
+            ErrorKind::Other,
+            format!("Failed to run {path} {args:?}: {res:?}"),
+        ));
+    }
+    let s = from_utf8(&res.stdout).map_err(|e| io::Error::new(ErrorKind::InvalidData, e))?;
+    Ok(s.replace('\n', ""))
 }
 
 #[expect(clippy::needless_pass_by_value)]
