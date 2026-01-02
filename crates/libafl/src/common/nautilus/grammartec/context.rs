@@ -14,6 +14,7 @@ use super::{
     tree::Tree,
 };
 
+/// The context for the grammar, containing rules and other metadata
 #[derive(Debug, Clone)]
 pub struct Context {
     rules: Vec<Rule>,
@@ -36,6 +37,7 @@ impl Default for Context {
 }
 
 impl Context {
+    /// Create a new [`Context`]
     #[must_use]
     pub fn new() -> Self {
         Context {
@@ -53,28 +55,33 @@ impl Context {
         }
     }
 
+    /// Initialize the context with a maximum length
     pub fn initialize(&mut self, max_len: usize) {
         self.calc_min_len();
         self.calc_num_options();
         self.max_len = max_len + 2;
     }
 
+    /// Get a rule by ID
     #[must_use]
     pub fn get_rule(&self, r: RuleId) -> &Rule {
         let id: usize = r.into();
         &self.rules[id]
     }
 
+    /// Get the nonterminal ID for a rule
     #[must_use]
     pub fn get_nt(&self, r: &RuleIdOrCustom) -> NTermId {
         self.get_rule(r.id()).nonterm()
     }
 
+    /// Get the number of children (nonterminals) for a rule
     #[must_use]
     pub fn get_num_children(&self, r: &RuleIdOrCustom) -> usize {
         self.get_rule(r.id()).number_of_nonterms()
     }
 
+    /// Add a rule to the context
     pub fn add_rule(&mut self, nt: &str, format: &[u8]) -> RuleId {
         let rid = self.rules.len().into();
         let rule = Rule::from_format(self, nt, format);
@@ -84,6 +91,7 @@ impl Context {
         rid
     }
 
+    /// Add a script rule to the context
     #[cfg(feature = "nautilus_py")]
     pub fn add_script(&mut self, nt: &str, nts: &[String], script: Py<PyAny>) -> RuleId {
         let rid = self.rules.len().into();
@@ -94,6 +102,7 @@ impl Context {
         rid
     }
 
+    /// Add a regex rule to the context
     pub fn add_regex(&mut self, nt: &str, regex: &str) -> RuleId {
         let rid = self.rules.len().into();
         let rule = Rule::from_regex(self, nt, regex);
@@ -103,6 +112,7 @@ impl Context {
         rid
     }
 
+    /// Add a terminal rule to the context
     pub fn add_term_rule(&mut self, nt: &str, term: &[u8]) -> RuleId {
         let rid = self.rules.len().into();
         let ntid = self.aquire_nt_id(nt);
@@ -111,6 +121,7 @@ impl Context {
         rid
     }
 
+    /// Acquire a nonterminal ID, creating it if it doesn't exist
     pub fn aquire_nt_id(&mut self, nt: &str) -> NTermId {
         let next_id = self.nt_ids_to_name.len().into();
         let id = self.names_to_nt_id.entry(nt.into()).or_insert(next_id);
@@ -118,6 +129,7 @@ impl Context {
         *id
     }
 
+    /// Get the ID of a nonterminal
     #[must_use]
     pub fn nt_id(&self, nt: &str) -> NTermId {
         *self
@@ -126,6 +138,7 @@ impl Context {
             .unwrap_or_else(|| panic!("{}", ("no such nonterminal: ".to_owned() + nt)))
     }
 
+    /// Get the name of a nonterminal from its ID
     #[must_use]
     pub fn nt_id_to_s(&self, nt: NTermId) -> String {
         self.nt_ids_to_name[&nt].clone()
@@ -145,6 +158,7 @@ impl Context {
         Some(res)
     }
 
+    /// Calculate the minimum length for all nonterminals
     pub fn calc_min_len(&mut self) {
         let mut something_changed = true;
         while something_changed {
@@ -189,6 +203,7 @@ impl Context {
         res
     }
 
+    /// Calculate the number of options for all nonterminals
     pub fn calc_num_options(&mut self) {
         for (nt, rules) in &self.nts_to_rules {
             self.nts_to_num_options.entry(*nt).or_insert(rules.len());
@@ -219,11 +234,13 @@ impl Context {
         }
     }
 
+    /// Check if a nonterminal has multiple possibilities
     #[must_use]
     pub fn check_if_nterm_has_multiple_possiblities(&self, nt: &NTermId) -> bool {
         self.get_rules_for_nt(*nt).len() > 1
     }
 
+    /// Get a random length for a rule
     pub fn get_random_len<R: Rand>(rand: &mut R, len: usize, rhs_of_rule: &[NTermId]) -> usize {
         Self::simple_get_random_len(rand, rhs_of_rule.len(), len)
     }
@@ -248,15 +265,18 @@ impl Context {
         res
     }
 
+    /// Get the minimum length for a nonterminal
     #[must_use]
     pub fn get_min_len_for_nt(&self, nt: NTermId) -> usize {
         self.nts_to_min_size[&nt]
     }
 
+    /// Get a random rule for a nonterminal
     pub fn get_random_rule_for_nt<R: Rand>(&self, rand: &mut R, nt: NTermId, len: usize) -> RuleId {
         self.simple_get_random_rule_for_nt(rand, nt, len)
     }
 
+    /// Get applicable rules for a nonterminal with a maximum length
     pub fn get_applicable_rules<'a, R: Rand>(
         &'a self,
         rand: &'a mut R,
@@ -273,6 +293,7 @@ impl Context {
             })
     }
 
+    /// Choose an applicable rule for a nonterminal
     pub fn choose_applicable_rule<R: Rand>(
         &self,
         rand: &mut R,
@@ -315,21 +336,25 @@ impl Context {
         }
     }
 
+    /// Get a random length for a rule ID
     #[must_use]
     pub fn get_random_len_for_ruleid(&self, _rule_id: &RuleId) -> usize {
         self.max_len //TODO?????
     }
 
+    /// Get a random length for a nonterminal
     #[must_use]
     pub fn get_random_len_for_nt(&self, _nt: &NTermId) -> usize {
         self.max_len
     }
 
+    /// Get the rules for a nonterminal
     #[must_use]
     pub fn get_rules_for_nt(&self, nt: NTermId) -> &Vec<RuleId> {
         &self.nts_to_rules[&nt]
     }
 
+    /// Generate a tree from a nonterminal
     pub fn generate_tree_from_nt<R: Rand>(
         &self,
         rand: &mut R,
@@ -340,6 +365,7 @@ impl Context {
         self.generate_tree_from_rule(rand, random_rule, max_len - 1)
     }
 
+    /// Generate a tree from a rule
     pub fn generate_tree_from_rule<R: Rand>(&self, rand: &mut R, r: RuleId, len: usize) -> Tree {
         let mut tree = Tree::from_rule_vec(vec![], self);
         tree.generate_from_rule(rand, r, len, self);

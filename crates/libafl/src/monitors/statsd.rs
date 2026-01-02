@@ -13,6 +13,7 @@
 use alloc::{
     borrow::Cow,
     string::{String, ToString},
+    sync::Arc,
     vec::Vec,
 };
 use std::net::UdpSocket;
@@ -22,13 +23,13 @@ use libafl_bolts::{ClientId, Error};
 
 use super::{
     Monitor,
-    stats::{ClientStatsManager, EdgeCoverage, ItemGeometry, manager::GlobalStats},
+    stats::{ClientStatsManager, EdgeCoverage, manager::GlobalStats, user_stats::TAG_CORE_ID},
 };
 
 const METRIC_PREFIX: &str = "fuzzing";
 
 /// Flavor of StatsD tag
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StatsdMonitorTagFlavor {
     /// [Datadog](https://docs.datadoghq.com/developers/dogstatsd/) style tag
     DogStatsd {
@@ -59,7 +60,7 @@ pub struct StatsdMonitor {
     target_host: String,
     target_port: u16,
     tag_flavor: StatsdMonitorTagFlavor,
-    statsd_client: Option<StatsdClient>,
+    statsd_client: Option<Arc<StatsdClient>>,
     enable_per_client_stats: bool,
 }
 
@@ -71,15 +72,13 @@ impl StatsdMonitor {
     /// not crash or throw, so use this freely. :)
     #[must_use]
     pub fn new(target_host: String, target_port: u16, tag_flavor: StatsdMonitorTagFlavor) -> Self {
-        let mut this = Self {
+        Self {
             target_host,
             target_port,
             tag_flavor,
             statsd_client: None,
             enable_per_client_stats: false,
-        };
-        this.setup_statsd_client();
-        this
+        }
     }
 
     /// Set if we want to report per-client metrics (default: false)
@@ -130,7 +129,7 @@ impl StatsdMonitor {
             }
         }
         let client = client_builder.build();
-        self.statsd_client = Some(client);
+        self.statsd_client = Some(Arc::new(client));
     }
 
     #[expect(clippy::cast_precision_loss)]
@@ -218,13 +217,18 @@ impl StatsdMonitor {
         let execs_per_sec = *execs_per_sec;
         let corpus_size = *corpus_size;
         let objective_size = *objective_size;
-        let ItemGeometry {
-            pending,
-            pend_fav,
-            own_finds,
-            imported,
-            stability,
-        } = client_stats_manager.item_geometry();
+        let (pending, pend_fav, own_finds, imported, stability) =
+            if let Some(item_geometry) = client_stats_manager.item_geometry() {
+                (
+                    item_geometry.pending,
+                    item_geometry.pend_fav,
+                    item_geometry.own_finds,
+                    item_geometry.imported,
+                    item_geometry.stability,
+                )
+            } else {
+                (0, 0, 0, 0, None)
+            };
         let edges_coverage = client_stats_manager.edges_coverage();
 
         Self::send_metrics(
@@ -250,7 +254,8 @@ impl StatsdMonitor {
             // It has `client_stats()` method which returns `&HashMap<ClientId, ClientStats>`.
             for (client_id, client) in client_stats_manager.client_stats() {
                 let core_id_str = client
-                    .get_user_stats("core_id")
+                    .user_stats_by_tag(TAG_CORE_ID)
+                    .next()
                     .map_or_else(|| "unknown".to_string(), |s| s.value().to_string());
 
                 let client_id_str = client_id.0.to_string();
@@ -296,8 +301,18 @@ impl StatsdMonitor {
 
                 let corpus_size = client.corpus_size();
                 let objective_size = client.objective_size();
-                let item_geometry = client.item_geometry();
-                let edges_coverage = client.edges_coverage();
+                let (pend_fav, pending, own_finds, imported, stability) =
+                    if let Some(item_geometry) = client.item_geometry() {
+                        (
+                            item_geometry.pend_fav,
+                            item_geometry.pending,
+                            item_geometry.own_finds,
+                            item_geometry.imported,
+                            item_geometry.stability,
+                        )
+                    } else {
+                        (0, 0, 0, 0, None)
+                    };
 
                 Self::send_metrics(
                     statsd_client,
@@ -305,11 +320,11 @@ impl StatsdMonitor {
                     execs,
                     client_execs_per_sec,
                     corpus_size,
-                    item_geometry.own_finds,
-                    item_geometry.imported,
-                    item_geometry.stability,
-                    item_geometry.pend_fav,
-                    item_geometry.pending,
+                    own_finds,
+                    imported,
+                    stability,
+                    pend_fav,
+                    pending,
                     objective_size,
                     edges_coverage.as_ref(),
                     &tags,

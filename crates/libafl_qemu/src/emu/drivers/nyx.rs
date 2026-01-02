@@ -2,12 +2,12 @@ use std::{cell::OnceCell, cmp::min, ptr, slice::from_raw_parts};
 
 use libafl::inputs::HasTargetBytes;
 
-use crate::{EmulatorDriverError, InputLocation, InputSetter, Qemu};
+use crate::{EmulatorDriverError, InputSetter, Qemu, emu::systemmode::SystemInputLocation};
 
 #[derive(Clone, Debug)]
 pub struct StdNyxInputSetter {
-    input_location: OnceCell<InputLocation>,
-    input_struct_location: OnceCell<InputLocation>,
+    input_location: OnceCell<SystemInputLocation>,
+    input_struct_location: OnceCell<SystemInputLocation>,
     max_input_size: usize,
 }
 
@@ -24,10 +24,10 @@ impl Default for StdNyxInputSetter {
 pub trait NyxInputSetter<I, S>: InputSetter<I, S> {
     fn set_input_struct_location(
         &mut self,
-        location: InputLocation,
+        location: SystemInputLocation,
     ) -> Result<(), EmulatorDriverError>;
 
-    fn input_struct_location(&self) -> Option<&InputLocation>;
+    fn input_struct_location(&self) -> Option<&SystemInputLocation>;
 
     fn max_input_size(&self) -> usize;
 }
@@ -78,13 +78,16 @@ where
         Ok(())
     }
 
-    fn set_input_location(&mut self, location: InputLocation) -> Result<(), EmulatorDriverError> {
+    fn set_input_location(
+        &mut self,
+        location: SystemInputLocation,
+    ) -> Result<(), EmulatorDriverError> {
         self.input_location
             .set(location)
             .or(Err(EmulatorDriverError::MultipleInputLocationDefinition))
     }
 
-    fn input_location(&self) -> Option<&InputLocation> {
+    fn input_location(&self) -> Option<&SystemInputLocation> {
         self.input_location.get()
     }
 }
@@ -95,14 +98,14 @@ where
 {
     fn set_input_struct_location(
         &mut self,
-        location: InputLocation,
+        location: SystemInputLocation,
     ) -> Result<(), EmulatorDriverError> {
         self.input_struct_location
             .set(location)
             .or(Err(EmulatorDriverError::MultipleInputLocationDefinition))
     }
 
-    fn input_struct_location(&self) -> Option<&InputLocation> {
+    fn input_struct_location(&self) -> Option<&SystemInputLocation> {
         self.input_struct_location.get()
     }
 

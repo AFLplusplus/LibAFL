@@ -18,8 +18,8 @@ use crate::{
     Error,
     common::HasMetadata,
     corpus::{Corpus, CorpusId, Testcase},
-    fuzzer::HasTargetBytesConverter,
-    inputs::{Input, ToTargetBytes},
+    fuzzer::HasToTargetBytesConverter,
+    inputs::{Input, ToTargetBytesConverter},
     stages::{Restartable, Stage},
     state::{HasCorpus, HasRand, HasSolutions},
 };
@@ -240,7 +240,7 @@ where
 }
 
 /// A stage that dumps the corpus and the solutions to disk,
-/// using the fuzzer's [`crate::fuzzer::HasTargetBytesConverter`] (if available).
+/// using the fuzzer's [`crate::fuzzer::HasToTargetBytesConverter`] (if available).
 ///
 /// Set the converter using the fuzzer builder's [`crate::fuzzer::StdFuzzerBuilder::target_bytes_converter`].
 #[derive(Debug)]
@@ -256,8 +256,8 @@ where
     CB: FnMut(&Testcase<I>, &CorpusId) -> P,
     S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
     P: AsRef<Path>,
-    Z: HasTargetBytesConverter,
-    Z::Converter: ToTargetBytes<I>,
+    Z: HasToTargetBytesConverter,
+    Z::Converter: ToTargetBytesConverter<I, S>,
     I: Input,
 {
     #[inline]
@@ -278,26 +278,49 @@ where
                 (state.corpus().first(), state.solutions().first())
             };
 
-        let mut get_bytes = |tc: &mut Testcase<I>| {
-            let input = tc.input().as_ref().unwrap();
-            Ok(fuzzer.to_target_bytes(input).to_vec())
-        };
+        let mut id = last_corpus.or_else(|| state.corpus().first());
+        while let Some(i) = id {
+            let (fname, input) = {
+                let corpus = state.corpus();
+                let testcase_entry = corpus.get(i)?;
+                let mut testcase = testcase_entry.borrow_mut();
+                corpus.load_input_into(&mut testcase)?;
+                let fname = self
+                    .corpus_dir
+                    .join((self.generate_filename)(&testcase, &i));
+                let input = testcase.input().as_ref().unwrap().clone();
+                (fname, input)
+            };
 
-        dump_from_corpus(
-            state.corpus(),
-            &self.corpus_dir,
-            &mut self.generate_filename,
-            &mut get_bytes,
-            last_corpus,
-        )?;
+            let bytes = fuzzer.convert_to_target_bytes(state, &input);
 
-        dump_from_corpus(
-            state.solutions(),
-            &self.solutions_dir,
-            &mut self.generate_filename,
-            &mut get_bytes,
-            last_solution,
-        )?;
+            let mut f = File::create(fname)?;
+            Write::write_all(&mut f, &bytes)?;
+
+            id = state.corpus().next(i);
+        }
+
+        let mut id = last_solution.or_else(|| state.solutions().first());
+        while let Some(i) = id {
+            let (fname, input) = {
+                let solutions = state.solutions();
+                let testcase_entry = solutions.get(i)?;
+                let mut testcase = testcase_entry.borrow_mut();
+                solutions.load_input_into(&mut testcase)?;
+                let fname = self
+                    .solutions_dir
+                    .join((self.generate_filename)(&testcase, &i));
+                let input = testcase.input().as_ref().unwrap().clone();
+                (fname, input)
+            };
+
+            let bytes = fuzzer.convert_to_target_bytes(state, &input);
+
+            let mut f = File::create(fname)?;
+            Write::write_all(&mut f, &bytes)?;
+
+            id = state.solutions().next(i);
+        }
 
         state.add_metadata(DumpToDiskMetadata {
             last_corpus: state.corpus().last(),

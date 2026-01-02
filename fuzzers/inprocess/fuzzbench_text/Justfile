@@ -53,7 +53,7 @@ run:
 
 [linux]
 [macos]
-test: fuzzer test-dump-cov
+test: fuzzer test-dump-cov test-dump-cov-fuzz
 	#!/bin/bash
 	rm -rf libafl_unix_shmem_server || true
 	mkdir in || true
@@ -98,3 +98,20 @@ test-dump-cov:
 	fi
 	# Clean up
 	rm -rf seeds_dump corpus_dump coverage_dump
+
+test-dump-cov-fuzz:
+	cargo build --profile={{PROFILE}} --features dump_cov
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cxx -g -rdynamic --libafl fuzz.o -o {{FUZZER_NAME}} -lm -lz
+	# Run fuzzing with dump_cov enabled but not active
+	rm -rf libafl_unix_shmem_server || true
+	mkdir -p in_dump_fuzz
+	echo a > in_dump_fuzz/a
+	timeout 31s ./{{FUZZER_NAME}} -o out_dump_fuzz -i in_dump_fuzz | tee fuzz_dump_stdout.log || true
+	if grep -qa "corpus: [2-9]" fuzz_dump_stdout.log || grep -qa "corpus: [1-9][0-9]" fuzz_dump_stdout.log; then \
+		echo "Fuzzer with dump_cov enabled is working (found multiple corpus entries)"; \
+	else \
+		echo "Fuzzer with dump_cov enabled failed to find multiple corpus entries"; \
+		exit 1; \
+	fi
+	rm -rf out_dump_fuzz in_dump_fuzz fuzz_dump_stdout.log

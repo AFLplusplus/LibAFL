@@ -139,6 +139,8 @@ static int quarantine_push(struct chunk_begin *ck) {
 void __libqasan_init_malloc(void) {
   if (__libqasan_malloc_initialized) return;
 
+  __libqasan_malloc_initialized = 1;
+
 #ifdef USE_LIBC_ALLOC
   __lq_libc_memalign = dlsym(RTLD_NEXT, "memalign");
   __lq_libc_free = dlsym(RTLD_NEXT, "free");
@@ -146,7 +148,6 @@ void __libqasan_init_malloc(void) {
 
   LOCK_INIT(&quarantine_lock, PTHREAD_PROCESS_PRIVATE);
 
-  __libqasan_malloc_initialized = 1;
   QASAN_LOG("\n");
   QASAN_LOG("Allocator initialization done.\n");
   QASAN_LOG("\n");

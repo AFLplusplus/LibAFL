@@ -2,16 +2,20 @@ use core::ops::Add;
 
 use serde::{Deserialize, Serialize};
 
+/// A unique identifier for a rule
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct RuleId(usize);
 
+/// A unique identifier for a node in the tree
 #[derive(PartialEq, PartialOrd, Eq, Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct NodeId(usize);
 
+/// A unique identifier for a nonterminal
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Hash, Serialize, Deserialize)]
 pub struct NTermId(usize);
 
 impl RuleId {
+    /// Get the integer value of the ID
     #[must_use]
     pub fn to_i(&self) -> usize {
         self.0
@@ -38,6 +42,7 @@ impl Add<usize> for RuleId {
 }
 
 impl NodeId {
+    /// Get the integer value of the ID
     #[must_use]
     pub fn to_i(&self) -> usize {
         self.0
@@ -91,6 +96,7 @@ impl NodeId {
 }
 
 impl NTermId {
+    /// Get the integer value of the ID
     #[must_use]
     pub fn to_i(self) -> usize {
         self.0

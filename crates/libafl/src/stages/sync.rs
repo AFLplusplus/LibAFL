@@ -249,8 +249,8 @@ where
     E: HasObservers + Executor<EM, I, S, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     I: Input + Clone,
-    IC: InputConverter<From = I, To = DI>,
-    ICB: InputConverter<From = DI, To = I>,
+    IC: InputConverter<S, From = I, To = DI>,
+    ICB: InputConverter<S, From = DI, To = I>,
     S: HasExecutions
         + HasRand
         + HasMetadata

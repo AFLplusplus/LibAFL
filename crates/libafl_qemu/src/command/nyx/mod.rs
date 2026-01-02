@@ -23,7 +23,7 @@ use paste::paste;
 
 use crate::{
     Emulator, EmulatorDriverError, EmulatorDriverResult, EmulatorExitResult, GuestReg,
-    InputLocation, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
+    IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
     command::{CommandError, CommandManager, IsCommand, NativeCommandParser},
     emu::{InputSetter, StdInputSetter, nyx::NyxInputSetter},
     get_exit_arch_regs,
@@ -249,14 +249,14 @@ where
         // Save input struct location for next runs
         <StdInputSetter as NyxInputSetter<I, S>>::set_input_struct_location(
             emu.driver_mut().input_setter_mut(),
-            InputLocation::new(qemu, &payload_struct_mem_chunk, None),
+            crate::emu::systemmode::SystemInputLocation::new(qemu, &payload_struct_mem_chunk, None),
         )
         .unwrap();
 
         // Save input location for next runs
         <StdInputSetter as InputSetter<I, S>>::set_input_location(
             emu.driver_mut().input_setter_mut(),
-            InputLocation::new(qemu, &payload_mem_chunk, None),
+            crate::emu::systemmode::SystemInputLocation::new(qemu, &payload_mem_chunk, None),
         )
         .unwrap();
 
@@ -270,7 +270,9 @@ pub struct NextPayloadCommand;
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for NextPayloadCommand
 where
-    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
+    ET: EmulatorModuleTuple<I, S>
+        + HasStdFiltersTuple
+        + crate::modules::utils::filters::HasPageFilterTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -326,7 +328,9 @@ pub struct SubmitCR3Command;
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for SubmitCR3Command
 where
-    ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
+    ET: EmulatorModuleTuple<I, S>
+        + HasStdFiltersTuple
+        + crate::modules::utils::filters::HasPageFilterTuple,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,

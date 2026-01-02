@@ -86,9 +86,8 @@ sancov_ctx = ["coverage"]
 ## This feature enables comparison logging using the LLVM `sancov` runtime.
 ## It compiles `sancov_cmp.c` with `SANCOV_CMPLOG` defined and links against weak symbols for comparison hooks.
 ## This allows tracing of comparison operands for advanced fuzzing techniques like RedQueen.
-sancov_cmplog = [
-  "common",
-] # Defines cmp and __sanitizer_weak_hook functions. Use libfuzzer_interceptors to define interceptors (only compatible with Linux)
+## Defines cmp and __sanitizer_weak_hook functions. Use libfuzzer_interceptors to define interceptors (only compatible with Linux)
+sancov_cmplog = ["common"]
 
 ## Support for `sancov` pcguard.
 ## This is an alias for `sancov_pcguard_hitcounts`, enabling hitcounts coverage by default.
@@ -113,7 +112,7 @@ cmplog = ["common"]
 ## Compile C code for forkserver support.
 ## This feature compiles `forkserver.rs` and enables the forkserver protocol for communicating with the fuzzer.
 ## It allows the target to be spawned and controlled by a parent fuzzer process.
-forkserver = ["common", "nix", "libafl/std", "libafl/fork"]
+forkserver = ["common", "nix", "libafl/std"]
 
 ## Compile C code for ASan on Windows.
 ## This feature compiles `windows_asan.c` and `windows_asan.rs` to provide AddressSanitizer support on Windows.
@@ -198,7 +197,7 @@ document-features = ["dep:document-features"]
 
 [build-dependencies]
 bindgen = "0.72.1"
-cc = { version = "1.2.49", features = ["parallel"] }
+cc = { version = "1.2.50", features = ["parallel"] }
 rustversion = "1.0.22"
 
 [dependencies]

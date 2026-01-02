@@ -318,7 +318,7 @@ where
 
         let map = match map.addr_kind {
             libvharness_sys::lqemu_addr_kind_LQEMU_ADDR_PHYS => QemuMemoryChunk::phys(
-                map.addr as GuestPhysAddr,
+                GuestPhysAddr::from(map.addr),
                 map.len as GuestAddr,
                 qemu.current_cpu().unwrap(),
             ),

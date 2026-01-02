@@ -380,10 +380,15 @@ impl<I> InMemoryOnDiskCorpus<I> {
     where
         I: Input,
     {
-        let file_name = testcase.filename_mut().take().unwrap_or_else(|| {
+        let base = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             testcase.input().as_ref().unwrap().generate_name(id)
         });
+
+        let file_name = match &self.prefix {
+            Some(pref) => format!("{pref}{base}"),
+            None => base,
+        };
 
         let mut ctr = 1;
         if self.locking {
@@ -413,7 +418,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
         }
         *testcase.filename_mut() = Some(file_name);
 
-        if self.meta_format.is_some() {
+        if let Some(meta_format) = &self.meta_format {
             let metafile_name = if self.locking {
                 format!(
                     ".{}_{}.metadata",
@@ -438,7 +443,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
             let json_error =
                 |err| Error::serialize(format!("Failed to json-ify metadata: {err:?}"));
 
-            let serialized = match self.meta_format.as_ref().unwrap() {
+            let serialized = match meta_format {
                 OnDiskMetadataFormat::Postcard => postcard::to_allocvec(&ondisk_meta)?,
                 OnDiskMetadataFormat::Json => {
                     serde_json::to_vec(&ondisk_meta).map_err(json_error)?

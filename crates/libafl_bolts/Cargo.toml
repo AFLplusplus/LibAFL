@@ -209,7 +209,7 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
 
 rustversion = { workspace = true }
 # optional stable simd
-wide = { version = "1.0.2", optional = true }
+wide = { version = "1.1.1", optional = true }
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }

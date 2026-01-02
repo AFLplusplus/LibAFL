@@ -1,9 +1,7 @@
 //! A binary-only testcase minimizer using qemu, similar to AFL++ afl-tmin
 #[cfg(feature = "i386")]
 use core::mem::size_of;
-use core::str::from_utf8;
-#[cfg(feature = "snapshot")]
-use core::time::Duration;
+use core::{str::from_utf8, time::Duration};
 use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 
 use clap::{builder::Str, Parser};
@@ -29,21 +27,15 @@ use libafl_bolts::{
     tuples::tuple_list,
     AsSlice, AsSliceMut,
 };
+#[cfg(feature = "snapshot")]
+use libafl_qemu::modules::SnapshotModule;
 use libafl_qemu::{
     elf::EasyElf,
     modules::{edges::StdEdgeCoverageChildModule, RedirectStdoutModule},
-    ArchExtras, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason,
-    QemuShutdownCause, Regs,
+    ArchExtras, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExecutor, QemuExitError,
+    QemuExitReason, QemuShutdownCause, Regs,
 };
-#[cfg(feature = "snapshot")]
-use libafl_qemu::{modules::SnapshotModule, QemuExecutor};
 use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
-
-#[cfg(feature = "fork")]
-compile_error!("'fork' feature is currently not implemented; pending forkserver PR.");
-
-#[cfg(all(feature = "fork", feature = "snapshot"))]
-compile_error!("Cannot enable both 'fork' and 'snapshot' features at the same time.");
 
 #[derive(Default)]
 pub struct Version;
@@ -174,6 +166,13 @@ pub fn fuzz() -> Result<(), Error> {
         SnapshotModule::new(),
         redirect_stdout_module
     );
+    #[cfg(not(feature = "snapshot"))]
+    let modules = tuple_list!(
+        StdEdgeCoverageChildModule::builder()
+            .const_map_observer(edges_observer.as_mut())
+            .build()?,
+        redirect_stdout_module
+    );
 
     // Create our QEMU emulator
     let emulator = Emulator::empty()
@@ -209,7 +208,6 @@ pub fn fuzz() -> Result<(), Error> {
     // Rust harness: this closure copies an input buffer to our private region
     // for target function input and updates registers to a single iteration
     // before telling QEMU to resume execution.
-    #[cfg(feature = "snapshot")]
     let mut harness =
         |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
             let target = input.target_bytes();
@@ -245,18 +243,18 @@ pub fn fuzz() -> Result<(), Error> {
 
     // Set up the most basic monitor possible.
     let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
-    {
-        Ok(res) => res,
-        Err(err) => match err {
-            Error::ShuttingDown => {
-                return Ok(());
-            }
-            _ => {
-                panic!("Failed to setup the restarter: {err}");
-            }
-        },
-    };
+    let (state, mut mgr) =
+        match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, true) {
+            Ok(res) => res,
+            Err(err) => match err {
+                Error::ShuttingDown => {
+                    return Ok(());
+                }
+                _ => {
+                    panic!("Failed to setup the restarter: {err}");
+                }
+            },
+        };
 
     // Our fuzzer is a simple queue scheduler (FIFO), and has no corpus feedback
     // or objective feedback. This is important as we need the MaxMapFeedback
@@ -296,7 +294,6 @@ pub fn fuzz() -> Result<(), Error> {
     });
 
     // The executor. Nothing exciting here.
-    #[cfg(feature = "snapshot")]
     let mut executor = QemuExecutor::new(
         emulator,
         &mut harness,

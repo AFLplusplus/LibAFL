@@ -1,3 +1,5 @@
+use std::io::Error;
+
 use anyhow::{Result, anyhow};
 use libc::{_exit, PR_SET_PDEATHSIG, prctl};
 use nix::{
@@ -8,14 +10,15 @@ use nix::{
     unistd::Pid,
 };
 
-use crate::errno::errno;
-
 pub struct Exit;
 
 impl Exit {
     pub fn die_on_parent_exit() -> Result<()> {
         if unsafe { prctl(PR_SET_PDEATHSIG, SIGKILL) } != 0 {
-            Err(anyhow!("Failed to prctl(PR_SET_PDEATHSIG): {}", errno()))?;
+            Err(anyhow!(
+                "Failed to prctl(PR_SET_PDEATHSIG): {:?}",
+                Error::last_os_error()
+            ))?;
         }
         Ok(())
     }

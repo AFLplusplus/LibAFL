@@ -15,7 +15,7 @@ edition = "2021"
 debug = true
 
 [features]
-default = ["std", "snapshot"]
+default = ["std", "fork"]
 fork = []
 snapshot = []
 std = []

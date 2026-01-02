@@ -19,7 +19,9 @@ use libafl::{
     },
     observers::ConstMapObserver,
     schedulers::QueueScheduler,
-    stages::{mutational::StdMutationalStage, UnicodeIdentificationStage},
+    stages::{
+        mutational::StdMutationalStage, AflStatsStage, CalibrationStage, UnicodeIdentificationStage,
+    },
     state::StdState,
     Evaluator,
 };
@@ -101,6 +103,14 @@ pub fn main() {
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();
 
+    let stats_stage = AflStatsStage::builder()
+        .report_interval(std::time::Duration::from_secs(1))
+        .map_feedback(&feedback)
+        .build()
+        .unwrap();
+
+    let calibration = CalibrationStage::new(&feedback);
+
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
@@ -133,8 +143,10 @@ pub fn main() {
         UnicodeSubcategoryRandMutator
     ));
     let mut stages = tuple_list!(
+        calibration,
         UnicodeIdentificationStage::new(),
-        StdMutationalStage::<_, _, UnicodeInput, BytesInput, _, _, _>::transforming(mutator)
+        StdMutationalStage::<_, _, UnicodeInput, BytesInput, _, _, _>::transforming(mutator),
+        stats_stage,
     );
 
     fuzzer

@@ -10,6 +10,7 @@ edition = "2021"
 [features]
 default = ["std"]
 tui = ["libafl/tui_monitor"]
+introspection = ["libafl/introspection"]
 std = []
 
 [profile.dev]

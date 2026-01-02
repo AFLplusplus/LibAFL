@@ -1010,7 +1010,7 @@ impl QemuHooks {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(u64, GuestAddr) = transmute(callback);
             let num = libafl_qemu_sys::libafl_qemu_add_instruction_hooks(
-                addr.into(),
+                addr,
                 Some(callback),
                 data,
                 i32::from(invalidate_block),
@@ -1026,7 +1026,7 @@ impl QemuHooks {
     pub fn remove_instruction_hooks_at(&self, addr: GuestAddr, invalidate_block: bool) -> usize {
         unsafe {
             libafl_qemu_sys::libafl_qemu_remove_instruction_hooks_at(
-                addr.into(),
+                addr,
                 i32::from(invalidate_block),
             )
         }

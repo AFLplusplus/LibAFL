@@ -1,26 +1,50 @@
-//! The UI-specific parts of [`super::TuiMonitor`]
-use alloc::{sync::Arc, vec::Vec};
-use core::cmp::{max, min};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use core::{
+    hash::{Hash, Hasher},
+    time::Duration,
+};
 use std::sync::RwLock;
 
-use libafl_bolts::format_big_number;
+use libafl_bolts::{current_time, format_big_number};
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    symbols,
     text::{Line, Span},
+    widgets::{Borders, Paragraph, Tabs},
+};
+
+#[cfg(feature = "introspection")]
+use super::widgets::draw_scrolled_stats;
+use super::{
+    layout::{split_client, split_main, split_title, split_top},
     widgets::{
-        Axis, Block, Borders, Cell, Chart, Dataset, List, ListItem, Paragraph, Row, Table, Tabs,
+        MultiTimeChartOptions, TimeChartOptions, calculate_tab_window, draw_item_geometry_text,
+        draw_key_value_block, draw_logs, draw_main_block, draw_multi_time_chart,
+        draw_process_timing_text, draw_time_chart, draw_user_stats,
     },
 };
-
-use super::{
-    Duration, ItemGeometry, ProcessTiming, String, TimedStats, TuiContext, current_time,
-    format_duration,
+#[cfg(feature = "introspection")]
+use crate::monitors::stats::PerfFeature;
+use crate::monitors::{
+    stats::{
+        ProcessTiming, TimedStat,
+        user_stats::{
+            TAG_AFL_STATS_CYCLES_DONE, TAG_AFL_STATS_CYCLES_WO_FINDS, TAG_AFL_STATS_IMPORTED,
+            TAG_AFL_STATS_OWN_FINDS, TAG_AFL_STATS_PENDING, TAG_AFL_STATS_PENDING_FAV,
+            TAG_AFL_STATS_PENDING_FAVORED, UserStatsTag, UserStatsValue,
+        },
+    },
+    tui::{ItemGeometry, TuiContext},
 };
 
+/// The UI for the TUI monitor
 #[derive(Default, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct TuiUi {
     title: String,
     version: String,
@@ -30,31 +54,91 @@ pub struct TuiUi {
     clients: Vec<usize>,
     charts_tab_idx: usize,
     graph_data: Vec<(f64, f64)>,
+    multi_graph_data: Vec<Vec<(f64, f64)>>,
+    is_narrow: bool,
+    logs_wrap: bool,
+    /// Cached tabs for lock-free navigation
+    tabs: Vec<String>,
 
+    /// If the UI should quit
     pub should_quit: bool,
+    /// If the UI should refresh
+    pub(crate) should_refresh: bool,
+    user_stats_scroll: usize,
+    pub(crate) user_stats_page_size: usize,
+
+    #[cfg(feature = "introspection")]
+    perf_stats_scroll: usize,
+    #[cfg(feature = "introspection")]
+    pub(crate) perf_stats_page_size: usize,
+
+    show_geometry: bool,
+    item_geometry_scroll: usize,
+    pub(crate) item_geometry_page_size: usize,
+}
+
+#[derive(Debug)]
+struct GenericStats {
+    labels: Vec<(Span<'static>, String)>,
+}
+
+#[derive(Debug)]
+struct PreparedFrameData {
+    // Overall
+    generic_stats: GenericStats,
+    total_timing: Option<(ProcessTiming, Duration)>,
+    total_geometry: Option<ItemGeometry>,
+
+    // Client
+    client_idx: usize,
+    client_generic_stats: GenericStats,
+    client_timing: Option<(ProcessTiming, Duration)>,
+    client_geometry: Option<ItemGeometry>,
+    client_user_stats: Vec<(Span<'static>, String)>,
+
+    // Logs
+    logs: Vec<String>,
+
+    // Charts
+    tabs: Vec<String>,
+    active_chart: Option<ChartKind>,
+
+    #[cfg(feature = "introspection")]
+    client_perf_stats: Vec<(Span<'static>, String)>,
+}
+
+#[derive(Debug)]
+enum ChartKind {
+    Single {
+        name: String,
+        series: Vec<TimedStat>,
+        window: Duration,
+        run_time: Duration,
+        style: Style,
+    },
+    Multi {
+        name: String,
+        series: Vec<(String, Vec<TimedStat>, Duration, Style)>,
+        run_time: Duration,
+    },
 }
 
 fn next_larger(sorted: &[usize], value: usize) -> Option<usize> {
-    if let Some(index) = sorted.iter().position(|x| *x > value) {
-        return Some(index);
-    }
-    None
+    sorted.iter().position(|x| *x > value).map(|i| sorted[i])
 }
 
 fn next_smaller(sorted: &[usize], value: usize) -> Option<usize> {
-    if let Some(index) = sorted.iter().rposition(|x| *x < value) {
-        return Some(index);
-    }
-    None
+    sorted.iter().rposition(|x| *x < value).map(|i| sorted[i])
 }
 
 impl TuiUi {
+    /// Create a new [`TuiUi`] with the given title and enhanced graphics flag
     #[must_use]
     pub fn new(title: String, enhanced_graphics: bool) -> Self {
         Self::with_version(title, String::from("default"), enhanced_graphics)
     }
 
-    // create the TuiUi with a given `version`.
+    /// create a new [`TuiUi`] with a given `version` string.
     #[must_use]
     pub fn with_version(title: String, version: String, enhanced_graphics: bool) -> Self {
         Self {
@@ -63,579 +147,841 @@ impl TuiUi {
             enhanced_graphics,
             show_logs: true,
             client_idx: 0,
-            ..TuiUi::default()
+            clients: vec![],
+            charts_tab_idx: 0,
+            graph_data: vec![],
+            multi_graph_data: vec![],
+            is_narrow: false,
+            logs_wrap: false,
+            tabs: vec!["Overview".to_string()],
+            should_quit: false,
+            should_refresh: false,
+            user_stats_scroll: 0,
+            user_stats_page_size: 10,
+            #[cfg(feature = "introspection")]
+            perf_stats_scroll: 0,
+            #[cfg(feature = "introspection")]
+            perf_stats_page_size: 10,
+            show_geometry: false,
+            item_geometry_scroll: 0,
+            item_geometry_page_size: 10,
         }
     }
-    pub fn on_key(&mut self, c: char) {
-        match c {
-            'q' => {
-                self.should_quit = true;
+
+    fn get_tabs(ctx: &TuiContext) -> Vec<String> {
+        let mut tabs = vec!["Overview".to_string()];
+        tabs.extend(ctx.graphs.clone());
+        tabs
+    }
+
+    /// Some stats are already displayed in other contexts. We can filter those.
+    fn is_redundant_userstat(tag: Option<UserStatsTag>) -> bool {
+        if let Some(tag) = tag {
+            matches!(
+                tag,
+                TAG_AFL_STATS_CYCLES_DONE
+                    | TAG_AFL_STATS_CYCLES_WO_FINDS
+                    | TAG_AFL_STATS_IMPORTED
+                    | TAG_AFL_STATS_OWN_FINDS
+                    | TAG_AFL_STATS_PENDING
+                    | TAG_AFL_STATS_PENDING_FAV
+                    | TAG_AFL_STATS_PENDING_FAVORED
+            )
+        } else {
+            false
+        }
+    }
+
+    fn update_clients_list(&mut self, ctx: &TuiContext) {
+        if ctx.clients_num != self.clients.len() {
+            let mut all: Vec<usize> = ctx.clients.keys().copied().collect();
+            all.sort_unstable();
+            if !all.is_empty() && !all.contains(&self.client_idx) {
+                self.client_idx = all[0];
             }
+            self.clients = all;
+        }
+    }
+
+    fn prepare_overall_stats(ctx: &TuiContext) -> GenericStats {
+        GenericStats {
+            labels: vec![
+                (Span::raw("clients"), format!("{}", ctx.clients.len())),
+                (Span::raw("total execs"), format_big_number(ctx.total_execs)),
+                (
+                    Span::raw("solutions"),
+                    format_big_number(ctx.total_solutions),
+                ),
+                (
+                    Span::raw("corpus count"),
+                    format_big_number(ctx.total_corpus_count),
+                ),
+            ],
+        }
+    }
+
+    fn prepare_total_timing(
+        ctx: &TuiContext,
+        run_time: Duration,
+    ) -> Option<(ProcessTiming, Duration)> {
+        if ctx.total_process_timing.exec_speed != "0/sec" {
+            Some((ctx.total_process_timing.clone(), run_time))
+        } else if let Some(client) = ctx.clients.get(&0) {
+            if client.process_timing.exec_speed == "0/sec" {
+                None
+            } else {
+                Some((client.process_timing.clone(), run_time))
+            }
+        } else {
+            None
+        }
+    }
+
+    #[allow(clippy::cast_precision_loss, clippy::type_complexity)]
+    fn prepare_client_data(
+        &self,
+        ctx: &TuiContext,
+    ) -> (
+        GenericStats,
+        Option<(ProcessTiming, Duration)>,
+        Option<ItemGeometry>,
+        Vec<(Span<'static>, String)>,
+    ) {
+        if let Some(client) = ctx.clients.get(&self.client_idx) {
+            let timing = if client.process_timing.exec_speed == "0/sec" {
+                None
+            } else {
+                Some((
+                    client.process_timing.clone(),
+                    current_time().saturating_sub(client.process_timing.client_start_time),
+                ))
+            };
+
+            let generic = GenericStats {
+                labels: vec![
+                    (
+                        Span::raw("corpus count"),
+                        format_big_number(client.client_stats.corpus_size()),
+                    ),
+                    (
+                        Span::raw("total execs"),
+                        format_big_number(client.client_stats.executions()),
+                    ),
+                    (
+                        Span::raw("cycles done"),
+                        client
+                            .cycles_done()
+                            .map_or(String::new(), |c| c.to_string()),
+                    ),
+                    (
+                        Span::raw("solutions"),
+                        format_big_number(client.client_stats.objective_size()),
+                    ),
+                ],
+            };
+
+            // Format user stats
+            let mut keys: Vec<_> = client.client_stats.user_stats().keys().collect();
+            keys.sort();
+            let user_stats_vec = keys
+                .into_iter()
+                .filter(|k| {
+                    let val = client.client_stats.user_stats().get(*k).unwrap();
+                    !Self::is_redundant_userstat(val.tag())
+                })
+                .map(|k| {
+                    let val = client.client_stats.user_stats().get(k).unwrap();
+                    let val_str = match val.value() {
+                        UserStatsValue::Number(n) => format_big_number(*n),
+                        UserStatsValue::Float(f) => format!("{f:.2}"),
+                        UserStatsValue::String(s) => s.to_string(),
+                        UserStatsValue::Ratio(a, b) => {
+                            if *b == 0 {
+                                "0/0".into()
+                            } else {
+                                let percentage = (*a as f64 / *b as f64) * 100.0;
+                                format!("{a}/{b} ({percentage:.2}%)")
+                            }
+                        }
+                        UserStatsValue::Percent(p) => format!("{:.2}%", p * 100.0),
+                    };
+
+                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+
+                    if let Some(tag) = val.tag() {
+                        tag.hash(&mut hasher);
+                    } else {
+                        k.hash(&mut hasher);
+                    }
+                    let color_idx = hasher.finish() as usize % 4;
+                    let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
+                    let style = Style::default().fg(colors[color_idx]);
+
+                    (Span::styled(k.to_string(), style), val_str)
+                })
+                .collect();
+
+            (
+                generic,
+                timing,
+                client.item_geometry.clone(),
+                user_stats_vec,
+            )
+        } else {
+            (GenericStats { labels: vec![] }, None, None, vec![])
+        }
+    }
+
+    #[cfg(feature = "introspection")]
+    #[allow(clippy::cast_precision_loss)]
+    fn prepare_client_perf_stats(&self, ctx: &TuiContext) -> Vec<(Span<'static>, String)> {
+        if let Some(client) = ctx.clients.get(&self.client_idx) {
+            let stats = &client.client_stats.introspection_stats;
+            let mut vec = Vec::new();
+            let elapsed = stats.elapsed_cycles() as f64;
+            let scheduler_percent = if elapsed == 0.0 {
+                0.0
+            } else {
+                stats.scheduler_cycles() as f64 / elapsed
+            };
+            vec.push((
+                Span::raw("scheduler"),
+                format!("{:.2}%", scheduler_percent * 100.0),
+            ));
+
+            let manager_percent = if elapsed == 0.0 {
+                0.0
+            } else {
+                stats.manager_cycles() as f64 / elapsed
+            };
+            vec.push((
+                Span::raw("manager"),
+                format!("{:.2}%", manager_percent * 100.0),
+            ));
+
+            if elapsed != 0.0 {
+                for (stage_index, features) in stats.used_stages() {
+                    for (feature_index, feature) in features.iter().enumerate() {
+                        let feature_percent = *feature as f64 / elapsed;
+                        if feature_percent > 0.0 {
+                            let feature_name: PerfFeature = feature_index.into();
+                            vec.push((
+                                Span::raw(format!("stage {stage_index}: {feature_name:?}")),
+                                format!("{:.2}%", feature_percent * 100.0),
+                            ));
+                        }
+                    }
+                }
+
+                for (name, val) in stats.feedbacks() {
+                    let feedback_percent = *val as f64 / elapsed;
+                    if feedback_percent > 0.0 {
+                        vec.push((
+                            Span::raw(format!("feedback: {name}")),
+                            format!("{:.2}%", feedback_percent * 100.0),
+                        ));
+                    }
+                }
+            }
+            vec
+        } else {
+            vec![]
+        }
+    }
+
+    fn prepare_charts(
+        &mut self,
+        ctx: &TuiContext,
+        run_time: Duration,
+    ) -> (Vec<String>, Option<ChartKind>) {
+        let tabs = Self::get_tabs(ctx);
+        if self.charts_tab_idx >= tabs.len() {
+            self.charts_tab_idx = 0;
+        }
+
+        let mut active_chart = None;
+        if tabs.len() > 1 {
+            let chart_idx = if self.charts_tab_idx == 0 {
+                1
+            } else {
+                self.charts_tab_idx
+            };
+
+            if chart_idx < tabs.len() {
+                let key = &tabs[chart_idx];
+
+                active_chart = match key.as_str() {
+                    "Overview" => None,
+                    "User Stats" => {
+                        let mut series = vec![];
+                        let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
+                        for (key, stats) in &ctx.custom_timed {
+                            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                            key.hash(&mut hasher);
+                            let color_idx = hasher.finish() as usize % 4;
+                            let style = Style::default().fg(colors[color_idx]);
+                            series.push((
+                                key.clone(),
+                                stats.series.clone().into(),
+                                stats.window,
+                                style,
+                            ));
+                        }
+                        series.sort_by(|a, b| a.0.cmp(&b.0));
+                        Some(ChartKind::Multi {
+                            name: "User Stats".to_string(),
+                            series,
+                            run_time,
+                        })
+                    }
+                    "corpus" => Some(ChartKind::Single {
+                        name: "corpus".to_string(),
+                        series: ctx.corpus_size_timed.series.clone().into(),
+                        window: ctx.corpus_size_timed.window,
+                        run_time,
+                        style: Style::default()
+                            .fg(Color::LightYellow)
+                            .add_modifier(Modifier::BOLD),
+                    }),
+                    "objectives" => Some(ChartKind::Single {
+                        name: "objectives".to_string(),
+                        series: ctx.objective_size_timed.series.clone().into(),
+                        window: ctx.objective_size_timed.window,
+                        run_time,
+                        style: Style::default()
+                            .fg(Color::LightYellow)
+                            .add_modifier(Modifier::BOLD),
+                    }),
+                    "exec/sec" => Some(ChartKind::Single {
+                        name: "exec/sec".to_string(),
+                        series: ctx.execs_per_sec_timed.series.clone().into(),
+                        window: ctx.execs_per_sec_timed.window,
+                        run_time,
+                        style: Style::default()
+                            .fg(Color::LightYellow)
+                            .add_modifier(Modifier::BOLD),
+                    }),
+                    custom => ctx.custom_timed.get(custom).map(|stats| {
+                        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                        if let Some(tag) = ctx.tags.get(custom) {
+                            tag.hash(&mut hasher);
+                        } else {
+                            custom.hash(&mut hasher);
+                        }
+                        let color_idx = hasher.finish() as usize % 4;
+                        let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
+                        let style = Style::default().fg(colors[color_idx]);
+
+                        ChartKind::Single {
+                            name: custom.to_string(),
+                            series: stats.series.clone().into(),
+                            window: stats.window,
+                            run_time,
+                            style,
+                        }
+                    }),
+                };
+            }
+        }
+        (tabs, active_chart)
+    }
+
+    /// Prepare the data for the next frame
+    #[allow(clippy::cast_precision_loss)]
+    fn prepare_data(&mut self, ctx: &TuiContext) -> PreparedFrameData {
+        self.update_clients_list(ctx);
+
+        let run_time = current_time().saturating_sub(ctx.start_time);
+
+        // 1. Overall Stats
+        let generic_stats = Self::prepare_overall_stats(ctx);
+
+        let total_timing = Self::prepare_total_timing(ctx, run_time);
+
+        let total_geometry = ctx.total_item_geometry.clone();
+
+        // 2. Client Stats
+        let (client_generic_stats, client_timing, client_geometry, client_user_stats) =
+            self.prepare_client_data(ctx);
+
+        #[cfg(feature = "introspection")]
+        let client_perf_stats = self.prepare_client_perf_stats(ctx);
+
+        // 3. Logs
+        let logs: Vec<String> = ctx.client_logs.iter().cloned().collect();
+
+        // 4. Charts
+        let (tabs, active_chart) = self.prepare_charts(ctx, run_time);
+
+        PreparedFrameData {
+            generic_stats,
+            total_timing,
+            total_geometry,
+            client_idx: self.client_idx,
+            client_generic_stats,
+            client_timing,
+            client_geometry,
+            client_user_stats,
+            logs,
+            tabs,
+            active_chart,
+            #[cfg(feature = "introspection")]
+            client_perf_stats,
+        }
+    }
+
+    /// Handle a key event
+    pub fn on_key(&mut self, c: char, app: &Arc<RwLock<TuiContext>>) {
+        match c {
+            'q' => self.should_quit = true,
+            'r' => self.should_refresh = true,
             'g' => {
-                self.charts_tab_idx = (self.charts_tab_idx + 1) % 3;
+                if !self.tabs.is_empty() {
+                    self.charts_tab_idx = (self.charts_tab_idx + 1) % self.tabs.len();
+                    // In wide mode, index 0 (Overview) and index 1 (First Chart) show the same thing on the right pane.
+                    // So we skip 0 to prevent "double press" feeling.
+                    if !self.is_narrow && self.charts_tab_idx == 0 && self.tabs.len() > 1 {
+                        self.charts_tab_idx = 1;
+                    }
+                }
+            }
+            'G' => {
+                if !self.tabs.is_empty() {
+                    self.charts_tab_idx =
+                        (self.charts_tab_idx + self.tabs.len() - 1) % self.tabs.len();
+                    // In wide mode, skip 0 when going backwards too
+                    if !self.is_narrow && self.charts_tab_idx == 0 && self.tabs.len() > 1 {
+                        self.charts_tab_idx = self.tabs.len() - 1;
+                    }
+                }
             }
             't' => {
                 self.show_logs = !self.show_logs;
+            }
+            'w' => {
+                self.logs_wrap = !self.logs_wrap;
+            }
+            '+' => {
+                let mut ctx = app.write().unwrap();
+                let w = ctx.corpus_size_timed.window * 2;
+                ctx.corpus_size_timed.update_window(w);
+                ctx.objective_size_timed.update_window(w);
+                ctx.execs_per_sec_timed.update_window(w);
+                for timer in ctx.custom_timed.values_mut() {
+                    let w = timer.window * 2;
+                    timer.update_window(w);
+                }
+            }
+            '-' => {
+                let mut ctx = app.write().unwrap();
+                let w = ctx.corpus_size_timed.window / 2;
+                ctx.corpus_size_timed.update_window(w);
+                ctx.objective_size_timed.update_window(w);
+                ctx.execs_per_sec_timed.update_window(w);
+                for timer in ctx.custom_timed.values_mut() {
+                    let w = timer.window / 2;
+                    timer.update_window(w);
+                }
+            }
+            'u' => {
+                let ctx = app.read().unwrap();
+                if let Some(client) = ctx.clients.get(&self.client_idx) {
+                    let total = client.client_stats.user_stats().len();
+                    if total > 0 {
+                        self.user_stats_scroll += self.user_stats_page_size;
+                        if self.user_stats_scroll >= total {
+                            self.user_stats_scroll = 0;
+                        }
+                    }
+                }
+            }
+            'U' => {
+                let ctx = app.read().unwrap();
+                if let Some(client) = ctx.clients.get(&self.client_idx) {
+                    let total = client.client_stats.user_stats().len();
+                    if total > 0 {
+                        if self.user_stats_scroll == 0 {
+                            let remainder = total % self.user_stats_page_size;
+                            if remainder == 0 {
+                                self.user_stats_scroll =
+                                    total.saturating_sub(self.user_stats_page_size);
+                            } else {
+                                self.user_stats_scroll = total - remainder;
+                            }
+                        } else {
+                            self.user_stats_scroll = self
+                                .user_stats_scroll
+                                .saturating_sub(self.user_stats_page_size);
+                        }
+                    }
+                }
+            }
+            #[cfg(feature = "introspection")]
+            'i' => {
+                let ctx = app.read().unwrap();
+                #[allow(clippy::cast_precision_loss)]
+                if let Some(client) = ctx.clients.get(&self.client_idx) {
+                    let has_geometry = client.item_geometry.is_some();
+                    let stats = &client.client_stats.introspection_stats;
+
+                    let mut total = 2;
+                    let elapsed = stats.elapsed_cycles() as f64;
+                    if elapsed != 0.0 {
+                        for (_, features) in stats.used_stages() {
+                            for feature in features {
+                                #[allow(clippy::cast_precision_loss)]
+                                if *feature as f64 / elapsed > 0.0 {
+                                    total += 1;
+                                }
+                            }
+                        }
+                        for (_, val) in stats.feedbacks() {
+                            #[allow(clippy::cast_precision_loss)]
+                            if *val as f64 / elapsed > 0.0 {
+                                total += 1;
+                            }
+                        }
+                    }
+
+                    if self.show_geometry {
+                        let geo_total = 5;
+                        let next = self.item_geometry_scroll + self.item_geometry_page_size;
+                        if next >= geo_total {
+                            if total > 0 {
+                                self.show_geometry = false;
+                                self.perf_stats_scroll = 0;
+                            } else {
+                                self.item_geometry_scroll = 0;
+                            }
+                        } else {
+                            self.item_geometry_scroll = next;
+                        }
+                    } else {
+                        let next = self.perf_stats_scroll + self.perf_stats_page_size;
+                        if next >= total {
+                            if has_geometry {
+                                self.show_geometry = true;
+                                self.item_geometry_scroll = 0;
+                            } else {
+                                self.perf_stats_scroll = 0;
+                            }
+                        } else {
+                            self.perf_stats_scroll = next;
+                        }
+                    }
+                }
+            }
+            #[cfg(feature = "introspection")]
+            'I' => {
+                let ctx = app.read().unwrap();
+                #[allow(clippy::cast_precision_loss)]
+                if let Some(client) = ctx.clients.get(&self.client_idx) {
+                    let has_geometry = client.item_geometry.is_some();
+                    let stats = &client.client_stats.introspection_stats;
+
+                    let mut total = 2;
+                    let elapsed = stats.elapsed_cycles() as f64;
+                    if elapsed != 0.0 {
+                        for (_, features) in stats.used_stages() {
+                            for feature in features {
+                                #[allow(clippy::cast_precision_loss)]
+                                if *feature as f64 / elapsed > 0.0 {
+                                    total += 1;
+                                }
+                            }
+                        }
+                        for (_, val) in stats.feedbacks() {
+                            #[allow(clippy::cast_precision_loss)]
+                            if *val as f64 / elapsed > 0.0 {
+                                total += 1;
+                            }
+                        }
+                    }
+
+                    if self.show_geometry {
+                        if self.item_geometry_scroll == 0 {
+                            if total > 0 {
+                                self.show_geometry = false;
+                                let remainder = total % self.perf_stats_page_size;
+                                if remainder == 0 {
+                                    self.perf_stats_scroll =
+                                        total.saturating_sub(self.perf_stats_page_size);
+                                } else {
+                                    self.perf_stats_scroll = total - remainder;
+                                }
+                            } else {
+                                let geo_total = 5;
+                                let remainder = geo_total % self.item_geometry_page_size;
+                                if remainder == 0 {
+                                    self.item_geometry_scroll =
+                                        geo_total.saturating_sub(self.item_geometry_page_size);
+                                } else {
+                                    self.item_geometry_scroll = geo_total - remainder;
+                                }
+                            }
+                        } else {
+                            self.item_geometry_scroll = self
+                                .item_geometry_scroll
+                                .saturating_sub(self.item_geometry_page_size);
+                        }
+                    } else if self.perf_stats_scroll == 0 {
+                        if has_geometry {
+                            self.show_geometry = true;
+                            let geo_total = 5;
+                            let remainder = geo_total % self.item_geometry_page_size;
+                            if remainder == 0 {
+                                self.item_geometry_scroll =
+                                    geo_total.saturating_sub(self.item_geometry_page_size);
+                            } else {
+                                self.item_geometry_scroll = geo_total - remainder;
+                            }
+                        } else if total > 0 {
+                            let remainder = total % self.perf_stats_page_size;
+                            if remainder == 0 {
+                                self.perf_stats_scroll =
+                                    total.saturating_sub(self.perf_stats_page_size);
+                            } else {
+                                self.perf_stats_scroll = total - remainder;
+                            }
+                        }
+                    } else {
+                        self.perf_stats_scroll = self
+                            .perf_stats_scroll
+                            .saturating_sub(self.perf_stats_page_size);
+                    }
+                }
+            }
+            '0'..='9' => {
+                if let Some(i) = c.to_digit(10) {
+                    let i = i as usize;
+                    if i < self.tabs.len() {
+                        self.charts_tab_idx = i;
+                    }
+                }
             }
             _ => {}
         }
     }
 
+    const NARROW_WIDTH_THRESHOLD: u16 = 75;
+    const SHORT_HEIGHT_THRESHOLD: u16 = 28;
+
+    /// Move to the next client
     pub fn on_right(&mut self) {
         if let Some(idx) = next_larger(&self.clients, self.client_idx) {
-            self.client_idx = self.clients[idx];
+            self.client_idx = idx; // next_larger returns explicit client ID in revised version
+        } else if !self.clients.is_empty() {
+            self.client_idx = self.clients[0];
         }
     }
 
+    /// Move to the previous client
     pub fn on_left(&mut self) {
         if let Some(idx) = next_smaller(&self.clients, self.client_idx) {
-            self.client_idx = self.clients[idx];
+            self.client_idx = idx; // next_smaller returns explicit client ID
+        } else if !self.clients.is_empty() {
+            self.client_idx = *self.clients.last().unwrap();
         }
     }
 
     /// Draw the current TUI context
     pub fn draw(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>) {
-        let new = app.read().unwrap().clients_num;
-        if new != self.clients.len() {
-            // get the list of all clients
-            let mut all: Vec<usize> = app.read().unwrap().clients.keys().copied().collect();
-            all.sort_unstable();
-
-            // move the current client to the first one
-            self.client_idx = all[0];
-
-            // move the vector holding all clients ids
-            self.clients = all;
-        }
-
-        let body = Layout::default()
-            .constraints(if self.show_logs {
-                if cfg!(feature = "introspection") {
-                    [
-                        Constraint::Percentage(41),
-                        Constraint::Percentage(44),
-                        Constraint::Percentage(15),
-                    ]
-                    .as_ref()
-                } else {
-                    [
-                        Constraint::Percentage(20),
-                        Constraint::Percentage(48),
-                        Constraint::Percentage(32),
-                    ]
-                    .as_ref()
-                }
-            } else {
-                [Constraint::Percentage(50), Constraint::Percentage(50)].as_ref()
-            })
-            .split(f.area());
-        let top_body = body[0];
-        let mid_body = body[1];
-
-        self.draw_overall_ui(f, app, top_body);
-        self.draw_client_ui(f, app, mid_body);
-
-        if self.show_logs {
-            let bottom_body = body[2];
-            self.draw_logs(f, app, bottom_body);
-        }
-    }
-
-    #[expect(clippy::too_many_lines)]
-    fn draw_overall_ui(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect) {
-        let top_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(16), Constraint::Min(0)].as_ref())
-            .split(area);
-        let bottom_layout = top_layout[1];
-
-        let left_top_layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(40), Constraint::Percentage(60)].as_ref())
-            .split(top_layout[0]);
-
-        let right_top_layout = left_top_layout[1];
-
-        let title_layout = Layout::default()
-            .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
-            .split(left_top_layout[0]);
-
-        let status_bar: String = format!("{} ({})", self.title, self.version.as_str());
-
-        let text = vec![Line::from(Span::styled(
-            &status_bar,
-            Style::default()
-                .fg(Color::LightMagenta)
-                .add_modifier(Modifier::BOLD),
-        ))];
-        let block = Block::default().borders(Borders::ALL);
-        let paragraph = Paragraph::new(text)
-            .block(block)
-            .alignment(Alignment::Center);
-        f.render_widget(paragraph, title_layout[0]);
-
-        let process_timting_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(6), Constraint::Min(0)].as_ref())
-            .split(title_layout[1]);
-        self.draw_process_timing_text(f, app, process_timting_layout[0], true);
-
-        let path_geometry_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(7), Constraint::Min(0)].as_ref())
-            .split(process_timting_layout[1]);
-        self.draw_item_geometry_text(f, app, path_geometry_layout[0], true);
-
-        let title_chart_layout = Layout::default()
-            .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
-            .split(right_top_layout);
-        let titles = vec![
-            Line::from(Span::styled(
-                "speed",
-                Style::default().fg(Color::LightGreen),
-            )),
-            Line::from(Span::styled(
-                "corpus",
-                Style::default().fg(Color::LightGreen),
-            )),
-            Line::from(Span::styled(
-                "objectives (`g` switch)",
-                Style::default().fg(Color::LightGreen),
-            )),
-        ];
-        let tabs = Tabs::new(titles)
-            .block(
-                Block::default()
-                    .title(Span::styled(
-                        "charts",
-                        Style::default()
-                            .fg(Color::LightCyan)
-                            .add_modifier(Modifier::BOLD),
-                    ))
-                    .borders(Borders::ALL),
-            )
-            .highlight_style(Style::default().fg(Color::LightYellow))
-            .select(self.charts_tab_idx);
-        f.render_widget(tabs, title_chart_layout[0]);
-
-        let chart_layout = title_chart_layout[1];
-
-        match self.charts_tab_idx {
-            0 => {
-                let ctx = app.read().unwrap();
-                self.draw_time_chart(
-                    "speed chart",
-                    "exec/sec",
-                    f,
-                    chart_layout,
-                    &ctx.execs_per_sec_timed,
-                );
-            }
-            1 => {
-                let ctx = app.read().unwrap();
-                self.draw_time_chart(
-                    "corpus chart",
-                    "corpus size",
-                    f,
-                    chart_layout,
-                    &ctx.corpus_size_timed,
-                );
-            }
-            2 => {
-                let ctx = app.read().unwrap();
-                self.draw_time_chart(
-                    "corpus chart",
-                    "objectives",
-                    f,
-                    chart_layout,
-                    &ctx.objective_size_timed,
-                );
-            }
-            _ => {}
-        }
-        self.draw_overall_generic_text(f, app, bottom_layout);
-    }
-
-    fn draw_client_ui(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect) {
-        let client_block = Block::default()
-            .title(Span::styled(
-                format!("client #{} (←/→ arrows to switch)", self.client_idx),
-                Style::default()
-                    .fg(Color::LightCyan)
-                    .add_modifier(Modifier::BOLD),
-            ))
-            .borders(Borders::ALL);
-
-        #[allow(unused_mut)] // cfg dependent
-        let mut client_area = client_block.inner(area);
-        f.render_widget(client_block, area);
+        let ctx = app.read().unwrap();
+        let prepared = self.prepare_data(&ctx);
+        drop(ctx);
+        self.tabs.clone_from(&prepared.tabs);
 
         #[cfg(feature = "introspection")]
-        {
-            let client_layout = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(11), Constraint::Percentage(50)].as_ref())
-                .split(client_area);
-            client_area = client_layout[0];
-            let instrospection_layout = client_layout[1];
-            self.draw_introspection_text(f, app, instrospection_layout);
+        let introspection = true;
+        #[cfg(not(feature = "introspection"))]
+        let introspection = false;
+
+        let has_charts = prepared.tabs.len() > 1;
+
+        let area = f.area();
+        let new_is_narrow = area.width < Self::NARROW_WIDTH_THRESHOLD;
+        if new_is_narrow && !self.is_narrow {
+            self.show_logs = false;
+            self.charts_tab_idx = 0;
+        } else if !new_is_narrow && self.charts_tab_idx == 0 && self.tabs.len() > 1 {
+            self.charts_tab_idx = 1;
         }
+        self.is_narrow = new_is_narrow;
 
-        let left_layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-            .split(client_area);
-        let right_layout = left_layout[1];
+        let is_short = area.height < Self::SHORT_HEIGHT_THRESHOLD;
+        let replace_client_with_logs = (self.is_narrow || is_short) && self.show_logs;
 
-        let left_top_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(6), Constraint::Length(5)].as_ref())
-            .split(left_layout[0]);
-        let left_bottom_layout = left_top_layout[1];
-        self.draw_process_timing_text(f, app, left_top_layout[0], false);
-        self.draw_client_generic_text(f, app, left_bottom_layout);
-
-        let right_top_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(7), Constraint::Length(5)].as_ref())
-            .split(right_layout);
-        let right_bottom_layout = right_top_layout[1];
-        self.draw_item_geometry_text(f, app, right_top_layout[0], false);
-        self.draw_client_results_text(f, app, right_bottom_layout);
-    }
-
-    #[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
-    fn draw_time_chart(
-        &mut self,
-        title: &str,
-        y_name: &str,
-        f: &mut Frame,
-        area: Rect,
-        stats: &TimedStats,
-    ) {
-        if stats.series.is_empty() {
-            return;
-        }
-        let start = stats.series.front().unwrap().time;
-        let end = stats.series.back().unwrap().time;
-        let min_lbl_x = format_duration(&start);
-        let med_lbl_x = format_duration(&(end.saturating_sub(start) / 2));
-        let max_lbl_x = format_duration(&end);
-
-        let x_labels = vec![
-            Span::styled(min_lbl_x, Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(med_lbl_x),
-            Span::styled(max_lbl_x, Style::default().add_modifier(Modifier::BOLD)),
-        ];
-
-        let max_x = u64::from(area.width);
-        let window = end.saturating_sub(start);
-        let time_unit = if max_x > window.as_secs() {
-            0 // millis / 10
-        } else if max_x > window.as_secs() * 60 {
-            1 // secs
-        } else {
-            2 // min
-        };
-        let convert_time = |d: &Duration| -> u64 {
-            if time_unit == 0 {
-                (d.as_millis() / 10) as u64
-            } else if time_unit == 1 {
-                d.as_secs()
-            } else {
-                d.as_secs() * 60
-            }
-        };
-        let window_unit = convert_time(&window);
-        if window_unit == 0 {
-            return;
-        }
-
-        let to_x = |d: &Duration| (convert_time(d) - convert_time(&start)) * max_x / window_unit;
-
-        self.graph_data.clear();
-
-        let mut max_y = u64::MIN;
-        let mut min_y = u64::MAX;
-        let mut prev = (0, 0);
-        for ts in &stats.series {
-            let x = to_x(&ts.time);
-            if x > prev.0 + 1 && x < max_x {
-                for v in (prev.0 + 1)..x {
-                    self.graph_data.push((v as f64, prev.1 as f64));
-                }
-            }
-            prev = (x, ts.item);
-            self.graph_data.push((x as f64, ts.item as f64));
-            max_y = max(ts.item, max_y);
-            min_y = min(ts.item, min_y);
-        }
-        if max_x > prev.0 + 1 {
-            for v in (prev.0 + 1)..max_x {
-                self.graph_data.push((v as f64, prev.1 as f64));
-            }
-        }
-
-        //log::trace!("max_x: {}, len: {}", max_x, self.graph_data.len());
-
-        let datasets = vec![
-            Dataset::default()
-                //.name("data")
-                .marker(if self.enhanced_graphics {
-                    symbols::Marker::Braille
-                } else {
-                    symbols::Marker::Dot
-                })
-                .style(
-                    Style::default()
-                        .fg(Color::LightYellow)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .data(&self.graph_data),
-        ];
-        let chart = Chart::new(datasets)
-            .block(
-                Block::default()
-                    .title(Span::styled(
-                        title,
-                        Style::default()
-                            .fg(Color::LightCyan)
-                            .add_modifier(Modifier::BOLD),
-                    ))
-                    .borders(Borders::ALL),
-            )
-            .x_axis(
-                Axis::default()
-                    .title("time")
-                    .style(Style::default().fg(Color::Gray))
-                    .bounds([0.0, max_x as f64])
-                    .labels(x_labels),
-            )
-            .y_axis(
-                Axis::default()
-                    .title(y_name)
-                    .style(Style::default().fg(Color::Gray))
-                    .bounds([min_y as f64, max_y as f64])
-                    .labels(vec![
-                        Span::styled(
-                            format!("{min_y}"),
-                            Style::default().add_modifier(Modifier::BOLD),
-                        ),
-                        Span::raw(format!("{}", (max_y - min_y) / 2)),
-                        Span::styled(
-                            format!("{max_y}"),
-                            Style::default().add_modifier(Modifier::BOLD),
-                        ),
-                    ]),
+        if replace_client_with_logs {
+            let body = split_main(area, true, introspection, has_charts);
+            let top_body = body[0];
+            let logs_area = Rect::new(
+                area.x,
+                top_body.bottom(),
+                area.width,
+                area.height.saturating_sub(top_body.height),
             );
-        f.render_widget(chart, area);
-    }
 
-    fn draw_item_geometry_text(
-        &mut self,
-        f: &mut Frame,
-        app: &Arc<RwLock<TuiContext>>,
-        area: Rect,
-        is_overall: bool,
-    ) {
-        let tui_context = app.read().unwrap();
-        let empty_geometry: ItemGeometry = ItemGeometry::new();
-        let item_geometry: &ItemGeometry = if is_overall {
-            &tui_context.total_item_geometry
-        } else if self.clients.is_empty() {
-            &empty_geometry
+            self.draw_overall_ui(f, top_body, has_charts, &prepared);
+            draw_logs(f, logs_area, &prepared.logs, self.logs_wrap);
         } else {
-            let clients = &tui_context.clients;
-            let client = clients.get(&self.client_idx);
-            let client = client.as_ref();
-            if let Some(client) = client {
-                &client.item_geometry
-            } else {
-                log::warn!("Client {} was `None`. Race condition?", &self.client_idx);
-                &empty_geometry
+            let body = split_main(area, self.show_logs, introspection, has_charts);
+            let top_body = body[0];
+            let mid_body = body[1];
+
+            self.draw_overall_ui(f, top_body, has_charts, &prepared);
+            self.draw_client_ui(f, mid_body, self.show_logs, &prepared);
+
+            if self.show_logs && body.len() > 2 {
+                draw_logs(f, body[2], &prepared.logs, self.logs_wrap);
             }
-        };
+        }
+    }
 
-        let items = vec![
-            Row::new(vec![
-                Cell::from(Span::raw("pending")),
-                Cell::from(Span::raw(format!("{}", item_geometry.pending))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("pend fav")),
-                Cell::from(Span::raw(format!("{}", item_geometry.pend_fav))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("own finds")),
-                Cell::from(Span::raw(format!("{}", item_geometry.own_finds))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("imported")),
-                Cell::from(Span::raw(format!("{}", item_geometry.imported))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("stability")),
-                Cell::from(Span::raw(format!(
-                    "{:.2}%",
-                    item_geometry.stability.unwrap_or(0.0) * 100.0
-                ))),
-            ]),
-        ];
+    fn draw_overall_ui(
+        &mut self,
+        f: &mut Frame,
+        area: Rect,
+        has_charts: bool,
+        data: &PreparedFrameData,
+    ) {
+        let overall_layout = area;
+        let (tab_area, content_area) = split_title(overall_layout);
 
-        let chunks = Layout::default()
-            .constraints(
-                [
-                    Constraint::Length(2 + items.len() as u16),
-                    Constraint::Min(0),
-                ]
-                .as_ref(),
-            )
-            .split(area);
+        if self.is_narrow {
+            let available_width = area.width.saturating_sub(4) as usize;
+            let (start, end, selected) =
+                calculate_tab_window(&data.tabs, available_width, self.charts_tab_idx);
+            let visible_titles: Vec<Span> = data.tabs[start..end]
+                .iter()
+                .map(|s| Span::from(s.clone()))
+                .collect();
 
-        let table = Table::default()
-            .rows(items)
-            .block(
-                Block::default()
-                    .title(Span::styled(
-                        "item geometry",
+            let tabs_widget = Tabs::new(visible_titles)
+                .block(draw_main_block(
+                    &self.title,
+                    Borders::TOP | Borders::LEFT | Borders::RIGHT,
+                    Some(Line::from(Span::styled(
+                        " G/g ",
                         Style::default()
                             .fg(Color::LightCyan)
                             .add_modifier(Modifier::BOLD),
-                    ))
-                    .borders(Borders::ALL),
-            )
-            .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-        f.render_widget(table, chunks[0]);
-    }
+                    ))),
+                    None,
+                ))
+                .select(selected)
+                .highlight_style(Style::default().fg(if self.charts_tab_idx > 0 {
+                    if let Some(ChartKind::Single { style, .. }) = &data.active_chart {
+                        style.fg.unwrap_or(Color::LightYellow)
+                    } else {
+                        Color::LightYellow
+                    }
+                } else {
+                    Color::LightYellow
+                }));
+            f.render_widget(tabs_widget, tab_area);
 
-    fn draw_process_timing_text(
-        &mut self,
-        f: &mut Frame,
-        app: &Arc<RwLock<TuiContext>>,
-        area: Rect,
-        is_overall: bool,
-    ) {
-        let tui_context = app.read().unwrap();
-        let empty_timing: ProcessTiming = ProcessTiming::new();
-        let tup: (Duration, &ProcessTiming) = if is_overall {
-            (tui_context.start_time, &tui_context.total_process_timing)
-        } else if self.clients.is_empty() {
-            (current_time(), &empty_timing)
+            if self.charts_tab_idx == 0 {
+                Self::draw_stats_column(f, content_area, data, true);
+            } else {
+                self.draw_chart(f, content_area, data);
+            }
         } else {
-            let clients = &tui_context.clients;
-            let client = clients.get(&self.client_idx);
-            let client = client.as_ref();
-            if let Some(client) = client {
-                (
-                    client.process_timing.client_start_time,
-                    &client.process_timing,
-                )
+            let (left_col, right_col) = if has_charts {
+                split_top(overall_layout)
             } else {
-                log::warn!("Client {} was `None`. Race condition?", &self.client_idx);
-                (current_time(), &empty_timing)
+                (overall_layout, Rect::default())
+            };
+
+            let has_charts = data.tabs.len() > 1;
+
+            let (left_title, left_stats) = split_title(left_col);
+            let status_bar = format!("{} ({})", self.title, self.version);
+            let p = Paragraph::new(Line::from(Span::styled(
+                status_bar,
+                Style::default()
+                    .fg(Color::LightMagenta)
+                    .add_modifier(Modifier::BOLD),
+            )))
+            .block(draw_main_block(&self.title, Borders::ALL, None, None))
+            .alignment(Alignment::Center);
+            f.render_widget(p, left_title);
+
+            Self::draw_stats_column(f, left_stats, data, false);
+
+            if !has_charts || data.tabs.len() <= 1 {
+                return;
             }
-        };
-        let items = vec![
-            Row::new(vec![
-                Cell::from(Span::raw("run time")),
-                Cell::from(Span::raw(format_duration(
-                    &current_time().saturating_sub(tup.0),
-                ))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("exec speed")),
-                Cell::from(Span::raw(&tup.1.exec_speed)),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("total execs")),
-                Cell::from(Span::raw(format_big_number(tup.1.total_execs))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("last new entry")),
-                Cell::from(Span::raw(format_duration(&(tup.1.last_new_entry)))),
-            ]),
-            Row::new(vec![
-                Cell::from(Span::raw("last solution")),
-                Cell::from(Span::raw(format_duration(&(tup.1.last_saved_solution)))),
-            ]),
-        ];
 
-        let chunks = Layout::default()
-            .constraints(
-                [
-                    Constraint::Length(2 + items.len() as u16),
-                    Constraint::Min(0),
-                ]
-                .as_ref(),
-            )
-            .split(area);
+            let chart_titles: Vec<String> = data.tabs[1..].to_vec();
+            let available_width = right_col.width.saturating_sub(4) as usize;
+            let visual_selected_idx = self.charts_tab_idx.saturating_sub(1);
 
-        let table = Table::default()
-            .rows(items)
-            .block(
-                Block::default()
-                    .title(Span::styled(
-                        "process timing",
+            let (start, end, selected) =
+                calculate_tab_window(&chart_titles, available_width, visual_selected_idx);
+
+            let visible_titles: Vec<Span> = chart_titles[start..end]
+                .iter()
+                .map(|s| Span::from(s.clone()))
+                .collect();
+
+            let tabs_widget = Tabs::new(visible_titles)
+                .block(draw_main_block(
+                    "charts",
+                    Borders::TOP | Borders::LEFT | Borders::RIGHT,
+                    Some(Line::from(Span::styled(
+                        format!(
+                            " {}/{} (switch g/G) ",
+                            self.charts_tab_idx.max(1),
+                            data.tabs.len().saturating_sub(1)
+                        ),
                         Style::default()
                             .fg(Color::LightCyan)
                             .add_modifier(Modifier::BOLD),
-                    ))
-                    .borders(Borders::ALL),
-            )
-            .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-        f.render_widget(table, chunks[0]);
+                    ))),
+                    None,
+                ))
+                .select(selected)
+                .highlight_style(Style::default().fg(
+                    if let Some(ChartKind::Single { style, .. }) = &data.active_chart {
+                        style.fg.unwrap_or(Color::LightYellow)
+                    } else {
+                        Color::LightYellow
+                    },
+                ));
+
+            let (right_title, right_chart) = split_title(right_col);
+            f.render_widget(tabs_widget, right_title);
+
+            self.draw_chart(f, right_chart, data);
+        }
     }
 
-    fn draw_overall_generic_text(
-        &mut self,
-        f: &mut Frame,
-        app: &Arc<RwLock<TuiContext>>,
-        area: Rect,
-    ) {
-        let items = {
-            let app = app.read().unwrap();
-            vec![
-                Row::new(vec![
-                    Cell::from(Span::raw("clients")),
-                    Cell::from(Span::raw(format!("{}", self.clients.len()))),
-                    Cell::from(Span::raw("total execs")),
-                    Cell::from(Span::raw(format_big_number(app.total_execs))),
-                ]),
-                Row::new(vec![
-                    Cell::from(Span::raw("solutions")),
-                    Cell::from(Span::raw(format_big_number(app.total_solutions))),
-                    Cell::from(Span::raw("corpus count")),
-                    Cell::from(Span::raw(format_big_number(app.total_corpus_count))),
-                ]),
-            ]
-        };
+    fn draw_stats_column(f: &mut Frame, area: Rect, data: &PreparedFrameData, is_narrow: bool) {
+        let has_timing = data.total_timing.is_some();
+        let mut constraints = vec![Constraint::Length(4)];
+        if has_timing {
+            constraints.push(Constraint::Length(6));
+        }
+        constraints.push(Constraint::Min(0));
 
         let chunks = Layout::default()
-            .constraints([Constraint::Percentage(100)].as_ref())
+            .direction(ratatui::layout::Direction::Vertical)
+            .constraints(constraints)
             .split(area);
 
-        let table = Table::default()
-            .rows(items)
-            .block(
-                Block::default()
-                    .title(Span::styled(
-                        "generic",
-                        Style::default()
-                            .fg(Color::LightCyan)
-                            .add_modifier(Modifier::BOLD),
-                    ))
-                    .borders(Borders::ALL),
-            )
-            .widths([
-                Constraint::Percentage(15),
-                Constraint::Percentage(16),
-                Constraint::Percentage(15),
-                Constraint::Percentage(16),
-                Constraint::Percentage(15),
-                Constraint::Percentage(27),
-            ]);
-        f.render_widget(table, chunks[0]);
-    }
+        let title = if is_narrow { "" } else { "Overview" };
+        draw_key_value_block(
+            f,
+            chunks[0],
+            title,
+            data.generic_stats.labels.clone(),
+            &[
+                Constraint::Length(10),
+                Constraint::Min(5),
+                Constraint::Length(14),
+                Constraint::Min(5),
+            ],
+        );
 
     fn draw_client_results_text(
         &mut self,
@@ -676,141 +1022,227 @@ impl TuiUi {
                 ]),
             ]
         };
-
-        let table = Table::default()
-            .rows(items)
-            .block(
-                Block::default()
-                    .title(Span::styled(
-                        "overall results",
-                        Style::default()
-                            .fg(Color::LightCyan)
-                            .add_modifier(Modifier::BOLD),
-                    ))
-                    .borders(Borders::ALL),
-            )
-            .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-        f.render_widget(table, area);
-    }
-
-    fn draw_client_generic_text(
-        &mut self,
-        f: &mut Frame,
-        app: &Arc<RwLock<TuiContext>>,
-        area: Rect,
-    ) {
-        let items = {
-            let app = app.read().unwrap();
-            vec![
-                Row::new(vec![
-                    Cell::from(Span::raw("corpus count")),
-                    Cell::from(Span::raw(format_big_number(
-                        app.clients.get(&self.client_idx).map_or(0, |x| x.corpus),
-                    ))),
-                ]),
-                Row::new(vec![
-                    Cell::from(Span::raw("total execs")),
-                    Cell::from(Span::raw(format_big_number(
-                        app.clients
-                            .get(&self.client_idx)
-                            .map_or(0, |x| x.executions),
-                    ))),
-                ]),
-            ]
-        };
-
-        let table = Table::default()
-            .rows(items)
-            .block(
-                Block::default()
-                    .title(Span::styled(
-                        "generic",
-                        Style::default()
-                            .fg(Color::LightCyan)
-                            .add_modifier(Modifier::BOLD),
-                    ))
-                    .borders(Borders::ALL),
-            )
-            .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-        f.render_widget(table, area);
-    }
-
-    #[cfg(feature = "introspection")]
-    fn draw_introspection_text(
-        &mut self,
-        f: &mut Frame,
-        app: &Arc<RwLock<TuiContext>>,
-        area: Rect,
-    ) {
-        let mut items = vec![];
-        {
-            let ctx = app.read().unwrap();
-            if let Some(client) = ctx.introspection.get(&self.client_idx) {
-                items.push(Row::new(vec![
-                    Cell::from(Span::raw("scheduler")),
-                    Cell::from(Span::raw(format!("{:.2}%", client.scheduler * 100.0))),
-                ]));
-                items.push(Row::new(vec![
-                    Cell::from(Span::raw("manager")),
-                    Cell::from(Span::raw(format!("{:.2}%", client.manager * 100.0))),
-                ]));
-                for i in 0..client.stages.len() {
-                    items.push(Row::new(vec![
-                        Cell::from(Span::raw(format!("stage {i}"))),
-                        Cell::from(Span::raw("")),
-                    ]));
-
-                    for (key, val) in &client.stages[i] {
-                        items.push(Row::new(vec![
-                            Cell::from(Span::raw(key.clone())),
-                            Cell::from(Span::raw(format!("{:.2}%", val * 100.0))),
-                        ]));
-                    }
-                }
-                for (key, val) in &client.feedbacks {
-                    items.push(Row::new(vec![
-                        Cell::from(Span::raw(key.clone())),
-                        Cell::from(Span::raw(format!("{:.2}%", val * 100.0))),
-                    ]));
-                }
-                items.push(Row::new(vec![
-                    Cell::from(Span::raw("not measured")),
-                    Cell::from(Span::raw(format!("{:.2}%", client.unmeasured * 100.0))),
-                ]));
-            }
+        let mut next_idx = 1;
+        if let Some((timing, run_time)) = &data.total_timing {
+            draw_process_timing_text(f, chunks[next_idx], "General", timing, *run_time);
+            next_idx += 1;
         }
 
-        let table = Table::default()
-            .rows(items)
-            .block(
-                Block::default()
-                    .title(Span::styled(
-                        "introspection",
-                        Style::default()
-                            .fg(Color::LightCyan)
-                            .add_modifier(Modifier::BOLD),
-                    ))
-                    .borders(Borders::ALL),
-            )
-            .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-        f.render_widget(table, area);
+        if let (Some(geometry), Some(chunk)) = (&data.total_geometry, chunks.get(next_idx)) {
+            draw_item_geometry_text(f, *chunk, geometry, "", 0, false);
+        }
     }
-    #[expect(clippy::unused_self)]
-    fn draw_logs(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect) {
-        let app = app.read().unwrap();
-        let logs: Vec<ListItem> = app
-            .client_logs
-            .iter()
-            .map(|msg| ListItem::new(Span::raw(msg)))
-            .collect();
-        let logs = List::new(logs).block(
-            Block::default().borders(Borders::ALL).title(Span::styled(
-                "clients logs (`t` to show/hide)",
-                Style::default()
-                    .fg(Color::LightCyan)
-                    .add_modifier(Modifier::BOLD),
-            )),
+
+    fn draw_chart(&mut self, f: &mut Frame, area: Rect, data: &PreparedFrameData) {
+        if let Some(chart) = &data.active_chart {
+            match chart {
+                ChartKind::Single {
+                    name,
+                    series,
+                    window,
+                    run_time,
+                    style,
+                } => {
+                    draw_time_chart(
+                        f,
+                        area,
+                        TimeChartOptions {
+                            title: "",
+                            y_name: name,
+                            stats: series,
+                            window: *window,
+                            graph_data: &mut self.graph_data,
+                            enhanced_graphics: self.enhanced_graphics,
+                            current_time: *run_time,
+                            preset_y_range: None,
+                            style: *style,
+                        },
+                    );
+                }
+                ChartKind::Multi {
+                    name,
+                    series,
+                    run_time,
+                } => {
+                    let series_refs: Vec<(&str, &[TimedStat], Duration, Style)> = series
+                        .iter()
+                        .map(|(n, s, w, st)| (n.as_str(), s.as_slice(), *w, *st))
+                        .collect();
+                    if self.multi_graph_data.len() < series.len() {
+                        self.multi_graph_data.resize(series.len(), vec![]);
+                    }
+                    draw_multi_time_chart(
+                        f,
+                        area,
+                        MultiTimeChartOptions {
+                            title: name,
+                            y_name: "value",
+                            series: series_refs,
+                            graph_data: &mut self.multi_graph_data,
+                            enhanced_graphics: self.enhanced_graphics,
+                            current_time: *run_time,
+                            preset_y_range: None,
+                            title_style: None,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    fn draw_client_ui(
+        &mut self,
+        f: &mut Frame,
+        area: Rect,
+        show_logs: bool,
+        data: &PreparedFrameData,
+    ) {
+        let title = format!(
+            "client #{}{}",
+            data.client_idx,
+            if self.clients.len() > 1 {
+                " (←/→ arrows to switch)"
+            } else {
+                ""
+            }
         );
-        f.render_widget(logs, area);
+
+        let top_right_hint = if show_logs {
+            None
+        } else {
+            Some(Line::from(Span::styled(
+                "`t` for logs, `q` to quit",
+                Style::default()
+                    .fg(Color::LightMagenta)
+                    .add_modifier(Modifier::BOLD),
+            )))
+        };
+
+        let block = draw_main_block(&title, Borders::ALL, top_right_hint, None);
+
+        let client_area = block.inner(area);
+        f.render_widget(block, area);
+
+        // Split client area
+        let (left, right) = split_client(client_area);
+
+        // Left: Generic + User Stats
+        // Limit height for generic to matching General (6)
+        let left_chunks = Layout::default()
+            .direction(ratatui::layout::Direction::Vertical)
+            .constraints([Constraint::Length(6), Constraint::Min(0)])
+            .split(left);
+
+        draw_key_value_block(
+            f,
+            left_chunks[0],
+            "Overview",
+            data.client_generic_stats.labels.clone(),
+            &[Constraint::Length(20), Constraint::Min(5)],
+        );
+
+        self.user_stats_page_size = draw_user_stats(
+            f,
+            left_chunks[1],
+            self.client_idx,
+            &data.client_user_stats,
+            self.user_stats_scroll,
+        );
+
+        // Right: Timing + Geometry/Perf Stats
+        let mut right_constraints = vec![];
+        if data.client_timing.is_some() {
+            right_constraints.push(Constraint::Length(6));
+        }
+        right_constraints.push(Constraint::Min(0));
+
+        let right_chunks = Layout::default()
+            .direction(ratatui::layout::Direction::Vertical)
+            .constraints(right_constraints)
+            .split(right);
+
+        let mut next_idx = 0;
+        if let Some((timing, run_time)) = &data.client_timing {
+            draw_process_timing_text(f, right_chunks[next_idx], "General", timing, *run_time);
+            next_idx += 1;
+        }
+
+        if let Some(chunk) = right_chunks.get(next_idx) {
+            #[cfg(feature = "introspection")]
+            let has_perf_stats = !data.client_perf_stats.is_empty();
+            #[cfg(not(feature = "introspection"))]
+            let has_perf_stats = false;
+
+            let has_geometry = data.client_geometry.is_some();
+            let show_geo = has_geometry && (self.show_geometry || !has_perf_stats);
+
+            if show_geo {
+                if let Some(geometry) = &data.client_geometry {
+                    let hint = if has_perf_stats { " (i/I)" } else { "" };
+                    self.item_geometry_page_size = draw_item_geometry_text(
+                        f,
+                        *chunk,
+                        geometry,
+                        hint,
+                        self.item_geometry_scroll,
+                        has_perf_stats,
+                    );
+                }
+            } else {
+                #[cfg(feature = "introspection")]
+                if has_perf_stats {
+                    self.perf_stats_page_size = draw_scrolled_stats(
+                        f,
+                        *chunk,
+                        "Client Perf Stats",
+                        &data.client_perf_stats,
+                        self.perf_stats_scroll,
+                        " (i/I)",
+                        true,
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::time::Duration;
+
+    use ratatui::{Terminal, backend::TestBackend};
+
+    use super::*;
+    use crate::monitors::tui::TuiContext;
+
+    #[test]
+    fn test_ui_render_lock_pattern() {
+        let mut tui_ui = TuiUi::new("Test".into(), false);
+        // Start time 0
+        let ctx = Arc::new(RwLock::new(TuiContext::new(Duration::from_secs(0))));
+
+        // Just verify it doesn't deadlock or panic
+        let backend = TestBackend::new(80, 40);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        // Render once
+        terminal.draw(|f| tui_ui.draw(f, &ctx)).unwrap();
+    }
+
+    #[test]
+    fn test_logs_visibility() {
+        let mut tui_ui = TuiUi::new("Test".into(), true); // show logs
+        let mut ctx_struct = TuiContext::new(Duration::from_secs(0));
+        ctx_struct.client_logs.push_back("Test log".into());
+        let ctx = Arc::new(RwLock::new(ctx_struct));
+
+        let backend = TestBackend::new(80, 40);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal.draw(|f| tui_ui.draw(f, &ctx)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let content = format!("{buffer:?}");
+        assert!(content.contains("Test log"), "Logs should be visible");
     }
 }

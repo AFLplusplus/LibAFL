@@ -1161,7 +1161,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 
 /// Generates a mini-BSOD given a signal and context.
 #[cfg(unix)]
-#[expect(clippy::non_ascii_literal)]
+#[allow(clippy::non_ascii_literal)]
 pub fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,

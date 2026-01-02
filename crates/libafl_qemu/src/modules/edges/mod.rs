@@ -322,7 +322,11 @@ where
 
     #[cfg(feature = "systemmode")]
     #[must_use]
-    pub fn must_instrument(&self, addr: GuestAddr, page_id: Option<GuestPhysAddr>) -> bool {
+    pub fn must_instrument_with_page_id(
+        &self,
+        addr: GuestAddr,
+        page_id: Option<GuestPhysAddr>,
+    ) -> bool {
         if let Some(page_id) = page_id {
             self.address_filter.allowed(&addr) && self.page_filter.allowed(&page_id)
         } else {
