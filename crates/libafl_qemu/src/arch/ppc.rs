@@ -126,7 +126,7 @@ pub type GuestReg = u32;
 
 impl crate::ArchExtras for crate::CPU {
     fn read_return_address(&self) -> Result<GuestAddr, QemuRWError> {
-        self.read_reg(Regs::Lr) as GuestAddr
+        self.read_reg(Regs::Lr).map(|res| res as GuestAddr)
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
