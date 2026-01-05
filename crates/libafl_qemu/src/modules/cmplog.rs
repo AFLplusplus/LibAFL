@@ -305,8 +305,8 @@ impl CmpLogRoutinesModule {
 
         let qemu = Qemu::get().unwrap();
 
-        let a0: GuestAddr = qemu.read_function_argument(0).unwrap_or(0);
-        let a1: GuestAddr = qemu.read_function_argument(1).unwrap_or(0);
+        let a0: GuestAddr = qemu.read_function_argument(0).unwrap_or(0) as GuestAddr;
+        let a1: GuestAddr = qemu.read_function_argument(1).unwrap_or(0) as GuestAddr;
 
         if a0 == 0 || a1 == 0 {
             return;
@@ -365,7 +365,7 @@ impl CmpLogRoutinesModule {
 
             let mut iaddr = pc;
 
-            'disasm: while let Ok(insns) = h.cs.disasm_count(code, iaddr.into(), 1) {
+            'disasm: while let Ok(insns) = h.cs.disasm_count(code, iaddr as u64, 1) {
                 if insns.is_empty() {
                     break;
                 }
@@ -374,7 +374,7 @@ impl CmpLogRoutinesModule {
                 for detail in insn_detail.groups() {
                     match u32::from(detail.0) {
                         capstone::InsnGroupType::CS_GRP_CALL => {
-                            let k = (hash_64_fast(pc.into())) & (CMPLOG_MAP_W as u64 - 1);
+                            let k = (hash_64_fast(pc as u64)) & (CMPLOG_MAP_W as u64 - 1);
                             qemu.hooks().add_instruction_hooks(
                                 k,
                                 insn.address() as GuestAddr,

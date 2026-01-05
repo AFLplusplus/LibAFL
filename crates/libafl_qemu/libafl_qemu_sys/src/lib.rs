@@ -93,6 +93,9 @@ pub type CPUStatePtr = *mut CPUState;
 pub type CPUArchStatePtr = *mut CPUArchState;
 pub type ExitReasonPtr = *mut libafl_exit_reason;
 
+pub type GuestLong = target_long;
+pub type GuestUlong = target_ulong;
+
 pub type GuestUsize = target_ulong;
 pub type GuestIsize = target_long;
 
@@ -101,6 +104,11 @@ pub type GuestPhysAddr = hwaddr;
 pub type GuestVirtAddr = vaddr;
 
 pub type GuestHwAddrInfo = qemu_plugin_hwaddr;
+
+#[cfg(feature = "usermode")]
+pub type GuestAbiLong = abi_ulong;
+#[cfg(feature = "usermode")]
+pub type GuestAbiUlong = abi_ulong;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
