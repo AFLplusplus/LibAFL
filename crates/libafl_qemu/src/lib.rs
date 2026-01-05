@@ -48,7 +48,7 @@ pub mod breakpoint;
 pub mod command;
 pub mod sync_exit;
 
-pub use libafl_qemu_sys::{GuestAddr, MmapPerms};
+pub use libafl_qemu_sys::{GuestAbiUlong, GuestAddr, GuestUlong, GuestUsize, MmapPerms};
 #[cfg(feature = "systemmode")]
 pub use libafl_qemu_sys::{GuestPhysAddr, GuestVirtAddr};
 
