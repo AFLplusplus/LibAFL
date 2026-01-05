@@ -47,21 +47,21 @@ mod tests {
     // [0x20000000, 0x23ffffff] 	LowShadow
     // [0x00000000, 0x1fffffff] 	LowMem
     #[test]
-    fn test_is_posion_bottom_of_low_mem() {
+    fn test_is_poison_bottom_of_low_mem() {
         let shadow = get_shadow();
         let result = shadow.is_poison(GS::LOW_MEM_OFFSET, 0x8);
         assert_eq!(result, Ok(false));
     }
 
     #[test]
-    fn test_is_posion_top_of_low_mem() {
+    fn test_is_poison_top_of_low_mem() {
         let shadow = get_shadow();
         let result = shadow.is_poison(GS::LOW_MEM_LIMIT - 0x7, 0x8);
         assert_eq!(result, Ok(false));
     }
 
     #[test]
-    fn test_is_posion_bottom_of_low_shadow() {
+    fn test_is_poison_bottom_of_low_shadow() {
         let shadow = get_shadow();
         let result = shadow.is_poison(GS::LOW_SHADOW_OFFSET, 0x8);
         assert_eq!(
@@ -73,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_posion_top_of_low_shadow() {
+    fn test_is_poison_top_of_low_shadow() {
         use libafl_asan::GuestAddr;
 
         let shadow = get_shadow();
@@ -83,7 +83,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_posion_bottom_of_high_shadow() {
+    fn test_is_poison_bottom_of_high_shadow() {
         let shadow = get_shadow();
         let result = shadow.is_poison(GS::HIGH_SHADOW_OFFSET, 0x8);
         assert_eq!(
@@ -95,7 +95,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_posion_top_of_high_shadow() {
+    fn test_is_poison_top_of_high_shadow() {
         let shadow = get_shadow();
         const ADDR: GuestAddr = GS::HIGH_SHADOW_OFFSET + GS::HIGH_SHADOW_SIZE - 8;
         let result = shadow.is_poison(ADDR, 0x8);
@@ -103,14 +103,14 @@ mod tests {
     }
 
     #[test]
-    fn test_is_posion_bottom_of_high_mem() {
+    fn test_is_poison_bottom_of_high_mem() {
         let shadow = get_shadow();
         let result = shadow.is_poison(GS::HIGH_MEM_OFFSET, 0x8);
         assert_eq!(result, Ok(false));
     }
 
     #[test]
-    fn test_is_posion_top_of_high_mem() {
+    fn test_is_poison_top_of_high_mem() {
         let shadow = get_shadow();
         let result = shadow.is_poison(GS::HIGH_MEM_LIMIT - 0x7, 0x8);
         assert_eq!(result, Ok(false));

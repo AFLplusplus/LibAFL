@@ -446,13 +446,13 @@ impl ShadowLayout for DefaultShadowLayout {
     // || `[0x000000000000, 0x000fffffffff]` || LowMem     || 64GB
     const SHADOW_OFFSET: usize = 0x001000000000;
     const LOW_MEM_OFFSET: GuestAddr = 0x0;
-    const LOW_MEM_SIZE: usize = 0x000fffffffff;
+    const LOW_MEM_SIZE: usize = 0x1000000000;
     const LOW_SHADOW_OFFSET: GuestAddr = 0x001000000000;
-    const LOW_SHADOW_SIZE: usize = 0x1ffffffff;
+    const LOW_SHADOW_SIZE: usize = 0x200000000;
     const HIGH_SHADOW_OFFSET: GuestAddr = 0x041200000000;
-    const HIGH_SHADOW_SIZE: usize = 0x1bfdffffffff;
+    const HIGH_SHADOW_SIZE: usize = 0x1bfe00000000;
     const HIGH_MEM_OFFSET: GuestAddr = 0x201000000000;
-    const HIGH_MEM_SIZE: usize = 0xdfefffffffff;
+    const HIGH_MEM_SIZE: usize = 0xdff000000000;
 
     const ALLOC_ALIGN_POW: usize = 3;
     const ALLOC_ALIGN_SIZE: usize = 1 << Self::ALLOC_ALIGN_POW;
