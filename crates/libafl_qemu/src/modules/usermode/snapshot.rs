@@ -976,7 +976,7 @@ where
         SYS_fstatat64 => {
             if a2 != 0 {
                 let h = get_snapshot_module_mut(emulator_modules).unwrap();
-                h.access(a2, 4096); // stat is not greater than a page
+                h.access(a2 as GuestAddr, 4096); // stat is not greater than a page
             }
         }
         #[cfg(not(cpu_target = "riscv32"))]
