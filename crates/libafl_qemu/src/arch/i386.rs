@@ -92,7 +92,7 @@ impl crate::ArchExtras for crate::CPU {
         QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
 
         let size: usize = size_of::<GuestReg>();
-        let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+        let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)? as GuestAddr;
         /*
          * Stack is full and descending. SP points to return address, arguments
          * are in reverse order above that.
@@ -116,7 +116,7 @@ impl crate::ArchExtras for crate::CPU {
         QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
 
         let val: GuestReg = val.into();
-        let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+        let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)? as GuestAddr;
         /*
          * Stack is full and descending. SP points to return address, arguments
          * are in reverse order above that.
