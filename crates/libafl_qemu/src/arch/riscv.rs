@@ -20,7 +20,7 @@ pub const SYS_riscv_flush_icache: c_long = SYS_arch_specific_syscall + 15;
 #[expect(non_upper_case_globals)]
 pub const SYS_riscv_hwprobe: c_long = SYS_arch_specific_syscall + 14;
 
-use crate::{CallingConvention, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
+use crate::{CallingConvention, GuestAddr, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
 
 #[expect(non_upper_case_globals)]
 impl CallingConvention {

@@ -544,7 +544,7 @@ pub struct QemuConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    #[cfg(feature = "usermode")]
+    #[cfg(all(feature = "usermode", feature = "x86_64"))]
     use crate::Qemu;
 
     #[test]
