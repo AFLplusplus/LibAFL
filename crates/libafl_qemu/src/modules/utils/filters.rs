@@ -14,9 +14,9 @@ use crate::Qemu;
 
 // TODO: make a better arch-specific / os-specific system. only works for x86_64 for now.
 #[cfg(feature = "x86_64")]
-pub const LINUX_PROCESS_ADDRESS_RANGE: Range<u64> = 0..0x0000_7fff_ffff_ffff;
+pub const LINUX_PROCESS_ADDRESS_RANGE: Range<GuestAddr> = 0..0x0000_7fff_ffff_ffff;
 #[cfg(feature = "x86_64")]
-pub const LINUX_KERNEL_ADDRESS_RANGE: Range<u64> = 0xFFFFFFFF80000000..0xFFFFFFFF9FFFFFFF;
+pub const LINUX_KERNEL_ADDRESS_RANGE: Range<GuestAddr> = 0xFFFFFFFF80000000..0xFFFFFFFF9FFFFFFF;
 
 /// Generic Filter that can be:
 /// - an allow list: allow nothing but the given list

@@ -241,7 +241,7 @@ fn fuzz(
 
     let input_addr: GuestAddr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
-        .unwrap() as GuestAddr;
+        .unwrap();
     println!("Placing input at {input_addr:#x}");
 
     let log = RefCell::new(

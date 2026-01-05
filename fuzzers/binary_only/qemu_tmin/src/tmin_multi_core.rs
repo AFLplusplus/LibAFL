@@ -247,7 +247,7 @@ pub fn fuzz() {
         // Map a private region for input buffer
         let input_addr: GuestAddr = qemu
             .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
-            .unwrap() as GuestAddr;
+            .unwrap();
         log::info!("Placing input at {input_addr:#x}");
 
         // Rust harness: this closure copies an input buffer to our private region
