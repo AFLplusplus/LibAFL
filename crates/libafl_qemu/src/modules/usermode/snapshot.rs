@@ -1007,7 +1007,7 @@ where
             if sys_const == SYS_mmap2 {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = get_snapshot_module_mut(emulator_modules).unwrap();
-                    h.add_mapped(result, a1 as usize, Some(prot));
+                    h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
                 }
             }
 
