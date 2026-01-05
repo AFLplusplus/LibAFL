@@ -634,7 +634,6 @@ jobs:
         arch:
           - aarch64
           - arm
-          - hexagon
           - i386
           - mips
           - ppc
