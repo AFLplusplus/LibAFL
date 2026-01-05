@@ -2,11 +2,11 @@ use std::ffi::CStr;
 
 use enum_map::EnumMap;
 use libafl::inputs::HasTargetBytes;
-use libafl_qemu_sys::GuestVirtAddr;
 use libc::c_uint;
 
 use crate::{
-    GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
+    GuestAddr, GuestReg, GuestVirtAddr, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs,
+    StdEmulatorDriver,
     command::{
         CommandError, NativeCommandParser,
         nyx::{
@@ -263,12 +263,12 @@ where
         qemu: Qemu,
         _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let agent_config_addr = qemu.read_reg(Regs::Rcx)? as GuestVirtAddr;
+        let agent_config_addr = qemu.read_reg(Regs::Rcx)? as GuestAddr;
 
         // # Safety
         // We use the C struct directly to get the agent config
         let agent_config: libvharness_sys::agent_config_t =
-            unsafe { qemu.read_mem_val(agent_config_addr as u64)? };
+            unsafe { qemu.read_mem_val(agent_config_addr)? };
 
         Ok(SetAgentConfigCommand::new(agent_config))
     }
