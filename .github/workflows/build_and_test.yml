@@ -648,23 +648,29 @@ jobs:
         uses: ./.github/workflows/qemu-fuzzer-tester-prepare
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
-        with:
-          # We will have each of these fuzzers have it's own cache since these
-          # are some of the heaviest fuzzers to build.
-          shared-key: qemu-${{ steps.fuzzer_name.outputs.fuzzer_name }}-i386
-          # We want to include the commit hash to ensure the cache is replaced
-          # on each new commit.
-          key: ${{ github.sha }}
-          cache-all-crates: true
-          # The code is built in the fuzzers own directory, not in the target
-          # directory in the root of the workspace
-          workspaces: |
-            fuzzers/${{ matrix.fuzzer }}
       # ---- build normal and examples ----
       - name: Build LibAFL QEMU (${{ matrix.mode }} - ${{ matrix.arch }})
         run: cargo build --verbose --package libafl_qemu --no-default-features --features ${{ matrix.mode }},${{ matrix.arch }}
       - name: Test LibAFL QEMU (${{ matrix.mode }} - ${{ matrix.arch }})
         run: cargo test --package libafl_qemu --no-default-features --features ${{ matrix.mode }},${{ matrix.arch }}
+
+  # hexagon systemmode is not available yet in qemu upstream.
+  # in the meantime, we only test usermode
+  libafl_qemu-hexagon:
+    if: contains(github.event.pull_request.labels.*.name, 'qemu-full')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare
+        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+      # ---- build normal and examples ----
+      - name: Build LibAFL QEMU (usermode - hexagon)
+        run: cargo build --verbose --package libafl_qemu --no-default-features --features usermode,hexagon
+      - name: Test LibAFL QEMU (usermode - hexagon)
+        run: cargo test --package libafl_qemu --no-default-features --features usermode,hexagon
 
   libafl_asan:
     name: 🔧 libafl_asan
