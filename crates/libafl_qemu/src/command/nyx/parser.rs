@@ -109,13 +109,13 @@ where
         qemu: Qemu,
         _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let allowed_range_addr = qemu.read_reg(Regs::Rcx)? as GuestVirtAddr;
+        let allowed_range_addr = qemu.read_reg(Regs::Rcx)? as GuestAddr;
 
         // # Safety
         // Range submit is represented with an array of 3 u64 in the Nyx API.
-        let allowed_range: [u64; 3] = unsafe { qemu.read_mem_val(allowed_range_addr as u64)? };
+        let allowed_range: [u64; 3] = unsafe { qemu.read_mem_val(allowed_range_addr)? };
 
-        Ok(RangeSubmitCommand::new(allowed_range[0]..allowed_range[1]))
+        Ok(RangeSubmitCommand::new(allowed_range[0] as GuestAddr..allowed_range[1] as GuestAddr))
     }
 }
 
