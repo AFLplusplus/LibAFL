@@ -661,7 +661,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'qemu-full')
     runs-on: ubuntu-24.04
     env:
-      LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}}
+      LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
