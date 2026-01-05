@@ -109,7 +109,7 @@ impl crate::ArchExtras for crate::CPU {
         T: Into<GuestAddr>,
     {
         let addr: GuestAddr = val.into();
-        self.write_reg(Regs::Ra, val as GuestReg)
+        self.write_reg(Regs::Ra, addr as GuestReg)
     }
 
     fn read_function_argument_with_cc(
