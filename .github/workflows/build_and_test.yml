@@ -626,8 +626,6 @@ jobs:
   libafl_qemu-full:
     if: contains(github.event.pull_request.labels.*.name, 'qemu-full')
     runs-on: ubuntu-24.04
-    env:
-      LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
     strategy:
       matrix:
         mode:
@@ -651,8 +649,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
       # ---- build normal and examples ----
       - name: Build LibAFL QEMU (${{ matrix.mode }} - ${{ matrix.arch }})
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
         run: cargo build --verbose --package libafl_qemu --no-default-features --features ${{ matrix.mode }},${{ matrix.arch }}
       - name: Test LibAFL QEMU (${{ matrix.mode }} - ${{ matrix.arch }})
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
         run: cargo test --package libafl_qemu --no-default-features --features ${{ matrix.mode }},${{ matrix.arch }}
 
   # hexagon systemmode is not available yet in qemu upstream.
@@ -660,8 +662,6 @@ jobs:
   libafl_qemu-hexagon:
     if: contains(github.event.pull_request.labels.*.name, 'qemu-full')
     runs-on: ubuntu-24.04
-    env:
-      LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -671,8 +671,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
       # ---- build normal and examples ----
       - name: Build LibAFL QEMU (usermode - hexagon)
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
         run: cargo build --verbose --package libafl_qemu --no-default-features --features usermode,hexagon
       - name: Test LibAFL QEMU (usermode - hexagon)
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
         run: cargo test --package libafl_qemu --no-default-features --features usermode,hexagon
 
   libafl_asan:
