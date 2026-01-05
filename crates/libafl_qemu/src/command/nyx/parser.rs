@@ -115,7 +115,9 @@ where
         // Range submit is represented with an array of 3 u64 in the Nyx API.
         let allowed_range: [u64; 3] = unsafe { qemu.read_mem_val(allowed_range_addr)? };
 
-        Ok(RangeSubmitCommand::new(allowed_range[0] as GuestAddr..allowed_range[1] as GuestAddr))
+        Ok(RangeSubmitCommand::new(
+            allowed_range[0] as GuestAddr..allowed_range[1] as GuestAddr,
+        ))
     }
 }
 

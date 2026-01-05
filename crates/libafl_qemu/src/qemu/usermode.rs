@@ -20,7 +20,6 @@ use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 
 #[cfg(all(doc, not(feature = "hexagon")))]
 use crate::modules::SnapshotModule;
-
 use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
 
 /// Choose how QEMU target signals should be handled.
