@@ -1304,7 +1304,7 @@ pub mod pybind {
 
     #[cfg(feature = "usermode")]
     pub use super::usermode::pybind::*;
-    use super::{GuestAddr, GuestUsize};
+    use super::{GuestAddr, GuestReg};
 
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, Py<PyAny>)> = vec![];
 
@@ -1358,13 +1358,13 @@ pub mod pybind {
             self.qemu.num_regs()
         }
 
-        fn write_reg(&self, reg: i32, val: GuestUsize) -> PyResult<()> {
+        fn write_reg(&self, reg: i32, val: GuestReg) -> PyResult<()> {
             self.qemu
                 .write_reg(reg, val)
                 .map_err(|err| PyValueError::new_err(format!("write register error: {err:?}")))
         }
 
-        fn read_reg(&self, reg: i32) -> PyResult<GuestUsize> {
+        fn read_reg(&self, reg: i32) -> PyResult<GuestReg> {
             self.qemu
                 .read_reg(reg)
                 .map_err(|err| PyValueError::new_err(format!("read register error: {err:?}")))

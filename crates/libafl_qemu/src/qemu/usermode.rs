@@ -211,6 +211,7 @@ impl CPU {
     }
 
     #[must_use]
+    #[allow(clippy::unnecessary_cast)]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
         unsafe { (addr as usize + guest_base) as *mut T }
     }
@@ -263,6 +264,7 @@ impl Qemu {
     }
 
     #[must_use]
+    #[allow(clippy::unnecessary_cast)]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
         unsafe { (addr as usize + guest_base) as *mut T }
     }
