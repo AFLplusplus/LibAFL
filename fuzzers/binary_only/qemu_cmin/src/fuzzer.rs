@@ -203,7 +203,7 @@ pub fn fuzz() -> Result<(), Error> {
         .unwrap();
     log::info!("Placing input at {input_addr:#x}");
 
-    let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
+    let stack_ptr = qemu.read_reg(Regs::Sp).unwrap();
 
     let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
     let (state, mut mgr) =
@@ -251,10 +251,12 @@ pub fn fuzz() -> Result<(), Error> {
         unsafe {
             qemu.write_mem(input_addr, buf).expect("qemu write failed.");
 
-            qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
+            qemu.write_reg(Regs::Pc, test_one_input_ptr as GuestReg)
+                .unwrap();
             qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
             qemu.write_return_address(ret_addr).unwrap();
-            qemu.write_function_argument(0, input_addr).unwrap();
+            qemu.write_function_argument(0, input_addr as GuestReg)
+                .unwrap();
             qemu.write_function_argument(1, len).unwrap();
 
             match qemu.run() {
@@ -285,10 +287,12 @@ pub fn fuzz() -> Result<(), Error> {
             unsafe {
                 qemu.write_mem(input_addr, buf).expect("qemu write failed.");
 
-                qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
+                qemu.write_reg(Regs::Pc, test_one_input_ptr as GuestReg)
+                    .unwrap();
                 qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
                 qemu.write_return_address(ret_addr).unwrap();
-                qemu.write_function_argument(0, input_addr).unwrap();
+                qemu.write_function_argument(0, input_addr as GuestReg)
+                    .unwrap();
                 qemu.write_function_argument(1, len).unwrap();
 
                 match qemu.run() {
