@@ -495,7 +495,7 @@ impl Qemu {
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use libafl_qemu_sys::{GuestAddr, MmapPerms};
+    use libafl_qemu_sys::{GuestAddr, GuestUlong, MmapPerms};
     use pyo3::{
         Bound, FromPyObject, Py, PyAny, PyResult, Python,
         exceptions::PyValueError,
@@ -512,20 +512,20 @@ pub mod pybind {
     pub struct SyscallHookResult {
         /// if None: run.
         /// else: skip with given value.
-        skip: Option<GuestAddr>,
+        skip: Option<GuestUlong>,
     }
 
     extern "C" fn py_syscall_hook_wrapper(
         _data: u64,
         sys_num: i32,
-        a0: GuestAddr,
-        a1: GuestAddr,
-        a2: GuestAddr,
-        a3: GuestAddr,
-        a4: GuestAddr,
-        a5: GuestAddr,
-        a6: GuestAddr,
-        a7: GuestAddr,
+        a0: GuestUlong,
+        a1: GuestUlong,
+        a2: GuestUlong,
+        a3: GuestUlong,
+        a4: GuestUlong,
+        a5: GuestUlong,
+        a6: GuestUlong,
+        a7: GuestUlong,
     ) -> hooks::SyscallHookResult {
         unsafe { (&raw const PY_SYSCALL_HOOK).read() }.map_or_else(
             || hooks::SyscallHookResult::Run,
