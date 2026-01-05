@@ -53,7 +53,7 @@ use libafl_qemu::{
         cmplog::{CmpLogModule, CmpLogObserver},
         edges::StdEdgeCoverageModule,
     },
-    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, Regs,
+    Emulator, GuestAddr, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, Regs,
     TargetSignalHandling,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
@@ -225,13 +225,13 @@ fn fuzz(
 
     println!("Break at {:#x}", qemu.read_reg(Regs::Pc).unwrap());
 
-    let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
+    let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap() as GuestAddr;
     let mut ret_addr = [0; 8];
 
     qemu.read_mem(stack_ptr, &mut ret_addr)
         .expect("Error while reading QEMU memory.");
 
-    let ret_addr = u64::from_le_bytes(ret_addr);
+    let ret_addr: GuestAddr = u64::from_le_bytes(ret_addr) as GuestAddr;
 
     println!("Stack pointer = {stack_ptr:#x}");
     println!("Return address = {ret_addr:#x}");
@@ -239,9 +239,9 @@ fn fuzz(
     qemu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     qemu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = qemu
+    let input_addr: GuestAddr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
-        .unwrap();
+        .unwrap() as GuestAddr;
     println!("Placing input at {input_addr:#x}");
 
     let log = RefCell::new(
@@ -370,10 +370,11 @@ fn fuzz(
                 // For better error handling, use `write_mem` and handle the returned Result
                 qemu.write_mem_unchecked(input_addr, buf);
 
-                qemu.write_reg(Regs::Rdi, input_addr).unwrap();
+                qemu.write_reg(Regs::Rdi, input_addr as GuestReg).unwrap();
                 qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
-                qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
-                qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
+                qemu.write_reg(Regs::Rip, test_one_input_ptr as GuestReg)
+                    .unwrap();
+                qemu.write_reg(Regs::Rsp, stack_ptr as GuestReg).unwrap();
 
                 let qemu_ret = qemu.run();
 
