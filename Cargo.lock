@@ -2621,6 +2621,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "home"
+version = "0.5.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc627f471c528ff0c4a49e1d5e60450c8f6461dd6d10ba9dcd3a61d3dff7728d"
+dependencies = [
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "hostname"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3322,7 +3331,7 @@ dependencies = [
  "cc",
  "glob",
  "serde",
- "which",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -3423,6 +3432,7 @@ dependencies = [
  "libfuzzer-sys",
  "rustversion",
  "toml 0.9.10+spec-1.1.0",
+ "which 6.0.3",
 ]
 
 [[package]]
@@ -3491,7 +3501,7 @@ dependencies = [
  "rustc_version 0.4.1",
  "rustversion",
  "shell-words",
- "which",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -3876,7 +3886,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35a0ceb2a395ffa403a863adcf365e82cc8d8338ac7f5f949b9df5ca3de251e1"
 dependencies = [
  "cc",
- "which",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -6054,7 +6064,7 @@ version = "0.16.0"
 dependencies = [
  "cmake",
  "log",
- "which",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -6070,7 +6080,7 @@ dependencies = [
  "regex",
  "symcc_libafl",
  "unchecked_unwrap",
- "which",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -6382,7 +6392,7 @@ dependencies = [
  "cmake",
  "cxx",
  "git2",
- "which",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -7078,6 +7088,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2878ef029c47c6e8cf779119f20fcf52bde7ad42a731b2a304bc221df17571e"
 dependencies = [
  "rustls-pki-types",
+]
+
+[[package]]
+name = "which"
+version = "6.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4ee928febd44d98f2f459a4a79bd4d928591333a494a10a868418ac1b39cf1f"
+dependencies = [
+ "either",
+ "home",
+ "rustix 0.38.44",
+ "winsafe 0.0.19",
 ]
 
 [[package]]

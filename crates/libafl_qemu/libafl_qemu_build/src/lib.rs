@@ -100,15 +100,19 @@ fn find_llvm_config() -> Result<String, String> {
         }
     }
 
-    if which("llvm-config").is_ok()
-        && let Some(ver) = find_llvm_version("llvm-config".to_owned())
-    {
-        if ver < rustc_llvm_ver {
-            println!(
-                "cargo:warning=Version of llvm-config is {ver} but needs to be at least rustc's version ({rustc_llvm_ver})! We will (try to) continue to build. Continue at your own risk, or rebuild with a set LLVM_CONFIG_PATH env variable, pointing to a newer version."
-            );
+    if which("llvm-config").is_ok() {
+        if let Some(ver) = find_llvm_version("llvm-config".to_owned()) {
+            if ver < rustc_llvm_ver {
+                println!(
+                    "cargo:warning=Version of llvm-config is {ver} but needs to be at least rustc's version ({rustc_llvm_ver})! We will (try to) continue to build. Continue at your own risk, or rebuild with a set LLVM_CONFIG_PATH env variable, pointing to a newer version."
+                );
+            }
+            return Ok("llvm-config".to_owned());
+        } else {
+            println!("cargo:warning=Found llvm-config but failed to determine version.");
         }
-        return Ok("llvm-config".to_owned());
+    } else {
+        println!("cargo:warning=llvm-config not found in PATH");
     }
 
     Err("Could not find llvm-config".to_owned())
