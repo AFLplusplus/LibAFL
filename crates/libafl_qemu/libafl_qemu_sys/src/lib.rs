@@ -96,7 +96,7 @@ pub type ExitReasonPtr = *mut libafl_exit_reason;
 pub type GuestUsize = target_ulong;
 pub type GuestIsize = target_long;
 
-pub type GuestAddr = target_ulong;
+pub type GuestAddr = vaddr;
 pub type GuestPhysAddr = hwaddr;
 pub type GuestVirtAddr = vaddr;
 

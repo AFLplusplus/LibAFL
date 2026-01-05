@@ -7,9 +7,8 @@ use std::{
 };
 
 use libafl_qemu_sys::{
-    GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr, libafl_load_qemu_snapshot,
-    libafl_page_from_addr, libafl_qemu_current_paging_id, libafl_qemu_run,
-    libafl_save_qemu_snapshot, qemu_cleanup,
+    GuestAddr, GuestPhysAddr, GuestVirtAddr, libafl_load_qemu_snapshot, libafl_page_from_addr,
+    libafl_qemu_current_paging_id, libafl_qemu_run, libafl_save_qemu_snapshot, qemu_cleanup,
 };
 use libc::EXIT_SUCCESS;
 use num_traits::Zero;
@@ -108,7 +107,7 @@ impl CPU {
     #[must_use]
     pub fn get_phys_addr(&self, vaddr: GuestVirtAddr) -> Option<GuestPhysAddr> {
         unsafe {
-            let page = libafl_page_from_addr(vaddr as GuestUsize) as GuestVirtAddr;
+            let page = libafl_page_from_addr(vaddr);
             let mut attrs = MaybeUninit::<libafl_qemu_sys::MemTxAttrs>::uninit();
             let paddr = libafl_qemu_sys::cpu_get_phys_page_attrs_debug(
                 self.cpu_ptr,
@@ -129,7 +128,7 @@ impl CPU {
     #[must_use]
     pub fn get_phys_addr_tlb(
         &self,
-        vaddr: GuestAddr,
+        vaddr: GuestVirtAddr,
         info: MemAccessInfo,
         is_store: bool,
     ) -> Option<GuestPhysAddr> {
@@ -142,7 +141,7 @@ impl CPU {
                     libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_R
                 },
             );
-            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr.into());
+            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr as u64);
             if phwaddr.is_null() {
                 None
             } else {
@@ -215,11 +214,10 @@ impl Qemu {
     // TODO: use address_space_rw and check for the result MemTxResult
     pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {
         unsafe {
-            libafl_qemu_sys::cpu_physical_memory_rw(
+            libafl_qemu_sys::cpu_physical_memory_write(
                 paddr,
                 buf.as_ptr() as *mut _,
                 buf.len() as u64,
-                true,
             );
         }
     }
@@ -233,11 +231,10 @@ impl Qemu {
     // TODO: use address_space_rw and check for the result MemTxResult
     pub unsafe fn read_phys_mem(&self, paddr: GuestPhysAddr, buf: &mut [u8]) {
         unsafe {
-            libafl_qemu_sys::cpu_physical_memory_rw(
+            libafl_qemu_sys::cpu_physical_memory_read(
                 paddr,
                 buf.as_mut_ptr() as *mut _,
                 buf.len() as u64,
-                false,
             );
         }
     }

@@ -213,7 +213,7 @@ mod generators {
             let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
             #[allow(clippy::unnecessary_cast)]
-            let id = (hash_64_fast(u64::from(src)) ^ hash_64_fast(u64::from(dest))) & mask;
+            let id = (hash_64_fast(src as u64) ^ hash_64_fast(dest as u64)) & mask;
 
             if !IS_CONST_MAP {
                 unsafe {
@@ -276,7 +276,7 @@ mod generators {
 
         let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
-        let id = hash_64_fast(u64::from(pc)) & mask;
+        let id = hash_64_fast(pc as u64) & mask;
 
         if !IS_CONST_MAP {
             unsafe {

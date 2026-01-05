@@ -220,7 +220,7 @@ where
         .unwrap();
     let id = meta.current_id as usize;
 
-    Some(*meta.map.entry(pc.into()).or_insert_with(|| {
+    Some(*meta.map.entry(pc as u64).or_insert_with(|| {
         meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u64;
         id as u64
     }))
@@ -245,7 +245,7 @@ where
         return None;
     }
 
-    Some(hash_64_fast(pc.into()) & (CMPLOG_MAP_W as u64 - 1))
+    Some(hash_64_fast(pc as u64) & (CMPLOG_MAP_W as u64 - 1))
 }
 
 pub extern "C" fn trace_cmp1_cmplog(_: *const (), id: u64, v0: u8, v1: u8) {

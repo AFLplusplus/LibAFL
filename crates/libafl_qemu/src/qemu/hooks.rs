@@ -703,7 +703,7 @@ create_hook_types!(
 
 create_hook_id!(Block, libafl_qemu_remove_block_hook, true);
 create_gen_wrapper!(block, (addr: GuestAddr), u64, 1, BlockHookId);
-create_post_gen_wrapper!(block, (addr: GuestAddr, len: GuestUsize), 1, BlockHookId);
+create_post_gen_wrapper!(block, (addr: GuestAddr, len: GuestAddr), 1, BlockHookId);
 create_exec_wrapper!(block, (id: u64), 0, 1, BlockHookId);
 
 // Read hook wrappers
@@ -1068,14 +1068,14 @@ impl QemuHooks {
         &self,
         data: T,
         generator: Option<unsafe extern "C" fn(T, GuestAddr) -> u64>,
-        post_gen: Option<unsafe extern "C" fn(T, GuestAddr, GuestUsize)>,
+        post_gen: Option<unsafe extern "C" fn(T, GuestAddr, GuestAddr)>,
         exec: Option<unsafe extern "C" fn(T, u64)>,
     ) -> BlockHookId {
         unsafe {
             let data: u64 = data.into().0;
             let generator: Option<unsafe extern "C" fn(u64, GuestAddr) -> u64> =
                 transmute(generator);
-            let post_gen: Option<unsafe extern "C" fn(u64, GuestAddr, GuestUsize)> =
+            let post_gen: Option<unsafe extern "C" fn(u64, GuestAddr, GuestAddr)> =
                 transmute(post_gen);
             let exec: Option<unsafe extern "C" fn(u64, u64)> = transmute(exec);
             let num = libafl_qemu_sys::libafl_add_block_hook(generator, post_gen, exec, data);

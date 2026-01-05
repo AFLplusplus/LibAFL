@@ -21,10 +21,10 @@ use std::{
 use libafl_bolts::Error;
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{
-    CPUArchState, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr,
-    libafl_flush_jit, libafl_get_exit_reason, libafl_page_from_addr, libafl_qemu_add_gdb_cmd,
-    libafl_qemu_cpu_index, libafl_qemu_current_cpu, libafl_qemu_gdb_reply, libafl_qemu_get_cpu,
-    libafl_qemu_init, libafl_qemu_num_cpus, libafl_qemu_num_regs, libafl_qemu_read_reg,
+    CPUArchState, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestVirtAddr, libafl_flush_jit,
+    libafl_get_exit_reason, libafl_page_from_addr, libafl_qemu_add_gdb_cmd, libafl_qemu_cpu_index,
+    libafl_qemu_current_cpu, libafl_qemu_gdb_reply, libafl_qemu_get_cpu, libafl_qemu_init,
+    libafl_qemu_num_cpus, libafl_qemu_num_regs, libafl_qemu_read_reg,
     libafl_qemu_remove_breakpoint, libafl_qemu_set_breakpoint, libafl_qemu_trigger_breakpoint,
     libafl_qemu_write_reg,
 };
@@ -70,10 +70,10 @@ pub trait HookId {
 }
 
 pub trait ArchExtras {
-    fn read_return_address(&self) -> Result<GuestReg, QemuRWError>;
+    fn read_return_address(&self) -> Result<GuestAddr, QemuRWError>;
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
-        T: Into<GuestReg>;
+        T: Into<GuestAddr>;
     fn read_function_argument_with_cc(
         &self,
         idx: u8,
@@ -472,7 +472,7 @@ impl CPU {
             maxl = std::cmp::max(format!("{r:#?}").len(), maxl);
         }
         for (i, r) in Regs::iter().enumerate() {
-            let v: GuestAddr = self.read_reg(r).unwrap();
+            let v = self.read_reg(r).unwrap() as GuestAddr;
             let sr = format!("{r:#?}");
             let _ = write!(&mut display, "{sr:>maxl$}: {v:#016x} ");
             if (i + 1) % 4 == 0 {
@@ -1049,7 +1049,7 @@ impl Qemu {
 }
 
 impl ArchExtras for Qemu {
-    fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
+    fn read_return_address(&self) -> Result<GuestAddr, QemuRWError> {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
             .read_return_address()
@@ -1057,7 +1057,7 @@ impl ArchExtras for Qemu {
 
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
-        T: Into<GuestReg>,
+        T: Into<GuestAddr>,
     {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
@@ -1170,7 +1170,7 @@ impl QemuMemoryChunk {
         let new_addr = self.addr + range.start;
         let slice_size = range.clone().count();
 
-        if new_addr + (slice_size as GuestUsize) >= self.addr + self.size {
+        if new_addr + (slice_size as GuestAddr) >= self.addr + (self.size as GuestAddr) {
             return None;
         }
 

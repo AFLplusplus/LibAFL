@@ -9,7 +9,7 @@ use hashbrown::HashMap;
 use libafl::{
     executors::ExitKind, inputs::HasTargetBytes, observers::ObserversTuple, state::HasExecutions,
 };
-use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
+use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 
 #[cfg(doc)]
 use crate::modules::EmulatorModule;
@@ -149,13 +149,13 @@ impl Debug for GuestAddrKind {
     }
 }
 
-impl Add<GuestUsize> for GuestAddrKind {
+impl Add<GuestAddr> for GuestAddrKind {
     type Output = Self;
 
-    fn add(self, rhs: GuestUsize) -> Self::Output {
+    fn add(self, rhs: GuestAddr) -> Self::Output {
         match self {
             GuestAddrKind::Physical(paddr) => {
-                GuestAddrKind::Physical(paddr + GuestPhysAddr::from(rhs))
+                GuestAddrKind::Physical(paddr + GuestPhysAddr::try_from(rhs).unwrap())
             }
             GuestAddrKind::Virtual(vaddr) => GuestAddrKind::Virtual(vaddr + rhs as GuestVirtAddr),
         }

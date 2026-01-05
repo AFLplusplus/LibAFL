@@ -1,5 +1,8 @@
 import "../../../just/libafl-qemu.just"
 
+set allow-duplicate-variables := true
+ARCH := env("ARCH", "arm")
+
 FUZZER_NAME := "qemu_baremetal"
 VHARNESS := BUILD_DIR / "vharness_out"
 
