@@ -126,7 +126,7 @@ bindgen = "0.72.1"
 bitbybit = "1.4.0" # bitfields, use this for bit fields and bit enums
 capstone = "0.13.0" # Disassembler used in libafl_unicorn to provide disassembly on crash
 clap = "4.5.52"
-cc = "1.2.50"
+cc = "1.2.51"
 cmake = "0.1.57"
 ctor = "0.6.3"
 document-features = "0.2.11"
@@ -134,7 +134,7 @@ erased-serde = { version = "0.4.5", default-features = false } # erased serde
 fastbloom = { version = "0.14.0", default-features = false }
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
 hashbrown = { version = "0.16.1", default-features = false } # A faster hashmap, nostd compatible
-just = "1.45.0"
+just = "1.46.0"
 libc = "0.2.178" # For (*nix) libc
 libipt = { version = "0.4.0", features = ["libipt_master"] }
 libvharness_sys = { path = "./crates/libafl_qemu/libvharness_sys", version = "0.16.0", default-features = false }
@@ -154,7 +154,7 @@ rangemap = "1.7.1"
 regex = "1.12.2"
 rustversion = "1.0.22"
 serde = { version = "1.0.228", default-features = false } # serialization lib
-serde_json = { version = "1.0.147", default-features = false }
+serde_json = { version = "1.0.148", default-features = false }
 serde_yaml = { version = "0.9.34" } # For parsing the injections yaml file
 serial_test = { version = "3.2.0", default-features = false }
 static_assertions = "1.1.0"
@@ -170,7 +170,7 @@ uuid = { version = "1.19.0", features = ["serde", "v4"] }
 which = "8.0.0"
 windows = "0.62.1"
 windows-core = "0.62.1"
-z3 = { version = "0.19.6", default-features = false }
+z3 = { version = "0.19.7", default-features = false }
 
 [workspace.lints.rust]
 # Deny
