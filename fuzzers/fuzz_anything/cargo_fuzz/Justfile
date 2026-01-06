@@ -5,12 +5,12 @@ install_cargo_fuzz:
     cargo install cargo-fuzz
 
 build: install_cargo_fuzz install_llvm_tools
-    cargo +nightly fuzz build fuzz_target_1
+    cargo +nightly fuzz build --target-dir fuzz/target fuzz_target_1
 
 [linux]
 test: build
     #!/bin/bash
-    timeout 30s cargo +nightly fuzz run fuzz_target_1 2>&1 | tee fuzz_stdout.log || true
+    timeout 30s cargo +nightly fuzz run --target-dir fuzz/target fuzz_target_1 2>&1 | tee fuzz_stdout.log || true
     if grep -qa "objectives: 1" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
