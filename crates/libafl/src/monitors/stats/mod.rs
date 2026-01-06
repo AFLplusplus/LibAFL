@@ -39,6 +39,8 @@ pub struct ClientStats {
     executions: u64,
     /// The number of executions of the previous state in case a client decrease the number of execution (e.g when restarting without saving the state)
     prev_state_executions: u64,
+    /// The testcase index currently being fuzzed
+    pub current_testcase_idx: Option<usize>,
     /// The size of the objectives corpus for this client
     objective_size: u64,
     /// The time for the last update of the objective size
@@ -310,7 +312,6 @@ impl ClientStats {
     ) -> Option<UserStats> {
         self.user_stats.insert(name, value)
     }
-
     /// Get a user-defined stat using the name
     #[must_use]
     pub fn get_user_stats(&self, name: &str) -> Option<&UserStats> {

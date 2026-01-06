@@ -420,7 +420,8 @@ where
         if self.plot_file_path.is_some() {
             self.write_plot_data(&plot_data)?;
         }
-
+        let filename = testcase.filename().clone();
+        let parent_idx = testcase.parent_id().map(|id| id.0);
         drop(testcase);
 
         // Send the stats as a list of UserStats
@@ -473,6 +474,31 @@ where
                 TAG_AFL_STATS_CYCLES_WO_FINDS,
             ),
         );
+        stats_map.insert(
+            Cow::Borrowed("current_testcase_idx"),
+            UserStats::new(
+                UserStatsValue::Number(corpus_idx.0 as u64),
+                AggregatorOps::None,
+            ),
+        );
+        if let Some(filename) = filename {
+            stats_map.insert(
+                Cow::Borrowed("current_testcase_filename"),
+                UserStats::new(
+                    UserStatsValue::String(Cow::Owned(filename.clone())),
+                    AggregatorOps::None,
+                ),
+            );
+        }
+        if let Some(parent_idx) = parent_idx {
+            stats_map.insert(
+                Cow::Borrowed("current_testcase_parent_idx"),
+                UserStats::new(
+                    UserStatsValue::Number(parent_idx as u64),
+                    AggregatorOps::None,
+                ),
+            );
+        }
 
         manager.fire(
             state,
