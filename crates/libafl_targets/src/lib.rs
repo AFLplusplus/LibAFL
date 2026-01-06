@@ -1,5 +1,8 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
 #![doc = include_str!("../README.md")]
+
+// Force a newline, otherwise the "feature flags" section doesn't format correctly in the docs
+#![doc = "\n"]
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]
 // For `std::simd`
