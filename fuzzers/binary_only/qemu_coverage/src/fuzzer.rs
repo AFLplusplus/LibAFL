@@ -179,15 +179,15 @@ pub fn fuzz() {
             .unwrap();
         log::info!("Placing input at {input_addr:#x}");
 
-        let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
+        let stack_ptr = qemu.read_reg(Regs::Sp).unwrap();
 
         let reset = |qemu: Qemu, buf: &[u8], len: GuestReg| -> Result<(), QemuRWError> {
             unsafe {
                 qemu.write_mem(input_addr, buf)?;
-                qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
+                qemu.write_reg(Regs::Pc, test_one_input_ptr as GuestReg)?;
                 qemu.write_reg(Regs::Sp, stack_ptr)?;
                 qemu.write_return_address(ret_addr)?;
-                qemu.write_function_argument(0, input_addr)?;
+                qemu.write_function_argument(0, input_addr as GuestReg)?;
                 qemu.write_function_argument(1, len)?;
 
                 match qemu.run() {

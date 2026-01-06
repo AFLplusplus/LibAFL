@@ -89,15 +89,16 @@ pub fn capstone() -> capstone::arch::arm64::ArchCapstoneBuilder {
 pub type GuestReg = u64;
 
 impl crate::ArchExtras for crate::CPU {
-    fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
-        self.read_reg(Regs::Lr)
+    fn read_return_address(&self) -> Result<GuestAddr, QemuRWError> {
+        self.read_reg(Regs::Lr).map(|res| res as GuestAddr)
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
-        T: Into<GuestReg>,
+        T: Into<GuestAddr>,
     {
-        self.write_reg(Regs::Lr, val)
+        let addr: GuestAddr = val.into();
+        self.write_reg(Regs::Lr, addr as GuestReg)
     }
 
     fn read_function_argument_with_cc(
@@ -118,7 +119,7 @@ impl crate::ArchExtras for crate::CPU {
             7 => self.read_reg(Regs::X7),
             _ => {
                 const SIZE: usize = size_of::<GuestReg>();
-                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)? as GuestAddr;
                 /*
                  * Stack is full and descending. SP points to return address, arguments
                  * are in reverse order above that. 8th argument is at SP + 8.
@@ -161,7 +162,7 @@ impl crate::ArchExtras for crate::CPU {
             7 => self.write_reg(Regs::X7, val),
             _ => {
                 let val: GuestReg = val.into();
-                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)? as GuestAddr;
                 /*
                  * Stack is full and descending. SP points to return address, arguments
                  * are in reverse order above that. 8th argument is at SP + 8.

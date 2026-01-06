@@ -7,7 +7,7 @@
 use core::{ffi::c_void, fmt::Debug, mem::transmute, ptr};
 
 use libafl::executors::hooks::inprocess::inprocess_get_state;
-use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize};
+use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUlong, GuestUsize};
 
 use crate::{
     HookData, HookId,
@@ -96,7 +96,7 @@ pub enum SyscallHookResult {
     /// If you need to change the return value of the syscall, please use a post-syscall hook.
     Run,
     /// Skip the syscall, and make the syscall return the value provided in the field in the target.
-    Skip(GuestAddr),
+    Skip(GuestUlong),
 }
 
 impl<F, C, R: Clone> Hook<F, C, R> {
@@ -467,14 +467,14 @@ create_hook_types!(
         &mut EmulatorModules<ET, I, S>,
         Option<&mut S>,
         sys_num: i32,
-        a0: GuestAddr,
-        a1: GuestAddr,
-        a2: GuestAddr,
-        a3: GuestAddr,
-        a4: GuestAddr,
-        a5: GuestAddr,
-        a6: GuestAddr,
-        a7: GuestAddr,
+        a0: GuestUlong,
+        a1: GuestUlong,
+        a2: GuestUlong,
+        a3: GuestUlong,
+        a4: GuestUlong,
+        a5: GuestUlong,
+        a6: GuestUlong,
+        a7: GuestUlong,
     ) -> SyscallHookResult,
     Box<
         dyn for<'a> FnMut(
@@ -482,27 +482,27 @@ create_hook_types!(
             &'a mut EmulatorModules<ET, I, S>,
             Option<&'a mut S>,
             i32,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
         ) -> SyscallHookResult,
     >,
     extern "C" fn(
         *const (),
         i32,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
     ) -> SyscallHookResult
 );
 #[cfg(feature = "usermode")]
@@ -512,14 +512,14 @@ create_wrapper!(
     pre_syscall,
     (
         sys_num: i32,
-        a0: GuestAddr,
-        a1: GuestAddr,
-        a2: GuestAddr,
-        a3: GuestAddr,
-        a4: GuestAddr,
-        a5: GuestAddr,
-        a6: GuestAddr,
-        a7: GuestAddr
+        a0: GuestUlong,
+        a1: GuestUlong,
+        a2: GuestUlong,
+        a3: GuestUlong,
+        a4: GuestUlong,
+        a5: GuestUlong,
+        a6: GuestUlong,
+        a7: GuestUlong
     ),
     SyscallHookResult
 );
@@ -532,47 +532,47 @@ create_hook_types!(
         Qemu,
         &mut EmulatorModules<ET, I, S>,
         Option<&mut S>,
-        res: GuestAddr,
+        res: GuestUlong,
         sys_num: i32,
-        a0: GuestAddr,
-        a1: GuestAddr,
-        a2: GuestAddr,
-        a3: GuestAddr,
-        a4: GuestAddr,
-        a5: GuestAddr,
-        a6: GuestAddr,
-        a7: GuestAddr,
-    ) -> GuestAddr,
+        a0: GuestUlong,
+        a1: GuestUlong,
+        a2: GuestUlong,
+        a3: GuestUlong,
+        a4: GuestUlong,
+        a5: GuestUlong,
+        a6: GuestUlong,
+        a7: GuestUlong,
+    ) -> GuestUlong,
     Box<
         dyn for<'a> FnMut(
             Qemu,
             &'a mut EmulatorModules<ET, I, S>,
             Option<&mut S>,
-            GuestAddr,
+            GuestUlong,
             i32,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-        ) -> GuestAddr,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+        ) -> GuestUlong,
     >,
     extern "C" fn(
         *const (),
-        GuestAddr,
+        GuestUlong,
         i32,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-        GuestAddr,
-    ) -> GuestAddr
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+        GuestUlong,
+    ) -> GuestUlong
 );
 #[cfg(feature = "usermode")]
 create_hook_id!(PostSyscall, libafl_qemu_remove_post_syscall_hook, false);
@@ -580,18 +580,18 @@ create_hook_id!(PostSyscall, libafl_qemu_remove_post_syscall_hook, false);
 create_wrapper!(
     post_syscall,
     (
-        res: GuestAddr,
+        res: GuestUlong,
         sys_num: i32,
-        a0: GuestAddr,
-        a1: GuestAddr,
-        a2: GuestAddr,
-        a3: GuestAddr,
-        a4: GuestAddr,
-        a5: GuestAddr,
-        a6: GuestAddr,
-        a7: GuestAddr
+        a0: GuestUlong,
+        a1: GuestUlong,
+        a2: GuestUlong,
+        a3: GuestUlong,
+        a4: GuestUlong,
+        a5: GuestUlong,
+        a6: GuestUlong,
+        a7: GuestUlong
     ),
-    GuestAddr
+    GuestUlong
 );
 
 // New thread hook wrappers
@@ -703,7 +703,7 @@ create_hook_types!(
 
 create_hook_id!(Block, libafl_qemu_remove_block_hook, true);
 create_gen_wrapper!(block, (addr: GuestAddr), u64, 1, BlockHookId);
-create_post_gen_wrapper!(block, (addr: GuestAddr, len: GuestUsize), 1, BlockHookId);
+create_post_gen_wrapper!(block, (addr: GuestAddr, len: GuestAddr), 1, BlockHookId);
 create_exec_wrapper!(block, (id: u64), 0, 1, BlockHookId);
 
 // Read hook wrappers
@@ -1068,14 +1068,14 @@ impl QemuHooks {
         &self,
         data: T,
         generator: Option<unsafe extern "C" fn(T, GuestAddr) -> u64>,
-        post_gen: Option<unsafe extern "C" fn(T, GuestAddr, GuestUsize)>,
+        post_gen: Option<unsafe extern "C" fn(T, GuestAddr, GuestAddr)>,
         exec: Option<unsafe extern "C" fn(T, u64)>,
     ) -> BlockHookId {
         unsafe {
             let data: u64 = data.into().0;
             let generator: Option<unsafe extern "C" fn(u64, GuestAddr) -> u64> =
                 transmute(generator);
-            let post_gen: Option<unsafe extern "C" fn(u64, GuestAddr, GuestUsize)> =
+            let post_gen: Option<unsafe extern "C" fn(u64, GuestAddr, GuestAddr)> =
                 transmute(post_gen);
             let exec: Option<unsafe extern "C" fn(u64, u64)> = transmute(exec);
             let num = libafl_qemu_sys::libafl_add_block_hook(generator, post_gen, exec, data);
@@ -1264,14 +1264,14 @@ impl QemuHooks {
         callback: extern "C" fn(
             T,
             i32,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
         ) -> SyscallHookResult,
     ) -> PreSyscallHookId {
         unsafe {
@@ -1279,14 +1279,14 @@ impl QemuHooks {
             let callback: extern "C" fn(
                 u64,
                 i32,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
             ) -> libafl_qemu_sys::libafl_syshook_ret = transmute(callback);
             let num = libafl_qemu_sys::libafl_add_pre_syscall_hook(Some(callback), data);
             PreSyscallHookId(num)
@@ -1298,33 +1298,33 @@ impl QemuHooks {
         data: T,
         callback: extern "C" fn(
             T,
-            GuestAddr,
+            GuestUlong,
             i32,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-            GuestAddr,
-        ) -> GuestAddr,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+        ) -> GuestUlong,
     ) -> PostSyscallHookId {
         unsafe {
             let data: u64 = data.into().0;
             let callback: extern "C" fn(
                 u64,
-                GuestAddr,
+                GuestUlong,
                 i32,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-            ) -> GuestAddr = transmute(callback);
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+            ) -> GuestUlong = transmute(callback);
             let num = libafl_qemu_sys::libafl_add_post_syscall_hook(Some(callback), data);
             PostSyscallHookId(num)
         }

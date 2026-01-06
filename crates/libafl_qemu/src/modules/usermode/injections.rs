@@ -15,7 +15,7 @@ use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path};
 
 use hashbrown::HashMap;
 use libafl::Error;
-use libafl_qemu_sys::GuestAddr;
+use libafl_qemu_sys::{GuestAddr, GuestUlong};
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(cpu_target = "hexagon"))]
@@ -228,7 +228,7 @@ impl InjectionModule {
             .current_cpu()
             .unwrap()
             .read_function_argument_with_cc(parameter, CallingConvention::Default)
-            .unwrap_or_default();
+            .unwrap_or_default() as GuestAddr;
 
         let module = emulator_modules.get_mut::<Self>().unwrap();
         let matches = &module.matches_list[id];
@@ -366,14 +366,14 @@ fn syscall_hook<ET, I, S>(
     // Syscall number
     syscall: i32,
     // Registers
-    x0: GuestAddr,
-    x1: GuestAddr,
-    _x2: GuestAddr,
-    _x3: GuestAddr,
-    _x4: GuestAddr,
-    _x5: GuestAddr,
-    _x6: GuestAddr,
-    _x7: GuestAddr,
+    x0: GuestUlong,
+    x1: GuestUlong,
+    _x2: GuestUlong,
+    _x3: GuestUlong,
+    _x4: GuestUlong,
+    _x5: GuestUlong,
+    _x6: GuestUlong,
+    _x7: GuestUlong,
 ) -> SyscallHookResult
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -398,25 +398,25 @@ where
             //println!("CMD {}", cmd);
 
             let first_parameter = unsafe {
-                if (*c_array.offset(1)).is_null() {
+                if (*c_array.add(1)).is_null() {
                     return SyscallHookResult::Run;
                 }
-                CStr::from_ptr(*c_array.offset(1)).to_string_lossy()
+                CStr::from_ptr(*c_array.add(1)).to_string_lossy()
             };
             let second_parameter = unsafe {
-                if (*c_array.offset(2)).is_null() {
+                if (*c_array.add(2)).is_null() {
                     return SyscallHookResult::Run;
                 }
-                CStr::from_ptr(*c_array.offset(2)).to_string_lossy()
+                CStr::from_ptr(*c_array.add(2)).to_string_lossy()
             };
 
             if first_parameter == "-c" {
                 let to_check = if second_parameter == "--" {
                     unsafe {
-                        if (*c_array.offset(3)).is_null() {
+                        if (*c_array.add(3)).is_null() {
                             return SyscallHookResult::Run;
                         }
-                        CStr::from_ptr(*c_array.offset(3)).to_string_lossy()
+                        CStr::from_ptr(*c_array.add(3)).to_string_lossy()
                     }
                 } else {
                     second_parameter

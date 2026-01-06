@@ -3,7 +3,7 @@
 use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
 
 use libafl::{executors::ExitKind, observers::ObserversTuple};
-use libafl_qemu_sys::{CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
+use libafl_qemu_sys::{CPUStatePtr, FatPtr, GuestAddr, TCGTemp};
 
 #[cfg(feature = "usermode")]
 use crate::qemu::{
@@ -336,7 +336,7 @@ where
                 unsafe extern "C" fn(
                     &mut TcgHookState<1, BlockHookId>,
                     pc: GuestAddr,
-                    block_length: GuestUsize,
+                    block_length: GuestAddr,
                 )
             );
 

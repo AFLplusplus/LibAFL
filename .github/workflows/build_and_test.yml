@@ -475,7 +475,7 @@ jobs:
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
-          # We will have each of these fuzzers have it's own cache since these
+          # We will have each of these fuzzers have its own cache since these
           # are some of the heaviest fuzzers to build.
           shared-key: qemu-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
           # We want to include the commit hash to ensure the cache is replaced
@@ -530,7 +530,7 @@ jobs:
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
-          # We will have each of these fuzzers have it's own cache since these
+          # We will have each of these fuzzers have its own cache since these
           # are some of the heaviest fuzzers to build.
           shared-key: qemu-${{ steps.fuzzer_name.outputs.fuzzer_name }}-arm
           # We want to include the commit hash to ensure the cache is replaced
@@ -622,6 +622,62 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: just -d utils/${{ matrix.util }} --justfile utils/${{ matrix.util }}/Justfile test
+
+  libafl_qemu-full:
+    if: contains(github.event.pull_request.labels.*.name, 'qemu-full')
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        mode:
+          - usermode
+          - systemmode
+        arch:
+          - aarch64
+          - arm
+          - i386
+          - mips
+          - ppc
+          - riscv32
+          - riscv64
+          - x86_64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare
+        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+      # ---- build normal and examples ----
+      - name: Build LibAFL QEMU (${{ matrix.mode }} - ${{ matrix.arch }})
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
+        run: cargo build --verbose --package libafl_qemu --no-default-features --features ${{ matrix.mode }},${{ matrix.arch }}
+      - name: Test LibAFL QEMU (${{ matrix.mode }} - ${{ matrix.arch }})
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
+        run: cargo test --package libafl_qemu --no-default-features --features ${{ matrix.mode }},${{ matrix.arch }}
+
+  # hexagon systemmode is not available yet in qemu upstream.
+  # in the meantime, we only test usermode
+  libafl_qemu-hexagon:
+    if: contains(github.event.pull_request.labels.*.name, 'qemu-full')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare
+        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+      # ---- build normal and examples ----
+      - name: Build LibAFL QEMU (usermode - hexagon)
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
+        run: cargo build --verbose --package libafl_qemu --no-default-features --features usermode,hexagon
+      - name: Test LibAFL QEMU (usermode - hexagon)
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
+        run: cargo test --package libafl_qemu --no-default-features --features usermode,hexagon
 
   libafl_asan:
     name: 🔧 libafl_asan

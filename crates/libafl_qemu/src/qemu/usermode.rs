@@ -9,7 +9,7 @@ use libafl_bolts::{Error, os::unix_signals::Signal};
 #[cfg(not(feature = "systemmode"))]
 use libafl_qemu_sys::libafl_qemu_run;
 use libafl_qemu_sys::{
-    GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
+    GuestAbiUlong, GuestAddr, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
     libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_set_brk,
     mmap_next_start, pageflags_get_root, read_self_maps,
@@ -18,8 +18,8 @@ use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
 use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 
-#[cfg(doc)]
-use crate::modules::snapshot::SnapshotModule;
+#[cfg(all(doc, not(feature = "hexagon")))]
+use crate::modules::SnapshotModule;
 use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
 
 /// Choose how QEMU target signals should be handled.
@@ -108,12 +108,12 @@ pub struct GuestMaps {
 
 /// Information about the image loaded by QEMU.
 pub struct ImageInfo {
-    pub code: Range<GuestAddr>,
-    pub data: Range<GuestAddr>,
-    pub stack: Range<GuestAddr>,
-    pub vdso: GuestAddr,
-    pub entry: GuestAddr,
-    pub brk: GuestAddr,
+    pub code: Range<GuestAbiUlong>,
+    pub data: Range<GuestAbiUlong>,
+    pub stack: Range<GuestAbiUlong>,
+    pub vdso: GuestAbiUlong,
+    pub entry: GuestAbiUlong,
+    pub brk: GuestAbiUlong,
     pub exec_stack: bool,
 }
 
@@ -211,6 +211,7 @@ impl CPU {
     }
 
     #[must_use]
+    #[allow(clippy::unnecessary_cast)]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
         unsafe { (addr as usize + guest_base) as *mut T }
     }
@@ -263,6 +264,7 @@ impl Qemu {
     }
 
     #[must_use]
+    #[allow(clippy::unnecessary_cast)]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
         unsafe { (addr as usize + guest_base) as *mut T }
     }
@@ -324,16 +326,16 @@ impl Qemu {
     }
 
     pub fn set_brk(&self, brk: GuestAddr) {
-        unsafe { libafl_set_brk(brk.into()) };
+        unsafe { libafl_set_brk(brk as GuestAbiUlong) };
     }
 
     #[must_use]
     pub fn get_mmap_start(&self) -> GuestAddr {
-        unsafe { mmap_next_start }
+        unsafe { mmap_next_start as GuestAddr }
     }
 
     pub fn set_mmap_start(&self, start: GuestAddr) {
-        unsafe { mmap_next_start = start };
+        unsafe { mmap_next_start = start as GuestAbiUlong };
     }
 
     #[expect(clippy::cast_sign_loss)]
@@ -346,7 +348,14 @@ impl Qemu {
         fd: i32,
     ) -> Result<GuestAddr, Error> {
         let res = unsafe {
-            libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, fd, 0)
+            libafl_qemu_sys::target_mmap(
+                addr as GuestAbiUlong,
+                size as GuestAbiUlong,
+                perms.into(),
+                flags,
+                fd,
+                0,
+            )
         };
         if res <= 0 {
             let errno = std::io::Error::last_os_error().raw_os_error();
@@ -389,8 +398,13 @@ impl Qemu {
     }
 
     pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
-        let res =
-            unsafe { libafl_qemu_sys::target_mprotect(addr, size as GuestUsize, perms.into()) };
+        let res = unsafe {
+            libafl_qemu_sys::target_mprotect(
+                addr as GuestAbiUlong,
+                size as GuestAbiUlong,
+                perms.into(),
+            )
+        };
         if res == 0 {
             Ok(())
         } else {
@@ -399,7 +413,9 @@ impl Qemu {
     }
 
     pub fn unmap(&self, addr: GuestAddr, size: usize) -> Result<(), String> {
-        if unsafe { libafl_qemu_sys::target_munmap(addr, size as GuestUsize) } == 0 {
+        if unsafe { libafl_qemu_sys::target_munmap(addr as GuestAbiUlong, size as GuestAbiUlong) }
+            == 0
+        {
             Ok(())
         } else {
             Err(format!("Failed to unmap {addr}"))
@@ -479,7 +495,7 @@ impl Qemu {
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use libafl_qemu_sys::{GuestAddr, MmapPerms};
+    use libafl_qemu_sys::{GuestAddr, GuestUlong, MmapPerms};
     use pyo3::{
         Bound, FromPyObject, Py, PyAny, PyResult, Python,
         exceptions::PyValueError,
@@ -496,20 +512,20 @@ pub mod pybind {
     pub struct SyscallHookResult {
         /// if None: run.
         /// else: skip with given value.
-        skip: Option<GuestAddr>,
+        skip: Option<GuestUlong>,
     }
 
     extern "C" fn py_syscall_hook_wrapper(
         _data: u64,
         sys_num: i32,
-        a0: GuestAddr,
-        a1: GuestAddr,
-        a2: GuestAddr,
-        a3: GuestAddr,
-        a4: GuestAddr,
-        a5: GuestAddr,
-        a6: GuestAddr,
-        a7: GuestAddr,
+        a0: GuestUlong,
+        a1: GuestUlong,
+        a2: GuestUlong,
+        a3: GuestUlong,
+        a4: GuestUlong,
+        a5: GuestUlong,
+        a6: GuestUlong,
+        a7: GuestUlong,
     ) -> hooks::SyscallHookResult {
         unsafe { (&raw const PY_SYSCALL_HOOK).read() }.map_or_else(
             || hooks::SyscallHookResult::Run,

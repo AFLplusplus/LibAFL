@@ -52,7 +52,6 @@ const WRAPPER_HEADER: &str = r#"
 #include "migration/vmstate.h"
 #include "migration/savevm.h"
 #include "hw/core/sysemu-cpu-ops.h"
-#include "exec/address-spaces.h"
 #include "exec/target_page.h"
 #include "system/system.h"
 
@@ -65,7 +64,6 @@ const WRAPPER_HEADER: &str = r#"
 
 #include "exec/cpu-common.h"
 #include "exec/cpu-all.h"
-#include "exec/exec-all.h"
 #include "exec/log.h"
 #include "trace/trace-root.h"
 #include "qemu/accel.h"
@@ -155,7 +153,8 @@ pub fn generate(
         .allowlist_function("target_munmap")
         .allowlist_function("page_check_range")
         .allowlist_function("cpu_memory_rw_debug")
-        .allowlist_function("cpu_physical_memory_rw")
+        .allowlist_function("cpu_physical_memory_read")
+        .allowlist_function("cpu_physical_memory_write")
         .allowlist_function("cpu_reset")
         .allowlist_function("cpu_synchronize_state")
         .allowlist_function("cpu_get_phys_page_attrs_debug")
