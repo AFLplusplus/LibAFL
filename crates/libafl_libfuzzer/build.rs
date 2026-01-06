@@ -6,7 +6,6 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-use which;
 
 #[cfg(feature = "rabbit")]
 const NAMESPACE: &str = "🐇";
@@ -187,15 +186,15 @@ fn rename_symbols(custom_lib_target: &Path) -> PathBuf {
     let nm = target_libdir.join("../bin/llvm-nm");
 
     let nm = if nm.exists() {
-        nm
+        nm.to_str().unwrap().to_string()
     } else {
-        which::which("llvm-nm").expect("Could not find llvm-nm")
+        libafl_build::find_llvm_tool("llvm-nm").expect("Could not find llvm-nm")
     };
 
     let rust_objcopy = if rust_objcopy.exists() {
-        rust_objcopy
+        rust_objcopy.to_str().unwrap().to_string()
     } else {
-        which::which("llvm-objcopy").expect("Could not find llvm-objcopy")
+        libafl_build::find_llvm_tool("llvm-objcopy").expect("Could not find llvm-objcopy")
     };
 
     let redefined_archive_path = custom_lib_target.join("libFuzzer.a");

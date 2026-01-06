@@ -214,7 +214,7 @@ pub fn fuzz() -> Result<(), Error> {
             let mut buf = target.as_slice();
             let mut len = buf.len();
             if len > MAX_INPUT_SIZE {
-                buf = &buf[0..MAX_INPUT_SIZE];
+                buf = &buf[0..MAX_INPUT_SIZE]
                 len = MAX_INPUT_SIZE;
             }
             let len = len as GuestReg;

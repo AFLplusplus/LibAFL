@@ -26,6 +26,7 @@ cc = "1.2.51"
 rustversion = "1.0.22"
 toml = { version = "0.9.10", features = ["preserve_order"] }
 which = "6.0.3"
+libafl_build = { workspace = true }
 
 [features]
 default = ["fork"]

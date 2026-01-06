@@ -9,6 +9,7 @@ members = [
   "crates/libafl_asan/libafl_asan_fuzz",
   "crates/libafl_asan/libafl_asan_libc",
   "crates/libafl_bolts",
+  "crates/libafl_build",
   "crates/libafl_cc",
   "crates/libafl_concolic/symcc_libafl",
   "crates/libafl_concolic/symcc_runtime",
@@ -83,6 +84,7 @@ exceptional = { path = "./crates/exceptional", version = "0.16.0", default-featu
 fast_rands = { path = "./crates/fast_rands", version = "0.16.0", default-features = false }
 libafl = { path = "./crates/libafl", version = "0.16.0", default-features = false }
 libafl_bolts = { path = "./crates/libafl_bolts", version = "0.16.0", default-features = false }
+libafl_build = { path = "./crates/libafl_build", version = "0.16.0", default-features = false }
 libafl_cc = { path = "./crates/libafl_cc", version = "0.16.0", default-features = false }
 libafl_core = { path = "./crates/libafl_core", version = "0.16.0", default-features = false }
 libafl_derive = { path = "./crates/libafl_derive", version = "0.16.0", default-features = false }

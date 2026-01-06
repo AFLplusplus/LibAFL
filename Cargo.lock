@@ -3325,11 +3325,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "libafl_build"
+version = "0.16.0"
+dependencies = [
+ "which 8.0.0",
+]
+
+[[package]]
 name = "libafl_cc"
 version = "0.16.0"
 dependencies = [
  "cc",
  "glob",
+ "libafl_build",
  "serde",
  "which 8.0.0",
 ]
@@ -3429,6 +3437,7 @@ version = "0.16.0"
 dependencies = [
  "cc",
  "document-features",
+ "libafl_build",
  "libfuzzer-sys",
  "rustversion",
  "toml 0.9.10+spec-1.1.0",
@@ -3498,6 +3507,7 @@ dependencies = [
  "bindgen 0.72.1",
  "cc",
  "json",
+ "libafl_build",
  "rustc_version 0.4.1",
  "rustversion",
  "shell-words",
