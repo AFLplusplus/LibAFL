@@ -34,6 +34,7 @@ members = [
   "crates/ll_mp",
   "crates/minibsod",
   "crates/no_std_time",
+  "crates/nonzero_macros",
   "crates/ownedref",
   "crates/serde_anymap",
   "crates/shmem_providers",
@@ -101,6 +102,7 @@ libafl_tinyinst = { path = "./crates/libafl_tinyinst", version = "0.16.0", defau
 ll_mp = { path = "./crates/ll_mp", version = "0.16.0", default-features = false }
 minibsod = { path = "./crates/minibsod", version = "0.16.0", default-features = false }
 no_std_time = { path = "./crates/no_std_time", version = "0.16.0", default-features = false }
+nonzero_macros = { path = "./crates/nonzero_macros", version = "0.16.0", default-features = false }
 ownedref = { path = "./crates/ownedref", version = "0.16.0", default-features = false }
 serde_anymap = { path = "./crates/serde_anymap", version = "0.16.0", default-features = false }
 shmem_providers = { path = "./crates/shmem_providers", version = "0.16.0", default-features = false }

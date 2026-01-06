@@ -89,7 +89,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Build Docs
-        run: just doc
+        run: just doc-all
 
   ubuntu-doc-test:
     runs-on: ubuntu-24.04

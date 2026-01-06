@@ -50,12 +50,6 @@ clippy-thumbv6m-none-eabi:
     cd {{LIBAFL_DIR}} && cargo clippy --target thumbv6m-none-eabi --no-default-features
     cd {{LIBAFL_BOLTS_DIR}} && cargo clippy --target thumbv6m-none-eabi --no-default-features
 
-# Builds the docs
-# Builds the docs
-doc feature='':
-    cargo {{MSRV}} test --workspace --locked --doc --exclude libafl_qemu --exclude libafl_qemu_sys --exclude libafl_qemu_build --exclude libafl_qemu_runner --exclude libvharness_sys --exclude libafl_sugar --exclude libafl_asan_libc {{feature}} -- --test-threads 1
-    RUSTFLAGS="--cfg docsrs" cargo +nightly doc --workspace --all-features --no-deps --exclude libafl_qemu --exclude libafl_qemu_sys --exclude libafl_qemu_build --exclude libafl_qemu_runner --exclude libvharness_sys --exclude libafl_sugar
-    RUSTFLAGS="--cfg docsrs" cargo +nightly doc -p libafl_qemu --features "document-features default python x86_64 usermode" --no-deps
 
 # Tests the code using miri
 test-miri:
@@ -332,3 +326,105 @@ increase-mem-limits:
 [linux]
 concolic-smoke-test:
     {{ROOT_DIR}}/libafl_concolic/test/smoke_test.sh
+
+mod libafl_bolts 'crates/libafl_bolts/Justfile'
+mod libafl 'crates/libafl/Justfile'
+mod libafl_targets 'crates/libafl_targets/Justfile'
+mod libafl_cc 'crates/libafl_cc/Justfile'
+mod libafl_derive 'crates/libafl_derive/Justfile'
+mod libafl_nyx 'crates/libafl_nyx/Justfile'
+mod build_id2 'crates/build_id2/Justfile'
+mod core_affinity2 'crates/core_affinity2/Justfile'
+mod exceptional 'crates/exceptional/Justfile'
+mod fast_rands 'crates/fast_rands/Justfile'
+mod libafl_core 'crates/libafl_core/Justfile'
+mod libafl_intelpt 'crates/libafl_intelpt/Justfile'
+mod libafl_sugar 'crates/libafl_sugar/Justfile'
+mod libafl_tinyinst 'crates/libafl_tinyinst/Justfile'
+mod libafl_unicorn 'crates/libafl_unicorn/Justfile'
+mod ll_mp 'crates/ll_mp/Justfile'
+mod minibsod 'crates/minibsod/Justfile'
+mod no_std_time 'crates/no_std_time/Justfile'
+mod ownedref 'crates/ownedref/Justfile'
+mod serde_anymap 'crates/serde_anymap/Justfile'
+mod shmem_providers 'crates/shmem_providers/Justfile'
+mod tuple_list_ex 'crates/tuple_list_ex/Justfile'
+mod libafl_libfuzzer 'crates/libafl_libfuzzer/Justfile'
+mod libafl_concolic_symcc_runtime 'crates/libafl_concolic/symcc_runtime/Justfile'
+mod libafl_concolic_dump_constraints 'crates/libafl_concolic/test/dump_constraints/Justfile'
+mod libafl_concolic_runtime_test 'crates/libafl_concolic/test/runtime_test/Justfile'
+mod libafl_concolic_symcc_libafl 'crates/libafl_concolic/symcc_libafl/Justfile'
+mod libafl_asan 'crates/libafl_asan/Justfile'
+mod libafl_asan_fuzz 'crates/libafl_asan/libafl_asan_fuzz/Justfile'
+mod libafl_asan_libc 'crates/libafl_asan/libafl_asan_libc/Justfile'
+mod libafl_qemu_runner 'crates/libafl_qemu/libafl_qemu_runner/Justfile'
+mod libafl_qemu_build 'crates/libafl_qemu/libafl_qemu_build/Justfile'
+mod libafl_qemu_sys 'crates/libafl_qemu/libafl_qemu_sys/Justfile'
+mod libvharness_sys 'crates/libafl_qemu/libvharness_sys/Justfile'
+mod libafl_qemu 'crates/libafl_qemu/Justfile'
+mod libafl_frida 'crates/libafl_frida/Justfile'
+
+mod build_and_test_fuzzers 'utils/build_and_test_fuzzers/Justfile'
+mod ci_runner 'utils/ci_runner/Justfile'
+mod ci_splitter 'utils/ci_splitter/Justfile'
+mod deexit 'utils/deexit/Justfile'
+mod drcov_utils 'utils/drcov_utils/Justfile'
+mod gramatron_construct_automata 'utils/gramatron/construct_automata/Justfile'
+mod libafl_benches 'utils/libafl_benches/Justfile'
+mod libafl_jumper 'utils/libafl_jumper/Justfile'
+
+doc-crates:
+  just libafl_bolts doc
+  just libafl doc
+  just libafl_targets doc
+  just libafl_cc doc
+  just libafl_derive doc
+  just libafl_nyx doc
+  just build_id2 doc
+  just core_affinity2 doc
+  just exceptional doc
+  just fast_rands doc
+  just libafl_core doc
+  just libafl_intelpt doc
+  just libafl_sugar doc
+  just libafl_tinyinst doc
+  just libafl_unicorn doc
+  just ll_mp doc
+  just minibsod doc
+  just no_std_time doc
+  just ownedref doc
+  just serde_anymap doc
+  just shmem_providers doc
+  just tuple_list_ex doc
+  just libafl_libfuzzer doc
+  just libafl_asan doc
+  just libafl_asan_fuzz doc_fuzz
+  just libafl_asan_libc doc_libc
+  just libafl_qemu_runner doc
+  just libafl_qemu_build doc
+  just libafl_qemu_sys doc
+  just libvharness_sys doc
+  just libafl_qemu doc
+  just libafl_concolic_symcc_runtime doc
+  just libafl_concolic_dump_constraints doc
+  just libafl_concolic_runtime_test doc
+  just libafl_concolic_symcc_libafl doc
+  just libafl_frida doc
+
+doc-utils:
+  just build_and_test_fuzzers doc
+  just ci_runner doc
+  just ci_splitter doc
+  just deexit doc
+  just drcov_utils doc
+  just gramatron_construct_automata doc
+  just libafl_benches doc
+  just libafl_jumper doc
+
+doc-all: doc-crates doc-utils
+
+repro:
+    cd fuzzers/binary_only/qemu_tmin && ./repro
+
+test_repro:
+    cd fuzzers/binary_only/qemu_tmin && ./repro

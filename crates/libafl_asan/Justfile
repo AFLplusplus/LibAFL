@@ -63,7 +63,7 @@ clippy:
 
 doc:
   #!/bin/sh
-  cargo doc
+  cargo doc --no-deps --all-features
 
 all: fix pretty build test clippy doc
 

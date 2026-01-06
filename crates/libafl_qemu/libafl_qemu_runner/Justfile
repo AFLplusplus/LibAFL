@@ -1,6 +1,9 @@
 import "../../../just/libafl-qemu.just"
 import "../../libafl_asan/fuzzer_name.just"
 
+doc:
+  DOCS_RS=1 cargo doc --no-deps --features x86_64
+
 [unix]
 build:
   #!/bin/sh
