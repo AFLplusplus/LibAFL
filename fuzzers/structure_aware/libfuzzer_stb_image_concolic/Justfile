@@ -57,7 +57,7 @@ test-concolic: build-fuzzer
     @# Ensure LD_LIBRARY_PATH includes runtime for libSymRuntime.so
     export LD_LIBRARY_PATH=$(pwd)/runtime:$LD_LIBRARY_PATH
     @# Build with no-restart feature for testing stability
-    @cargo build --manifest-path fuzzer/Cargo.toml
+    @cargo build --manifest-path fuzzer/Cargo.toml --no-default-features --features std
     @# 30 seconds should be enough to find something
     timeout -s SIGINT 30s ./fuzzer/target/debug/libfuzzer_stb_image_concolic --concolic > concolic_test.log 2>&1 || true
     @# Check if we found any new paths (corpus > 1)

@@ -94,7 +94,7 @@ doc:
 # Runs clippy on all crates
 [private]
 clippy-inner feature='':
-    cargo {{ MSRV }} clippy --workspace --locked --all-targets --exclude libafl_asan_libc {{ feature }} -- -D warnings
+    cargo {{ MSRV }} clippy --workspace --all-targets --exclude libafl_asan_libc {{ feature }} -- -D warnings
 
 # Run clippy on all targets and all sources
 [linux]
