@@ -32,7 +32,9 @@ build feature='' ignore='':
 
 # Run tests on all projects in the workspace
 test feature='' ignore='':
-    cargo {{MSRV}} test --workspace --locked --all-targets --exclude libafl_asan_libc {{feature}}
+    cargo {{MSRV}} test --workspace --locked --all-targets --exclude libafl_asan_libc --exclude libafl_asan {{feature}}
+    # Run libafl_asan tests serially to avoid address conflicts
+    RUST_TEST_THREADS=1 cargo {{MSRV}} test -p libafl_asan -j 1 {{feature}}
 
 # Runs tests without default features (for no_std)
 test-no-std:
