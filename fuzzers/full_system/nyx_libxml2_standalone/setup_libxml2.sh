@@ -48,7 +48,22 @@ if [ ! -d "$PACKER_DIR" ]; then
     PACKER_DIR="$SCRIPT_DIR/target/debug/packer/packer"
 fi
 
+if [ ! -f "$PACKER_DIR/nyx_packer.py" ]; then
+    echo "nyx_packer.py not found in $PACKER_DIR or source."
+    echo "Cloning nyx-fuzz/packer to use packer..."
+    # Clone into a temporary directory or local directory
+    if [ ! -d "packer" ]; then
+        git clone https://github.com/nyx-fuzz/packer
+    fi
+    PACKER_DIR="$(pwd)/packer/packer"
+fi
+
 echo "PACKER_DIR: $PACKER_DIR"
+
+if [ ! -f "$PACKER_DIR/nyx_packer.py" ]; then
+    echo "ERROR: nyx_packer.py still not found at $PACKER_DIR/nyx_packer.py"
+    exit 1
+fi
 
 python3 "$PACKER_DIR/nyx_packer.py" \
     ./libxml2/xmllint \
@@ -60,4 +75,5 @@ python3 "$PACKER_DIR/nyx_packer.py" \
     --fast_reload_mode \
     --purge || exit
 
+# Config gen is also in packer dir
 python3 "$PACKER_DIR/nyx_config_gen.py" /tmp/nyx_libxml2/ Kernel || exit

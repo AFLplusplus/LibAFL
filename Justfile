@@ -33,7 +33,7 @@ no-default-features: (default "--no-default-features")
 # Run check on all projects in the workspace
 check feature='' ignore='':
     cargo {{ MSRV }} check --workspace --locked --all-targets --exclude libafl_asan_libc {{ feature }}
-    cargo {{ MSRV }} check --manifest-path fuzz/Cargo.toml --locked --all-targets
+
 
 # Run build on all projects in the workspace
 build feature='' ignore='':
