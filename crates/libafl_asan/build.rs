@@ -230,7 +230,18 @@ fn get_host_vma() -> Vma {
 
 fn guess_vma(arch: &Arch) -> Option<Vma> {
     match arch {
-        Arch::AArch64 => Some(get_host_vma()),
+        Arch::AArch64 => {
+            let host = env::var_os("HOST").unwrap();
+            let target = env::var_os("TARGET").unwrap();
+
+            if host == target {
+                Some(get_host_vma())
+            } else {
+                let default_vma = Vma::Vma48;
+                println!("cargo:warning=Host and target triplets do not match. Using default VMA: {default_vma:?}");
+                Some(default_vma)
+            }
+        },
         _ => None,
     }
 }
@@ -269,7 +280,7 @@ fn main() {
     println!("cargo:rerun-if-changed=cc/src/log.c");
     println!("cargo:rerun-if-changed=cc/src/vasprintf.c");
 
-    if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() != "windows" {
+    if env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() != "windows" {
         cc::Build::new()
             .define("_GNU_SOURCE", None)
             .opt_level(3)
