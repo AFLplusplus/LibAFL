@@ -131,10 +131,6 @@ fn main() {
     println!("cargo:rerun-if-changed=src/common-llvm.h");
     println!("cargo:rerun-if-changed=build.rs");
 
-    let llvm_bindir = libafl_build::llvm_bindir().expect("Could not find LLVM bindir");
-    let llvm_ar_path = env::var("LLVM_AR_PATH");
-    let llvm_cxxflags = libafl_build::llvm_cxxflags().expect("Could not find LLVM cxxflags");
-    let llvm_ldflags = libafl_build::llvm_ldflags().expect("Could not find LLVM ldflags");
     let llvm_version = env::var("LLVM_VERSION");
 
     // test if llvm-config is available and we can compile the passes
@@ -165,6 +161,11 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
 
         return;
     }
+
+    let llvm_bindir = libafl_build::llvm_bindir().expect("Could not find LLVM bindir");
+    let llvm_ar_path = env::var("LLVM_AR_PATH");
+    let llvm_cxxflags = libafl_build::llvm_cxxflags().expect("Could not find LLVM cxxflags");
+    let llvm_ldflags = libafl_build::llvm_ldflags().expect("Could not find LLVM ldflags");
 
     let bindir_path = Path::new(&llvm_bindir);
     let llvm_ar_path = if let Ok(ar_path) = llvm_ar_path {
