@@ -240,7 +240,7 @@ fn get_layout() -> TargetShadowLayout {
     let vma = guess_vma(&arch);
     let os = target_os();
 
-    println!("cargo:warning=Host: {arch} - VMA {vma:?} - {os}.");
+    println!("cargo:warning=Generating layout for environment: {arch} - VMA {vma:?} - {os}.");
 
     if let Some(specific_layout) = SPECIFIC_LAYOUTS.get(&(arch.clone(), vma, os.clone())) {
         specific_layout.clone()
