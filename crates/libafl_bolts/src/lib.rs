@@ -633,32 +633,9 @@ pub fn has_tls() -> bool {
     true
 }
 
-/// Zero-cost way to construct [`core::num::NonZeroUsize`] at compile-time.
-#[macro_export]
-macro_rules! nonzero {
-    // TODO: Further simplify with `unwrap`/`expect` once MSRV includes
-    // https://github.com/rust-lang/rust/issues/67441
-    ($val:expr) => {
-        const {
-            match core::num::NonZero::new($val) {
-                Some(x) => x,
-                None => panic!("Value passed to `nonzero!` was zero"),
-            }
-        }
-    };
-}
-
-/// Get a [`core::ptr::NonNull`] to a global static mut (or similar).
-///
-/// The same as [`core::ptr::addr_of_mut`] or `&raw mut`, but wrapped in said [`NonNull`](core::ptr::NonNull).
-#[macro_export]
-macro_rules! nonnull_raw_mut {
-    ($val:expr) => {
-        // # Safety
-        // The pointer to a value will never be null (unless we're on an archaic OS in a CTF challenge).
-        unsafe { core::ptr::NonNull::new(&raw mut $val).unwrap_unchecked() }
-    };
-}
+pub use nonzero_macros;
+#[doc(inline)]
+pub use nonzero_macros::{nonnull_raw_mut, nonzero, try_nonzero};
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)] // expect somehow breaks here

@@ -3293,6 +3293,7 @@ dependencies = [
  "miniz_oxide",
  "nix 0.30.1",
  "no_std_time",
+ "nonzero_macros",
  "num_enum",
  "ownedref",
  "postcard",
@@ -3332,6 +3333,7 @@ dependencies = [
  "backtrace",
  "document-features",
  "nix 0.30.1",
+ "nonzero_macros",
  "postcard",
  "pyo3",
  "rustversion",
@@ -4148,6 +4150,13 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "nonzero_macros"
+version = "0.16.0"
+dependencies = [
+ "document-features",
 ]
 
 [[package]]

@@ -176,7 +176,7 @@ where
                 // -> the subtraction result is greater than 0.
                 // other_size is checked above to be larger than zero.
                 let range = rand_range(state, other_size, unsafe {
-                    NonZero::new(min(other_size, size - target)).unwrap_unchecked()
+                    NonZero::new_unchecked(min(other_size, size - target))
                 });
 
                 let [part, chosen] = match part_idx.cmp(&choice) {
