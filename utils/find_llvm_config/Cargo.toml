@@ -1,5 +1,5 @@
 [package]
-name = "get_llvm_config"
+name = "find_llvm_config"
 version = "0.1.0"
 edition = "2021"
 description = "A standalone binary to find the llvm-config path"

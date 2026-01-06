@@ -1,4 +1,4 @@
-# get_llvm_config
+# find_llvm_config
 
 A standalone binary to find the `llvm-config` path.
 

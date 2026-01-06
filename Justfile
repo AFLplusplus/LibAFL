@@ -82,8 +82,7 @@ test-docs: test-docs-internal
 
 # Build documentation
 doc:
-    RUSTDOCFLAGS="-Dwarnings" cargo {{MSRV}} doc --workspace --locked --all-features --no-deps --document-private-items --exclude libafl_qemu
-    RUSTDOCFLAGS="-Dwarnings" cargo {{MSRV}} doc -p libafl_qemu --locked --no-default-features --features usermode,python --no-deps --document-private-items
+    ./scripts/doc_all.py
 
 # Runs clippy on all crates
 [private]
@@ -336,20 +335,18 @@ concolic-smoke-test:
     {{ROOT_DIR}}/libafl_concolic/test/smoke_test.sh
 
 
-doc-all: doc
-
 [unix]
 test-repro-qemu-tmin:
     cd {{FUZZERS_DIR}}/binary_only/qemu_tmin && ./repro
 
 # Tests everything (crates, fuzzers, docs, repro)
 [linux]
-test-all: test test-fuzzers test-docs test-repro-qemu-tmin concolic-smoke-test doc-all
+test-all: test test-fuzzers test-docs test-repro-qemu-tmin concolic-smoke-test doc
 
 # Tests everything (crates, fuzzers, docs, repro)
 [macos]
-test-all: test test-fuzzers test-docs test-repro-qemu-tmin doc-all
+test-all: test test-fuzzers test-docs test-repro-qemu-tmin doc
 
 # Tests everything (crates, fuzzers, docs)
 [windows]
-test-all: test test-fuzzers test-docs doc-all
+test-all: test test-fuzzers test-docs doc
