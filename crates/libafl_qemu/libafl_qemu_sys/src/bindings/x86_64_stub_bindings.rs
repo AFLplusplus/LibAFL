@@ -9592,11 +9592,11 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
-    pub fn libafl_qemu_read_reg(
-        cpu: *mut CPUState,
-        reg: ::std::os::raw::c_int,
-        val: *mut u8,
-    ) -> ::std::os::raw::c_int;
+    pub fn libafl_maps_next(
+        node: *mut IntervalTreeNode,
+        root: *mut IntervalTreeRoot,
+        ret: *mut libafl_mapinfo,
+    ) -> *mut IntervalTreeNode;
 }
 unsafe extern "C" {
     pub fn libafl_qemu_num_regs(cpu: *mut CPUState) -> ::std::os::raw::c_int;
@@ -10510,4 +10510,176 @@ pub struct kvm_dirty_gfn {
 #[derive(Debug, Default, Copy, Clone)]
 pub struct kvm_nested_state {
     pub _address: u8,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct libafl_mapinfo {
+    pub start: target_ulong,
+    pub end: target_ulong,
+    pub offset: target_ulong,
+    pub path: *const ::std::os::raw::c_char,
+    pub flags: ::std::os::raw::c_int,
+    pub is_priv: ::std::os::raw::c_int,
+    pub is_valid: bool,
+}
+
+pub type libafl_syscall_hook_cb = ::std::option::Option<
+    unsafe extern "C" fn(
+        data: u64,
+        sys_num: i32,
+        a0: target_ulong,
+        a1: target_ulong,
+        a2: target_ulong,
+        a3: target_ulong,
+        a4: target_ulong,
+        a5: target_ulong,
+        a6: target_ulong,
+        a7: target_ulong,
+    ) -> SyscallHookResult,
+>;
+
+pub type libafl_post_syscall_hook_cb = ::std::option::Option<
+    unsafe extern "C" fn(
+        data: u64,
+        res: target_ulong,
+        sys_num: i32,
+        a0: target_ulong,
+        a1: target_ulong,
+        a2: target_ulong,
+        a3: target_ulong,
+        a4: target_ulong,
+        a5: target_ulong,
+        a6: target_ulong,
+        a7: target_ulong,
+    ) -> target_ulong,
+>;
+
+unsafe extern "C" {
+    pub fn libafl_add_pre_syscall_hook(
+        callback: libafl_syscall_hook_cb,
+        data: u64,
+    ) -> usize;
+
+    pub fn libafl_add_post_syscall_hook(
+        callback: libafl_post_syscall_hook_cb,
+        data: u64,
+    ) -> usize;
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub enum SyscallHookResult {
+    Run,
+    Skip(target_ulong),
+}
+
+pub type libafl_syshook_ret = SyscallHookResult;
+
+unsafe extern "C" {
+    pub fn libafl_qemu_remove_pre_syscall_hook(
+        num: usize,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn libafl_qemu_remove_post_syscall_hook(
+        num: usize,
+    ) -> ::std::os::raw::c_int;
+}
+
+unsafe extern "C" {
+    pub fn libafl_qemu_read_reg(
+        cpu: *mut CPUState,
+        reg: ::std::os::raw::c_int,
+        val: *mut u8,
+    ) -> ::std::os::raw::c_int;
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct IntervalTreeNode {
+    pub _dummy: u8,
+}
+
+unsafe extern "C" {
+    pub fn libafl_set_in_target_signal_ctx();
+    pub fn libafl_set_return_on_crash(r: bool);
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct libafl_qemu_signal_context_struct {
+    pub in_qemu_sig_hdlr: bool,
+    pub is_target_signal: bool,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct libafl_image_info {
+    pub start_code: target_ulong,
+    pub end_code: target_ulong,
+    pub start_data: target_ulong,
+    pub end_data: target_ulong,
+    pub stack_limit: target_ulong,
+    pub start_stack: target_ulong,
+    pub vdso: target_ulong,
+    pub entry: target_ulong,
+    pub brk: target_ulong,
+    pub exec_stack: bool,
+}
+
+unsafe extern "C" {
+    pub fn target_mmap(
+        start: target_ulong,
+        len: target_ulong,
+        prot: ::std::os::raw::c_int,
+        flags: ::std::os::raw::c_int,
+        fd: ::std::os::raw::c_int,
+        offset: target_ulong,
+    ) -> target_ulong;
+
+    pub fn target_munmap(
+        start: target_ulong,
+        len: target_ulong,
+    ) -> ::std::os::raw::c_int;
+
+    pub fn libafl_qemu_signal_context() -> *mut libafl_qemu_signal_context_struct;
+
+    pub fn libafl_qemu_native_signal_handler(
+        host_signum: ::std::os::raw::c_int,
+        info: *mut libc::siginfo_t,
+        p: *mut ::std::os::raw::c_void,
+    );
+
+    pub fn libafl_get_image_info() -> *const libafl_image_info;
+
+    pub fn target_mprotect(
+        start: target_ulong,
+        len: target_ulong,
+        prot: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+
+unsafe extern "C" {
+    pub fn page_check_range(
+        start: target_ulong,
+        len: target_ulong,
+        flags: ::std::os::raw::c_int,
+    ) -> bool;
+}
+
+unsafe extern "C" {
+    pub static mut exec_path: *const ::std::os::raw::c_char;
+    pub static mut guest_base: target_ulong;
+    pub static mut libafl_force_dfl: ::std::os::raw::c_int;
+    pub static mut mmap_next_start: target_ulong;
+
+    pub fn libafl_get_brk() -> target_ulong;
+    pub fn libafl_get_initial_brk() -> target_ulong;
+    pub fn libafl_load_addr() -> target_ulong;
+    pub fn libafl_set_brk(brk: target_ulong) -> ::std::os::raw::c_int;
+
+    pub fn libafl_maps_first(root: *mut IntervalTreeRoot) -> *mut IntervalTreeNode;
+    pub fn free_self_maps(root: *mut IntervalTreeRoot);
+    pub fn read_self_maps() -> *mut IntervalTreeRoot;
+    pub fn pageflags_get_root() -> *mut IntervalTreeRoot;
 }

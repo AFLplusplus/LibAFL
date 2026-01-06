@@ -80,6 +80,11 @@ test-docs: test-docs-internal
     RUSTDOCFLAGS="-Dwarnings" cargo {{MSRV}} doc --workspace --locked --all-features --no-deps --document-private-items --exclude libafl_qemu
     RUSTDOCFLAGS="-Dwarnings" cargo {{MSRV}} doc -p libafl_qemu --locked --no-default-features --features usermode,python --no-deps --document-private-items
 
+# Build documentation
+doc:
+    RUSTDOCFLAGS="-Dwarnings" cargo {{MSRV}} doc --workspace --locked --all-features --no-deps --document-private-items --exclude libafl_qemu
+    RUSTDOCFLAGS="-Dwarnings" cargo {{MSRV}} doc -p libafl_qemu --locked --no-default-features --features usermode,python --no-deps --document-private-items
+
 # Runs clippy on all crates
 [private]
 clippy-inner feature='':
@@ -331,12 +336,7 @@ concolic-smoke-test:
     {{ROOT_DIR}}/libafl_concolic/test/smoke_test.sh
 
 
-doc-all:
-    {{SCRIPTS_DIR}}/doc_all.py
-
-[unix]
-repro-qemu-tmin:
-    cd fuzzers/binary_only/qemu_tmin && ./repro
+doc-all: doc
 
 [unix]
 test-repro-qemu-tmin:
