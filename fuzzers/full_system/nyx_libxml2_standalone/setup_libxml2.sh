@@ -7,12 +7,48 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Set LLVM_CONFIG if not set
 if [ -z "$LLVM_CONFIG" ]; then
-    # Build the get_llvm_config utility
-    pushd "$SCRIPT_DIR/../../../utils/get_llvm_config"
+    # Build the find_llvm_config utility
+    pushd "$SCRIPT_DIR/../../../utils/find_llvm_config"
     cargo build --release
     popd
-    LLVM_CONFIG=$("$SCRIPT_DIR/../../../utils/get_llvm_config/target/release/get_llvm_config")
+    LLVM_CONFIG=$("$SCRIPT_DIR/../../../utils/find_llvm_config/target/release/find_llvm_config")
     export LLVM_CONFIG
+fi
+
+# Ensure QEMU-Nyx is available
+QEMU_NYX_BIN="$SCRIPT_DIR/../../../target/debug/QEMU-Nyx/x86_64-softmmu/qemu-system-x86_64"
+if [ ! -f "$QEMU_NYX_BIN" ]; then
+    echo "QEMU-Nyx not found at $QEMU_NYX_BIN. Building libafl_nyx..."
+    pushd "$SCRIPT_DIR/../../.." > /dev/null
+    cargo build -p libafl_nyx || echo "Failed to build libafl_nyx, continuing anyway..."
+    popd > /dev/null
+fi
+
+PACKER_DIR="$SCRIPT_DIR/../../../libafl_nyx/packer/packer"
+if [ ! -d "$PACKER_DIR" ]; then
+    PACKER_DIR="$SCRIPT_DIR/target/debug/packer/packer"
+fi
+
+if [ ! -f "$PACKER_DIR/nyx_packer.py" ]; then
+    echo "nyx_packer.py not found in $PACKER_DIR or source."
+    echo "Cloning nyx-fuzz/packer to use packer..."
+    # Clone into a temporary directory or local directory
+    if [ ! -d "packer" ]; then
+        git clone https://github.com/nyx-fuzz/packer
+    fi
+    PACKER_DIR="$(pwd)/packer/packer"
+fi
+
+echo "PACKER_DIR: $PACKER_DIR"
+
+if [ -f "$QEMU_NYX_BIN" ]; then
+    echo "Found QEMU-Nyx at $QEMU_NYX_BIN"
+    # Create nyx.ini with correct QEMU path
+    # We only need to set QEMU-PT_PATH, others will default to relative paths which are correct
+    echo "[Packer]" > "$PACKER_DIR/nyx.ini"
+    echo "QEMU-PT_PATH=$QEMU_NYX_BIN" >> "$PACKER_DIR/nyx.ini"
+else
+    echo "WARNING: QEMU-Nyx still not found. nyx_config_gen.py might fail."
 fi
 
 if [ -z "$AFL_CC" ]; then
@@ -43,27 +79,9 @@ cd ./libxml2/ || exit
 ./autogen.sh --enable-shared=no --without-python || exit
 make -j || exit
 cd - || exit
-PACKER_DIR="$SCRIPT_DIR/../../../libafl_nyx/packer/packer"
-if [ ! -d "$PACKER_DIR" ]; then
-    PACKER_DIR="$SCRIPT_DIR/target/debug/packer/packer"
-fi
 
-if [ ! -f "$PACKER_DIR/nyx_packer.py" ]; then
-    echo "nyx_packer.py not found in $PACKER_DIR or source."
-    echo "Cloning nyx-fuzz/packer to use packer..."
-    # Clone into a temporary directory or local directory
-    if [ ! -d "packer" ]; then
-        git clone https://github.com/nyx-fuzz/packer
-    fi
-    PACKER_DIR="$(pwd)/packer/packer"
-fi
 
-echo "PACKER_DIR: $PACKER_DIR"
 
-if [ ! -f "$PACKER_DIR/nyx_packer.py" ]; then
-    echo "ERROR: nyx_packer.py still not found at $PACKER_DIR/nyx_packer.py"
-    exit 1
-fi
 
 python3 "$PACKER_DIR/nyx_packer.py" \
     ./libxml2/xmllint \
