@@ -1,5 +1,5 @@
 #!/bin/bash
-SCRIPT_DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 # cargo build --release
 # PWD=$(pwd)
 # export CC="$PWD/target/release/libafl_cc"
@@ -47,6 +47,8 @@ PACKER_DIR="$SCRIPT_DIR/../../../libafl_nyx/packer/packer"
 if [ ! -d "$PACKER_DIR" ]; then
     PACKER_DIR="$SCRIPT_DIR/target/debug/packer/packer"
 fi
+
+echo "PACKER_DIR: $PACKER_DIR"
 
 python3 "$PACKER_DIR/nyx_packer.py" \
     ./libxml2/xmllint \
