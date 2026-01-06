@@ -211,7 +211,7 @@ fn get_host_vma() -> Vma {
         48 => Vma::Vma48,
         52 => Vma::Vma52,
         val => {
-            panic!("Unsupported VMA with {val} bits")
+            panic!("Dynamic layout does not support VMA with {val} bits")
         }
     }
 }
@@ -221,7 +221,7 @@ fn get_arch_vma(arch: &Arch) -> Option<Vma> {
         Arch::X86_64 => None,
         Arch::X86 => None,
         Arch::AArch64 => Some(get_host_vma()),
-        _ => panic!("Unsupported arch"),
+        _ => panic!("Dynamic layout does not support arch: {arch:?}"),
     }
 }
 
