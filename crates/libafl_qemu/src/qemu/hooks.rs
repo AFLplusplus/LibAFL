@@ -936,6 +936,12 @@ pub type CrashHookClosure<ET, I, S> = Box<dyn FnMut(Qemu, &mut EmulatorModules<E
 /// The thin wrapper around QEMU hooks.
 /// It is considered unsafe to use it directly.
 ///
+/// It is recommended to use `EmulatorHooks`, which provides a safe, structured
+/// abstraction on top of `QemuHooks` and integrates with emulator modules.
+///
+/// Existing emulator modules (for example, syscall injection or coverage modules) provide concrete usage
+/// examples of registering hooks via `EmulatorHooks`.
+///
 /// There are several types of hooks in place:
 ///
 /// • **Instruction** hooks: as the name suggests, to hook a specific
