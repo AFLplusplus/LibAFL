@@ -2,7 +2,7 @@
 name = "nonzero_macros"
 version.workspace = true
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
-description = "Lightweight, no_std, dependency-free macros for LibAFL and beyond"
+description = "Macros for compile-time checked `NonZero` integers and safe `NonNull` pointer creation in `no_std` environments."
 documentation = "https://docs.rs/nonzero_macros"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "./README.md"

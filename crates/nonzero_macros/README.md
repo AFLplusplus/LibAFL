@@ -3,8 +3,11 @@
  <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL logo" width="250" heigh="250">
 
 
-A collection of lightweight, `no_std`, dependency-free macros for Rust.
-Originally part of [LibAFL](https://github.com/AFLplusplus/LibAFL), these macros are now available as a standalone crate.
+Macros for compile-time checked `NonZero` integers and safe `NonNull` pointer creation in `no_std` environments.
+
+Far simpler than other crates, as it leverages the modern generic `core::num::NonZero` type.
+Lightweight, `no_std`, and dependency-free.
+
 
 ## Macros
 
