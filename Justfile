@@ -8,6 +8,16 @@ export LIBAFL_BOLTS_DIR := join(justfile_directory(), "crates/libafl_bolts")
 export LIBAFL_TARGETS_DIR := join(justfile_directory(), "crates/libafl_targets")
 MSRV := env_var_or_default('MSRV', "")
 
+# List all available just targets in this justfile
+@help *PAT:
+    if [[ '{{ PAT }}' =~ '' ]]; then just -l; else just -l | rg -i '{{ PAT }}'; fi
+
+@_check:
+    just --fmt --unstable --check
+
+@_fmt:
+    just -q _check || just --fmt --unstable
+
 # Check, build, and test all crates with default features enabled
 default feature='' ignore='': (check feature ignore) (build feature ignore) (test feature ignore)
 

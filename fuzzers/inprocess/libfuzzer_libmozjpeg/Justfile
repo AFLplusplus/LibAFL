@@ -7,7 +7,6 @@ FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 LIBAFL_CC := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
 LIBAFL_CXX := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
 
-
 alias cc := cxx
 
 [linux]
@@ -26,7 +25,7 @@ mozjpg:
 [linux]
 [macos]
 cxx:
-    cargo build --profile {{PROFILE}}
+    cargo build --profile {{ PROFILE }}
 
 [windows]
 cxx:
@@ -36,8 +35,8 @@ cxx:
 [macos]
 lib: mozjpg cxx
     #!/bin/bash
-    cd mozjpeg-4.0.3 && cmake . -DENABLE_SHARED=false -DPNG_SUPPORTED=false -DCMAKE_C_COMPILER="{{LIBAFL_CC}}" -DCMAKE_CXX_COMPILER="{{LIBAFL_CXX}}" -G "Unix Makefiles"
-    cd {{PROJECT_DIR}}
+    cd mozjpeg-4.0.3 && cmake . -DENABLE_SHARED=false -DPNG_SUPPORTED=false -DCMAKE_C_COMPILER="{{ LIBAFL_CC }}" -DCMAKE_CXX_COMPILER="{{ LIBAFL_CXX }}" -G "Unix Makefiles"
+    cd {{ PROJECT_DIR }}
     make -C mozjpeg-4.0.3
 
 [windows]
@@ -47,7 +46,7 @@ lib:
 [linux]
 [macos]
 fuzzer: lib cxx
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/mozjpeg-4.0.3/libjpeg.a {{PROJECT_DIR}}/mozjpeg-4.0.3/libturbojpeg.a -I {{PROJECT_DIR}}/mozjpeg-4.0.3/ -o {{FUZZER_NAME}} -lm -lz
+    {{ LIBAFL_CXX }} {{ PROJECT_DIR }}/harness.cc {{ PROJECT_DIR }}/mozjpeg-4.0.3/libjpeg.a {{ PROJECT_DIR }}/mozjpeg-4.0.3/libturbojpeg.a -I {{ PROJECT_DIR }}/mozjpeg-4.0.3/ -o {{ FUZZER_NAME }} -lm -lz
 
 [windows]
 fuzzer:
@@ -57,9 +56,9 @@ fuzzer:
 [macos]
 run: fuzzer
     #!/bin/bash
-    ./{{FUZZER_NAME}} &
+    ./{{ FUZZER_NAME }} &
     sleep 0.2
-    ./{{FUZZER_NAME}}
+    ./{{ FUZZER_NAME }}
 
 [windows]
 run: fuzzer
@@ -70,9 +69,9 @@ run: fuzzer
 test: fuzzer
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
-    (timeout 31s ./{{FUZZER_NAME}} | tee fuzz_stdout.log 2>/dev/null || true) &
+    (timeout 31s ./{{ FUZZER_NAME }} | tee fuzz_stdout.log 2>/dev/null || true) &
     sleep 0.2
-    timeout 30s ./{{FUZZER_NAME}} >/dev/null 2>/dev/null || true
+    timeout 30s ./{{ FUZZER_NAME }} >/dev/null 2>/dev/null || true
     if grep -qa "corpus: 30" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
@@ -85,7 +84,6 @@ test: fuzzer
     echo "Unsupported on this platform"
 
 clean:
-    rm -rf {{FUZZER_NAME}}
+    rm -rf {{ FUZZER_NAME }}
     make -C mozjpeg-4.0.3 clean || true
     cargo clean
-

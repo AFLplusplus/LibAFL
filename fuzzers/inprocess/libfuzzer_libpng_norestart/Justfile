@@ -7,7 +7,6 @@ FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 LIBAFL_CC := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
 LIBAFL_CXX := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
 
-
 alias cc := cxx
 
 [linux]
@@ -26,7 +25,7 @@ libpng:
 [linux]
 [macos]
 cxx:
-    cargo build --profile {{PROFILE}}
+    cargo build --profile {{ PROFILE }}
 
 [windows]
 cxx:
@@ -35,7 +34,7 @@ cxx:
 [linux]
 [macos]
 crash_cxx:
-    cargo build --profile {{PROFILE}} --features=crash
+    cargo build --profile {{ PROFILE }} --features=crash
 
 [windows]
 crash_cxx:
@@ -46,8 +45,8 @@ crash_cxx:
 lib: libpng cxx
     #!/bin/bash
     cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-    cd {{PROJECT_DIR}}
-    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}"
+    cd {{ PROJECT_DIR }}
+    make -C libpng-1.6.37 CC="{{ LIBAFL_CC }}" CXX="{{ LIBAFL_CXX }}"
 
 [windows]
 lib:
@@ -58,8 +57,8 @@ lib:
 crash_lib: libpng crash_cxx
     #!/bin/bash
     cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-    cd {{PROJECT_DIR}}
-    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}"
+    cd {{ PROJECT_DIR }}
+    make -C libpng-1.6.37 CC="{{ LIBAFL_CC }}" CXX="{{ LIBAFL_CXX }}"
 
 [windows]
 crash_lib:
@@ -68,7 +67,7 @@ crash_lib:
 [linux]
 [macos]
 fuzzer: lib cxx
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz
+    {{ LIBAFL_CXX }} {{ PROJECT_DIR }}/harness.cc {{ PROJECT_DIR }}/libpng-1.6.37/.libs/libpng16.a -I {{ PROJECT_DIR }}/libpng-1.6.37/ -o {{ FUZZER_NAME }} -lm -lz
 
 [windows]
 fuzzer:
@@ -77,18 +76,17 @@ fuzzer:
 [linux]
 [macos]
 crash_fuzzer: crash_lib crash_cxx
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz
+    {{ LIBAFL_CXX }} {{ PROJECT_DIR }}/harness.cc {{ PROJECT_DIR }}/libpng-1.6.37/.libs/libpng16.a -I {{ PROJECT_DIR }}/libpng-1.6.37/ -o {{ FUZZER_NAME }} -lm -lz
 
 [windows]
 crash_fuzzer:
     echo "Unsupported on this platform"
 
-
 [linux]
 [macos]
 run: fuzzer
     #!/bin/bash
-    ./{{FUZZER_NAME}} --cores 0 --input ./corpus
+    ./{{ FUZZER_NAME }} --cores 0 --input ./corpus
 
 [windows]
 run: fuzzer
@@ -98,19 +96,18 @@ run: fuzzer
 [macos]
 crash: crash_fuzzer
     #!/bin/bash
-    ./{{FUZZER_NAME}} --cores 0 --input ./corpus
+    ./{{ FUZZER_NAME }} --cores 0 --input ./corpus
 
 [windows]
 crash: fuzzer
     echo "Unsupported on this platform"
-
 
 [linux]
 [macos]
 test: fuzzer
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
-    timeout 31s ./{{FUZZER_NAME}} --cores 0 --input ./corpus 2>/dev/null | tee fuzz_stdout.log || true
+    timeout 31s ./{{ FUZZER_NAME }} --cores 0 --input ./corpus 2>/dev/null | tee fuzz_stdout.log || true
     if grep -qa "corpus: 30" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
@@ -123,7 +120,6 @@ test: fuzzer
     echo "Unsupported on this platform"
 
 clean:
-    rm -rf {{FUZZER_NAME}}
+    rm -rf {{ FUZZER_NAME }}
     make -C libpng-1.6.37 clean || true
     cargo clean
-
