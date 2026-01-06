@@ -1,6 +1,10 @@
 use std::{env, path::PathBuf, process::Command};
 fn main() {
-    if cfg!(target_os = "linux") && cfg!(target_arch = "x86_64") && !cfg!(doc) {
+    if cfg!(target_os = "linux")
+        && cfg!(target_arch = "x86_64")
+        && !cfg!(doc)
+        && std::env::var("DOCS_RS").is_err()
+    {
         // Use CARGO_TARGET_DIR if available, otherwise fall back to OUT_DIR's parent directories
         let target_dir = if let Ok(target_dir) = env::var("CARGO_TARGET_DIR") {
             PathBuf::from(target_dir)

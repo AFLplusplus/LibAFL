@@ -679,6 +679,7 @@ dependencies = [
  "miniz_oxide",
  "nix",
  "no_std_time",
+ "nonzero_macros",
  "num_enum",
  "ownedref",
  "postcard",
@@ -705,6 +706,7 @@ version = "0.16.0"
 dependencies = [
  "backtrace",
  "nix",
+ "nonzero_macros",
  "postcard",
  "rustversion",
  "serde",
@@ -875,6 +877,10 @@ version = "0.16.0"
 dependencies = [
  "rustversion",
 ]
+
+[[package]]
+name = "nonzero_macros"
+version = "0.16.0"
 
 [[package]]
 name = "num-traits"
