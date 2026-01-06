@@ -56,6 +56,23 @@ static SPECIFIC_LAYOUTS: LazyLock<HashMap<(Arch, Option<Vma>, Os), TargetShadowL
         // || `[0x00000000, 0x1fffffff]` || LowMem     ||
         layouts.insert((Arch::X86, None, Os::Linux), DEFAULT_32B_LAYOUT.clone());
 
+        // Default Linux/AArch64 (42-bit VMA) mapping:
+        // || `[0x09000000000, 0x03ffffffffff]` || highmem    || 3520GB
+        // || `[0x02200000000, 0x008fffffffff]` || highshadow || 440GB
+        // || `[0x01200000000, 0x0021ffffffff]` || shadowgap  || 64GB
+        // || `[0x01000000000, 0x0011ffffffff]` || lowshadow  || 8GB
+        // || `[0x00000000000, 0x000fffffffff]` || lowmem     || 64GB
+        layouts.insert(
+            (Arch::AArch64, Some(Vma::Vma42), Os::Linux),
+            TargetShadowLayout {
+                high_mem: 0x09000000000..=0x03ffffffffff,
+                high_shadow: 0x02200000000..=0x008fffffffff,
+                shadow_gap: 0x01200000000..=0x0021ffffffff,
+                low_shadow: 0x01000000000..=0x0011ffffffff,
+                low_mem: 0x00000000000..=0x000fffffffff,
+            },
+        );
+
         // Default Linux/AArch64 (48-bit VMA) mapping:
         // || `[0x201000000000, 0xffffffffffff]` || HighMem    || 229312GB
         // || `[0x041200000000, 0x200fffffffff]` || HighShadow || 28664GB
@@ -82,6 +99,10 @@ use super::ShadowLayout;
 
 #[derive(Debug)]
 pub struct DefaultShadowLayout;
+
+#[unsafe(no_mangle)]
+#[used]
+pub static libafl_shadow_base: stdint::uintptr_t = {shadow_base};
 
 impl ShadowLayout for DefaultShadowLayout {
     const SHADOW_OFFSET: usize = {shadow_offset};
@@ -324,6 +345,7 @@ fn main() {
 
     let gen_layout = LAYOUT_TEMPLATE
         .to_string()
+        .replace("{shadow_base}", &layout.low_shadow_offset())
         .replace("{shadow_offset}", &layout.low_shadow_offset())
         .replace("{low_mem_offset}", &layout.low_mem_offset())
         .replace("{low_mem_size}", &layout.low_mem_size())
