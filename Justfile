@@ -32,16 +32,15 @@ no-default-features: (default "--no-default-features")
 
 # Run check on all projects in the workspace
 check feature='' ignore='':
-    cargo {{ MSRV }} check --workspace --locked --all-targets --exclude libafl_asan_libc {{ feature }}
-
+    cargo {{ MSRV }} check --workspace --all-targets --exclude libafl_asan_libc {{ feature }}
 
 # Run build on all projects in the workspace
 build feature='' ignore='':
-    cargo {{ MSRV }} build --workspace --locked --all-targets --exclude libafl_asan_libc {{ feature }}
+    cargo {{ MSRV }} build --workspace --all-targets --exclude libafl_asan_libc {{ feature }}
 
 # Run tests on all projects in the workspace
 test feature='' ignore='':
-    cargo {{ MSRV }} test --workspace --locked --all-targets --exclude libafl_asan_libc --exclude libafl_asan {{ feature }}
+    cargo {{ MSRV }} test --workspace --all-targets --exclude libafl_asan_libc --exclude libafl_asan {{ feature }}
     # Run libafl_asan tests serially to avoid address conflicts
     RUST_TEST_THREADS=1 cargo {{ MSRV }} test -p libafl_asan -j 1 {{ feature }}
 
@@ -85,8 +84,8 @@ test-docs-internal:
 
 # Tests all code in docs
 test-docs: test-docs-internal
-    RUSTDOCFLAGS="-Dwarnings" cargo {{ MSRV }} doc --workspace --locked --all-features --no-deps --document-private-items --exclude libafl_qemu
-    RUSTDOCFLAGS="-Dwarnings" cargo {{ MSRV }} doc -p libafl_qemu --locked --no-default-features --features usermode,python --no-deps --document-private-items
+    RUSTDOCFLAGS="-Dwarnings" cargo {{ MSRV }} doc --workspace --all-features --no-deps --document-private-items --exclude libafl_qemu
+    RUSTDOCFLAGS="-Dwarnings" cargo {{ MSRV }} doc -p libafl_qemu --no-default-features --features usermode,python --no-deps --document-private-items
 
 # Build documentation
 doc:
