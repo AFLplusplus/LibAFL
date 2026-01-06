@@ -82,8 +82,6 @@ pub fn build_with_bindings(
     cargo_propagate_rpath();
 }
 
-
-
 // For bindgen, the llvm version must be >= of the rust llvm version
 fn find_llvm_config() -> Result<String, String> {
     libafl_build::find_llvm_config()

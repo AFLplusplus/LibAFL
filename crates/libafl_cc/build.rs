@@ -10,7 +10,7 @@ use core::str;
     feature = "dump-cfg",
 ))]
 use std::path::PathBuf;
-use std::{env, fs::File, io::Write, path::Path};
+use std::{env, fs::File, io::Write, path::Path, process::Command};
 
 #[cfg(any(
     feature = "function-logging",
