@@ -10,3 +10,4 @@ categories = ["development-tools::testing", "development-tools::build-utils"]
 
 [dependencies]
 which = { workspace = true }
+glob = { workspace = true }

@@ -26,9 +26,10 @@ cd ./libxml2/ || exit
 ./autogen.sh --enable-shared=no || exit
 make -j || exit
 cd - || exit
-PACKER_DIR="../../../libafl_nyx/packer/packer"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PACKER_DIR="$SCRIPT_DIR/../../../crates/libafl_nyx/packer/packer"
 if [ ! -d "$PACKER_DIR" ]; then
-    PACKER_DIR="./target/debug/packer/packer"
+    PACKER_DIR="$SCRIPT_DIR/target/debug/packer/packer"
 fi
 
 python3 "$PACKER_DIR/nyx_packer.py" \

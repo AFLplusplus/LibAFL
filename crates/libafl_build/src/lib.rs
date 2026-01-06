@@ -162,10 +162,9 @@ pub fn find_llvm_tool(tool: &str) -> Result<String, String> {
     }
 
     let tool_name = tool;
-    let tool_name_versioned = |version: u32| format!("{tool}-{version}");
-
     #[cfg(not(any(target_vendor = "apple", target_os = "solaris", target_os = "illumos")))]
     {
+        let tool_name_versioned = |version: u32| format!("{tool}-{version}");
         for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
             let name = tool_name_versioned(version);
             if which(&name).is_ok() {
