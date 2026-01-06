@@ -1,33 +1,49 @@
 #!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "$0" )" &> /dev/null && pwd )"
 # cargo build --release
 # PWD=$(pwd)
 # export CC="$PWD/target/release/libafl_cc"
 # export CXX="$PWD/target/release/libafl_cxx"
 
-# Check if afl-clang-fast exists in PATH
-if ! command -v afl-clang-fast &> /dev/null
-then
-    echo "afl-clang-fast not found. Cloning and compiling AFLplusplus..."
-    git clone https://github.com/AFLplusplus/AFLplusplus.git
-    pushd AFLplusplus
-    make
+# Set LLVM_CONFIG if not set
+if [ -z "$LLVM_CONFIG" ]; then
+    # Build the get_llvm_config utility
+    pushd "$SCRIPT_DIR/../../../utils/get_llvm_config"
+    cargo build --release
     popd
-    export CC="$(pwd)/AFLplusplus/afl-clang-fast"
-    export CXX="$(pwd)/AFLplusplus/afl-clang-fast++"
-else
-    echo "afl-clang-fast already exists in PATH."
-    export CC="afl-clang-fast"
-    export CXX="afl-clang-fast++"
+    LLVM_CONFIG=$("$SCRIPT_DIR/../../../utils/get_llvm_config/target/release/get_llvm_config")
+    export LLVM_CONFIG
 fi
 
-curl -C - https://gitlab.gnome.org/GNOME/libxml2/-/archive/v2.9.14/libxml2-v2.9.14.tar.gz --output libxml2-v2.9.14.tar.gz
+if [ -z "$AFL_CC" ]; then
+    export AFL_CC="$($LLVM_CONFIG --bindir)/clang"
+    export AFL_CXX="$($LLVM_CONFIG --bindir)/clang++"
+fi
+
+# Force local AFL++ build to avoid broken system binary
+echo "Building local AFL++..."
+export LLVM_CONFIG=llvm-config-18
+if [ ! -d "AFLplusplus" ]; then
+    git clone https://github.com/AFLplusplus/AFLplusplus.git
+fi
+pushd AFLplusplus
+make clean
+make
+popd
+
+export CC="$SCRIPT_DIR/AFLplusplus/afl-clang-fast"
+export CXX="$SCRIPT_DIR/AFLplusplus/afl-clang-fast++"
+
+echo "DEBUG: CC: $CC"
+$CC --version
+
+curl -L https://gitlab.gnome.org/GNOME/libxml2/-/archive/v2.9.14/libxml2-v2.9.14.tar.gz --output libxml2-v2.9.14.tar.gz
 tar -xf ./libxml2-v2.9.14.tar.gz  --transform s/libxml2-v2.9.14/libxml2/ || exit
 cd ./libxml2/ || exit
-./autogen.sh --enable-shared=no || exit
+./autogen.sh --enable-shared=no --without-python || exit
 make -j || exit
 cd - || exit
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-PACKER_DIR="$SCRIPT_DIR/../../../crates/libafl_nyx/packer/packer"
+PACKER_DIR="$SCRIPT_DIR/../../../libafl_nyx/packer/packer"
 if [ ! -d "$PACKER_DIR" ]; then
     PACKER_DIR="$SCRIPT_DIR/target/debug/packer/packer"
 fi

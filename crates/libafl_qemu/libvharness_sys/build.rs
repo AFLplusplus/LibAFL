@@ -102,6 +102,7 @@ fn main() {
         } else {
             "lqemu".to_string()
         };
+        println!("cargo:warning=API: {}", api);
 
         let platform = if cfg!(feature = "linux") {
             "linux".to_string()

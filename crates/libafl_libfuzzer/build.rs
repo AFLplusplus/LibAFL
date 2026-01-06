@@ -116,14 +116,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             let Some(toml::Value::Table(deps)) = root.get_mut("dependencies") else {
                 unreachable!("Invalid Cargo.toml");
             };
-            let version = env!("CARGO_PKG_VERSION");
+            let _version = env!("CARGO_PKG_VERSION");
             for (_name, spec) in deps {
                 if let toml::Value::Table(spec) = spec {
-                    // replace all path deps with version deps
-                    if spec.remove("path").is_some() {
+                    // replace all path deps with absolute path deps
+                    if let Some(path) = spec.get("path") {
+                        let path = path.as_str().unwrap();
+                        let absolute_path = fs::canonicalize(path)?;
                         spec.insert(
-                            "version".to_string(),
-                            toml::Value::String(version.to_string()),
+                            "path".to_string(),
+                            toml::Value::String(absolute_path.to_string_lossy().to_string()),
                         );
                     }
                 }

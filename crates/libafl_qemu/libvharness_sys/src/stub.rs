@@ -142,11 +142,37 @@ pub struct __BindgenComplex<T> {
     pub re: T,
     pub im: T,
 }
-pub const VHARNESS_WORD_SIZE: u32 = 64;
-pub const __bool_true_false_are_defined: u32 = 1;
-pub const true_: u32 = 1;
-pub const false_: u32 = 0;
-pub const _STDINT_H: u32 = 1;
+#[repr(C)]
+#[derive(Default)]
+pub struct __IncompleteArrayField<T>(::std::marker::PhantomData<T>, [T; 0]);
+impl<T> __IncompleteArrayField<T> {
+    #[inline]
+    pub const fn new() -> Self {
+        __IncompleteArrayField(::std::marker::PhantomData, [])
+    }
+    #[inline]
+    pub fn as_ptr(&self) -> *const T {
+        self as *const _ as *const T
+    }
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        self as *mut _ as *mut T
+    }
+    #[inline]
+    pub unsafe fn as_slice(&self, len: usize) -> &[T] {
+        ::std::slice::from_raw_parts(self.as_ptr(), len)
+    }
+    #[inline]
+    pub unsafe fn as_mut_slice(&mut self, len: usize) -> &mut [T] {
+        ::std::slice::from_raw_parts_mut(self.as_mut_ptr(), len)
+    }
+}
+impl<T> ::std::fmt::Debug for __IncompleteArrayField<T> {
+    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        fmt.write_str("__IncompleteArrayField")
+    }
+}
+pub const _STDIO_H: u32 = 1;
 pub const _FEATURES_H: u32 = 1;
 pub const _DEFAULT_SOURCE: u32 = 1;
 pub const __GLIBC_USE_ISOC2Y: u32 = 0;
@@ -183,7 +209,7 @@ pub const __STDC_IEC_60559_COMPLEX__: u32 = 201404;
 pub const __STDC_ISO_10646__: u32 = 201706;
 pub const __GNU_LIBRARY__: u32 = 6;
 pub const __GLIBC__: u32 = 2;
-pub const __GLIBC_MINOR__: u32 = 42;
+pub const __GLIBC_MINOR__: u32 = 41;
 pub const _SYS_CDEFS_H: u32 = 1;
 pub const __glibc_c99_flexarr_available: u32 = 1;
 pub const __LDOUBLE_REDIRECTS_TO_FLOAT128_ABI: u32 = 0;
@@ -204,48 +230,6 @@ pub const __STATFS_MATCHES_STATFS64: u32 = 1;
 pub const __KERNEL_OLD_TIMEVAL_MATCHES_TIMEVAL64: u32 = 1;
 pub const __FD_SETSIZE: u32 = 1024;
 pub const _BITS_TIME64_H: u32 = 1;
-pub const _BITS_WCHAR_H: u32 = 1;
-pub const _BITS_STDINT_INTN_H: u32 = 1;
-pub const _BITS_STDINT_UINTN_H: u32 = 1;
-pub const _BITS_STDINT_LEAST_H: u32 = 1;
-pub const INT8_MIN: i32 = -128;
-pub const INT16_MIN: i32 = -32768;
-pub const INT32_MIN: i32 = -2147483648;
-pub const INT8_MAX: u32 = 127;
-pub const INT16_MAX: u32 = 32767;
-pub const INT32_MAX: u32 = 2147483647;
-pub const UINT8_MAX: u32 = 255;
-pub const UINT16_MAX: u32 = 65535;
-pub const UINT32_MAX: u32 = 4294967295;
-pub const INT_LEAST8_MIN: i32 = -128;
-pub const INT_LEAST16_MIN: i32 = -32768;
-pub const INT_LEAST32_MIN: i32 = -2147483648;
-pub const INT_LEAST8_MAX: u32 = 127;
-pub const INT_LEAST16_MAX: u32 = 32767;
-pub const INT_LEAST32_MAX: u32 = 2147483647;
-pub const UINT_LEAST8_MAX: u32 = 255;
-pub const UINT_LEAST16_MAX: u32 = 65535;
-pub const UINT_LEAST32_MAX: u32 = 4294967295;
-pub const INT_FAST8_MIN: i32 = -128;
-pub const INT_FAST16_MIN: i64 = -9223372036854775808;
-pub const INT_FAST32_MIN: i64 = -9223372036854775808;
-pub const INT_FAST8_MAX: u32 = 127;
-pub const INT_FAST16_MAX: u64 = 9223372036854775807;
-pub const INT_FAST32_MAX: u64 = 9223372036854775807;
-pub const UINT_FAST8_MAX: u32 = 255;
-pub const UINT_FAST16_MAX: i32 = -1;
-pub const UINT_FAST32_MAX: i32 = -1;
-pub const INTPTR_MIN: i64 = -9223372036854775808;
-pub const INTPTR_MAX: u64 = 9223372036854775807;
-pub const UINTPTR_MAX: i32 = -1;
-pub const PTRDIFF_MIN: i64 = -9223372036854775808;
-pub const PTRDIFF_MAX: u64 = 9223372036854775807;
-pub const SIG_ATOMIC_MIN: i32 = -2147483648;
-pub const SIG_ATOMIC_MAX: u32 = 2147483647;
-pub const SIZE_MAX: i32 = -1;
-pub const WINT_MIN: u32 = 0;
-pub const WINT_MAX: u32 = 4294967295;
-pub const _STDIO_H: u32 = 1;
 pub const _____fpos_t_defined: u32 = 1;
 pub const ____mbstate_t_defined: u32 = 1;
 pub const _____fpos64_t_defined: u32 = 1;
@@ -287,11 +271,94 @@ pub const __HAVE_DISTINCT_FLOAT32X: u32 = 0;
 pub const __HAVE_DISTINCT_FLOAT64X: u32 = 0;
 pub const __HAVE_DISTINCT_FLOAT128X: u32 = 0;
 pub const __HAVE_FLOATN_NOT_TYPEDEF: u32 = 0;
-pub const LIBAFL_CUSTOM_INSN_OPCODE: u32 = 1727150607;
-pub const LIBAFL_BACKDOOR_OPCODE: u32 = 1156725263;
-pub const LIBAFL_QEMU_TEST_VALUE: u32 = 3405691582;
-pub const LQEMU_VERSION_MAJOR: u32 = 0;
-pub const LQEMU_VERSION_MINOR: u32 = 1;
+pub const _STDINT_H: u32 = 1;
+pub const _BITS_WCHAR_H: u32 = 1;
+pub const _BITS_STDINT_INTN_H: u32 = 1;
+pub const _BITS_STDINT_UINTN_H: u32 = 1;
+pub const _BITS_STDINT_LEAST_H: u32 = 1;
+pub const INT8_MIN: i32 = -128;
+pub const INT16_MIN: i32 = -32768;
+pub const INT32_MIN: i32 = -2147483648;
+pub const INT8_MAX: u32 = 127;
+pub const INT16_MAX: u32 = 32767;
+pub const INT32_MAX: u32 = 2147483647;
+pub const UINT8_MAX: u32 = 255;
+pub const UINT16_MAX: u32 = 65535;
+pub const UINT32_MAX: u32 = 4294967295;
+pub const INT_LEAST8_MIN: i32 = -128;
+pub const INT_LEAST16_MIN: i32 = -32768;
+pub const INT_LEAST32_MIN: i32 = -2147483648;
+pub const INT_LEAST8_MAX: u32 = 127;
+pub const INT_LEAST16_MAX: u32 = 32767;
+pub const INT_LEAST32_MAX: u32 = 2147483647;
+pub const UINT_LEAST8_MAX: u32 = 255;
+pub const UINT_LEAST16_MAX: u32 = 65535;
+pub const UINT_LEAST32_MAX: u32 = 4294967295;
+pub const INT_FAST8_MIN: i32 = -128;
+pub const INT_FAST16_MIN: i64 = -9223372036854775808;
+pub const INT_FAST32_MIN: i64 = -9223372036854775808;
+pub const INT_FAST8_MAX: u32 = 127;
+pub const INT_FAST16_MAX: u64 = 9223372036854775807;
+pub const INT_FAST32_MAX: u64 = 9223372036854775807;
+pub const UINT_FAST8_MAX: u32 = 255;
+pub const UINT_FAST16_MAX: i32 = -1;
+pub const UINT_FAST32_MAX: i32 = -1;
+pub const INTPTR_MIN: i64 = -9223372036854775808;
+pub const INTPTR_MAX: u64 = 9223372036854775807;
+pub const UINTPTR_MAX: i32 = -1;
+pub const PTRDIFF_MIN: i64 = -9223372036854775808;
+pub const PTRDIFF_MAX: u64 = 9223372036854775807;
+pub const SIG_ATOMIC_MIN: i32 = -2147483648;
+pub const SIG_ATOMIC_MAX: u32 = 2147483647;
+pub const SIZE_MAX: i32 = -1;
+pub const WINT_MIN: u32 = 0;
+pub const WINT_MAX: u32 = 4294967295;
+pub const HYPERCALL_KAFL_RAX_ID: u32 = 31;
+pub const HYPERCALL_KAFL_ACQUIRE: u32 = 0;
+pub const HYPERCALL_KAFL_GET_PAYLOAD: u32 = 1;
+pub const HYPERCALL_KAFL_GET_PROGRAM: u32 = 2;
+pub const HYPERCALL_KAFL_GET_ARGV: u32 = 3;
+pub const HYPERCALL_KAFL_RELEASE: u32 = 4;
+pub const HYPERCALL_KAFL_SUBMIT_CR3: u32 = 5;
+pub const HYPERCALL_KAFL_SUBMIT_PANIC: u32 = 6;
+pub const HYPERCALL_KAFL_SUBMIT_KASAN: u32 = 7;
+pub const HYPERCALL_KAFL_PANIC: u32 = 8;
+pub const HYPERCALL_KAFL_KASAN: u32 = 9;
+pub const HYPERCALL_KAFL_LOCK: u32 = 10;
+pub const HYPERCALL_KAFL_INFO: u32 = 11;
+pub const HYPERCALL_KAFL_NEXT_PAYLOAD: u32 = 12;
+pub const HYPERCALL_KAFL_PRINTF: u32 = 13;
+pub const HYPERCALL_KAFL_PRINTK_ADDR: u32 = 14;
+pub const HYPERCALL_KAFL_PRINTK: u32 = 15;
+pub const HYPERCALL_KAFL_USER_RANGE_ADVISE: u32 = 16;
+pub const HYPERCALL_KAFL_USER_SUBMIT_MODE: u32 = 17;
+pub const HYPERCALL_KAFL_USER_FAST_ACQUIRE: u32 = 18;
+pub const HYPERCALL_KAFL_USER_ABORT: u32 = 20;
+pub const HYPERCALL_KAFL_TIMEOUT: u32 = 21;
+pub const HYPERCALL_KAFL_RANGE_SUBMIT: u32 = 29;
+pub const HYPERCALL_KAFL_REQ_STREAM_DATA: u32 = 30;
+pub const HYPERCALL_KAFL_PANIC_EXTENDED: u32 = 32;
+pub const HYPERCALL_KAFL_CREATE_TMP_SNAPSHOT: u32 = 33;
+pub const HYPERCALL_KAFL_DEBUG_TMP_SNAPSHOT: u32 = 34;
+pub const HYPERCALL_KAFL_GET_HOST_CONFIG: u32 = 35;
+pub const HYPERCALL_KAFL_SET_AGENT_CONFIG: u32 = 36;
+pub const HYPERCALL_KAFL_DUMP_FILE: u32 = 37;
+pub const HYPERCALL_KAFL_REQ_STREAM_DATA_BULK: u32 = 38;
+pub const HYPERCALL_KAFL_PERSIST_PAGE_PAST_SNAPSHOT: u32 = 39;
+pub const HYPERTRASH_HYPERCALL_MASK: u32 = 2852126720;
+pub const HYPERCALL_KAFL_NESTED_PREPARE: u32 = 2852126720;
+pub const HYPERCALL_KAFL_NESTED_CONFIG: u32 = 2852126721;
+pub const HYPERCALL_KAFL_NESTED_ACQUIRE: u32 = 2852126722;
+pub const HYPERCALL_KAFL_NESTED_RELEASE: u32 = 2852126723;
+pub const HYPERCALL_KAFL_NESTED_HPRINTF: u32 = 2852126724;
+pub const HPRINTF_MAX_SIZE: u32 = 4096;
+pub const KAFL_MODE_64: u32 = 0;
+pub const KAFL_MODE_32: u32 = 1;
+pub const KAFL_MODE_16: u32 = 2;
+pub const NYX_HOST_MAGIC: u32 = 1215854926;
+pub const NYX_AGENT_MAGIC: u32 = 1098414414;
+pub const NYX_HOST_VERSION: u32 = 2;
+pub const NYX_AGENT_VERSION: u32 = 1;
 pub type __gnuc_va_list = __builtin_va_list;
 pub type va_list = __builtin_va_list;
 pub type __u_char = ::std::os::raw::c_uchar;
@@ -367,24 +434,6 @@ pub type __caddr_t = *mut ::std::os::raw::c_char;
 pub type __intptr_t = ::std::os::raw::c_long;
 pub type __socklen_t = ::std::os::raw::c_uint;
 pub type __sig_atomic_t = ::std::os::raw::c_int;
-pub type int_least8_t = __int_least8_t;
-pub type int_least16_t = __int_least16_t;
-pub type int_least32_t = __int_least32_t;
-pub type int_least64_t = __int_least64_t;
-pub type uint_least8_t = __uint_least8_t;
-pub type uint_least16_t = __uint_least16_t;
-pub type uint_least32_t = __uint_least32_t;
-pub type uint_least64_t = __uint_least64_t;
-pub type int_fast8_t = ::std::os::raw::c_schar;
-pub type int_fast16_t = ::std::os::raw::c_long;
-pub type int_fast32_t = ::std::os::raw::c_long;
-pub type int_fast64_t = ::std::os::raw::c_long;
-pub type uint_fast8_t = ::std::os::raw::c_uchar;
-pub type uint_fast16_t = ::std::os::raw::c_ulong;
-pub type uint_fast32_t = ::std::os::raw::c_ulong;
-pub type uint_fast64_t = ::std::os::raw::c_ulong;
-pub type intmax_t = __intmax_t;
-pub type uintmax_t = __uintmax_t;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct __mbstate_t {
@@ -565,9 +614,7 @@ pub struct _IO_FILE {
     pub _freeres_buf: *mut ::std::os::raw::c_void,
     pub _prevchain: *mut *mut _IO_FILE,
     pub _mode: ::std::os::raw::c_int,
-    pub _unused3: ::std::os::raw::c_int,
-    pub _total_written: __uint64_t,
-    pub _unused2: [::std::os::raw::c_char; 8usize],
+    pub _unused2: [::std::os::raw::c_char; 20usize],
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
@@ -621,10 +668,7 @@ const _: () = {
     ["Offset of field: _IO_FILE::_prevchain"]
         [::std::mem::offset_of!(_IO_FILE, _prevchain) - 184usize];
     ["Offset of field: _IO_FILE::_mode"][::std::mem::offset_of!(_IO_FILE, _mode) - 192usize];
-    ["Offset of field: _IO_FILE::_unused3"][::std::mem::offset_of!(_IO_FILE, _unused3) - 196usize];
-    ["Offset of field: _IO_FILE::_total_written"]
-        [::std::mem::offset_of!(_IO_FILE, _total_written) - 200usize];
-    ["Offset of field: _IO_FILE::_unused2"][::std::mem::offset_of!(_IO_FILE, _unused2) - 208usize];
+    ["Offset of field: _IO_FILE::_unused2"][::std::mem::offset_of!(_IO_FILE, _unused2) - 196usize];
 };
 impl Default for _IO_FILE {
     fn default() -> Self {
@@ -1204,91 +1248,165 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn __overflow(arg1: *mut FILE, arg2: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
 }
-pub type vword = u64;
-pub const lqemu_map_kind_LQEMU_MAP_COV: lqemu_map_kind = lqemu_map_kind(0);
-pub const lqemu_map_kind_LQEMU_MAP_CMP: lqemu_map_kind = lqemu_map_kind(1);
-impl ::std::ops::BitOr<lqemu_map_kind> for lqemu_map_kind {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, other: Self) -> Self {
-        lqemu_map_kind(self.0 | other.0)
-    }
-}
-impl ::std::ops::BitOrAssign for lqemu_map_kind {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: lqemu_map_kind) {
-        self.0 |= rhs.0;
-    }
-}
-impl ::std::ops::BitAnd<lqemu_map_kind> for lqemu_map_kind {
-    type Output = Self;
-    #[inline]
-    fn bitand(self, other: Self) -> Self {
-        lqemu_map_kind(self.0 & other.0)
-    }
-}
-impl ::std::ops::BitAndAssign for lqemu_map_kind {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: lqemu_map_kind) {
-        self.0 &= rhs.0;
-    }
-}
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct lqemu_map_kind(pub ::std::os::raw::c_uint);
-pub const lqemu_addr_kind_LQEMU_ADDR_PHYS: lqemu_addr_kind = lqemu_addr_kind(0);
-pub const lqemu_addr_kind_LQEMU_ADDR_VIRT: lqemu_addr_kind = lqemu_addr_kind(1);
-impl ::std::ops::BitOr<lqemu_addr_kind> for lqemu_addr_kind {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, other: Self) -> Self {
-        lqemu_addr_kind(self.0 | other.0)
-    }
-}
-impl ::std::ops::BitOrAssign for lqemu_addr_kind {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: lqemu_addr_kind) {
-        self.0 |= rhs.0;
-    }
-}
-impl ::std::ops::BitAnd<lqemu_addr_kind> for lqemu_addr_kind {
-    type Output = Self;
-    #[inline]
-    fn bitand(self, other: Self) -> Self {
-        lqemu_addr_kind(self.0 & other.0)
-    }
-}
-impl ::std::ops::BitAndAssign for lqemu_addr_kind {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: lqemu_addr_kind) {
-        self.0 &= rhs.0;
-    }
-}
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct lqemu_addr_kind(pub ::std::os::raw::c_uint);
+pub type int_least8_t = __int_least8_t;
+pub type int_least16_t = __int_least16_t;
+pub type int_least32_t = __int_least32_t;
+pub type int_least64_t = __int_least64_t;
+pub type uint_least8_t = __uint_least8_t;
+pub type uint_least16_t = __uint_least16_t;
+pub type uint_least32_t = __uint_least32_t;
+pub type uint_least64_t = __uint_least64_t;
+pub type int_fast8_t = ::std::os::raw::c_schar;
+pub type int_fast16_t = ::std::os::raw::c_long;
+pub type int_fast32_t = ::std::os::raw::c_long;
+pub type int_fast64_t = ::std::os::raw::c_long;
+pub type uint_fast8_t = ::std::os::raw::c_uchar;
+pub type uint_fast16_t = ::std::os::raw::c_ulong;
+pub type uint_fast32_t = ::std::os::raw::c_ulong;
+pub type uint_fast64_t = ::std::os::raw::c_ulong;
+pub type intmax_t = __intmax_t;
+pub type uintmax_t = __uintmax_t;
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct lqemu_map {
-    pub map_kind: lqemu_map_kind,
-    pub addr_kind: lqemu_addr_kind,
-    pub addr: vword,
-    pub len: vword,
-    pub is_physically_contiguous: bool,
+#[derive(Debug, Default)]
+pub struct _bindgen_ty_1 {
+    pub size: i32,
+    pub data: __IncompleteArrayField<u8>,
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of lqemu_map"][::std::mem::size_of::<lqemu_map>() - 32usize];
-    ["Alignment of lqemu_map"][::std::mem::align_of::<lqemu_map>() - 8usize];
-    ["Offset of field: lqemu_map::map_kind"][::std::mem::offset_of!(lqemu_map, map_kind) - 0usize];
-    ["Offset of field: lqemu_map::addr_kind"]
-        [::std::mem::offset_of!(lqemu_map, addr_kind) - 4usize];
-    ["Offset of field: lqemu_map::addr"][::std::mem::offset_of!(lqemu_map, addr) - 8usize];
-    ["Offset of field: lqemu_map::len"][::std::mem::offset_of!(lqemu_map, len) - 16usize];
-    ["Offset of field: lqemu_map::is_physically_contiguous"]
-        [::std::mem::offset_of!(lqemu_map, is_physically_contiguous) - 24usize];
+    ["Size of _bindgen_ty_1"][::std::mem::size_of::<_bindgen_ty_1>() - 4usize];
+    ["Alignment of _bindgen_ty_1"][::std::mem::align_of::<_bindgen_ty_1>() - 4usize];
+    ["Offset of field: _bindgen_ty_1::size"][::std::mem::offset_of!(_bindgen_ty_1, size) - 0usize];
+    ["Offset of field: _bindgen_ty_1::data"][::std::mem::offset_of!(_bindgen_ty_1, data) - 4usize];
 };
-impl Default for lqemu_map {
+pub type kAFL_payload = _bindgen_ty_1;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct _bindgen_ty_2 {
+    pub ip: [u64; 4usize],
+    pub size: [u64; 4usize],
+    pub enabled: [u8; 4usize],
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of _bindgen_ty_2"][::std::mem::size_of::<_bindgen_ty_2>() - 72usize];
+    ["Alignment of _bindgen_ty_2"][::std::mem::align_of::<_bindgen_ty_2>() - 8usize];
+    ["Offset of field: _bindgen_ty_2::ip"][::std::mem::offset_of!(_bindgen_ty_2, ip) - 0usize];
+    ["Offset of field: _bindgen_ty_2::size"][::std::mem::offset_of!(_bindgen_ty_2, size) - 32usize];
+    ["Offset of field: _bindgen_ty_2::enabled"]
+        [::std::mem::offset_of!(_bindgen_ty_2, enabled) - 64usize];
+};
+pub type kAFL_ranges = _bindgen_ty_2;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct host_config_t {
+    pub host_magic: u32,
+    pub host_version: u32,
+    pub bitmap_size: u32,
+    pub ijon_bitmap_size: u32,
+    pub payload_buffer_size: u32,
+    pub worker_id: u32,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of host_config_t"][::std::mem::size_of::<host_config_t>() - 24usize];
+    ["Alignment of host_config_t"][::std::mem::align_of::<host_config_t>() - 1usize];
+    ["Offset of field: host_config_t::host_magic"]
+        [::std::mem::offset_of!(host_config_t, host_magic) - 0usize];
+    ["Offset of field: host_config_t::host_version"]
+        [::std::mem::offset_of!(host_config_t, host_version) - 4usize];
+    ["Offset of field: host_config_t::bitmap_size"]
+        [::std::mem::offset_of!(host_config_t, bitmap_size) - 8usize];
+    ["Offset of field: host_config_t::ijon_bitmap_size"]
+        [::std::mem::offset_of!(host_config_t, ijon_bitmap_size) - 12usize];
+    ["Offset of field: host_config_t::payload_buffer_size"]
+        [::std::mem::offset_of!(host_config_t, payload_buffer_size) - 16usize];
+    ["Offset of field: host_config_t::worker_id"]
+        [::std::mem::offset_of!(host_config_t, worker_id) - 20usize];
+};
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct _bindgen_ty_3 {
+    pub agent_magic: u32,
+    pub agent_version: u32,
+    pub agent_timeout_detection: u8,
+    pub agent_tracing: u8,
+    pub agent_ijon_tracing: u8,
+    pub agent_non_reload_mode: u8,
+    pub trace_buffer_vaddr: u64,
+    pub ijon_trace_buffer_vaddr: u64,
+    pub coverage_bitmap_size: u32,
+    pub input_buffer_size: u32,
+    pub dump_payloads: u8,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of _bindgen_ty_3"][::std::mem::size_of::<_bindgen_ty_3>() - 37usize];
+    ["Alignment of _bindgen_ty_3"][::std::mem::align_of::<_bindgen_ty_3>() - 1usize];
+    ["Offset of field: _bindgen_ty_3::agent_magic"]
+        [::std::mem::offset_of!(_bindgen_ty_3, agent_magic) - 0usize];
+    ["Offset of field: _bindgen_ty_3::agent_version"]
+        [::std::mem::offset_of!(_bindgen_ty_3, agent_version) - 4usize];
+    ["Offset of field: _bindgen_ty_3::agent_timeout_detection"]
+        [::std::mem::offset_of!(_bindgen_ty_3, agent_timeout_detection) - 8usize];
+    ["Offset of field: _bindgen_ty_3::agent_tracing"]
+        [::std::mem::offset_of!(_bindgen_ty_3, agent_tracing) - 9usize];
+    ["Offset of field: _bindgen_ty_3::agent_ijon_tracing"]
+        [::std::mem::offset_of!(_bindgen_ty_3, agent_ijon_tracing) - 10usize];
+    ["Offset of field: _bindgen_ty_3::agent_non_reload_mode"]
+        [::std::mem::offset_of!(_bindgen_ty_3, agent_non_reload_mode) - 11usize];
+    ["Offset of field: _bindgen_ty_3::trace_buffer_vaddr"]
+        [::std::mem::offset_of!(_bindgen_ty_3, trace_buffer_vaddr) - 12usize];
+    ["Offset of field: _bindgen_ty_3::ijon_trace_buffer_vaddr"]
+        [::std::mem::offset_of!(_bindgen_ty_3, ijon_trace_buffer_vaddr) - 20usize];
+    ["Offset of field: _bindgen_ty_3::coverage_bitmap_size"]
+        [::std::mem::offset_of!(_bindgen_ty_3, coverage_bitmap_size) - 28usize];
+    ["Offset of field: _bindgen_ty_3::input_buffer_size"]
+        [::std::mem::offset_of!(_bindgen_ty_3, input_buffer_size) - 32usize];
+    ["Offset of field: _bindgen_ty_3::dump_payloads"]
+        [::std::mem::offset_of!(_bindgen_ty_3, dump_payloads) - 36usize];
+};
+pub type agent_config_t = _bindgen_ty_3;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct kafl_dump_file_t {
+    pub file_name_str_ptr: u64,
+    pub data_ptr: u64,
+    pub bytes: u64,
+    pub append: u8,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of kafl_dump_file_t"][::std::mem::size_of::<kafl_dump_file_t>() - 25usize];
+    ["Alignment of kafl_dump_file_t"][::std::mem::align_of::<kafl_dump_file_t>() - 1usize];
+    ["Offset of field: kafl_dump_file_t::file_name_str_ptr"]
+        [::std::mem::offset_of!(kafl_dump_file_t, file_name_str_ptr) - 0usize];
+    ["Offset of field: kafl_dump_file_t::data_ptr"]
+        [::std::mem::offset_of!(kafl_dump_file_t, data_ptr) - 8usize];
+    ["Offset of field: kafl_dump_file_t::bytes"]
+        [::std::mem::offset_of!(kafl_dump_file_t, bytes) - 16usize];
+    ["Offset of field: kafl_dump_file_t::append"]
+        [::std::mem::offset_of!(kafl_dump_file_t, append) - 24usize];
+};
+#[repr(C, packed)]
+#[derive(Debug, Copy, Clone)]
+pub struct req_data_bulk_t {
+    pub file_name: [::std::os::raw::c_char; 256usize],
+    pub num_addresses: u64,
+    pub addresses: [u64; 479usize],
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of req_data_bulk_t"][::std::mem::size_of::<req_data_bulk_t>() - 4096usize];
+    ["Alignment of req_data_bulk_t"][::std::mem::align_of::<req_data_bulk_t>() - 1usize];
+    ["Offset of field: req_data_bulk_t::file_name"]
+        [::std::mem::offset_of!(req_data_bulk_t, file_name) - 0usize];
+    ["Offset of field: req_data_bulk_t::num_addresses"]
+        [::std::mem::offset_of!(req_data_bulk_t, num_addresses) - 256usize];
+    ["Offset of field: req_data_bulk_t::addresses"]
+        [::std::mem::offset_of!(req_data_bulk_t, addresses) - 264usize];
+};
+impl Default for req_data_bulk_t {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {
@@ -1296,153 +1414,6 @@ impl Default for lqemu_map {
             s.assume_init()
         }
     }
-}
-pub const LibaflQemuEndStatus_LIBAFL_QEMU_END_UNKNOWN: LibaflQemuEndStatus = LibaflQemuEndStatus(0);
-pub const LibaflQemuEndStatus_LIBAFL_QEMU_END_OK: LibaflQemuEndStatus = LibaflQemuEndStatus(1);
-pub const LibaflQemuEndStatus_LIBAFL_QEMU_END_CRASH: LibaflQemuEndStatus = LibaflQemuEndStatus(2);
-impl ::std::ops::BitOr<LibaflQemuEndStatus> for LibaflQemuEndStatus {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, other: Self) -> Self {
-        LibaflQemuEndStatus(self.0 | other.0)
-    }
-}
-impl ::std::ops::BitOrAssign for LibaflQemuEndStatus {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: LibaflQemuEndStatus) {
-        self.0 |= rhs.0;
-    }
-}
-impl ::std::ops::BitAnd<LibaflQemuEndStatus> for LibaflQemuEndStatus {
-    type Output = Self;
-    #[inline]
-    fn bitand(self, other: Self) -> Self {
-        LibaflQemuEndStatus(self.0 & other.0)
-    }
-}
-impl ::std::ops::BitAndAssign for LibaflQemuEndStatus {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: LibaflQemuEndStatus) {
-        self.0 &= rhs.0;
-    }
-}
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct LibaflQemuEndStatus(pub ::std::os::raw::c_uint);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_VIRT: LibaflQemuCommand =
-    LibaflQemuCommand(0);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_START_PHYS: LibaflQemuCommand =
-    LibaflQemuCommand(1);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_END: LibaflQemuCommand = LibaflQemuCommand(4);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SAVE: LibaflQemuCommand = LibaflQemuCommand(5);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LOAD: LibaflQemuCommand = LibaflQemuCommand(6);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VERSION: LibaflQemuCommand = LibaflQemuCommand(7);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW: LibaflQemuCommand =
-    LibaflQemuCommand(8);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_INTERNAL_ERROR: LibaflQemuCommand =
-    LibaflQemuCommand(9);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LQPRINTF: LibaflQemuCommand = LibaflQemuCommand(10);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_TEST: LibaflQemuCommand = LibaflQemuCommand(11);
-pub const LibaflQemuCommand_LIBAFL_QEMU_COMMAND_SET_MAP: LibaflQemuCommand = LibaflQemuCommand(12);
-impl ::std::ops::BitOr<LibaflQemuCommand> for LibaflQemuCommand {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, other: Self) -> Self {
-        LibaflQemuCommand(self.0 | other.0)
-    }
-}
-impl ::std::ops::BitOrAssign for LibaflQemuCommand {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: LibaflQemuCommand) {
-        self.0 |= rhs.0;
-    }
-}
-impl ::std::ops::BitAnd<LibaflQemuCommand> for LibaflQemuCommand {
-    type Output = Self;
-    #[inline]
-    fn bitand(self, other: Self) -> Self {
-        LibaflQemuCommand(self.0 & other.0)
-    }
-}
-impl ::std::ops::BitAndAssign for LibaflQemuCommand {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: LibaflQemuCommand) {
-        self.0 &= rhs.0;
-    }
-}
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct LibaflQemuCommand(pub ::std::os::raw::c_uint);
-pub use self::LibaflQemuCommand as LibaflExit;
-unsafe extern "C" {
-    pub fn _lqemu_custom_insn_call0(cmd: vword) -> vword;
-}
-unsafe extern "C" {
-    pub fn _lqemu_custom_insn_call1(cmd: vword, arg1: vword) -> vword;
-}
-unsafe extern "C" {
-    pub fn _lqemu_custom_insn_call2(cmd: vword, arg1: vword, arg2: vword) -> vword;
-}
-unsafe extern "C" {
-    pub fn _lqemu_backdoor_call0(cmd: vword) -> vword;
-}
-unsafe extern "C" {
-    pub fn _lqemu_backdoor_call1(cmd: vword, arg1: vword) -> vword;
-}
-unsafe extern "C" {
-    pub fn _lqemu_backdoor_call2(cmd: vword, arg1: vword, arg2: vword) -> vword;
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_start_virt(buf_vaddr: *mut ::std::os::raw::c_void, max_len: vword) -> vword;
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_start_phys(buf_paddr: *mut ::std::os::raw::c_void, max_len: vword) -> vword;
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_input_virt(buf_vaddr: *mut ::std::os::raw::c_void, max_len: vword) -> vword;
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_input_phys(buf_paddr: *mut ::std::os::raw::c_void, max_len: vword) -> vword;
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_end(status: LibaflQemuEndStatus);
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_save();
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_load();
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_version() -> vword;
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_page_current_allow();
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_internal_error();
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_test();
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_trace_vaddr_range(start: vword, end: vword);
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_trace_vaddr_size(start: vword, size: vword);
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_set_covmap_virt(
-        vaddr: *mut ::std::os::raw::c_char,
-        len: vword,
-        is_physically_contiguous: bool,
-    );
-}
-unsafe extern "C" {
-    pub fn libafl_qemu_set_covmap_phys(paddr: *mut ::std::os::raw::c_char, len: vword);
-}
-unsafe extern "C" {
-    pub fn lqprintf(fmt: *const ::std::os::raw::c_char, ...);
 }
 pub type __builtin_va_list = [__va_list_tag; 1usize];
 #[repr(C)]

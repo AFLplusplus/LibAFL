@@ -77,7 +77,8 @@ test-docs-internal:
 
 # Tests all code in docs
 test-docs: test-docs-internal
-    RUSTDOCFLAGS="-Dwarnings" cargo {{MSRV}} doc --workspace --locked --all-features --no-deps --document-private-items
+    RUSTDOCFLAGS="-Dwarnings" cargo {{MSRV}} doc --workspace --locked --all-features --no-deps --document-private-items --exclude libafl_qemu
+    RUSTDOCFLAGS="-Dwarnings" cargo {{MSRV}} doc -p libafl_qemu --locked --no-default-features --features usermode,python --no-deps --document-private-items
 
 # Runs clippy on all crates
 [private]
