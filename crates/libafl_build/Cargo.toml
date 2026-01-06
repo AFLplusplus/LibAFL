@@ -1,0 +1,12 @@
+[package]
+name = "libafl_build"
+version = "0.16.0"
+edition = "2021"
+description = "Build-time utilities for LibAFL"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+keywords = ["fuzzing", "testing", "build"]
+categories = ["development-tools::testing", "development-tools::build-utils"]
+
+[dependencies]
+which = { workspace = true }
