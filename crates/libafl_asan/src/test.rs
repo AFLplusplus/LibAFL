@@ -44,7 +44,7 @@ type TestHost = crate::host::linux::LinuxHost;
 
 #[cfg(feature = "guest")]
 type TestShadow =
-    crate::shadow::guest::GuestShadow<TestMap, crate::shadow::guest::DefaultShadowLayout>;
+    crate::shadow::guest::GuestShadow<TestMap, crate::shadow::layout::DefaultShadowLayout>;
 
 #[cfg(feature = "guest")]
 type TestTracking = crate::tracking::guest::GuestTracking;

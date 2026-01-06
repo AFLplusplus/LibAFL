@@ -5,10 +5,7 @@ mod tests {
 
     use libafl_asan::{
         mmap::libc::LibcMmap,
-        shadow::{
-            PoisonType, Shadow,
-            guest::{DefaultShadowLayout, GuestShadow},
-        },
+        shadow::{PoisonType, Shadow, guest::GuestShadow, layout::DefaultShadowLayout},
         symbols::dlsym::{DlSymSymbols, LookupTypeNext},
     };
     use spin::Lazy;

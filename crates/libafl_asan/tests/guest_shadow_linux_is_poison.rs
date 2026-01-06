@@ -8,7 +8,8 @@ mod tests {
         mmap::libc::LibcMmap,
         shadow::{
             Shadow,
-            guest::{DefaultShadowLayout, GuestShadow, GuestShadowError},
+            guest::{GuestShadow, GuestShadowError},
+            layout::DefaultShadowLayout,
         },
         symbols::dlsym::{DlSymSymbols, LookupTypeNext},
     };

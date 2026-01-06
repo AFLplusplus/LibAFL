@@ -7,10 +7,7 @@ mod tests {
             frontend::{AllocatorFrontend, default::DefaultFrontend},
         },
         mmap::unix::MmapRegion,
-        shadow::{
-            Shadow,
-            guest::{DefaultShadowLayout, GuestShadow},
-        },
+        shadow::{Shadow, guest::GuestShadow, layout::DefaultShadowLayout},
         tracking::guest::GuestTracking,
     };
     use spin::{Lazy, Mutex, MutexGuard};
