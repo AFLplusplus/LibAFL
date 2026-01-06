@@ -238,10 +238,12 @@ fn guess_vma(arch: &Arch) -> Option<Vma> {
                 Some(get_host_vma())
             } else {
                 let default_vma = Vma::Vma48;
-                println!("cargo:warning=Host and target triplets do not match. Using default VMA: {default_vma:?}");
+                println!(
+                    "cargo:warning=Host and target triplets do not match. Using default VMA: {default_vma:?}"
+                );
                 Some(default_vma)
             }
-        },
+        }
         _ => None,
     }
 }
