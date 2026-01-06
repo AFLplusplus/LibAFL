@@ -1,10 +1,40 @@
 use std::{collections::HashMap, env, fs, ops::RangeInclusive, path::Path, sync::LazyLock};
 
-use build_target::{Arch, Os, target_arch, target_os};
+use build_target::{Arch, Os, PointerWidth, target_arch, target_os, target_pointer_width};
 use rand::Rng;
 
+// Default Linux/i386 mapping on i386 machine
+// (addresses starting with 0xc0000000 are reserved
+// for kernel and thus not sanitized):
+// || `[0x38000000, 0xbfffffff]` || HighMem    ||
+// || `[0x27000000, 0x37ffffff]` || HighShadow ||
+// || `[0x24000000, 0x26ffffff]` || ShadowGap  ||
+// || `[0x20000000, 0x23ffffff]` || LowShadow  ||
+// || `[0x00000000, 0x1fffffff]` || LowMem     ||
+const DEFAULT_32B_LAYOUT: TargetShadowLayout = TargetShadowLayout {
+    high_mem: 0x38000000..=0xbfffffff,
+    high_shadow: 0x27000000..=0x37ffffff,
+    shadow_gap: 0x24000000..=0x26ffffff,
+    low_shadow: 0x20000000..=0x23ffffff,
+    low_mem: 0x00000000..=0x1fffffff,
+};
+
+// Typical shadow mapping on Linux/x86_64 with SHADOW_OFFSET == 0x00007fff8000:
+// || `[0x10007fff8000, 0x7fffffffffff]` || HighMem    ||
+// || `[0x02008fff7000, 0x10007fff7fff]` || HighShadow ||
+// || `[0x00008fff7000, 0x02008fff6fff]` || ShadowGap  ||
+// || `[0x00007fff8000, 0x00008fff6fff]` || LowShadow  ||
+// || `[0x000000000000, 0x00007fff7fff]` || LowMem     ||
+const DEFAULT_64B_LAYOUT: TargetShadowLayout = TargetShadowLayout {
+    high_mem: 0x10007fff8000..=0x7fffffffffff,
+    high_shadow: 0x02008fff7000..=0x10007fff7fff,
+    shadow_gap: 0x00008fff7000..=0x02008fff6fff,
+    low_shadow: 0x00007fff8000..=0x00008fff6fff,
+    low_mem: 0x000000000000..=0x00007fff7fff,
+};
+
 #[expect(clippy::type_complexity)]
-static LAYOUTS: LazyLock<HashMap<(Arch, Option<Vma>, Os), TargetShadowLayout>> =
+static SPECIFIC_LAYOUTS: LazyLock<HashMap<(Arch, Option<Vma>, Os), TargetShadowLayout>> =
     LazyLock::new(|| {
         let mut layouts = HashMap::new();
 
@@ -14,16 +44,7 @@ static LAYOUTS: LazyLock<HashMap<(Arch, Option<Vma>, Os), TargetShadowLayout>> =
         // || `[0x00008fff7000, 0x02008fff6fff]` || ShadowGap  ||
         // || `[0x00007fff8000, 0x00008fff6fff]` || LowShadow  ||
         // || `[0x000000000000, 0x00007fff7fff]` || LowMem     ||
-        layouts.insert(
-            (Arch::X86_64, None, Os::Linux),
-            TargetShadowLayout {
-                high_mem: 0x10007fff8000..=0x7fffffffffff,
-                high_shadow: 0x02008fff7000..=0x10007fff7fff,
-                shadow_gap: 0x00008fff7000..=0x02008fff6fff,
-                low_shadow: 0x00007fff8000..=0x00008fff6fff,
-                low_mem: 0x000000000000..=0x00007fff7fff,
-            },
-        );
+        layouts.insert((Arch::X86_64, None, Os::Linux), DEFAULT_64B_LAYOUT.clone());
 
         // Default Linux/i386 mapping on i386 machine
         // (addresses starting with 0xc0000000 are reserved
@@ -33,16 +54,7 @@ static LAYOUTS: LazyLock<HashMap<(Arch, Option<Vma>, Os), TargetShadowLayout>> =
         // || `[0x24000000, 0x26ffffff]` || ShadowGap  ||
         // || `[0x20000000, 0x23ffffff]` || LowShadow  ||
         // || `[0x00000000, 0x1fffffff]` || LowMem     ||
-        layouts.insert(
-            (Arch::X86, None, Os::Linux),
-            TargetShadowLayout {
-                high_mem: 0x38000000..=0xbfffffff,
-                high_shadow: 0x27000000..=0x37ffffff,
-                shadow_gap: 0x24000000..=0x26ffffff,
-                low_shadow: 0x20000000..=0x23ffffff,
-                low_mem: 0x00000000..=0x1fffffff,
-            },
-        );
+        layouts.insert((Arch::X86, None, Os::Linux), DEFAULT_32B_LAYOUT.clone());
 
         // Default Linux/AArch64 (48-bit VMA) mapping:
         // || `[0x201000000000, 0xffffffffffff]` || HighMem    || 229312GB
@@ -230,12 +242,21 @@ fn get_layout() -> TargetShadowLayout {
     let vma = get_arch_vma(&arch);
     let os = target_os();
 
-    LAYOUTS
-        .get(&(arch.clone(), vma, os.clone()))
-        .unwrap_or_else(|| {
-            panic!("Could not find the right layout for {arch:?} (VMA {vma:?}) {os:?}")
-        })
-        .clone()
+    if let Some(specific_layout) = SPECIFIC_LAYOUTS.get(&(arch.clone(), vma, os.clone())) {
+        specific_layout.clone()
+    } else {
+        let (default_layout, nb_bits) = match target_pointer_width() {
+            PointerWidth::U32 => (DEFAULT_32B_LAYOUT.clone(), 32),
+            PointerWidth::U64 => (DEFAULT_64B_LAYOUT.clone(), 64),
+            _ => {
+                panic!("Could not find the right layout for {arch:?} (VMA {vma:?}) {os:?}")
+            }
+        };
+
+        println!("cargo:warning=Using default layout for {nb_bits} bits architectures.");
+
+        default_layout
+    }
 }
 
 fn main() {
@@ -303,6 +324,4 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("gen_layout.rs");
     fs::write(&dest_path, gen_layout).unwrap();
-
-    println!("cargo:warning={}", dest_path.display());
 }
