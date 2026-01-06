@@ -228,18 +228,16 @@ fn get_host_vma() -> Vma {
     }
 }
 
-fn get_arch_vma(arch: &Arch) -> Option<Vma> {
+fn guess_vma(arch: &Arch) -> Option<Vma> {
     match arch {
-        Arch::X86_64 => None,
-        Arch::X86 => None,
         Arch::AArch64 => Some(get_host_vma()),
-        _ => panic!("Dynamic layout does not support arch: {arch:?}"),
+        _ => None,
     }
 }
 
 fn get_layout() -> TargetShadowLayout {
     let arch = target_arch();
-    let vma = get_arch_vma(&arch);
+    let vma = guess_vma(&arch);
     let os = target_os();
 
     if let Some(specific_layout) = SPECIFIC_LAYOUTS.get(&(arch.clone(), vma, os.clone())) {
