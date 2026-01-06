@@ -47,7 +47,7 @@ where
             // So len + 1 is always non-zero.
             let size = state
                 .rand_mut()
-                .below(unsafe { NonZero::new(input.terminals().len() + 1).unwrap_unchecked() });
+                .below(unsafe { NonZero::new_unchecked(input.terminals().len() + 1) });
             input.terminals_mut().truncate(size);
         }
         if self.generator.append_generated_terminals(input, state) > 0 {
