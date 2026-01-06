@@ -123,10 +123,10 @@ mod tests {
     fn test_try_nonzero() {
         // Const context
         const VAL: Option<NonZeroU8> = try_nonzero!(5);
+        const ZERO: Option<NonZeroU8> = try_nonzero!(0);
+
         assert!(VAL.is_some());
         assert_eq!(VAL.unwrap().get(), 5);
-
-        const ZERO: Option<NonZeroU8> = try_nonzero!(0);
         assert!(ZERO.is_none());
 
         // Runtime context
