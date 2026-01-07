@@ -309,6 +309,7 @@ where
 
                 core::sync::atomic::compiler_fence(Ordering::SeqCst);
 
+                // If the child exited via Ctrl+C, we stop the respawner.
                 if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     return Err(Error::shutting_down());
                 }

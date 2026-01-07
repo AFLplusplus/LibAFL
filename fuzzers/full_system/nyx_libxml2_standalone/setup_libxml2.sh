@@ -11,7 +11,15 @@ if [ -z "$LLVM_CONFIG" ]; then
     pushd "$SCRIPT_DIR/../../../utils/find_llvm_config"
     cargo build --release
     popd
-    LLVM_CONFIG=$("$SCRIPT_DIR/../../../utils/find_llvm_config/target/release/find_llvm_config")
+    # It is in workspace target
+    if [ -f "$SCRIPT_DIR/../../../target/release/find_llvm_config" ]; then
+        LLVM_CONFIG=$("$SCRIPT_DIR/../../../target/release/find_llvm_config")
+    elif [ -f "$SCRIPT_DIR/../../../utils/find_llvm_config/target/release/find_llvm_config" ]; then
+        LLVM_CONFIG=$("$SCRIPT_DIR/../../../utils/find_llvm_config/target/release/find_llvm_config")
+    else
+        echo "Could not find find_llvm_config binary"
+        exit 1
+    fi
     export LLVM_CONFIG
 fi
 
@@ -56,19 +64,21 @@ if [ -z "$AFL_CC" ]; then
     export AFL_CXX="$($LLVM_CONFIG --bindir)/clang++"
 fi
 
-# Force local AFL++ build to avoid broken system binary
-echo "Building local AFL++..."
-export LLVM_CONFIG=llvm-config-18
-if [ ! -d "AFLplusplus" ]; then
-    git clone https://github.com/AFLplusplus/AFLplusplus.git
-fi
-pushd AFLplusplus
-make clean
-make
-popd
+# Use libafl_cc
+# We build it from the current crate (nyx_libxml2_parallel) which has src/bin/libafl_cc.rs
+echo "Building libafl_cc..."
+cargo build --bin libafl_cc
 
-export CC="$SCRIPT_DIR/AFLplusplus/afl-clang-fast"
-export CXX="$SCRIPT_DIR/AFLplusplus/afl-clang-fast++"
+LIBAFL_CC="$SCRIPT_DIR/target/debug/libafl_cc"
+LIBAFL_CXX="$SCRIPT_DIR/target/debug/libafl_cxx"
+
+# Create symlink for C++ if missing
+if [ ! -f "$LIBAFL_CXX" ]; then
+    ln -s "$LIBAFL_CC" "$LIBAFL_CXX"
+fi
+
+export CC="$LIBAFL_CC"
+export CXX="$LIBAFL_CXX"
 
 echo "DEBUG: CC: $CC"
 $CC --version
