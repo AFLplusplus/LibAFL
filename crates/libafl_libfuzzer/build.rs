@@ -185,6 +185,18 @@ fn rename_symbols(custom_lib_target: &Path) -> PathBuf {
     let rust_objcopy = target_libdir.join("../bin/llvm-objcopy");
     let nm = target_libdir.join("../bin/llvm-nm");
 
+    let nm = if nm.exists() {
+        nm.to_str().unwrap().to_string()
+    } else {
+        libafl_build::find_llvm_tool("llvm-nm").expect("Could not find llvm-nm")
+    };
+
+    let rust_objcopy = if rust_objcopy.exists() {
+        rust_objcopy.to_str().unwrap().to_string()
+    } else {
+        libafl_build::find_llvm_tool("llvm-objcopy").expect("Could not find llvm-objcopy")
+    };
+
     let redefined_archive_path = custom_lib_target.join("libFuzzer.a");
     let redefined_symbols = custom_lib_target.join("redefs.txt");
 

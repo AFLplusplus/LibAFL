@@ -46,12 +46,28 @@ run_multi: build harness
         -- {{ HARNESS }}
 
 [unix]
+repro:
+    {{REAL_CC}} repro.c -o repro
+
+[unix]
+test_repro: build repro
+    mkdir -p corpus_repro
+    echo "AAAAABUG" > corpus_repro/test_case
+    {{ FUZZER_SINGLE }} \
+        --output ./output_repro \
+        --input ./corpus_repro \
+        --iterations 100 \
+        -- ./repro
+
+[unix]
 test:
     ARCH=x86_64 just run_single
     ARCH=x86_64 just run_multi
     ARCH=arm just run_single
     ARCH=arm just run_multi
+    ARCH=x86_64 just test_repro
 
 [unix]
 clean:
     cargo clean
+    rm -rf corpus_repro output_repro repro
