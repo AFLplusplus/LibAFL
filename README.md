@@ -29,8 +29,10 @@ feel free to add an AST-based input for structured fuzzing, and more.
 
 - **The Rust development language**
   - We highly recommend *not* to use e.g. your Linux distribution package as this is likely outdated. So rather install Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
-   - Minimum supported Rust version: `1.89.0`
-    - If your installed Rust version is **lower than `1.89.0`**, update to the latest stable toolchain:
+  - The minimum supported Rust version is defined. You can always check the currently required version in LibAFL’s [Cargo.toml](https://github.com/AFLplusplus/LibAFL/blob/main/crates/libafl/Cargo.toml):
+
+    If your installed Rust version is older than the one listed in Cargo.toml, update to the latest stable toolchain:
+
     ```bash
     rustup update stable
     ```
