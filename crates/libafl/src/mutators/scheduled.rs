@@ -156,7 +156,7 @@ where
         // We check for empty mutations
         state
             .rand_mut()
-            .below(unsafe { NonZero::new(self.mutations.len()).unwrap_unchecked() })
+            .below(unsafe { NonZero::new_unchecked(self.mutations.len()) })
             .into()
     }
 }
@@ -238,7 +238,7 @@ where
         // We check for empty mutations
         state
             .rand_mut()
-            .below(unsafe { NonZero::new(self.mutations.len()).unwrap_unchecked() })
+            .below(unsafe { NonZero::new_unchecked(self.mutations.len()) })
             .into()
     }
 }

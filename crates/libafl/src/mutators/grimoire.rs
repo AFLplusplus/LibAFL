@@ -307,7 +307,7 @@ where
         // # Safety
         // gen.len() is positive.
         let rand_idx = fast_bound(rand_idx, unsafe {
-            NonZero::new(generalized.len()).unwrap_unchecked()
+            NonZero::new_unchecked(generalized.len())
         });
 
         'first: for item in &mut generalized[..rand_idx] {

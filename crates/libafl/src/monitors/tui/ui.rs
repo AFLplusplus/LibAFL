@@ -277,6 +277,15 @@ impl TuiUi {
                         Span::raw("solutions"),
                         format_big_number(client.client_stats.objective_size()),
                     ),
+                    (
+                        Span::raw("current testcase"),
+                        client
+                            .client_stats
+                            .user_stats()
+                            .get("current_testcase_idx")
+                            .and_then(|s| s.value().as_u64())
+                            .map_or_else(|| "-".to_string(), |v| v.to_string()),
+                    ),
                 ],
             };
 

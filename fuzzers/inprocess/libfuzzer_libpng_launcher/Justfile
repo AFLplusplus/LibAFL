@@ -55,13 +55,13 @@ lib:
 fuzzer: lib cxx
     mkdir -p {{PROJECT_DIR}}/corpus
     cp {{PROJECT_DIR}}/libpng-1.6.37/contrib/testpngs/rgb-alpha-8.png {{PROJECT_DIR}}/corpus/seed.png
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/{{PROFILE_DIR}}/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz --libafl-ignore-configurations -Wl,--allow-multiple-definition
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/{{PROFILE_DIR}}/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}.coverage -lm -lz --libafl-ignore-configurations -Wl,--allow-multiple-definition
 
 [macos]
 fuzzer: lib cxx
     mkdir -p {{PROJECT_DIR}}/corpus
     cp {{PROJECT_DIR}}/libpng-1.6.37/contrib/testpngs/rgb-alpha-8.png {{PROJECT_DIR}}/corpus/seed.png
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/{{PROFILE_DIR}}/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz -framework CoreFoundation -framework Security
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/{{PROFILE_DIR}}/liblibfuzzer_libpng.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}}.coverage -lm -lz -framework CoreFoundation -framework Security
 
 [windows]
 fuzzer:
@@ -82,7 +82,7 @@ test: fuzzer test-statsd test-tcp-fork test-tcp-no-fork test-tui test-all
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
     echo "Testing default (no fork)..."
-    timeout 31s ./{{FUZZER_NAME}} --broker-port 21337 --cores 0 --input ./corpus  2>&1 | tee fuzz_stdout.log || true
+    timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21337 --cores 0 --input ./corpus  2>&1 | tee fuzz_stdout.log || true
     if grep -qa "corpus: " fuzz_stdout.log; then
         echo "Fuzzer (no fork) is working"
     else
@@ -93,7 +93,7 @@ test: fuzzer test-statsd test-tcp-fork test-tcp-no-fork test-tui test-all
     echo "Testing with fork..."
     rm -rf libafl_unix_shmem_server || true
     rm -rf out_fork || true
-    timeout 31s ./{{FUZZER_NAME}} --broker-port 21338 --cores 0 --input ./corpus --output ./out_fork --fork 2>&1 | tee fuzz_fork_stdout.log || true
+    timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21338 --cores 0 --input ./corpus --output ./out_fork --fork 2>&1 | tee fuzz_fork_stdout.log || true
     if grep -qa "corpus: " fuzz_fork_stdout.log; then
         echo "Fuzzer (fork) is working"
     else
@@ -106,7 +106,7 @@ test: fuzzer test-statsd test-tcp-fork test-tcp-no-fork test-tui test-all
     rm -rf out_fork_crash || true
     # Run with crash_after. It should crash and restart repeatedly.
     # We check if it still produces output/runs.
-    timeout 31s ./{{FUZZER_NAME}} --broker-port 21343 --cores 0 --input ./corpus --output ./out_fork_crash --fork --crash-after 100 2>&1 | tee fuzz_fork_crash_stdout.log || true
+    timeout 31s ./{{FUZZER_NAME}}.coverage --broker-port 21343 --cores 0 --input ./corpus --output ./out_fork_crash --fork --crash-after 100 2>&1 | tee fuzz_fork_crash_stdout.log || true
     # Check for objectives (crashes are recorded as objectives in the stats)
     # Note: forked child's stderr may not propagate, so we check stats output
     if grep -qa "objectives: [1-9]" fuzz_fork_crash_stdout.log; then
@@ -301,6 +301,6 @@ test-all: fuzzer-all
 
 
 clean:
-    rm -rf {{FUZZER_NAME}}
+    rm -rf {{FUZZER_NAME}}.coverage
     make -C libpng-1.6.37 clean || true
     cargo clean
