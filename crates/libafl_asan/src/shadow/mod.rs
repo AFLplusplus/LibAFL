@@ -21,6 +21,8 @@ pub mod guest;
 #[cfg(feature = "host")]
 pub mod host;
 
+pub mod layout;
+
 #[repr(u8)]
 #[derive(Debug, Copy, Clone)]
 pub enum PoisonType {

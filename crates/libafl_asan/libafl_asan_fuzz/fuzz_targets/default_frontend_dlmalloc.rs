@@ -9,10 +9,7 @@ use libafl_asan::{
         frontend::{AllocatorFrontend, default::DefaultFrontend},
     },
     mmap::unix::MmapRegion,
-    shadow::{
-        Shadow,
-        guest::{DefaultShadowLayout, GuestShadow},
-    },
+    shadow::{Shadow, guest::GuestShadow, layout::DefaultShadowLayout},
     tracking::guest::GuestTracking,
 };
 use libfuzzer_sys::fuzz_target;
