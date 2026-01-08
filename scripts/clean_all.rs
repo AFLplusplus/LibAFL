@@ -1,6 +1,4 @@
 use std::env;
-use std::fs;
-use std::path::Path;
 use std::process::{Command, exit};
 
 fn main() {
@@ -70,3 +68,16 @@ fn main() {
         }
     }
 }
+
+
+
+// README
+
+// - first we will compile the rust file
+//     rustc scripts/clean_all.rs -o scripts/clean_all
+
+// - now we have the executable which we will run
+//     ./scripts/clean_all
+
+
+
