@@ -45,7 +45,7 @@ pub fn fuzz() {
     };
     // Hardcoded parameters
     let timeout = Duration::from_secs(3);
-    let broker_port = 1337;
+    let broker_port = 1338;
     let cores = Cores::from_cmdline("1").unwrap();
     let corpus_dirs = [PathBuf::from("./corpus")];
     let objective_dir = PathBuf::from("./crashes");

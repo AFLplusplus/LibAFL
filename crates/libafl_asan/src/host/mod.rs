@@ -17,7 +17,7 @@ pub mod linux;
 #[repr(usize)]
 #[derive(Debug, Copy, Clone)]
 #[allow(dead_code)]
-enum HostAction {
+pub enum HostAction {
     CheckLoad,
     CheckStore,
     Poison,

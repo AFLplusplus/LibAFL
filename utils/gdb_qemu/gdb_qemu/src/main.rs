@@ -1,6 +1,5 @@
 mod args;
 mod child;
-mod errno;
 mod exit;
 mod logger;
 mod parent;

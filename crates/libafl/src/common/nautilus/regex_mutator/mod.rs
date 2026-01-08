@@ -4,12 +4,14 @@ use core::num::NonZero;
 use libafl_bolts::rands::Rand;
 use regex_syntax::hir::{Class, ClassBytesRange, ClassUnicodeRange, Hir, Literal};
 
+/// A script for generating strings from a regex
 #[derive(Debug)]
 pub struct RegexScript {
     remaining: usize,
 }
 
 impl RegexScript {
+    /// Create a new [`RegexScript`]
     pub fn new<R: Rand>(rand: &mut R) -> Self {
         let len = if rand.next().is_multiple_of(256) {
             rand.next() % 0xffff
@@ -22,16 +24,18 @@ impl RegexScript {
         }
     }
 
+    /// Get a value modulo `val`
     pub fn get_mod<R: Rand>(&mut self, rand: &mut R, val: usize) -> usize {
         if self.remaining == 0 || val == 0 {
             0
         } else {
             // # Safety
             // This is checked above to be non-null.
-            rand.below(unsafe { NonZero::new(val).unwrap_unchecked() })
+            rand.below(unsafe { NonZero::new_unchecked(val) })
         }
     }
 
+    /// Get a value in the range `[min, max)`
     pub fn get_range<R: Rand>(&mut self, rand: &mut R, min: usize, max: usize) -> usize {
         self.get_mod(rand, max - min) + min
     }
@@ -119,6 +123,7 @@ fn get_repetitions<R: Rand>(
     }
 }
 
+/// Generate a string from a regex
 pub fn generate<R: Rand>(rand: &mut R, hir: &Hir) -> Vec<u8> {
     use regex_syntax::hir::HirKind;
     let mut scr = RegexScript::new(rand);

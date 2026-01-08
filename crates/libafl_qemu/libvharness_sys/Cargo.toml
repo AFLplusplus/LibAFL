@@ -34,7 +34,7 @@ riscv64 = []
 clippy = []
 
 [build-dependencies]
-cmake = "0.1.54"
+cmake = "0.1.57"
 bindgen = "0.72.0"
 
 [lints]

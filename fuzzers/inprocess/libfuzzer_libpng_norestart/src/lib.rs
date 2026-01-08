@@ -10,9 +10,8 @@ use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
-        launcher::{ClientDescription, Launcher},
-        llmp::LlmpShouldSaveState,
-        EventConfig, EventRestarter, LlmpRestartingEventManager,
+        ClientDescription, EventConfig, EventRestarter, Launcher, LlmpRestartingEventManager,
+        ShouldSaveState,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -21,7 +20,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::{MultiMonitor, OnDiskTomlMonitor},
     mutators::{
-        havoc_mutations::havoc_mutations,
+        havoc_mutations,
         scheduled::{tokens_mutations, HavocScheduledMutator},
         token_mutations::Tokens,
     },
@@ -289,9 +288,9 @@ pub extern "C" fn libafl_main() {
         .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"))
         .serialize_state(if opt.reload_corpus {
-            LlmpShouldSaveState::OOMSafeNever
+            ShouldSaveState::OOMSafeNever
         } else {
-            LlmpShouldSaveState::OOMSafeOnRestart
+            ShouldSaveState::OOMSafeOnRestart
         })
         .build()
         .launch()

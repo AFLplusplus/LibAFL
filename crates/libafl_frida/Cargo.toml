@@ -73,7 +73,7 @@ frida-gum = { version = "0.17.1", features = [
   "script",
   "backtrace",
 ] }
-dynasmrt = "4.0.1"
+dynasmrt = "4.0.2"
 
 color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
 termcolor = "1.4.1"
@@ -110,7 +110,7 @@ yaxpeax-x86 = "2.0.0"
 iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-winsafe = { version = "0.0.26", features = ["kernel"] }
+winsafe = { version = "0.0.27", features = ["kernel"] }
 winapi = { version = "0.3", features = [
   "processthreadsapi",
   "winnt",

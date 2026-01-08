@@ -206,18 +206,18 @@ pub fn fuzz() -> Result<(), Error> {
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
     let monitor = SimpleMonitor::new(|s| log::info!("{s}"));
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
-    {
-        Ok(res) => res,
-        Err(err) => match err {
-            Error::ShuttingDown => {
-                return Ok(());
-            }
-            _ => {
-                panic!("Failed to setup the restarter: {err}");
-            }
-        },
-    };
+    let (state, mut mgr) =
+        match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider, false) {
+            Ok(res) => res,
+            Err(err) => match err {
+                Error::ShuttingDown => {
+                    return Ok(());
+                }
+                _ => {
+                    panic!("Failed to setup the restarter: {err}");
+                }
+            },
+        };
 
     let mut feedback = MaxMapFeedback::new(&edges_observer);
 
@@ -238,7 +238,7 @@ pub fn fuzz() -> Result<(), Error> {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     #[cfg(feature = "fork")]
-    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
+    let mut harness = |_emulator: &mut _, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();

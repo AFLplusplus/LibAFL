@@ -34,14 +34,18 @@ mod snapshot;
 pub use snapshot::*;
 
 #[cfg(feature = "usermode")]
-mod usermode;
+pub(crate) mod usermode;
 #[cfg(feature = "usermode")]
 pub use usermode::*;
 
 #[cfg(feature = "systemmode")]
-mod systemmode;
+pub(crate) mod systemmode;
+#[cfg(feature = "systemmode")]
+pub use systemmode::StdSnapshotManager;
 #[cfg(feature = "systemmode")]
 pub use systemmode::*;
+#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
+pub use usermode::StdSnapshotManager;
 
 use crate::config::QemuConfigBuilder;
 
@@ -150,7 +154,9 @@ impl Add<GuestUsize> for GuestAddrKind {
 
     fn add(self, rhs: GuestUsize) -> Self::Output {
         match self {
-            GuestAddrKind::Physical(paddr) => GuestAddrKind::Physical(paddr + rhs as GuestPhysAddr),
+            GuestAddrKind::Physical(paddr) => {
+                GuestAddrKind::Physical(paddr + GuestPhysAddr::from(rhs))
+            }
             GuestAddrKind::Virtual(vaddr) => GuestAddrKind::Virtual(vaddr + rhs as GuestVirtAddr),
         }
     }

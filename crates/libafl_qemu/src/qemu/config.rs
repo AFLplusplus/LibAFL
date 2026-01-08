@@ -569,7 +569,7 @@ mod test {
     #[test]
     #[cfg(feature = "systemmode")]
     fn accelerator_kvm_to_string() {
-        let accel = Accelerator::Kvm;
+        let accel = Accelerator::Kvm(KvmProperties::default());
         assert_eq!(accel.to_string(), "-accel kvm");
     }
 }

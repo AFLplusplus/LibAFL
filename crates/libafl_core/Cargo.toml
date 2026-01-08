@@ -57,6 +57,7 @@ backtrace = { workspace = true, default-features = true, optional = true }
 postcard = { workspace = true, optional = true }
 nix = { workspace = true, optional = true }
 pyo3 = { workspace = true, optional = true }
+nonzero_macros = { workspace = true }
 serde = { workspace = true, features = ["derive", "alloc"], optional = true }
 
 [target.'cfg(windows)'.dependencies]

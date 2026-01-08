@@ -9,10 +9,10 @@ pub use combined::CombinedExecutor;
 #[cfg(feature = "std")]
 pub use command::CommandExecutor;
 pub use differential::DiffExecutor;
-#[cfg(all(feature = "std", feature = "fork", unix))]
+#[cfg(all(feature = "std", unix))]
 pub use forkserver::{Forkserver, ForkserverExecutor};
 pub use inprocess::InProcessExecutor;
-#[cfg(all(feature = "std", feature = "fork", unix))]
+#[cfg(all(feature = "std", unix))]
 pub use inprocess_fork::InProcessForkExecutor;
 #[cfg(unix)]
 use libafl_bolts::os::unix_signals::Signal;
@@ -31,7 +31,7 @@ pub mod combined;
 #[cfg(feature = "std")]
 pub mod command;
 pub mod differential;
-#[cfg(all(feature = "std", feature = "fork", unix))]
+#[cfg(all(feature = "std", unix))]
 pub mod forkserver;
 pub mod inprocess;
 pub mod nop;
@@ -344,7 +344,7 @@ pub mod test {
     fn nop_executor() {
         let empty_input = BytesInput::new(vec![]);
         let mut executor = NopExecutor::ok();
-        let mut fuzzer = NopFuzzer::new();
+        let mut fuzzer: NopFuzzer = NopFuzzer::new();
         let mut mgr: NopEventManager = NopEventManager::new();
         let mut state: NopState<BytesInput> = NopState::new();
 

@@ -11,6 +11,8 @@ edition = "2021"
 default = ["std"]
 std = []
 statsd = ["libafl/statsd_monitor"]
+tcp_manager = ["libafl/tcp_manager"]
+tui = ["libafl/tui_monitor"]
 
 [profile.release]
 lto = true
@@ -33,6 +35,7 @@ libafl_bolts = { path = "../../../crates/libafl_bolts" }
 libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_pcguard_hitcounts",
   "libfuzzer",
+  "common",
 ] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../../crates/libafl_cc" }

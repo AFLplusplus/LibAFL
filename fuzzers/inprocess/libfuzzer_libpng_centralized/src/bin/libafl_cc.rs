@@ -1,6 +1,6 @@
 use std::env;
 
-use libafl_cc::{ClangWrapper, CompilerWrapper, ToolWrapper};
+use libafl_cc::{ClangWrapper, CompilerWrapper, Configuration, ToolWrapper};
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -24,7 +24,19 @@ pub fn main() {
             .parse_args(&args)
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "libfuzzer_libpng")
-            .add_arg("-fsanitize-coverage=trace-pc-guard")
+            .add_configuration(Configuration::GenerateCoverageMap)
+            .add_configuration(Configuration::Compound(vec![
+                Configuration::GenerateCoverageMap,
+                Configuration::CmpLog,
+            ]))
+            .add_configuration(Configuration::Compound(vec![
+                Configuration::GenerateCoverageMap,
+                Configuration::AddressSanitizer,
+            ]))
+            .add_configuration(Configuration::Compound(vec![
+                Configuration::GenerateCoverageMap,
+                Configuration::UndefinedBehaviorSanitizer,
+            ]))
             .run()
             .expect("Failed to run the wrapped compiler")
         {

@@ -1,5 +1,9 @@
 //! Stage to compute and report AFL++ stats
-use alloc::{borrow::Cow, string::String, vec::Vec};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{
     fmt::{Debug, Display},
     marker::PhantomData,
@@ -12,6 +16,7 @@ use std::{
     process,
 };
 
+use hashbrown::HashMap;
 #[cfg(unix)]
 use libafl_bolts::os::peak_rss_mb_child_processes;
 use libafl_bolts::{
@@ -30,13 +35,16 @@ use crate::{
     events::{Event, EventFirer, EventWithStats},
     executors::HasObservers,
     feedbacks::{HasObserverHandle, MapFeedbackMetadata},
-    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::user_stats::{
+        AggregatorOps, TAG_AFL_STATS_CYCLES_DONE, TAG_AFL_STATS_CYCLES_WO_FINDS,
+        TAG_AFL_STATS_IMPORTED, TAG_AFL_STATS_OWN_FINDS, TAG_AFL_STATS_PENDING,
+        TAG_AFL_STATS_PENDING_FAV, UserStats, UserStatsValue,
+    },
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{HasQueueCycles, minimizer::IsFavoredMetadata},
     stages::{Restartable, Stage, calibrate::UnstableEntriesMetadata},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable},
-    std::string::ToString,
 };
 
 /// AFL++'s default stats update interval
@@ -412,29 +420,91 @@ where
         if self.plot_file_path.is_some() {
             self.write_plot_data(&plot_data)?;
         }
-
+        let filename = testcase.filename().clone();
+        let parent_idx = testcase.parent_id().map(|id| id.0);
         drop(testcase);
 
-        // We construct this simple json by hand to squeeze out some extra speed.
-        let json = format!(
-            "{{\
-                \"pending\":{},\
-                \"pending_fav\":{},\
-                \"own_finds\":{},\
-                \"imported\":{}\
-            }}",
-            stats.pending_total, stats.pending_favs, stats.corpus_found, stats.corpus_imported
+        // Send the stats as a list of UserStats
+        let mut stats_map = HashMap::default();
+        stats_map.insert(
+            Cow::Borrowed("pending"),
+            UserStats::with_tag(
+                UserStatsValue::Number(stats.pending_total as u64),
+                AggregatorOps::Sum,
+                TAG_AFL_STATS_PENDING,
+            ),
         );
+        stats_map.insert(
+            Cow::Borrowed("pending_fav"),
+            UserStats::with_tag(
+                UserStatsValue::Number(stats.pending_favs as u64),
+                AggregatorOps::Sum,
+                TAG_AFL_STATS_PENDING_FAV,
+            ),
+        );
+        stats_map.insert(
+            Cow::Borrowed("own_finds"),
+            UserStats::with_tag(
+                UserStatsValue::Number(stats.corpus_found as u64),
+                AggregatorOps::Sum,
+                TAG_AFL_STATS_OWN_FINDS,
+            ),
+        );
+        stats_map.insert(
+            Cow::Borrowed("imported"),
+            UserStats::with_tag(
+                UserStatsValue::Number(stats.corpus_imported as u64),
+                AggregatorOps::Sum,
+                TAG_AFL_STATS_IMPORTED,
+            ),
+        );
+        stats_map.insert(
+            Cow::Borrowed("cycles_done"),
+            UserStats::with_tag(
+                UserStatsValue::Number(self.cycles_done),
+                AggregatorOps::Sum,
+                TAG_AFL_STATS_CYCLES_DONE,
+            ),
+        );
+        stats_map.insert(
+            Cow::Borrowed("cycles_wo_finds"),
+            UserStats::with_tag(
+                UserStatsValue::Number(self.cycles_wo_finds),
+                AggregatorOps::Sum,
+                TAG_AFL_STATS_CYCLES_WO_FINDS,
+            ),
+        );
+        stats_map.insert(
+            Cow::Borrowed("current_testcase_idx"),
+            UserStats::new(
+                UserStatsValue::Number(corpus_idx.0 as u64),
+                AggregatorOps::None,
+            ),
+        );
+        if let Some(filename) = filename {
+            stats_map.insert(
+                Cow::Borrowed("current_testcase_filename"),
+                UserStats::new(
+                    UserStatsValue::String(Cow::Owned(filename.clone())),
+                    AggregatorOps::None,
+                ),
+            );
+        }
+        if let Some(parent_idx) = parent_idx {
+            stats_map.insert(
+                Cow::Borrowed("current_testcase_parent_idx"),
+                UserStats::new(
+                    UserStatsValue::Number(parent_idx as u64),
+                    AggregatorOps::None,
+                ),
+            );
+        }
 
         manager.fire(
             state,
             EventWithStats::with_current_time(
-                Event::UpdateUserStats {
-                    name: Cow::Borrowed("AflStats"),
-                    value: UserStats::new(
-                        UserStatsValue::String(Cow::Owned(json)),
-                        AggregatorOps::None,
-                    ),
+                Event::UpdateUserStatsMap {
+                    stats: stats_map,
                     phantom: PhantomData,
                 },
                 *state.executions(),

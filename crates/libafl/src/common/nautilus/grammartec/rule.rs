@@ -16,9 +16,12 @@ use crate::common::nautilus::{
     regex_mutator,
 };
 
+/// A child of a rule, either a terminal or a nonterminal
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RuleChild {
+    /// A terminal string
     Term(Vec<u8>),
+    /// A nonterminal
     NTerm(NTermId),
 }
 
@@ -37,11 +40,13 @@ fn show_bytes(bs: &[u8]) -> String {
 }
 
 impl RuleChild {
+    /// Create a new terminal [`RuleChild`]
     #[must_use]
     pub fn from_lit(lit: &[u8]) -> Self {
         RuleChild::Term(lit.into())
     }
 
+    /// Create a new nonterminal [`RuleChild`]
     pub fn from_nt(nt: &str, ctx: &mut Context) -> Self {
         let (nonterm, _) = RuleChild::split_nt_description(nt);
         RuleChild::NTerm(ctx.aquire_nt_id(&nonterm))
@@ -67,12 +72,16 @@ impl RuleChild {
     }
 }
 
+/// A rule ID or a custom rule (e.g. regex generated)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RuleIdOrCustom {
+    /// A standard rule ID
     Rule(RuleId),
+    /// A custom rule with generated data
     Custom(RuleId, Vec<u8>),
 }
 impl RuleIdOrCustom {
+    /// Get the rule ID
     #[must_use]
     pub fn id(&self) -> RuleId {
         match self {
@@ -80,6 +89,7 @@ impl RuleIdOrCustom {
         }
     }
 
+    /// Get the data for a custom rule
     #[must_use]
     pub fn data(&self) -> &[u8] {
         match self {
@@ -89,37 +99,50 @@ impl RuleIdOrCustom {
     }
 }
 
+/// A rule in the grammar
 #[derive(Debug, Clone)]
 pub enum Rule {
+    /// A plain rule
     Plain(PlainRule),
+    /// A script rule (Python)
     #[cfg(feature = "nautilus_py")]
     Script(ScriptRule),
+    /// A regex rule
     RegExp(RegExpRule),
 }
 
+/// A regex rule
 #[derive(Debug, Clone)]
 pub struct RegExpRule {
+    /// The nonterminal this rule produces
     pub nonterm: NTermId,
+    /// The regex HIR
     pub hir: Hir,
 }
 
 impl RegExpRule {
+    /// Debug show
     #[must_use]
     pub fn debug_show(&self, ctx: &Context) -> String {
         format!("{} => {:?}", ctx.nt_id_to_s(self.nonterm), self.hir)
     }
 }
 
+/// A script rule
 #[cfg(feature = "nautilus_py")]
 #[derive(Debug)]
 pub struct ScriptRule {
+    /// The nonterminal this rule produces
     pub nonterm: NTermId,
+    /// The nonterminals used in the script
     pub nonterms: Vec<NTermId>,
+    /// The python script
     pub script: Py<PyAny>,
 }
 
 #[cfg(feature = "nautilus_py")]
 impl ScriptRule {
+    /// Debug show
     #[must_use]
     pub fn debug_show(&self, ctx: &Context) -> String {
         let args = self
@@ -132,14 +155,19 @@ impl ScriptRule {
     }
 }
 
+/// A plain rule
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlainRule {
+    /// The nonterminal this rule produces
     pub nonterm: NTermId,
+    /// The children of this rule
     pub children: Vec<RuleChild>,
+    /// The nonterminals in the children
     pub nonterms: Vec<NTermId>,
 }
 
 impl PlainRule {
+    /// Debug show
     #[must_use]
     pub fn debug_show(&self, ctx: &Context) -> String {
         let args = self
@@ -164,6 +192,7 @@ impl Clone for ScriptRule {
 }
 
 impl Rule {
+    /// Create a new script rule
     #[cfg(feature = "nautilus_py")]
     pub fn from_script(
         ctx: &mut Context,
@@ -178,6 +207,7 @@ impl Rule {
         })
     }
 
+    /// Create a new regex rule
     pub fn from_regex(ctx: &mut Context, nonterm: &str, regex: &str) -> Self {
         use regex_syntax::ParserBuilder;
 
@@ -191,6 +221,7 @@ impl Rule {
         })
     }
 
+    /// Debug show
     #[must_use]
     pub fn debug_show(&self, ctx: &Context) -> String {
         match self {
@@ -201,6 +232,7 @@ impl Rule {
         }
     }
 
+    /// Create a new plain rule from a format string
     pub fn from_format(ctx: &mut Context, nonterm: &str, format: &[u8]) -> Self {
         let children = Rule::tokenize(format, ctx);
         let nonterms = children
@@ -220,6 +252,7 @@ impl Rule {
         })
     }
 
+    /// Create a new terminal rule
     #[must_use]
     pub fn from_term(ntermid: NTermId, term: &[u8]) -> Self {
         let children = vec![RuleChild::Term(term.to_vec())];
@@ -285,6 +318,7 @@ impl Rule {
             .collect::<Vec<_>>()
     }
 
+    /// Get the nonterminals used in this rule
     #[must_use]
     pub fn nonterms(&self) -> &[NTermId] {
         match self {
@@ -295,11 +329,13 @@ impl Rule {
         }
     }
 
+    /// Get the number of nonterminals used in this rule
     #[must_use]
     pub fn number_of_nonterms(&self) -> usize {
         self.nonterms().len()
     }
 
+    /// Get the nonterminal this rule produces
     #[must_use]
     pub fn nonterm(&self) -> NTermId {
         match self {
@@ -310,6 +346,7 @@ impl Rule {
         }
     }
 
+    /// Generate a tree from this rule
     pub fn generate<R: Rand>(
         &self,
         rand: &mut R,

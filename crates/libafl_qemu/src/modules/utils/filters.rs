@@ -3,7 +3,9 @@
 //! It is not a module by itself, but instead used as helper to have filters
 //! in other modules.
 
-use std::{cell::UnsafeCell, fmt::Debug, ops::Range};
+#[cfg(any(feature = "injections", not(cpu_target = "hexagon")))]
+use std::cell::UnsafeCell;
+use std::{fmt::Debug, ops::Range};
 
 use hashbrown::HashSet;
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
@@ -69,13 +71,13 @@ where
     }
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
 pub trait HasStdFilters: HasAddressFilter {}
 
 #[cfg(feature = "systemmode")]
 pub trait HasStdFilters: HasAddressFilter + HasPageFilter {}
 
-#[cfg(feature = "usermode")]
+#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
 pub trait HasStdFiltersTuple: HasAddressFilterTuple {}
 
 #[cfg(feature = "systemmode")]
@@ -130,7 +132,7 @@ where
     }
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
 impl<M> HasStdFilters for M where M: HasAddressFilter {}
 
 #[cfg(feature = "systemmode")]
@@ -146,7 +148,6 @@ where
 }
 
 /// Offers accessors to modules' page filters.
-#[cfg(feature = "systemmode")]
 pub trait HasPageFilter {
     type PageFilter: PageFilter;
 
@@ -289,7 +290,7 @@ pub struct PageFilterVec {
 #[derive(Debug, Clone)]
 pub struct StdPageFilter(FilterList<PageFilterVec>);
 
-#[cfg(feature = "usermode")]
+#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
 pub type StdPageFilter = NopPageFilter;
 
 #[cfg(feature = "systemmode")]
@@ -384,10 +385,13 @@ impl PageFilter for NopPageFilter {
 }
 
 #[cfg(feature = "usermode")]
-#[allow(dead_code)]
+#[cfg(any(feature = "injections", not(cpu_target = "hexagon")))]
 pub(crate) static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> =
     UnsafeCell::new(NopAddressFilter);
-#[cfg(feature = "systemmode")]
+#[cfg(any(
+    feature = "systemmode",
+    not(any(cpu_target = "mips", cpu_target = "hexagon"))
+))]
 pub(crate) static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::new(NopPageFilter);
 
 #[cfg(all(feature = "systemmode", test))]
@@ -434,13 +438,6 @@ mod tests {
         fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
             &mut self.page_filter
         }
-    }
-
-    impl<AF, PF> HasStdFilters for DummyModule<AF, PF>
-    where
-        AF: AddressFilter,
-        PF: PageFilter,
-    {
     }
 
     fn gen_module<AF, PF>(af: AF, pf: PF) -> impl HasStdFilters<AddressFilter = AF, PageFilter = PF>

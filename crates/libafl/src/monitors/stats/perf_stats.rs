@@ -149,6 +149,12 @@ impl ClientPerfStats {
         self.current_time = time;
     }
 
+    /// Set the start time with the given time
+    #[inline]
+    pub fn set_start_time(&mut self, time: u64) {
+        self.start_time = time;
+    }
+
     /// Start a timer with the current time counter
     #[inline]
     pub fn start_timer(&mut self) {
@@ -350,6 +356,14 @@ impl fmt::Display for ClientPerfStats {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         // Calculate the elapsed time from the monitor
         let elapsed: f64 = self.elapsed_cycles() as f64;
+
+        // Guard against division by zero which would produce NaN
+        if elapsed == 0.0 {
+            return write!(
+                f,
+                "     NaN: Scheduler\n     NaN: Manager\n  Feedbacks:\n     NaN: Not Measured"
+            );
+        }
 
         // Calculate the percentages for each benchmark
         let scheduler_percent = self.scheduler as f64 / elapsed;

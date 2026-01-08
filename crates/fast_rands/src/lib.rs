@@ -199,9 +199,7 @@ pub trait Rand {
         // We check that the upper_bound_incl <= lower_bound_incl above (alas only in debug), so the below is fine.
         // Even if we encounter a 0 in release here, the worst-case scenario should be an invalid return value.
         lower_bound_incl
-            + self.below(unsafe {
-                NonZero::new(upper_bound_incl - lower_bound_incl + 1).unwrap_unchecked()
-            })
+            + self.below(unsafe { NonZero::new_unchecked(upper_bound_incl - lower_bound_incl + 1) })
     }
 
     /// Convenient variant of [`choose`].
@@ -238,7 +236,7 @@ pub trait Rand {
             if lower > 1 {
                 // # Safety
                 // lower is > 1, we don't consume more than usize elements, so this should always be non-0.
-                let ix = self.below(unsafe { NonZero::new(lower + consumed).unwrap_unchecked() });
+                let ix = self.below(unsafe { NonZero::new_unchecked(lower + consumed) });
                 let skip = if ix < lower {
                     result = iter.nth(ix);
                     lower - (ix + 1)
@@ -260,7 +258,7 @@ pub trait Rand {
                 consumed += 1;
                 // # SAFETY
                 // `consumed` can never be 0 here. We just increased it by 1 above.
-                if self.below(unsafe { NonZero::new(consumed).unwrap_unchecked() }) == 0 {
+                if self.below(unsafe { NonZero::new_unchecked(consumed) }) == 0 {
                     result = elem;
                 }
             }

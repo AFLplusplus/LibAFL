@@ -103,7 +103,7 @@ impl AddressResolver {
     pub fn resolve(&self, pc: GuestAddr) -> String {
         let resolve_addr = |addr: GuestAddr| -> String {
             let mut info = String::new();
-            if let Some((range, idx)) = self.ranges.get_key_value(&(addr as u64)) {
+            if let Some((range, idx)) = self.ranges.get_key_value(&u64::from(addr)) {
                 if let Some((ctx, is_pie)) = self.resolvers[*idx].as_ref() {
                     let raddr = if *is_pie {
                         addr - (range.start as GuestAddr)

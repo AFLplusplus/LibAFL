@@ -96,6 +96,8 @@ where
     S: Unpin,
     F: FnMut(&[u8]) + 'static,
 {
+    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+
     fn first_exec<ET>(
         &mut self,
         _qemu: Qemu,
@@ -109,6 +111,7 @@ where
 }
 
 #[expect(clippy::too_many_arguments)]
+#[allow(clippy::cast_possible_wrap)]
 fn syscall_write_hook<F, ET, I, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,

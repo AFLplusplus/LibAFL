@@ -63,7 +63,7 @@ use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
     Error,
     executors::{Executor, ExitKind, HasObservers, HasTimeout, SetTimeout},
-    inputs::{HasTargetBytes, ToTargetBytes},
+    inputs::{HasTargetBytes, ToTargetBytesConverter},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::HasExecutions,
 };
@@ -380,7 +380,7 @@ where
     T: CommandConfigurator<Child> + HasTimeout + Debug,
     OT: ObserversTuple<I, S>,
 {
-    fn execute_input_with_command<TB: ToTargetBytes<I>>(
+    fn execute_input_with_command<TB: ToTargetBytesConverter<I, S>>(
         &mut self,
         target_bytes_converter: &mut TB,
         state: &mut S,
@@ -392,7 +392,7 @@ where
         *state.executions_mut() += 1;
         let mut child = self
             .configurator
-            .spawn_child(target_bytes_converter.to_target_bytes(input))?;
+            .spawn_child(target_bytes_converter.convert_to_target_bytes(state, input))?;
 
         let exit_kind = child
             .wait_timeout(self.configurator.timeout())
@@ -438,7 +438,7 @@ where
     S: HasExecutions,
     T: CommandConfigurator<Child> + HasTimeout + Debug,
     OT: MatchName + ObserversTuple<I, S>,
-    Z: ToTargetBytes<I>,
+    Z: ToTargetBytesConverter<I, S>,
 {
     fn run_target(
         &mut self,
@@ -479,7 +479,7 @@ where
     OT: MatchName + ObserversTuple<I, S>,
     S: HasExecutions,
     T: CommandConfigurator<Pid> + Debug,
-    Z: ToTargetBytes<I>,
+    Z: ToTargetBytesConverter<I, S>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`
@@ -497,7 +497,7 @@ where
 
         let child = self
             .configurator
-            .spawn_child(fuzzer.to_target_bytes(input))?;
+            .spawn_child(fuzzer.convert_to_target_bytes(state, input))?;
 
         let wait_status = waitpid_filtered(child, Some(WaitPidFlag::WUNTRACED))?;
         if !matches!(wait_status, Stopped(c, Signal::SIGSTOP) if c == child) {
@@ -750,10 +750,10 @@ impl CommandExecutorBuilder {
 /// };
 ///
 /// use libafl::{
-///     Error, HasTargetBytesConverter,
+///     Error, HasToTargetBytesConverter,
 ///     corpus::Corpus,
 ///     executors::{Executor, HasTimeout, command::CommandConfigurator},
-///     inputs::{BytesInput, HasTargetBytes, Input, ToTargetBytes},
+///     inputs::{BytesInput, HasTargetBytes, Input, ToTargetBytesConverter},
 ///     state::HasExecutions,
 /// };
 /// use libafl_bolts::ownedref::OwnedSlice;
@@ -784,7 +784,7 @@ impl CommandExecutorBuilder {
 /// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
 ///     S: HasExecutions,
-///     Z: ToTargetBytes<BytesInput>,
+///     Z: ToTargetBytesConverter<BytesInput, S>,
 /// {
 ///     MyExecutor.into_executor((), None, None)
 /// }
@@ -914,9 +914,10 @@ mod tests {
         let executor = executor.build(());
         let mut executor = executor.unwrap();
 
+        let mut fuzzer: NopFuzzer = NopFuzzer::new();
         executor
             .run_target(
-                &mut NopFuzzer::new(),
+                &mut fuzzer,
                 &mut NopState::<NopInput>::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
@@ -942,9 +943,10 @@ mod tests {
         let executor = executor.build(tuple_list!(stdout));
         let mut executor = executor.unwrap();
 
+        let mut fuzzer: NopFuzzer = NopFuzzer::new();
         executor
             .run_target(
-                &mut NopFuzzer::new(),
+                &mut fuzzer,
                 &mut NopState::<NopInput>::new(),
                 &mut mgr,
                 &BytesInput::new(b".".to_vec()),

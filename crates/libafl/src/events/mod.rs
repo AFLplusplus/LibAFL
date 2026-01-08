@@ -10,6 +10,7 @@ pub use simple::*;
 pub mod centralized;
 #[cfg(all(unix, feature = "std"))]
 pub use centralized::*;
+use hashbrown::HashMap;
 #[cfg(feature = "std")]
 pub mod launcher;
 
@@ -17,6 +18,12 @@ pub mod llmp;
 pub use llmp::*;
 #[cfg(feature = "tcp_manager")]
 pub mod tcp;
+
+/// The restarting event manager, capable of resetting the state of the fuzzer
+#[cfg(feature = "std")]
+pub mod restarting;
+#[cfg(feature = "std")]
+pub use restarting::*;
 
 pub mod broker_hooks;
 #[cfg(feature = "introspection")]
@@ -95,7 +102,9 @@ impl SignalHandler for ShutdownSignalData {
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManagers`, such as [`LlmpRestartingEventManager`].
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[repr(transparent)]
 pub struct EventManagerId(
     /// The id
@@ -294,6 +303,11 @@ impl<I> EventWithStats<I> {
     pub fn stats(&self) -> &ExecStats {
         &self.stats
     }
+
+    /// Deconstruct this into its parts
+    pub fn into_parts(self) -> (Event<I>, ExecStats) {
+        (self.event, self.stats)
+    }
 }
 
 // TODO remove forward_id as not anymore needed for centralized
@@ -328,6 +342,13 @@ pub enum Event<I> {
         name: Cow<'static, str>,
         /// Custom user monitor value
         value: UserStats,
+        /// [`PhantomData`]
+        phantom: PhantomData<I>,
+    },
+    /// New list of user stats event to monitor.
+    UpdateUserStatsMap {
+        /// Custom user monitor name
+        stats: HashMap<Cow<'static, str>, UserStats>,
         /// [`PhantomData`]
         phantom: PhantomData<I>,
     },
@@ -371,6 +392,7 @@ impl<I> Event<I> {
         match self {
             Event::NewTestcase { .. } => "Testcase",
             Event::Heartbeat => "Client Heartbeat",
+            Event::UpdateUserStatsMap { .. } => "UserStatsMap",
             Event::UpdateUserStats { .. } => "UserStats",
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor { .. } => "PerfMonitor",
@@ -393,7 +415,9 @@ impl<I> Event<I> {
                 Cow::Owned(format!("Testcase {}", input.generate_name(None)))
             }
             Event::Heartbeat => Cow::Borrowed("Client Heartbeat"),
-            Event::UpdateUserStats { .. } => Cow::Borrowed("UserStats"),
+            Event::UpdateUserStats { .. } | Event::UpdateUserStatsMap { .. } => {
+                Cow::Borrowed("UserStats")
+            }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor { .. } => Cow::Borrowed("PerfMonitor"),
             Event::Objective { .. } => Cow::Borrowed("Objective"),
@@ -749,5 +773,40 @@ mod tests {
             }
             _ => panic!("mistmatch"),
         }
+    }
+}
+
+/// Specify if the State must be persistent over restarts
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ShouldSaveState {
+    /// Always save and restore the state on restart (not OOM resistant)
+    OnRestart,
+    /// Never save the state (not OOM resistant)
+    Never,
+    /// Best-effort save and restore the state on restart (OOM safe)
+    /// This adds additional runtime costs when processing events
+    OOMSafeOnRestart,
+    /// Never save the state (OOM safe)
+    /// This adds additional runtime costs when processing events
+    OOMSafeNever,
+}
+
+impl ShouldSaveState {
+    /// Check if the state must be saved `on_restart()`
+    #[must_use]
+    pub fn on_restart(&self) -> bool {
+        matches!(
+            self,
+            ShouldSaveState::OnRestart | ShouldSaveState::OOMSafeOnRestart
+        )
+    }
+
+    /// Check if the policy is OOM safe
+    #[must_use]
+    pub fn oom_safe(&self) -> bool {
+        matches!(
+            self,
+            ShouldSaveState::OOMSafeOnRestart | ShouldSaveState::OOMSafeNever
+        )
     }
 }

@@ -16,7 +16,7 @@ use libafl::{
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
 };
-use libafl_core::{AsSlice, Error, HasLen, Named};
+use libafl_core::{Error, HasLen, Named};
 
 unsafe extern "C" {
     fn libafl_targets_has_libfuzzer_custom_mutator() -> bool;
@@ -174,14 +174,14 @@ where
 
                 if succeeded {
                     let target = intermediary.mutator_bytes();
-                    if target.as_slice().len() > max_size {
+                    if target.len() > max_size {
                         self.result
                             .replace(Err(Error::illegal_state("Mutation result was too long!")))
                             .ok();
                     } else {
                         let actual = unsafe { core::slice::from_raw_parts_mut(data, max_size) };
-                        actual[..target.as_slice().len()].copy_from_slice(target.as_slice());
-                        new_size = target.as_slice().len();
+                        actual[..target.len()].copy_from_slice(target);
+                        new_size = target.len();
                     }
                 }
                 return;

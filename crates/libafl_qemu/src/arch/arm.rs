@@ -69,14 +69,16 @@ impl Regs {
     pub const Cpsr: Regs = Regs::R25;
 }
 
-/// Return an ARM ArchCapstoneBuilder
+/// Return an ARM `ArchCapstoneBuilder`
+#[must_use]
 pub fn capstone() -> capstone::arch::arm::ArchCapstoneBuilder {
     capstone::Capstone::new()
         .arm()
         .mode(capstone::arch::arm::ArchMode::Arm)
 }
 
-/// Return an ARM Thumb ArchCapstoneBuilder
+/// Return an ARM Thumb `ArchCapstoneBuilder`
+#[must_use]
 pub fn capstone_thumb() -> capstone::arch::arm::ArchCapstoneBuilder {
     capstone::Capstone::new()
         .arm()
@@ -126,7 +128,7 @@ impl crate::ArchExtras for crate::CPU {
                     Ok(GuestReg::from_le_bytes(buf).into())
                 }
                 #[cfg(not(feature = "be"))]
-                Ok(GuestReg::from_le_bytes(buf).into())
+                Ok(GuestReg::from_le_bytes(buf))
             }
         }
     }
@@ -149,7 +151,7 @@ impl crate::ArchExtras for crate::CPU {
             2 => self.write_reg(Regs::R2, val),
             3 => self.write_reg(Regs::R3, val),
             _ => {
-                let val: GuestReg = val.into();
+                let val: GuestReg = val;
                 let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
                 /*
                  * Stack is full and descending. SP points to return address, arguments

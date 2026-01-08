@@ -54,7 +54,8 @@ impl Regs {
     pub const Pc: Regs = Regs::Eip;
 }
 
-/// Return an X86 ArchCapstoneBuilder
+/// Return an X86 `ArchCapstoneBuilder`
+#[must_use]
 pub fn capstone() -> capstone::arch::x86::ArchCapstoneBuilder {
     capstone::Capstone::new()
         .x86()
@@ -68,7 +69,7 @@ impl crate::ArchExtras for crate::CPU {
         let stack_ptr: GuestReg = self.read_reg(Regs::Esp)?;
         let mut ret_addr = [0; size_of::<GuestReg>()];
         self.read_mem(stack_ptr, &mut ret_addr)?;
-        Ok(GuestReg::from_le_bytes(ret_addr).into())
+        Ok(GuestReg::from_le_bytes(ret_addr))
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
@@ -89,17 +90,17 @@ impl crate::ArchExtras for crate::CPU {
     ) -> Result<GuestReg, QemuRWError> {
         QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
 
-        const SIZE: usize = size_of::<GuestReg>();
+        let size: usize = size_of::<GuestReg>();
         let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
         /*
          * Stack is full and descending. SP points to return address, arguments
          * are in reverse order above that.
          */
 
-        let offset = (SIZE as GuestAddr) * (GuestAddr::from(idx) + 1);
-        let mut val = [0u8; SIZE];
+        let offset = (size as GuestAddr) * (GuestAddr::from(idx) + 1);
+        let mut val = [0u8; size_of::<GuestReg>()];
         self.read_mem(stack_ptr + offset, &mut val)?;
-        Ok(GuestReg::from_le_bytes(val).into())
+        Ok(GuestReg::from_le_bytes(val))
     }
 
     fn write_function_argument_with_cc<T>(

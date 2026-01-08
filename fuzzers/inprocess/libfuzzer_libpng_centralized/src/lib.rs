@@ -69,7 +69,7 @@ struct Opt {
         long,
         help = "Choose the broker TCP port, default is 1337",
         name = "PORT",
-        default_value = "1337"
+        default_value = "1341"
     )]
     broker_port: u16,
 
@@ -242,10 +242,14 @@ pub extern "C" fn libafl_main() {
                 println!("We imported {} inputs from disk.", state.corpus().count());
             }
             if !mgr.is_main() {
+                println!("Running client fuzz_loop");
                 fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                println!("Client fuzz_loop finished");
             } else {
+                println!("Running main fuzz_loop");
                 let mut empty_stages = tuple_list!();
                 fuzzer.fuzz_loop(&mut empty_stages, &mut executor, &mut state, &mut mgr)?;
+                println!("Main fuzz_loop finished");
             }
             Ok(())
         };
@@ -256,14 +260,13 @@ pub extern "C" fn libafl_main() {
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
-        .secondary_run_client(&mut secondary_run_client)
+        .run_client(&mut secondary_run_client)
         .main_run_client(&mut main_run_client)
         .cores(&cores)
         .broker_port(broker_port)
-        .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"))
+        .centralized_broker_port(1340)
         .build()
-        .launch()
+        .launch_centralized()
     {
         Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
