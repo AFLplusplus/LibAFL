@@ -164,6 +164,12 @@ impl<ET, I, S> Default for EmulatorHookCollection<ET, I, S> {
 }
 
 /// Hook collection,
+///
+/// `EmulatorHooks` provides the standard interface for registering QEMU-based
+/// instrumentation in `LibAFL` from a high-level perspective.
+///
+/// It integrates with emulator modules to ensure hooks are registered
+/// safely and at the correct time.
 #[derive(Debug)]
 pub struct EmulatorHooks<ET, I, S> {
     qemu_hooks: QemuHooks,
