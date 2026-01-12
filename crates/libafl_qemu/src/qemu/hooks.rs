@@ -1091,9 +1091,11 @@ impl QemuHooks {
 
     /// Add `pre_exec` in the (pre-)execution hooks, `post_exec` in the post-execution hooks.
     ///
-    /// `pre_exec` gets passed a pointer to the cpu state before the code is run.
+    /// `pre_exec` gets passed a pointer to the CPU state before the code is run and
+    /// executes before the harness performs its work.
     ///
-    /// `post_exec` gets passed a pointer to the cpu state after the code is run.
+    /// `post_exec` gets passed a pointer to the CPU state after the code is run and
+    /// executes after the harness completes. So the snapshot has already been restored.
     pub fn add_cpu_run_hooks<T: Into<HookData>>(
         &self,
         data: T,

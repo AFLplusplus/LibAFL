@@ -150,7 +150,8 @@ pub fn fuzz() {
                     }
 
                     qemu.write_phys_mem(input_addr, buf);
-
+                    // `qemu().run()` completes the full harness execution cycle.
+                    // The snapshot is restored before this call returns.
                     match emulator.qemu().run() {
                         Ok(QemuExitReason::Breakpoint(_)) => {} // continue execution, nothing to do there.
                         Ok(QemuExitReason::Timeout) => return ExitKind::Timeout, // timeout, propagate
