@@ -1166,10 +1166,9 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_set_get_affinity() {
-        let Ok(ids) = get_core_ids() else { return };
-        if ids.is_empty() {
-            return;
-        }
+        let ids = get_core_ids().unwrap();
+        assert!(!ids.is_empty());
+
         ids[0].set_affinity().expect("Failed to set affinity");
         let affinity = get_affinity()
             .expect("Failed to get affinity")
