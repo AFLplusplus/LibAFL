@@ -713,6 +713,8 @@ where
                                         index as u64 * self.launch_delay,
                                     ));
 
+                                    bind_to.set_affinity()?;
+
                                     if !debug_output && let Some(file) = &self.opened_stdout_file {
                                         // # Safety
                                         // We assume the file descriptors are valid here
@@ -775,6 +777,8 @@ where
                 Ok(core_conf) => {
                     let client_description = ClientDescription::from_safe_string(&core_conf);
                     // the actual client. do the fuzzing
+
+                    client_description.core_id.set_affinity()?;
 
                     let (state, mgr) = spawn_mgr(&self, Some(client_description.clone()), None)?;
 
@@ -1394,7 +1398,7 @@ impl<'a, CF, MF, MT, SP> CentralizedLauncherBuilder<'a, CF, MF, MT, SP> {
         }
     }
 
-    /// The 'main' function to run for each client forked. This shouldn not return.
+    /// The 'main' function to run for each client forked. This should not return.
     #[must_use]
     pub fn secondary_run_client<CF2>(
         self,
