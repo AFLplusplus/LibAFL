@@ -527,7 +527,7 @@ dependencies = [
  "addr2line",
  "cfg-if 1.0.4",
  "libc",
- "miniz_oxide",
+ "miniz_oxide 0.8.9",
  "object 0.37.3",
  "rustc-demangle",
  "serde",
@@ -2190,7 +2190,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfe33edd8e85a12a67454e37f8c75e730830d83e313556ab9ebf9ee7fbeb3bfb"
 dependencies = [
  "crc32fast",
- "miniz_oxide",
+ "miniz_oxide 0.8.9",
 ]
 
 [[package]]
@@ -3295,7 +3295,7 @@ dependencies = [
  "log",
  "mach2 0.6.0",
  "minibsod",
- "miniz_oxide",
+ "miniz_oxide 0.9.0",
  "nix 0.30.1",
  "no_std_time",
  "nonzero_macros",
@@ -3825,7 +3825,7 @@ dependencies = [
  "hostname",
  "libafl_core",
  "log",
- "miniz_oxide",
+ "miniz_oxide 0.9.0",
  "nix 0.30.1",
  "no_std_time",
  "postcard",
@@ -4002,6 +4002,15 @@ checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
 dependencies = [
  "adler2",
  "simd-adler32",
+]
+
+[[package]]
+name = "miniz_oxide"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5faa9f23e86bd5768d76def086192ff5f869fb088da12a976ea21e9796b975f6"
+dependencies = [
+ "adler2",
 ]
 
 [[package]]
