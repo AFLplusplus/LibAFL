@@ -70,7 +70,7 @@ itertools = { version = "0.14.0", default-features = false }
 log = { version = "0.4.29", default-features = false, features = [
   "release_max_level_info",
 ] }
-libc = { version = "0.2.178", default-features = false, optional = true }
+libc = { version = "0.2.180", default-features = false, optional = true }
 nostd-musl = { version = "0.1.6", default-features = false, features = [
   "optimized-assembly",
 ] }
