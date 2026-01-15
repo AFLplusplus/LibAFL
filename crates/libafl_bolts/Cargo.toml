@@ -148,7 +148,7 @@ rustversion = { workspace = true }
 [dev-dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
 rand = "0.9.0"
-chrono = "0.4.42"
+chrono = "0.4.43"
 itertools = "0.14.0"
 
 [dependencies]
