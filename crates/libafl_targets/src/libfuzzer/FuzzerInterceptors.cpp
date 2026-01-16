@@ -232,3 +232,54 @@ static void fuzzerInit() {
 }
 
 #endif
+
+#include <cstddef>
+#include <cstdint>
+#include <stdbool.h>
+extern "C" {
+  /*
+   * Fallback implementations for optional libFuzzer custom hooks.
+   *
+   * These symbols must always exist so that Rust code can link
+   * unconditionally. If the user defines real hooks, those
+   * definitions override these weak fallbacks.
+   */
+  
+  /* ---------- Custom Mutator ---------- */
+  
+  __attribute__((weak))
+  bool libafl_targets_has_libfuzzer_custom_mutator(void) {
+      return false;
+  }
+  
+  __attribute__((weak))
+  size_t libafl_targets_libfuzzer_custom_mutator(
+      uint8_t* /* data */,
+      size_t /* size */,
+      size_t /* max_size */,
+      uint32_t /* seed */
+  ) {
+      return 0;
+  }
+  
+  /* ---------- Custom Crossover ---------- */
+  
+  __attribute__((weak))
+  bool libafl_targets_has_libfuzzer_custom_crossover(void) {
+      return false;
+  }
+  
+  __attribute__((weak))
+  size_t libafl_targets_libfuzzer_custom_crossover(
+      const uint8_t* /* data1 */,
+      size_t /* size1 */,
+      const uint8_t* /* data2 */,
+      size_t /* size2 */,
+      uint8_t* /* out */,
+      size_t /* max_out_size */,
+      uint32_t /* seed */
+  ) {
+      return 0;
+  }
+  
+} // extern "C"
