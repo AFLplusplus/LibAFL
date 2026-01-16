@@ -82,6 +82,24 @@ jobs:
       - name: Test libafl_targets no_std
         run: cd crates/libafl_targets && cargo test --no-default-features
 
+  macos-libfuzzer-build-test:
+    runs-on: macOS-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install LLVM
+        run: brew install llvm@${{env.MAIN_LLVM_VERSION}}
+
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "macOS-libfuzzer" }
+
+      - name: Install llvm-tools (macOS)
+        run: rustup component add llvm-tools
+      - name: Build libafl_targets and libafl_libfuzzer (macOS)
+        run: cargo build -p libafl_targets && cargo build -p libafl_libfuzzer
+
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
     steps:
