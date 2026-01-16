@@ -233,9 +233,14 @@ static void fuzzerInit() {
 
 #endif
 
+#if defined(_MSC_VER)
+#define WEAK
+#else
+#define WEAK __attribute__((weak))
+#endif
+
 #include <cstddef>
 #include <cstdint>
-#include <stdbool.h>
 extern "C" {
   /*
    * Fallback implementations for optional libFuzzer custom hooks.
@@ -247,12 +252,12 @@ extern "C" {
   
   /* ---------- Custom Mutator ---------- */
   
-  __attribute__((weak))
-  bool libafl_targets_has_libfuzzer_custom_mutator(void) {
+  WEAK
+  bool libafl_targets_has_libfuzzer_custom_mutator() {
       return false;
   }
   
-  __attribute__((weak))
+  WEAK
   size_t libafl_targets_libfuzzer_custom_mutator(
       uint8_t* /* data */,
       size_t /* size */,
@@ -264,12 +269,12 @@ extern "C" {
   
   /* ---------- Custom Crossover ---------- */
   
-  __attribute__((weak))
-  bool libafl_targets_has_libfuzzer_custom_crossover(void) {
+  WEAK
+  bool libafl_targets_has_libfuzzer_custom_crossover() {
       return false;
   }
   
-  __attribute__((weak))
+  WEAK
   size_t libafl_targets_libfuzzer_custom_crossover(
       const uint8_t* /* data1 */,
       size_t /* size1 */,
