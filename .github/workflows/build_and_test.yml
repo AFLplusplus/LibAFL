@@ -107,14 +107,14 @@ jobs:
 
       - name: Add fuzz target
         run: cargo fuzz add parse_cbor
-      
-      - name: Add dependencies for the PoC
-        run: cd fuzz && cargo add ciborium && cargo add serde --features derive
 
       - name: Force fuzz project to use workspace LibAFL
         run: |
             printf '\n[patch.crates-io]\nlibafl_libfuzzer = { path = "../crates/libafl_libfuzzer" }\nlibafl_targets = { path = "../crates/libafl_targets" }\n\n[workspace]\n' >> fuzz/Cargo.toml
             sed -i 's|path = ".."|path = "../crates/build_id2"|' fuzz/Cargo.toml
+
+      - name: Add dependencies for the PoC
+        run: cd fuzz && cargo add ciborium && cargo add serde --features derive
 
       - name: Replace fuzz target with PoC from issue 3649
         run: |
