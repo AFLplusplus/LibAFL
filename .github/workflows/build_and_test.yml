@@ -103,7 +103,7 @@ jobs:
           shared-key: "macOS-libfuzzer-fuzz-test"
 
       - name: Create fuzz project
-        run: cargo fuzz init fuzz-ci
+        run: mkdir fuzz-ci && cd fuzz-ci && cargo fuzz init
 
       - name: Add fuzz target
         run: cd fuzz-ci && cargo fuzz add parse_cbor
@@ -143,9 +143,7 @@ jobs:
           EOF
 
       - name: Build fuzz target (regression test)
-        run: |
-          cd fuzz-ci
-          cargo fuzz build -v --engine libafl --target aarch64-apple-darwin parse_cbor
+        run: cd fuzz-ci && cargo fuzz build -v --engine libafl --target aarch64-apple-darwin parse_cbor
 
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
