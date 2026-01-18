@@ -82,7 +82,7 @@ jobs:
       - name: Test libafl_targets no_std
         run: cd crates/libafl_targets && cargo test --no-default-features
 
-  macos-libfuzzer-build-test:
+  macos-libfuzzer-fuzz-test:
     runs-on: macOS-latest
 
     steps:
@@ -90,15 +90,62 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install LLVM
-        run: brew install llvm@${{env.MAIN_LLVM_VERSION}}
+        run: brew install llvm@${{ env.MAIN_LLVM_VERSION }}
+
+      - name: Install llvm-tools
+        run: rustup component add llvm-tools
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
 
       - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "macOS-libfuzzer" }
+        with:
+          shared-key: "macOS-libfuzzer-fuzz-test"
 
-      - name: Install llvm-tools (macOS)
-        run: rustup component add llvm-tools
-      - name: Build libafl_targets and libafl_libfuzzer (macOS)
-        run: cargo build -p libafl_targets && cargo build -p libafl_libfuzzer
+      - name: Create fuzz project
+        run: cargo fuzz init --fuzzer libfuzzer fuzz-ci
+
+      - name: Add fuzz target
+        run: cd fuzz-ci && cargo fuzz add parse_cbor
+
+      - name: Force fuzz project to use workspace LibAFL
+        run: |
+          cat >> fuzz-ci/Cargo.toml << 'EOF'
+
+          [patch.crates-io]
+          libafl_libfuzzer = { path = "../crates/libafl_libfuzzer" }
+          libafl_targets   = { path = "../crates/libafl_targets" }
+          EOF
+
+      - name: Replace fuzz target with PoC from issue 3649
+        run: |
+          cat > fuzz-ci/fuzz_targets/parse_cbor.rs << 'EOF'
+          #![no_main]
+
+          use std::collections::HashMap;
+          use libfuzzer_sys::fuzz_target;
+          use ciborium::from_reader;
+          use serde::{Serialize, Deserialize};
+
+          #[derive(Debug, Serialize, Deserialize)]
+          struct TestData {
+              a: Vec<usize>,
+              b: bool,
+              c: f32,
+              d: HashMap<usize, String>,
+          }
+
+          fuzz_target!(|data: &[u8]| {
+              if let Ok(td) = from_reader(data) {
+                  let _: TestData = td;
+              }
+          });
+          EOF
+
+      - name: Build fuzz target (regression test)
+        run: |
+          cd fuzz-ci
+          cargo fuzz build -v --engine libafl --target aarch64-apple-darwin parse_cbor
 
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
