@@ -103,7 +103,7 @@ jobs:
           shared-key: "macOS-libfuzzer-fuzz-test"
 
       - name: Create fuzz project
-        run: cargo fuzz init --fuzzer libfuzzer fuzz-ci
+        run: cargo fuzz init fuzz-ci
 
       - name: Add fuzz target
         run: cd fuzz-ci && cargo fuzz add parse_cbor
