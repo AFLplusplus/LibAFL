@@ -110,8 +110,17 @@ jobs:
 
       - name: Force fuzz project to use workspace LibAFL
         run: |
-            printf '\n[patch.crates-io]\nlibafl_libfuzzer = { path = "../crates/libafl_libfuzzer" }\nlibafl_targets = { path = "../crates/libafl_targets" }\n\n[workspace]\n' >> fuzz/Cargo.toml
+            sed -i '' '/libfuzzer-sys = "0.4"/d' fuzz/Cargo.toml
+            sed -i '' '/\[dependencies\]/d' fuzz/Cargo.toml
             sed -i '' 's|path = ".."|path = "../crates/build_id2"|' fuzz/Cargo.toml
+            printf '%s\n' \
+              '' \
+              '[dependencies]' \
+              'libfuzzer-sys = { package = "libafl_libfuzzer", path = "../crates/libafl_libfuzzer" }' \
+              'libafl_targets = { path = "../crates/libafl_targets", features = ["libfuzzer"] }' \
+              '' \
+              '[workspace]' \
+              >> fuzz/Cargo.toml
 
       - name: Add dependencies for the PoC
         run: cd fuzz && cargo add ciborium && cargo add serde --features derive
@@ -142,7 +151,7 @@ jobs:
               > fuzz/fuzz_targets/parse_cbor.rs
 
       - name: Build fuzz target (regression test)
-        run: cd fuzz && cargo fuzz build -v --target aarch64-apple-darwin parse_cbor
+        run: cd fuzz && cargo +nightly fuzz build -v --target aarch64-apple-darwin parse_cbor
 
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
