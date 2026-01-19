@@ -59,7 +59,7 @@ hexagon = ["libafl_qemu/hexagon"]
 
 [build-dependencies]
 vergen = { version = "9.0.1", features = ["build", "cargo", "rustc", "si"] }
-vergen-git2 = "1.0.1"
+vergen-git2 = "9.1.0"
 
 [dependencies]
 clap = { version = "4.5.52", features = ["derive", "string"] }
