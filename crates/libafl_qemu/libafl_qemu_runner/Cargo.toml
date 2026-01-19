@@ -58,7 +58,7 @@ ppc = ["libafl_qemu/ppc", "be"]
 hexagon = ["libafl_qemu/hexagon"]
 
 [build-dependencies]
-vergen = { version = "9.0.1", features = ["build", "cargo", "rustc", "si"] }
+vergen = { version = "9.1.0", features = ["build", "cargo", "rustc", "si"] }
 vergen-git2 = "1.0.1"
 
 [dependencies]
