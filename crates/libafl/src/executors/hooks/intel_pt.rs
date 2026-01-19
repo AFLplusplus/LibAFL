@@ -17,7 +17,7 @@ pub struct IntelPTHook<T> {
 impl<I, S, T> ExecutorHook<I, S> for IntelPTHook<T>
 where
     S: Serialize,
-    T: AddAssign + From<u8> + Debug,
+    T: AddAssign + Copy + Debug + From<u8>,
 {
     fn init(&mut self, _state: &mut S) {}
 

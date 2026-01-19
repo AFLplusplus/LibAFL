@@ -98,7 +98,7 @@ hashbrown = { workspace = true, default-features = false }
 stdint = "1.0.0"
 
 [build-dependencies]
-cc = { version = "1.2.51" }
+cc = { version = "1.2.52" }
 build-target = "0.8.0"
 libc = "0.2.179"
 rand = "0.9.2"

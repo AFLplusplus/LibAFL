@@ -148,7 +148,7 @@ rustversion = { workspace = true }
 [dev-dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
 rand = "0.9.0"
-chrono = "0.4.42"
+chrono = "0.4.43"
 itertools = "0.14.0"
 
 [dependencies]
@@ -161,6 +161,7 @@ libafl_derive = { workspace = true, default-features = true, optional = true }
 ll_mp = { workspace = true }
 minibsod = { workspace = true, optional = true }
 no_std_time = { workspace = true }
+nonzero_macros = { workspace = true }
 ownedref = { workspace = true }
 serde_anymap = { workspace = true, optional = true }
 shmem_providers = { workspace = true }
@@ -190,7 +191,7 @@ postcard = { workspace = true, optional = true } # no_std compatible serde seria
 num_enum = { workspace = true, default-features = false }
 
 ctor = { optional = true, version = "0.6.3" }
-miniz_oxide = { version = "0.8.0", optional = true }
+miniz_oxide = { version = "0.9.0", optional = true }
 hostname = { version = "0.4.2", optional = true } # Is there really no gethostname in the stdlib?
 log = { workspace = true }
 nix = { workspace = true, optional = true, default-features = false, features = [

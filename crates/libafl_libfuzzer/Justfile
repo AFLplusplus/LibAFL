@@ -1,0 +1,3 @@
+# Bypasses the build as well as "missing LIBAFL_LIBFUZZER_RUNTIME_PATH"
+doc:
+  RUSTFLAGS="--cfg clippy" RUSTDOCFLAGS="--cfg clippy" cargo doc -p libafl_libfuzzer --no-deps --all-features

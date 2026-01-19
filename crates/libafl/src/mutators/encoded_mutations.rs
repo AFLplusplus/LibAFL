@@ -196,12 +196,12 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
         // The size is larger than 1 here (checked just above)
         let off = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size) });
         // # Safety
         // The size of the offset is below size, the value is never 0.
         let len = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size - off).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size - off) });
         input.codes_mut().drain(off..off + len);
 
         Ok(MutationResult::Mutated)
@@ -253,7 +253,7 @@ where
         // Worst case, we will get a wrong int value as return, not too bad.
         let off = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size + 1).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size + 1) });
         let mut len = 1 + state.rand_mut().below(nz);
 
         if size + len > max_size {
@@ -321,15 +321,15 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
         // it's larger than 1
         let from = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size) });
         let to = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size) });
         // # Safety
         // Both from and to are smaller than size, so size minus any of these can never be 0.
         let len = 1 + state
             .rand_mut()
-            .below(unsafe { NonZero::new(size - max(from, to)).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size - max(from, to)) });
 
         unsafe {
             buffer_self_copy(input.codes_mut(), from, to, len);
@@ -400,13 +400,13 @@ where
         let max_size = state.max_size();
         let from = state
             .rand_mut()
-            .below(unsafe { NonZero::new(other_size).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(other_size) });
         let to = state.rand_mut().below(nz);
         // # Safety
         // from is smaller than other_size, other_size is larger than 2, so the subtraction is larger than 0.
         let mut len = 1 + state
             .rand_mut()
-            .below(unsafe { NonZero::new(other_size - from).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(other_size - from) });
 
         if size + len > max_size {
             if max_size > size {
@@ -485,19 +485,19 @@ where
         // other_size >= 2
         let from = state
             .rand_mut()
-            .below(unsafe { NonZero::new(other_size).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(other_size) });
 
         // # Safety
         // size > 0, other_size > from,
         let len = state
             .rand_mut()
-            .below(unsafe { NonZero::new(min(other_size - from, size)).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(min(other_size - from, size)) });
 
         // # Safety
         // size is non-zero, len is below min(size, ...), so the subtraction will always be positive.
         let to = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size - len).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size - len) });
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // no need to load the input again, it'll already be present at this point.
