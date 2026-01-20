@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, fs, ops::RangeInclusive, path::Path, sync::LazyLock};
 
-use build_target::{Arch, Os, PointerWidth, target_arch, target_os, target_pointer_width};
+use build_target::{target_arch, target_os, target_pointer_width, Arch, Os, PointerWidth};
 use rand::Rng;
 
 // Default Linux/i386 mapping on x86_64 machine:
@@ -267,16 +267,16 @@ fn guess_vma(arch: &Arch) -> Option<Vma> {
     }
 }
 
-fn host_pointer_width() -> PointerWidth {
-    let ptr_width = std::mem::size_of::<usize>() * 8;
-
-    match ptr_width {
-        16 => PointerWidth::U16,
-        32 => PointerWidth::U32,
-        64 => PointerWidth::U64,
-        _ => panic!("Unsupported pointer width: {ptr_width}"),
-    }
-}
+// fn host_pointer_width() -> PointerWidth {
+//     let ptr_width = std::mem::size_of::<usize>() * 8;
+//
+//     match ptr_width {
+//         16 => PointerWidth::U16,
+//         32 => PointerWidth::U32,
+//         64 => PointerWidth::U64,
+//         _ => panic!("Unsupported pointer width: {ptr_width}"),
+//     }
+// }
 
 fn default_layout(width: PointerWidth) -> (TargetShadowLayout, usize) {
     match width {
