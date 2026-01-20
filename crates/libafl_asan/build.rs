@@ -1,13 +1,14 @@
 use std::{collections::HashMap, env, fs, ops::RangeInclusive, path::Path, sync::LazyLock};
 
-use build_target::{target_arch, target_os, target_pointer_width, Arch, Os, PointerWidth};
+use build_target::{Arch, Os, PointerWidth, target_arch, target_os, target_pointer_width};
 use rand::Rng;
 
-// `[0x40000000, 0xffffffff]` 	HighMem
-// `[0x28000000, 0x3fffffff]` 	HighShadow
-// `[0x24000000, 0x27ffffff]` 	ShadowGap
-// `[0x20000000, 0x23ffffff]` 	LowShadow
-// `[0x00000000, 0x1fffffff]` 	LowMem
+// Default Linux/i386 mapping on x86_64 machine:
+// || `[0x40000000, 0xffffffff]` || HighMem    ||
+// || `[0x28000000, 0x3fffffff]` || HighShadow ||
+// || `[0x24000000, 0x27ffffff]` || ShadowGap  ||
+// || `[0x20000000, 0x23ffffff]` || LowShadow  ||
+// || `[0x00000000, 0x1fffffff]` || LowMem     ||
 const DEFAULT_32B_LAYOUT: TargetShadowLayout = TargetShadowLayout {
     high_mem: 0x40000000..=0xffffffff,
     high_shadow: 0x28000000..=0x3fffffff,
@@ -43,12 +44,10 @@ static SPECIFIC_LAYOUTS: LazyLock<HashMap<(Arch, Option<Vma>, Os), TargetShadowL
         // || `[0x000000000000, 0x00007fff7fff]` || LowMem     ||
         layouts.insert((Arch::X86_64, None, Os::Linux), DEFAULT_64B_LAYOUT.clone());
 
-        // Default Linux/i386 mapping on i386 machine
-        // (addresses starting with 0xc0000000 are reserved
-        // for kernel and thus not sanitized):
-        // || `[0x38000000, 0xbfffffff]` || HighMem    ||
-        // || `[0x27000000, 0x37ffffff]` || HighShadow ||
-        // || `[0x24000000, 0x26ffffff]` || ShadowGap  ||
+        // Default Linux/i386 mapping on x86_64 machine:
+        // || `[0x40000000, 0xffffffff]` || HighMem    ||
+        // || `[0x28000000, 0x3fffffff]` || HighShadow ||
+        // || `[0x24000000, 0x27ffffff]` || ShadowGap  ||
         // || `[0x20000000, 0x23ffffff]` || LowShadow  ||
         // || `[0x00000000, 0x1fffffff]` || LowMem     ||
         layouts.insert((Arch::X86, None, Os::Linux), DEFAULT_32B_LAYOUT.clone());
@@ -97,6 +96,8 @@ use super::ShadowLayout;
 #[derive(Debug)]
 pub struct DefaultShadowLayout;
 
+/// This symbol is also defined in qemu-libafl-bridge as a weak symbol.
+/// Thus, it will be overwritten by this one if LibAFL QEMU and LibAFL ASAN are used together.
 #[unsafe(no_mangle)]
 #[used]
 pub static libafl_shadow_base: stdint::uintptr_t = {shadow_base};
