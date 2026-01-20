@@ -3,18 +3,15 @@ use std::{collections::HashMap, env, fs, ops::RangeInclusive, path::Path, sync::
 use build_target::{target_arch, target_os, target_pointer_width, Arch, Os, PointerWidth};
 use rand::Rng;
 
-// Default Linux/i386 mapping on i386 machine
-// (addresses starting with 0xc0000000 are reserved
-// for kernel and thus not sanitized):
-// || `[0x38000000, 0xbfffffff]` || HighMem    ||
-// || `[0x27000000, 0x37ffffff]` || HighShadow ||
-// || `[0x24000000, 0x26ffffff]` || ShadowGap  ||
-// || `[0x20000000, 0x23ffffff]` || LowShadow  ||
-// || `[0x00000000, 0x1fffffff]` || LowMem     ||
+// `[0x40000000, 0xffffffff]` 	HighMem
+// `[0x28000000, 0x3fffffff]` 	HighShadow
+// `[0x24000000, 0x27ffffff]` 	ShadowGap
+// `[0x20000000, 0x23ffffff]` 	LowShadow
+// `[0x00000000, 0x1fffffff]` 	LowMem
 const DEFAULT_32B_LAYOUT: TargetShadowLayout = TargetShadowLayout {
-    high_mem: 0x38000000..=0xbfffffff,
-    high_shadow: 0x27000000..=0x37ffffff,
-    shadow_gap: 0x24000000..=0x26ffffff,
+    high_mem: 0x40000000..=0xffffffff,
+    high_shadow: 0x28000000..=0x3fffffff,
+    shadow_gap: 0x24000000..=0x27ffffff,
     low_shadow: 0x20000000..=0x23ffffff,
     low_mem: 0x00000000..=0x1fffffff,
 };
@@ -297,11 +294,11 @@ fn get_layout() -> TargetShadowLayout {
 
     println!("cargo:warning=Generating layout for environment: {arch} - VMA {vma:?} - {os}.");
 
-    if std::env::var_os("CARGO_FEATURE_TEST").is_some() {
-        // we are running tests, only use the host address space
-        let (default_layout, _) = default_layout(host_pointer_width());
-        return default_layout;
-    };
+    // if std::env::var_os("CARGO_FEATURE_TEST").is_some() {
+    //     // we are running tests, only use the host address space
+    //     let (default_layout, _) = default_layout(host_pointer_width());
+    //     return default_layout;
+    // };
 
     if let Some(specific_layout) = SPECIFIC_LAYOUTS.get(&(arch.clone(), vma, os.clone())) {
         specific_layout.clone()
