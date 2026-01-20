@@ -13,10 +13,7 @@ use libafl_asan::{
     file::linux::LinuxFileReader,
     logger::linux::LinuxLogger,
     mmap::unix::MmapRegion,
-    shadow::{
-        Shadow,
-        guest::{DefaultShadowLayout, GuestShadow},
-    },
+    shadow::{Shadow, guest::GuestShadow, layout::DefaultShadowLayout},
     symbols::{Symbols, nop::NopSymbols},
     tracking::{Tracking, guest_fast::GuestFastTracking},
 };
