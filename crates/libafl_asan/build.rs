@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, fs, ops::RangeInclusive, path::Path, sync::LazyLock};
 
-use build_target::{target_arch, target_os, target_pointer_width, Arch, Os, PointerWidth};
+use build_target::{Arch, Os, PointerWidth, target_arch, target_os, target_pointer_width};
 use rand::Rng;
 
 // Default Linux/i386 mapping on x86_64 machine:
