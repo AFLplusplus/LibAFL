@@ -61,6 +61,8 @@ test = ["dlmalloc", "guest", "libc"]
 tracking = []
 ## Generate a dynamic shadow layout automatically
 dynamic_layout = []
+## nostd flag
+nostd = []
 
 [dependencies]
 baby-mimalloc = { version = "0.2.1", default-features = false, features = [
