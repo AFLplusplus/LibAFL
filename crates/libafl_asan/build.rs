@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, fs, ops::RangeInclusive, path::Path, sync::LazyLock};
 
-use build_target::{Arch, Os, PointerWidth, target_arch, target_os, target_pointer_width};
+use build_target::{target_arch, target_os, target_pointer_width, Arch, Os, PointerWidth};
 use rand::Rng;
 
 // Default Linux/i386 mapping on i386 machine
@@ -269,6 +269,27 @@ fn guess_vma(arch: &Arch) -> Option<Vma> {
     }
 }
 
+fn host_pointer_width() -> PointerWidth {
+    let ptr_width = std::mem::size_of::<usize>() * 8;
+
+    match ptr_width {
+        16 => PointerWidth::U16,
+        32 => PointerWidth::U32,
+        64 => PointerWidth::U64,
+        _ => panic!("Unsupported pointer width: {ptr_width}"),
+    }
+}
+
+fn default_layout(width: PointerWidth) -> (TargetShadowLayout, usize) {
+    match width {
+        PointerWidth::U32 => (DEFAULT_32B_LAYOUT.clone(), 32),
+        PointerWidth::U64 => (DEFAULT_64B_LAYOUT.clone(), 64),
+        _ => {
+            panic!("Could not find the right layout for host architecture.")
+        }
+    }
+}
+
 fn get_layout() -> TargetShadowLayout {
     let arch = target_arch();
     let vma = guess_vma(&arch);
@@ -276,16 +297,16 @@ fn get_layout() -> TargetShadowLayout {
 
     println!("cargo:warning=Generating layout for environment: {arch} - VMA {vma:?} - {os}.");
 
+    if std::env::var_os("CARGO_FEATURE_TEST").is_some() {
+        // we are running tests, only use the host address space
+        let (default_layout, _) = default_layout(host_pointer_width());
+        return default_layout;
+    };
+
     if let Some(specific_layout) = SPECIFIC_LAYOUTS.get(&(arch.clone(), vma, os.clone())) {
         specific_layout.clone()
     } else {
-        let (default_layout, nb_bits) = match target_pointer_width() {
-            PointerWidth::U32 => (DEFAULT_32B_LAYOUT.clone(), 32),
-            PointerWidth::U64 => (DEFAULT_64B_LAYOUT.clone(), 64),
-            _ => {
-                panic!("Could not find the right layout for {arch:?} (VMA {vma:?}) {os:?}")
-            }
-        };
+        let (default_layout, nb_bits) = default_layout(target_pointer_width());
 
         println!("cargo:warning=Using default layout for {nb_bits} bits architectures.");
 
@@ -342,6 +363,11 @@ fn main() {
         .compile("log");
 
     let layout = get_layout();
+
+    println!(
+        "cargo:warning=shadow_base = {}",
+        &layout.low_shadow_offset()
+    );
 
     let gen_layout = LAYOUT_TEMPLATE
         .to_string()
