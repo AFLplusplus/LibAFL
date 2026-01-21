@@ -1,7 +1,7 @@
 //! The [`CachedOnDiskCorpus`] stores [`Testcase`]s to disk, keeping a subset of them in memory/cache, evicting in a FIFO manner.
 
 use alloc::{collections::vec_deque::VecDeque, string::String};
-use core::cell::{Ref, RefCell, RefMut};
+use core::{cell::{Ref, RefCell, RefMut}, num::NonZeroUsize};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ use crate::{
 pub struct CachedOnDiskCorpus<I> {
     inner: InMemoryOnDiskCorpus<I>,
     cached_indexes: RefCell<VecDeque<CorpusId>>,
-    cache_max_len: usize,
+    cache_max_len: NonZeroUsize,
 }
 
 impl<I> CachedOnDiskCorpus<I>
@@ -36,7 +36,7 @@ where
         if testcase.input().is_none() {
             self.inner.load_input_into(testcase)?;
             let mut borrowed_num = 0;
-            while self.cached_indexes.borrow().len() >= self.cache_max_len {
+            while self.cached_indexes.borrow().len() >= self.cache_max_len.get() {
                 let to_be_evicted = self.cached_indexes.borrow_mut().pop_front().unwrap();
 
                 if let Ok(mut borrowed) = self.inner.get_from_all(to_be_evicted)?.try_borrow_mut() {
@@ -44,7 +44,7 @@ where
                 } else {
                     self.cached_indexes.borrow_mut().push_back(to_be_evicted);
                     borrowed_num += 1;
-                    if self.cache_max_len == borrowed_num {
+                    if self.cache_max_len.get() == borrowed_num {
                         break;
                     }
                 }
@@ -217,7 +217,7 @@ impl<I> CachedOnDiskCorpus<I> {
     /// to pick a different metadata format, use [`CachedOnDiskCorpus::with_meta_format`].
     ///
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
-    pub fn new<P>(dir_path: P, cache_max_len: usize) -> Result<Self, Error>
+    pub fn new<P>(dir_path: P, cache_max_len: NonZeroUsize) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
@@ -225,7 +225,7 @@ impl<I> CachedOnDiskCorpus<I> {
     }
 
     /// Creates an [`CachedOnDiskCorpus`] that does not store [`Testcase`] metadata to disk.
-    pub fn no_meta<P>(dir_path: P, cache_max_len: usize) -> Result<Self, Error>
+    pub fn no_meta<P>(dir_path: P, cache_max_len: NonZeroUsize) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
@@ -237,7 +237,7 @@ impl<I> CachedOnDiskCorpus<I> {
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
     pub fn with_meta_format<P>(
         dir_path: P,
-        cache_max_len: usize,
+        cache_max_len: NonZeroUsize,
         meta_format: Option<OnDiskMetadataFormat>,
     ) -> Result<Self, Error>
     where
@@ -255,7 +255,7 @@ impl<I> CachedOnDiskCorpus<I> {
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
     pub fn with_meta_format_and_prefix<P>(
         dir_path: P,
-        cache_max_len: usize,
+        cache_max_len: NonZeroUsize,
         meta_format: Option<OnDiskMetadataFormat>,
         prefix: Option<String>,
         locking: bool,
@@ -275,12 +275,7 @@ impl<I> CachedOnDiskCorpus<I> {
     }
 
     /// Internal constructor `fn`
-    fn _new(on_disk_corpus: InMemoryOnDiskCorpus<I>, cache_max_len: usize) -> Result<Self, Error> {
-        if cache_max_len == 0 {
-            return Err(Error::illegal_argument(
-                "The max cache len in CachedOnDiskCorpus cannot be 0",
-            ));
-        }
+    fn _new(on_disk_corpus: InMemoryOnDiskCorpus<I>, cache_max_len: NonZeroUsize) -> Result<Self, Error> {
         Ok(Self {
             inner: on_disk_corpus,
             cached_indexes: RefCell::new(VecDeque::new()),
