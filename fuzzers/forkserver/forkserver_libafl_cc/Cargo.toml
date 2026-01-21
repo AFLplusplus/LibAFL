@@ -9,6 +9,8 @@ default = ["std"]
 std = []
 # Forces a crash
 crash = []
+# Enable git-recency mapping generation support in the `libafl_cc` wrapper.
+git-recency = ["libafl_cc/git-recency"]
 
 [profile.release]
 lto = true

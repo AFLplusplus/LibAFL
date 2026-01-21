@@ -8,6 +8,7 @@ use core::str;
     feature = "cmplog-instructions",
     feature = "ctx",
     feature = "dump-cfg",
+    feature = "git-recency",
 ))]
 use std::path::PathBuf;
 use std::{env, fs::File, io::Write, path::Path, process::Command};
@@ -33,6 +34,7 @@ const LLVM_VERSION_MIN: u32 = 15;
     feature = "cmplog-instructions",
     feature = "ctx",
     feature = "dump-cfg",
+    feature = "git-recency",
 ))]
 fn dll_extension<'a>() -> &'a str {
     if let Ok(vendor) = env::var("CARGO_CFG_TARGET_VENDOR")
@@ -187,6 +189,7 @@ fn find_llvm_version() -> Option<i32> {
     feature = "cmplog-instructions",
     feature = "ctx",
     feature = "dump-cfg",
+    feature = "git-recency",
 ))]
 #[expect(clippy::too_many_arguments)]
 fn build_pass(
@@ -388,6 +391,11 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         exec_llvm_config(&["--cxxflags"])
     };
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
+    // Rust's LLVM is commonly built without RTTI. We also build our pass plugins without RTTI so
+    // they can be loaded via `rustc -Z llvm-plugins=...` for Rust targets.
+    if !cxxflags.iter().any(|f| f == "-fno-rtti") {
+        cxxflags.push("-fno-rtti".to_string());
+    }
 
     let edge_map_default_size: usize = option_env!("LIBAFL_EDGES_MAP_DEFAULT_SIZE")
         .map_or(Ok(65_536), str::parse)
@@ -568,6 +576,18 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         "dump-cfg-pass.cc",
         None,
         false,
+    );
+
+    #[cfg(feature = "git-recency")]
+    build_pass(
+        bindir_path,
+        out_dir,
+        &cxxflags,
+        &ldflags,
+        src_dir,
+        "git-recency-pass.cc",
+        None,
+        true,
     );
 
     cc::Build::new()

@@ -1,7 +1,11 @@
 //! LLVM compiler Wrapper from `LibAFL`
 
-use core::{env, str::FromStr};
-use std::path::{Path, PathBuf};
+use core::str::FromStr;
+use std::{
+    env,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX, ToolWrapper};
 
@@ -39,6 +43,9 @@ pub enum LLVMPasses {
     Ctx,
     /// Function logging
     FunctionLogging,
+    /// Git recency mapping for `trace-pc-guard`
+    #[cfg(feature = "git-recency")]
+    GitRecency,
 }
 
 impl LLVMPasses {
@@ -65,6 +72,10 @@ impl LLVMPasses {
             LLVMPasses::FunctionLogging => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("function-logging.{}", dll_extension()))
             }
+            #[cfg(feature = "git-recency")]
+            LLVMPasses::GitRecency => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("git-recency-pass.{}", dll_extension()))
+            }
         }
     }
 }
@@ -89,6 +100,7 @@ pub struct ClangWrapper {
     has_libafl_arg: bool,
 
     output: Option<PathBuf>,
+    git_recency_mapping_out: Option<PathBuf>,
     configurations: Vec<crate::Configuration>,
     ignoring_configurations: bool,
     parse_args_called: bool,
@@ -251,6 +263,12 @@ impl ToolWrapper for ClangWrapper {
 
         self.linking = linking;
         self.shared = shared;
+        self.git_recency_mapping_out = None;
+        #[cfg(feature = "git-recency")]
+        {
+            self.git_recency_mapping_out =
+                env::var_os(crate::git_recency::GIT_RECENCY_MAPPING_ENV).map(PathBuf::from);
+        }
 
         new_args.push("-g".into());
         if self.optimize {
@@ -318,6 +336,8 @@ impl ToolWrapper for ClangWrapper {
     ) -> Result<Vec<String>, Error> {
         let mut args = vec![];
         let mut use_pass = false;
+        #[cfg(feature = "git-recency")]
+        let mut output_for_sidecar: Option<String> = None;
 
         if self.is_cpp {
             args.push(self.wrapped_cxx.clone());
@@ -355,13 +375,21 @@ impl ToolWrapper for ClangWrapper {
                 let output = configuration.replace_extension(&output);
                 let new_filename = output.into_os_string().into_string().unwrap();
                 args.push("-o".to_string());
-                args.push(new_filename);
+                args.push(new_filename.clone());
+                #[cfg(feature = "git-recency")]
+                {
+                    output_for_sidecar = Some(new_filename);
+                }
             }
         } else if let Some(output) = self.output.clone() {
             let output = configuration.replace_extension(&output);
             let new_filename = output.into_os_string().into_string().unwrap();
             args.push("-o".to_string());
-            args.push(new_filename);
+            args.push(new_filename.clone());
+            #[cfg(feature = "git-recency")]
+            {
+                output_for_sidecar = Some(new_filename);
+            }
         } else {
             // No output specified, we need to rewrite the single .c file's name into a -o
             // argument.
@@ -376,7 +404,7 @@ impl ToolWrapper for ClangWrapper {
                     match &extension_lowercase[..] {
                         "c" | "cc" | "cxx" | "cpp" => {
                             args.push("-o".to_string());
-                            args.push(if self.linking {
+                            let out_path = if self.linking {
                                 configuration
                                     .replace_extension(&PathBuf::from("a.out"))
                                     .into_os_string()
@@ -386,7 +414,12 @@ impl ToolWrapper for ClangWrapper {
                                 let mut result = configuration.replace_extension(&arg_as_path);
                                 result.set_extension("o");
                                 result.into_os_string().into_string().unwrap()
-                            });
+                            };
+                            args.push(out_path.clone());
+                            #[cfg(feature = "git-recency")]
+                            {
+                                output_for_sidecar = Some(out_path);
+                            }
                             break;
                         }
                         _ => {}
@@ -401,6 +434,48 @@ impl ToolWrapper for ClangWrapper {
 
         if self.need_libafl_arg && !self.has_libafl_arg {
             return Ok(args);
+        }
+
+        // If we're generating a git-recency mapping, keep `SanitizerCoverage` instrumentation
+        // placement stable.
+        #[cfg(feature = "git-recency")]
+        if self.git_recency_mapping_out.is_some() && !self.linking && !self.is_asm {
+            args.push("-mllvm".into());
+            args.push("--sanitizer-early-opt-ep".into());
+        }
+
+        #[cfg(feature = "git-recency")]
+        if self.git_recency_mapping_out.is_some()
+            && !self.linking
+            && !self.is_asm
+            && output_for_sidecar.as_ref().is_some_and(|p| {
+                Path::new(p).extension().is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("o") || ext.eq_ignore_ascii_case("obj")
+                })
+            })
+        {
+            use_pass = true;
+
+            let pass_path = LLVMPasses::GitRecency
+                .path()
+                .into_os_string()
+                .into_string()
+                .unwrap();
+
+            args.push("-Xclang".into());
+            args.push("-load".into());
+            args.push("-Xclang".into());
+            args.push(pass_path.clone());
+            args.push("-Xclang".into());
+            args.push(format!("-fpass-plugin={pass_path}"));
+
+            let sidecar_path = format!(
+                "-libafl-git-recency-sidecar={}.{}",
+                output_for_sidecar.as_ref().unwrap(),
+                crate::git_recency::SIDECAR_EXT
+            );
+            args.push("-mllvm".into());
+            args.push(sidecar_path);
         }
 
         for pass in &self.passes {
@@ -466,6 +541,91 @@ impl ToolWrapper for ClangWrapper {
 
     fn is_silent(&self) -> bool {
         self.is_silent
+    }
+
+    fn run(&mut self) -> Result<Option<i32>, Error> {
+        let mut last_status = Ok(None);
+        let configurations = if self.ignore_configurations()? {
+            vec![crate::Configuration::Default]
+        } else {
+            self.configurations()?
+        };
+
+        for configuration in configurations {
+            let mut args = self.command_for_configuration(configuration)?;
+            self.filter(&mut args);
+
+            if !self.is_silent() {
+                dbg!(args.clone());
+            }
+            if args.is_empty() {
+                last_status = Err(Error::InvalidArguments(
+                    "The number of arguments cannot be 0".into(),
+                ));
+                continue;
+            }
+
+            let status = match Command::new(&args[0]).args(&args[1..]).status() {
+                Ok(s) => s,
+                Err(e) => {
+                    last_status = Err(Error::Io(e));
+                    continue;
+                }
+            };
+            if !self.is_silent() {
+                dbg!(status);
+            }
+            last_status = Ok(status.code());
+
+            #[cfg(feature = "git-recency")]
+            if status.success()
+                && self.linking
+                && let Some(mapping_out) = &self.git_recency_mapping_out
+            {
+                let cwd = env::current_dir().map_err(Error::Io)?;
+
+                let mut link_output: Option<PathBuf> = None;
+                let mut i = 1;
+                while i + 1 < args.len() {
+                    if args[i] == "-o" {
+                        link_output = Some(PathBuf::from(&args[i + 1]));
+                    }
+                    i += 1;
+                }
+                let Some(link_output) = link_output else {
+                    return Err(Error::Unknown(
+                        "git recency mapping could not determine link output path".to_string(),
+                    ));
+                };
+
+                let mut object_files: Vec<PathBuf> = Vec::new();
+                for arg in &args[1..] {
+                    if arg.starts_with('-') || arg.starts_with('@') {
+                        continue;
+                    }
+                    if Path::new(arg)
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("a"))
+                    {
+                        continue;
+                    }
+                    if Path::new(arg).extension().is_some_and(|ext| {
+                        ext.eq_ignore_ascii_case("o") || ext.eq_ignore_ascii_case("obj")
+                    }) {
+                        object_files.push(PathBuf::from(arg));
+                    }
+                }
+
+                crate::git_recency::generate_git_recency_mapping(
+                    mapping_out,
+                    &link_output,
+                    &object_files,
+                    &cwd,
+                )?;
+            }
+        }
+
+        last_status
     }
 }
 
@@ -537,6 +697,7 @@ impl ClangWrapper {
             need_libafl_arg: false,
             has_libafl_arg: false,
             output: None,
+            git_recency_mapping_out: None,
             configurations: vec![crate::Configuration::Default],
             ignoring_configurations: false,
             parse_args_called: false,
