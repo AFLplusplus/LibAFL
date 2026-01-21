@@ -2,12 +2,13 @@
    LibAFL - Git recency mapping LLVM pass
    --------------------------------------------------
 
-   This pass records a per-object mapping from SanitizerCoverage pc-guard indices
-   to source locations (file + line). The final mapping to `git blame` timestamps
-   is produced at link time by `libafl_cc`.
+   This pass records a per-object mapping from SanitizerCoverage pc-guard
+   indices to source locations (file + line). The final mapping to `git blame`
+   timestamps is produced at link time by `libafl_cc`.
 
-   The mapping is emitted both as a sidecar file (v1) and embedded into the object
-   in a dedicated section (v2) so link-time merging can handle static archives.
+   The mapping is emitted both as a sidecar file (v1) and embedded into the
+   object in a dedicated section (v2) so link-time merging can handle static
+   archives.
 */
 
 #include "common-llvm.h"
@@ -98,8 +99,8 @@ static const Function *called_function_stripped(const CallBase *CB) {
   return dyn_cast<Function>(V);
 }
 
-static void append_debuglocs_for_bb(const BasicBlock &BB,
-                                   std::vector<LocEntry> &out) {
+static void append_debuglocs_for_bb(const BasicBlock      &BB,
+                                    std::vector<LocEntry> &out) {
   for (const auto &I : BB) {
     if (isa<DbgInfoIntrinsic>(&I)) { continue; }
 
@@ -149,11 +150,10 @@ static void append_debuglocs_for_bb(const BasicBlock &BB,
   }
 
   // Deterministic + deduplicated output per BB.
-  std::sort(out.begin(), out.end(),
-            [](const LocEntry &a, const LocEntry &b) {
-              if (a.path == b.path) { return a.line < b.line; }
-              return a.path < b.path;
-            });
+  std::sort(out.begin(), out.end(), [](const LocEntry &a, const LocEntry &b) {
+    if (a.path == b.path) { return a.line < b.line; }
+    return a.path < b.path;
+  });
   out.erase(std::unique(out.begin(), out.end(),
                         [](const LocEntry &a, const LocEntry &b) {
                           return a.line == b.line && a.path == b.path;
@@ -166,9 +166,9 @@ class GitRecencyPass : public PassInfoMixin<GitRecencyPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM) {
     // Collect source locations for each *instrumented* basic block.
     //
-    // We record one entry for each `__sanitizer_cov_trace_pc_guard` call. This keeps
-    // the emitted entry count aligned with the number of guards in the object even
-    // if multiple trace calls end up in a single basic block.
+    // We record one entry for each `__sanitizer_cov_trace_pc_guard` call. This
+    // keeps the emitted entry count aligned with the number of guards in the
+    // object even if multiple trace calls end up in a single basic block.
     std::vector<std::vector<LocEntry>> ordered;
     for (auto &F : M) {
       if (is_sancov_trace_function(F.getName()) ||
@@ -217,11 +217,12 @@ class GitRecencyPass : public PassInfoMixin<GitRecencyPass> {
     }
 
     // v2: embedded section (supports static archives at link time)
-    auto &Ctx = M.getContext();
+    auto      &Ctx = M.getContext();
     ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), blob.size());
     GlobalVariable *meta = new GlobalVariable(
         M, arrayTy, true, GlobalVariable::PrivateLinkage,
-        ConstantDataArray::get(Ctx, ArrayRef<uint8_t>(blob.data(), blob.size())),
+        ConstantDataArray::get(Ctx,
+                               ArrayRef<uint8_t>(blob.data(), blob.size())),
         "libafl_gitrecency_" + M.getName());
     meta->setAlignment(Align(1));
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || \
