@@ -37,8 +37,12 @@ where
             self.inner.load_input_into(testcase)?;
             let mut borrowed_num = 0;
             while self.cached_indexes.borrow().len() >= self.cache_max_len {
-                let to_be_evicted = self.cached_indexes.borrow_mut().pop_front().unwrap();
-
+                let to_be_evicted = self.cached_indexes
+                    .borrow_mut()
+                    .pop_front()
+                    .ok_or_else(|| Error::illegal_state(
+                        "Cache eviction: VecDeque empty despite length check"
+                    ))?;
                 if let Ok(mut borrowed) = self.inner.get_from_all(to_be_evicted)?.try_borrow_mut() {
                     *borrowed.input_mut() = None;
                 } else {
