@@ -3327,6 +3327,7 @@ version = "0.16.0"
 dependencies = [
  "cc",
  "glob",
+ "object 0.38.1",
  "serde",
  "which",
 ]

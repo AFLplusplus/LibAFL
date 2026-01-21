@@ -39,6 +39,12 @@ coverage-accounting = []
 cmplog-instructions = []
 ctx = []
 dump-cfg = []
+git-recency = ["dep:object"]
+
+[[bin]]
+name = "libafl_git_recency_mapgen"
+path = "src/bin/libafl_git_recency_mapgen.rs"
+required-features = ["git-recency"]
 
 [build-dependencies]
 cc = { workspace = true, features = ["parallel"] }
@@ -52,6 +58,7 @@ serde = { workspace = true, default-features = false, features = [
   "alloc",
   "derive",
 ] } # serialization lib
+object = { version = "0.38.1", optional = true }
 
 [lints]
 workspace = true

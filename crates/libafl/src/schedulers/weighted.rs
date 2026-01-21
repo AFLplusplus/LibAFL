@@ -21,7 +21,7 @@ use crate::{
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler, on_add_metadata_default,
         on_evaluation_metadata_default, on_next_metadata_default,
         powersched::{BaseSchedule, PowerSchedule, SchedulerMetadata},
-        testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
+        testcase_score::{CorpusWeightTestcaseScore, GitRecencyTestcaseScore, TestcaseScore},
     },
     state::{HasCorpus, HasRand},
 };
@@ -389,6 +389,9 @@ where
 
 /// The standard corpus weight, same as in `AFL++`
 pub type StdWeightedScheduler<C, O> = WeightedScheduler<C, CorpusWeightTestcaseScore, O>;
+
+/// A git-aware corpus weight scheduler that biases towards testcases covering recently changed code.
+pub type GitAwareStdWeightedScheduler<C, O> = WeightedScheduler<C, GitRecencyTestcaseScore, O>;
 
 #[cfg(test)]
 mod tests {
