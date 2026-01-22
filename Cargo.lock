@@ -2099,7 +2099,7 @@ dependencies = [
  "libafl_core",
  "libc",
  "log",
- "nix 0.30.1",
+ "nix 0.31.0",
  "num_enum",
  "rustversion",
  "windows 0.62.2",
@@ -3189,7 +3189,7 @@ dependencies = [
  "log",
  "meminterval",
  "mlua",
- "nix 0.30.1",
+ "nix 0.31.0",
  "no_std_time",
  "num-traits",
  "num_enum",
@@ -3297,7 +3297,7 @@ dependencies = [
  "mach2 0.6.0",
  "minibsod",
  "miniz_oxide 0.9.0",
- "nix 0.30.1",
+ "nix 0.31.0",
  "no_std_time",
  "nonzero_macros",
  "num_enum",
@@ -3338,7 +3338,7 @@ version = "0.16.0"
 dependencies = [
  "backtrace",
  "document-features",
- "nix 0.30.1",
+ "nix 0.31.0",
  "nonzero_macros",
  "postcard",
  "pyo3",
@@ -3381,7 +3381,7 @@ dependencies = [
  "mach-sys",
  "mimalloc",
  "mmap-rs",
- "nix 0.30.1",
+ "nix 0.31.0",
  "num-traits",
  "paste",
  "rangemap",
@@ -3405,7 +3405,7 @@ dependencies = [
  "libafl_bolts",
  "libc",
  "log",
- "nix 0.30.1",
+ "nix 0.31.0",
  "num-traits",
  "num_enum",
  "perf-event-open-sys",
@@ -3441,7 +3441,7 @@ dependencies = [
  "libafl_bolts",
  "libafl_targets",
  "libnyx",
- "nix 0.30.1",
+ "nix 0.31.0",
  "regex",
  "serde",
  "typed-builder",
@@ -3563,7 +3563,7 @@ dependencies = [
  "libc",
  "log",
  "meminterval",
- "nix 0.30.1",
+ "nix 0.31.0",
  "ownedref",
  "rangemap",
  "rustversion",
@@ -3594,9 +3594,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.179"
+version = "0.2.180"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5a2d376baa530d1238d133232d15e239abad80d05838b4b59354e5268af431f"
+checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
 
 [[package]]
 name = "libcasr"
@@ -3827,7 +3827,7 @@ dependencies = [
  "libafl_core",
  "log",
  "miniz_oxide 0.9.0",
- "nix 0.30.1",
+ "nix 0.31.0",
  "no_std_time",
  "postcard",
  "rustversion",
@@ -4144,6 +4144,18 @@ name = "nix"
 version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
+dependencies = [
+ "bitflags 2.10.0",
+ "cfg-if 1.0.4",
+ "cfg_aliases",
+ "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db9f2b173ed7678e98df5c31c60c3d49595cb37e9b58c71e85ec03e88a278fae"
 dependencies = [
  "bitflags 2.10.0",
  "cfg-if 1.0.4",
@@ -4815,11 +4827,12 @@ dependencies = [
 
 [[package]]
 name = "ptcov"
-version = "0.0.5"
+version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49fc3038cb5032affe0f1ef9b1891f9ebf902c1a076a8dd8bedab77885c392d6"
+checksum = "bb9ec054af0cc5cb654bdcd5ee7b1798258875830c2a4ee9341a0f448b468951"
 dependencies = [
  "iced-x86",
+ "num-traits",
 ]
 
 [[package]]
@@ -5758,7 +5771,7 @@ dependencies = [
  "libafl_core",
  "libc",
  "log",
- "nix 0.30.1",
+ "nix 0.31.0",
  "postcard",
  "rustversion",
  "serde",
