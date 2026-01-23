@@ -7,21 +7,21 @@ use std::{
 };
 
 use backtrace::Backtrace;
-use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
+use color_backtrace::{BacktracePrinter, Verbosity, default_output_stream};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
 use frida_gum::{Gum, Process};
 use libafl::{
+    Error, HasMetadata,
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
-    Error, HasMetadata,
 };
 use libafl_bolts::{
+    Named, SerdeAny,
     ownedref::OwnedPtr,
     tuples::{Handle, Handled, MatchNameRef},
-    Named, SerdeAny,
 };
 use mmap_rs::MmapOptions;
 use serde::{Deserialize, Serialize};
