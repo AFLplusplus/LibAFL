@@ -7,21 +7,21 @@ use std::{
 };
 
 use backtrace::Backtrace;
-use color_backtrace::{BacktracePrinter, Verbosity, default_output_stream};
+use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
 use frida_gum::{Gum, Process};
 use libafl::{
-    Error, HasMetadata,
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
+    Error, HasMetadata,
 };
 use libafl_bolts::{
-    Named, SerdeAny,
     ownedref::OwnedPtr,
     tuples::{Handle, Handled, MatchNameRef},
+    Named, SerdeAny,
 };
 use mmap_rs::MmapOptions;
 use serde::{Deserialize, Serialize};
@@ -368,7 +368,6 @@ impl AsanErrors {
                         writeln!(output, " at 0x{_pc:x}").unwrap();
                     }
 
-                    #[expect(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                     for reg in 0..29 {
                         let val = cpu_context.reg(reg);
