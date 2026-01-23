@@ -4,6 +4,7 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    ptr,
 };
 #[cfg(all(windows, not(test)))]
 use std::process::abort;
@@ -96,7 +97,7 @@ where
             // but we need to pass the harness entry point
             // so that Stalker knows to pick it despite the module being excluded
             let harness_fn_ref: &H = self.base.harness();
-            let ptr: *const H = harness_fn_ref as *const H;
+            let ptr: *const H = ptr::from_ref::<H>(harness_fn_ref);
             log::info!("Activating Stalker for {ptr:p}");
             self.stalker.activate(NativePointer(ptr as *mut c_void));
         }

@@ -496,14 +496,14 @@ impl AsanGiovese {
             )
         };
 
-        if res == MAP_FAILED {
-            panic!(
-                "Error: could not map asan host memory at {:#x} (size {:#x}): {}",
-                addr as usize,
-                size,
-                std::io::Error::last_os_error().raw_os_error().unwrap()
-            );
-        }
+        assert_ne!(
+            res,
+            MAP_FAILED,
+            "Error: could not map asan host memory at {:#x} (size {:#x}): {}",
+            addr as usize,
+            size,
+            std::io::Error::last_os_error().raw_os_error().unwrap()
+        );
     }
 
     unsafe fn init(self: &mut Pin<Box<Self>>, qemu_hooks: QemuHooks) {
