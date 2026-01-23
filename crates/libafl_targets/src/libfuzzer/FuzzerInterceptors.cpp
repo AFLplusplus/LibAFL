@@ -286,6 +286,17 @@ EXT_FUNC_IMPL(
     return 0;
 }
 
+EXT_FUNC_IMPL(libafl_main, int, (void), false);
+int LLVMFuzzerRunDriver(int*, char***, int(*)(const uint8_t*, size_t));
+int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
+
+int main(int argc, char** argv) {
+  if (libafl_main) {
+    return libafl_main(argc, argv);
+  }
+  return LLVMFuzzerRunDriver(&argc, &argv, LLVMFuzzerTestOneInput);
+}
+
 
 /* ===================== LibAFL Rust-facing shims ===================== */
 
