@@ -235,6 +235,7 @@ static void fuzzerInit() {
 
 #include <cstddef>
 #include <cstdint>
+
 extern "C" {
 
 /* ===================== LLVM libFuzzer ABI hooks ===================== */
@@ -246,7 +247,6 @@ EXT_FUNC_IMPL(
     (uint8_t* data, size_t size, size_t max_size, uint32_t seed),
     false
 ) {
-    // Default libFuzzer behavior: keep input unchanged
     (void)data;
     (void)max_size;
     (void)seed;
@@ -286,19 +286,23 @@ EXT_FUNC_IMPL(
     return 0;
 }
 
-// int libafl_main(int argc, char** argv)
+/* ===================== Entry + driver forwarding ===================== */
+#if defined(__APPLE__)
+__attribute__((weak_import)) int libafl_main(int argc, char** argv);
+#else
 EXT_FUNC_IMPL(libafl_main, int, (int argc, char** argv), false);
-
+#endif
 int LLVMFuzzerRunDriver(int*, char***, int(*)(const uint8_t*, size_t));
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
 
 int main(int argc, char** argv) {
-  if (libafl_main) {
-    return libafl_main(argc, argv);
-  }
-  return LLVMFuzzerRunDriver(&argc, &argv, LLVMFuzzerTestOneInput);
+#if defined(__APPLE__)
+    if (&libafl_main) return libafl_main(argc, argv);
+#else
+    if (libafl_main) return libafl_main(argc, argv);
+#endif
+    return LLVMFuzzerRunDriver(&argc, &argv, LLVMFuzzerTestOneInput);
 }
-
 
 /* ===================== LibAFL Rust-facing shims ===================== */
 
