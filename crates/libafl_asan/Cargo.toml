@@ -33,6 +33,7 @@ default = [
   "mimalloc",
   "test",
   "tracking",
+  "dynamic_layout",
 ]
 ## Enable support for the `dlmalloc` allocator backend
 dlmalloc = ["dep:dlmalloc"]
@@ -58,6 +59,10 @@ mimalloc = ["dep:baby-mimalloc"]
 test = ["dlmalloc", "guest", "libc"]
 ## Enable support for memory tracking
 tracking = []
+## Generate a dynamic shadow layout automatically
+dynamic_layout = []
+## nostd flag
+nostd = []
 
 [dependencies]
 baby-mimalloc = { version = "0.2.1", default-features = false, features = [
@@ -92,9 +97,14 @@ syscalls = { version = "0.7.0", default-features = false, optional = true }
 thiserror = { version = "2.0.16", default-features = false }
 ahash = { workspace = true, default-features = false }
 hashbrown = { workspace = true, default-features = false }
+stdint = "1.0.0"
 
 [build-dependencies]
 cc = { version = "1.2.52" }
+build-target = "0.8.0"
+libc = "0.2.179"
+rand = "0.9.2"
+page_size = "0.6.0"
 
 [dev-dependencies]
 env_logger = { version = "0.11.6" }

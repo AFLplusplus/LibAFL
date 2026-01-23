@@ -32,7 +32,7 @@
 //! The componentized nature of the design is intended to permit the user to
 //! adapt `asan` to their needs with minimal modification by selecting and
 //! combining alternative implementations of the various key components.
-#![cfg_attr(not(feature = "test"), no_std)]
+#![cfg_attr(all(feature = "nostd", not(feature = "test")), no_std)]
 #![cfg_attr(target_arch = "powerpc", feature(asm_experimental_arch))]
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 
@@ -62,7 +62,7 @@ pub mod mem;
 
 pub mod mmap;
 
-#[cfg(not(feature = "test"))]
+#[cfg(all(feature = "nostd", not(feature = "test")))]
 mod nostd;
 
 pub mod patch;
@@ -115,10 +115,10 @@ pub type off_t = isize;
 #[allow(non_camel_case_types)]
 pub type off_t = libc::off_t;
 
+#[cfg(not(feature = "test"))]
+use core::ffi::{c_char, c_void};
 use core::mem::transmute;
 
-#[cfg(not(feature = "test"))]
-use ::core::ffi::{c_char, c_void};
 use nostd_printf::vsnprintf;
 
 /*

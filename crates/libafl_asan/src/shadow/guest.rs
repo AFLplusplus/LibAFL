@@ -11,7 +11,7 @@ use thiserror::Error;
 use crate::{
     GuestAddr,
     mmap::Mmap,
-    shadow::{PoisonType, Shadow},
+    shadow::{PoisonType, Shadow, layout::ShadowLayout},
 };
 
 #[allow(dead_code)]
@@ -389,69 +389,6 @@ impl<M: Mmap, L: ShadowLayout> GuestShadow<M, L> {
             Err(GuestShadowError::InvalidMemoryAddress(addr))
         }
     }
-}
-
-pub trait ShadowLayout: Debug + Send {
-    const LOW_MEM_OFFSET: usize;
-    const LOW_MEM_SIZE: usize;
-
-    const LOW_SHADOW_OFFSET: usize;
-    const LOW_SHADOW_SIZE: usize;
-
-    const HIGH_SHADOW_OFFSET: usize;
-    const HIGH_SHADOW_SIZE: usize;
-
-    const HIGH_MEM_OFFSET: usize;
-    const HIGH_MEM_SIZE: usize;
-
-    const SHADOW_OFFSET: usize;
-    const ALLOC_ALIGN_POW: usize;
-    const ALLOC_ALIGN_SIZE: usize;
-}
-
-#[derive(Debug)]
-pub struct DefaultShadowLayout;
-
-#[cfg(target_pointer_width = "32")]
-impl ShadowLayout for DefaultShadowLayout {
-    // [0x40000000, 0xffffffff] 	HighMem
-    // [0x28000000, 0x3fffffff] 	HighShadow
-    // [0x24000000, 0x27ffffff] 	ShadowGap
-    // [0x20000000, 0x23ffffff] 	LowShadow
-    // [0x00000000, 0x1fffffff] 	LowMem
-    const SHADOW_OFFSET: usize = 0x20000000;
-    const LOW_MEM_OFFSET: GuestAddr = 0x0;
-    const LOW_MEM_SIZE: usize = 0x20000000;
-    const LOW_SHADOW_OFFSET: GuestAddr = 0x20000000;
-    const LOW_SHADOW_SIZE: usize = 0x4000000;
-    const HIGH_SHADOW_OFFSET: GuestAddr = 0x28000000;
-    const HIGH_SHADOW_SIZE: usize = 0x18000000;
-    const HIGH_MEM_OFFSET: GuestAddr = 0x40000000;
-    const HIGH_MEM_SIZE: usize = 0xc0000000;
-
-    const ALLOC_ALIGN_POW: usize = 3;
-    const ALLOC_ALIGN_SIZE: usize = 1 << Self::ALLOC_ALIGN_POW;
-}
-
-#[cfg(target_pointer_width = "64")]
-impl ShadowLayout for DefaultShadowLayout {
-    // [0x10007fff8000, 0x7fffffffffff] 	HighMem
-    // [0x02008fff7000, 0x10007fff7fff] 	HighShadow
-    // [0x00008fff7000, 0x02008fff6fff] 	ShadowGap
-    // [0x00007fff8000, 0x00008fff6fff] 	LowShadow
-    // [0x000000000000, 0x00007fff7fff] 	LowMem
-    const SHADOW_OFFSET: usize = 0x7fff8000;
-    const LOW_MEM_OFFSET: GuestAddr = 0x0;
-    const LOW_MEM_SIZE: usize = 0x00007fff8000;
-    const LOW_SHADOW_OFFSET: GuestAddr = 0x00007fff8000;
-    const LOW_SHADOW_SIZE: usize = 0xffff000;
-    const HIGH_SHADOW_OFFSET: GuestAddr = 0x02008fff7000;
-    const HIGH_SHADOW_SIZE: usize = 0xdfff0001000;
-    const HIGH_MEM_OFFSET: GuestAddr = 0x10007fff8000;
-    const HIGH_MEM_SIZE: usize = 0x6fff80008000;
-
-    const ALLOC_ALIGN_POW: usize = 3;
-    const ALLOC_ALIGN_SIZE: usize = 1 << Self::ALLOC_ALIGN_POW;
 }
 
 #[derive(Error, Debug, PartialEq)]

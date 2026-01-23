@@ -21,6 +21,7 @@ libafl_asan = { path = "../../../libafl_asan", default-features = false, feature
   "host",
   "syscalls",
   "tracking",
+  "nostd",
 ] }
 log = { version = "0.4.22", default-features = false, features = [
   "release_max_level_info",

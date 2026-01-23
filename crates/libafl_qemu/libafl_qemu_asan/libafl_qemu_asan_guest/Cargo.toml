@@ -21,6 +21,7 @@ libafl_asan = { path = "../../../libafl_asan", default-features = false, feature
   "libc",
   "mimalloc",
   "tracking",
+  "nostd",
 ] }
 libafl_asan_libc = { path = "../../../libafl_asan/libafl_asan_libc", default-features = false }
 log = { version = "0.4.22", default-features = false, features = [

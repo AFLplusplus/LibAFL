@@ -228,7 +228,7 @@ impl InjectionModule {
             .current_cpu()
             .unwrap()
             .read_function_argument_with_cc(parameter, CallingConvention::Default)
-            .unwrap_or_default();
+            .unwrap_or_default() as GuestAddr;
 
         let module = emulator_modules.get_mut::<Self>().unwrap();
         let matches = &module.matches_list[id];
@@ -398,25 +398,25 @@ where
             //println!("CMD {}", cmd);
 
             let first_parameter = unsafe {
-                if (*c_array.offset(1)).is_null() {
+                if (*c_array.add(1)).is_null() {
                     return SyscallHookResult::Run;
                 }
-                CStr::from_ptr(*c_array.offset(1)).to_string_lossy()
+                CStr::from_ptr(*c_array.add(1)).to_string_lossy()
             };
             let second_parameter = unsafe {
-                if (*c_array.offset(2)).is_null() {
+                if (*c_array.add(2)).is_null() {
                     return SyscallHookResult::Run;
                 }
-                CStr::from_ptr(*c_array.offset(2)).to_string_lossy()
+                CStr::from_ptr(*c_array.add(2)).to_string_lossy()
             };
 
             if first_parameter == "-c" {
                 let to_check = if second_parameter == "--" {
                     unsafe {
-                        if (*c_array.offset(3)).is_null() {
+                        if (*c_array.add(3)).is_null() {
                             return SyscallHookResult::Run;
                         }
-                        CStr::from_ptr(*c_array.offset(3)).to_string_lossy()
+                        CStr::from_ptr(*c_array.add(3)).to_string_lossy()
                     }
                 } else {
                     second_parameter
@@ -479,7 +479,7 @@ mod tests {
               tests:
                 - input_value: "*)(FUZZ=*))(|"
                   match_value: "*)(FUZZ=*))(|"
-            
+
             # XSS injection tests
             # This is a minimal example that only checks for libxml2
             - name: "xss"

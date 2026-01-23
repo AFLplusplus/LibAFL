@@ -413,10 +413,11 @@ jobs:
           filters: |
             qemu:
               - '.github/**'
-              - 'libafl/**'
-              - 'libafl_bolts/**'
-              - 'libafl_targets/**'
-              - 'libafl_qemu/**'
+              - 'crates/libafl/**'
+              - 'crates/libafl_bolts/**'
+              - 'crates/libafl_targets/**'
+              - 'crates/libafl_qemu/**'
+              - 'crates/libafl_asan/**'
               - 'fuzzers/**/*qemu*/**'
 
   fuzzer-unicorn:

@@ -34,7 +34,7 @@ cur_input
 .venv
 
 crashes
-corpus
+fuzzers/**/corpus
 !**/src/corpus
 
 callgrind.out.*
@@ -48,7 +48,6 @@ test.dict
 
 # Ignore all built fuzzers
 AFLplusplus
-test_*
 !test_harness.cpp
 *_fuzzer
 
