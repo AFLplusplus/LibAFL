@@ -286,15 +286,6 @@ EXT_FUNC_IMPL(
     return 0;
 }
 
-// int libafl
-EXT_FUNC_IMPL(
-    libafl_main,
-    int,
-    (void),
-    false
-) {
-    return 0;
-}
 
 /* ===================== LibAFL Rust-facing shims ===================== */
 

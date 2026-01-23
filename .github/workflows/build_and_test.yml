@@ -151,7 +151,7 @@ jobs:
               > fuzz/fuzz_targets/parse_cbor.rs
 
       - name: Build fuzz target (regression test)
-        run: cd fuzz && cargo +nightly fuzz build -v --target aarch64-apple-darwin parse_cbor
+        run: cd fuzz && cargo +nightly fuzz run -v --target aarch64-apple-darwin parse_cbor -- -runs=1000
 
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
