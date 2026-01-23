@@ -1,5 +1,4 @@
-use vergen::{BuildBuilder, CargoBuilder, Emitter, RustcBuilder, SysinfoBuilder};
-use vergen_git2::Git2Builder;
+use vergen_git2::{BuildBuilder, CargoBuilder, Emitter, Git2Builder, RustcBuilder, SysinfoBuilder};
 
 #[macro_export]
 macro_rules! assert_unique_feature {

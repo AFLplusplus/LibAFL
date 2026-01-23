@@ -42,6 +42,7 @@ run: harness build
 test_inner: run
     #!/bin/bash
 
+    # TODO: remove me when tests working
     exit 0
 
     echo A
