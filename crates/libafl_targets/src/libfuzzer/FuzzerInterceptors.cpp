@@ -286,7 +286,9 @@ EXT_FUNC_IMPL(
     return 0;
 }
 
-EXT_FUNC_IMPL(libafl_main, int, (void), false);
+// int libafl_main(int argc, char** argv)
+EXT_FUNC_IMPL(libafl_main, int, (int argc, char** argv), false);
+
 int LLVMFuzzerRunDriver(int*, char***, int(*)(const uint8_t*, size_t));
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
 
