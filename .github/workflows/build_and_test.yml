@@ -327,6 +327,7 @@ jobs:
           - full_system/nyx_launcher
           - full_system/nyx_libxml2_standalone
           - full_system/nyx_libxml2_parallel
+          - full_system/qemu_intel_pt_bootloader
 
           # Structure-aware
           - structure_aware/nautilus_sync
