@@ -203,7 +203,13 @@ where
             let mut removed = Vec::with_capacity(state.corpus().count());
             for (seed, (id, _)) in seed_exprs {
                 // if the model says the seed isn't there, mark it for deletion
-                if !model.eval(&seed, true).unwrap().as_bool().unwrap() {
+                let eval_result = model.eval(&seed, true).ok_or_else(|| {
+                    Error::unknown("Failed to evaluate Z3 model for seed expression")
+                })?;
+                let bool_value = eval_result.as_bool().ok_or_else(|| {
+                    Error::illegal_state("Z3 model evaluation result is not a boolean")
+                })?;
+                if !bool_value {
                     removed.push(id);
                 }
             }

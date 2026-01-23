@@ -87,7 +87,9 @@ impl<I> Testcase<I> {
     /// Returns this [`Testcase`] with a loaded `Input`]
     pub fn load_input<C: Corpus<I>>(&mut self, corpus: &C) -> Result<&I, Error> {
         corpus.load_input_into(self)?;
-        Ok(self.input.as_ref().unwrap())
+        self.input
+            .as_ref()
+            .ok_or_else(|| Error::empty_optional("input"))
     }
 
     /// Get the input, if available any
@@ -539,7 +541,21 @@ impl<I> Drop for Testcase<I> {
     fn drop(&mut self) {
         if let Some(filename) = &self.filename {
             let mut path = PathBuf::from(filename);
-            let lockname = format!(".{}.lafl_lock", path.file_name().unwrap().to_str().unwrap());
+            let file_name = match path.file_name() {
+                Some(name) => name,
+                None => {
+                    eprintln!("Path has no filename: {}", path.display());
+                    return;
+                }
+            };
+            let file_name_str = match file_name.to_str() {
+                Some(s) => s,
+                None => {
+                    eprintln!("Path contains non-UTF8: {}", path.display());
+                    return;
+                }
+            };
+            let lockname = format!(".{}.lafl_lock", file_name_str);
             path.set_file_name(lockname);
             let _ = std::fs::remove_file(path);
         }

@@ -89,7 +89,7 @@ where
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let id = self.inner.add(testcase)?;
-        let testcase = &mut self.get(id).unwrap().borrow_mut();
+        let testcase = &mut self.get(id)?.borrow_mut();
         self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(id)
@@ -99,7 +99,7 @@ where
     #[inline]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let id = self.inner.add_disabled(testcase)?;
-        let testcase = &mut self.get_from_all(id).unwrap().borrow_mut();
+        let testcase = &mut self.get_from_all(id)?.borrow_mut();
         self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(id)
@@ -110,7 +110,7 @@ where
     fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         let entry = self.inner.replace(id, testcase)?;
         self.remove_testcase(&entry)?;
-        let testcase = &mut self.get(id).unwrap().borrow_mut();
+        let testcase = &mut self.get(id)?.borrow_mut();
         self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(entry)
@@ -222,7 +222,7 @@ where
     fn disable(&mut self, id: CorpusId) -> Result<(), Error> {
         self.inner.disable(id)?;
         // Ensure testcase is saved to disk correctly with its new status
-        let testcase_cell = &mut self.get_from_all(id).unwrap().borrow_mut();
+        let testcase_cell = &mut self.get_from_all(id)?.borrow_mut();
         self.save_testcase(testcase_cell, Some(id))?;
         Ok(())
     }
@@ -231,7 +231,7 @@ where
     fn enable(&mut self, id: CorpusId) -> Result<(), Error> {
         self.inner.enable(id)?;
         // Ensure testcase is saved to disk correctly with its new status
-        let testcase_cell = &mut self.get_from_all(id).unwrap().borrow_mut();
+        let testcase_cell = &mut self.get_from_all(id)?.borrow_mut();
         self.save_testcase(testcase_cell, Some(id))?;
         Ok(())
     }
@@ -353,7 +353,9 @@ impl<I> InMemoryOnDiskCorpus<I> {
         if testcase.filename().is_some() {
             // We are renaming!
 
-            let old_filename = testcase.filename_mut().take().unwrap();
+            let old_filename = testcase.filename_mut().take().ok_or_else(|| {
+                Error::illegal_argument("Filename was checked as Some but is now None")
+            })?;
             let new_filename = filename;
 
             // Do operations below when new filename is specified
@@ -381,10 +383,12 @@ impl<I> InMemoryOnDiskCorpus<I> {
         I: Input,
     {
         let base = testcase.filename_mut().take().unwrap_or_else(|| {
-            // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            testcase.input().as_ref().unwrap().generate_name(id)
+            testcase
+                .input()
+                .as_ref()
+                .map(|input| input.generate_name(id))
+                .unwrap_or_else(|| format!("unnamed_{:?}", id))
         });
-
         let file_name = match &self.prefix {
             Some(pref) => format!("{pref}{base}"),
             None => base,
@@ -419,14 +423,13 @@ impl<I> InMemoryOnDiskCorpus<I> {
         *testcase.filename_mut() = Some(file_name);
 
         if let Some(meta_format) = &self.meta_format {
+            let filename = testcase.filename().as_ref().ok_or_else(|| {
+                Error::illegal_state("Testcase filename should be set before metadata creation")
+            })?;
             let metafile_name = if self.locking {
-                format!(
-                    ".{}_{}.metadata",
-                    testcase.filename().as_ref().unwrap(),
-                    ctr
-                )
+                format!(".{}_{}.metadata", filename, ctr)
             } else {
-                format!(".{}.metadata", testcase.filename().as_ref().unwrap())
+                format!(".{}.metadata", filename)
             };
             let metafile_path = self.dir_path.join(&metafile_name);
             let mut tmpfile_path = metafile_path.clone();

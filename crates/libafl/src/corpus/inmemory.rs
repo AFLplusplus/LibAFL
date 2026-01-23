@@ -80,7 +80,11 @@ impl<I> TestcaseStorageMap<I> {
                 self.remove_key(id);
                 match item.prev {
                     Some(prev) => {
-                        self.map.get_mut(&prev).unwrap().next = item.next;
+                        if let Some(prev_node) = self.map.get_mut(&prev) {
+                            prev_node.next = item.next;
+                        } else {
+                            debug_assert!(false, "List corrupted: prev {} missing", prev);
+                        }
                     }
                     _ => {
                         // first elem
@@ -89,7 +93,11 @@ impl<I> TestcaseStorageMap<I> {
                 }
                 match item.next {
                     Some(next) => {
-                        self.map.get_mut(&next).unwrap().prev = item.prev;
+                        if let Some(next_node) = self.map.get_mut(&next) {
+                            next_node.prev = item.prev;
+                        } else {
+                            debug_assert!(false, "List corrupted: next {} missing", next);
+                        }
                     }
                     _ => {
                         // last elem
@@ -265,8 +273,13 @@ impl<I> TestcaseStorage<I> {
             &mut self.enabled
         };
         let prev = if let Some(last_id) = corpus.last_id {
-            corpus.map.get_mut(&last_id).unwrap().next = Some(id);
-            Some(last_id)
+            if let Some(last_node) = corpus.map.get_mut(&last_id) {
+                last_node.next = Some(id);
+                Some(last_id)
+            } else {
+                debug_assert!(false, "List corrupted: last {} missing", last_id);
+                None
+            }
         } else {
             None
         };
@@ -305,8 +318,15 @@ impl<I> TestcaseStorage<I> {
             &mut self.enabled
         };
         let prev = if let Some(last_id) = corpus.last_id {
-            corpus.map.get_mut(&last_id).unwrap().next = Some(id);
-            Some(last_id)
+            if let Some(last_node) = corpus.map.get_mut(&last_id) {
+                last_node.next = Some(id);
+                Some(last_id)
+            } else {
+                return Err(Error::illegal_state(format!(
+                    "List corrupted: last node {} not found during insertion",
+                    last_id
+                )));
+            }
         } else {
             None
         };
@@ -585,7 +605,9 @@ mod tests {
         // Add initial test cases with distinct byte patterns ([1,2,3],[2,3,4],[3,4,5])
         for i in 0..3u8 {
             let input = BytesInput::new(vec![i + 1, i + 2, i + 3]);
-            let tc_id = corpus.add(Testcase::new(input)).unwrap();
+            let tc_id = corpus
+                .add(Testcase::new(input))
+                .expect("Failed to add valid testcase during corpus setup");
             ids.push(tc_id);
         }
 
@@ -690,7 +712,11 @@ mod tests {
         assert_corpus_counts(&corpus, 2, 1);
 
         let removed = corpus.remove(ids[0])?;
-        let removed_data = removed.input().as_ref().unwrap().mutator_bytes();
+        let removed_data = removed
+            .input()
+            .as_ref()
+            .ok_or_else(|| Error::invalid_input("Removed testcase must have input data"))?
+            .mutator_bytes();
         assert_eq!(
             removed_data,
             &vec![1, 2, 3],
@@ -699,7 +725,11 @@ mod tests {
         assert_corpus_counts(&corpus, 2, 0);
 
         let removed = corpus.remove(ids[1])?;
-        let removed_data = removed.input().as_ref().unwrap().mutator_bytes();
+        let removed_data = removed
+            .input()
+            .as_ref()
+            .ok_or_else(|| Error::invalid_input("Removed testcase must have input data"))?
+            .mutator_bytes();
         assert_eq!(
             removed_data,
             &vec![2, 3, 4],
