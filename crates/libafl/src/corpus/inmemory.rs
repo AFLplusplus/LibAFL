@@ -83,7 +83,7 @@ impl<I> TestcaseStorageMap<I> {
                         if let Some(prev_node) = self.map.get_mut(&prev) {
                             prev_node.next = item.next;
                         } else {
-                            debug_assert!(false, "List corrupted: prev {} missing", prev);
+                            debug_assert!(false, "List corrupted: prev {prev} missing");
                         }
                     }
                     _ => {
@@ -96,7 +96,7 @@ impl<I> TestcaseStorageMap<I> {
                         if let Some(next_node) = self.map.get_mut(&next) {
                             next_node.prev = item.prev;
                         } else {
-                            debug_assert!(false, "List corrupted: next {} missing", next);
+                            debug_assert!(false, "List corrupted: next {next} missing");
                         }
                     }
                     _ => {
@@ -277,7 +277,7 @@ impl<I> TestcaseStorage<I> {
                 last_node.next = Some(id);
                 Some(last_id)
             } else {
-                debug_assert!(false, "List corrupted: last {} missing", last_id);
+                debug_assert!(false, "List corrupted: last {last_id} missing");
                 None
             }
         } else {
@@ -323,8 +323,7 @@ impl<I> TestcaseStorage<I> {
                 Some(last_id)
             } else {
                 return Err(Error::illegal_state(format!(
-                    "List corrupted: last node {} not found during insertion",
-                    last_id
+                    "List corrupted: last node {last_id} not found during insertion"
                 )));
             }
         } else {

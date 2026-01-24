@@ -541,21 +541,15 @@ impl<I> Drop for Testcase<I> {
     fn drop(&mut self) {
         if let Some(filename) = &self.filename {
             let mut path = PathBuf::from(filename);
-            let file_name = match path.file_name() {
-                Some(name) => name,
-                None => {
-                    eprintln!("Path has no filename: {}", path.display());
-                    return;
-                }
+            let Some(file_name) = path.file_name() else {
+                eprintln!("Path has no filename: {}", path.display());
+                return;
             };
-            let file_name_str = match file_name.to_str() {
-                Some(s) => s,
-                None => {
-                    eprintln!("Path contains non-UTF8: {}", path.display());
-                    return;
-                }
+            let Some(file_name_str) = file_name.to_str() else {
+                eprintln!("Path contains non-UTF8: {}", path.display());
+                return;
             };
-            let lockname = format!(".{}.lafl_lock", file_name_str);
+            let lockname = format!(".{file_name_str}.lafl_lock");
             path.set_file_name(lockname);
             let _ = std::fs::remove_file(path);
         }

@@ -383,11 +383,10 @@ impl<I> InMemoryOnDiskCorpus<I> {
         I: Input,
     {
         let base = testcase.filename_mut().take().unwrap_or_else(|| {
-            testcase
-                .input()
-                .as_ref()
-                .map(|input| input.generate_name(id))
-                .unwrap_or_else(|| format!("unnamed_{:?}", id))
+            testcase.input().as_ref().map_or_else(
+                || format!("unnamed_{id:?}"),
+                |input| input.generate_name(id),
+            )
         });
         let file_name = match &self.prefix {
             Some(pref) => format!("{pref}{base}"),
@@ -427,9 +426,9 @@ impl<I> InMemoryOnDiskCorpus<I> {
                 Error::illegal_state("Testcase filename should be set before metadata creation")
             })?;
             let metafile_name = if self.locking {
-                format!(".{}_{}.metadata", filename, ctr)
+                format!(".{filename}_{ctr}.metadata")
             } else {
-                format!(".{}.metadata", filename)
+                format!(".{filename}.metadata")
             };
             let metafile_path = self.dir_path.join(&metafile_name);
             let mut tmpfile_path = metafile_path.clone();
