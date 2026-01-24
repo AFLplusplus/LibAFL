@@ -1125,6 +1125,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn test_type_eq() {
         // An alias for equality testing
         type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
