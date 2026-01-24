@@ -169,7 +169,7 @@ impl AsanErrors {
                 );
             }));
 
-         #[allow(clippy::non_ascii_literal)]
+        #[allow(clippy::non_ascii_literal)]
         writeln!(output, "{:━^100}", " Memory error detected! ").unwrap();
         output
             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
@@ -204,7 +204,7 @@ impl AsanErrors {
                 }
                 output.reset().unwrap();
 
-                 #[allow(clippy::non_ascii_literal)]
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 #[cfg(target_arch = "aarch64")]
                 for reg in 0..=30 {
@@ -253,7 +253,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86")]
                 writeln!(output, "eip: 0x{:08x}", error.pc).unwrap();
 
-                 #[allow(clippy::non_ascii_literal)]
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
@@ -303,7 +303,7 @@ impl AsanErrors {
                     .print_trace(&error.backtrace, output)
                     .unwrap();
 
-                 #[allow(clippy::non_ascii_literal)]
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 let fault_address: i64 = fault_address.try_into().unwrap();
                 let metadata_address: i64 = error.metadata.address.try_into().unwrap();
@@ -336,7 +336,7 @@ impl AsanErrors {
                 }
 
                 if error.metadata.freed {
-                     #[allow(clippy::non_ascii_literal)]
+                    #[allow(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                     if let Some(backtrace) = &mut release_site_backtrace {
                         writeln!(output, "free site backtrace:").unwrap();
@@ -373,7 +373,7 @@ impl AsanErrors {
                         writeln!(output, " at 0x{_pc:x}").unwrap();
                     }
 
-                     #[allow(clippy::non_ascii_literal)]
+                    #[allow(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                     for reg in 0..29 {
                         let val = cpu_context.reg(reg);
@@ -400,7 +400,7 @@ impl AsanErrors {
                 output.reset().unwrap();
                 backtrace_printer.print_trace(backtrace, output).unwrap();
 
-                 #[allow(clippy::non_ascii_literal)]
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
@@ -421,7 +421,7 @@ impl AsanErrors {
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
-                 #[allow(clippy::non_ascii_literal)]
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                 if let Some(backtrace) = &mut release_site_backtrace {
                     writeln!(output, "previous free site backtrace:").unwrap();
@@ -438,7 +438,7 @@ impl AsanErrors {
                 writeln!(output, " of {ptr:#016x}").unwrap();
                 output.reset().unwrap();
 
-                 #[allow(clippy::non_ascii_literal)]
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
@@ -481,7 +481,7 @@ impl AsanErrors {
                 }
                 output.reset().unwrap();
 
-                 #[allow(clippy::non_ascii_literal)]
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
@@ -540,7 +540,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86")]
                 writeln!(output, "Eip: 0x{pc:08x}").unwrap();
 
-                 #[allow(clippy::non_ascii_literal)]
+                #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
