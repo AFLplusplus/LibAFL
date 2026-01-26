@@ -308,6 +308,7 @@ jobs:
           - full_system/nyx_launcher
           - full_system/nyx_libxml2_standalone
           - full_system/nyx_libxml2_parallel
+          - full_system/qemu_intel_pt_bootloader
 
           # Structure-aware
           - structure_aware/nautilus_sync
@@ -715,7 +716,7 @@ jobs:
         run: cd fuzzers/fuzz_anything/baby_no_std && cargo run || test $? -ne 0 || exit 1
       - name: no_std tests
         run: cd ./crates/libafl && cargo test --no-default-features
-  
+
   x86-i686-build:
     runs-on: ubuntu-24.04
 
@@ -733,7 +734,7 @@ jobs:
           shared-key: x86-i686
       - name: test
         run: cargo check --target=i686-unknown-linux-gnu
-        
+
 
   nostd-clippy:
     runs-on: ubuntu-24.04
