@@ -259,5 +259,6 @@ mach2 = "0.6.0"
 name = "simd"
 path = "./examples/simd/simd.rs"
 bench = true
+test = false
 harness = false
 required-features = ["std", "simd"]

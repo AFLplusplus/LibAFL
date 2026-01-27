@@ -3,30 +3,30 @@ PROJECT_DIR := absolute_path(".")
 CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
 PROFILE := env("PROFILE", "dev")
 PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
+EXTENSION := if os() == "windows" { ".exe" } else { "" }
+LIBAFL_CC := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc" + EXTENSION
+LIBAFL_CXX := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx" + EXTENSION
+FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME + EXTENSION
 
-EXTENSION := if os() == "windows" {".exe"} else { "" }
-LIBAFL_CC := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc" + EXTENSION
-LIBAFL_CXX := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx" + EXTENSION
-FUZZER := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME + EXTENSION
 set windows-shell := ['cmd.exe', '/c']
-set unstable
+set unstable := true
 
 alias cc := cxx
 
 cxx:
-    cargo build --profile {{PROFILE}}
+    cargo build --profile {{ PROFILE }}
 
 fuzzer: cxx
     #!/bin/bash
-    cargo build --profile {{PROFILE}}
-    {{LIBAFL_CC}} -o ./{{FUZZER_NAME}} harness.cc
+    cargo build --profile {{ PROFILE }}
+    {{ LIBAFL_CC }} -o ./{{ FUZZER_NAME }} harness.cc
 
 [linux]
 [macos]
 run: fuzzer
     #!/bin/bash
-    ./{{FUZZER_NAME}} &
-    ./{{FUZZER_NAME}}
+    ./{{ FUZZER_NAME }} &
+    ./{{ FUZZER_NAME }}
     sleep 0.2
 
 [windows]
@@ -38,9 +38,9 @@ run: fuzzer
 test: fuzzer
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
-    (timeout 31s ./{{FUZZER_NAME}} | tee fuzz_stdout.log 2>/dev/null || true) &
+    (timeout 31s ./{{ FUZZER_NAME }} | tee fuzz_stdout.log 2>/dev/null || true) &
     sleep 0.2
-    timeout 30s ./{{FUZZER_NAME}} >/dev/null 2>/dev/null || true
+    timeout 30s ./{{ FUZZER_NAME }} >/dev/null 2>/dev/null || true
     if grep -qa "corpus: 30" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
@@ -48,12 +48,12 @@ test: fuzzer
         exit 1
     fi
 
-[windows]
 [script("cmd.exe", "/c")]
+[windows]
 test:
     cargo build --release
 
 clean:
     #!/bin/bash
-    rm -f {{FUZZER_NAME}}
+    rm -f {{ FUZZER_NAME }}
     cargo clean

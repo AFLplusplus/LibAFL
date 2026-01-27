@@ -260,7 +260,7 @@ pub fn fuzz() -> Result<(), Error> {
             match qemu.run() {
                 Ok(QemuExitReason::Breakpoint(_)) => {}
                 Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                    process::exit(0)
+                    process::exit(libafl_bolts::os::CTRL_C_EXIT)
                 }
                 Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                 _ => panic!("Unexpected QEMU exit."),

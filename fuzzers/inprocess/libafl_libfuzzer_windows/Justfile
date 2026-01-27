@@ -1,10 +1,10 @@
 import "../../../just/libafl.just"
 
-FUZZER_NAME     := "libafl_libfuzzer_windows"
+FUZZER_NAME := "libafl_libfuzzer_windows"
 FUZZER_NAME_WIN := "libafl_libfuzzer_windows.exe"
 
 set windows-shell := ['cmd.exe', '/c']
-set unstable
+set unstable := true
 
 [windows]
 libafl_libfuzzer:
@@ -19,12 +19,12 @@ harness: libafl_libfuzzer
 [windows]
 run: harness
     if not exist corpus mkdir corpus
-    {{FUZZER_NAME_WIN}} -use_value_profile=1 corpus
+    {{ FUZZER_NAME_WIN }} -use_value_profile=1 corpus
 
-[windows]
 [script("cmd.exe", "/c")]
+[windows]
 test: harness
     if exist corpus rd /s /q corpus
     mkdir corpus
-    {{FUZZER_NAME_WIN}} -use_value_profile=1 -runs=30000 corpus
+    {{ FUZZER_NAME_WIN }} -use_value_profile=1 -runs=30000 corpus
     dir /a-d corpus && (echo Files exist) || (exit /b 1337)

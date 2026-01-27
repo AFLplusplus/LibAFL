@@ -40,4 +40,15 @@ if [ "$1" != "check" ]; then
   fi
 fi
 
+if command -v just > /dev/null; then
+  echo "[*] Formatting Justfiles"
+  find . -type f -name "Justfile" | while read -r JUSTFILE; do
+    if [ "$1" = "check" ]; then
+      just --unstable --fmt --check --justfile "$JUSTFILE" || exit 1
+    else
+      just -q --justfile "$JUSTFILE" _check || just --unstable --fmt --justfile "$JUSTFILE" || exit 1
+    fi
+  done
+fi
+
 echo "[*] Done :)"

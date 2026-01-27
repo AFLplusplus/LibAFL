@@ -16,7 +16,7 @@ fn main() {
 
     // Force linking against libc++
     if target_vendor != "apple" && target_family == "unix" {
-        println!("cargo:rustc-link-lib=dylib=c++");
+        println!("cargo:rustc-link-lib=dylib=stdc++");
     }
 
     if target_vendor == "apple" {

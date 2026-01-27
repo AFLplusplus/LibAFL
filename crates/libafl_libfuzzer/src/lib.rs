@@ -134,6 +134,7 @@ unsafe extern "C" {
     // variable which is set by the build script, which is not run under clippy.
     not(clippy)
 ))]
+/// The raw bytes of the `libafl_libfuzzer` runtime library
 pub const LIBAFL_LIBFUZZER_RUNTIME_LIBRARY: &'static [u8] =
     include_bytes!(env!("LIBAFL_LIBFUZZER_RUNTIME_PATH"));
 
