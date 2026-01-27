@@ -40,7 +40,7 @@ build feature='' ignore='':
 
 # Run tests on all projects in the workspace
 test feature='' ignore='':
-    cargo {{ MSRV }} test --workspace --all-targets --exclude libafl_asan_libc --exclude libafl_asan {{ feature }}
+    cargo {{ MSRV }} test --workspace --all-targets --exclude libafl_asan_libc --exclude libafl_asan --exclude libafl_asan_fuzz {{ feature }}
     # Run libafl_asan tests serially to avoid address conflicts
     RUST_TEST_THREADS=1 cargo {{ MSRV }} test -p libafl_asan -j 1 {{ feature }}
 

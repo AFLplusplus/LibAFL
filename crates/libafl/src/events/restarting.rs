@@ -238,9 +238,13 @@ where
                     #[cfg(all(unix, feature = "std"))]
                     unsafe {
                         let mut set: libc::sigset_t = core::mem::zeroed();
-                        libc::sigemptyset(&mut set);
-                        libc::sigaddset(&mut set, libc::SIGINT);
-                        libc::pthread_sigmask(libc::SIG_BLOCK, &set, core::ptr::null_mut());
+                        libc::sigemptyset(&raw mut set);
+                        libc::sigaddset(&raw mut set, libc::SIGINT);
+                        libc::pthread_sigmask(
+                            libc::SIG_BLOCK,
+                            &raw const set,
+                            core::ptr::null_mut(),
+                        );
                     }
 
                     match unsafe { fork() }? {
@@ -251,25 +255,25 @@ where
                             #[cfg(all(unix, feature = "std"))]
                             unsafe {
                                 let mut set: libc::sigset_t = core::mem::zeroed();
-                                libc::sigemptyset(&mut set);
-                                libc::sigaddset(&mut set, libc::SIGINT);
+                                libc::sigemptyset(&raw mut set);
+                                libc::sigaddset(&raw mut set, libc::SIGINT);
                                 let mut pending: libc::sigset_t = core::mem::zeroed();
-                                libc::sigpending(&mut pending);
-                                if libc::sigismember(&pending, libc::SIGINT) == 1 {
+                                libc::sigpending(&raw mut pending);
+                                if libc::sigismember(&raw const pending, libc::SIGINT) == 1 {
                                     // If we have a pending SIGINT, it means the process group received a SIGINT
                                     // (e.g. from Ctrl+C or timeout). We treat this as a clean shutdown.
                                     // We unblock the signal to ensure it's cleared/handled if we were to continue,
                                     // but here we return ShuttingDown immediately.
                                     libc::pthread_sigmask(
                                         libc::SIG_UNBLOCK,
-                                        &set,
+                                        &raw const set,
                                         core::ptr::null_mut(),
                                     );
                                     return Err(Error::shutting_down());
                                 }
                                 libc::pthread_sigmask(
                                     libc::SIG_UNBLOCK,
-                                    &set,
+                                    &raw const set,
                                     core::ptr::null_mut(),
                                 );
                             }
@@ -279,11 +283,11 @@ where
                             #[cfg(all(unix, feature = "std"))]
                             unsafe {
                                 let mut set: libc::sigset_t = core::mem::zeroed();
-                                libc::sigemptyset(&mut set);
-                                libc::sigaddset(&mut set, libc::SIGINT);
+                                libc::sigemptyset(&raw mut set);
+                                libc::sigaddset(&raw mut set, libc::SIGINT);
                                 libc::pthread_sigmask(
                                     libc::SIG_UNBLOCK,
-                                    &set,
+                                    &raw const set,
                                     core::ptr::null_mut(),
                                 );
                             }

@@ -177,6 +177,13 @@ pub fn find_llvm_tool(tool: &str) -> Result<String, String> {
         return Ok(tool_name.to_owned());
     }
 
+    if let Ok(bindir) = llvm_bindir() {
+        let path = std::path::Path::new(&bindir).join(tool_name);
+        if path.exists() {
+            return Ok(path.to_string_lossy().to_string());
+        }
+    }
+
     Err(format!("could not find {tool}"))
 }
 

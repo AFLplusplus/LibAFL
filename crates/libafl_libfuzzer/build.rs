@@ -163,6 +163,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-link-lib=c++");
     } else {
         println!("cargo:rustc-link-lib=stdc++");
+        println!("cargo:rustc-link-arg=-Wl,--allow-multiple-definition");
     }
     Ok(())
 }
