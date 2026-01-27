@@ -1,3 +1,5 @@
+//! A restarting event manager is for fuzzers that restart their process.
+//! Keeps the fuzzing state alive across restarts using a persistent broker.
 use core::{fmt::Debug, sync::atomic::Ordering, time::Duration};
 
 #[cfg(feature = "std")]

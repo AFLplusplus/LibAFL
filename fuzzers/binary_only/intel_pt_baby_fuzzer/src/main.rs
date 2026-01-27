@@ -1,11 +1,5 @@
 use std::{
-    fs::File,
-    hint::black_box,
-    io::{Read, Seek, SeekFrom},
-    num::NonZero,
-    path::PathBuf,
-    process,
-    time::Duration,
+    hint::black_box, num::NonZero, path::PathBuf, process, ptr::copy_nonoverlapping, time::Duration,
 };
 
 #[cfg(feature = "tui")]
@@ -100,17 +94,18 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    // Get the memory map of the current process
+    // Get the memory map of the current process, copy the executable memory that will be
+    // disassembled and used for Intel PT trace decoding
     let my_pid = i32::try_from(process::id()).unwrap();
     let process_maps = get_process_maps(my_pid).unwrap();
     let images = process_maps
         .iter()
         .filter_map(|pm| {
             if pm.is_exec() && pm.filename().is_some() && pm.inode != 0 {
-                let mut file = File::open(pm.filename().unwrap()).unwrap();
                 let mut data = vec![0; pm.size()];
-                file.seek(SeekFrom::Start(pm.offset as u64)).unwrap();
-                file.read_exact(&mut data).unwrap();
+                unsafe {
+                    copy_nonoverlapping(pm.start() as *const u8, data.as_mut_ptr(), data.len())
+                }
                 Some(PtImage::new(data, pm.start() as u64))
             } else {
                 None

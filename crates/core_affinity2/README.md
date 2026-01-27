@@ -28,7 +28,7 @@ use std::thread;
 use core_affinity2::{get_core_ids, CoreId};
 
 // Get the available core IDs
-if let Some(core_ids) = get_core_ids() {
+if let Ok(core_ids) = get_core_ids() {
     let core_count = core_ids.len();
     println!("Found {} cores:", core_count);
 

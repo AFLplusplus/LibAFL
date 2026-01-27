@@ -5,7 +5,7 @@ use alloc::{borrow::ToOwned, boxed::Box, ffi::CString, format, string::String, v
 use core::{
     ffi::CStr,
     fmt::Debug,
-    ops::{AddAssign, RangeInclusive},
+    ops::RangeInclusive,
     ptr,
     ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
 };
@@ -31,7 +31,7 @@ use perf_event_open_sys::{
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
-pub use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder, PtImage};
+pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtCoverageDecoderBuilder, PtImage};
 use ptcov::{PtCpu, PtCpuVendor};
 use raw_cpuid::CpuId;
 
@@ -191,7 +191,7 @@ impl IntelPT {
         map_len: usize,
     ) -> Result<(), Error>
     where
-        T: AddAssign + From<u8> + Debug,
+        T: CoverageEntry,
     {
         let head = unsafe { self.aux_head.read_volatile() };
         let tail = unsafe { self.aux_tail.read_volatile() };
@@ -243,7 +243,12 @@ impl IntelPT {
 
         let pt_trace = unsafe { &*slice_from_raw_parts(data_ptr, len) };
         let coverage = unsafe { &mut *slice_from_raw_parts_mut(map_ptr, map_len) };
-        self.ptcov_decoder.coverage(pt_trace, coverage).unwrap();
+        // todo: trace collection might fail for microarchitectural reasons, introduce in LibAFL a
+        // way to mark an execution as to be ignored and repeated.
+        if let Err(e) = self.ptcov_decoder.coverage(pt_trace, coverage) {
+            log::warn!("PT trace decoding to coverage failed: {e:?}");
+            coverage.fill(0.into());
+        }
 
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
         // might not contain a PSB packet.
