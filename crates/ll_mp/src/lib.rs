@@ -2473,7 +2473,7 @@ impl Brokers {
     #[cfg(any(all(unix, feature = "alloc", not(miri)), all(windows, feature = "std")))]
     fn setup_handlers() {
         #[cfg(all(unix, not(miri)))]
-        if let Err(e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
+        if let Err(e) = unsafe { setup_signal_handler(&raw mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler - Ignore.
             log::info!("Failed to setup signal handlers: {e}");
         } else {
@@ -2941,7 +2941,7 @@ where
     #[cfg(any(all(unix, feature = "alloc", not(miri)), all(windows, feature = "std")))]
     fn setup_handlers() {
         #[cfg(all(unix, not(miri)))]
-        if let Err(e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
+        if let Err(e) = unsafe { setup_signal_handler(&raw mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler - Ignore.
             log::info!("Failed to setup signal handlers: {e}");
         } else {
