@@ -119,60 +119,65 @@ where
             ));
         }
 
-        let serialized = postcard::to_allocvec(state)?;
+        let shmem_len = self.shmem.len();
+        let content_ptr = self.content_mut() as *mut StateShMemContent;
+        // Calculate available space: shmem.len() - sizeof(StateShMemContent)
+        let available = shmem_len.checked_sub(size_of::<StateShMemContent>()).ok_or(Error::illegal_state("ShMem too small"))?;
+        
+        let buf_slice = unsafe {
+            slice::from_raw_parts_mut((*content_ptr).buf.as_mut_ptr(), available)
+        };
 
-        if size_of::<StateShMemContent>() + serialized.len() > self.shmem.len() {
-            // generate a filename
-            let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-            // Using the last few k as randomness for a filename, hoping it's unique.
-            hasher.write(&serialized[serialized.len().saturating_sub(4096)..]);
-
-            let filename = format!("{:016x}.libafl_state", hasher.finish());
-            let tmpfile = temp_dir().join(&filename);
-            File::create(tmpfile)?.write_all(&serialized)?;
-
-            // write the filename to shmem
-            let filename_buf = postcard::to_allocvec(&filename)?;
-
-            let len = filename_buf.len();
-            if len > self.shmem.len() {
-                return Err(Error::illegal_state(format!(
-                    "The state restorer map is too small to fit anything, even the filename! 
-                        It needs to be at least {} bytes. 
-                        The tmpfile was written to {}.",
-                    len,
-                    temp_dir().join(&filename).display()
-                )));
+        // Try to serialize directly to shmem
+        match postcard::to_slice(state, buf_slice) {
+            Ok(bytes) => {
+                // Success!
+                let len = bytes.len();
+                unsafe {
+                    ptr::write_volatile(&mut (*content_ptr).buf_len, len);
+                    ptr::write_volatile(&mut (*content_ptr).is_disk, false);
+                }
+                Ok(())
             }
+            Err(postcard::Error::SerializeBufferFull) => {
+                // Buffer full, fall back to allocating vector and file (unsafe in signal handler usually, but best effort)
+                let serialized = postcard::to_allocvec(state)?;
+                // generate a filename
+                let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+                // Using the last few k as randomness for a filename, hoping it's unique.
+                hasher.write(&serialized[serialized.len().saturating_sub(4096)..]);
 
-            /*log::info!(
-                "Storing {} bytes to tmpfile {} (larger than map of {} bytes)",
-                serialized.len(),
-                &filename,
-                self.shmem.len()
-            );*/
+                let filename = format!("{:016x}.libafl_state", hasher.finish());
+                let tmpfile = temp_dir().join(&filename);
+                File::create(tmpfile)?.write_all(&serialized)?;
 
-            let shmem_content = self.content_mut();
-            unsafe {
-                ptr::copy_nonoverlapping(
-                    filename_buf.as_ptr(),
-                    shmem_content.buf.as_mut_ptr(),
-                    len,
-                );
+                // write the filename to shmem
+                let filename_buf = postcard::to_allocvec(&filename)?;
+
+                let len = filename_buf.len();
+                if len > available {
+                    return Err(Error::illegal_state(format!(
+                        "The state restorer map is too small to fit anything, even the filename! 
+                            It needs to be at least {} bytes. 
+                            The tmpfile was written to {}.",
+                        len,
+                        temp_dir().join(&filename).display()
+                    )));
+                }
+
+                unsafe {
+                    ptr::copy_nonoverlapping(
+                        filename_buf.as_ptr(),
+                        (*content_ptr).buf.as_mut_ptr(),
+                        len,
+                    );
+                    ptr::write_volatile(&mut (*content_ptr).buf_len, len);
+                    ptr::write_volatile(&mut (*content_ptr).is_disk, true);
+                }
+                Ok(())
             }
-            shmem_content.buf_len = len;
-            shmem_content.is_disk = true;
-        } else {
-            // write to shmem directly
-            let len = serialized.len();
-            let shmem_content = self.content_mut();
-            unsafe {
-                ptr::copy_nonoverlapping(serialized.as_ptr(), shmem_content.buf.as_mut_ptr(), len);
-            }
-            shmem_content.buf_len = len;
-            shmem_content.is_disk = false;
+            Err(e) => Err(Error::serialize(format!("Postcard internal error: {e}"))),
         }
-        Ok(())
     }
 
     /// Reset this [`StateRestorer`] to an empty state.
@@ -183,8 +188,10 @@ where
             // Remove tmpfile and ignore result
             drop(fs::remove_file(tmpfile));
         }
-        content_mut.is_disk = false;
-        content_mut.buf_len = 0;
+        unsafe {
+            ptr::write_volatile(&mut content_mut.is_disk, false);
+            ptr::write_volatile(&mut content_mut.buf_len, 0);
+        }
     }
 
     /// When called from a child, informs the restarter/parent process
@@ -234,7 +241,8 @@ where
 
     /// Returns true, if this [`StateRestorer`] has contents.
     pub fn has_content(&self) -> bool {
-        self.content().buf_len > 0
+        let buf_len = unsafe { read_volatile(&raw const self.content().buf_len) };
+        buf_len > 0
     }
 
     /// Restores the contents saved in this [`StateRestorer`], if any are available.

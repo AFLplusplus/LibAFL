@@ -1,0 +1,26 @@
+import "../../../just/libafl.just"
+
+FUZZER_NAME := "frida_crash_repro"
+FUZZER_NAME_WIN := "frida_fuzzer.exe"
+
+set windows-shell := ['cmd.exe', '/c']
+set unstable
+
+[unix]
+harness:
+    clang++ -O3 -c -fPIC harness.cc -o harness.o
+    clang++ -O3 harness.o -shared -o test-harness.so
+
+[windows]
+harness:
+    cl /O2 /c harness.cc /Fo:harness.obj
+    link /DLL /OUT:test-harness.dll harness.obj
+
+[unix]
+[windows]
+build:
+    cargo build --profile {{ PROFILE }}
+
+[unix]
+run: build harness
+    {{ FUZZER }} -H ./test-harness.so -l ./test-harness.so ./corpus

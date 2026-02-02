@@ -4815,11 +4815,12 @@ dependencies = [
 
 [[package]]
 name = "ptcov"
-version = "0.0.5"
+version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49fc3038cb5032affe0f1ef9b1891f9ebf902c1a076a8dd8bedab77885c392d6"
+checksum = "bb9ec054af0cc5cb654bdcd5ee7b1798258875830c2a4ee9341a0f448b468951"
 dependencies = [
  "iced-x86",
+ "num-traits",
 ]
 
 [[package]]
