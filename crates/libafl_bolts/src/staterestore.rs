@@ -122,11 +122,12 @@ where
         let shmem_len = self.shmem.len();
         let content_ptr = self.content_mut() as *mut StateShMemContent;
         // Calculate available space: shmem.len() - sizeof(StateShMemContent)
-        let available = shmem_len.checked_sub(size_of::<StateShMemContent>()).ok_or(Error::illegal_state("ShMem too small"))?;
-        
-        let buf_slice = unsafe {
-            slice::from_raw_parts_mut((*content_ptr).buf.as_mut_ptr(), available)
-        };
+        let available = shmem_len
+            .checked_sub(size_of::<StateShMemContent>())
+            .ok_or(Error::illegal_state("ShMem too small"))?;
+
+        let buf_slice =
+            unsafe { slice::from_raw_parts_mut((*content_ptr).buf.as_mut_ptr(), available) };
 
         // Try to serialize directly to shmem
         match postcard::to_slice(state, buf_slice) {
