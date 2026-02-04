@@ -293,3 +293,26 @@ pub fn null_fd() -> Result<RawFd, Error> {
         Ok(NULL_FILE.get_or_init(move || null_file).as_raw_fd())
     }
 }
+
+/// A cross-platform exit function that uses the safest method for the current OS.
+/// On Linux, it uses `SYS_exit_group` to bypass potential deadlocks (like with Frida).
+/// On other Unix systems, it uses `libc::_exit`.
+/// On Windows, it uses `ExitProcess`.
+pub fn exit(code: i32) -> ! {
+    #[cfg(target_os = "linux")]
+    unsafe {
+        libc::syscall(libc::SYS_exit_group, code);
+        // This should be unreachable, but just in case
+        libc::_exit(code);
+    }
+
+    #[cfg(all(unix, not(target_os = "linux")))]
+    unsafe {
+        libc::_exit(code);
+    }
+
+    #[cfg(windows)]
+    unsafe {
+        windows::Win32::System::Threading::ExitProcess(code as u32);
+    }
+}
