@@ -149,7 +149,7 @@ where
     pub fn new(print_fn: F) -> Self {
         Self {
             print_fn,
-            pizza_mode: crate::monitors::is_pizza_mode(),
+            pizza_mode: crate::monitors::pizza_is_served(),
         }
     }
 

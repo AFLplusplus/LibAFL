@@ -48,10 +48,10 @@ pub use statsd::StatsdMonitor;
 /// Returns if we're cooking.
 #[cfg(feature = "std")]
 #[must_use]
-pub(crate) fn is_pizza_mode() -> bool {
-    static IS_PIZZA_MODE: OnceLock<bool> = OnceLock::new();
-    *IS_PIZZA_MODE.get_or_init(|| {
-        std::env::var_os("AFL_PIZZA_MODE").is_some() || {
+pub(crate) fn pizza_is_served() -> bool {
+    static PIZZA_IS_SERVED: OnceLock<bool> = OnceLock::new();
+    *PIZZA_IS_SERVED.get_or_init(|| {
+        std::env::var("AFL_PIZZA_MODE").map_or(false, |v| v != "0") || {
             #[cfg(unix)]
             // SAFETY: `localtime` and `time` are standard libc functions. `t` is initialized.
             unsafe {
@@ -75,7 +75,7 @@ pub(crate) fn is_pizza_mode() -> bool {
 #[cfg(not(feature = "std"))]
 /// Returns `true` if it is currently pizza mode.
 #[must_use]
-pub fn is_pizza_mode() -> bool {
+pub fn pizza_is_served() -> bool {
     false
 }
 
@@ -153,7 +153,7 @@ impl Monitor for SimplePrintingMonitor {
             .collect::<Vec<_>>();
         userstats.sort();
         let global_stats = client_stats_manager.global_stats();
-        let (run, customers, corpus, objectives, executions, speed) = if is_pizza_mode() {
+        let (run, customers, corpus, objectives, executions, speed) = if pizza_is_served() {
             (
                 "time to bake",
                 "customers",
@@ -236,7 +236,7 @@ where
         sender_id: ClientId,
     ) -> Result<(), Error> {
         let global_stats = client_stats_manager.global_stats();
-        let (run, customers, corpus, objectives, executions, speed) = if is_pizza_mode() {
+        let (run, customers, corpus, objectives, executions, speed) = if pizza_is_served() {
             (
                 "time to bake",
                 "customers",
@@ -399,7 +399,7 @@ mod test {
     #[test]
     #[cfg(feature = "std")]
     fn test_pizza_mode() {
-        let _ = super::is_pizza_mode();
+        let _ = super::pizza_is_served();
     }
 
     #[test]

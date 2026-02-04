@@ -451,9 +451,9 @@ pub fn draw_process_timing_text(
 ) {
     let (run, speed, entry, solution) = if pizza_mode {
         (
-            "time to bake",
+            "open time",
             "baking speed",
-            "last pizza recipe",
+            "last pizza baked",
             "last delivery",
         )
     } else {

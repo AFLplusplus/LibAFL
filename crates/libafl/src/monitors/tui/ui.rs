@@ -143,7 +143,11 @@ impl TuiUi {
 
     /// create a new [`TuiUi`] with a given `version` string.
     #[must_use]
-    pub fn with_version(title: String, version: String, enhanced_graphics: bool) -> Self {
+    pub fn with_version(mut title: String, version: String, enhanced_graphics: bool) -> Self {
+        let pizza_mode = crate::monitors::pizza_is_served();
+        if pizza_mode {
+            title = "Mozzarbella Pizzeria management system".into();
+        }
         Self {
             title,
             version,
@@ -168,7 +172,7 @@ impl TuiUi {
             show_geometry: false,
             item_geometry_scroll: 0,
             item_geometry_page_size: 10,
-            pizza_mode: crate::monitors::is_pizza_mode(),
+            pizza_mode: crate::monitors::pizza_is_served(),
         }
     }
 
@@ -230,7 +234,7 @@ impl TuiUi {
 
     fn prepare_overall_stats(&self, ctx: &TuiContext) -> GenericStats {
         let (corpus, objectives, executions) = if self.pizza_mode {
-            ("pizzas", "deliveries", "doughs")
+            ("pizzas on the menu", "deliveries", "doughs")
         } else {
             ("corpus count", "solutions", "total execs")
         };
@@ -379,8 +383,13 @@ impl TuiUi {
                     let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
                     let style = Style::default().fg(colors[color_idx]);
 
+                    // Map keys if pizza mode is active
                     let key_str = if self.pizza_mode {
                         match k.as_ref() {
+                            "cycles done" => "seasons done",
+                            "unique crashes" => "at table",
+                            "unique hangs" => "number of Peroni",
+                            "map density" => "Baking progress",
                             "edges" => "toppings",
                             "stability" => "dough consistency",
                             "havoc_inc" => "spice level",
@@ -934,7 +943,13 @@ impl TuiUi {
             );
 
             self.draw_overall_ui(f, top_body, has_charts, &prepared);
-            draw_logs(f, logs_area, &prepared.logs, self.logs_wrap, prepared.pizza_mode);
+            draw_logs(
+                f,
+                logs_area,
+                &prepared.logs,
+                self.logs_wrap,
+                prepared.pizza_mode,
+            );
         } else {
             let body = split_main(area, self.show_logs, introspection, has_charts);
             let top_body = body[0];
@@ -944,7 +959,13 @@ impl TuiUi {
             self.draw_client_ui(f, mid_body, self.show_logs, &prepared);
 
             if self.show_logs && body.len() > 2 {
-                draw_logs(f, body[2], &prepared.logs, self.logs_wrap, prepared.pizza_mode);
+                draw_logs(
+                    f,
+                    body[2],
+                    &prepared.logs,
+                    self.logs_wrap,
+                    prepared.pizza_mode,
+                );
             }
         }
     }
