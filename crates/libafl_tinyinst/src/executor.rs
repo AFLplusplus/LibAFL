@@ -242,6 +242,95 @@ where
         self
     }
 
+    /// Enable comparison coverage (`-cmp_coverage`)
+    ///
+    /// Counts the number of bytes that match in cmp/sub instructions.
+    #[must_use]
+    pub fn cmp_coverage(mut self) -> Self {
+        self.tinyinst_args.push("-cmp_coverage".to_string());
+        self
+    }
+
+    /// Generate unwind information (`-generate_unwind`)
+    ///
+    /// Generates stack unwinding information for instrumented code
+    /// and enables full sanitizer stack traces.
+    #[must_use]
+    pub fn generate_unwind(mut self) -> Self {
+        self.tinyinst_args.push("-generate_unwind".to_string());
+        self
+    }
+
+    /// Set target environment variable (`-target_env`)
+    ///
+    /// Sets an environment variable for the target process.
+    #[must_use]
+    pub fn target_env(mut self, key: &str, value: &str) -> Self {
+        self.tinyinst_args.push("-target_env".to_string());
+        self.tinyinst_args.push(format!("{}={}", key, value));
+        self
+    }
+
+    /// Set target offset (`-target_offset`)
+    ///
+    /// Specifies the offset of the target function within the target module.
+    #[must_use]
+    pub fn target_offset(mut self, offset: usize) -> Self {
+        self.tinyinst_args.push("-target_offset".to_string());
+        self.tinyinst_args.push(format!("0x{:x}", offset));
+        self
+    }
+
+    /// Set indirect instrumentation mode (`-indirect_instrumentation`)
+    ///
+    /// Controls which instrumentation to use for indirect jump/calls.
+    ///
+    /// # Options
+    /// - `"none"`: No indirect instrumentation
+    /// - `"local"`: Per-callsite linked list (accurate edges, slower)
+    /// - `"global"`: Global hashtable (better performance, default)
+    /// - `"auto"`: Automatically choose (defaults to global on x86, local on ARM64)
+    #[must_use]
+    pub fn indirect_instrumentation(mut self, mode: &str) -> Self {
+        self.tinyinst_args.push("-indirect_instrumentation".to_string());
+        self.tinyinst_args.push(mode.to_string());
+        self
+    }
+
+    /// Enable patching of return addresses (`-patch_return_addresses`)
+    ///
+    /// Patches return addresses on the stack to avoid breakpoint-based return handling.
+    /// Can improve performance but may cause issues with some targets.
+    #[must_use]
+    pub fn patch_return_addresses(mut self) -> Self {
+        self.tinyinst_args.push("-patch_return_addresses".to_string());
+        self
+    }
+
+    /// Set stack offset (`-stack_offset`)
+    ///
+    /// Specifies additional stack space to reserve during instrumentation.
+    #[must_use]
+    pub fn stack_offset(mut self, offset: usize) -> Self {
+        self.tinyinst_args.push("-stack_offset".to_string());
+        self.tinyinst_args.push(offset.to_string());
+        self
+    }
+
+    /// Set coverage type (`-covtype`)
+    ///
+    /// Specifies what type of coverage to collect.
+    ///
+    /// # Options
+    /// - `"bb"`: Basic block coverage (default)
+    /// - `"edge"`: Edge coverage
+    #[must_use]
+    pub fn coverage_type(mut self, covtype: &str) -> Self {
+        self.tinyinst_args.push("-covtype".to_string());
+        self.tinyinst_args.push(covtype.to_string());
+        self
+    }
+
     /// Build [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
     pub fn build<OT, S>(
         &mut self,
