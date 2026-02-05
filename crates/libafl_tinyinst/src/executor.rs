@@ -4,6 +4,7 @@ use core::{
     ptr,
     time::Duration,
 };
+use std::collections::HashSet;
 
 use libafl::{
     Error,
@@ -28,6 +29,8 @@ pub struct TinyInstExecutor<S, SHM, OT> {
     phantom: PhantomData<S>,
     cur_input: InputFile,
     map: Option<SHM>,
+    /// Cumulative coverage tracking across all executions
+    cumulative_coverage: HashSet<u64>,
 }
 
 impl TinyInstExecutor<(), NopShMem, ()> {
@@ -85,6 +88,12 @@ where
             status = self.tinyinst.run();
             self.tinyinst
                 .vec_coverage(self.coverage_ptr.as_mut().unwrap(), false);
+
+            // Track cumulative coverage
+            let coverage = self.coverage_ptr.as_ref().unwrap();
+            for &offset in coverage {
+                self.cumulative_coverage.insert(offset);
+            }
         }
 
         match status {
@@ -396,6 +405,7 @@ where
             phantom: PhantomData,
             cur_input,
             map,
+            cumulative_coverage: HashSet::new(),
         })
     }
 }
@@ -409,5 +419,24 @@ impl<S, SHM, OT> HasObservers for TinyInstExecutor<S, SHM, OT> {
 
     fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         RefIndexable::from(&mut self.observers)
+    }
+}
+
+impl<S, SHM, OT> TinyInstExecutor<S, SHM, OT> {
+    /// Get the cumulative coverage set (all unique offsets seen across all executions)
+    #[must_use]
+    pub fn cumulative_coverage(&self) -> &HashSet<u64> {
+        &self.cumulative_coverage
+    }
+
+    /// Get the count of unique offsets in cumulative coverage
+    #[must_use]
+    pub fn cumulative_coverage_count(&self) -> usize {
+        self.cumulative_coverage.len()
+    }
+
+    /// Reset the cumulative coverage tracking
+    pub fn reset_cumulative_coverage(&mut self) {
+        self.cumulative_coverage.clear();
     }
 }
