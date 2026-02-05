@@ -17,6 +17,8 @@
   - Instead of names, `MultipartInput` uses generic `key`s (function names were changed accordingly).
   - If you don't need the keys to identify individual parts, consider using `ListInput` directly.
   - `StdScheduledMutator` has been renamed to `HavocScheduledMutator`.
+- `TinyInstExecutor` generic order changed from `<S, SHM, OT>` to `<OT, S, SHM>`.
+- `TinyInstExecutor` now returns `ExitKind::Timeout` for hang instead of `ExitKind::Crash`.
 
 ## 0.14.1 -> 0.15.0
 
