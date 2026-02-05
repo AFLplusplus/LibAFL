@@ -88,7 +88,8 @@ where
         }
 
         match status {
-            RunResult::CRASH | RunResult::HANG => Ok(ExitKind::Crash),
+            RunResult::CRASH => Ok(ExitKind::Crash),
+            RunResult::HANG => Ok(ExitKind::Timeout),
             RunResult::OK => Ok(ExitKind::Ok),
             RunResult::OTHER_ERROR => Err(Error::unknown(
                 "Tinyinst RunResult is other error".to_string(),
