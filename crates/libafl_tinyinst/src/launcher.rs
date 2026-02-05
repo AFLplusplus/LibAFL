@@ -6,7 +6,7 @@
 extern crate alloc;
 
 use alloc::sync::Arc;
-use core::{marker::PhantomData, time::Duration};
+use core::time::Duration;
 use std::{
     collections::HashSet,
     sync::RwLock,
@@ -17,22 +17,19 @@ use libafl::Error;
 
 /// Shared state between fuzzing threads
 #[derive(Debug)]
-pub struct SharedState<C, I> {
+pub struct SharedState<C> {
     /// Shared corpus protected by `RwLock`
     pub corpus: Arc<RwLock<C>>,
     /// Shared cumulative coverage set
     pub coverage: Arc<RwLock<HashSet<u64>>>,
-    /// Phantom data for input type
-    _phantom: PhantomData<I>,
 }
 
-impl<C, I> SharedState<C, I> {
+impl<C> SharedState<C> {
     /// Create a new shared state with the given corpus
     pub fn new(corpus: C) -> Self {
         Self {
             corpus: Arc::new(RwLock::new(corpus)),
             coverage: Arc::new(RwLock::new(HashSet::new())),
-            _phantom: PhantomData,
         }
     }
 
@@ -64,12 +61,11 @@ impl<C, I> SharedState<C, I> {
     }
 }
 
-impl<C, I> Clone for SharedState<C, I> {
+impl<C> Clone for SharedState<C> {
     fn clone(&self) -> Self {
         Self {
             corpus: Arc::clone(&self.corpus),
             coverage: Arc::clone(&self.coverage),
-            _phantom: PhantomData,
         }
     }
 }
@@ -251,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_shared_state() {
-        let state: SharedState<Vec<String>, ()> = SharedState::new(vec!["test".to_string()]);
+        let state: SharedState<Vec<String>> = SharedState::new(vec!["test".to_string()]);
 
         // Test coverage tracking
         state.add_coverage(&[0x1000, 0x2000, 0x3000]);

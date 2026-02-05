@@ -21,7 +21,7 @@ use libafl_bolts::{
 use tinyinst::tinyinst::{TinyInst, litecov::RunResult};
 
 /// [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
-pub struct TinyInstExecutor<S, SHM, OT> {
+pub struct TinyInstExecutor<OT, S, SHM> {
     tinyinst: TinyInst,
     coverage_ptr: *mut Vec<u64>,
     timeout: Duration,
@@ -41,7 +41,7 @@ impl TinyInstExecutor<(), NopShMem, ()> {
     }
 }
 
-impl<S, SHM, OT> Debug for TinyInstExecutor<S, SHM, OT> {
+impl<OT, S, SHM> Debug for TinyInstExecutor<OT, S, SHM> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         f.debug_struct("TinyInstExecutor")
             .field("timeout", &self.timeout)
@@ -49,7 +49,7 @@ impl<S, SHM, OT> Debug for TinyInstExecutor<S, SHM, OT> {
     }
 }
 
-impl<EM, I, OT, S, SHM, Z> Executor<EM, I, S, Z> for TinyInstExecutor<S, SHM, OT>
+impl<EM, I, OT, S, SHM, Z> Executor<EM, I, S, Z> for TinyInstExecutor<OT, S, SHM>
 where
     S: HasExecutions,
     I: HasTargetBytes,
@@ -344,7 +344,7 @@ where
     pub fn build<OT, S>(
         &mut self,
         observers: OT,
-    ) -> Result<TinyInstExecutor<S, SP::ShMem, OT>, Error> {
+    ) -> Result<TinyInstExecutor<OT, S, SP::ShMem>, Error> {
         if self.coverage_ptr.is_null() {
             return Err(Error::illegal_argument("Coverage pointer may not be null."));
         }
@@ -410,7 +410,7 @@ where
     }
 }
 
-impl<S, SHM, OT> HasObservers for TinyInstExecutor<S, SHM, OT> {
+impl<OT, S, SHM> HasObservers for TinyInstExecutor<OT, S, SHM> {
     type Observers = OT;
 
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
@@ -422,7 +422,7 @@ impl<S, SHM, OT> HasObservers for TinyInstExecutor<S, SHM, OT> {
     }
 }
 
-impl<S, SHM, OT> TinyInstExecutor<S, SHM, OT> {
+impl<OT, S, SHM> TinyInstExecutor<OT, S, SHM> {
     /// Get the cumulative coverage set (all unique offsets seen across all executions)
     #[must_use]
     pub fn cumulative_coverage(&self) -> &HashSet<u64> {

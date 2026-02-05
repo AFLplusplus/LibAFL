@@ -1,5 +1,8 @@
 /*!
 The tinyinst module for `LibAFL`.
+
+Note: This crate requires `std` as TinyInst uses OS-level debugging APIs.
+`no_std` is not supported.
 */
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(test), warn(
