@@ -44,3 +44,6 @@ The tinyinst module for `LibAFL`.
 
 /// Tinyinst executor
 pub mod executor;
+
+/// TinyInst map observer for MaxMapFeedback compatibility
+pub mod observer;

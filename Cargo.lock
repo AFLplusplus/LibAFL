@@ -3579,6 +3579,7 @@ dependencies = [
  "libafl",
  "libafl_bolts",
  "log",
+ "serde",
  "tinyinst",
 ]
 

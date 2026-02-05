@@ -267,7 +267,7 @@ where
     #[must_use]
     pub fn target_env(mut self, key: &str, value: &str) -> Self {
         self.tinyinst_args.push("-target_env".to_string());
-        self.tinyinst_args.push(format!("{}={}", key, value));
+        self.tinyinst_args.push(format!("{key}={value}"));
         self
     }
 
@@ -277,7 +277,7 @@ where
     #[must_use]
     pub fn target_offset(mut self, offset: usize) -> Self {
         self.tinyinst_args.push("-target_offset".to_string());
-        self.tinyinst_args.push(format!("0x{:x}", offset));
+        self.tinyinst_args.push(format!("0x{offset:x}"));
         self
     }
 

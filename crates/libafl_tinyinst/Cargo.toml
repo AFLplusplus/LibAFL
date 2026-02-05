@@ -31,6 +31,7 @@ libafl_bolts = { workspace = true, default-features = true, features = [
 ] }
 tinyinst = { workspace = true }
 log = { workspace = true }
+serde = { workspace = true, features = ["alloc", "derive"] }
 
 [build-dependencies]
 cmake = { workspace = true }
