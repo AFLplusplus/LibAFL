@@ -21,12 +21,12 @@ harness: libpng
     $CROSS_CXX \
         ./harness.cc \
         $CROSS_CFLAGS \
-        "{{TARGET_DIR}}/build-png/.libs/libpng16.a" \
-        "{{TARGET_DIR}}/build-zlib/libz.a" \
-        -I"{{DEPS_DIR}}/libpng-1.6.37" \
-        -I"{{TARGET_DIR}}/build-png" \
-        -I"{{TARGET_DIR}}/build-zlib/zlib/lib" \
-        -L"{{TARGET_DIR}}/build-zlib/zlib/lib" \
+        "{{ TARGET_DIR }}/build-png/.libs/libpng16.a" \
+        "{{ TARGET_DIR }}/build-zlib/libz.a" \
+        -I"{{ DEPS_DIR }}/libpng-1.6.37" \
+        -I"{{ TARGET_DIR }}/build-png" \
+        -I"{{ TARGET_DIR }}/build-zlib/zlib/lib" \
+        -L"{{ TARGET_DIR }}/build-zlib/zlib/lib" \
         -o"{{ HARNESS }}" \
         -lm -static
 
@@ -47,7 +47,7 @@ run_multi: build harness
 
 [unix]
 repro:
-    {{REAL_CC}} repro.c -o repro
+    {{ REAL_CC }} repro.c -o repro
 
 [unix]
 test_repro: build repro

@@ -7,7 +7,6 @@ FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 LIBAFL_CC := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
 LIBAFL_CXX := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
 
-
 alias cc := cxx
 
 [linux]
@@ -26,7 +25,7 @@ libpng:
 [linux]
 [macos]
 cxx:
-    cargo build --profile {{PROFILE}}
+    cargo build --profile {{ PROFILE }}
 
 [windows]
 cxx:
@@ -37,8 +36,8 @@ cxx:
 lib: libpng cxx
     #!/bin/bash
     cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-    cd {{PROJECT_DIR}}
-    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}"
+    cd {{ PROJECT_DIR }}
+    make -C libpng-1.6.37 CC="{{ LIBAFL_CC }}" CXX="{{ LIBAFL_CXX }}"
 
 [windows]
 lib:
@@ -47,7 +46,7 @@ lib:
 [linux]
 [macos]
 fuzzer: lib cxx
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz
+    {{ LIBAFL_CXX }} {{ PROJECT_DIR }}/harness.cc {{ PROJECT_DIR }}/libpng-1.6.37/.libs/libpng16.a -I {{ PROJECT_DIR }}/libpng-1.6.37/ -o {{ FUZZER_NAME }} -lm -lz
 
 [windows]
 fuzzer:
@@ -56,17 +55,16 @@ fuzzer:
 [linux]
 [macos]
 run: fuzzer
-    ./{{FUZZER_NAME}} --cores 0
+    ./{{ FUZZER_NAME }} --cores 0
 
 [windows]
 run: fuzzer
     echo "Unsupported on this platform"
 
-
 [linux]
 [macos]
 run_unix_sync: fuzzer
-    ./{{FUZZER_NAME}} --cores 0 -b 1337
+    ./{{ FUZZER_NAME }} --cores 0 -b 1337
 
 [windows]
 run_unix_sync: fuzzer
@@ -77,7 +75,7 @@ run_unix_sync: fuzzer
 test: fuzzer
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
-    timeout 31s ./{{FUZZER_NAME}} --cores 0 2>/dev/null | tee fuzz_stdout.log || true
+    timeout 31s ./{{ FUZZER_NAME }} --cores 0 2>/dev/null | tee fuzz_stdout.log || true
     if grep -qa "corpus: 8" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
@@ -90,7 +88,6 @@ test: fuzzer
     echo "Unsupported on this platform"
 
 clean:
-    rm -rf {{FUZZER_NAME}}
+    rm -rf {{ FUZZER_NAME }}
     make -C libpng-1.6.37 clean || true
     cargo clean
-

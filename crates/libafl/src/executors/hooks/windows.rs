@@ -324,9 +324,7 @@ pub mod windows_exception_handler {
 
                 compiler_fence(Ordering::SeqCst);
 
-                unsafe {
-                    libafl_bolts::os::exit(1);
-                }
+                libafl_bolts::os::exit(1);
             }
         }
         compiler_fence(Ordering::SeqCst);
@@ -482,9 +480,7 @@ pub mod windows_exception_handler {
 
         if is_crash {
             log::info!("Exiting!");
-            unsafe {
-                libafl_bolts::os::exit(1);
-            }
+            libafl_bolts::os::exit(1);
         }
         // log::info!("Not Exiting!");
     }

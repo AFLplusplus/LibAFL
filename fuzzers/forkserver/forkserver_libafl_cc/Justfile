@@ -9,7 +9,6 @@ FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 FORKSERVER := CARGO_TARGET_DIR / PROFILE_DIR / FORKSERVER_NAME
 PROJECT_DIR := absolute_path(".")
 
-
 alias cc := cxx
 
 [linux]
@@ -28,7 +27,7 @@ libpng:
 [linux]
 [macos]
 cxx:
-    cargo build --profile {{PROFILE}}
+    cargo build --profile {{ PROFILE }}
 
 [windows]
 cxx:
@@ -37,7 +36,7 @@ cxx:
 [linux]
 [macos]
 fuzzer: cxx
-    {{LIBAFL_CC}} {{PROJECT_DIR}}/src/program.c -o {{FUZZER_NAME}} -lm -lz
+    {{ LIBAFL_CC }} {{ PROJECT_DIR }}/src/program.c -o {{ FUZZER_NAME }} -lm -lz
 
 [windows]
 fuzzer:
@@ -47,7 +46,7 @@ fuzzer:
 [macos]
 run: fuzzer
     #!/bin/bash
-    taskset -c 1 {{FORKSERVER}} ./{{FUZZER_NAME}} ./corpus/ -t 1000
+    taskset -c 1 {{ FORKSERVER }} ./{{ FUZZER_NAME }} ./corpus/ -t 1000
 
 [windows]
 run: fuzzer
@@ -57,7 +56,7 @@ run: fuzzer
 [macos]
 test: fuzzer
     #!/bin/bash
-    timeout 30s {{FORKSERVER}} ./{{FUZZER_NAME}} ./corpus/ -t 1000 | tee fuzz_stdout.log || true
+    timeout 30s {{ FORKSERVER }} ./{{ FUZZER_NAME }} ./corpus/ -t 1000 | tee fuzz_stdout.log || true
     if grep -qa "objectives: 1" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
@@ -70,6 +69,6 @@ test: fuzzer
     echo "Unsupported on this platform"
 
 clean:
-    rm -rf {{FUZZER_NAME}}
+    rm -rf {{ FUZZER_NAME }}
     make -C libpng-1.6.37 clean || true
     cargo clean

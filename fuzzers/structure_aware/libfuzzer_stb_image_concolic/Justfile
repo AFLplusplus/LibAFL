@@ -27,7 +27,6 @@ clean-runtime:
     @echo "Cleaning runtime project..."
     @cargo clean --manifest-path runtime/Cargo.toml
 
-
 # --- Fuzzer Project ---
 
 # Build the fuzzer project
@@ -71,4 +70,3 @@ test-concolic: build-fuzzer
     fi
     rm -f concolic_test.log target_symcc.out
     rm -rf corpus
-

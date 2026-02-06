@@ -19,4 +19,4 @@ test:
     echo "Unsupported on this platform"
 
 clean:
-	cargo clean
+    cargo clean

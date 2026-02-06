@@ -99,9 +99,10 @@ clippy-inner feature='':
 # Run clippy on all targets and all sources
 [linux]
 clippy:
-    just clippy-inner --no-default-features
+    just clippy-inner "--no-default-features --exclude libafl_jumper --exclude libafl_frida"
     just clippy-inner
-    just clippy-inner --all-features
+    # libafl_qemu has mutually exclusive features (usermode vs systemmode) so all-features is invalid
+    just clippy-inner "--all-features --exclude libafl_qemu"
 
 # Run clippy on.. some things?
 [macos]

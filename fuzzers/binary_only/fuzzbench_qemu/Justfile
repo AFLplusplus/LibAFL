@@ -25,7 +25,6 @@ run: build harness
       -- \
       ./{{ HARNESS_NAME }}
 
-
 [unix]
 test: build harness
     #!/bin/bash

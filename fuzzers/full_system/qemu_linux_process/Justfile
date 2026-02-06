@@ -1,12 +1,12 @@
 import "../../../just/libafl-qemu.just"
-FUZZER_NAME := "qemu_linux_process"
 
+FUZZER_NAME := "qemu_linux_process"
 LINUX_BUILDER_URL := "https://github.com/AFLplusplus/linux-qemu-image-builder.git"
 LINUX_BUILDER_DIR := TARGET_DIR / "linux_builder"
 LINUX_BUILDER_OUT := LINUX_BUILDER_DIR / "output"
 
 target_dir:
-    mkdir -p "{{TARGET_DIR}}"
+    mkdir -p "{{ TARGET_DIR }}"
 
 linux_builder_dir: target_dir
     #!/bin/bash
@@ -29,7 +29,7 @@ update_files api="lqemu": target_dir linux_builder_dir (build api)
     cp {{ BUILD_DIR }}/include/* "{{ LINUX_BUILDER_DIR }}/setup/"
 
 target api="lqemu": linux_builder_dir compile_target update_files
-    {{LINUX_BUILDER_DIR}}/build.sh
+    {{ LINUX_BUILDER_DIR }}/build.sh
 
 build api="lqemu":
     cargo build \
@@ -54,7 +54,7 @@ run api="lqemu": (build api)
     qemu-img create -f qcow2 -o backing_file={{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.fd -F raw {{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.qcow2
     qemu-img create -f qcow2 -o backing_file={{ LINUX_BUILDER_OUT }}/linux.qcow2 -F qcow2 {{ LINUX_BUILDER_OUT }}/linux.tmp.qcow2
 
-    {{FUZZER}} \
+    {{ FUZZER }} \
       -accel tcg \
       -m 4G \
       -drive if=pflash,format=qcow2,file="{{ LINUX_BUILDER_OUT }}/OVMF_CODE.4m.qcow2" `# OVMF code pflash` \

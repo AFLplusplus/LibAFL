@@ -1,5 +1,5 @@
 set windows-shell := ['cmd.exe', '/c']
-set unstable
+set unstable := true
 
 [unix]
 build:

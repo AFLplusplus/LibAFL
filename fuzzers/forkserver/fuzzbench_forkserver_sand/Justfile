@@ -9,13 +9,12 @@ FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 FORKSERVER := CARGO_TARGET_DIR / PROFILE_DIR / FORKSERVER_NAME
 PROJECT_DIR := absolute_path(".")
 
-
 alias cc := cxx
 
 [linux]
 [macos]
 cxx:
-    cargo build --profile {{PROFILE}}
+    cargo build --profile {{ PROFILE }}
 
 [windows]
 cxx:
@@ -24,7 +23,7 @@ cxx:
 [linux]
 [macos]
 fuzzer: cxx
-    {{LIBAFL_CC}} {{PROJECT_DIR}}/src/vuln.c -o vuln_native -lm -lz
+    {{ LIBAFL_CC }} {{ PROJECT_DIR }}/src/vuln.c -o vuln_native -lm -lz
 
 [windows]
 fuzzer:
@@ -33,7 +32,7 @@ fuzzer:
 [linux]
 [macos]
 fuzzer_asan: cxx
-    AFL_SAN_NO_INST=1 {{LIBAFL_CC}} {{PROJECT_DIR}}/src/vuln.c -fsanitize=address -o vuln_asan -lm -lz
+    AFL_SAN_NO_INST=1 {{ LIBAFL_CC }} {{ PROJECT_DIR }}/src/vuln.c -fsanitize=address -o vuln_asan -lm -lz
 
 [windows]
 fuzzer_asan:
@@ -44,7 +43,7 @@ fuzzer_asan:
 run: fuzzer fuzzer_asan
     #!/bin/bash
     mkdir -p input && echo "a" >> input/a
-    taskset -c 1 {{FUZZER}} -i input -o /tmp/out -a ./vuln_asan -t 1000 ./vuln_native
+    taskset -c 1 {{ FUZZER }} -i input -o /tmp/out -a ./vuln_asan -t 1000 ./vuln_native
 
 [windows]
 run: fuzzer fuzzer_asan
@@ -55,7 +54,7 @@ run: fuzzer fuzzer_asan
 test: fuzzer fuzzer_asan
     #!/bin/bash
     mkdir -p input && echo "a" >> input/a
-    timeout 10s {{FUZZER}} -i input -o /tmp/out -a ./vuln_asan -t 1000 ./vuln_native | tee fuzz_stdout.log || true
+    timeout 10s {{ FUZZER }} -i input -o /tmp/out -a ./vuln_asan -t 1000 ./vuln_native | tee fuzz_stdout.log || true
     if grep -qa "objectives: 1" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
@@ -68,6 +67,6 @@ test: fuzzer fuzzer_asan
     echo "Unsupported on this platform"
 
 clean:
-    rm -rf {{FUZZER}}
+    rm -rf {{ FUZZER }}
     rm -rf vuln_native vuln_asan
     cargo clean
