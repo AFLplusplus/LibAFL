@@ -5,6 +5,7 @@
 //! - MmapShMemProvider for POSIX shared memory compatibility
 //! - Persistent mode fuzzing with the `_fuzz` entry point
 //! - Coverage-guided fuzzing with cumulative offset tracking
+//! - Multi-process fuzzing with shared corpus
 //!
 //! # Building the harness
 //! ```bash
@@ -13,18 +14,25 @@
 //!
 //! # Running
 //! ```bash
+//! # Single process
 //! sudo ./target/debug/tinyinst_mac
+//!
+//! # Multi-process (4 workers)
+//! sudo ./target/debug/tinyinst_mac --workers 4
 //! ```
 use std::{
+    env,
     fs,
     path::PathBuf,
+    process::Command,
     sync::atomic::{AtomicU64, Ordering},
+    thread,
     time::{Duration, Instant},
 };
 
 use libafl::{
     Fuzzer, StdFuzzer,
-    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
+    corpus::{Corpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     feedbacks::{CrashFeedback, ListFeedback},
     inputs::BytesInput,
@@ -53,7 +61,71 @@ fn main() {
 fn main() {
     env_logger::init();
 
-    println!("=== TinyInst ImageIO Fuzzer for macOS ===\n");
+    // Check if we're a worker process
+    let args: Vec<String> = env::args().collect();
+    let worker_id = args
+        .iter()
+        .position(|arg| arg == "--worker-id")
+        .and_then(|pos| args.get(pos + 1))
+        .and_then(|id| id.parse::<usize>().ok());
+
+    if let Some(id) = worker_id {
+        // We're a worker - run fuzzer
+        println!("=== Worker {} starting ===", id);
+        run_worker(id);
+        return;
+    }
+
+    // Check if we should spawn multiple workers
+    let num_workers = args
+        .iter()
+        .position(|arg| arg == "--workers")
+        .and_then(|pos| args.get(pos + 1))
+        .and_then(|n| n.parse::<usize>().ok())
+        .unwrap_or(1);
+
+    if num_workers > 1 {
+        println!("=== TinyInst ImageIO Fuzzer for macOS ===");
+        println!("Spawning {} worker processes...\n", num_workers);
+        spawn_workers(num_workers);
+    } else {
+        println!("=== TinyInst ImageIO Fuzzer for macOS (single process) ===\n");
+        run_worker(0);
+    }
+}
+
+#[cfg(target_vendor = "apple")]
+fn spawn_workers(num_workers: usize) {
+    let exe_path = env::current_exe().expect("Failed to get executable path");
+    let mut children = Vec::new();
+
+    for worker_id in 0..num_workers {
+        let child = Command::new(&exe_path)
+            .arg("--worker-id")
+            .arg(worker_id.to_string())
+            .spawn()
+            .expect("Failed to spawn worker");
+
+        println!("Spawned worker {} (PID: {})", worker_id, child.id());
+        children.push(child);
+
+        // Small delay between spawns
+        thread::sleep(Duration::from_millis(500));
+    }
+
+    println!("\nAll workers started. Press Ctrl+C to stop all workers.\n");
+
+    // Wait for all workers
+    for (id, mut child) in children.into_iter().enumerate() {
+        match child.wait() {
+            Ok(status) => println!("Worker {} exited with status: {}", id, status),
+            Err(e) => eprintln!("Worker {} error: {}", id, e),
+        }
+    }
+}
+
+#[cfg(target_vendor = "apple")]
+fn run_worker(worker_id: usize) {
 
     // TinyInst instrumentation args - instrument ImageIO framework
     let tinyinst_args = vec![
@@ -76,42 +148,52 @@ fn main() {
     // Use MmapShMemProvider for macOS POSIX shared memory compatibility
     let mut shmem_provider = MmapShMemProvider::with_filename_as_id();
 
-    // Load seed images from seeds directory
-    let seed_dir = PathBuf::from("../../../seeds/pngs");
-    let rand = StdRand::new();
-    let mut corpus = CachedOnDiskCorpus::new(PathBuf::from("./corpus"), 64).unwrap();
+    // Shared corpus directory (all workers share the same corpus)
+    let corpus_dir = PathBuf::from("./corpus");
+    let mut corpus = OnDiskCorpus::new(corpus_dir).unwrap();
 
-    if seed_dir.exists() {
-        for entry in fs::read_dir(&seed_dir).expect("Failed to read seeds directory") {
-            let entry = entry.expect("Failed to read entry");
-            let path = entry.path();
-            if path.is_file() {
-                match fs::read(&path) {
-                    Ok(data) => {
-                        println!("Loading seed: {} ({} bytes)", path.display(), data.len());
-                        let input = BytesInput::new(data);
-                        corpus
-                            .add(Testcase::new(input))
-                            .expect("error in adding corpus");
+    // Load seed images from seeds directory (only if corpus is empty)
+    if corpus.count() == 0 {
+        let seed_dir = PathBuf::from("../../../seeds/pngs");
+        if seed_dir.exists() {
+            println!("[Worker {}] Loading seeds...", worker_id);
+            for entry in fs::read_dir(&seed_dir).expect("Failed to read seeds directory") {
+                let entry = entry.expect("Failed to read entry");
+                let path = entry.path();
+                if path.is_file() {
+                    match fs::read(&path) {
+                        Ok(data) => {
+                            println!(
+                                "[Worker {}] Loading seed: {} ({} bytes)",
+                                worker_id,
+                                path.display(),
+                                data.len()
+                            );
+                            let input = BytesInput::new(data);
+                            corpus
+                                .add(Testcase::new(input))
+                                .expect("error in adding corpus");
+                        }
+                        Err(e) => eprintln!("Failed to read {}: {}", path.display(), e),
                     }
-                    Err(e) => eprintln!("Failed to read {}: {}", path.display(), e),
                 }
             }
         }
     }
 
-    println!("Corpus size: {}", corpus.count());
+    println!("[Worker {}] Corpus size: {}", worker_id, corpus.count());
     let solutions = OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap();
 
     let mut objective = CrashFeedback::new();
+    let rand = StdRand::new();
     let mut state = StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
     let scheduler = RandScheduler::new();
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let monitor = SimpleMonitor::new(|x| {
+    let monitor = SimpleMonitor::new(move |x| {
         let cov_count = CUMULATIVE_COUNT.load(Ordering::Relaxed);
-        println!("{x}");
-        println!("  >> Cumulative coverage offsets: {}", cov_count);
+        println!("[Worker {}] {}", worker_id, x);
+        println!("[Worker {}]   >> Cumulative coverage offsets: {}", worker_id, cov_count);
     });
 
     let mut mgr = SimpleEventManager::new(monitor);
@@ -130,8 +212,8 @@ fn main() {
     let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-    println!("\nStarting ImageIO fuzzer...");
-    println!("Press Ctrl+C to stop\n");
+    println!("[Worker {}] Starting ImageIO fuzzer...", worker_id);
+    println!("[Worker {}] Press Ctrl+C to stop\n", worker_id);
 
     // Run fuzzing loop with coverage tracking
     let start = Instant::now();
@@ -142,7 +224,7 @@ fn main() {
         match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(_) => {}
             Err(e) => {
-                println!("Fuzzer error: {:?}", e);
+                println!("[Worker {}] Fuzzer error: {:?}", worker_id, e);
                 break;
             }
         }
@@ -161,10 +243,23 @@ fn main() {
             } else {
                 0.0
             };
-            println!("\n=== Coverage Report ({}s) ===", elapsed);
-            println!("  Executions: {} ({:.2}/sec)", executions, exec_per_sec);
-            println!("  Cumulative unique offsets: {}", current_cov);
-            println!("  Corpus size: {}", state.corpus().count());
+            println!(
+                "\n[Worker {}] === Coverage Report ({}s) ===",
+                worker_id, elapsed
+            );
+            println!(
+                "[Worker {}]   Executions: {} ({:.2}/sec)",
+                worker_id, executions, exec_per_sec
+            );
+            println!(
+                "[Worker {}]   Cumulative unique offsets: {}",
+                worker_id, current_cov
+            );
+            println!(
+                "[Worker {}]   Corpus size: {}",
+                worker_id,
+                state.corpus().count()
+            );
 
             // Print sample offsets
             let offsets = executor.cumulative_coverage();
@@ -174,7 +269,7 @@ fn main() {
                     .take(10)
                     .map(|x| format!("0x{:x}", x))
                     .collect();
-                println!("  Sample offsets: {:?}", sample);
+                println!("[Worker {}]   Sample offsets: {:?}", worker_id, sample);
             }
             println!();
 

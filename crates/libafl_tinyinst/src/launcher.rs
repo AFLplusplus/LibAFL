@@ -1,19 +1,89 @@
 //! Multi-threaded launcher for `TinyInst` fuzzing
 //!
-//! This module provides [`TinyInstLauncher`], a simple multi-threaded launcher that
-//! spawns multiple fuzzing threads. Each thread runs independently with its own
-//! fuzzer state.
-//!
-//! For corpus sharing between threads, use LibAFL's standard `EventManager` patterns
-//! (e.g., `CentralizedEventManager` or `LlmpEventManager`) in your client function.
+//! This module provides [`TinyInstLauncher`] for spawning multiple fuzzing threads
+//! and [`SharedCorpusQueue`] for sharing corpus entries between threads.
 
-#[cfg(test)]
 extern crate alloc;
 
+use alloc::sync::Arc;
 use core::time::Duration;
-use std::thread::{self, JoinHandle};
+use std::{
+    collections::VecDeque,
+    sync::Mutex,
+    thread::{self, JoinHandle},
+};
 
-use libafl::Error;
+use libafl::{Error, inputs::Input};
+
+/// Shared corpus queue for distributing testcases between fuzzing threads
+///
+/// Each thread can push new interesting testcases to the queue, and
+/// periodically pull testcases discovered by other threads.
+#[derive(Debug, Clone)]
+pub struct SharedCorpusQueue<I> {
+    queue: Arc<Mutex<VecDeque<I>>>,
+}
+
+impl<I> SharedCorpusQueue<I>
+where
+    I: Input,
+{
+    /// Create a new empty shared corpus queue
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            queue: Arc::new(Mutex::new(VecDeque::new())),
+        }
+    }
+
+    /// Push a new testcase to the queue for other threads to discover
+    pub fn push(&self, input: I) {
+        if let Ok(mut queue) = self.queue.lock() {
+            queue.push_back(input);
+        }
+    }
+
+    /// Try to pop a testcase from the queue (non-blocking)
+    ///
+    /// Returns `None` if the queue is empty or lock fails
+    #[must_use]
+    pub fn pop(&self) -> Option<I> {
+        self.queue.lock().ok()?.pop_front()
+    }
+
+    /// Drain all testcases from the queue
+    ///
+    /// Returns a vector of all pending testcases
+    #[must_use]
+    pub fn drain(&self) -> Vec<I> {
+        if let Ok(mut queue) = self.queue.lock() {
+            queue.drain(..).collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get the current queue length
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.queue.lock().map(|q| q.len()).unwrap_or(0)
+    }
+
+    /// Check if the queue is empty
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<I> Default for SharedCorpusQueue<I>
+where
+    I: Input,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Builder for [`TinyInstLauncher`]
 #[derive(Debug)]
@@ -82,21 +152,26 @@ impl<F> TinyInstLauncherBuilder<F> {
 /// Spawns multiple fuzzing threads, each running the provided client function
 /// with its thread ID. Each thread maintains its own independent fuzzer state.
 ///
-/// For sharing corpus entries between threads, implement your client function
-/// to use LibAFL's `EventManager` patterns.
+/// For sharing corpus entries between threads, use [`SharedCorpusQueue`]:
+/// each thread can push new testcases and pull testcases from other threads.
 ///
 /// # Example
 ///
 /// ```ignore
-/// use libafl_tinyinst::launcher::TinyInstLauncher;
+/// use libafl_tinyinst::launcher::{TinyInstLauncher, SharedCorpusQueue};
+/// use libafl::inputs::BytesInput;
 /// use std::time::Duration;
+///
+/// let shared_queue = SharedCorpusQueue::<BytesInput>::new();
 ///
 /// let launcher = TinyInstLauncher::builder()
 ///     .num_threads(4)
 ///     .launch_delay(Duration::from_millis(100))
 ///     .run_client(|thread_id| {
-///         println!("Thread {} starting", thread_id);
-///         // Setup and run fuzzer with its own state...
+///         let queue = shared_queue.clone();
+///         // In your fuzzer loop:
+///         // - When finding new testcase: queue.push(input)
+///         // - Periodically: for input in queue.drain() { add to corpus }
 ///         Ok(())
 ///     })
 ///     .build()?;

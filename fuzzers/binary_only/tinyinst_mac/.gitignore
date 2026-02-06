@@ -6,5 +6,6 @@
 
 # Fuzzer runtime
 /corpus/
+/corpus_*/
 /crashes/
 /.cur_input
