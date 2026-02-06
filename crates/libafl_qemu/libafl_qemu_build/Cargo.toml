@@ -36,7 +36,6 @@ paranoid_debug = [
 
 [dependencies]
 bindgen = { workspace = true }
-libafl_build = { workspace = true }
 which = { workspace = true }
 json = "0.12.4"
 shell-words = "1.1.1"

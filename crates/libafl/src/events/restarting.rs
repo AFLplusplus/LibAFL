@@ -13,8 +13,6 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     staterestore::StateRestorer,
 };
-#[cfg(all(unix, feature = "std"))]
-use libc;
 use serde::{Serialize, de::DeserializeOwned};
 
 #[cfg(all(unix, not(miri)))]
@@ -236,66 +234,20 @@ where
                 #[cfg(unix)]
                 let child_status = if self.fork {
                     self.shmem_provider.pre_fork()?;
-                    // Block SIGINT to ensure we can check if it was delivered after waitpid
-                    #[cfg(all(unix, feature = "std"))]
-                    unsafe {
-                        let mut set: libc::sigset_t = core::mem::zeroed();
-                        libc::sigemptyset(&raw mut set);
-                        libc::sigaddset(&raw mut set, libc::SIGINT);
-                        libc::pthread_sigmask(
-                            libc::SIG_BLOCK,
-                            &raw const set,
-                            core::ptr::null_mut(),
-                        );
-                    }
-
                     match unsafe { fork() }? {
                         ForkResult::Parent(handle) => {
-                            self.shmem_provider.post_fork(false)?;
-                            let status = handle.status();
-
-                            #[cfg(all(unix, feature = "std"))]
                             unsafe {
-                                let mut set: libc::sigset_t = core::mem::zeroed();
-                                libc::sigemptyset(&raw mut set);
-                                libc::sigaddset(&raw mut set, libc::SIGINT);
-                                let mut pending: libc::sigset_t = core::mem::zeroed();
-                                libc::sigpending(&raw mut pending);
-                                if libc::sigismember(&raw const pending, libc::SIGINT) == 1 {
-                                    // If we have a pending SIGINT, it means the process group received a SIGINT
-                                    // (e.g. from Ctrl+C or timeout). We treat this as a clean shutdown.
-                                    // We unblock the signal to ensure it's cleared/handled if we were to continue,
-                                    // but here we return ShuttingDown immediately.
-                                    libc::pthread_sigmask(
-                                        libc::SIG_UNBLOCK,
-                                        &raw const set,
-                                        core::ptr::null_mut(),
-                                    );
-                                    return Err(Error::shutting_down());
-                                }
-                                libc::pthread_sigmask(
-                                    libc::SIG_UNBLOCK,
-                                    &raw const set,
-                                    core::ptr::null_mut(),
-                                );
+                                libc::signal(libc::SIGINT, libc::SIG_IGN);
                             }
-                            status
+                            self.shmem_provider.post_fork(false)?;
+                            handle.status()
                         }
                         ForkResult::Child => {
-                            #[cfg(all(unix, feature = "std"))]
-                            unsafe {
-                                let mut set: libc::sigset_t = core::mem::zeroed();
-                                libc::sigemptyset(&raw mut set);
-                                libc::sigaddset(&raw mut set, libc::SIGINT);
-                                libc::pthread_sigmask(
-                                    libc::SIG_UNBLOCK,
-                                    &raw const set,
-                                    core::ptr::null_mut(),
-                                );
-                            }
-
                             self.shmem_provider.post_fork(true)?;
-
+                            // We need to return the staterestorer from the child
+                            // But we don't have it in a variable here (it's in mgr)
+                            // Actually we can just break and let the code below handle it
+                            // But we need to make sure we don't drop mgr or staterestorer incorrectly
                             break (staterestorer, self.shmem_provider.clone(), None::<CoreId>);
                         }
                     }
@@ -315,7 +267,6 @@ where
 
                 core::sync::atomic::compiler_fence(Ordering::SeqCst);
 
-                // If the child exited via Ctrl+C, we stop the respawner.
                 if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     return Err(Error::shutting_down());
                 }

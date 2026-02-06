@@ -437,8 +437,6 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
     unsafe {
         let signal = &Signal::try_from(sig).unwrap();
-        #[cfg(feature = "std")]
-        eprintln!("DEBUG: Handling signal: {signal:?}");
         let handler = {
             match &SIGNAL_HANDLERS[*signal as usize] {
                 Some(handler_holder) => &mut **handler_holder.handler.get(),

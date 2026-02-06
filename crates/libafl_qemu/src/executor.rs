@@ -1,4 +1,3 @@
-#![allow(unused_imports)]
 //! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
 use core::{
     ffi::c_void,
