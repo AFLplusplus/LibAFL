@@ -1,0 +1,21 @@
+[package]
+name = "tinyinst_mac"
+version = "0.16.0"
+edition = "2021"
+description = "TinyInst-based fuzzer for macOS Apple Silicon targeting ImageIO"
+
+[dependencies]
+libafl = { path = "../../../crates/libafl", features = ["introspection"] }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_tinyinst = { path = "../../../crates/libafl_tinyinst" }
+shmem_providers = { path = "../../../crates/shmem_providers" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+env_logger = "0.11"
+
+[[bin]]
+name = "tinyinst_mac"
+path = "src/main.rs"
+
+[profile.release]
+codegen-units = 1
+opt-level = 3

@@ -1,0 +1,10 @@
+# Build artifacts
+/target/
+/Cargo.lock
+/imageio/imageio
+/imageio/*.dSYM/
+
+# Fuzzer runtime
+/corpus/
+/crashes/
+/.cur_input
