@@ -183,6 +183,19 @@ where
         self
     }
 
+    /// The module to collect coverage for (`-coverage_module`)
+    ///
+    /// Specifies which modules to collect coverage information from.
+    /// This is required for coverage-guided fuzzing.
+    #[must_use]
+    pub fn coverage_module(mut self, module: Vec<String>) -> Self {
+        for modname in module {
+            self.tinyinst_args.push("-coverage_module".to_string());
+            self.tinyinst_args.push(modname);
+        }
+        self
+    }
+
     /// Use shmem
     #[must_use]
     pub fn use_shmem(mut self) -> Self {
@@ -328,7 +341,7 @@ where
         self
     }
 
-    /// Set coverage type (`-covtype`)
+    /// Set coverage type (`-coverage_type`)
     ///
     /// Specifies what type of coverage to collect.
     ///
@@ -337,7 +350,7 @@ where
     /// - `"edge"`: Edge coverage
     #[must_use]
     pub fn coverage_type(mut self, covtype: &str) -> Self {
-        self.tinyinst_args.push("-covtype".to_string());
+        self.tinyinst_args.push("-coverage_type".to_string());
         self.tinyinst_args.push(covtype.to_string());
         self
     }

@@ -126,18 +126,8 @@ fn spawn_workers(num_workers: usize) {
 
 #[cfg(target_vendor = "apple")]
 fn run_worker(worker_id: usize) {
-
-    // TinyInst instrumentation args - instrument ImageIO framework
-    // Note: -coverage_module enables coverage collection for the specified module
-    let tinyinst_args = vec![
-        "-instrument_module".to_string(),
-        "ImageIO".to_string(),
-        "-coverage_module".to_string(),
-        "ImageIO".to_string(),
-        "-coverage_type".to_string(),
-        "edge".to_string(),
-        "-generate_unwind".to_string(),
-    ];
+    // Target module to instrument and collect coverage
+    let target_module = vec!["ImageIO".to_string()];
 
     // Program args - use shmem to pass testcases
     let args = vec![
@@ -208,7 +198,10 @@ fn run_worker(worker_id: usize) {
     let mut executor = if use_persistent {
         println!("[Worker {}] Using persistent mode", worker_id);
         TinyInstExecutor::builder()
-            .tinyinst_args(tinyinst_args)
+            .instrument_module(target_module.clone())
+            .coverage_module(target_module)
+            .coverage_type("edge")
+            .generate_unwind()
             .program_args(args)
             .use_shmem()
             // Note: macOS mangles C function names with underscore prefix
@@ -221,7 +214,10 @@ fn run_worker(worker_id: usize) {
     } else {
         println!("[Worker {}] Using normal mode (set PERSISTENT=1 for persistent mode)", worker_id);
         TinyInstExecutor::builder()
-            .tinyinst_args(tinyinst_args)
+            .instrument_module(target_module.clone())
+            .coverage_module(target_module)
+            .coverage_type("edge")
+            .generate_unwind()
             .program_args(args)
             .use_shmem()
             .timeout(Duration::new(5, 0))
