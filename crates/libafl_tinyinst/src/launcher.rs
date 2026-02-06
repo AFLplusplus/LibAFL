@@ -1,74 +1,19 @@
 //! Multi-threaded launcher for `TinyInst` fuzzing
 //!
-//! This module provides [`TinyInstLauncher`], a multi-threaded launcher that
-//! spawns multiple fuzzing threads with shared state for corpus and coverage.
+//! This module provides [`TinyInstLauncher`], a simple multi-threaded launcher that
+//! spawns multiple fuzzing threads. Each thread runs independently with its own
+//! fuzzer state.
+//!
+//! For corpus sharing between threads, use LibAFL's standard `EventManager` patterns
+//! (e.g., `CentralizedEventManager` or `LlmpEventManager`) in your client function.
 
+#[cfg(test)]
 extern crate alloc;
 
-use alloc::sync::Arc;
 use core::time::Duration;
-use std::{
-    collections::HashSet,
-    sync::RwLock,
-    thread::{self, JoinHandle},
-};
+use std::thread::{self, JoinHandle};
 
 use libafl::Error;
-
-/// Shared state between fuzzing threads
-#[derive(Debug)]
-pub struct SharedState<C> {
-    /// Shared corpus protected by `RwLock`
-    pub corpus: Arc<RwLock<C>>,
-    /// Shared cumulative coverage set
-    pub coverage: Arc<RwLock<HashSet<u64>>>,
-}
-
-impl<C> SharedState<C> {
-    /// Create a new shared state with the given corpus
-    pub fn new(corpus: C) -> Self {
-        Self {
-            corpus: Arc::new(RwLock::new(corpus)),
-            coverage: Arc::new(RwLock::new(HashSet::new())),
-        }
-    }
-
-    /// Get a clone of the corpus Arc
-    #[must_use]
-    pub fn corpus_arc(&self) -> Arc<RwLock<C>> {
-        Arc::clone(&self.corpus)
-    }
-
-    /// Get a clone of the coverage Arc
-    #[must_use]
-    pub fn coverage_arc(&self) -> Arc<RwLock<HashSet<u64>>> {
-        Arc::clone(&self.coverage)
-    }
-
-    /// Get the current coverage count
-    #[must_use]
-    pub fn coverage_count(&self) -> usize {
-        self.coverage.read().map(|c| c.len()).unwrap_or(0)
-    }
-
-    /// Add new coverage offsets
-    pub fn add_coverage(&self, offsets: &[u64]) {
-        if let Ok(mut cov) = self.coverage.write() {
-            for &offset in offsets {
-                cov.insert(offset);
-            }
-        }
-    }
-}
-
-impl<C> Clone for SharedState<C> {
-    fn clone(&self) -> Self {
-        Self {
-            corpus: Arc::clone(&self.corpus),
-            coverage: Arc::clone(&self.coverage),
-        }
-    }
-}
 
 /// Builder for [`TinyInstLauncher`]
 #[derive(Debug)]
@@ -134,9 +79,11 @@ impl<F> TinyInstLauncherBuilder<F> {
 
 /// Multi-threaded launcher for `TinyInst` fuzzing
 ///
-/// Spawns multiple fuzzing threads that can share state through
-/// [`SharedState`]. Each thread runs the provided client function
-/// with its thread ID.
+/// Spawns multiple fuzzing threads, each running the provided client function
+/// with its thread ID. Each thread maintains its own independent fuzzer state.
+///
+/// For sharing corpus entries between threads, implement your client function
+/// to use LibAFL's `EventManager` patterns.
 ///
 /// # Example
 ///
@@ -149,7 +96,7 @@ impl<F> TinyInstLauncherBuilder<F> {
 ///     .launch_delay(Duration::from_millis(100))
 ///     .run_client(|thread_id| {
 ///         println!("Thread {} starting", thread_id);
-///         // Setup and run fuzzer...
+///         // Setup and run fuzzer with its own state...
 ///         Ok(())
 ///     })
 ///     .build()?;
@@ -242,26 +189,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloc::sync::Arc;
     use core::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
-
-    #[test]
-    fn test_shared_state() {
-        let state: SharedState<Vec<String>> = SharedState::new(vec!["test".to_string()]);
-
-        // Test coverage tracking
-        state.add_coverage(&[0x1000, 0x2000, 0x3000]);
-        assert_eq!(state.coverage_count(), 3);
-
-        // Add duplicate
-        state.add_coverage(&[0x1000]);
-        assert_eq!(state.coverage_count(), 3);
-
-        // Add new
-        state.add_coverage(&[0x4000]);
-        assert_eq!(state.coverage_count(), 4);
-    }
 
     #[test]
     fn test_launcher_single_thread() {
