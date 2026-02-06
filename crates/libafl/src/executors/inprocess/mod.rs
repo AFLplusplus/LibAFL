@@ -335,7 +335,6 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
     Z: HasObjective<Objective = OF>,
     I: Input + Clone,
 {
-    log::info!("in crash handler!");
     let mut observers = executor.observers_mut();
 
     observers
@@ -381,8 +380,6 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
 
     // Serialize the state and wait safely for the broker to read pending messages
     event_mgr.on_restart(state).unwrap();
-
-    log::info!("Bye!");
 }
 
 #[cfg(test)]
