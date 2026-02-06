@@ -200,7 +200,7 @@ pub const LLMP_FLAG_FROM_MM: Flags = Flags(0x4);
 
 /// Timt the broker 2 broker connection waits for incoming data,
 /// before checking for own data to forward again.
-const _LLMP_B2B_BLOCK_TIME: Duration = Duration::from_millis(3_000);
+const _LLMP_B2B_BLOCK_TIME: Duration = Duration::from_secs(3);
 
 /// If broker2broker is enabled, bind to public IP
 #[cfg(feature = "llmp_bind_public")]

@@ -120,7 +120,7 @@ where
         }
 
         let shmem_len = self.shmem.len();
-        let content_ptr = self.content_mut() as *mut StateShMemContent;
+        let content_ptr = ptr::from_mut::<StateShMemContent>(self.content_mut());
         // Calculate available space: shmem.len() - sizeof(StateShMemContent)
         let available = shmem_len
             .checked_sub(size_of::<StateShMemContent>())

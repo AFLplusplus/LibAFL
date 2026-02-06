@@ -423,7 +423,7 @@ mod tests {
         let idx1 = corpus.add(testcase1).unwrap();
 
         let mut testcase2 = Testcase::new(NopInput {});
-        testcase2.set_exec_time(Duration::from_millis(1000)); // Low weight
+        testcase2.set_exec_time(Duration::from_secs(1)); // Low weight
         let idx2 = corpus.add(testcase2).unwrap();
 
         let observer = StdMapObserver::owned("map", vec![0u8; 16]);

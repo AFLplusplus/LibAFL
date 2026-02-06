@@ -259,7 +259,7 @@ pub struct StdChildArgsInner {
 impl Default for StdChildArgsInner {
     fn default() -> Self {
         Self {
-            timeout: Duration::from_millis(5000),
+            timeout: Duration::from_secs(5),
             stderr_observer: None,
             stdout_observer: None,
             current_directory: None,

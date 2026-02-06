@@ -314,7 +314,7 @@ impl Allocator {
         hint_base: usize,
     ) -> Option<&mut AllocationMetadata> {
         let mut metadatas: Vec<&mut AllocationMetadata> = self.allocations.values_mut().collect();
-        metadatas.sort_by(|a, b| a.address.cmp(&b.address));
+        metadatas.sort_by_key(|a| a.address);
         let mut offset_to_closest = i64::MAX;
         let mut closest = None;
         let ptr: i64 = ptr.try_into().unwrap();
@@ -919,31 +919,31 @@ fn check_shadow() {
     assert!(allocator.check_shadow(allocation, 8));
     assert!(!allocator.check_shadow(allocation, 9));
     assert!(!allocator.check_shadow(allocation, 10));
-    assert!(allocator.check_shadow(unsafe { allocation.offset(1) }, 7));
-    assert!(allocator.check_shadow(unsafe { allocation.offset(2) }, 6));
-    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 5));
-    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 4));
-    assert!(allocator.check_shadow(unsafe { allocation.offset(5) }, 3));
-    assert!(allocator.check_shadow(unsafe { allocation.offset(6) }, 2));
-    assert!(allocator.check_shadow(unsafe { allocation.offset(7) }, 1));
-    assert!(allocator.check_shadow(unsafe { allocation.offset(8) }, 0));
-    assert!(!allocator.check_shadow(unsafe { allocation.offset(9) }, 1));
-    assert!(!allocator.check_shadow(unsafe { allocation.offset(9) }, 8));
-    assert!(!allocator.check_shadow(unsafe { allocation.offset(1) }, 9));
-    assert!(!allocator.check_shadow(unsafe { allocation.offset(1) }, 8));
-    assert!(!allocator.check_shadow(unsafe { allocation.offset(2) }, 8));
-    assert!(!allocator.check_shadow(unsafe { allocation.offset(3) }, 8));
+    assert!(allocator.check_shadow(unsafe { allocation.add(1) }, 7));
+    assert!(allocator.check_shadow(unsafe { allocation.add(2) }, 6));
+    assert!(allocator.check_shadow(unsafe { allocation.add(3) }, 5));
+    assert!(allocator.check_shadow(unsafe { allocation.add(4) }, 4));
+    assert!(allocator.check_shadow(unsafe { allocation.add(5) }, 3));
+    assert!(allocator.check_shadow(unsafe { allocation.add(6) }, 2));
+    assert!(allocator.check_shadow(unsafe { allocation.add(7) }, 1));
+    assert!(allocator.check_shadow(unsafe { allocation.add(8) }, 0));
+    assert!(!allocator.check_shadow(unsafe { allocation.add(9) }, 1));
+    assert!(!allocator.check_shadow(unsafe { allocation.add(9) }, 8));
+    assert!(!allocator.check_shadow(unsafe { allocation.add(1) }, 9));
+    assert!(!allocator.check_shadow(unsafe { allocation.add(1) }, 8));
+    assert!(!allocator.check_shadow(unsafe { allocation.add(2) }, 8));
+    assert!(!allocator.check_shadow(unsafe { allocation.add(3) }, 8));
     let allocation = unsafe { allocator.alloc(0xc, 0) };
-    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 8));
+    assert!(allocator.check_shadow(unsafe { allocation.add(4) }, 8));
     //subqword access
-    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 2));
+    assert!(allocator.check_shadow(unsafe { allocation.add(3) }, 2));
     //unaligned access
-    assert!(allocator.check_shadow(unsafe { allocation.offset(3) }, 8));
+    assert!(allocator.check_shadow(unsafe { allocation.add(3) }, 8));
     let allocation = unsafe { allocator.alloc(0x20, 0) };
     //access with unaligned parts at the beginning and end
-    assert!(allocator.check_shadow(unsafe { allocation.offset(10) }, 21));
+    assert!(allocator.check_shadow(unsafe { allocation.add(10) }, 21));
     //invalid, unaligned access
-    assert!(!allocator.check_shadow(unsafe { allocation.offset(10) }, 29));
+    assert!(!allocator.check_shadow(unsafe { allocation.add(10) }, 29));
     let allocation = unsafe { allocator.alloc(4, 0) };
     assert!(!allocation.is_null());
     assert!(allocator.check_shadow(allocation, 1));
@@ -955,7 +955,7 @@ fn check_shadow() {
     assert!(!allocator.check_shadow(allocation, 7));
     assert!(!allocator.check_shadow(allocation, 8));
     let allocation = unsafe { allocator.alloc(0xc, 0) };
-    assert!(allocator.check_shadow(unsafe { allocation.offset(4) }, 8));
+    assert!(allocator.check_shadow(unsafe { allocation.add(4) }, 8));
     let allocation = unsafe { allocator.alloc(0x3c, 0) };
-    assert!(allocator.check_shadow(unsafe { allocation.offset(0x3a) }, 2));
+    assert!(allocator.check_shadow(unsafe { allocation.add(0x3a) }, 2));
 }

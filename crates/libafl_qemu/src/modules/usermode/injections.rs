@@ -398,25 +398,25 @@ where
             //println!("CMD {}", cmd);
 
             let first_parameter = unsafe {
-                if (*c_array.offset(1)).is_null() {
+                if (*c_array.add(1)).is_null() {
                     return SyscallHookResult::Run;
                 }
-                CStr::from_ptr(*c_array.offset(1)).to_string_lossy()
+                CStr::from_ptr(*c_array.add(1)).to_string_lossy()
             };
             let second_parameter = unsafe {
-                if (*c_array.offset(2)).is_null() {
+                if (*c_array.add(2)).is_null() {
                     return SyscallHookResult::Run;
                 }
-                CStr::from_ptr(*c_array.offset(2)).to_string_lossy()
+                CStr::from_ptr(*c_array.add(2)).to_string_lossy()
             };
 
             if first_parameter == "-c" {
                 let to_check = if second_parameter == "--" {
                     unsafe {
-                        if (*c_array.offset(3)).is_null() {
+                        if (*c_array.add(3)).is_null() {
                             return SyscallHookResult::Run;
                         }
-                        CStr::from_ptr(*c_array.offset(3)).to_string_lossy()
+                        CStr::from_ptr(*c_array.add(3)).to_string_lossy()
                     }
                 } else {
                     second_parameter
