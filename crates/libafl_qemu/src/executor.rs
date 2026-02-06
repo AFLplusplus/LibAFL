@@ -191,7 +191,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
                 OF,
                 S,
                 Z,
-            >(signal, info, context.as_deref_mut(), data);
+            >(signal, info, context, data);
         }
     }
 
@@ -209,7 +209,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
             OF,
             S,
             Z,
-        >(signal, info, context.as_deref_mut(), data);
+        >(signal, info, context, data);
     }
 }
 
