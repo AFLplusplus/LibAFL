@@ -161,6 +161,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if cfg!(target_os = "macos") {
         println!("cargo:rustc-link-lib=c++");
+        println!("cargo:rustc-link-arg=-Wl,-u,_libafl_main");
     } else {
         println!("cargo:rustc-link-lib=stdc++");
     }
