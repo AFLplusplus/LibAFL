@@ -128,9 +128,14 @@ fn spawn_workers(num_workers: usize) {
 fn run_worker(worker_id: usize) {
 
     // TinyInst instrumentation args - instrument ImageIO framework
+    // Note: -coverage_module enables coverage collection for the specified module
     let tinyinst_args = vec![
         "-instrument_module".to_string(),
         "ImageIO".to_string(),
+        "-coverage_module".to_string(),
+        "ImageIO".to_string(),
+        "-coverage_type".to_string(),
+        "edge".to_string(),
         "-generate_unwind".to_string(),
     ];
 
@@ -197,17 +202,34 @@ fn run_worker(worker_id: usize) {
     });
 
     let mut mgr = SimpleEventManager::new(monitor);
-    let mut executor = TinyInstExecutor::builder()
-        .tinyinst_args(tinyinst_args)
-        .program_args(args)
-        .use_shmem()
-        // Note: macOS mangles C function names with underscore prefix
-        .persistent("imageio".to_string(), "_fuzz".to_string(), 1, 10000)
-        .timeout(Duration::new(5, 0))
-        .shmem_provider(&mut shmem_provider)
-        .coverage_ptr(&raw mut COVERAGE)
-        .build(tuple_list!(observer))
-        .unwrap();
+    // Check if persistent mode is enabled via environment variable
+    let use_persistent = env::var("PERSISTENT").is_ok();
+    
+    let mut executor = if use_persistent {
+        println!("[Worker {}] Using persistent mode", worker_id);
+        TinyInstExecutor::builder()
+            .tinyinst_args(tinyinst_args)
+            .program_args(args)
+            .use_shmem()
+            // Note: macOS mangles C function names with underscore prefix
+            .persistent("imageio".to_string(), "_fuzz".to_string(), 1, 10000)
+            .timeout(Duration::new(5, 0))
+            .shmem_provider(&mut shmem_provider)
+            .coverage_ptr(&raw mut COVERAGE)
+            .build(tuple_list!(observer))
+            .unwrap()
+    } else {
+        println!("[Worker {}] Using normal mode (set PERSISTENT=1 for persistent mode)", worker_id);
+        TinyInstExecutor::builder()
+            .tinyinst_args(tinyinst_args)
+            .program_args(args)
+            .use_shmem()
+            .timeout(Duration::new(5, 0))
+            .shmem_provider(&mut shmem_provider)
+            .coverage_ptr(&raw mut COVERAGE)
+            .build(tuple_list!(observer))
+            .unwrap()
+    };
 
     let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
@@ -218,7 +240,21 @@ fn run_worker(worker_id: usize) {
     // Run fuzzing loop with coverage tracking
     let start = Instant::now();
     let mut last_cov_print = Instant::now();
+    let mut last_corpus_sync = Instant::now();
     let mut executions: u64 = 0;
+    let mut known_corpus_files: std::collections::HashSet<String> = std::collections::HashSet::new();
+    
+    // Track existing corpus files
+    let corpus_dir = PathBuf::from("./corpus");
+    if corpus_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&corpus_dir) {
+            for entry in entries.flatten() {
+                if let Some(name) = entry.file_name().to_str() {
+                    known_corpus_files.insert(name.to_string());
+                }
+            }
+        }
+    }
 
     loop {
         match fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr) {
@@ -234,6 +270,34 @@ fn run_worker(worker_id: usize) {
         // Update cumulative coverage
         let current_cov = executor.cumulative_coverage_count() as u64;
         CUMULATIVE_COUNT.store(current_cov, Ordering::Relaxed);
+
+        // Sync corpus from other workers every 30 seconds
+        if last_corpus_sync.elapsed() >= Duration::from_secs(30) {
+            if let Ok(entries) = fs::read_dir(&corpus_dir) {
+                let mut new_inputs = 0;
+                for entry in entries.flatten() {
+                    if let Some(name) = entry.file_name().to_str() {
+                        if !known_corpus_files.contains(name) {
+                            // New file from another worker
+                            if let Ok(data) = fs::read(entry.path()) {
+                                let input = BytesInput::new(data);
+                                if state.corpus_mut().add(Testcase::new(input)).is_ok() {
+                                    new_inputs += 1;
+                                }
+                                known_corpus_files.insert(name.to_string());
+                            }
+                        }
+                    }
+                }
+                if new_inputs > 0 {
+                    println!(
+                        "[Worker {}] Synced {} new inputs from other workers",
+                        worker_id, new_inputs
+                    );
+                }
+            }
+            last_corpus_sync = Instant::now();
+        }
 
         // Print coverage stats every 10 seconds
         if last_cov_print.elapsed() >= Duration::from_secs(10) {
