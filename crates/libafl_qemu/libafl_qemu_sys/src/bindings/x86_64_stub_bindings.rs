@@ -9073,6 +9073,12 @@ unsafe extern "C" {
     pub fn libafl_qemu_remove_hw_breakpoint(addr: target_ulong) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    pub fn libafl_load_qemu_snapshot(name: *mut ::std::os::raw::c_char, sync: bool);
+    pub fn libafl_save_qemu_snapshot(name: *mut ::std::os::raw::c_char, sync: bool);
+    pub fn qemu_cleanup(code: ::std::os::raw::c_int);
+    pub fn libafl_qemu_current_paging_id(cpu: *mut CPUState) -> u64;
+}
+unsafe extern "C" {
     pub fn libafl_hook_syscall_post_run(
         num: ::std::os::raw::c_int,
         arg1: abi_long,

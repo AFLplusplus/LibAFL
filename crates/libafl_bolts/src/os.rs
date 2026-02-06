@@ -313,6 +313,7 @@ pub fn exit(code: i32) -> ! {
 
     #[cfg(windows)]
     unsafe {
+        #[allow(clippy::cast_sign_loss)]
         windows::Win32::System::Threading::ExitProcess(code as u32);
     }
 

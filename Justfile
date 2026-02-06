@@ -96,19 +96,31 @@ doc:
 clippy-inner feature='':
     cargo {{ MSRV }} clippy --workspace --all-targets --exclude libafl_asan_libc {{ feature }} -- -D warnings
 
+# Runs clippy on crates excluded from the workspace
+[private]
+clippy-excluded:
+    cargo {{ MSRV }} clippy --manifest-path crates/libafl_libfuzzer_runtime/Cargo.toml --all-targets -- -D warnings
+    cargo {{ MSRV }} clippy --manifest-path bindings/pylibafl/Cargo.toml --all-targets -- -D warnings
+    cargo {{ MSRV }} clippy --manifest-path utils/noaslr/Cargo.toml --workspace --all-targets -- -D warnings
+    cargo {{ MSRV }} clippy --manifest-path utils/libafl_repo_tools/Cargo.toml --all-targets -- -D warnings
+    cargo {{ MSRV }} clippy --manifest-path utils/gdb_qemu/Cargo.toml --all-targets -- -D warnings
+    cargo {{ MSRV }} clippy --manifest-path utils/multi_machine_generator/Cargo.toml --all-targets -- -D warnings
+
 # Run clippy on all targets and all sources
 [linux]
 clippy:
-    cargo +nightly clippy --tests --all
+    cargo +nightly clippy --tests --all # --fix --allow-dirty --allow-staged
     just clippy-inner "--no-default-features --exclude libafl_jumper --exclude libafl_frida"
     just clippy-inner
     # libafl_qemu has mutually exclusive features (usermode vs systemmode) so all-features is invalid
     just clippy-inner "--all-features --exclude libafl_qemu"
+    just clippy-excluded
 
 # Run clippy on.. some things?
 [macos]
 clippy:
     cargo +nightly clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
+    just clippy-excluded
 
 # Run clippy powershell script
 [windows]
