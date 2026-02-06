@@ -131,7 +131,7 @@ pub mod unix_signal_handler {
                     ExitKind::Crash,
                 );
 
-                libc::_exit(128 + 6); // SIGABRT exit code
+                libafl_bolts::os::exit(128 + 6); // SIGABRT exit code
             }
 
             (*data).signal_handler_exit();
@@ -192,7 +192,7 @@ pub mod unix_signal_handler {
                 ExitKind::Timeout,
             );
             log::info!("Exiting");
-            libc::_exit(55);
+            libafl_bolts::os::exit(55);
         }
     }
 
@@ -310,7 +310,7 @@ pub mod unix_signal_handler {
                 // TODO tell the parent to not restart
             }
 
-            libc::_exit(128 + (signal as i32));
+            libafl_bolts::os::exit(128 + (signal as i32));
         }
     }
 }

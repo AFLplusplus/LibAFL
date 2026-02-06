@@ -5,7 +5,7 @@ use alloc::{borrow::ToOwned, boxed::Box, ffi::CString, format, string::String, v
 use core::{
     ffi::CStr,
     fmt::Debug,
-    ops::{AddAssign, RangeInclusive},
+    ops::RangeInclusive,
     ptr,
     ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
 };
@@ -31,7 +31,7 @@ use perf_event_open_sys::{
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
-pub use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder, PtImage};
+pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtCoverageDecoderBuilder, PtImage};
 use ptcov::{PtCpu, PtCpuVendor};
 use raw_cpuid::CpuId;
 
@@ -191,7 +191,7 @@ impl IntelPT {
         map_len: usize,
     ) -> Result<(), Error>
     where
-        T: AddAssign + Copy + Debug + From<u8>,
+        T: CoverageEntry,
     {
         let head = unsafe { self.aux_head.read_volatile() };
         let tail = unsafe { self.aux_tail.read_volatile() };
