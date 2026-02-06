@@ -1,10 +1,7 @@
 //! The [`MultiMonitor`] displays both cumulative and per-client stats.
 
 use alloc::string::String;
-use core::{
-    fmt::{Debug, Formatter, Write},
-    time::Duration,
-};
+use core::fmt::{Debug, Formatter, Write};
 
 use libafl_bolts::{ClientId, Error, current_time};
 
@@ -17,6 +14,7 @@ where
     F: FnMut(&str),
 {
     print_fn: F,
+    pizza_mode: bool,
 }
 
 impl<F> Debug for MultiMonitor<F>
@@ -46,16 +44,29 @@ where
         };
         let head = format!("{event_msg}{pad} {sender}");
         let global_stats = client_stats_manager.global_stats();
-        let mut global_fmt = format!(
-            "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
-            head,
-            global_stats.run_time_pretty,
-            global_stats.client_stats_count,
-            global_stats.corpus_size,
-            global_stats.objective_size,
-            global_stats.total_execs,
-            global_stats.execs_per_sec_pretty
-        );
+        let mut global_fmt = if self.pizza_mode {
+            format!(
+                "[{}]  (GLOBAL) time to bake: {}, customers: {}, pizzas: {}, deliveries: {}, doughs: {}, p/s: {}, Pineapple pizzas: 0",
+                head,
+                global_stats.run_time_pretty,
+                global_stats.client_stats_count,
+                global_stats.corpus_size,
+                global_stats.objective_size,
+                global_stats.total_execs,
+                global_stats.execs_per_sec_pretty
+            )
+        } else {
+            format!(
+                "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+                head,
+                global_stats.run_time_pretty,
+                global_stats.client_stats_count,
+                global_stats.corpus_size,
+                global_stats.objective_size,
+                global_stats.total_execs,
+                global_stats.execs_per_sec_pretty
+            )
+        };
         for (key, val) in client_stats_manager.aggregated() {
             write!(global_fmt, ", {key}: {val}").unwrap();
         }
@@ -64,19 +75,29 @@ where
 
         client_stats_manager.client_stats_insert(sender_id)?;
         let cur_time = current_time();
-        let exec_sec = client_stats_manager
+        let exec_sec_val = client_stats_manager
             .update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time))?;
         let client = client_stats_manager.client_stats_for(sender_id)?;
 
-        let pad = " ".repeat(head.len());
-        let mut fmt = format!(
-            " {}   (CLIENT) corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
-            pad,
-            client.corpus_size(),
-            client.objective_size(),
-            client.executions(),
-            exec_sec
-        );
+        let mut fmt = if self.pizza_mode {
+            format!(
+                " {}   (CUSTOMER) pizzas: {}, deliveries: {}, doughs: {}, p/s: {}",
+                pad,
+                client.corpus_size(),
+                client.objective_size(),
+                client.executions(),
+                exec_sec_val
+            )
+        } else {
+            format!(
+                " {}   (CLIENT) corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+                pad,
+                client.corpus_size(),
+                client.objective_size(),
+                client.executions(),
+                exec_sec_val
+            )
+        };
         for (key, val) in client.user_stats() {
             write!(fmt, ", {key}: {val}").unwrap();
         }
@@ -87,12 +108,29 @@ where
         {
             // Print the client performance monitor. Skip clients with no introspection data
             // (e.g., broker that never fuzzes will have elapsed_cycles == 0)
+            let client_header = if self.pizza_mode {
+                "Customer"
+            } else {
+                "Client"
+            };
+            let cycles_label = if self.pizza_mode {
+                "pizzas baked"
+            } else {
+                "cycles"
+            };
             for (client_id, client) in client_stats_manager
                 .client_stats()
                 .iter()
                 .filter(|(_, x)| x.enabled() && x.introspection_stats.elapsed_cycles() > 0)
             {
-                let fmt = format!("Client {:03}:\n{}", client_id.0, client.introspection_stats);
+                let fmt = format!(
+                    "{} {:03}:\n{} {}: {}",
+                    client_header,
+                    client_id.0,
+                    client.introspection_stats,
+                    cycles_label,
+                    client.executions()
+                );
                 (self.print_fn)(&fmt);
             }
 
@@ -109,15 +147,14 @@ where
 {
     /// Creates the monitor, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
-        Self { print_fn }
+        Self {
+            print_fn,
+            pizza_mode: crate::monitors::pizza_is_served(),
+        }
     }
 
-    /// Creates the monitor with a given `start_time`.
-    #[deprecated(
-        since = "0.16.0",
-        note = "Please use new to create. start_time is useless here."
-    )]
-    pub fn with_time(print_fn: F, _start_time: Duration) -> Self {
-        Self::new(print_fn)
+    /// Adds pineapple.
+    pub fn add_pineapple(&mut self) {
+        self.pizza_mode = false;
     }
 }

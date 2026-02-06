@@ -104,7 +104,7 @@ pub mod windows_asan_handler {
                 );
             }
             // Don't need to exit, Asan will exit for us
-            // ExitProcess(1);
+            libafl_bolts::os::exit(1);
         }
     }
 }
@@ -251,7 +251,7 @@ pub mod windows_exception_handler {
                     ExitKind::Crash,
                 );
 
-                ExitProcess(1);
+                libafl_bolts::os::exit(1);
             }
             old_hook(panic_info);
             (*data).signal_handler_exit();
@@ -325,7 +325,7 @@ pub mod windows_exception_handler {
                 compiler_fence(Ordering::SeqCst);
 
                 unsafe {
-                    ExitProcess(1);
+                    libafl_bolts::os::exit(1);
                 }
             }
         }
@@ -483,7 +483,7 @@ pub mod windows_exception_handler {
         if is_crash {
             log::info!("Exiting!");
             unsafe {
-                ExitProcess(1);
+                libafl_bolts::os::exit(1);
             }
         }
         // log::info!("Not Exiting!");
