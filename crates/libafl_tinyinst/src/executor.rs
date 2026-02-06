@@ -301,7 +301,8 @@ where
     /// - `"auto"`: Automatically choose (defaults to global on x86, local on ARM64)
     #[must_use]
     pub fn indirect_instrumentation(mut self, mode: &str) -> Self {
-        self.tinyinst_args.push("-indirect_instrumentation".to_string());
+        self.tinyinst_args
+            .push("-indirect_instrumentation".to_string());
         self.tinyinst_args.push(mode.to_string());
         self
     }
@@ -312,7 +313,8 @@ where
     /// Can improve performance but may cause issues with some targets.
     #[must_use]
     pub fn patch_return_addresses(mut self) -> Self {
-        self.tinyinst_args.push("-patch_return_addresses".to_string());
+        self.tinyinst_args
+            .push("-patch_return_addresses".to_string());
         self
     }
 

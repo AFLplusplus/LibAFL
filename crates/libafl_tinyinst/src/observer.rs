@@ -64,7 +64,11 @@ impl TinyInstMapObserver {
     /// # Safety
     /// The `coverage_ptr` must point to a valid `Vec<u64>` that outlives this observer.
     #[must_use]
-    pub fn with_map_size(name: &'static str, coverage_ptr: *const Vec<u64>, map_size: usize) -> Self {
+    pub fn with_map_size(
+        name: &'static str,
+        coverage_ptr: *const Vec<u64>,
+        map_size: usize,
+    ) -> Self {
         Self {
             map: vec![0u8; map_size],
             name: Cow::Borrowed(name),
@@ -256,7 +260,7 @@ mod tests {
     #[test]
     fn test_hash_distribution() {
         let coverage: Vec<u64> = vec![];
-        let observer = TinyInstMapObserver::new("test", &coverage);
+        let observer = TinyInstMapObserver::new("test", &raw const coverage);
 
         // Test that different offsets hash to different buckets
         let h1 = observer.hash_offset(0x1000);
@@ -270,7 +274,7 @@ mod tests {
     #[test]
     fn test_map_update() {
         let coverage: Vec<u64> = vec![0x1000, 0x2000, 0x3000, 0x1000]; // 0x1000 appears twice
-        let mut observer = TinyInstMapObserver::new("test", &coverage);
+        let mut observer = TinyInstMapObserver::new("test", &raw const coverage);
 
         observer.update_map_from_coverage();
 
@@ -285,7 +289,7 @@ mod tests {
     #[test]
     fn test_reset() {
         let coverage: Vec<u64> = vec![0x1000, 0x2000];
-        let mut observer = TinyInstMapObserver::new("test", &coverage);
+        let mut observer = TinyInstMapObserver::new("test", &raw const coverage);
 
         observer.update_map_from_coverage();
         assert!(observer.count_bytes() > 0);

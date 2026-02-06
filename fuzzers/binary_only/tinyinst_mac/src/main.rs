@@ -23,17 +23,17 @@ use std::{
 };
 
 use libafl::{
+    Fuzzer, StdFuzzer,
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     feedbacks::{CrashFeedback, ListFeedback},
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations, HavocScheduledMutator},
+    mutators::{HavocScheduledMutator, havoc_mutations},
     observers::ListObserver,
     schedulers::RandScheduler,
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
-    Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{ownedref::OwnedMutPtr, rands::StdRand, tuples::tuple_list};
 use libafl_tinyinst::executor::TinyInstExecutor;
