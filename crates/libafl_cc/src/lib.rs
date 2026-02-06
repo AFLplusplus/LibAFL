@@ -51,6 +51,10 @@ pub mod cfg;
 pub use cfg::{CfgEdge, ControlFlowGraph, EntryBasicBlockInfo, HasWeight};
 pub mod clang;
 pub use clang::{ClangWrapper, LLVMPasses};
+#[cfg(feature = "git-recency")]
+mod git_recency;
+#[cfg(feature = "git-recency")]
+pub use git_recency::generate_git_recency_mapping;
 pub mod libtool;
 pub use libtool::LibtoolWrapper;
 

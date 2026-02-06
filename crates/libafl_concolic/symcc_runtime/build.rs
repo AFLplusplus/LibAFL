@@ -110,14 +110,17 @@ fn write_cpp_function_export_macro(out_path: &Path, cpp_bindings: &bindgen::Bind
 
 fn checkout_symcc(out_path: &Path) -> PathBuf {
     if std::env::var("DOCS_RS").is_ok() {
-        "symcc".into()
-    } else {
-        let repo_dir = out_path.join("libafl_symcc_src");
-        if !repo_dir.exists() {
-            clone_symcc(&repo_dir);
+        let repo_dir: PathBuf = "symcc".into();
+        if repo_dir.exists() {
+            return repo_dir;
         }
-        repo_dir
     }
+
+    let repo_dir = out_path.join("libafl_symcc_src");
+    if !repo_dir.exists() {
+        clone_symcc(&repo_dir);
+    }
+    repo_dir
 }
 
 fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {

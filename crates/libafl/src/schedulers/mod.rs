@@ -4,7 +4,10 @@ use alloc::{borrow::ToOwned, string::ToString};
 use core::{hash::Hash, marker::PhantomData};
 
 pub mod testcase_score;
-pub use testcase_score::{LenTimeMulTestcasePenalty, TestcasePenalty, TestcaseScore};
+pub use testcase_score::{
+    GitRecencyConfigMetadata, GitRecencyMapMetadata, GitRecencyTestcaseMetadata,
+    GitRecencyTestcaseScore, LenTimeMulTestcasePenalty, TestcasePenalty, TestcaseScore,
+};
 
 pub mod queue;
 pub use queue::QueueScheduler;
@@ -24,7 +27,7 @@ pub mod accounting;
 pub use accounting::CoverageAccountingScheduler;
 
 pub mod weighted;
-pub use weighted::{StdWeightedScheduler, WeightedScheduler};
+pub use weighted::{GitAwareStdWeightedScheduler, StdWeightedScheduler, WeightedScheduler};
 
 pub mod tuneable;
 use libafl_bolts::{
