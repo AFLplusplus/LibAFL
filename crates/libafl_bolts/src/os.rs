@@ -315,4 +315,7 @@ pub fn exit(code: i32) -> ! {
     unsafe {
         windows::Win32::System::Threading::ExitProcess(code as u32);
     }
+    
+    // Fallback for other OSes or if the above fail to diverge
+    loop {}
 }

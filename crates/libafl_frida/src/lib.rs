@@ -395,8 +395,7 @@ mod tests {
 
     #[expect(clippy::too_many_lines)]
     unsafe fn test_asan(options: &FuzzerOptions) {
-        unsafe {
-            // The names of the functions to run
+        // The names of the functions to run
             let tests = vec![
                 ("LLVMFuzzerTestOneInput", None),
                 ("heap_oob_read", Some("heap out-of-bounds read")),
@@ -570,7 +569,6 @@ mod tests {
             frida_helper
                 .borrow_mut()
                 .deinit(GUM.get().expect("Gum uninitialized"));
-        }
     }
 
     #[test]

@@ -287,6 +287,7 @@ jobs:
           # Binary-only
           - binary_only/fuzzbench_fork_qemu
           - binary_only/frida_executable_libpng
+          - binary_only/frida_crash_repro
           # - binary_only/frida_windows_gdiplus
           - binary_only/frida_libpng
           - binary_only/fuzzbench_qemu
