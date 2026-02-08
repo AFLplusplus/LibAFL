@@ -7,8 +7,6 @@ use core::{
 };
 
 #[cfg(feature = "std")]
-use bincode::{Decode, Encode};
-#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
 /// A `SymExprRef` identifies a [`SymExpr`] in a trace.
@@ -27,7 +25,7 @@ pub type SymExprRef = NonZeroUsize;
 /// Therefore, a location is an opaque value that can only be compared against itself.
 ///
 /// It is possible to get at the underlying value using [`Into::into`], should this restriction be too inflexible for your usecase.
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize, Encode, Decode))]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Location(usize);
@@ -59,7 +57,7 @@ impl From<usize> for Location {
 /// `SymExpr` represents a message in the serialization format.
 /// The messages in the format are a perfect mirror of the methods that are called on the runtime during execution.
 #[cfg(feature = "std")]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Encode, Decode)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum SymExpr {
     /// A byte from the input at a specific offset.
     InputByte {
