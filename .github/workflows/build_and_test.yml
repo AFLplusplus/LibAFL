@@ -4,7 +4,7 @@ permissions:
 
 on:
   push:
-    branches: [ main, "pr/**" ]
+    branches: [ main, "pr/**", "fix/**" ]
   pull_request:
     branches: [ main ]
     types: ["labeled", "opened", "synchronize", "reopened"]
