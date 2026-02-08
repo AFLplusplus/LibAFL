@@ -18,7 +18,7 @@ use std::{
 
 use ahash::RandomState;
 use libafl_core::{AsSlice, Error};
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::shmem::{ShMem, ShMemProvider};
 

@@ -9,19 +9,19 @@ use core::{
 use std::process::abort;
 
 use frida_gum::{
-    Gum, MemoryRange, NativePointer,
     stalker::{NoneEventSink, Stalker},
+    Gum, MemoryRange, NativePointer,
 };
 #[cfg(windows)]
 use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks};
 use libafl::{
-    Error,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{Input, ToTargetBytesConverter},
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
+    Error,
 };
-use libafl_bolts::{AsSlice, tuples::RefIndexable};
+use libafl_bolts::{tuples::RefIndexable, AsSlice};
 
 #[cfg(not(test))]
 use crate::asan::errors::AsanErrors;

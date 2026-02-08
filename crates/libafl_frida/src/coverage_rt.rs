@@ -5,8 +5,8 @@ use core::{cell::RefCell, marker::PhantomPinned, pin::Pin};
 
 #[cfg(target_arch = "aarch64")]
 use dynasmrt::DynasmLabelApi;
-use dynasmrt::{DynasmApi, dynasm};
-use frida_gum::{ModuleMap, instruction_writer::InstructionWriter, stalker::StalkerOutput};
+use dynasmrt::{dynasm, DynasmApi};
+use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput, ModuleMap};
 use libafl_bolts::hash_std;
 use rangemap::RangeMap;
 

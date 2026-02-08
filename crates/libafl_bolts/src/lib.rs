@@ -332,7 +332,7 @@ pub fn get_thread_id() -> u64 {
 #[allow(clippy::cast_sign_loss)]
 /// Return thread ID without using TLS
 pub fn get_thread_id() -> u64 {
-    use libc::{SYS_gettid, syscall};
+    use libc::{syscall, SYS_gettid};
 
     unsafe { syscall(SYS_gettid) as u64 }
 }
@@ -641,7 +641,7 @@ pub use nonzero_macros::{nonnull_raw_mut, nonzero, try_nonzero};
 #[allow(missing_docs)] // expect somehow breaks here
 pub mod pybind {
 
-    use pyo3::{Bound, PyResult, pymodule, types::PyModule};
+    use pyo3::{pymodule, types::PyModule, Bound, PyResult};
 
     #[macro_export]
     macro_rules! unwrap_me_body {

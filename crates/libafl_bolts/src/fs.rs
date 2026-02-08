@@ -8,7 +8,7 @@ use core::{
 #[cfg(unix)]
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::{
-    fs::{self, File, OpenOptions, remove_file},
+    fs::{self, remove_file, File, OpenOptions},
     io::{Seek, Write},
     path::{Path, PathBuf},
     sync::OnceLock,
@@ -190,7 +190,7 @@ impl Drop for InputFile {
 mod test {
     use std::fs;
 
-    use crate::fs::{InputFile, write_file_atomic};
+    use crate::fs::{write_file_atomic, InputFile};
 
     #[test]
     fn test_atomic_file_write() {

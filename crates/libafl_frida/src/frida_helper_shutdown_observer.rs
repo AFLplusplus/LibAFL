@@ -1,17 +1,17 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{cell::RefCell, fmt};
 
+#[cfg(feature = "nautilus")]
+use libafl::inputs::NautilusInput;
 use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, Input},
     observers::Observer,
 };
-#[cfg(feature = "nautilus")]
-use libafl::inputs::NautilusInput;
-use libafl_bolts::{Error, Named, ownedref::OwnedSlice};
+use libafl_bolts::{ownedref::OwnedSlice, Error, Named};
 use serde::{
-    Serialize,
     de::{self, Deserialize, Deserializer, MapAccess, Visitor},
+    Serialize,
 };
 
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};

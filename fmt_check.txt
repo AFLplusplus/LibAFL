@@ -1,0 +1,12 @@
+﻿rustup : error: toolchain 'nightly-x86_64-pc-windows-msvc' is 
+not installed
+At line:1 char:1
++ rustup run nightly cargo fmt --check 2>&1 | Out-File 
+-FilePath fmt_ch ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (error: toolchai.. 
+   .s not installed:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+help: run `rustup toolchain install 
+nightly-x86_64-pc-windows-msvc` to install it

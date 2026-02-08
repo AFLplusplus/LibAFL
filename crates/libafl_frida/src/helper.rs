@@ -11,9 +11,9 @@ use std::{
 };
 
 use frida_gum::{
-    Backend, Gum, Module, ModuleMap, Script,
     instruction_writer::InstructionWriter,
     stalker::{StalkerIterator, StalkerOutput, Transformer},
+    Backend, Gum, Module, ModuleMap, Script,
 };
 use frida_gum_sys::gchar;
 use libafl::Error;
@@ -23,7 +23,7 @@ use libafl_bolts::{
 };
 use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
-use nix::sys::mman::{MapFlags, ProtFlags, mmap_anonymous};
+use nix::sys::mman::{mmap_anonymous, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -742,9 +742,16 @@ where
                 ))]
                 if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>() {
                     if let Some((op1, op2, shift, special_case)) =
-                        CmpLogRuntime::cmplog_is_interesting_instruction(decoder, address, instr) 
+                        CmpLogRuntime::cmplog_is_interesting_instruction(decoder, address, instr)
                     {
-                        rt.emit_comparison_handling(address, output, &op1, &op2, &shift, &special_case);
+                        rt.emit_comparison_handling(
+                            address,
+                            output,
+                            &op1,
+                            &op2,
+                            &shift,
+                            &special_case,
+                        );
                     }
                 }
 
@@ -776,6 +783,7 @@ where
                 ));
             }
         }
+    }
 
     /// Clean up all runtimes
     pub fn deinit(&mut self, gum: &Gum) {
