@@ -1,8 +1,6 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{cell::RefCell, fmt};
 
-#[cfg(feature = "nautilus")]
-use libafl::inputs::NautilusInput;
 use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, Input},
@@ -28,13 +26,6 @@ where
 {
     fn target_bytes(&self) -> Option<OwnedSlice<'_, u8>> {
         Some(HasTargetBytes::target_bytes(self))
-    }
-}
-
-#[cfg(feature = "nautilus")]
-impl FridaHelperInput for NautilusInput {
-    fn target_bytes(&self) -> Option<OwnedSlice<'_, u8>> {
-        None
     }
 }
 
