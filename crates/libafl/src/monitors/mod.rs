@@ -51,7 +51,7 @@ pub use statsd::StatsdMonitor;
 pub(crate) fn pizza_is_served() -> bool {
     static PIZZA_IS_SERVED: OnceLock<bool> = OnceLock::new();
     *PIZZA_IS_SERVED.get_or_init(|| {
-        std::env::var("AFL_PIZZA_MODE").map_or(false, |v| v != "0") || {
+        std::env::var("AFL_PIZZA_MODE").is_ok_and(|v| v != "0") || {
             #[cfg(unix)]
             // SAFETY: `localtime` and `time` are standard libc functions. `t` is initialized.
             unsafe {
@@ -405,7 +405,8 @@ mod test {
     #[test]
     #[cfg(feature = "std")]
     fn test_multi_monitor_pizza_mode() {
-        use std::{cell::RefCell, string::String};
+        use alloc::string::String;
+        use core::cell::RefCell;
         let output = RefCell::new(String::new());
         let _monitor = super::MultiMonitor::new(|s| output.borrow_mut().push_str(s));
     }

@@ -213,7 +213,7 @@ pub fn peak_rss_mb_child_processes() -> Result<i64, Error> {
     use core::mem;
     use std::io;
 
-    use libc::{RUSAGE_CHILDREN, rusage};
+    use libc::{rusage, RUSAGE_CHILDREN};
 
     let rss = unsafe {
         let mut rusage = mem::MaybeUninit::<rusage>::uninit();
@@ -298,6 +298,7 @@ pub fn null_fd() -> Result<RawFd, Error> {
 /// On Linux, it uses `SYS_exit_group` to bypass potential deadlocks (like with Frida).
 /// On other Unix systems, it uses `libc::_exit`.
 /// On Windows, it uses `ExitProcess`.
+#[allow(unused_variables)]
 pub fn exit(code: i32) -> ! {
     #[cfg(target_os = "linux")]
     unsafe {
@@ -317,6 +318,6 @@ pub fn exit(code: i32) -> ! {
     }
 
     // Fallback for platforms/configurations where the above fail to diverge
-    #[allow(unreachable_code)]
+    #[allow(unreachable_code, clippy::empty_loop)]
     loop {}
 }
