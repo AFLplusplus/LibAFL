@@ -1,2 +1,2 @@
 doc:
-  DOCS_RS=1 cargo doc --no-deps --features x86_64
+    DOCS_RS=1 cargo doc --no-deps --features x86_64

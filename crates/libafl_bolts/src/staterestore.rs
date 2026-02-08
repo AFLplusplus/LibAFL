@@ -120,7 +120,7 @@ where
         }
 
         let shmem_len = self.shmem.len();
-        let content_ptr = self.content_mut() as *mut StateShMemContent;
+        let content_ptr = ptr::from_mut::<StateShMemContent>(self.content_mut());
         // Calculate available space: shmem.len() - sizeof(StateShMemContent)
         let available = shmem_len
             .checked_sub(size_of::<StateShMemContent>())
@@ -135,8 +135,8 @@ where
                 // Success!
                 let len = bytes.len();
                 unsafe {
-                    ptr::write_volatile(&mut (*content_ptr).buf_len, len);
-                    ptr::write_volatile(&mut (*content_ptr).is_disk, false);
+                    ptr::write_volatile(&raw mut (*content_ptr).buf_len, len);
+                    ptr::write_volatile(&raw mut (*content_ptr).is_disk, false);
                 }
                 Ok(())
             }
@@ -172,8 +172,8 @@ where
                         (*content_ptr).buf.as_mut_ptr(),
                         len,
                     );
-                    ptr::write_volatile(&mut (*content_ptr).buf_len, len);
-                    ptr::write_volatile(&mut (*content_ptr).is_disk, true);
+                    ptr::write_volatile(&raw mut (*content_ptr).buf_len, len);
+                    ptr::write_volatile(&raw mut (*content_ptr).is_disk, true);
                 }
                 Ok(())
             }
@@ -190,8 +190,8 @@ where
             drop(fs::remove_file(tmpfile));
         }
         unsafe {
-            ptr::write_volatile(&mut content_mut.is_disk, false);
-            ptr::write_volatile(&mut content_mut.buf_len, 0);
+            ptr::write_volatile(&raw mut content_mut.is_disk, false);
+            ptr::write_volatile(&raw mut content_mut.buf_len, 0);
         }
     }
 

@@ -4,7 +4,7 @@ FUZZER_NAME := "frida_crash_repro"
 FUZZER_NAME_WIN := "frida_fuzzer.exe"
 
 set windows-shell := ['cmd.exe', '/c']
-set unstable
+set unstable := true
 
 [unix]
 harness:

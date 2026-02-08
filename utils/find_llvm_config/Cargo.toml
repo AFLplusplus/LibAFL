@@ -1,0 +1,13 @@
+[package]
+name = "find_llvm_config"
+version = "0.1.0"
+edition = "2021"
+description = "A standalone binary to find the llvm-config path"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/AFLplusplus/LibAFL"
+readme = "README.md"
+keywords = ["fuzzing", "testing", "llvm"]
+categories = ["development-tools::testing"]
+
+[dependencies]
+libafl_build = { path = "../../crates/libafl_build" }
