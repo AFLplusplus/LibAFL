@@ -46,7 +46,7 @@ jobs:
       - if: runner.os == 'Linux'
         uses: ./.github/workflows/ubuntu-prepare
       - if: runner.os != 'Linux'
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
       - name: Install LLVM
         if: runner.os == 'MacOS'
         run: brew install llvm@${{env.MAIN_LLVM_VERSION}}
@@ -190,8 +190,8 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rustfmt
-      - name: "But default to stable"
-        run: rustup default stable
+      - name: "But default to nightly"
+        run: rustup default nightly
       - name: Check each feature
         # Skipping `python` as it has to be built with the `maturin` tool
         # `sancov_pcguard_edges` is tested seperatelyc
@@ -202,7 +202,7 @@ jobs:
 #    runs-on: ubuntu-24.04
 #    needs: ubuntu
 #    steps:
-#      - uses: dtolnay/rust-toolchain@stable
+#      - uses: dtolnay/rust-toolchain@nightly
 #      - uses: actions/checkout@v4
 #      - uses: Swatinem/rust-cache@v2
 #        with: { shared-key: "ubuntu" }
@@ -260,7 +260,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v3
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: taiki-e/install-action@cargo-hack
       # Note: We currently only specify minimum rust versions for the default workspace members
       - run: just msrv
