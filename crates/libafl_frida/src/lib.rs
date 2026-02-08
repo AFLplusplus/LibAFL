@@ -482,7 +482,7 @@ mod tests {
             let mut feedback = ConstFeedback::new(true);
 
             let asan_obs = AsanErrorsObserver::from_static_asan_errors();
-            let frida_helper_observer = FridaHelperObserver::new(frida_helper.as_ref());
+            let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
             // Feedbacks to recognize an input as solution
             let mut objective = feedback_or_fast!(

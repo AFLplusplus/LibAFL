@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{borrow::Cow, rc::Rc, vec::Vec};
 use core::{cell::RefCell, fmt};
 
 use libafl::{
@@ -35,7 +35,7 @@ where
 /// This is necessary as we don't want to keep the instrumentation around when processing the crash
 pub struct FridaHelperObserver<'a, RT> {
     #[serde(skip)]
-    helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>,
+    helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
 }
 
 impl<'a, RT> FridaHelperObserver<'a, RT>
@@ -44,7 +44,7 @@ where
 {
     /// Creates a new [`FridaHelperObserver`] with the given name.
     #[must_use]
-    pub fn new(helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>) -> Self {
+    pub fn new(helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>) -> Self {
         Self { helper }
     }
 }
