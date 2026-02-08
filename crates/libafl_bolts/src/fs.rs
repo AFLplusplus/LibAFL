@@ -161,10 +161,11 @@ pub fn find_new_files_rec<P: AsRef<Path>>(
 
         if attr.is_file() && attr.len() > 0 {
             if let Ok(time) = attr.modified() {
-                if let Some(last_check) = last_check
-                    && time.duration_since(SystemTime::UNIX_EPOCH).unwrap() < *last_check
-                {
-                    continue;
+                #[allow(clippy::collapsible_if)]
+                if let Some(last_check) = last_check {
+                    if time.duration_since(SystemTime::UNIX_EPOCH).unwrap() < *last_check {
+                        continue;
+                    }
                 }
                 new_files.push(path.clone());
             }
