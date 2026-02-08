@@ -1,9 +1,14 @@
-#![allow(missing_docs)]
-use alloc::{borrow::Cow, rc::Rc};
+use alloc::{borrow::Cow, vec::Vec};
 use core::{cell::RefCell, fmt};
 
-use libafl::{Error, executors::ExitKind, inputs::Input, observers::Observer};
-use libafl_bolts::Named;
+use libafl::{
+    executors::ExitKind,
+    inputs::{HasTargetBytes, Input},
+    observers::Observer,
+};
+#[cfg(feature = "nautilus")]
+use libafl::inputs::NautilusInput;
+use libafl_bolts::{Error, Named, ownedref::OwnedSlice};
 use serde::{
     Serialize,
     de::{self, Deserialize, Deserializer, MapAccess, Visitor},
@@ -11,21 +16,44 @@ use serde::{
 
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 
+/// A trait for inputs that can be used with `FridaHelperObserver`
+pub trait FridaHelperInput: Input {
+    /// Get the target bytes for the input, if available
+    fn target_bytes(&self) -> Option<OwnedSlice<'_, u8>>;
+}
+
+impl<T> FridaHelperInput for T
+where
+    T: Input + HasTargetBytes,
+{
+    fn target_bytes(&self) -> Option<OwnedSlice<'_, u8>> {
+        Some(HasTargetBytes::target_bytes(self))
+    }
+}
+
+#[cfg(feature = "nautilus")]
+impl FridaHelperInput for NautilusInput {
+    fn target_bytes(&self) -> Option<OwnedSlice<'_, u8>> {
+        None
+    }
+}
+
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Serialize, Debug)]
+/// An observer that shuts down the Frida helper upon crash
+/// This is necessary as we don't want to keep the instrumentation around when processing the crash
 pub struct FridaHelperObserver<'a, RT> {
     #[serde(skip)]
-    helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
+    helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>,
 }
 
 impl<'a, RT> FridaHelperObserver<'a, RT>
 where
     RT: FridaRuntimeTuple + 'a,
 {
+    /// Creates a new [`FridaHelperObserver`] with the given name.
     #[must_use]
-    pub fn new(
-        helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
-    ) -> Self {
+    pub fn new(helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>) -> Self {
         Self { helper }
     }
 }
@@ -33,11 +61,16 @@ where
 impl<'a, I, S, RT> Observer<I, S> for FridaHelperObserver<'a, RT>
 where
     RT: FridaRuntimeTuple + 'a,
-    I: Input,
+    I: FridaHelperInput,
 {
-    fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(&mut self, _state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         if *exit_kind == ExitKind::Crash {
-            return self.helper.borrow_mut().post_exec(None);
+            // Custom implementation logic for `FridaInProcessExecutor`
+            log::error!("Custom post_exec called for FridaInProcessExecutorHelper");
+            // Add any custom logic specific to FridaInProcessExecutor
+            let target_bytes = input.target_bytes();
+            let bytes = target_bytes.as_deref().unwrap_or(&[]);
+            return self.helper.borrow_mut().post_exec(bytes);
         }
         Ok(())
     }
@@ -70,6 +103,7 @@ impl<'de, RT> Deserialize<'de> for FridaHelperObserver<'_, RT> {
             where
                 M: MapAccess<'de>,
             {
+                // Construct the struct without deserializing `helper`
                 Err(de::Error::custom(
                     "Cannot deserialize `FridaHelperObserver` with a mutable reference",
                 ))
@@ -78,7 +112,7 @@ impl<'de, RT> Deserialize<'de> for FridaHelperObserver<'_, RT> {
 
         deserializer.deserialize_struct(
             "FridaHelperObserver",
-            &[],
+            &[], // No fields to deserialize
             FridaHelperObserverVisitor {
                 phantom: core::marker::PhantomData,
             },

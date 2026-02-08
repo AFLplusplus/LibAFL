@@ -25,6 +25,7 @@ features = [
   "serdeany_autoreg",
   "track_hit_feedbacks",
   "document-features",
+  "nautilus",
 ]
 
 [features]
@@ -42,6 +43,8 @@ serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 ## If Frida should be automatically downloaded (else you'll have to provide a Frida version to use manually)
 auto-download = ["frida-gum-sys/auto-download", "frida-gum/auto-download"]
+## Enable support for NautilusInput in FridaHelperObserver
+nautilus = ["libafl/nautilus"]
 
 [build-dependencies]
 cc = { workspace = true, features = ["parallel"] }
