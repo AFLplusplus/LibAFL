@@ -43,7 +43,7 @@ runs:
           qemu-user \
           software-properties-common \
           wget
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@nightly
     - name: install just
       uses: extractions/setup-just@v3
     - name: Install cargo-binstall

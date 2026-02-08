@@ -12,6 +12,8 @@ runs:
         submodules: true
         fetch-depth: 0
     - uses: ./.github/workflows/ubuntu-prepare
+      with:
+        use_nightly: 'true'
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"

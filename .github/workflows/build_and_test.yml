@@ -612,6 +612,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
+        with:
+          use_nightly: 'true'
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y g++-powerpc-linux-gnu gcc-powerpc-linux-gnu gdb-multiarch
       - name: Add rust targets
@@ -737,7 +739,7 @@ jobs:
   nostd-clippy:
     runs-on: ubuntu-24.04
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rust-src
       - name: Add targets
@@ -892,7 +894,7 @@ jobs:
     needs:
       - common
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - name: Setup Z3
         id: z3
         uses: cda-tum/setup-z3@v1
@@ -910,7 +912,7 @@ jobs:
   macos:
     runs-on: macOS-latest
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
       - name: Install deps
@@ -931,7 +933,7 @@ jobs:
   ubuntu-cross-android-arm64:
     runs-on: ubuntu-24.04
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25b
