@@ -744,7 +744,6 @@ where
                     if let Some((op1, op2, shift, special_case)) =
                         CmpLogRuntime::cmplog_is_interesting_instruction(decoder, address, instr) 
                     {
-                        //emit code that saves the relevant data in runtime(passes it to x0, x1)
                         rt.emit_comparison_handling(address, output, &op1, &op2, &shift, &special_case);
                     }
                 }
