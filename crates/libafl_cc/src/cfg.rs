@@ -368,25 +368,28 @@ mod tests {
         assert_eq!(entry.calling_func, "main");
         assert_eq!(entry.successor_edges.len(), 2);
         assert_eq!(entry.node_loc, 41864);
-        assert_eq!(entry.successor_edges[0], (41864 >> 1) ^ 52706);
-        assert_eq!(entry.successor_edges[1], (41864 >> 1) ^ 26911);
+        assert_eq!(entry.successor_edges[0], (41864 >> 1) ^ 0xcde2);
+        assert_eq!(entry.successor_edges[1], (41864 >> 1) ^ 0x691f);
 
-        let mut edge = cfg.get_edge((50306 >> 1) ^ 19123).unwrap();
+        let mut edge = cfg.get_edge((50306 >> 1) ^ 0x4ab3).unwrap();
         assert_eq!(edge.calling_func, "_ZN7MyClass1VEi");
         assert_eq!(edge.successor_edges.len(), 0);
         assert_eq!(edge.successor_basic_blocks.len(), 0);
 
-        edge = cfg.get_edge((26911 >> 1) ^ 52706).unwrap();
+        edge = cfg.get_edge((0x691f >> 1) ^ 0xcde2).unwrap();
         assert_eq!(edge.calling_func, "main");
         assert_eq!(edge.successor_edges.len(), 0);
         assert_eq!(edge.successor_basic_blocks.len(), 0);
 
-        edge = cfg.get_edge((41864 >> 1) ^ 26911).unwrap();
+        edge = cfg.get_edge((41864 >> 1) ^ 0x691f).unwrap();
         assert_eq!(edge.calling_func, "main");
         assert_eq!(edge.successor_edges.len(), 2);
-        assert_eq!(*edge.successor_edges.first().unwrap(), (26911 >> 1) ^ 52706);
+        assert_eq!(
+            *edge.successor_edges.first().unwrap(),
+            (0x691f >> 1) ^ 0xcde2
+        );
 
-        assert!(cfg.get_edge(26911).is_none());
+        assert!(cfg.get_edge(0x691f).is_none());
         assert!(cfg.get_edge(41864).is_some());
     }
 
@@ -394,10 +397,10 @@ mod tests {
     #[cfg_attr(miri, ignore)] // Testcase takes too long in miri. :/
     fn test_shortest_path() {
         let cfg: ControlFlowGraph<TestMetadata> = ControlFlowGraph::from_content(TEST_GRAPH_STR);
-        let distances = cfg.calculate_distances_to_all_edges((41864 >> 1) ^ 26911);
-        assert_eq!(*distances.get(&((41864 >> 1) ^ 26911)).unwrap(), 1);
-        assert_eq!(*distances.get(&((26911 >> 1) ^ 52706)).unwrap(), 2);
-        assert_eq!(*distances.get(&((26911 >> 1) ^ 41925)).unwrap(), 2);
-        assert!(!distances.contains_key(&((41864 >> 1) ^ 52706)));
+        let distances = cfg.calculate_distances_to_all_edges((41864 >> 1) ^ 0x691f);
+        assert_eq!(*distances.get(&((41864 >> 1) ^ 0x691f)).unwrap(), 1);
+        assert_eq!(*distances.get(&((0x691f >> 1) ^ 0xcde2)).unwrap(), 2);
+        assert_eq!(*distances.get(&((0x691f >> 1) ^ 0xa3c5)).unwrap(), 2);
+        assert!(!distances.contains_key(&((41864 >> 1) ^ 0xcde2)));
     }
 }

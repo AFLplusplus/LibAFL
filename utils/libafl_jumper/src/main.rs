@@ -98,27 +98,32 @@ fn main() {
 }
 
 /// Main for `no_std` - that's the one we will use inside LibAFL_QEMU.
+///
+/// # Safety
+/// This function will jump to an address given as a string as parameter. The definition of unsafe.
 #[cfg(not(feature = "std"))]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn main(argc: i32, argv: *const *const u8) -> ! {
-    if argc < 2 || argv.is_null() {
-        // No params - nothing we can do.
-        // # Safety
-        // So much crash.
-        libafl_jmp(0x42424242_u32 as _);
+    unsafe {
+        if argc < 2 || argv.is_null() {
+            // No params - nothing we can do.
+            // # Safety
+            // So much crash.
+            libafl_jmp(0x42424242_u32 as _);
+        }
+
+        let arg = argv.add(1);
+        let mut val = *arg;
+
+        if *val == b'0' && *val.add(1) == b'x' || *val.add(1) == b'X' {
+            // strip leading 0x
+            val = val.add(2);
+        }
+
+        let hex_string = CStr::from_ptr(*val as _).to_str().unwrap();
+
+        decode_hex_and_jmp(hex_string);
     }
-
-    let arg = argv.add(1);
-    let mut val = *arg;
-
-    if *val == b'0' && *val.add(1) == b'x' || *val.add(1) == b'X' {
-        // strip leading 0x
-        val = val.add(2);
-    }
-
-    let hex_string = CStr::from_ptr(*val as _).to_str().unwrap();
-
-    decode_hex_and_jmp(hex_string);
 }
 
 fn decode_hex_and_jmp(hex_string: &str) -> ! {

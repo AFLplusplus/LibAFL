@@ -313,6 +313,15 @@ pub fn exit(code: i32) -> ! {
 
     #[cfg(windows)]
     unsafe {
+        #[allow(clippy::cast_sign_loss)]
         windows::Win32::System::Threading::ExitProcess(code as u32);
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        #[cfg(feature = "std")]
+        std::process::exit(code);
+        #[cfg(not(feature = "std"))]
+        panic!("exit called with {code} on unsupported no_std platform");
     }
 }

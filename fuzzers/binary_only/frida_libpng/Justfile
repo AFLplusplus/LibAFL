@@ -4,7 +4,7 @@ FUZZER_NAME := "frida_fuzzer"
 FUZZER_NAME_WIN := "frida_fuzzer.exe"
 
 set windows-shell := ['cmd.exe', '/c']
-set unstable
+set unstable := true
 
 [unix]
 libpng:
@@ -61,7 +61,7 @@ run: build harness
 
 [windows]
 run: build harness
-    {{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME_WIN}} -F LLVMFuzzerTestOneInput -H .\libpng-harness.dll -l .\libpng-harness.dll -l .\zlib.dll -l .\libpng16.dll --cores=0
+    {{ TARGET_DIR }}\{{ PROFILE }}\{{ FUZZER_NAME_WIN }} -F LLVMFuzzerTestOneInput -H .\libpng-harness.dll -l .\libpng-harness.dll -l .\zlib.dll -l .\libpng16.dll --cores=0
 
 [unix]
 test: build harness
@@ -76,10 +76,10 @@ test: build harness
         exit 1
     fi
 
-[windows]
 [script("cmd.exe", "/c")]
+[windows]
 test: build harness
-    start "" "{{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME_WIN}}" -F LLVMFuzzerTestOneInput -H .\libpng-harness.dll -l .\libpng-harness.dll -l .\zlib.dll -l .\libpng16.dll --cores=0
+    start "" "{{ TARGET_DIR }}\{{ PROFILE }}\{{ FUZZER_NAME_WIN }}" -F LLVMFuzzerTestOneInput -H .\libpng-harness.dll -l .\libpng-harness.dll -l .\zlib.dll -l .\libpng16.dll --cores=0
     ping -n 10 127.0.0.1>NUL && taskkill /im frida_fuzzer.exe /F
     dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
 

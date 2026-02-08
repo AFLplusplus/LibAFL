@@ -1,8 +1,9 @@
 import "../../../just/libafl.just"
+
 FUZZER_NAME := "tinyinst_simple"
 
 set windows-shell := ["cmd.exe", "/c"]
-set unstable
+set unstable := true
 
 [linux]
 harness:
@@ -12,17 +13,16 @@ harness:
 harness:
     cl test\test.cpp -o test.exe
 
-
-fuzzer: 
-    cargo build --profile {{PROFILE}}
+fuzzer:
+    cargo build --profile {{ PROFILE }}
 
 run: harness fuzzer
-    cargo run --profile {{PROFILE}}
+    cargo run --profile {{ PROFILE }}
 
 [linux]
 test: harness fuzzer
     #!/bin/bash
-    cp {{TARGET_DIR}}/{{PROFILE_DIR}}/tinyinst_simple .
+    cp {{ TARGET_DIR }}/{{ PROFILE_DIR }}/tinyinst_simple .
     echo "Running tests"
     timeout 5s ./tinyinst_simple || true
     # corpus_discovered folder exists and is not empty
@@ -34,7 +34,7 @@ test: harness fuzzer
 
 [windows]
 test: harness fuzzer
-    copy .\target\{{PROFILE_DIR}}\tinyinst_simple.exe .
+    copy .\target\{{ PROFILE_DIR }}\tinyinst_simple.exe .
     start .\tinyinst_simple.exe
     ping -n 10 127.0.0.1>NUL && taskkill /im tinyinst_simple.exe /F
     dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)

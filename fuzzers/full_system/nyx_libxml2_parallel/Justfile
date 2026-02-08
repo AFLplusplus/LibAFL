@@ -1,4 +1,5 @@
 import "../../../just/libafl.just"
+
 FUZZER_NAME := "nyx_libxml2_parallel"
 
 [unix]
