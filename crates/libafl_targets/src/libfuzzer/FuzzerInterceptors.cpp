@@ -232,3 +232,101 @@ static void fuzzerInit() {
 }
 
 #endif
+
+#include <cstddef>
+#include <cstdint>
+extern "C" {
+
+/* ===================== LLVM libFuzzer ABI hooks ===================== */
+
+// size_t LLVMFuzzerCustomMutator(uint8_t*, size_t, size_t, uint32_t)
+EXT_FUNC_IMPL(
+    LLVMFuzzerCustomMutator,
+    size_t,
+    (uint8_t* data, size_t size, size_t max_size, uint32_t seed),
+    false
+) {
+    // Default libFuzzer behavior: keep input unchanged
+    (void)data;
+    (void)max_size;
+    (void)seed;
+    return size;
+}
+
+// size_t LLVMFuzzerCustomCrossOver(const uint8_t*, size_t,
+//                                  const uint8_t*, size_t,
+//                                  uint8_t*, size_t, uint32_t)
+EXT_FUNC_IMPL(
+    LLVMFuzzerCustomCrossOver,
+    size_t,
+    (const uint8_t* data1, size_t size1,
+     const uint8_t* data2, size_t size2,
+     uint8_t* out, size_t max_out_size, uint32_t seed),
+    false
+) {
+    (void)data1;
+    (void)size1;
+    (void)data2;
+    (void)size2;
+    (void)out;
+    (void)max_out_size;
+    (void)seed;
+    return 0;
+}
+
+// int LLVMFuzzerInitialize(int*, char***)
+EXT_FUNC_IMPL(
+    LLVMFuzzerInitialize,
+    int,
+    (int* argc, char*** argv),
+    false
+) {
+    (void)argc;
+    (void)argv;
+    return 0;
+}
+
+
+/* ===================== LibAFL Rust-facing shims ===================== */
+
+EXT_FUNC_IMPL(
+    libafl_targets_has_libfuzzer_custom_mutator,
+    bool,
+    (void),
+    false
+) {
+    return CHECK_WEAK_FN(LLVMFuzzerCustomMutator);
+}
+
+EXT_FUNC_IMPL(
+    libafl_targets_libfuzzer_custom_mutator,
+    size_t,
+    (uint8_t* data, size_t size, size_t max_size, uint32_t seed),
+    false
+) {
+    return LLVMFuzzerCustomMutator(data, size, max_size, seed);
+}
+
+EXT_FUNC_IMPL(
+    libafl_targets_has_libfuzzer_custom_crossover,
+    bool,
+    (void),
+    false
+) {
+    return CHECK_WEAK_FN(LLVMFuzzerCustomCrossOver);
+}
+
+EXT_FUNC_IMPL(
+    libafl_targets_libfuzzer_custom_crossover,
+    size_t,
+    (const uint8_t* data1, size_t size1,
+     const uint8_t* data2, size_t size2,
+     uint8_t* out, size_t max_out_size, uint32_t seed),
+    false
+) {
+    return LLVMFuzzerCustomCrossOver(
+        data1, size1, data2, size2, out, max_out_size, seed
+    );
+}
+
+} // extern "C"

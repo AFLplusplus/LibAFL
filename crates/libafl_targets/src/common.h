@@ -3,8 +3,10 @@
 
 #include <stdint.h>
 
+#ifndef __cplusplus
 #define true 1
 #define false 0
+#endif
 
 #if !defined(_WIN32) && defined(__SIZEOF_INT128__)
 typedef unsigned __int128 uint128_t;

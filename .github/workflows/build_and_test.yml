@@ -81,6 +81,77 @@ jobs:
         run: just test-serial
 
 
+  macos-libfuzzer-fuzz-test:
+    runs-on: macOS-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install LLVM
+        run: brew install llvm@${{ env.MAIN_LLVM_VERSION }}
+
+      - name: Install llvm-tools
+        run: rustup component add llvm-tools
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "macOS-libfuzzer-fuzz-test"
+
+      - name: Create fuzz project
+        run: cargo fuzz init
+
+      - name: Add fuzz target
+        run: cargo fuzz add parse_cbor
+
+      - name: Force fuzz project to use workspace LibAFL
+        run: |
+            sed -i '' '/libfuzzer-sys = "0.4"/d' fuzz/Cargo.toml
+            sed -i '' '/\[dependencies\]/d' fuzz/Cargo.toml
+            sed -i '' 's|path = ".."|path = "../crates/build_id2"|' fuzz/Cargo.toml
+            printf '%s\n' \
+              '' \
+              '[dependencies]' \
+              'libfuzzer-sys = { package = "libafl_libfuzzer", path = "../crates/libafl_libfuzzer" }' \
+              'libafl_targets = { path = "../crates/libafl_targets", features = ["libfuzzer"] }' \
+              '' \
+              '[workspace]' \
+              >> fuzz/Cargo.toml
+
+      - name: Add dependencies for the PoC
+        run: cd fuzz && cargo add ciborium && cargo add serde --features derive
+
+      - name: Replace fuzz target with PoC from issue 3649
+        run: |
+            printf '%s\n' \
+              '#![no_main]' \
+              '' \
+              'use std::collections::HashMap;' \
+              'use libfuzzer_sys::fuzz_target;' \
+              'use ciborium::from_reader;' \
+              'use serde::{Serialize, Deserialize};' \
+              '' \
+              '#[derive(Debug, Serialize, Deserialize)]' \
+              'struct TestData {' \
+              '    a: Vec<usize>,' \
+              '    b: bool,' \
+              '    c: f32,' \
+              '    d: HashMap<usize, String>,' \
+              '}' \
+              '' \
+              'fuzz_target!(|data: &[u8]| {' \
+              '    if let Ok(td) = from_reader(data) {' \
+              '        let _: TestData = td;' \
+              '    }' \
+              '});' \
+              > fuzz/fuzz_targets/parse_cbor.rs
+
+      - name: Build fuzz target (regression test)
+        run: cd fuzz && cargo +nightly fuzz run -v --target aarch64-apple-darwin parse_cbor -- -runs=1000
+
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
     steps:

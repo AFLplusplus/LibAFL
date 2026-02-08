@@ -157,10 +157,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cargo:rustc-link-search=native={}",
         custom_lib_target.to_str().unwrap()
     );
-    println!("cargo:rustc-link-lib=static=Fuzzer");
+    println!("cargo:rustc-link-lib=static:+whole-archive=Fuzzer");
 
     if cfg!(target_os = "macos") {
         println!("cargo:rustc-link-lib=c++");
+        println!("cargo:rustc-link-arg=-Wl,-u,_libafl_main");
     } else {
         println!("cargo:rustc-link-lib=stdc++");
         println!("cargo:rustc-link-arg=-Wl,--allow-multiple-definition");
