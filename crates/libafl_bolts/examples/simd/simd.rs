@@ -2,11 +2,11 @@ use chrono::Utc;
 use clap::Parser;
 use itertools::Itertools;
 use libafl_bolts::simd::{
-    covmap_is_interesting_naive, covmap_is_interesting_simd, simplify_map_naive, simplify_map_simd,
     AndReducer, MaxReducer, MinReducer, OrReducer, Reducer, SimdAndReducer, SimdMaxReducer,
-    SimdMinReducer, SimdOrReducer, SimdReducer, VectorType,
+    SimdMinReducer, SimdOrReducer, SimdReducer, VectorType, covmap_is_interesting_naive,
+    covmap_is_interesting_simd, simplify_map_naive, simplify_map_simd,
 };
-use rand::{rngs::ThreadRng, RngCore};
+use rand::{RngCore, rngs::ThreadRng};
 
 #[derive(Parser)]
 struct Cli {

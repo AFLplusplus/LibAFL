@@ -213,7 +213,7 @@ pub fn peak_rss_mb_child_processes() -> Result<i64, Error> {
     use core::mem;
     use std::io;
 
-    use libc::{rusage, RUSAGE_CHILDREN};
+    use libc::{RUSAGE_CHILDREN, rusage};
 
     let rss = unsafe {
         let mut rusage = mem::MaybeUninit::<rusage>::uninit();

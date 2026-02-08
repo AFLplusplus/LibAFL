@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::fs::{get_unique_std_input_file, InputFile};
+use crate::fs::{InputFile, get_unique_std_input_file};
 
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin

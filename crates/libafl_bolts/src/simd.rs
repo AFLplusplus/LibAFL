@@ -74,11 +74,7 @@ where
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
-        if first > second {
-            first
-        } else {
-            second
-        }
+        if first > second { first } else { second }
     }
 }
 
@@ -131,11 +127,7 @@ where
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
-        if first < second {
-            first
-        } else {
-            second
-        }
+        if first < second { first } else { second }
     }
 }
 

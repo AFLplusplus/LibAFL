@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, rc::Rc, vec::Vec};
+use alloc::{borrow::Cow, rc::Rc};
 use core::{cell::RefCell, fmt};
 
 use libafl::{

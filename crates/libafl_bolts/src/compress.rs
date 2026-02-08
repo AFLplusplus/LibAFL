@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use miniz_oxide::{
-    deflate::{compress_to_vec, CompressionLevel},
+    deflate::{CompressionLevel, compress_to_vec},
     inflate::decompress_to_vec,
 };
 
