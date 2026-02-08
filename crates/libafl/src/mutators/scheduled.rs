@@ -311,7 +311,12 @@ where
             let mut testcase = (*state.corpus_mut().get(id)?).borrow_mut();
             let mut log = Vec::<Cow<'static, str>>::new();
             while let Some(idx) = self.mutation_log.pop() {
-                let name = self.scheduled.mutations().name(idx.0).unwrap().clone(); // TODO maybe return an Error on None
+                let name = self
+                    .scheduled
+                    .mutations()
+                    .name(idx.0)
+                    .cloned()
+                    .ok_or_else(|| Error::unknown(format!("Missing mutation name for id {}", idx.0)))?;
                 log.push(name);
             }
             let meta = LogMutationMetadata::new(log);
@@ -517,5 +522,40 @@ mod tests {
             };
             assert_ne!(equal_in_a_row, 20);
         }
+    }
+    #[test]
+    fn logger_scheduled_errors_on_missing_name() {
+        use crate::mutators::MutationId;
+        use libafl_bolts::rands::StdRand;
+        use crate::{
+            corpus::{Corpus, InMemoryCorpus, Testcase},
+            feedbacks::ConstFeedback,
+            inputs::BytesInput,
+            mutators::{havoc_mutations::havoc_mutations, scheduled::SingleChoiceScheduledMutator},
+            state::StdState,
+        };
+
+        let rand = StdRand::with_seed(0x1337);
+        let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
+        corpus.add(Testcase::new(b"abc".to_vec().into())).unwrap();
+        let corpus_id = corpus.first().unwrap();
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        ).unwrap();
+
+        let scheduled = SingleChoiceScheduledMutator::new(havoc_mutations());
+        let mut logger = super::LoggerScheduledMutator::new(scheduled);
+
+        // Push an invalid id to trigger the error path
+        logger.mutation_log.push(MutationId(usize::MAX));
+
+        let res = logger.post_exec(&mut state, Some(corpus_id));
+        assert!(res.is_err());
     }
 }
