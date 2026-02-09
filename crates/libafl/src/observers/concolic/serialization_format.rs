@@ -11,10 +11,10 @@
 //! Specifically:
 //! * it requires only constant memory space for serialization, which allows for tracing complex and/or
 //!   long-running programs.
-//! * the trace itself requires little space. A typical binary operation (such as an add) typically takes just a few bytes.
+//! * the trace itself requires little space. A typical binary operation (such as an add) typically takes just a 3 bytes.
 //! * it easy to encode. There is no translation between the interface of the runtime itself and the trace it generates.
 //! * it is similarly easy to decode and can be easily translated into an in-memory AST without overhead, because
-//!   expressions are decoded from leaf to root instead of root to leaf.
+//!   expressions are decoded from leaf to root instead of root to leaf.    
 //! * At its core, it is just [`SymExpr`]s, which can be added to, modified and removed from with ease. The
 //!   definitions are automatically shared between the runtime and the consuming program, since both depend on the same
 //!   `LibAFL`.
@@ -220,6 +220,8 @@ pub struct MessageFileWriter<W> {
     id_counter: usize,
     writer: W,
     writer_start_position: u64,
+    /// Reusable buffer for serialization to avoid per-message allocations
+    serialized_buffer: alloc::vec::Vec<u8>,
 }
 
 impl<W> Debug for MessageFileWriter<W>
@@ -244,6 +246,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             id_counter: 1,
             writer,
             writer_start_position,
+            serialized_buffer: alloc::vec::Vec::new(),
         })
     }
 
@@ -382,10 +385,11 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             }
         }
 
-        // Serialize and write directly with postcard
-        let serialized = postcard::to_allocvec(&message)?;
+        // Serialize into reusable buffer, avoiding per-message allocations
+        self.serialized_buffer.clear();
+        self.serialized_buffer = postcard::to_allocvec(&message)?;
         self.writer
-            .write_all(&serialized)
+            .write_all(&self.serialized_buffer)
             .map_err(|_| PostcardError::SerializeBufferFull)?;
 
         // for every path constraint, make sure we can later decode it in case we crash by updating the trace header
