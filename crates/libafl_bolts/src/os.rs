@@ -298,6 +298,7 @@ pub fn null_fd() -> Result<RawFd, Error> {
 /// On Linux, it uses `SYS_exit_group` to bypass potential deadlocks (like with Frida).
 /// On other Unix systems, it uses `libc::_exit`.
 /// On Windows, it uses `ExitProcess`.
+#[allow(unused_variables)]
 pub fn exit(code: i32) -> ! {
     #[cfg(target_os = "linux")]
     unsafe {

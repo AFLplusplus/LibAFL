@@ -4,7 +4,7 @@ permissions:
 
 on:
   push:
-    branches: [ main, "pr/**" ]
+    branches: [ main, "pr/**", "fix/**" ]
   pull_request:
     branches: [ main ]
     types: ["labeled", "opened", "synchronize", "reopened"]
@@ -45,8 +45,10 @@ jobs:
       - uses: extractions/setup-just@v3
       - if: runner.os == 'Linux'
         uses: ./.github/workflows/ubuntu-prepare
+        with:
+          use_nightly: 'true'
       - if: runner.os != 'Linux'
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
       - name: Install LLVM
         if: runner.os == 'MacOS'
         run: brew install llvm@${{env.MAIN_LLVM_VERSION}}
@@ -86,6 +88,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
+        with:
+          use_nightly: 'true'
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Build Docs
@@ -96,6 +100,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
+        with:
+          use_nightly: 'true'
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Test Docs
@@ -125,6 +131,8 @@ jobs:
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
+        with:
+          use_nightly: 'true'
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
@@ -149,6 +157,8 @@ jobs:
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
+        with:
+          use_nightly: 'true'
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: "ubuntu-clippy"
@@ -182,8 +192,8 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rustfmt
-      - name: "But default to stable"
-        run: rustup default stable
+      - name: "But default to nightly"
+        run: rustup default nightly
       - name: Check each feature
         # Skipping `python` as it has to be built with the `maturin` tool
         # `sancov_pcguard_edges` is tested seperatelyc
@@ -194,7 +204,7 @@ jobs:
 #    runs-on: ubuntu-24.04
 #    needs: ubuntu
 #    steps:
-#      - uses: dtolnay/rust-toolchain@stable
+#      - uses: dtolnay/rust-toolchain@nightly
 #      - uses: actions/checkout@v4
 #      - uses: Swatinem/rust-cache@v2
 #        with: { shared-key: "ubuntu" }
@@ -252,7 +262,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: extractions/setup-just@v3
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: taiki-e/install-action@cargo-hack
       # Note: We currently only specify minimum rust versions for the default workspace members
       - run: just msrv
@@ -291,6 +301,7 @@ jobs:
           # Binary-only
           - binary_only/fuzzbench_fork_qemu
           - binary_only/frida_executable_libpng
+          - binary_only/frida_crash_repro
           # - binary_only/frida_windows_gdiplus
           - binary_only/frida_crash_repro
           - binary_only/frida_libpng
@@ -603,11 +614,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
+        with:
+          use_nightly: 'true'
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y g++-powerpc-linux-gnu gcc-powerpc-linux-gnu gdb-multiarch
       - name: Add rust targets
         shell: bash
-        run: rustup target add --toolchain stable-x86_64-unknown-linux-gnu powerpc-unknown-linux-gnu
+        run: rustup target add --toolchain nightly-x86_64-unknown-linux-gnu powerpc-unknown-linux-gnu
       - name: Build and run utils (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -728,7 +741,7 @@ jobs:
   nostd-clippy:
     runs-on: ubuntu-24.04
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy, rust-src
       - name: Add targets
@@ -883,7 +896,7 @@ jobs:
     needs:
       - common
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - name: Setup Z3
         id: z3
         uses: cda-tum/setup-z3@v1
@@ -901,7 +914,7 @@ jobs:
   macos:
     runs-on: macOS-latest
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
       - name: Install deps
@@ -922,7 +935,7 @@ jobs:
   ubuntu-cross-android-arm64:
     runs-on: ubuntu-24.04
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25b

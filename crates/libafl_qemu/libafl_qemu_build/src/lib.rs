@@ -93,9 +93,14 @@ fn find_llvm_config() -> Result<String, String> {
     }
 
     let rustc_llvm_ver = find_rustc_llvm_version().unwrap();
-    for version in (rustc_llvm_ver..=LLVM_VERSION_MAX).rev() {
+    for version in (14..=LLVM_VERSION_MAX).rev() {
         let llvm_config_name: String = format!("llvm-config-{version}");
         if which(&llvm_config_name).is_ok() {
+            if version < rustc_llvm_ver {
+                println!(
+                    "cargo:warning=Version of llvm-config is {version} but needs to be at least rustc's version ({rustc_llvm_ver})! We will (try to) continue to build. Continue at your own risk, or rebuild with a set LLVM_CONFIG_PATH env variable, pointing to a newer version."
+                );
+            }
             return Ok(llvm_config_name);
         }
     }

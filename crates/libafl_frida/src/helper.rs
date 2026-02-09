@@ -11,9 +11,9 @@ use std::{
 };
 
 use frida_gum::{
-    Backend, Gum, Module, ModuleMap, Script,
     instruction_writer::InstructionWriter,
     stalker::{StalkerIterator, StalkerOutput, Transformer},
+    Backend, Gum, Module, ModuleMap, Script,
 };
 use frida_gum_sys::gchar;
 use libafl::Error;
@@ -23,7 +23,7 @@ use libafl_bolts::{
 };
 use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
-use nix::sys::mman::{MapFlags, ProtFlags, mmap_anonymous};
+use nix::sys::mman::{mmap_anonymous, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -57,9 +57,8 @@ pub trait FridaRuntime: 'static + Debug + core::any::Any {
     fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error>;
 }
 
-/// Use the runtime if closure evaluates to true
 pub struct IfElseRuntime<CB, FR1, FR2> {
-    closure: CB,
+    closure: RefCell<CB>,
     if_runtimes: FR1,
     else_runtimes: FR2,
 }
@@ -76,10 +75,9 @@ where
     }
 }
 impl<CB, FR1, FR2> IfElseRuntime<CB, FR1, FR2> {
-    /// Constructor for this conditionally enabled runtime
     pub fn new(closure: CB, if_runtimes: FR1, else_runtimes: FR2) -> Self {
         Self {
-            closure,
+            closure: RefCell::new(closure),
             if_runtimes,
             else_runtimes,
         }
@@ -98,7 +96,7 @@ where
         ranges: &RangeMap<u64, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     ) {
-        if (self.closure)().unwrap() {
+        if (self.closure.borrow_mut())().unwrap() {
             self.if_runtimes.init_all(gum, ranges, module_map);
         } else {
             self.else_runtimes.init_all(gum, ranges, module_map);
@@ -106,7 +104,7 @@ where
     }
 
     fn deinit(&mut self, gum: &Gum) {
-        if (self.closure)().unwrap() {
+        if (self.closure.borrow_mut())().unwrap() {
             self.if_runtimes.deinit_all(gum);
         } else {
             self.else_runtimes.deinit_all(gum);
@@ -114,7 +112,7 @@ where
     }
 
     fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
-        if (self.closure)()? {
+        if (self.closure.borrow_mut())()? {
             self.if_runtimes.pre_exec_all(input_bytes)
         } else {
             self.else_runtimes.pre_exec_all(input_bytes)
@@ -122,10 +120,33 @@ where
     }
 
     fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
-        if (self.closure)()? {
+        if (self.closure.borrow_mut())()? {
             self.if_runtimes.post_exec_all(input_bytes)
         } else {
             self.else_runtimes.post_exec_all(input_bytes)
+        }
+    }
+}
+
+impl<CB, FR1, FR2> MatchFirstType for IfElseRuntime<CB, FR1, FR2>
+where
+    CB: FnMut() -> Result<bool, Error>,
+    FR1: MatchFirstType,
+    FR2: MatchFirstType,
+{
+    fn match_first_type<T: 'static>(&self) -> Option<&T> {
+        if (self.closure.borrow_mut())().unwrap_or(false) {
+            self.if_runtimes.match_first_type::<T>()
+        } else {
+            self.else_runtimes.match_first_type::<T>()
+        }
+    }
+
+    fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        if (self.closure.borrow_mut())().unwrap_or(false) {
+            self.if_runtimes.match_first_type_mut::<T>()
+        } else {
+            self.else_runtimes.match_first_type_mut::<T>()
         }
     }
 }
@@ -699,54 +720,60 @@ where
                 };
 
                 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                if let Some(details) = res
-                    && let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>()
-                {
-                    let start = output.writer().pc();
-                    rt.emit_shadow_check(
-                        address,
-                        output,
-                        instr.bytes().len(),
-                        details.0,
-                        details.1,
-                        details.2,
-                        details.3,
-                        details.4,
-                    );
-                    log::trace!(
-                        "emitted shadow_check for {:x} at {:x}-{:x}",
-                        address,
-                        start,
-                        output.writer().pc()
-                    );
+                if let Some(details) = res {
+                    if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
+                        let start = output.writer().pc();
+                        rt.emit_shadow_check(
+                            address,
+                            output,
+                            instr.bytes().len(),
+                            details.0,
+                            details.1,
+                            details.2,
+                            details.3,
+                            details.4,
+                        );
+                        log::trace!(
+                            "emitted shadow_check for {:x} at {:x}-{:x}",
+                            address,
+                            start,
+                            output.writer().pc()
+                        );
+                    }
                 }
 
                 #[cfg(target_arch = "aarch64")]
-                if let Some((basereg, indexreg, displacement, width, shift)) = res
-                    && let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>()
-                {
-                    rt.emit_shadow_check(
-                        address,
-                        output,
-                        basereg,
-                        indexreg,
-                        displacement,
-                        width,
-                        shift,
-                    );
+                if let Some((basereg, indexreg, displacement, width, shift)) = res {
+                    if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
+                        rt.emit_shadow_check(
+                            address,
+                            output,
+                            basereg,
+                            indexreg,
+                            displacement,
+                            width,
+                            shift,
+                        );
+                    }
                 }
 
                 #[cfg(all(
                     feature = "cmplog",
                     any(target_arch = "aarch64", target_arch = "x86_64")
                 ))]
-                if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>()
-                    && let Some((op1, op2, shift, special_case)) =
+                if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>() {
+                    if let Some((op1, op2, shift, special_case)) =
                         CmpLogRuntime::cmplog_is_interesting_instruction(decoder, address, instr)
-                //change this as well
-                {
-                    //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                    rt.emit_comparison_handling(address, output, &op1, &op2, &shift, &special_case);
+                    {
+                        rt.emit_comparison_handling(
+                            address,
+                            output,
+                            &op1,
+                            &op2,
+                            &shift,
+                            &special_case,
+                        );
+                    }
                 }
 
                 if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
@@ -762,19 +789,20 @@ where
             }
             instruction.keep();
         }
-        if basic_block_size != 0
-            && let Some(rt) = runtimes_unborrowed
+        if basic_block_size != 0 {
+            if let Some(rt) = runtimes_unborrowed
                 .borrow_mut()
                 .match_first_type_mut::<DrCovRuntime>()
-        {
-            log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
+            {
+                log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
 
-            // We can maybe remove the `basic_block_size as u64`` cast in the future
-            #[allow(trivial_numeric_casts)]
-            rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
-                basic_block_start,
-                basic_block_start + (basic_block_size as u64),
-            ));
+                // We can maybe remove the `basic_block_size as u64`` cast in the future
+                #[allow(trivial_numeric_casts)]
+                rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
+                    basic_block_start,
+                    basic_block_start + (basic_block_size as u64),
+                ));
+            }
         }
     }
 

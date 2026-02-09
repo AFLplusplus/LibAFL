@@ -1,14 +1,33 @@
 use alloc::{borrow::Cow, rc::Rc};
 use core::{cell::RefCell, fmt};
 
-use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::Observer};
-use libafl_bolts::{Error, Named};
+use libafl::{
+    executors::ExitKind,
+    inputs::{HasTargetBytes, Input},
+    observers::Observer,
+};
+use libafl_bolts::{ownedref::OwnedSlice, Error, Named};
 use serde::{
-    Serialize,
     de::{self, Deserialize, Deserializer, MapAccess, Visitor},
+    Serialize,
 };
 
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
+
+/// A trait for inputs that can be used with `FridaHelperObserver`
+pub trait FridaHelperInput: Input {
+    /// Get the target bytes for the input, if available
+    fn target_bytes(&self) -> Option<OwnedSlice<'_, u8>>;
+}
+
+impl<T> FridaHelperInput for T
+where
+    T: Input + HasTargetBytes,
+{
+    fn target_bytes(&self) -> Option<OwnedSlice<'_, u8>> {
+        Some(HasTargetBytes::target_bytes(self))
+    }
+}
 
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Serialize, Debug)]
@@ -16,7 +35,6 @@ use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 /// This is necessary as we don't want to keep the instrumentation around when processing the crash
 pub struct FridaHelperObserver<'a, RT> {
     #[serde(skip)]
-    // helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>,
     helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
 }
 
@@ -26,27 +44,24 @@ where
 {
     /// Creates a new [`FridaHelperObserver`] with the given name.
     #[must_use]
-    pub fn new(
-        // helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>,
-        helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
-    ) -> Self {
+    pub fn new(helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>) -> Self {
         Self { helper }
     }
 }
 
 impl<'a, I, S, RT> Observer<I, S> for FridaHelperObserver<'a, RT>
 where
-    // S: UsesInput,
-    // S::Input: HasTargetBytes,
     RT: FridaRuntimeTuple + 'a,
-    I: HasTargetBytes,
+    I: FridaHelperInput,
 {
     fn post_exec(&mut self, _state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         if *exit_kind == ExitKind::Crash {
             // Custom implementation logic for `FridaInProcessExecutor`
             log::error!("Custom post_exec called for FridaInProcessExecutorHelper");
             // Add any custom logic specific to FridaInProcessExecutor
-            return self.helper.borrow_mut().post_exec(&input.target_bytes());
+            let target_bytes = input.target_bytes();
+            let bytes = target_bytes.as_deref().unwrap_or(&[]);
+            return self.helper.borrow_mut().post_exec(bytes);
         }
         Ok(())
     }
