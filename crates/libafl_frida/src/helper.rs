@@ -59,7 +59,7 @@ pub trait FridaRuntime: 'static + Debug + core::any::Any {
 
 /// Use the runtime if closure evaluates to true
 pub struct IfElseRuntime<CB, FR1, FR2> {
-    closure: CB,
+    closure: RefCell<CB>,
     if_runtimes: FR1,
     else_runtimes: FR2,
 }
@@ -79,7 +79,7 @@ impl<CB, FR1, FR2> IfElseRuntime<CB, FR1, FR2> {
     /// Constructor for this conditionally enabled runtime
     pub fn new(closure: CB, if_runtimes: FR1, else_runtimes: FR2) -> Self {
         Self {
-            closure,
+            closure: RefCell::new(closure),
             if_runtimes,
             else_runtimes,
         }
@@ -98,7 +98,7 @@ where
         ranges: &RangeMap<u64, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     ) {
-        if (self.closure)().unwrap() {
+        if (self.closure.borrow_mut())().unwrap() {
             self.if_runtimes.init_all(gum, ranges, module_map);
         } else {
             self.else_runtimes.init_all(gum, ranges, module_map);
@@ -106,7 +106,7 @@ where
     }
 
     fn deinit(&mut self, gum: &Gum) {
-        if (self.closure)().unwrap() {
+        if (self.closure.borrow_mut())().unwrap() {
             self.if_runtimes.deinit_all(gum);
         } else {
             self.else_runtimes.deinit_all(gum);
@@ -114,7 +114,7 @@ where
     }
 
     fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
-        if (self.closure)()? {
+        if (self.closure.borrow_mut())()? {
             self.if_runtimes.pre_exec_all(input_bytes)
         } else {
             self.else_runtimes.pre_exec_all(input_bytes)
@@ -122,10 +122,33 @@ where
     }
 
     fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
-        if (self.closure)()? {
+        if (self.closure.borrow_mut())()? {
             self.if_runtimes.post_exec_all(input_bytes)
         } else {
             self.else_runtimes.post_exec_all(input_bytes)
+        }
+    }
+}
+
+impl<CB, FR1, FR2> MatchFirstType for IfElseRuntime<CB, FR1, FR2>
+where
+    CB: FnMut() -> Result<bool, Error>,
+    FR1: MatchFirstType,
+    FR2: MatchFirstType,
+{
+    fn match_first_type<T: 'static>(&self) -> Option<&T> {
+        if (self.closure.borrow_mut())().unwrap_or(false) {
+            self.if_runtimes.match_first_type::<T>()
+        } else {
+            self.else_runtimes.match_first_type::<T>()
+        }
+    }
+
+    fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        if (self.closure.borrow_mut())().unwrap_or(false) {
+            self.if_runtimes.match_first_type_mut::<T>()
+        } else {
+            self.else_runtimes.match_first_type_mut::<T>()
         }
     }
 }
