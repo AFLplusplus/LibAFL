@@ -12,7 +12,7 @@ runs:
     - name: Remove old rust
       shell: bash
       run: sudo apt purge -y 'rust*' 'cargo*'
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@nightly
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
@@ -23,5 +23,7 @@ runs:
         submodules: true
         fetch-depth: 0
     - uses: ./.github/workflows/ubuntu-prepare
+      with:
+        use_nightly: 'true'
     - uses: Swatinem/rust-cache@v2
       with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }

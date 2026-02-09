@@ -8,7 +8,7 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "./README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "frida", "instrumentation"]
-edition = "2024"
+edition = "2021"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -25,6 +25,7 @@ features = [
   "serdeany_autoreg",
   "track_hit_feedbacks",
   "document-features",
+  "nautilus",
 ]
 
 [features]
@@ -42,11 +43,32 @@ serdeany_autoreg = ["libafl_bolts/serdeany_autoreg"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 ## If Frida should be automatically downloaded (else you'll have to provide a Frida version to use manually)
 auto-download = ["frida-gum-sys/auto-download", "frida-gum/auto-download"]
+## Enable support for NautilusInput in FridaHelperObserver
+nautilus = ["libafl/nautilus"]
 
 [build-dependencies]
 cc = { workspace = true, features = ["parallel"] }
 
 [dependencies]
+ahash = { workspace = true, default-features = true }
+backtrace = { workspace = true, default-features = false, features = [
+  "std",
+  "serde",
+] }
+color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
+dynasmrt = "4.0.2"
+frida-gum = { version = "0.17.1", features = [
+  "event-sink",
+  "invocation-listener",
+  "module-names",
+  "script",
+  "backtrace",
+] }
+frida-gum-sys = { version = "0.17.1", features = [
+  "event-sink",
+  "invocation-listener",
+] }
+hashbrown = { workspace = true, default-features = true }
 libafl = { workspace = true, features = [
   "std",
   "derive",
@@ -57,36 +79,15 @@ libafl_targets = { workspace = true, default-features = true, features = [
   "std",
   "sancov_cmplog",
 ] }
-
-nix = { workspace = true, default-features = true, features = ["mman"] }
 libc = { workspace = true }
-hashbrown = { workspace = true, default-features = true }
-rangemap = { workspace = true }
-frida-gum-sys = { version = "0.17.1", features = [
-  "event-sink",
-  "invocation-listener",
-] }
-frida-gum = { version = "0.17.1", features = [
-  "event-sink",
-  "invocation-listener",
-  "module-names",
-  "script",
-  "backtrace",
-] }
-dynasmrt = "4.0.2"
-
-color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
-termcolor = "1.4.1"
-serde = { workspace = true, default-features = true }
-backtrace = { workspace = true, default-features = false, features = [
-  "std",
-  "serde",
-] }
-num-traits = { workspace = true, default-features = true }
-ahash = { workspace = true, default-features = true }
-paste = { workspace = true }
 log = { workspace = true }
 mmap-rs = "0.7.0"
+nix = { workspace = true, default-features = true, features = ["mman"] }
+num-traits = { workspace = true, default-features = true }
+paste = { workspace = true }
+rangemap = { workspace = true }
+serde = { workspace = true, default-features = true }
+termcolor = "1.4.1"
 yaxpeax-arch = "0.3.2"
 
 document-features = { workspace = true, optional = true } # Document all features of this crate (for `cargo doc`)

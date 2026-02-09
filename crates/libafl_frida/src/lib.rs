@@ -80,7 +80,7 @@ pub mod frida_helper_shutdown_observer;
 
 // for parsing asan and cmplog cores
 
-use libafl_bolts::core_affinity::{CoreId, Cores, get_core_ids};
+use libafl_bolts::core_affinity::{get_core_ids, CoreId, Cores};
 /// A representation of the various Frida options
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[expect(clippy::struct_excessive_bools)]
@@ -195,30 +195,30 @@ impl FridaOptions {
                 }
             } // end of for loop
 
-            if options.enable_asan
-                && let Some(asan_cores) = asan_cores
-            {
-                let core_ids = get_core_ids().unwrap();
-                assert_eq!(
-                    core_ids.len(),
-                    1,
-                    "Client should only be bound to a single core"
-                );
-                let core_id: CoreId = core_ids[0];
-                options.enable_asan = asan_cores.ids.contains(&core_id);
+            if options.enable_asan {
+                if let Some(asan_cores) = asan_cores {
+                    let core_ids = get_core_ids().unwrap();
+                    assert_eq!(
+                        core_ids.len(),
+                        1,
+                        "Client should only be bound to a single core"
+                    );
+                    let core_id: CoreId = core_ids[0];
+                    options.enable_asan = asan_cores.ids.contains(&core_id);
+                }
             }
             #[cfg(feature = "cmplog")]
-            if options.enable_cmplog
-                && let Some(cmplog_cores) = cmplog_cores
-            {
-                let core_ids = get_core_ids().unwrap();
-                assert_eq!(
-                    core_ids.len(),
-                    1,
-                    "Client should only be bound to a single core"
-                );
-                let core_id = core_ids[0];
-                options.enable_cmplog = cmplog_cores.ids.contains(&core_id);
+            if options.enable_cmplog {
+                if let Some(cmplog_cores) = cmplog_cores {
+                    let core_ids = get_core_ids().unwrap();
+                    assert_eq!(
+                        core_ids.len(),
+                        1,
+                        "Client should only be bound to a single core"
+                    );
+                    let core_id = core_ids[0];
+                    options.enable_cmplog = cmplog_cores.ids.contains(&core_id);
+                }
             }
         }
         options
@@ -360,20 +360,20 @@ mod tests {
     use clap::Parser;
     use frida_gum::Gum;
     use libafl::{
-        Fuzzer, StdFuzzer,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         feedback_and_fast, feedback_or_fast,
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasTargetBytes},
-        mutators::{HavocScheduledMutator, mutations::BitFlipMutator},
+        mutators::{mutations::BitFlipMutator, HavocScheduledMutator},
         schedulers::StdScheduler,
         stages::StdMutationalStage,
         state::{HasSolutions, StdState},
+        Fuzzer, StdFuzzer,
     };
     use libafl_bolts::{
-        AsSlice, SimpleStdoutLogger, cli::FuzzerOptions, rands::StdRand, tuples::tuple_list,
+        cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
     };
     use mimalloc::MiMalloc;
     use serial_test::serial;
@@ -395,182 +395,180 @@ mod tests {
 
     #[expect(clippy::too_many_lines)]
     unsafe fn test_asan(options: &FuzzerOptions) {
-        unsafe {
-            // The names of the functions to run
-            let tests = vec![
-                ("LLVMFuzzerTestOneInput", None),
-                ("heap_oob_read", Some("heap out-of-bounds read")),
-                ("heap_oob_write", Some("heap out-of-bounds write")),
-                ("heap_uaf_write", Some("heap use-after-free write")),
-                ("heap_uaf_read", Some("heap use-after-free read")),
-                ("malloc_heap_oob_read", Some("heap out-of-bounds read")),
-                ("malloc_heap_oob_write", Some("heap out-of-bounds write")),
-                (
-                    "malloc_heap_oob_write_0x12",
-                    Some("heap out-of-bounds write"),
-                ),
-                (
-                    "malloc_heap_oob_write_0x14",
-                    Some("heap out-of-bounds write"),
-                ),
-                (
-                    "malloc_heap_oob_write_0x17",
-                    Some("heap out-of-bounds write"),
-                ),
-                (
-                    "malloc_heap_oob_write_0x17_int_at_0x16",
-                    Some("heap out-of-bounds write"),
-                ),
-                (
-                    "malloc_heap_oob_write_0x17_int_at_0x15",
-                    Some("heap out-of-bounds write"),
-                ),
-                ("malloc_heap_oob_write_0x17_int_at_0x13", None),
-                (
-                    "malloc_heap_oob_write_0x17_int_at_0x14",
-                    Some("heap out-of-bounds write"),
-                ),
-                ("malloc_heap_uaf_write", Some("heap use-after-free write")),
-                ("malloc_heap_uaf_read", Some("heap use-after-free read")),
-                (
-                    "heap_oob_memcpy_read",
-                    Some("function arg resulting in bad read"),
-                ),
-                (
-                    "heap_oob_memcpy_write",
-                    Some("function arg resulting in bad write"),
-                ),
-            ];
+        // The names of the functions to run
+        let tests = vec![
+            ("LLVMFuzzerTestOneInput", None),
+            ("heap_oob_read", Some("heap out-of-bounds read")),
+            ("heap_oob_write", Some("heap out-of-bounds write")),
+            ("heap_uaf_write", Some("heap use-after-free write")),
+            ("heap_uaf_read", Some("heap use-after-free read")),
+            ("malloc_heap_oob_read", Some("heap out-of-bounds read")),
+            ("malloc_heap_oob_write", Some("heap out-of-bounds write")),
+            (
+                "malloc_heap_oob_write_0x12",
+                Some("heap out-of-bounds write"),
+            ),
+            (
+                "malloc_heap_oob_write_0x14",
+                Some("heap out-of-bounds write"),
+            ),
+            (
+                "malloc_heap_oob_write_0x17",
+                Some("heap out-of-bounds write"),
+            ),
+            (
+                "malloc_heap_oob_write_0x17_int_at_0x16",
+                Some("heap out-of-bounds write"),
+            ),
+            (
+                "malloc_heap_oob_write_0x17_int_at_0x15",
+                Some("heap out-of-bounds write"),
+            ),
+            ("malloc_heap_oob_write_0x17_int_at_0x13", None),
+            (
+                "malloc_heap_oob_write_0x17_int_at_0x14",
+                Some("heap out-of-bounds write"),
+            ),
+            ("malloc_heap_uaf_write", Some("heap use-after-free write")),
+            ("malloc_heap_uaf_read", Some("heap use-after-free read")),
+            (
+                "heap_oob_memcpy_read",
+                Some("function arg resulting in bad read"),
+            ),
+            (
+                "heap_oob_memcpy_write",
+                Some("function arg resulting in bad write"),
+            ),
+        ];
 
-            //NOTE: RTLD_NOW is required on linux as otherwise the hooks will NOT work
+        //NOTE: RTLD_NOW is required on linux as otherwise the hooks will NOT work
 
-            #[cfg(target_os = "linux")]
-            let lib = libloading::os::unix::Library::open(
-                Some(options.clone().harness.unwrap()),
-                libloading::os::unix::RTLD_NOW,
+        #[cfg(target_os = "linux")]
+        let lib = libloading::os::unix::Library::open(
+            Some(options.clone().harness.unwrap()),
+            libloading::os::unix::RTLD_NOW,
+        )
+        .unwrap();
+
+        #[cfg(not(target_os = "linux"))]
+        let lib = libloading::Library::new(options.clone().harness.unwrap()).unwrap();
+
+        let coverage = CoverageRuntime::new();
+        let asan = AsanRuntime::new(options);
+        // let mut frida_helper = FridaInstrumentationHelper::new(
+        //     GUM.get().expect("Gum uninitialized"),
+        //     options,
+        //     tuple_list!(coverage, asan),
+        // );
+        let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+            GUM.get().expect("Gum uninitialized"),
+            options,
+            tuple_list!(coverage, asan),
+        )));
+
+        // Run the tests for each function
+        for test in tests {
+            let (function_name, expected_error) = test;
+            log::info!("Testing with harness function {function_name}");
+
+            let mut corpus = InMemoryCorpus::<BytesInput>::new();
+
+            //TODO - make sure we use the right one
+            let testcase = Testcase::new(vec![0; 4].into());
+            corpus.add(testcase).unwrap();
+
+            let rand = StdRand::with_seed(0);
+
+            let mut feedback = ConstFeedback::new(true);
+
+            let asan_obs = AsanErrorsObserver::from_static_asan_errors();
+            let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
+
+            // Feedbacks to recognize an input as solution
+            let mut objective = feedback_or_fast!(
+                // true enables the AsanErrorFeedback
+                feedback_and_fast!(
+                    ConstFeedback::from(true),
+                    AsanErrorsFeedback::new(&asan_obs)
+                )
+            );
+
+            let mut state = StdState::new(
+                rand,
+                corpus,
+                InMemoryCorpus::<BytesInput>::new(),
+                &mut feedback,
+                &mut objective,
             )
             .unwrap();
 
-            #[cfg(not(target_os = "linux"))]
-            let lib = libloading::Library::new(options.clone().harness.unwrap()).unwrap();
+            let mut event_manager = NopEventManager::new();
 
-            let coverage = CoverageRuntime::new();
-            let asan = AsanRuntime::new(options);
-            // let mut frida_helper = FridaInstrumentationHelper::new(
-            //     GUM.get().expect("Gum uninitialized"),
-            //     options,
-            //     tuple_list!(coverage, asan),
-            // );
-            let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
-                GUM.get().expect("Gum uninitialized"),
-                options,
-                tuple_list!(coverage, asan),
-            )));
+            let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
 
-            // Run the tests for each function
-            for test in tests {
-                let (function_name, expected_error) = test;
-                log::info!("Testing with harness function {function_name}");
+            let observers = tuple_list!(
+                frida_helper_observer,
+                asan_obs //,
+            );
 
-                let mut corpus = InMemoryCorpus::<BytesInput>::new();
+            {
+                #[cfg(target_os = "linux")]
+                let target_func: libloading::os::unix::Symbol<
+                    unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
+                > = lib.get(function_name.as_bytes()).unwrap();
 
-                //TODO - make sure we use the right one
-                let testcase = Testcase::new(vec![0; 4].into());
-                corpus.add(testcase).unwrap();
+                #[cfg(not(target_os = "linux"))]
+                let target_func: libloading::Symbol<
+                    unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
+                > = lib.get(function_name.as_bytes()).unwrap();
 
-                let rand = StdRand::with_seed(0);
+                let mut harness = |input: &BytesInput| {
+                    let target = input.target_bytes();
+                    let buf = target.as_slice();
+                    (target_func)(buf.as_ptr(), buf.len());
+                    ExitKind::Ok
+                };
 
-                let mut feedback = ConstFeedback::new(true);
-
-                let asan_obs = AsanErrorsObserver::from_static_asan_errors();
-                let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
-
-                // Feedbacks to recognize an input as solution
-                let mut objective = feedback_or_fast!(
-                    // true enables the AsanErrorFeedback
-                    feedback_and_fast!(
-                        ConstFeedback::from(true),
-                        AsanErrorsFeedback::new(&asan_obs)
+                let mut executor = FridaInProcessExecutor::new(
+                    GUM.get().expect("Gum uninitialized"),
+                    InProcessExecutor::new(
+                        &mut harness,
+                        observers, // tuple_list!(),
+                        &mut fuzzer,
+                        &mut state,
+                        &mut event_manager,
                     )
+                    .unwrap(),
+                    // &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
-                let mut state = StdState::new(
-                    rand,
-                    corpus,
-                    InMemoryCorpus::<BytesInput>::new(),
-                    &mut feedback,
-                    &mut objective,
-                )
-                .unwrap();
+                let mutator = HavocScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
+                let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
+                    mutator,
+                    NonZero::new(1).unwrap()
+                ));
 
-                let mut event_manager = NopEventManager::new();
+                log::info!("Starting fuzzing!");
+                fuzzer
+                    .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
+                    .unwrap_or_else(|err| panic!("Error in fuzz_one: {err:?}"));
 
-                let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
-
-                let observers = tuple_list!(
-                    frida_helper_observer,
-                    asan_obs //,
-                );
-
-                {
-                    #[cfg(target_os = "linux")]
-                    let target_func: libloading::os::unix::Symbol<
-                        unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
-                    > = lib.get(function_name.as_bytes()).unwrap();
-
-                    #[cfg(not(target_os = "linux"))]
-                    let target_func: libloading::Symbol<
-                        unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
-                    > = lib.get(function_name.as_bytes()).unwrap();
-
-                    let mut harness = |input: &BytesInput| {
-                        let target = input.target_bytes();
-                        let buf = target.as_slice();
-                        (target_func)(buf.as_ptr(), buf.len());
-                        ExitKind::Ok
-                    };
-
-                    let mut executor = FridaInProcessExecutor::new(
-                        GUM.get().expect("Gum uninitialized"),
-                        InProcessExecutor::new(
-                            &mut harness,
-                            observers, // tuple_list!(),
-                            &mut fuzzer,
-                            &mut state,
-                            &mut event_manager,
-                        )
-                        .unwrap(),
-                        // &mut frida_helper,
-                        Rc::clone(&frida_helper),
-                    );
-
-                    let mutator = HavocScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
-                    let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
-                        mutator,
-                        NonZero::new(1).unwrap()
-                    ));
-
-                    log::info!("Starting fuzzing!");
-                    fuzzer
-                        .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
-                        .unwrap_or_else(|err| panic!("Error in fuzz_one: {err:?}"));
-
-                    log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
-                    if let Some(expected_error) = expected_error {
-                        assert_eq!(state.solutions().count(), 1);
-                        if let Some(error) = AsanErrors::get_mut_blocking().errors.first() {
-                            assert_eq!(error.description(), expected_error);
-                        }
-                    } else {
-                        assert_eq!(state.solutions().count(), 0);
+                log::info!("Done fuzzing! Got {} solutions", state.solutions().count());
+                if let Some(expected_error) = expected_error {
+                    assert_eq!(state.solutions().count(), 1);
+                    if let Some(error) = AsanErrors::get_mut_blocking().errors.first() {
+                        assert_eq!(error.description(), expected_error);
                     }
+                } else {
+                    assert_eq!(state.solutions().count(), 0);
                 }
             }
-
-            frida_helper
-                .borrow_mut()
-                .deinit(GUM.get().expect("Gum uninitialized"));
         }
+
+        frida_helper
+            .borrow_mut()
+            .deinit(GUM.get().expect("Gum uninitialized"));
     }
 
     #[test]

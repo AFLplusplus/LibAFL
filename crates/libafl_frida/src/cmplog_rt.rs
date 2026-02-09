@@ -30,7 +30,7 @@ use iced_x86::{
     OpKind, Register,
 };
 use libafl::Error;
-use libafl_targets::{CMPLOG_MAP_W, cmps::__libafl_targets_cmplog_instructions};
+use libafl_targets::{cmps::__libafl_targets_cmplog_instructions, CMPLOG_MAP_W};
 use rangemap::RangeMap;
 
 use crate::helper::FridaRuntime;
