@@ -1,7 +1,7 @@
 use alloc::{borrow::Cow, rc::Rc};
 use core::{cell::RefCell, fmt};
 
-use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::Observer};
+use libafl::{executors::ExitKind, inputs::Input, observers::Observer};
 use libafl_bolts::{Error, Named};
 use serde::{
     Serialize,
@@ -36,17 +36,15 @@ where
 
 impl<'a, I, S, RT> Observer<I, S> for FridaHelperObserver<'a, RT>
 where
-    // S: UsesInput,
-    // S::Input: HasTargetBytes,
     RT: FridaRuntimeTuple + 'a,
-    I: HasTargetBytes,
+    I: Input,
 {
-    fn post_exec(&mut self, _state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         if *exit_kind == ExitKind::Crash {
             // Custom implementation logic for `FridaInProcessExecutor`
             log::error!("Custom post_exec called for FridaInProcessExecutorHelper");
             // Add any custom logic specific to FridaInProcessExecutor
-            return self.helper.borrow_mut().post_exec(&input.target_bytes());
+            return self.helper.borrow_mut().post_exec(&[]);
         }
         Ok(())
     }
