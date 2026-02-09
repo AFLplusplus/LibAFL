@@ -88,7 +88,7 @@ spin = { version = "0.10.0", default-features = false, features = [
   "mutex",
   "spin_mutex",
 ] }
-syscalls = { version = "0.7.0", default-features = false, optional = true }
+syscalls = { version = "0.8.1", default-features = false, optional = true }
 thiserror = { version = "2.0.16", default-features = false }
 ahash = { workspace = true, default-features = false }
 hashbrown = { workspace = true, default-features = false }
