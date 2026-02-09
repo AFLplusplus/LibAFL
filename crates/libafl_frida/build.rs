@@ -83,6 +83,7 @@ fn main() {
         let mut cmd = std::process::Command::new(clangpp);
         cmd.args(compiler.args())
             .arg("test_harness.cpp")
+            .arg("-shared")
             .arg("-o")
             .arg(Path::new(&out_dir).join("test_harness.so"))
             .status()
