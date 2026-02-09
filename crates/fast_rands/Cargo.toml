@@ -50,7 +50,7 @@ serde = { workspace = true, default-features = false, features = [
 ] } # serialization lib
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
-rand_core = { version = "0.9.5", optional = true }
+rand_core = { version = "0.10.0", optional = true }
 pyo3 = { workspace = true, optional = true, features = ["serde", "macros"] }
 
 [lints]
