@@ -1,0 +1,49 @@
+   Compiling frida_crash_repro v0.16.0 (/usr/local/google/home/dmnk/tmp/LibAFL/fuzzers/binary_only/frida_crash_repro)
+   Compiling libafl_bolts v0.16.0 (/usr/local/google/home/dmnk/tmp/LibAFL/crates/libafl_bolts)
+   Compiling libafl v0.16.0 (/usr/local/google/home/dmnk/tmp/LibAFL/crates/libafl)
+   Compiling libafl_targets v0.16.0 (/usr/local/google/home/dmnk/tmp/LibAFL/crates/libafl_targets)
+   Compiling libafl_frida v0.16.0 (/usr/local/google/home/dmnk/tmp/LibAFL/crates/libafl_frida)
+warning: unused imports: `HasMetadata` and `Tokens`
+  --> src/fuzzer.rs:20:43
+   |
+20 |         token_mutations::{I2SRandReplace, Tokens},
+   |                                           ^^^^^^
+...
+26 |     Error, HasMetadata,
+   |            ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `frida_helper_observer`
+   --> src/fuzzer.rs:141:13
+    |
+141 |         let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
+    |             ^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_frida_helper_observer`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `frida_crash_repro` (bin "frida_crash_repro") generated 2 warnings (run `cargo fix --bin "frida_crash_repro"` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 33s
+     Running `target/release/frida_crash_repro -H ./test-harness.so -l ./test-harness.so -i ./corpus -p 1374`
+[2026-01-28T02:33:15Z INFO  frida_crash_repro::fuzzer] Frida crash repro fuzzer starting up.
+[2026-01-28T02:33:15Z INFO  libafl::events::launcher] spawning on cores: Cores { cmdline: "0", ids: [CoreId(0)] }
+[2026-01-28T02:33:15Z INFO  libafl::events::launcher] child spawned with id 1 and bound to core CoreId(0)
+[2026-01-28T02:33:15Z INFO  libafl::events::launcher] I am broker!!.
+[2026-01-28T02:33:15Z INFO  libafl::events::restarting] Spawning next client (id 0)
+[2026-01-28T02:33:15Z INFO  libafl::events::launcher] 1233162 PostFork
+DEBUG: StateRestorer::has_content called
+DEBUG: content addr: 0x7f6ebf31a000, buf_len: 0
+[2026-01-28T02:33:15Z INFO  libafl::events::restarting] First run. Let's set it all up
+[2026-01-28T02:33:15Z INFO  ll_mp] LlmpBroker: creating on port 1374
+[2026-01-28T02:33:15Z INFO  ll_mp] LlmpBroker: created inner on port 1374
+[2026-01-28T02:33:15Z INFO  ll_mp] Successfully setup signal handlers
+[2026-01-28T02:33:15Z INFO  ll_mp] New connection: 127.0.0.1:35154/127.0.0.1:35154
+[Objective   #1]  (GLOBAL) run time: 0s, clients: 1, corpus: 0, objectives: 1, executions: 1, exec/sec: 0.000
+                  (CLIENT) corpus: 0, objectives: 1, executions: 1, exec/sec: 0.000
+[Broker Heartbeat #0]  (GLOBAL) run time: 30s, clients: 1, corpus: 0, objectives: 1, executions: 1, exec/sec: 0.033
+                       (CLIENT) corpus: 0, objectives: 0, executions: 0, exec/sec: 0.000
+[Broker Heartbeat #0]  (GLOBAL) run time: 1m-0s, clients: 2, corpus: 0, objectives: 1, executions: 1, exec/sec: 0.017
+                       (CLIENT) corpus: 0, objectives: 0, executions: 0, exec/sec: 0.000
+[2026-01-28T02:34:45Z INFO  libafl::events::launcher] Broker shutting down
+
+Finished fuzzing. Good bye.

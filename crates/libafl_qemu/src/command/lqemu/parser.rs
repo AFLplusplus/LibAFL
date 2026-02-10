@@ -4,7 +4,7 @@ use std::{ffi::CStr, sync::OnceLock};
 
 use enum_map::{EnumMap, enum_map};
 use libafl::{executors::ExitKind, inputs::HasTargetBytes};
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use libafl_qemu_sys::GuestPhysAddr;
 use libafl_qemu_sys::{GuestAddr, GuestVirtAddr};
 use libc::c_uint;
@@ -20,15 +20,15 @@ use crate::{
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
     sync_exit::ExitArgs,
 };
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use crate::{MapKind, command::lqemu::SetMapCommand};
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 pub struct StartPhysCommandParser;
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 impl<C, ET, I, IS, S, SM>
     NativeCommandParser<C, LqemuCommandManager<S>, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for StartPhysCommandParser
@@ -98,7 +98,7 @@ where
             )))
         }
 
-        #[cfg(feature = "systemmode")]
+        #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
         {
             let memory_chunk =
                 QemuMemoryChunk::virt(input_virt_addr, max_input_size, qemu.current_cpu().unwrap());
@@ -288,9 +288,9 @@ where
     }
 }
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 pub struct SetMapCommandParser;
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 impl<C, CM, ET, I, IS, S, SM> NativeCommandParser<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for SetMapCommandParser
 where

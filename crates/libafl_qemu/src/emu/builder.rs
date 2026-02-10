@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use libafl::{inputs::HasTargetBytes, state::HasExecutions};
 use libafl_bolts::tuples::{Append, Prepend, tuple_list};
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use crate::FastSnapshotManager;
 #[cfg(doc)]
 use crate::config::QemuConfig;
@@ -58,7 +58,7 @@ impl<C, I, S>
     }
 }
 
-#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
+#[cfg(feature = "usermode")]
 impl<C, I, S>
     EmulatorBuilder<
         C,
@@ -88,7 +88,7 @@ where
     }
 }
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 impl<C, I, S>
     EmulatorBuilder<
         C,

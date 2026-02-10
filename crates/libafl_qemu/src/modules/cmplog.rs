@@ -360,7 +360,7 @@ impl CmpLogRoutinesModule {
             };
             #[cfg(feature = "systemmode")]
             {
-                qemu.read_mem(pc, code); // TODO handle faults
+                let _ = qemu.read_mem(pc, code); // TODO handle faults
             }
 
             let mut iaddr = pc;
@@ -459,11 +459,13 @@ impl crate::modules::utils::filters::HasPageFilter for CmpLogRoutinesModule {
     type PageFilter = NopPageFilter; // Or StdPageFilter? NopPageFilter is fine for usermode if not used.
 
     #[cfg(feature = "systemmode")]
+    #[allow(static_mut_refs)]
     fn page_filter(&self) -> &Self::PageFilter {
         unsafe { &*crate::modules::utils::filters::NOP_PAGE_FILTER.get() }
     }
 
     #[cfg(feature = "systemmode")]
+    #[allow(static_mut_refs)]
     fn page_filter_mut(&mut self) -> &mut Self::PageFilter {
         unsafe { &mut *crate::modules::utils::filters::NOP_PAGE_FILTER.get() }
     }

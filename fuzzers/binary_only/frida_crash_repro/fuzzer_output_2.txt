@@ -1,0 +1,12 @@
+   Compiling frida_crash_repro v0.16.0 (/usr/local/google/home/dmnk/tmp/LibAFL/fuzzers/binary_only/frida_crash_repro)
+   Compiling libafl v0.16.0 (/usr/local/google/home/dmnk/tmp/LibAFL/crates/libafl)
+error: unused import: `std::fmt::Write`
+   --> /usr/local/google/home/dmnk/tmp/LibAFL/crates/libafl/src/executors/inprocess/mod.rs:411:13
+    |
+411 |         use std::fmt::Write;
+    |             ^^^^^^^^^^^^^^^
+    |
+    = note: `-D unused-imports` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_imports)]`
+
+error: could not compile `libafl` (lib) due to 1 previous error

@@ -12,7 +12,11 @@ use crate::{
 
 #[cfg(not(feature = "nyx"))]
 pub mod lqemu;
-#[cfg(all(not(feature = "nyx"), feature = "systemmode"))]
+#[cfg(all(
+    not(feature = "nyx"),
+    feature = "systemmode",
+    not(feature = "usermode")
+))]
 pub use lqemu::SetMapCommand;
 #[cfg(not(feature = "nyx"))]
 pub use lqemu::{

@@ -1,0 +1,33 @@
+   Compiling frida_crash_repro v0.16.0 (/usr/local/google/home/dmnk/tmp/LibAFL/fuzzers/binary_only/frida_crash_repro)
+warning: unused imports: `HasMetadata` and `Tokens`
+  --> src/fuzzer.rs:20:43
+   |
+20 |         token_mutations::{I2SRandReplace, Tokens},
+   |                                           ^^^^^^
+...
+26 |     Error, HasMetadata,
+   |            ^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `frida_helper_observer`
+   --> src/fuzzer.rs:141:13
+    |
+141 |         let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
+    |             ^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_frida_helper_observer`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `frida_crash_repro` (bin "frida_crash_repro") generated 2 warnings (run `cargo fix --bin "frida_crash_repro"` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 11s
+     Running `target/release/frida_crash_repro -H ./test-harness.so -l ./test-harness.so -i ./corpus -p 1368`
+DEBUG: StateRestorer::has_content called
+DEBUG: content addr: 0x7fcd284e9000, buf_len: 0
+[Objective   #1]  (GLOBAL) run time: 0s, clients: 1, corpus: 0, objectives: 1, executions: 1, exec/sec: 0.000
+                  (CLIENT) corpus: 0, objectives: 1, executions: 1, exec/sec: 0.000
+[Broker Heartbeat #0]  (GLOBAL) run time: 30s, clients: 1, corpus: 0, objectives: 1, executions: 1, exec/sec: 0.033
+                       (CLIENT) corpus: 0, objectives: 0, executions: 0, exec/sec: 0.000
+[Broker Heartbeat #0]  (GLOBAL) run time: 1m-0s, clients: 2, corpus: 0, objectives: 1, executions: 1, exec/sec: 0.017
+                       (CLIENT) corpus: 0, objectives: 0, executions: 0, exec/sec: 0.000
+
+Finished fuzzing. Good bye.

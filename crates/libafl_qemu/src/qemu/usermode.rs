@@ -1,4 +1,4 @@
-#[cfg(not(feature = "systemmode"))]
+#[cfg(not(all(feature = "systemmode", not(feature = "usermode"))))]
 use std::ptr::copy_nonoverlapping;
 use std::{
     ffi::c_void, mem::MaybeUninit, ops::Range, slice::from_raw_parts_mut,
@@ -6,11 +6,11 @@ use std::{
 };
 
 use libafl_bolts::{Error, os::unix_signals::Signal};
-#[cfg(not(feature = "systemmode"))]
+#[cfg(not(all(feature = "systemmode", not(feature = "usermode"))))]
 use libafl_qemu_sys::libafl_qemu_run;
 use libafl_qemu_sys::{
-    GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
-    exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
+    GuestAddr, GuestPhysAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms,
+    VerifyAccess, exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
     libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_set_brk,
     mmap_next_start, pageflags_get_root, read_self_maps,
 };
@@ -187,7 +187,7 @@ impl CPU {
     /// This will read from a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    #[cfg(not(feature = "systemmode"))]
+    #[cfg(not(all(feature = "systemmode", not(feature = "usermode"))))]
     pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
         let host_addr = self.g2h::<u8>(addr);
         unsafe {
@@ -202,7 +202,7 @@ impl CPU {
     /// This will write to a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    #[cfg(not(feature = "systemmode"))]
+    #[cfg(not(all(feature = "systemmode", not(feature = "usermode"))))]
     pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
         let host_addr = self.g2h::<u8>(addr);
         unsafe {
@@ -226,6 +226,10 @@ impl CPU {
             // TODO add support for tagged GuestAddr
             libafl_qemu_sys::page_check_range(addr, size as GuestAddr, kind.into())
         }
+    }
+    #[must_use]
+    pub fn current_paging_id(&self) -> Option<GuestPhysAddr> {
+        None
     }
 }
 
@@ -291,7 +295,7 @@ impl Qemu {
         }
     }
 
-    #[cfg(not(feature = "systemmode"))]
+    #[cfg(not(all(feature = "systemmode", not(feature = "usermode"))))]
     pub(super) unsafe fn run_inner(self) {
         unsafe {
             libafl_qemu_run();
