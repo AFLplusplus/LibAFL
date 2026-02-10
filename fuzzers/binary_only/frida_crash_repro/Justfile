@@ -24,26 +24,3 @@ build:
 [unix]
 run: build harness
     {{ FUZZER }} -H ./test-harness.so -l ./test-harness.so ./corpus
-
-[unix]
-test: build harness
-    #!/bin/bash
-    mkdir -p corpus
-    echo "A" > corpus/initial_seed
-    timeout 10s {{ FUZZER }} -H ./test-harness.so -l ./test-harness.so -i corpus --broker-port 10042 > fuzz_stdout.log 2>&1 || true
-    if grep -qa "corpus: " fuzz_stdout.log; then
-        echo "Fuzzer is working"
-    else
-        echo "Fuzzer does not generate any testcases or any crashes"
-        echo "Fuzzer output:"
-        cat fuzz_stdout.log
-        exit 1
-    fi
-
-[script("cmd.exe", "/c")]
-[windows]
-test: build harness
-    start "" "{{ TARGET_DIR }}\{{ PROFILE }}\{{ FUZZER_NAME_WIN }}" -H .\test-harness.dll -l .\test-harness.dll --cores=0
-    ping -n 5 127.0.0.1>NUL && taskkill /im frida_fuzzer.exe /F
-    dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
-

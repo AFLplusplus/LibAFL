@@ -17,13 +17,13 @@ use libafl::{
     mutators::{
         havoc_mutations::havoc_mutations,
         scheduled::{tokens_mutations, HavocScheduledMutator},
-        token_mutations::I2SRandReplace,
+        token_mutations::{I2SRandReplace, Tokens},
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{IfElseStage, ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
-    Error,
+    Error, HasMetadata,
 };
 use libafl_bolts::{
     cli::{parse_args, FuzzerOptions},
