@@ -38,13 +38,13 @@ pub(crate) mod usermode;
 #[cfg(feature = "usermode")]
 pub use usermode::*;
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 pub(crate) mod systemmode;
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 pub use systemmode::StdSnapshotManager;
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 pub use systemmode::*;
-#[cfg(all(feature = "usermode", not(feature = "systemmode")))]
+#[cfg(feature = "usermode")]
 pub use usermode::StdSnapshotManager;
 
 use crate::config::QemuConfigBuilder;

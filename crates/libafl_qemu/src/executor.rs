@@ -34,7 +34,7 @@ use libafl_bolts::{
     os::unix_signals::{Signal, ucontext_t},
     tuples::RefIndexable,
 };
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use libafl_qemu_sys::libafl_exit_request_timeout;
 use libc::siginfo_t;
 
@@ -179,7 +179,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
     I: Input,
     Z: HasObjective<Objective = OF>,
 {
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     unsafe {
         if BREAK_ON_TMOUT.load(Ordering::Acquire) {
             libafl_exit_request_timeout();

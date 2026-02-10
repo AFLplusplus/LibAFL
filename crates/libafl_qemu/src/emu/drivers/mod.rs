@@ -1,18 +1,18 @@
 //! Emulator Drivers, as the name suggests, drive QEMU execution
 //! They are used to perform specific actions on the emulator before and / or after QEMU runs.
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use std::collections::HashMap;
 use std::{cell::OnceCell, fmt::Debug};
 
 use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::ObserversTuple};
 use libafl_bolts::os::{CTRL_C_EXIT, unix_signals::Signal};
 
-#[cfg(not(feature = "systemmode"))]
+#[cfg(not(all(feature = "systemmode", not(feature = "usermode"))))]
 use crate::InputLocation;
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use crate::PhysMemoryChunk;
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use crate::emu::systemmode::SystemInputLocation as InputLocation;
 use crate::{
     Emulator, EmulatorExitError, EmulatorExitResult, IsSnapshotManager, Qemu, QemuError,
@@ -185,7 +185,7 @@ pub enum MapKind {
 pub struct StdEmulatorDriverBuilder<IS> {
     input_setter: IS,
     hooks_locked: bool,
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     allow_page_on_start: bool,
     #[cfg(feature = "x86_64")]
     process_only: bool,
@@ -200,7 +200,7 @@ where
         Self {
             input_setter: IS::default(),
             hooks_locked: true,
-            #[cfg(feature = "systemmode")]
+            #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
             allow_page_on_start: false,
             #[cfg(feature = "x86_64")]
             process_only: false,
@@ -214,14 +214,14 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
     pub fn new(
         input_setter: IS,
         hooks_locked: bool,
-        #[cfg(feature = "systemmode")] allow_page_on_start: bool,
+        #[cfg(all(feature = "systemmode", not(feature = "usermode")))] allow_page_on_start: bool,
         #[cfg(feature = "x86_64")] process_only: bool,
         print_commands: bool,
     ) -> Self {
         Self {
             input_setter,
             hooks_locked,
-            #[cfg(feature = "systemmode")]
+            #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
             allow_page_on_start,
             #[cfg(feature = "x86_64")]
             process_only,
@@ -233,7 +233,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
         StdEmulatorDriverBuilder::new(
             input_setter,
             self.hooks_locked,
-            #[cfg(feature = "systemmode")]
+            #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
             self.allow_page_on_start,
             #[cfg(feature = "x86_64")]
             self.process_only,
@@ -246,7 +246,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
         Self::new(
             self.input_setter,
             hooks_locked,
-            #[cfg(feature = "systemmode")]
+            #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
             self.allow_page_on_start,
             #[cfg(feature = "x86_64")]
             self.process_only,
@@ -254,7 +254,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
         )
     }
 
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     #[must_use]
     pub fn allow_page_on_start(self, allow_page_on_start: bool) -> Self {
         Self::new(
@@ -273,7 +273,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
         Self::new(
             self.input_setter,
             self.hooks_locked,
-            #[cfg(feature = "systemmode")]
+            #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
             self.allow_page_on_start,
             process_only,
             self.print_commands,
@@ -285,7 +285,7 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
         Self::new(
             self.input_setter,
             self.hooks_locked,
-            #[cfg(feature = "systemmode")]
+            #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
             self.allow_page_on_start,
             #[cfg(feature = "x86_64")]
             self.process_only,
@@ -298,12 +298,12 @@ impl<IS> StdEmulatorDriverBuilder<IS> {
             input_setter: self.input_setter,
             snapshot_id: OnceCell::new(),
             hooks_locked: self.hooks_locked,
-            #[cfg(feature = "systemmode")]
+            #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
             allow_page_on_start: self.allow_page_on_start,
             #[cfg(feature = "x86_64")]
             process_only: self.process_only,
             print_commands: self.print_commands,
-            #[cfg(feature = "systemmode")]
+            #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
             maps: HashMap::new(),
         }
     }
@@ -315,13 +315,13 @@ pub struct GenericEmulatorDriver<IS> {
     input_setter: IS,
     snapshot_id: OnceCell<SnapshotId>,
     hooks_locked: bool,
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     allow_page_on_start: bool,
     #[cfg(feature = "x86_64")]
     process_only: bool,
     print_commands: bool,
     // maps declared by the VM
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     maps: HashMap<MapKind, PhysMemoryChunk>,
 }
 
@@ -377,7 +377,7 @@ impl<IS> GenericEmulatorDriver<IS> {
         was_locked
     }
 
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     pub fn allow_page_on_start(&self) -> bool {
         self.allow_page_on_start
     }
@@ -387,12 +387,12 @@ impl<IS> GenericEmulatorDriver<IS> {
         self.process_only
     }
 
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     pub fn maps(&self) -> &HashMap<MapKind, PhysMemoryChunk> {
         &self.maps
     }
 
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     pub fn maps_mut(&mut self) -> &mut HashMap<MapKind, PhysMemoryChunk> {
         &mut self.maps
     }

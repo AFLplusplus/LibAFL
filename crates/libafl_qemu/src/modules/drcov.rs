@@ -16,7 +16,7 @@ use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
 use super::utils::filters::HasAddressFilter;
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use crate::modules::utils::filters::{HasPageFilter, NOP_PAGE_FILTER, NopPageFilter};
 use crate::{
     Qemu,
@@ -332,7 +332,7 @@ where
         }
     }
 
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     fn first_exec<ET>(
         &mut self,
         _qemu: Qemu,
@@ -563,7 +563,7 @@ where
     }
 }
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 impl<F> HasPageFilter for DrCovModule<F> {
     type PageFilter = NopPageFilter;
 

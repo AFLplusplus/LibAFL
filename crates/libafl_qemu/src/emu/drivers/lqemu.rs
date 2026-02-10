@@ -3,9 +3,9 @@ use std::cell::OnceCell;
 use libafl::inputs::HasTargetBytes;
 use libafl_bolts::AsSlice;
 
-#[cfg(not(feature = "systemmode"))]
+#[cfg(not(all(feature = "systemmode", not(feature = "usermode"))))]
 use crate::InputLocation;
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use crate::emu::systemmode::SystemInputLocation as InputLocation;
 use crate::{GuestReg, Qemu};
 

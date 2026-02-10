@@ -7,7 +7,7 @@ use std::{
 use enum_map::Enum;
 use libafl::{executors::ExitKind, inputs::HasTargetBytes};
 use libafl_qemu_sys::GuestAddr;
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use libafl_qemu_sys::GuestPhysAddr;
 use num_enum::TryFromPrimitive;
 use paste::paste;
@@ -18,13 +18,13 @@ use parser::{
     StartVirtCommandParser, TestCommandParser, VaddrFilterAllowRangeCommandParser,
     VersionCommandParser,
 };
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use parser::{SetMapCommandParser, StartPhysCommandParser};
 
 use super::{CommandError, IsCommand, IsStdCommandManager};
-#[cfg(not(feature = "systemmode"))]
+#[cfg(not(all(feature = "systemmode", not(feature = "usermode"))))]
 use crate::InputLocation;
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use crate::emu::systemmode::SystemInputLocation as InputLocation;
 use crate::{
     Emulator, EmulatorDriverError, EmulatorDriverResult, EmulatorExitResult, GenericEmulatorDriver,
@@ -32,7 +32,7 @@ use crate::{
     define_std_command_manager_inner,
     modules::{EmulatorModuleTuple, utils::filters::HasStdFiltersTuple},
 };
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use crate::{MapKind, QemuMemoryChunk};
 
 pub const VERSION_MAJOR: u64 = libvharness_sys::LQEMU_VERSION_MAJOR as u64;
@@ -64,7 +64,7 @@ define_std_command_manager_bound!(
     ]
 );
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 define_std_command_manager_bound!(
     LqemuCommandManager,
     HasTargetBytes,
@@ -205,7 +205,7 @@ where
                 .set_input_location(self.input_location.clone())?;
 
             // Auto page filtering if option is enabled
-            #[cfg(feature = "systemmode")]
+            #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
             if emu.driver_mut().allow_page_on_start()
                 && let Some(paging_id) = qemu.current_cpu().unwrap().current_paging_id()
             {
@@ -304,13 +304,13 @@ impl<C, CM, ED, ET, I, S, SM> IsCommand<C, CM, ED, ET, I, S, SM> for VersionComm
     }
 }
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 #[derive(Debug, Clone)]
 pub struct PageAllowCommand {
     page_id: GuestPhysAddr,
 }
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 impl<C, CM, ED, ET, I, S, SM> IsCommand<C, CM, ED, ET, I, S, SM> for PageAllowCommand
 where
     ET: EmulatorModuleTuple<I, S> + HasStdFiltersTuple,
@@ -413,14 +413,14 @@ where
     }
 }
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 #[derive(Debug, Clone)]
 pub struct SetMapCommand {
     kind: MapKind,
     map: QemuMemoryChunk,
 }
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 impl<C, CM, ET, I, IS, S, SM> IsCommand<C, CM, GenericEmulatorDriver<IS>, ET, I, S, SM>
     for SetMapCommand
 where
@@ -454,7 +454,7 @@ where
     }
 }
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 impl SetMapCommand {
     #[must_use]
     pub fn new(kind: MapKind, map: QemuMemoryChunk) -> Self {
@@ -529,7 +529,7 @@ impl Display for AddressAllowCommand {
     }
 }
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 impl Display for PageAllowCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Allowed page: {:?}", self.page_id)

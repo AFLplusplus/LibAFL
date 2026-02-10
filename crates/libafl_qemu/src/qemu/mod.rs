@@ -17,7 +17,7 @@ use std::{
     sync::OnceLock,
 };
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use libafl_bolts::Error;
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{
@@ -28,7 +28,7 @@ use libafl_qemu_sys::{
     libafl_qemu_remove_breakpoint, libafl_qemu_set_breakpoint, libafl_qemu_trigger_breakpoint,
     libafl_qemu_write_reg,
 };
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 use libafl_qemu_sys::{libafl_qemu_remove_hw_breakpoint, libafl_qemu_set_hw_breakpoint};
 use num_traits::Num;
 use strum::IntoEnumIterator;
@@ -48,9 +48,9 @@ mod usermode;
 #[cfg(feature = "usermode")]
 pub use usermode::*;
 
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 mod systemmode;
-#[cfg(feature = "systemmode")]
+#[cfg(all(feature = "systemmode", not(feature = "usermode")))]
 pub use systemmode::*;
 
 mod hooks;
@@ -597,7 +597,7 @@ impl Qemu {
             libafl_qemu_init(argc, argv.as_ptr() as *mut *mut ::std::os::raw::c_char);
         }
 
-        #[cfg(feature = "systemmode")]
+        #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
         unsafe {
             libafl_qemu_sys::syx_snapshot_init(true);
             libc::atexit(qemu_cleanup_atexit);
@@ -715,7 +715,7 @@ impl Qemu {
                 },
                 libafl_qemu_sys::libafl_exit_reason_kind_CUSTOM_INSN => QemuExitReason::SyncExit,
 
-                #[cfg(feature = "systemmode")]
+                #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
                 libafl_qemu_sys::libafl_exit_reason_kind_TIMEOUT => QemuExitReason::Timeout,
 
                 libafl_qemu_sys::libafl_exit_reason_kind_CRASH => QemuExitReason::Crash,
@@ -914,7 +914,7 @@ impl Qemu {
         }
     }
 
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     pub fn set_hw_breakpoint(&self, addr: GuestAddr) -> Result<(), Error> {
         let ret = unsafe { libafl_qemu_set_hw_breakpoint(addr as GuestVirtAddr) };
         match ret {
@@ -925,7 +925,7 @@ impl Qemu {
         }
     }
 
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     pub fn remove_hw_breakpoint(&self, addr: GuestAddr) -> Result<(), Error> {
         let ret = unsafe { libafl_qemu_remove_hw_breakpoint(addr as GuestVirtAddr) };
         match ret {
@@ -1199,7 +1199,7 @@ impl QemuMemoryChunk {
                     // For now the default behaviour is to fall back to virtual addresses
                     qemu.read_mem(hwaddr.try_into().unwrap(), output_sliced)?;
                 }
-                #[cfg(feature = "systemmode")]
+                #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
                 unsafe {
                     qemu.read_phys_mem(hwaddr, output_sliced);
                 }
@@ -1218,7 +1218,7 @@ impl QemuMemoryChunk {
     /// If the underlying memory cannot be represented as a slice
     /// (for example, if the memory is fragmented in the host address space),
     /// [`None`] is returned.
-    #[cfg(feature = "systemmode")]
+    #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
     #[must_use]
     pub fn to_phys_mem_chunk(&self, qemu: Qemu) -> Option<PhysMemoryChunk> {
         match self.addr {
@@ -1283,7 +1283,7 @@ impl QemuMemoryChunk {
                     // For now the default behaviour is to fall back to virtual addresses
                     qemu.write_mem(hwaddr.try_into().unwrap(), input_sliced)?;
                 }
-                #[cfg(feature = "systemmode")]
+                #[cfg(all(feature = "systemmode", not(feature = "usermode")))]
                 unsafe {
                     qemu.write_phys_mem(hwaddr, input_sliced);
                 }
