@@ -2705,12 +2705,12 @@ impl AsanRuntime {
         decoder: InstDecoder,
         address: u64,
         instr: &Insn,
-    ) -> Option<(u8, X86Register, X86Register, u8, i32)> {
+    ) -> Vec<(u8, X86Register, X86Register, u8, i32)> {
         let result = frida_to_cs(decoder, instr);
 
         if let Err(e) = result {
             log::error!("{e}");
-            return None;
+            return vec![];
         }
 
         let cs_instr = result.unwrap();
@@ -2724,19 +2724,14 @@ impl AsanRuntime {
         // put nop into the white-list so that instructions like
         // like `nop dword [rax + rax]` does not get caught.
         match cs_instr.opcode() {
-            Opcode::LEA | Opcode::NOP => return None,
+            Opcode::LEA | Opcode::NOP => return vec![],
 
             _ => (),
         }
 
-        // This is a TODO! In this case, both the src and the dst are mem operand
-        // so we would need to return two operadns?
-        if cs_instr.prefixes.rep_any() {
-            return None;
-        }
-
         log::trace!("{:#x} {:#?} {:#?}", address, cs_instr, cs_instr.to_string());
 
+        let mut res = vec![];
         for operand in operands {
             if operand.is_memory() {
                 // log::trace!("{:#?}", operand);
@@ -2753,13 +2748,23 @@ impl AsanRuntime {
                         // println!("{:#?}", (memsz, basereg, indexreg, scale, disp));
                         log::trace!("ASAN Interesting operand {operand:#?}");
                         log::trace!("{:#?}", (memsz, basereg, indexreg, scale, disp));
-                        return Some((memsz, basereg, indexreg, scale, disp));
+                        res.push((memsz, basereg, indexreg, scale, disp));
+                        
+                        if cs_instr.prefixes.rep_any() && indexreg == X86Register::None {
+                            // if the instruction has a rep prefix and does not have an index
+                            // register, then it accesses memory for a contiguous range of addresses.
+                            // we need to check the last accessed address in the range as well
+                            // target address to check is given by base + (RCX * scale) + disp - width
+
+                            let width = memsz as i32;
+                            res.push((memsz, basereg, X86Register::Rcx, scale, disp - width));
+                        }
                     }
                 } // else {} // perhaps avx instructions?
             }
         }
 
-        None
+        res
     }
 
     // FIXME: later for x86
@@ -2771,12 +2776,12 @@ impl AsanRuntime {
         decoder: InstDecoder,
         address: u64,
         instr: &Insn,
-    ) -> Option<(u8, X86Register, X86Register, u8, i32)> {
+    ) -> Vec<(u8, X86Register, X86Register, u8, i32)> {
         let result = frida_to_cs(decoder, instr);
 
         if let Err(e) = result {
             log::error!("{e}");
-            return None;
+            return vec![];
         }
 
         let cs_instr = result.unwrap();
@@ -2790,19 +2795,14 @@ impl AsanRuntime {
         // put nop into the white-list so that instructions like
         // like `nop dword [rax + rax]` does not get caught.
         match cs_instr.opcode() {
-            Opcode::LEA | Opcode::NOP => return None,
+            Opcode::LEA | Opcode::NOP => return vec![],
 
             _ => (),
         }
 
-        // This is a TODO! In this case, both the src and the dst are mem operand
-        // so we would need to return two operadns?
-        if cs_instr.prefixes.rep_any() {
-            return None;
-        }
-
         log::trace!("{:#x} {:#?} {:#?}", address, cs_instr, cs_instr.to_string());
 
+        let mut res = vec![];
         for operand in operands {
             if operand.is_memory() {
                 // log::trace!("{:#?}", operand);
@@ -2819,13 +2819,23 @@ impl AsanRuntime {
                         // println!("{:#?}", (memsz, basereg, indexreg, scale, disp));
                         log::trace!("ASAN Interesting operand {operand:#?}");
                         log::trace!("{:#?}", (memsz, basereg, indexreg, scale, disp));
-                        return Some((memsz, basereg, indexreg, scale, disp));
+                        res.push((memsz, basereg, indexreg, scale, disp));
+                        
+                        if cs_instr.prefixes.rep_any() && indexreg == X86Register::None {
+                            // if the instruction has a rep prefix and does not have an index
+                            // register, then it accesses memory for a contiguous range of addresses.
+                            // we need to check the last accessed address in the range as well
+                            // target address to check is given by base + (RCX * scale) + disp - width
+
+                            let width = memsz as i32;
+                            res.push((memsz, basereg, X86Register::Rcx, scale, disp - width));
+                        }
                     }
                 } // else {} // perhaps avx instructions?
             }
         }
 
-        None
+        res
     }
 
     /// Emits a asan shadow byte check.
