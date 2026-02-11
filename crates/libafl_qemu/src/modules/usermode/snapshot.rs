@@ -39,6 +39,9 @@ pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 pub const SNAPSHOT_PAGE_ZEROES: [u8; SNAPSHOT_PAGE_SIZE] = [0; SNAPSHOT_PAGE_SIZE];
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
 
+// Linux error codes can be up to -255
+pub const LINUX_ERROR_CODE_CUTOFF: u64 = 0xFFFFFFFFFFFFFF00;
+
 pub type StopExecutionCallback = Box<dyn FnMut(&mut SnapshotModule, Qemu)>;
 
 #[derive(Debug, Clone)]
@@ -938,17 +941,19 @@ where
     I: Unpin,
     S: Unpin,
 {
+    // Make sure the syscall executed successfully otherwise every access based on 
+    // the result will be incorrect 
+    if result >= LINUX_ERROR_CODE_CUTOFF {
+        return result;
+    }
+
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
     match i64::from(sys_num) {
         SYS_read | SYS_pread64 => {
             let h = get_snapshot_module_mut(emulator_modules).unwrap();
-            /*
-             * Only note the access if the call is successful. And only mark the
-             * portion of the buffer which has actually been modified.
-             */
-            if result != GuestAddr::MAX {
-                h.access(a1, result as usize);
-            }
+            
+            // Only mark the portion of the buffer which has actually been modified.
+            h.access(a1, result as usize);
         }
         SYS_readlinkat => {
             let h = get_snapshot_module_mut(emulator_modules).unwrap();
@@ -957,7 +962,7 @@ where
         #[cfg(not(cpu_target = "riscv32"))]
         SYS_futex => {
             let h = get_snapshot_module_mut(emulator_modules).unwrap();
-            h.access(a0, a3 as usize);
+            h.access(a0, 4);
         }
         #[cfg(not(any(
             cpu_target = "arm",
@@ -995,12 +1000,6 @@ where
         }
         // mmap syscalls
         sys_const => {
-            if result == GuestAddr::MAX
-            /* -1 */
-            {
-                return result;
-            }
-
             // TODO handle huge pages
 
             #[cfg(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "riscv32"))]
