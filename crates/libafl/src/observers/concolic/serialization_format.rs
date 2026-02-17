@@ -220,8 +220,6 @@ pub struct MessageFileWriter<W> {
     id_counter: usize,
     writer: W,
     writer_start_position: u64,
-    /// Reusable buffer for serialization to avoid per-message allocations
-    serialized_buffer: alloc::vec::Vec<u8>,
 }
 
 impl<W> Debug for MessageFileWriter<W>
@@ -246,7 +244,6 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             id_counter: 1,
             writer,
             writer_start_position,
-            serialized_buffer: alloc::vec::Vec::new(),
         })
     }
 
@@ -385,12 +382,22 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             }
         }
 
-        // Serialize into reusable buffer, avoiding per-message allocations
-        self.serialized_buffer.clear();
-        self.serialized_buffer = postcard::to_allocvec(&message)?;
-        self.writer
-            .write_all(&self.serialized_buffer)
-            .map_err(|_| PostcardError::SerializeBufferFull)?;
+        // using stack buffer for small messages, to avoid per-message heap allocation using to_allocvec
+        let mut stack_buf = [0u8; 1024];
+        match postcard::to_slice(&message, &mut stack_buf) {
+            Ok(serialized) => {
+                self.writer
+                    .write_all(serialized)
+                    .map_err(|_| PostcardError::SerializeBufferFull)?;
+            }
+            Err(PostcardError::SerializeBufferFull) => {
+                let serialized = postcard::to_allocvec(&message)?;
+                self.writer
+                    .write_all(&serialized)
+                    .map_err(|_| PostcardError::SerializeBufferFull)?;
+            }
+            Err(e) => return Err(e),
+        }
 
         // for every path constraint, make sure we can later decode it in case we crash by updating the trace header
         if let SymExpr::PathConstraint { .. } = &message {
