@@ -1513,11 +1513,12 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let other_size = {
+        let (mapped_other_input, other_size) = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other_input = other_testcase.load_input(state.corpus())?;
             let input_mapped = (self.input_mapper)(other_input).map_to_option_bytes();
-            input_mapped.map_or(0, <Vec<u8>>::len)
+            let size = input_mapped.as_ref().map_or(0, <Vec<u8>>::len);
+            (input_mapped, size)
         };
 
         if other_size < 2 {
@@ -1536,14 +1537,7 @@ where
             .rand_mut()
             .below(unsafe { NonZero::new_unchecked(size) });
 
-        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
-        // No need to load the input again, it'll still be cached.
-        let other_input = &mut other_testcase.input().as_ref().unwrap();
-        let wrapped_mapped_other_input = (self.input_mapper)(other_input).map_to_option_bytes();
-        if wrapped_mapped_other_input.is_none() {
-            return Ok(MutationResult::Skipped);
-        }
-        let mapped_other_input = wrapped_mapped_other_input.unwrap();
+        let mapped_other_input = mapped_other_input.unwrap();
 
         Ok(CrossoverInsertMutator::crossover_insert(
             input,
