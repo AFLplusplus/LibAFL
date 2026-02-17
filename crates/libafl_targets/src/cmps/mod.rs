@@ -618,18 +618,18 @@ impl CmpMap for AflppCmpLogMap {
                         self.vals.operands[idx][execution].v1 as u16,
                         false,
                     ))),
-                    3 => Some(CmpValues::U32((
+                    2..=3 => Some(CmpValues::U32((
                         self.vals.operands[idx][execution].v0 as u32,
                         self.vals.operands[idx][execution].v1 as u32,
                         false,
                     ))),
-                    7 => Some(CmpValues::U64((
+                    4..=7 => Some(CmpValues::U64((
                         self.vals.operands[idx][execution].v0,
                         self.vals.operands[idx][execution].v1,
                         false,
                     ))),
                     // TODO handle 128 bits & 256 bits & 512 bits cmps
-                    15 | 31 | 63 => None,
+                    8..=63 => None,
                     _ => panic!("Invalid CmpLog shape {shape}"),
                 }
             }
