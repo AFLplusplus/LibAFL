@@ -11,21 +11,21 @@
 //! Specifically:
 //! * it requires only constant memory space for serialization, which allows for tracing complex and/or
 //!   long-running programs.
-//! * the trace itself requires little space. A typical binary operation (such as an add) typically takes just 3 bytes.
+//! * the trace itself requires little space. A typical binary operation (such as an add) typically takes just a 3 bytes.
 //! * it easy to encode. There is no translation between the interface of the runtime itself and the trace it generates.
 //! * it is similarly easy to decode and can be easily translated into an in-memory AST without overhead, because
-//!   expressions are decoded from leaf to root instead of root to leaf.
+//!   expressions are decoded from leaf to root instead of root to leaf.    
 //! * At its core, it is just [`SymExpr`]s, which can be added to, modified and removed from with ease. The
 //!   definitions are automatically shared between the runtime and the consuming program, since both depend on the same
 //!   `LibAFL`.
 //!
 //! ## Techniques
 //! The serialization format applies multiple techniques to achieve its goals.
-//! * It uses bincode for efficient binary serialization. Crucially, bincode uses variable length integer encoding,
+//! * It uses postcard for efficient binary serialization. Crucially, postcard uses variable length integer encoding,
 //!   allowing it encode small integers use fewer bytes.
 //! * References to previous expressions are stored relative to the current expressions id. The vast majority of
 //!   expressions refer to other expressions that were defined close to their use. Therefore, encoding relative references
-//!   keeps references small. Therefore, they make optimal use of bincodes variable length integer encoding.
+//!   keeps references small. Therefore, they make optimal use of postcard's variable length integer encoding.
 //! * Ids of expressions ([`SymExprRef`]s) are implicitly derived by their position in the message stream. Effectively,
 //!   a counter is used to identify expressions.
 //! * The current length of the trace in bytes in serialized in a fixed format at the beginning of the trace.
@@ -43,64 +43,58 @@
 //! ... making for a total of 5 bytes.
 
 use core::fmt::{self, Debug, Formatter};
-use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
+use std::io::{self, Seek, SeekFrom, Write};
 
-use bincode::{
-    config::{self, Configuration},
-    decode_from_std_read, encode_into_std_write,
-    error::{DecodeError, EncodeError},
-};
+use postcard::Error as PostcardError;
 
 use super::{SymExpr, SymExprRef};
 
-fn serialization_options() -> Configuration {
-    config::standard()
-}
-
-/// A `MessageFileReader` reads a stream of [`SymExpr`] and their corresponding [`SymExprRef`]s from any [`Read`].
-pub struct MessageFileReader<R: Read> {
-    reader: R,
-    deserializer_config: Configuration,
+/// A `MessageFileReader` reads a stream of [`SymExpr`] and their corresponding [`SymExprRef`]s from a byte buffer.
+pub struct MessageFileReader<'a> {
+    buffer: &'a [u8],
     current_id: usize,
 }
 
-impl<R: Read> Debug for MessageFileReader<R> {
+impl Debug for MessageFileReader<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "MessageFileReader {{ current_id: {} }}", self.current_id)
+        write!(
+            f,
+            "MessageFileReader {{ current_id: {}, remaining: {} bytes }}",
+            self.current_id,
+            self.buffer.len()
+        )
     }
 }
 
-impl<R: Read> MessageFileReader<R> {
-    /// Construct from the given reader.
-    pub fn from_reader(reader: R) -> Self {
+impl<'a> MessageFileReader<'a> {
+    /// Construct from the given buffer.
+    #[must_use]
+    pub fn from_buffer(buffer: &'a [u8]) -> Self {
         Self {
-            reader,
-            deserializer_config: serialization_options(),
+            buffer,
             current_id: 1,
         }
     }
 
-    /// Parse the next message out of the stream.
-    /// [`Option::None`] is returned once the stream is depleted.
-    /// IO and serialization errors are passed to the caller as [`DecodeError`].
+    /// Parse the next message out of the buffer.
+    /// [`Option::None`] is returned once the buffer is depleted.
+    /// Serialization errors are passed to the caller as [`PostcardError`].
     /// Finally, the returned tuple contains the message itself as a [`SymExpr`] and the [`SymExprRef`] associated
     /// with this message.
     /// The `SymExprRef` may be used by following messages to refer back to this message.
-    pub fn next_message(&mut self) -> Option<Result<(SymExprRef, SymExpr), DecodeError>> {
-        match decode_from_std_read(&mut self.reader, self.deserializer_config) {
-            Ok(mut message) => {
+    pub fn next_message(&mut self) -> Option<Result<(SymExprRef, SymExpr), PostcardError>> {
+        if self.buffer.is_empty() {
+            return None;
+        }
+
+        // Use postcard's take_from_bytes which deserializes and returns remaining bytes
+        match postcard::take_from_bytes::<SymExpr>(self.buffer) {
+            Ok((mut message, remaining)) => {
+                self.buffer = remaining;
                 let message_id = self.transform_message(&mut message);
                 Some(Ok((message_id, message)))
             }
-            Err(e) => match e {
-                DecodeError::Io {
-                    inner: ref io_err, ..
-                } => match io_err.kind() {
-                    io::ErrorKind::UnexpectedEof => None,
-                    _ => Some(Err(e)),
-                },
-                _ => Some(Err(e)),
-            },
+            Err(e) => Some(Err(e)),
         }
     }
 
@@ -226,7 +220,6 @@ pub struct MessageFileWriter<W> {
     id_counter: usize,
     writer: W,
     writer_start_position: u64,
-    serialization_options: Configuration,
 }
 
 impl<W> Debug for MessageFileWriter<W>
@@ -251,7 +244,6 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             id_counter: 1,
             writer,
             writer_start_position,
-            serialization_options: serialization_options(),
         })
     }
 
@@ -287,7 +279,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
     /// Writes a message to the stream and returns the [`SymExprRef`] that should be used to refer back to this message.
     /// May error when the underlying `Write` errors or when there is a serialization error.
     #[expect(clippy::too_many_lines)]
-    pub fn write_message(&mut self, mut message: SymExpr) -> Result<SymExprRef, EncodeError> {
+    pub fn write_message(&mut self, mut message: SymExpr) -> Result<SymExprRef, PostcardError> {
         let current_id = self.id_counter;
         match &mut message {
             SymExpr::InputByte { .. }
@@ -389,14 +381,28 @@ impl<W: Write + Seek> MessageFileWriter<W> {
                 *b = self.make_relative(*b);
             }
         }
-        encode_into_std_write(&message, &mut self.writer, self.serialization_options)?;
+
+        // using stack buffer for small messages, to avoid per-message heap allocation using to_allocvec
+        let mut stack_buf = [0u8; 1024];
+        match postcard::to_slice(&message, &mut stack_buf) {
+            Ok(serialized) => {
+                self.writer
+                    .write_all(serialized)
+                    .map_err(|_| PostcardError::SerializeBufferFull)?;
+            }
+            Err(PostcardError::SerializeBufferFull) => {
+                let serialized = postcard::to_allocvec(&message)?;
+                self.writer
+                    .write_all(&serialized)
+                    .map_err(|_| PostcardError::SerializeBufferFull)?;
+            }
+            Err(e) => return Err(e),
+        }
 
         // for every path constraint, make sure we can later decode it in case we crash by updating the trace header
         if let SymExpr::PathConstraint { .. } = &message {
-            self.write_trace_size().map_err(|err| EncodeError::Io {
-                inner: err,
-                index: 0,
-            })?;
+            self.write_trace_size()
+                .map_err(|_| PostcardError::SerializeBufferFull)?;
         }
         Ok(SymExprRef::new(current_id).unwrap())
     }
@@ -413,35 +419,34 @@ pub const DEFAULT_ENV_NAME: &str = "SHARED_MEMORY_MESSAGES";
 /// that the memory will not be physically mapped until accessed, alleviating resource concerns.
 pub const DEFAULT_SIZE: usize = 1024 * 1024 * 1024;
 
-impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {
-    /// Creates a new `MessageFileReader` from the given buffer.
-    /// It is expected that trace in this buffer is not length prefixed and the buffer itself should have the exact
-    /// length of the trace (ie. contain no partial message).
-    /// See also [`MessageFileReader::from_length_prefixed_buffer`].
-    #[must_use]
-    pub fn from_buffer(buffer: &'buffer [u8]) -> Self {
-        Self::from_reader(Cursor::new(buffer))
-    }
-
+impl<'a> MessageFileReader<'a> {
     /// Creates a new `MessageFileReader` from the given buffer, expecting the contained trace to be prefixed by the
     /// trace length (as generated by the [`MessageFileWriter`]).
-    /// See also [`MessageFileReader::from_buffer`].
-    pub fn from_length_prefixed_buffer(mut buffer: &'buffer [u8]) -> io::Result<Self> {
-        let mut len_buf = 0_u64.to_le_bytes();
-        buffer.read_exact(&mut len_buf)?;
-        let buffer_len = u64::from_le_bytes(len_buf);
-        usize::try_from(buffer_len).unwrap();
-        let buffer_len = buffer_len as usize;
-        let (buffer, _) = buffer.split_at(buffer_len);
-        Ok(Self::from_buffer(buffer))
+    pub fn from_length_prefixed_buffer(buffer: &'a [u8]) -> io::Result<Self> {
+        if buffer.len() < 8 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Buffer too small for trace header",
+            ));
+        }
+        let len_bytes: [u8; 8] = buffer[0..8].try_into().unwrap();
+        let trace_len = u64::from_le_bytes(len_bytes) as usize;
+
+        if buffer.len() < 8 + trace_len {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Buffer smaller than trace length",
+            ));
+        }
+
+        let trace_buffer = &buffer[8..8 + trace_len];
+        Ok(Self::from_buffer(trace_buffer))
     }
 
-    /// Gets the currently used buffer. If the buffer was length prefixed, the returned buffer does not contain the
-    /// prefix and is exactly as many bytes long as the prefix specified. Effectively, the length prefix is removed and
-    /// used to limit the buffer.
+    /// Gets the remaining buffer
     #[must_use]
     pub fn get_buffer(&self) -> &[u8] {
-        self.reader.get_ref()
+        self.buffer
     }
 }
 
