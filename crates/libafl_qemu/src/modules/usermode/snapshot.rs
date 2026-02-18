@@ -244,7 +244,6 @@ impl SnapshotModule {
         self.tracked_fds = None;
     }
 
-
     /// Records all non-standard (not STDOUT/STDERR/STDIN) open file-descriptors and 
     /// their current seek offsets at snapshot time into `tracked_fds`.
     /// Non-seekable FDs (sockets, pipes) are skipped. Logs a summary if any are found.
