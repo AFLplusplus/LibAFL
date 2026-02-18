@@ -22,7 +22,9 @@ use crate::SYS_mmap2;
 )))]
 use crate::SYS_newfstatat;
 use crate::{
-    Qemu, SYS_brk, SYS_mprotect, SYS_mremap, SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat,
+    Qemu, SYS_accept, SYS_accept4, SYS_brk, SYS_close, SYS_dup, SYS_dup3, SYS_epoll_create1,
+    SYS_eventfd2, SYS_memfd_create, SYS_mprotect, SYS_mremap, SYS_munmap, SYS_openat, SYS_pipe2,
+    SYS_pread64, SYS_read, SYS_readlinkat, SYS_socket, SYS_socketpair,
     emu::EmulatorModules,
     modules::{
         EmulatorModule, EmulatorModuleTuple,
@@ -33,6 +35,8 @@ use crate::{
 };
 #[cfg(not(cpu_target = "riscv32"))]
 use crate::{SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_statfs};
+#[cfg(not(any(cpu_target = "aarch64", cpu_target = "riscv32")))]
+use crate::SYS_dup2;
 
 // TODO use the functions provided by Qemu
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
@@ -156,6 +160,7 @@ pub struct SnapshotModule {
     pub stop_execution: Option<StopExecutionCallback>,
     pub empty: bool,
     pub interval_filter: IntervalSnapshotFilters,
+    pub tracked_fds: Option<HashMap<i32, Option<i64>>>,
     auto_reset: bool,
 }
 
@@ -188,6 +193,7 @@ impl SnapshotModule {
             stop_execution: None,
             empty: true,
             interval_filter: IntervalSnapshotFilters::new(),
+            tracked_fds: Some(HashMap::default()),
             auto_reset: true,
         }
     }
@@ -206,6 +212,7 @@ impl SnapshotModule {
             stop_execution: None,
             empty: true,
             interval_filter,
+            tracked_fds: Some(HashMap::default()),
             auto_reset: true,
         }
     }
@@ -224,12 +231,59 @@ impl SnapshotModule {
             stop_execution: Some(stop_execution),
             empty: true,
             interval_filter: IntervalSnapshotFilters::new(),
+            tracked_fds: Some(HashMap::default()),
             auto_reset: true,
         }
     }
 
     pub fn use_manual_reset(&mut self) {
         self.auto_reset = false;
+    }
+    
+    pub fn disable_fd_tracking(mut self) {
+        self.tracked_fds = None;
+    }
+
+
+    /// Records all non-standard (not STDOUT/STDERR/STDIN) open file-descriptors and 
+    /// their current seek offsets at snapshot time into `tracked_fds`.
+    /// Non-seekable FDs (sockets, pipes) are skipped. Logs a summary if any are found.
+    fn snapshot_fds(&mut self) {
+        if let Some(tracked_fds) = &mut self.tracked_fds {
+            tracked_fds.clear();
+            let Ok(entries) = std::fs::read_dir("/proc/self/fd") else {
+                log::warn!("Failed to read /proc/self/fd while taking snapshot");
+                return;
+            };
+
+            let mut fds: Vec<(i32, String)> = entries
+                .flatten()
+                .filter_map(|e| {
+                    let fd = e.file_name().to_string_lossy().parse::<i32>().ok()?;
+                    if fd <= 2 {
+                        return None; // skip stdin/stdout/stderr
+                    }
+                    let target = std::fs::read_link(format!("/proc/self/fd/{}", fd))
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|_| "?".to_string());
+                    Some((fd, target))
+                })
+                .collect();
+            fds.sort_by_key(|(fd, _)| *fd);
+
+            if !fds.is_empty() {
+                log::info!("Non-standard FDs open at snapshot time ({}):", fds.len());
+                for (fd, target) in &fds {
+                    let offset = unsafe { libc::lseek(*fd, 0, libc::SEEK_CUR) };
+                    if offset >= 0 {
+                        tracked_fds.insert(*fd, Some(offset));
+                        log::info!("  {} -> {} (offset: {})", fd, target, offset);
+                    } else {
+                        log::info!("  {} -> {} (not seekable)", fd, target);
+                    }
+                }
+            }
+        }
     }
 
     pub fn snapshot(&mut self, qemu: Qemu) {
@@ -238,6 +292,10 @@ impl SnapshotModule {
         self.initial_brk = qemu.get_initial_brk();
         self.mmap_start = qemu.get_mmap_start();
         self.pages.clear();
+ 
+        // Snapshot open file descriptors
+        self.snapshot_fds();
+        
         for acc in &mut self.accesses {
             unsafe { (*acc.get()).clear() };
         }
@@ -438,6 +496,17 @@ impl SnapshotModule {
             let new_maps = self.new_maps.get_mut().unwrap();
 
             log::debug!("Start restore");
+
+            if let Some(tracked_fds) = &mut self.tracked_fds {
+                for (fd, snapshot_offset) in tracked_fds.drain() {
+                    match snapshot_offset {
+                        // FD was opened after snapshot — close it
+                        None => unsafe { libc::close(fd); },
+                        // FD existed at snapshot time, restore its seek position
+                        Some(offset) => unsafe { libc::lseek(fd, offset, libc::SEEK_SET); },
+                    }
+                }
+            }
 
             let new_brk = qemu.get_brk();
             if new_brk < self.brk {
@@ -988,6 +1057,60 @@ where
         SYS_getrandom => {
             let h = get_snapshot_module_mut(emulator_modules).unwrap();
             h.access(a0, a1 as usize);
+        }
+        SYS_openat | SYS_dup | SYS_dup3 | SYS_epoll_create1 | SYS_eventfd2 | SYS_socket
+        | SYS_accept | SYS_accept4 | SYS_memfd_create => {
+            let h = get_snapshot_module_mut(emulator_modules).unwrap();
+            if let Some(tracked_fds) = &mut h.tracked_fds {
+                tracked_fds.insert(result as i32, None);
+            }
+        }
+        #[cfg(not(any(cpu_target = "aarch64", cpu_target = "riscv32")))]
+        SYS_dup2 => {
+            let h = get_snapshot_module_mut(emulator_modules).unwrap();
+            // dup2 implicitly closes the target newfd before duplicating
+            if let Some(tracked_fds) = &mut h.tracked_fds {
+                tracked_fds.remove(&(a1 as i32));
+                tracked_fds.insert(result as i32, None);
+            }
+        }
+        SYS_pipe2 => {
+            // pipe2 writes two FDs (int[2]) to the buffer at a0
+            let h = get_snapshot_module_mut(emulator_modules).unwrap();
+            h.access(a0, 8);
+
+            if let Some(tracked_fds) = &mut h.tracked_fds {
+                let mut buf = [0u8; 8]; // 2 * sizeof(i32)
+                let qemu = Qemu::get().unwrap();
+                if qemu.read_mem(a0, &mut buf).is_ok() {
+                    let fd0 = i32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
+                    let fd1 = i32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]);
+                    tracked_fds.insert(fd0, None);
+                    tracked_fds.insert(fd1, None);
+                }
+            }
+        }
+        SYS_socketpair => {
+            // socketpair writes two FDs (int[2]) to the buffer at a3
+            let h = get_snapshot_module_mut(emulator_modules).unwrap();
+            h.access(a3, 8);
+            
+            if let Some(tracked_fds) = &mut h.tracked_fds {
+                let mut buf = [0u8; 8]; // 2 * sizeof(i32)
+                let qemu = Qemu::get().unwrap();
+                if qemu.read_mem(a3, &mut buf).is_ok() {
+                    let fd0 = i32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
+                    let fd1 = i32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]);
+                    tracked_fds.insert(fd0, None);
+                    tracked_fds.insert(fd1, None);
+                }
+            }
+        }
+        SYS_close => {
+            let h = get_snapshot_module_mut(emulator_modules).unwrap();
+            if let Some(tracked_fds) = &mut h.tracked_fds {
+                tracked_fds.remove(&(a0 as i32));
+            }
         }
         SYS_brk => {
             // We don't handle brk here. It is handled in the reset function only when it's needed.
