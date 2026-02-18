@@ -39,8 +39,7 @@ pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 pub const SNAPSHOT_PAGE_ZEROES: [u8; SNAPSHOT_PAGE_SIZE] = [0; SNAPSHOT_PAGE_SIZE];
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
 
-// Linux error codes can be up to -255
-pub const LINUX_ERROR_CODE_CUTOFF: u64 = 0xFFFFFFFFFFFFFF00;
+pub const MAX_ERRNO : i64 = 4095;
 
 pub type StopExecutionCallback = Box<dyn FnMut(&mut SnapshotModule, Qemu)>;
 
@@ -943,7 +942,7 @@ where
 {
     // Make sure the syscall executed successfully otherwise every access based on 
     // the result will be incorrect 
-    if result >= LINUX_ERROR_CODE_CUTOFF {
+    if result >= (-MAX_ERRNO) as GuestAddr {
         return result;
     }
 
