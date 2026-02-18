@@ -240,7 +240,7 @@ impl SnapshotModule {
         self.auto_reset = false;
     }
     
-    pub fn disable_fd_tracking(mut self) {
+    pub fn disable_fd_tracking(&mut self) {
         self.tracked_fds = None;
     }
 
