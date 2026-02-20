@@ -1181,7 +1181,7 @@ pub fn generate_minibsod<W: Write>(
         writeln!(writer, "Received signal {signal}")?;
     }
     writeln!(writer, "{:━^100}", " BACKTRACE ")?;
-    writeln!(writer, "{:?}", std::backtrace::Backtrace::force_capture())?;
+    writeln!(writer, "{:?}", std::backtrace::Backtrace::capture())?;
     writeln!(writer, "{:━^100}", " MAPS ")?;
     write_minibsod(writer)
 }
@@ -1218,7 +1218,7 @@ pub fn generate_minibsod<W: Write>(
         (*exception_pointers).ContextRecord.as_mut().unwrap()
     })?;
     writeln!(writer, "{:━^100}", " BACKTRACE ")?;
-    writeln!(writer, "{:?}", std::backtrace::Backtrace::force_capture())?;
+    writeln!(writer, "{:?}", std::backtrace::Backtrace::capture())?;
     writeln!(writer, "{:━^100}", " MAPS ")?;
     write_minibsod(writer)
 }
