@@ -105,10 +105,32 @@ const DEFER_SIG: &str = "##SIG_AFL_DEFER_FORKSRV##\0";
 const SHMEM_ENV_VAR: &str = "__AFL_SHM_ID";
 static AFL_HARNESS_FILE_INPUT: &str = "@@";
 
+fn print_line(s: &str) {
+    println!("{s}");
+}
+
+fn print_nop(_: &str) {}
+
 fn main() {
     env_logger::init();
     let mut opt = Opt::parse();
     parse_envs(&mut opt).expect("invalid configuration");
+
+    if opt.pizza_mode {
+        // TODO: Audit that the environment access only happens in single-threaded code
+        unsafe { std::env::set_var("AFL_PIZZA_MODE", "1") };
+    }
+    if opt.exit_when_done {
+        eprintln!(
+            "AFL_EXIT_WHEN_DONE is accepted but currently has no dedicated behavior in libafl-fuzz"
+        );
+    }
+    if opt.final_sync {
+        eprintln!(
+            "AFL_FINAL_SYNC is accepted but currently has no dedicated behavior in libafl-fuzz"
+        );
+    }
+
     executor::check_binary(&mut opt, SHMEM_ENV_VAR).expect("binary to be valid");
 
     // Create the shared memory map provider for LLMP
@@ -117,9 +139,15 @@ fn main() {
 
     // Create our Monitor
     #[cfg(not(feature = "fuzzbench"))]
-    let monitor = MultiMonitor::new(|s| println!("{s}"));
+    let monitor = {
+        let print_fn: fn(&str) = if opt.no_ui { print_nop } else { print_line };
+        MultiMonitor::new(print_fn)
+    };
     #[cfg(feature = "fuzzbench")]
-    let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    let monitor = {
+        let print_fn: fn(&str) = if opt.no_ui { print_nop } else { print_line };
+        SimpleMonitor::new(print_fn)
+    };
 
     opt.auto_resume = if opt.auto_resume {
         true
@@ -359,6 +387,16 @@ struct Opt {
     crash_mode: bool,
     #[clap(skip)]
     non_instrumented_mode: bool,
+    #[clap(skip)]
+    final_sync: bool,
+    #[clap(skip)]
+    ignore_unknown_envs: bool,
+    #[clap(skip)]
+    no_ui: bool,
+    #[clap(skip)]
+    pizza_mode: bool,
+    #[clap(skip)]
+    exit_when_done: bool,
 }
 
 #[expect(dead_code, clippy::struct_excessive_bools)]
