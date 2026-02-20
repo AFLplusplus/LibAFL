@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [features]
-default = []
+default = ["interceptors"]
 ## Enables forking mode for the LibAFL launcher (instead of starting new processes)
 fork = ["libafl/fork"]
 track_hit_feedbacks = [
@@ -13,6 +13,8 @@ track_hit_feedbacks = [
   "libafl_targets/track_hit_feedbacks",
 ]
 tui_monitor = ["libafl/tui_monitor"]
+interceptors = ["libafl_targets/libfuzzer_interceptors"]
+no_link_main = ["libafl_targets/libfuzzer_no_link_main"]
 
 [target.'cfg(not(windows))'.features]
 ## Enable the `fork` feature on non-windows platforms
@@ -61,7 +63,6 @@ libafl_targets = { path = "../libafl_targets", features = [
   "libfuzzer",
   "libfuzzer_oom",
   "libfuzzer_define_run_driver",
-  "libfuzzer_interceptors",
   "sanitizers_flags",
   "whole_archive",
   "sanitizer_interfaces",
