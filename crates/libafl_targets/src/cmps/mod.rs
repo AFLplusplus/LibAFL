@@ -412,19 +412,26 @@ impl CmpMap for CmpLogMap {
                         self.vals.operands[idx][execution].1 as u16,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
-                    3 => Some(CmpValues::U32((
+                    // Shape 2 = 24-bit (3 bytes): AFL++ GCC cmplog plugin reports 24-bit comparisons
+                    // via hookN. Treat as 32-bit (U32), same as the clang plugin does.
+                    2 | 3 => Some(CmpValues::U32((
                         self.vals.operands[idx][execution].0 as u32,
                         self.vals.operands[idx][execution].1 as u32,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
-                    7 => Some(CmpValues::U64((
+                    // Shapes 4/5/6 = 40/48/56-bit: AFL++ GCC cmplog plugin can report these sizes
+                    // via hookN. Treat as 64-bit (U64), rounding up to the next power-of-2.
+                    4 | 5 | 6 | 7 => Some(CmpValues::U64((
                         self.vals.operands[idx][execution].0,
                         self.vals.operands[idx][execution].1,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
                     // TODO handle 128 bits & 256 bits & 512 bits cmps
                     15 | 31 | 63 => None,
-                    _ => panic!("Invalid CmpLog shape {shape}"),
+                    _ => {
+                        log::warn!("Ignoring unknown CmpLog shape {shape}");
+                        None
+                    }
                 }
             }
         } else {
@@ -618,19 +625,26 @@ impl CmpMap for AflppCmpLogMap {
                         self.vals.operands[idx][execution].v1 as u16,
                         false,
                     ))),
-                    3 => Some(CmpValues::U32((
+                    // Shape 2 = 24-bit (3 bytes): AFL++ GCC cmplog plugin reports 24-bit comparisons
+                    // via hookN. Treat as 32-bit (U32), same as the clang plugin does.
+                    2 | 3 => Some(CmpValues::U32((
                         self.vals.operands[idx][execution].v0 as u32,
                         self.vals.operands[idx][execution].v1 as u32,
                         false,
                     ))),
-                    7 => Some(CmpValues::U64((
+                    // Shapes 4/5/6 = 40/48/56-bit: AFL++ GCC cmplog plugin can report these sizes
+                    // via hookN. Treat as 64-bit (U64), rounding up to the next power-of-2.
+                    4 | 5 | 6 | 7 => Some(CmpValues::U64((
                         self.vals.operands[idx][execution].v0,
                         self.vals.operands[idx][execution].v1,
                         false,
                     ))),
                     // TODO handle 128 bits & 256 bits & 512 bits cmps
                     15 | 31 | 63 => None,
-                    _ => panic!("Invalid CmpLog shape {shape}"),
+                    _ => {
+                        log::warn!("Ignoring unknown CmpLog shape {shape}");
+                        None
+                    }
                 }
             }
         } else {
