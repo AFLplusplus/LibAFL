@@ -1115,9 +1115,9 @@ impl AflppRedQueen {
                         cloned[buf_idx + 5] = ((repl >> 16) & 0xff) as u8;
                         cloned[buf_idx + 4] = ((repl >> 24) & 0xff) as u8;
                         cloned[buf_idx + 3] = ((repl >> 32) & 0xff) as u8;
-                        cloned[buf_idx + 2] = ((repl >> 32) & 0xff) as u8;
-                        cloned[buf_idx + 1] = ((repl >> 40) & 0xff) as u8;
-                        cloned[buf_idx] = ((repl >> 48) & 0xff) as u8;
+                        cloned[buf_idx + 2] = ((repl >> 40) & 0xff) as u8;
+                        cloned[buf_idx + 1] = ((repl >> 48) & 0xff) as u8;
+                        cloned[buf_idx] = ((repl >> 56) & 0xff) as u8;
 
                         vec.push(cloned);
                         return Ok(true);
