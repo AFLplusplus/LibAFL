@@ -16,7 +16,7 @@ use crate::{
     mutators::{MutationResult, Mutator, Tokens, rand_range},
     nonzero,
     stages::{
-        UnicodeIdentificationMetadata, extract_metadata,
+        UnicodeIdentificationMetadata,
         mutational::{MutatedTransform, MutatedTransformPost},
     },
     state::{HasCorpus, HasMaxSize, HasRand},
@@ -268,7 +268,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     }
 
     input.0.splice(range, replacement);
-    input.1 = extract_metadata(input.0.mutator_bytes());
+    input.1 = UnicodeIdentificationMetadata::new(input.0.mutator_bytes());
 
     MutationResult::Mutated
 }
@@ -445,7 +445,7 @@ where
             }
 
             input.0.splice(range, token.iter().copied());
-            input.1 = extract_metadata(input.0.mutator_bytes());
+            input.1 = UnicodeIdentificationMetadata::new(input.0.mutator_bytes());
             return Ok(MutationResult::Mutated);
         }
 
@@ -508,7 +508,7 @@ where
             }
 
             input.0.splice(range, token.iter().copied());
-            input.1 = extract_metadata(input.0.mutator_bytes());
+            input.1 = UnicodeIdentificationMetadata::new(input.0.mutator_bytes());
             return Ok(MutationResult::Mutated);
         }
 
@@ -528,7 +528,7 @@ mod test {
         corpus::NopCorpus,
         inputs::{BytesInput, HasMutatorBytes},
         mutators::{Mutator, UnicodeCategoryRandMutator, UnicodeSubcategoryRandMutator},
-        stages::extract_metadata,
+        stages::UnicodeIdentificationMetadata,
         state::StdState,
     };
 
@@ -550,7 +550,7 @@ mod test {
             )?;
 
             for _ in 0..(1 << 12) {
-                let metadata = extract_metadata(bytes.mutator_bytes());
+                let metadata = UnicodeIdentificationMetadata::new(bytes.mutator_bytes());
                 let mut input = (bytes, metadata);
                 let _ = mutator.mutate(&mut state, &mut input);
                 println!(
@@ -585,7 +585,7 @@ mod test {
             )?;
 
             for _ in 0..(1 << 12) {
-                let metadata = extract_metadata(bytes.mutator_bytes());
+                let metadata = UnicodeIdentificationMetadata::new(bytes.mutator_bytes());
                 let mut input = (bytes, metadata);
                 let _ = mutator.mutate(&mut state, &mut input);
                 println!(
