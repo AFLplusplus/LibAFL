@@ -13,19 +13,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Error, HasMetadata, executors::ExitKind, observers::Observer};
 
-/// A bytes string for cmplog with up to 32 elements.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+/// A bytes string for cmplog with up to 64 elements.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct CmplogBytes {
-    buf: [u8; 32],
+    buf: [u8; 64],
     len: u8,
 }
 
 impl CmplogBytes {
     /// Creates a new [`CmplogBytes`] object from the provided buf and length.
-    /// Lengths above 32 are illegal but will be ignored.
+    /// Lengths above 64 are illegal but will be ignored.
     #[must_use]
-    pub fn from_buf_and_len(buf: [u8; 32], len: u8) -> Self {
-        debug_assert!(len <= 32, "Len too big: {len}, max: 32");
+    pub fn from_buf_and_len(buf: [u8; 64], len: u8) -> Self {
+        debug_assert!(len <= 64, "Len too big: {len}, max: 64");
         CmplogBytes { buf, len }
     }
 }
@@ -46,6 +46,49 @@ impl HasLen for CmplogBytes {
     }
 }
 
+impl Serialize for CmplogBytes {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut s = serializer.serialize_struct("CmplogBytes", 2)?;
+        s.serialize_field("buf", &self.buf.as_slice())?;
+        s.serialize_field("len", &self.len)?;
+        s.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for CmplogBytes {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::{self, MapAccess, Visitor};
+        use core::fmt;
+        struct CmplogBytesVisitor;
+        impl<'de> Visitor<'de> for CmplogBytesVisitor {
+            type Value = CmplogBytes;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct CmplogBytes")
+            }
+            fn visit_map<V: MapAccess<'de>>(self, mut map: V) -> Result<CmplogBytes, V::Error> {
+                let mut buf_vec: Option<Vec<u8>> = None;
+                let mut len: Option<u8> = None;
+                while let Some(key) = map.next_key::<alloc::string::String>()? {
+                    match key.as_str() {
+                        "buf" => { buf_vec = Some(map.next_value()?); }
+                        "len" => { len = Some(map.next_value()?); }
+                        _ => { let _ = map.next_value::<de::IgnoredAny>()?; }
+                    }
+                }
+                let buf_vec = buf_vec.ok_or_else(|| de::Error::missing_field("buf"))?;
+                let len = len.ok_or_else(|| de::Error::missing_field("len"))?;
+                let mut buf = [0u8; 64];
+                let copy_len = buf_vec.len().min(64);
+                buf[..copy_len].copy_from_slice(&buf_vec[..copy_len]);
+                Ok(CmplogBytes { buf, len })
+            }
+        }
+        const FIELDS: &[&str] = &["buf", "len"];
+        deserializer.deserialize_struct("CmplogBytes", FIELDS, CmplogBytesVisitor)
+    }
+}
+
 /// Compare values collected during a run
 #[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Clone)]
 pub enum CmpValues {
@@ -57,6 +100,8 @@ pub enum CmpValues {
     U32((u32, u32, bool)),
     /// (side 1 of comparison, side 2 of comparison, side 1 value is const)
     U64((u64, u64, bool)),
+    /// (side 1 of comparison, side 2 of comparison, side 1 value is const)
+    U128((u128, u128, bool)),
     /// Two vecs of u8 values/byte
     Bytes((CmplogBytes, CmplogBytes)),
 }
@@ -67,18 +112,19 @@ impl CmpValues {
     pub fn is_numeric(&self) -> bool {
         matches!(
             self,
-            CmpValues::U8(_) | CmpValues::U16(_) | CmpValues::U32(_) | CmpValues::U64(_)
+            CmpValues::U8(_) | CmpValues::U16(_) | CmpValues::U32(_) | CmpValues::U64(_) | CmpValues::U128(_)
         )
     }
 
     /// Converts the value to a u64 tuple
     #[must_use]
-    pub fn to_u64_tuple(&self) -> Option<(u64, u64, bool)> {
+    pub fn to_u128_tuple(&self) -> Option<(u128, u128, bool)> {
         match self {
-            CmpValues::U8(t) => Some((u64::from(t.0), u64::from(t.1), t.2)),
-            CmpValues::U16(t) => Some((u64::from(t.0), u64::from(t.1), t.2)),
-            CmpValues::U32(t) => Some((u64::from(t.0), u64::from(t.1), t.2)),
-            CmpValues::U64(t) => Some(*t),
+            CmpValues::U8(t) => Some((u128::from(t.0), u128::from(t.1), t.2)),
+            CmpValues::U16(t) => Some((u128::from(t.0), u128::from(t.1), t.2)),
+            CmpValues::U32(t) => Some((u128::from(t.0), u128::from(t.1), t.2)),
+            CmpValues::U64(t) => Some((u128::from(t.0), u128::from(t.1), t.2)),
+            CmpValues::U128(t) => Some(*t),
             CmpValues::Bytes(_) => None,
         }
     }
@@ -140,8 +186,8 @@ impl CmpValuesMetadata {
                     let mut last: Option<CmpValues> = None;
                     for j in 0..execs {
                         if let Some(val) = cmp_map.values_of(i, j) {
-                            if let Some(l) = last.and_then(|x| x.to_u64_tuple())
-                                && let Some(v) = val.to_u64_tuple()
+                            if let Some(l) = last.and_then(|x| x.to_u128_tuple())
+                                && let Some(v) = val.to_u128_tuple()
                             {
                                 if l.0.wrapping_add(1) == v.0 {
                                     increasing_v0 += 1;
