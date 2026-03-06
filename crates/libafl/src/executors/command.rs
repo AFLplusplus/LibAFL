@@ -391,7 +391,6 @@ where
     ) -> Result<ExitKind, Error> {
         use wait_timeout::ChildExt;
 
-        self.observers_mut().pre_exec_all(state, input)?;
         *state.executions_mut() += 1;
         let mut child = self
             .configurator
