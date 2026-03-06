@@ -21,6 +21,7 @@ pub struct WithObservers<E, I, OT, S> {
 impl<E, EM, I, OT, S, Z> Executor<EM, I, S, Z> for WithObservers<E, I, OT, S>
 where
     E: Executor<EM, I, S, Z>,
+    OT: ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,
@@ -29,7 +30,10 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.executor.run_target(fuzzer, state, mgr, input)
+        self.observers.pre_exec_all(state, input)?;
+        let exit_kind = self.executor.run_target(fuzzer, state, mgr, input)?;
+        self.observers.post_exec_all(state, input, &exit_kind)?;
+        Ok(exit_kind)
     }
 }
 

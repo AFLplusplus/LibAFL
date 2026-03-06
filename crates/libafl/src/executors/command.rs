@@ -380,7 +380,10 @@ where
     T: CommandConfigurator<Child> + HasTimeout + Debug,
     OT: ObserversTuple<I, S>,
 {
-    fn execute_input_with_command<TB: ToTargetBytesConverter<I, S>>(
+    /// Use this when wrapping with `WithObservers` - build `CommandExecutor` with
+    /// empty observers `()`, wrap with `WithObservers`, and let the fuzzer manage
+    /// the observer lifecycle.
+    fn execute_command_only<TB: ToTargetBytesConverter<I, S>>(
         &mut self,
         target_bytes_converter: &mut TB,
         state: &mut S,
@@ -426,6 +429,19 @@ where
             stdout.read_to_end(&mut buf)?;
             self.observers_mut().index_mut(&stdout_handle).observe(buf);
         }
+
+        Ok(exit_kind)
+    }
+
+    fn execute_input_with_command<TB: ToTargetBytesConverter<I, S>>(
+        &mut self,
+        target_bytes_converter: &mut TB,
+        state: &mut S,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
+        self.observers_mut().pre_exec_all(state, input)?;
+
+        let exit_kind = self.execute_command_only(target_bytes_converter, state, input)?;
 
         self.observers_mut()
             .post_exec_child_all(state, input, &exit_kind)?;
@@ -954,5 +970,100 @@ mod tests {
             .unwrap();
 
         assert!(executor.observers.0.output.is_some());
+    }
+
+    /// Test that WithObservers correctly calls pre_exec and post_exec on an observer list (tuple)
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_with_observers() {
+        use libafl_bolts::tuples::{Handled, MatchNameRef};
+        use tuple_list::tuple_list;
+
+        use crate::{
+            executors::{HasObservers, WithObservers},
+            observers::TimeObserver,
+        };
+
+        let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
+            SimpleEventManager::new(SimpleMonitor::new(|status| {
+                log::info!("{status}");
+            }));
+
+        // Create CommandExecutor with EMPTY observers
+        #[cfg(windows)]
+        let executor = CommandExecutor::builder()
+            .program("cmd")
+            .arg("/c")
+            .arg("echo")
+            .input(InputLocation::Arg { argnum: 2 });
+        #[cfg(not(windows))]
+        let executor = CommandExecutor::builder()
+            .program("echo")
+            .input(InputLocation::Arg { argnum: 0 });
+
+        let executor = executor.build::<BytesInput, (), _>(()).unwrap();
+
+        // Assert that the CommandExecutor has NO observers (empty tuple)
+        {
+            use crate::executors::HasObservers;
+            let inner_observers: &() = &*executor.observers();
+            assert_eq!(
+                inner_observers,
+                &(),
+                "CommandExecutor should have empty observers when used with WithObservers"
+            );
+        }
+
+        let time_observer1 = TimeObserver::new("time1");
+        let time_observer2 = TimeObserver::new("time2");
+        let handle1 = time_observer1.handle();
+        let handle2 = time_observer2.handle();
+
+        // Verify observers start with no recorded runtime (pre_exec not yet called)
+        assert!(
+            time_observer1.last_runtime().is_none(),
+            "Observer 1 should have no runtime before execution"
+        );
+        assert!(
+            time_observer2.last_runtime().is_none(),
+            "Observer 2 should have no runtime before execution"
+        );
+
+        let observer_list = tuple_list!(time_observer1, time_observer2);
+        let mut executor = WithObservers::new(executor, observer_list);
+
+        let mut fuzzer: NopFuzzer = NopFuzzer::new();
+        let mut state = NopState::<NopInput>::new();
+        executor
+            .run_target(
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+                &BytesInput::new(b"test".to_vec()),
+            )
+            .unwrap();
+
+        // Verify BOTH observers had pre_exec and post_exec called
+        let observers = executor.observers();
+
+        let time_obs1: &TimeObserver = observers.get(&handle1).as_ref().unwrap();
+        assert!(
+            time_obs1.last_runtime().is_some(),
+            "Observer 1: pre_exec and post_exec should have been called (last_runtime is set)"
+        );
+
+        let time_obs2: &TimeObserver = observers.get(&handle2).as_ref().unwrap();
+        assert!(
+            time_obs2.last_runtime().is_some(),
+            "Observer 2: pre_exec and post_exec should have been called (last_runtime is set)"
+        );
+
+        // Both observers should have recorded similar runtimes (same execution)
+        let runtime1 = time_obs1.last_runtime().unwrap();
+        let runtime2 = time_obs2.last_runtime().unwrap();
+        assert!(
+            runtime1.as_micros() > 0 || runtime2.as_micros() > 0,
+            "At least one observer should have recorded non-zero runtime"
+        );
     }
 }
