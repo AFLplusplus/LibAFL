@@ -577,6 +577,35 @@ where
                     }
                 }
             }
+            CmpValues::U128((v1, v2, v1_is_const)) => {
+                if len >= size_of::<u128>() {
+                    for i in off..=len - size_of::<u128>() {
+                        let val =
+                            u128::from_ne_bytes(bytes[i..i + size_of::<u128>()].try_into().unwrap());
+                        if !v1_is_const && val == *v1 {
+                            let new_bytes = v2.to_ne_bytes();
+                            bytes[i..i + size_of::<u128>()].copy_from_slice(&new_bytes);
+                            result = MutationResult::Mutated;
+                            break;
+                        } else if !v1_is_const && val.swap_bytes() == *v1 {
+                            let new_bytes = v2.swap_bytes().to_ne_bytes();
+                            bytes[i..i + size_of::<u128>()].copy_from_slice(&new_bytes);
+                            result = MutationResult::Mutated;
+                            break;
+                        } else if val == *v2 {
+                            let new_bytes = v1.to_ne_bytes();
+                            bytes[i..i + size_of::<u128>()].copy_from_slice(&new_bytes);
+                            result = MutationResult::Mutated;
+                            break;
+                        } else if val.swap_bytes() == *v2 {
+                            let new_bytes = v1.swap_bytes().to_ne_bytes();
+                            bytes[i..i + size_of::<u128>()].copy_from_slice(&new_bytes);
+                            result = MutationResult::Mutated;
+                            break;
+                        }
+                    }
+                }
+            }
             CmpValues::Bytes(v) => {
                 'outer: for i in off..len {
                     let mut size = core::cmp::min(v.0.len(), len - i);
@@ -764,6 +793,39 @@ where
                         let mut val_bytes = [0; size_of::<u64>()];
                         val_bytes[..cmp_size].copy_from_slice(&bytes[i..i + cmp_size]);
                         let val = u64::from_ne_bytes(val_bytes);
+
+                        if val == v.0 {
+                            let new_bytes = &v.1.to_ne_bytes()[..cmp_size];
+                            bytes[i..i + cmp_size].copy_from_slice(new_bytes);
+                            result = MutationResult::Mutated;
+                            break;
+                        } else if val == v.1 {
+                            let new_bytes = &v.0.to_ne_bytes()[..cmp_size];
+                            bytes[i..i + cmp_size].copy_from_slice(new_bytes);
+                            result = MutationResult::Mutated;
+                            break;
+                        } else if val.swap_bytes() == v.0 {
+                            let new_bytes = v.1.swap_bytes().to_ne_bytes();
+                            bytes[i..i + cmp_size].copy_from_slice(&new_bytes[..cmp_size]);
+                            result = MutationResult::Mutated;
+                            break;
+                        } else if val.swap_bytes() == v.1 {
+                            let new_bytes = v.0.swap_bytes().to_ne_bytes();
+                            bytes[i..i + cmp_size].copy_from_slice(&new_bytes[..cmp_size]);
+                            result = MutationResult::Mutated;
+                            break;
+                        }
+                    }
+                }
+            }
+            CmpValues::U128(v) => {
+                let cmp_size = random_slice_size::<{ size_of::<u128>() }, S>(state);
+
+                if len >= cmp_size {
+                    for i in off..(len - (cmp_size - 1)) {
+                        let mut val_bytes = [0; size_of::<u128>()];
+                        val_bytes[..cmp_size].copy_from_slice(&bytes[i..i + cmp_size]);
+                        let val = u128::from_ne_bytes(val_bytes);
 
                         if val == v.0 {
                             let new_bytes = &v.1.to_ne_bytes()[..cmp_size];
@@ -1796,6 +1858,50 @@ where
                                     let v = orig_v1.to_ne_bytes().to_vec();
                                     Self::try_add_autotokens(&mut gathered_tokens, &v, hshape);
                                 }
+                            }
+                        }
+                        // U128 comparisons: pass only the low 64 bits to cmp_extend_encoding
+                        // (the existing API is u64-based; 128-bit magic values are still useful
+                        // as autotoken candidates even without full extend-encoding support)
+                        (CmpValues::U128(orig), CmpValues::U128(new)) => {
+                            let orig_v0 = orig.0 as u64;
+                            let orig_v1 = orig.1 as u64;
+                            let new_v0 = new.0 as u64;
+                            let new_v1 = new.1 as u64;
+                            let attribute = header.attribute().value();
+
+                            if new_v0 != orig_v0 && orig_v0 != orig_v1 {
+                                self.cmp_extend_encoding(
+                                    orig_v0,
+                                    orig_v1,
+                                    new_v0,
+                                    new_v1,
+                                    attribute,
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                    &mut ret,
+                                )?;
+                            }
+
+                            if new_v1 != orig_v1 && orig_v0 != orig_v1 {
+                                self.cmp_extend_encoding(
+                                    orig_v1,
+                                    orig_v0,
+                                    new_v1,
+                                    new_v0,
+                                    Self::swapa(attribute),
+                                    new_bytes,
+                                    orig_bytes,
+                                    cmp_buf_idx,
+                                    taint_len,
+                                    input_len,
+                                    hshape,
+                                    &mut ret,
+                                )?;
                             }
                         }
                         (CmpValues::Bytes(orig), CmpValues::Bytes(new)) => {

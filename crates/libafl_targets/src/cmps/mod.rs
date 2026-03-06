@@ -422,23 +422,34 @@ impl CmpMap for CmpLogMap {
                         self.vals.operands[idx][execution].1,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
-                    // TODO handle 128 bits & 256 bits & 512 bits cmps
-                    15 | 31 | 63 => None,
+                    // 128-bit: reconstruct u128 from lo and hi 64-bit halves
+                    15 => {
+                        let v0_lo = self.vals.operands[idx][execution].0;
+                        let v0_hi = self.vals.operands[idx][execution].1;
+                        let v0 = (v0_hi as u128) << 64 | v0_lo as u128;
+                        let v1_lo = self.vals.operands[idx][execution].1;
+                        let v1_hi = self.vals.operands[idx][execution].0;
+                        let v1 = (v1_hi as u128) << 64 | v1_lo as u128;
+                        let is_const = self.vals.operands[idx][execution].2 == 1;
+                        Some(CmpValues::U128((v0, v1, is_const)))
+                    }
+                    // TODO handle 256 bits & 512 bits cmps
+                    31 | 63 => None,
                     _ => panic!("Invalid CmpLog shape {shape}"),
                 }
             }
         } else {
             unsafe {
-                Some(CmpValues::Bytes((
-                    CmplogBytes::from_buf_and_len(
-                        self.vals.routines[idx][execution].0,
-                        CMPLOG_RTN_LEN as u8,
-                    ),
-                    CmplogBytes::from_buf_and_len(
-                        self.vals.routines[idx][execution].1,
-                        CMPLOG_RTN_LEN as u8,
-                    ),
-                )))
+                Some(CmpValues::Bytes({
+                    let mut buf0 = [0u8; 64];
+                    let mut buf1 = [0u8; 64];
+                    buf0[..CMPLOG_RTN_LEN].copy_from_slice(&self.vals.routines[idx][execution].0);
+                    buf1[..CMPLOG_RTN_LEN].copy_from_slice(&self.vals.routines[idx][execution].1);
+                    (
+                        CmplogBytes::from_buf_and_len(buf0, CMPLOG_RTN_LEN as u8),
+                        CmplogBytes::from_buf_and_len(buf1, CMPLOG_RTN_LEN as u8),
+                    )
+                }))
             }
         }
     }
@@ -628,8 +639,18 @@ impl CmpMap for AflppCmpLogMap {
                         self.vals.operands[idx][execution].v1,
                         false,
                     ))),
-                    // TODO handle 128 bits & 256 bits & 512 bits cmps
-                    15 | 31 | 63 => None,
+                    // 128-bit: reconstruct u128 from v0/v0_128 and v1/v1_128 fields
+                    15 => {
+                        let v0_lo = self.vals.operands[idx][execution].v0;
+                        let v0_hi = self.vals.operands[idx][execution].v0_128;
+                        let v0 = (v0_hi as u128) << 64 | v0_lo as u128;
+                        let v1_lo = self.vals.operands[idx][execution].v1;
+                        let v1_hi = self.vals.operands[idx][execution].v1_128;
+                        let v1 = (v1_hi as u128) << 64 | v1_lo as u128;
+                        Some(CmpValues::U128((v0, v1, false)))
+                    }
+                    // TODO handle 256 bits & 512 bits cmps
+                    31 | 63 => None,
                     _ => panic!("Invalid CmpLog shape {shape}"),
                 }
             }
@@ -637,10 +658,16 @@ impl CmpMap for AflppCmpLogMap {
             unsafe {
                 let v0_len = self.vals.fn_operands[idx][execution].v0_len & (0x80 - 1);
                 let v1_len = self.vals.fn_operands[idx][execution].v1_len & (0x80 - 1);
-                Some(CmpValues::Bytes((
-                    CmplogBytes::from_buf_and_len(self.vals.fn_operands[idx][execution].v0, v0_len),
-                    CmplogBytes::from_buf_and_len(self.vals.fn_operands[idx][execution].v1, v1_len),
-                )))
+                Some(CmpValues::Bytes({
+                    let mut buf0 = [0u8; 64];
+                    let mut buf1 = [0u8; 64];
+                    buf0[..32].copy_from_slice(&self.vals.fn_operands[idx][execution].v0);
+                    buf1[..32].copy_from_slice(&self.vals.fn_operands[idx][execution].v1);
+                    (
+                        CmplogBytes::from_buf_and_len(buf0, v0_len),
+                        CmplogBytes::from_buf_and_len(buf1, v1_len),
+                    )
+                }))
             }
         }
     }
