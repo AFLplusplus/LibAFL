@@ -63,6 +63,17 @@ where
         }
     }
 
+    /// Enumerate the n-th input deterministically using the IntegerizedStack algorithm.
+    /// This produces a unique [`GramatronInput`] for each value of `n`.
+    pub fn enumerate_nth(&self, n: u64) -> GramatronInput {
+        let terminals = crate::generators::enumerator::enumerate_automaton(
+            self.automaton.init_state,
+            n,
+            self.automaton,
+        );
+        GramatronInput::new(terminals)
+    }
+
     /// Append the generated terminals
     pub fn append_generated_terminals(&self, input: &mut GramatronInput, state: &mut S) -> usize {
         let mut counter = 0;
