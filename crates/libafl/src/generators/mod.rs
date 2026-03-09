@@ -7,6 +7,8 @@ use libafl_bolts::rands::Rand;
 
 use crate::{Error, inputs::bytes::BytesInput, nonzero, state::HasRand};
 
+pub mod enumerator;
+
 pub mod gramatron;
 use core::cmp::max;
 
