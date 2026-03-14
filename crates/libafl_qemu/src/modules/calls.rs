@@ -1,4 +1,4 @@
-use core::{cell::UnsafeCell, fmt::Debug};
+use core::{cell::{Cell, UnsafeCell}, fmt::Debug};
 
 use capstone::prelude::*;
 use libafl::{
@@ -491,10 +491,9 @@ where
     }
 }
 
-// TODO support multiple threads with thread local callstack
 #[derive(Debug)]
 pub struct OnCrashBacktraceCollector<'a> {
-    callstack_hash: u64,
+    callstack_hash: ThreadLocal<Cell<u64>>,
     observer_handle: Handle<BacktraceObserver<'a>>,
 }
 
@@ -502,18 +501,22 @@ impl<'a> OnCrashBacktraceCollector<'a> {
     #[must_use]
     pub fn new(observer: &BacktraceObserver<'a>) -> Self {
         Self {
-            callstack_hash: 0,
+            callstack_hash: ThreadLocal::new(),
             observer_handle: observer.handle(),
         }
     }
 
+    /// Returns the callstack hash accumulated on the current thread.
     #[must_use]
     pub fn callstack_hash(&self) -> u64 {
-        self.callstack_hash
+        self.callstack_hash.get_or_default().get()
     }
 
     pub fn reset(&mut self) {
-        self.callstack_hash = 0;
+        // iter_mut gives &mut Cell<u64> for every local thread slot.
+        for cell in self.callstack_hash.iter_mut() {
+            cell.set(0);
+        }
     }
 }
 
@@ -533,7 +536,8 @@ where
         I: Unpin,
         S: Unpin,
     {
-        self.callstack_hash ^= u64::from(pc) + call_len as u64;
+        let cell = self.callstack_hash.get_or_default();
+        cell.set(cell.get() ^ (u64::from(pc).wrapping_add(call_len as u64)));
     }
 
     #[allow(clippy::unnecessary_cast)]
@@ -548,7 +552,8 @@ where
         I: Unpin,
         S: Unpin,
     {
-        self.callstack_hash ^= u64::from(ret_addr);
+        let cell = self.callstack_hash.get_or_default();
+        cell.set(cell.get() ^ u64::from(ret_addr));
     }
 
     fn pre_exec<I>(&mut self, _qemu: Qemu, _input: &I)
@@ -572,7 +577,8 @@ where
         let observer = observers
             .get_mut(&self.observer_handle)
             .expect("A OnCrashBacktraceCollector needs a BacktraceObserver");
-        observer.fill_external(self.callstack_hash, exit_kind);
+        // Report the current thread's hash.
+        observer.fill_external(self.callstack_hash(), exit_kind);
     }
 }
 
