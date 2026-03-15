@@ -281,6 +281,7 @@ where
 
             while let Some(id) = cur_id {
                 let input = state.corpus().cloned_input_for_id(id)?;
+                let corpus_size = state.corpus().count();
 
                 self.client.fire(
                     state,
@@ -289,7 +290,7 @@ where
                             input,
                             observers_buf: None,
                             exit_kind: ExitKind::Ok,
-                            corpus_size: 0, // TODO choose if sending 0 or the actual real value
+                            corpus_size,
                             client_config: EventConfig::AlwaysUnique,
                             forward_id: None,
                             #[cfg(all(unix, feature = "multi_machine"))]
