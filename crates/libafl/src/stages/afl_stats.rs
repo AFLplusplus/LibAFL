@@ -83,6 +83,18 @@ impl From<Duration> for FuzzTime {
 
 libafl_bolts::impl_serdeany!(FuzzTime);
 
+/// `TrimTime` - Use to report time spent in queue trimming/minimization
+/// (AFL++ `trim` concept).
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TrimTime(pub Duration);
+impl From<Duration> for TrimTime {
+    fn from(value: Duration) -> Self {
+        Self(value)
+    }
+}
+
+libafl_bolts::impl_serdeany!(TrimTime);
+
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
 #[derive(Debug, Clone)]
@@ -357,7 +369,10 @@ where
                 .metadata::<SyncTime>()
                 .map_or(Duration::from_secs(0), |d| d.0)
                 .as_secs(),
-            trim_time: 0, // TODO
+            trim_time: state
+                .metadata::<TrimTime>()
+                .map_or(Duration::from_secs(0), |d| d.0)
+                .as_secs(),
             execs_done: total_executions,
             execs_per_sec: *state.executions(),     // TODO
             execs_ps_last_min: *state.executions(), // TODO
@@ -913,5 +928,81 @@ where
             autotokens_enabled: self.uses_autotokens,
             phantom: PhantomData,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::HasMetadata;
+    use crate::Error;
+    use crate::stages::{time_tracker::TimeTrackingStageWrapper, Stage};
+    use libafl_bolts::serdeany::SerdeAnyMap;
+
+    struct DummyState {
+        metadata: SerdeAnyMap,
+    }
+
+    impl DummyState {
+        fn new() -> Self {
+            Self {
+                metadata: SerdeAnyMap::new(),
+            }
+        }
+    }
+
+    impl HasMetadata for DummyState {
+        fn metadata_map(&self) -> &SerdeAnyMap {
+            &self.metadata
+        }
+
+        fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
+            &mut self.metadata
+        }
+    }
+
+    struct NoopStage;
+
+    impl<E, EM, S, Z> Stage<E, EM, S, Z> for NoopStage {
+        fn perform(
+            &mut self,
+            _fuzzer: &mut Z,
+            _executor: &mut E,
+            _state: &mut S,
+            _manager: &mut EM,
+        ) -> Result<(), Error> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn trim_time_is_read_from_metadata() {
+        let mut state = DummyState::new();
+        state.add_metadata(TrimTime(Duration::from_secs(7)));
+
+        let seconds = state
+            .metadata::<TrimTime>()
+            .map_or(Duration::from_secs(0), |d| d.0)
+            .as_secs();
+
+        assert_eq!(seconds, 7);
+    }
+
+    #[test]
+    fn time_tracking_wrapper_updates_trim_time_metadata() {
+        let mut state = DummyState::new();
+
+        let mut wrapper: TimeTrackingStageWrapper<TrimTime, _, NoopStage> =
+            TimeTrackingStageWrapper::new(NoopStage);
+        let mut fuzzer = ();
+        let mut executor = ();
+        let mut manager = ();
+
+        wrapper
+            .perform(&mut fuzzer, &mut executor, &mut state, &mut manager)
+            .unwrap();
+
+        let stored = state.metadata::<TrimTime>().unwrap().0;
+        assert!(stored >= Duration::from_secs(0));
     }
 }

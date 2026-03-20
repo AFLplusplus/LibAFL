@@ -13,7 +13,7 @@ use alloc::{
 use core::{fmt, marker::PhantomData};
 
 #[cfg(feature = "std")]
-pub use afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime};
+pub use afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime, TrimTime};
 pub use calibrate::{CalibrationStage, run_target_with_timing};
 pub use colorization::*;
 #[cfg(all(feature = "std", unix))]
