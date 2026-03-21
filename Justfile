@@ -151,7 +151,7 @@ test-fuzzer fuzzer_dir:
 
 # Build libafl only
 build-libafl:
-    cargo build
+    cargo build -p libafl
 
 # Run tests serially
 test-serial:
