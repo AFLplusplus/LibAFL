@@ -31,7 +31,7 @@ impl Default for CMainArgsBuilder {
 }
 
 impl CMainArgsBuilder {
-    /// Creates a new CMainArgsBuilder
+    /// Creates a new `CMainArgsBuilder`
     #[must_use]
     pub fn new() -> Self {
         Self {
