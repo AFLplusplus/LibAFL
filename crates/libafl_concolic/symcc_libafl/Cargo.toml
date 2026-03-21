@@ -36,7 +36,6 @@ clone = ["which"]
 [dependencies]
 which = { workspace = true, optional = true }
 cmake = { workspace = true, optional = true }
-log = { workspace = true }
 
 [lints]
 workspace = true

@@ -26,4 +26,3 @@ debug = true
 [dependencies]
 libafl = { path = "../../../crates/libafl", features = ["multipart_inputs"] }
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
-log = { version = "0.4.22", features = ["release_max_level_info"] }
