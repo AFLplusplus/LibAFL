@@ -24,13 +24,10 @@ clap = { version = "4.5", default-features = false, features = [
   "error-context",
   "usage",
 ] }
-log = { version = "0.4", default-features = false }
 nix = { version = "0.30.1", default-features = false, features = [
   "process",
   "personality",
 ] }
 readonly = { version = "0.2.8", default-features = false }
-simplelog = { version = "0.12.1", default-features = false }
-
 [target.'cfg(any(target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd"))'.dependencies]
 libc = "0.2"
