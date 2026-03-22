@@ -257,7 +257,7 @@ impl Qemu {
 
     pub fn save_snapshot(&self, name: &str, sync: bool) -> Result<(), QemuSnapshotError> {
         let s = CString::new(name).expect("Invalid snapshot name");
-        let ret=unsafe { libafl_save_qemu_snapshot(s.as_ptr().cast_mut(), sync) };
+        let ret = unsafe { libafl_save_qemu_snapshot(s.as_ptr().cast_mut(), sync) };
         if ret != 0 {
             return Err(QemuSnapshotError::SaveFailed);
         }
@@ -267,7 +267,7 @@ impl Qemu {
 
     pub fn load_snapshot(&self, name: &str, sync: bool) -> Result<(), QemuSnapshotError> {
         let s = CString::new(name).expect("Invalid snapshot name");
-        let ret=unsafe { libafl_load_qemu_snapshot(s.as_ptr().cast_mut(), sync) };
+        let ret = unsafe { libafl_load_qemu_snapshot(s.as_ptr().cast_mut(), sync) };
         if ret != 0 {
             return Err(QemuSnapshotError::LoadFailed);
         }
