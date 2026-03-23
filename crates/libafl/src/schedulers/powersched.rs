@@ -165,7 +165,7 @@ pub struct PowerSchedule {
 
 impl PowerSchedule {
     #[must_use]
-    /// Constructor
+    /// Creates a new `PowerSchedule` with the specified base schedule.
     pub fn new(base: BaseSchedule) -> Self {
         Self {
             base,
