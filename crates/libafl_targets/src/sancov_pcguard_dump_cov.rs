@@ -40,9 +40,9 @@ pub struct SrcLoc {
 /// * `Vec<SrcLoc>` - The covered lines, location and symbol
 pub fn dump_covered_lines(clear: bool) -> Vec<SrcLoc> {
     let mut res = Vec::new();
-    #[allow(clippy::collapsible_if)]
-    if let Ok(mut guard) = COVERED_PCS.lock() {
-        if let Some(map) = guard.as_mut() {
+    if let Ok(mut guard) = COVERED_PCS.lock()
+        && let Some(map) = guard.as_mut()
+    {
             for (&pc, &hits) in map.iter() {
                 let mut loc = SrcLoc {
                     pc,
