@@ -70,6 +70,7 @@ jobs:
       - name: Doc
         if: runner.os == 'Linux'
         run: just doc
+      # DO NOT move the cache pull before this point, as it causes mdbook to fail due to duplicated deps
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
         if: runner.os == 'Linux'
