@@ -331,7 +331,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(
     while start < stop {
         unsafe {
             *start = MAX_EDGES_FOUND as u32;
-            start = start.offset(1);
+            start = start.add(1);
         }
 
         #[cfg(feature = "pointer_maps")]
