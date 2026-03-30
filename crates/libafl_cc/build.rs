@@ -1,6 +1,5 @@
 use core::str;
 #[cfg(any(
-    target_vendor = "apple",
     feature = "function-logging",
     feature = "cmplog-routines",
     feature = "autotokens",
