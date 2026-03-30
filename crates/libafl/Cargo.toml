@@ -121,7 +121,7 @@ intel_pt = ["std", "dep:libafl_intelpt", "dep:nix", "dep:num_enum"]
 intel_pt_export_raw = ["intel_pt", "libafl_intelpt/export_raw"]
 
 ## Enables features for corpus minimization
-cmin = ["z3"]
+cmin = ["dep:z3"]
 
 ## Enables the `PrometheusMonitor` which will monitor stats via UDP, for `Grafana` and others.
 prometheus_monitor = [
@@ -287,6 +287,8 @@ wait-timeout = { version = "0.2.0", optional = true } # used by CommandExecutor 
 
 regex = { workspace = true, optional = true }
 regex-syntax = { version = "0.8.4", optional = true } # For nautilus
+
+z3 = { workspace = true, optional = true } # for corpus minimization
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
 serial_test = { workspace = true, optional = true, default-features = false, features = [
