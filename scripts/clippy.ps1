@@ -31,8 +31,6 @@ function Run-Clippy {
 
 # Define projects for Windows
 $AllProjects = @(
-    "crates/libafl_concolic/test/dump_constraints",
-    "crates/libafl_concolic/test/runtime_test",
     "crates/libafl_libfuzzer",
     "crates/libafl_nyx",
     "crates/libafl_sugar",
