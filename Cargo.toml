@@ -11,10 +11,6 @@ members = [
   "crates/libafl_bolts",
   "crates/libafl_build",
   "crates/libafl_cc",
-  "crates/libafl_concolic/symcc_libafl",
-  "crates/libafl_concolic/symcc_runtime",
-  "crates/libafl_concolic/test/dump_constraints",
-  "crates/libafl_concolic/test/runtime_test",
   "crates/libafl_core",
   "crates/libafl_derive",
   "crates/libafl_frida",
@@ -68,8 +64,6 @@ exclude = [
   "utils/libafl_repo_tools",
   "utils/multi_machine_generator",
   "utils/noaslr",
-  # additional crates
-  "crates/libafl_concolic/test/symcc/util/symcc_fuzzing_helper",
 ]
 
 [workspace.package]
@@ -108,12 +102,6 @@ ownedref = { path = "./crates/ownedref", version = "0.16.0", default-features = 
 serde_anymap = { path = "./crates/serde_anymap", version = "0.16.0", default-features = false }
 shmem_providers = { path = "./crates/shmem_providers", version = "0.16.0", default-features = false }
 tuple_list_ex = { path = "./crates/tuple_list_ex", version = "0.16.0", default-features = false }
-
-# Concolic fuzzing crates
-dump_constraints = { path = "./crates/libafl_concolic/test/dump_constraints", version = "0.16.0", default-features = false }
-runtime_test = { path = "./crates/libafl_concolic/test/runtime_test", version = "0.16.0", default-features = false }
-symcc_libafl = { path = "./crates/libafl_concolic/symcc_libafl", version = "0.16.0", default-features = false }
-symcc_runtime = { path = "./crates/libafl_concolic/symcc_runtime", version = "0.16.0", default-features = false }
 
 # Utils
 build_and_test_fuzzers = { path = "./utils/build_and_test_fuzzers", version = "0.16.0", default-features = false }

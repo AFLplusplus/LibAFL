@@ -189,20 +189,6 @@ jobs:
         # `sancov_pcguard_edges` is tested seperatelyc
         run: just check-features ${{ matrix.instance_idx }}
 
-#  idk why bindgen generates a corrupted file only on CI.
-#  ubuntu-concolic:
-#    runs-on: ubuntu-24.04
-#    needs: ubuntu
-#    steps:
-#      - uses: dtolnay/rust-toolchain@stable
-#      - uses: actions/checkout@v4
-#      - uses: Swatinem/rust-cache@v2
-#        with: { shared-key: "ubuntu" }
-#      - name: Install smoke test deps
-#        run: sudo ./crates/libafl_concolic/test/smoke_test_ubuntu_deps.sh
-#      - name: Run smoke test
-#        run: ./crates/libafl_concolic/test/smoke_test.sh
-#
   python-bindings:
     runs-on: ubuntu-24.04
     steps:
@@ -340,7 +326,6 @@ jobs:
           # - inprocess/libfuzzer_windows_asan
           - inprocess/libfuzzer_stb_image_sugar
           - inprocess/libfuzzer_stb_image
-          - structure_aware/libfuzzer_stb_image_concolic
           # - inprocess/sqlite_centralized_multi_machine
           # - inprocess/libafl_libfuzzer_windows
 
