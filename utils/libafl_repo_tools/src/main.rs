@@ -387,7 +387,9 @@ async fn main() -> io::Result<()> {
             println!("Using {version}");
         }
 
-        let _ = warning.map(print_warning);
+        if let Some(w) = warning {
+            print_warning(&w);
+        }
 
         for project in rust_projects_to_handle.clone() {
             tokio_joinset.spawn(run_cargo_fmt(project, cli.check, cli.verbose));
@@ -450,7 +452,6 @@ async fn get_version_string(path: &str, args: &[&str]) -> Result<String, io::Err
     Ok(from_utf8(&res.stdout).unwrap().replace('\n', ""))
 }
 
-#[expect(clippy::needless_pass_by_value)]
-fn print_warning(warning: String) {
+fn print_warning(warning: &str) {
     println!("\n{} {}\n", "Warning:".yellow().bold(), warning);
 }
