@@ -58,6 +58,8 @@ jobs:
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: just check-blobs
+      - name: Check for conflicting versions
+        run: cargo tree -d
       - name: Build libafl debug
         run: just build-libafl
       - name: Test the book (Linux)
