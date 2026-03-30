@@ -95,9 +95,3 @@ It also supports a wide range of hooks and instrumentation options.
 ### [`libafl_nyx`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_nyx)
 
 [Nyx](https://nyx-fuzz.com/) is a KVM-based snapshot fuzzer. `libafl_nyx` adds these capabilities to LibAFL. There is a specific section explaining usage of libafl_nyx [later in the book](../advanced_features/nyx.md).
-
-### [`libafl_concolic`](https://github.com/AFLplusplus/LibAFL/tree/main/crates/libafl_concolic)
-
-Concolic fuzzing is the combination of fuzzing and a symbolic execution engine.
-This can reach greater depth than normal fuzzing, and is exposed in this crate.
-There is a specific section explaining usage of libafl_concolic [later in the book](../advanced_features/concolic.md).
