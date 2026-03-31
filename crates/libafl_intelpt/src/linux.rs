@@ -354,7 +354,7 @@ impl Default for IntelPTBuilder<'_> {
     ///     .unwrap()
     ///     .perf_aux_buffer_size(16 * 1024 * 1024)
     ///     .unwrap()
-    ///     .images(Vec::new())
+    ///     .images(&[])
     ///     .ip_filters(Default::default());
     /// assert_eq!(builder, IntelPTBuilder::default());
     /// ```
