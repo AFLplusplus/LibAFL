@@ -156,7 +156,6 @@ fn fast_bound_usize(rand: u64, n: usize) -> usize {
 /// Please note that these are not cryptographically secure.
 /// Or, even if some might be by accident, at least they are not seeded in a cryptographically secure fashion.
 pub trait Rand {
-    
     /// Sets the seed of this Rand
     fn set_seed(&mut self, seed: u64);
 
@@ -174,9 +173,11 @@ pub trait Rand {
         u as f64 * MAX_DIV
     }
 
-    /// TODO: add documentation
-    fn create_sub_rng(&mut self) -> Self 
-    where Self: Sized + Clone, 
+    /// Creates and returns a sub-RNG that gets its initial state from the current RNG state 
+    #[must_use]
+    fn create_sub_rng(&mut self) -> Self
+    where
+        Self: Sized + Clone,
     {
         let mut sub = self.clone();
         sub.set_seed(self.next());
@@ -894,4 +895,21 @@ mod tests {
         // LibAFL's Rand trait is auto-implemented for all SeedableRng + RngCore types.
         assert!(CountingRng(0).coinflip(0.1));
     }
+
+    #[test]
+    #[cfg(feature = "rand_trait")]
+    fn test_sub_rng_seed() {
+        let mut parent_a = StdRand::with_seed(0);
+        let mut parent_b = StdRand::with_seed(0);
+        let mut parent_c = StdRand::with_seed(1);
+
+        let mut sub_a = parent_a.create_sub_rng();
+        let mut sub_b = parent_b.create_sub_rng();
+        let mut sub_c = parent_c.create_sub_rng();
+
+        assert_ne!(sub_a.next(), sub_c.next());
+        sub_b.next();
+        assert_eq!(sub_a.next(), sub_b.next());
+    }
+
 }
