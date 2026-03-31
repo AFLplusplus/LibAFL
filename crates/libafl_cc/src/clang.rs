@@ -42,6 +42,40 @@ pub enum LLVMPasses {
 }
 
 impl LLVMPasses {
+    fn supported_for_llvm_version(self, llvm_version: Option<usize>) -> bool {
+        let Some(llvm_version) = llvm_version else {
+            return true;
+        };
+
+        if llvm_version < 22 {
+            return true;
+        }
+
+        !matches!(
+            self,
+            LLVMPasses::CoverageAccounting
+                | LLVMPasses::DumpCfg
+                | LLVMPasses::Ctx
+                | LLVMPasses::FunctionLogging
+        )
+    }
+
+    fn should_load(self) -> Result<bool, Error> {
+        if !self.supported_for_llvm_version(LIBAFL_CC_LLVM_VERSION) {
+            return Ok(false);
+        }
+
+        let path = self.path();
+        if path.exists() {
+            Ok(true)
+        } else {
+            Err(Error::Unknown(format!(
+                "LLVM pass artifact for {self:?} was not built at {}. Check your LLVM setup and enabled libafl_cc features.",
+                path.display()
+            )))
+        }
+    }
+
     /// Gets the path of the LLVM pass
     #[must_use]
     pub fn path(&self) -> PathBuf {
@@ -404,6 +438,17 @@ impl ToolWrapper for ClangWrapper {
         }
 
         for pass in &self.passes {
+            if !pass.should_load()? {
+                if !self.is_silent {
+                    eprintln!(
+                        "libafl_cc: skipping LLVM pass {pass:?} because LLVM {} is newer than the last version this custom LibAFL pass is known to support.",
+                        LIBAFL_CC_LLVM_VERSION
+                            .map_or_else(|| "unknown".to_string(), |version| version.to_string())
+                    );
+                }
+                continue;
+            }
+
             use_pass = true;
             // https://github.com/llvm/llvm-project/issues/56137
             // Need this -Xclang -load -Xclang -<pass>.so thing even with the new PM
@@ -613,7 +658,17 @@ impl ClangWrapper {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ClangWrapper, ToolWrapper};
+    use crate::{ClangWrapper, LLVMPasses, ToolWrapper};
+
+    #[test]
+    fn test_llvm_22_support_matrix() {
+        assert!(LLVMPasses::CmpLogRtn.supported_for_llvm_version(Some(22)));
+        assert!(LLVMPasses::AutoTokens.supported_for_llvm_version(Some(22)));
+        assert!(!LLVMPasses::CoverageAccounting.supported_for_llvm_version(Some(22)));
+        assert!(!LLVMPasses::DumpCfg.supported_for_llvm_version(Some(22)));
+        assert!(!LLVMPasses::Ctx.supported_for_llvm_version(Some(22)));
+        assert!(!LLVMPasses::FunctionLogging.supported_for_llvm_version(Some(22)));
+    }
 
     #[test]
     #[cfg_attr(miri, ignore)]

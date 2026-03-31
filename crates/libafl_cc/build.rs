@@ -24,6 +24,27 @@ use std::{env, fs::File, io::Write, path::Path};
 
 #[cfg(any(
     feature = "function-logging",
+    feature = "coverage-accounting",
+    feature = "ctx",
+    feature = "dump-cfg",
+))]
+fn pass_supported_in_llvm(src_file: &str, llvm_version: Option<usize>) -> bool {
+    let Some(llvm_version) = llvm_version else {
+        return true;
+    };
+
+    if llvm_version < 22 {
+        return true;
+    }
+
+    !matches!(
+        src_file,
+        "function-logging.cc" | "coverage-accounting-pass.cc" | "ctx-pass.cc" | "dump-cfg-pass.cc"
+    )
+}
+
+#[cfg(any(
+    feature = "function-logging",
     feature = "cmplog-routines",
     feature = "autotokens",
     feature = "coverage-accounting",
@@ -119,6 +140,46 @@ fn build_pass(
             );
         }
     }
+}
+
+#[cfg(any(
+    feature = "function-logging",
+    feature = "cmplog-routines",
+    feature = "autotokens",
+    feature = "coverage-accounting",
+    feature = "cmplog-instructions",
+    feature = "ctx",
+    feature = "dump-cfg",
+))]
+fn maybe_build_pass(
+    llvm_version: Option<usize>,
+    bindir_path: &Path,
+    out_dir: &Path,
+    cxxflags: &Vec<String>,
+    ldflags: &Vec<&str>,
+    src_dir: &Path,
+    src_file: &str,
+    additional_srcfiles: Option<&Vec<&str>>,
+    required: bool,
+) {
+    if !pass_supported_in_llvm(src_file, llvm_version) {
+        let version = llvm_version.unwrap();
+        println!(
+            "cargo:warning=Skipping compiler pass src/{src_file}: LLVM {version} is newer than the last version this custom LibAFL pass is known to support."
+        );
+        return;
+    }
+
+    build_pass(
+        bindir_path,
+        out_dir,
+        cxxflags,
+        ldflags,
+        src_dir,
+        src_file,
+        additional_srcfiles,
+        required,
+    );
 }
 
 #[expect(clippy::too_many_lines)]
@@ -238,6 +299,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     cxxflags.push(format!("-DACCOUNTING_MAP_SIZE={acc_map_size}"));
 
     let llvm_version = libafl_build::find_llvm_version();
+    let llvm_version = llvm_version.and_then(|version| usize::try_from(version).ok());
 
     // We want the paths quoted, and debug formatting does that - allow debug formatting.
     #[allow(unknown_lints)] // not on stable yet
@@ -307,7 +369,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     }
 
     #[cfg(feature = "function-logging")]
-    build_pass(
+    maybe_build_pass(
+        llvm_version,
         bindir_path,
         out_dir,
         &cxxflags,
@@ -319,7 +382,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     );
 
     #[cfg(feature = "cmplog-routines")]
-    build_pass(
+    maybe_build_pass(
+        llvm_version,
         bindir_path,
         out_dir,
         &cxxflags,
@@ -331,7 +395,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     );
 
     #[cfg(feature = "autotokens")]
-    build_pass(
+    maybe_build_pass(
+        llvm_version,
         bindir_path,
         out_dir,
         &cxxflags,
@@ -343,7 +408,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     );
 
     #[cfg(feature = "coverage-accounting")]
-    build_pass(
+    maybe_build_pass(
+        llvm_version,
         bindir_path,
         out_dir,
         &cxxflags,
@@ -355,7 +421,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     );
 
     #[cfg(feature = "cmplog-instructions")]
-    build_pass(
+    maybe_build_pass(
+        llvm_version,
         bindir_path,
         out_dir,
         &cxxflags,
@@ -367,7 +434,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     );
 
     #[cfg(feature = "ctx")]
-    build_pass(
+    maybe_build_pass(
+        llvm_version,
         bindir_path,
         out_dir,
         &cxxflags,
@@ -379,7 +447,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     );
 
     #[cfg(feature = "dump-cfg")]
-    build_pass(
+    maybe_build_pass(
+        llvm_version,
         bindir_path,
         out_dir,
         &cxxflags,

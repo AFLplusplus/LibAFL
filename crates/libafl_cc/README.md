@@ -5,7 +5,13 @@
 It's advisable to use this crate together with a fairly recent `LLVM` version.
 To install LLVM, use the official [download page](https://releases.llvm.org/download.html).
 
-The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0 up to LLVM 17.0.0)
+The LLVM tools (including clang, clang++) are needed (newer than LLVM 11.0.0).
+
+`libafl_cc` supports recent LLVM releases, including LLVM 22+, for the core
+wrapper flow and the maintained passes such as `cmplog` and `autotokens`.
+Some custom LibAFL-specific passes are currently only supported through LLVM 21.
+On LLVM 22 and newer, `function-logging`, `coverage-accounting`, `ctx`, and
+`dump-cfg` are skipped until they are ported to the newer LLVM API.
 
 - When compiling LLVM tools on Windows, you can try to compile LLVM with the below commands (tested on LLVM 16.0.6).
 - NOTE: This assumes you have Visual Studio 17 2022 and MSVC v143 Tools installed under "Individual Components"
