@@ -173,17 +173,6 @@ pub trait Rand {
         u as f64 * MAX_DIV
     }
 
-    /// Creates and returns a sub-RNG that gets its initial state from the current RNG state 
-    #[must_use]
-    fn create_sub_rng(&mut self) -> Self
-    where
-        Self: Sized + Clone,
-    {
-        let mut sub = self.clone();
-        sub.set_seed(self.next());
-        sub
-    }
-
     /// Returns true with specified probability
     #[inline]
     fn coinflip(&mut self, success_prob: f64) -> bool {
@@ -294,6 +283,20 @@ where
         self.next_u64()
     }
 }
+
+/// Produce a sub-RNG seeded from the current RNG state.
+/// Useful when sampling random data while also accessing the state.
+pub trait SubRng: Rand + Sized + Clone {
+    /// Creates and returns a sub-RNG.
+    #[must_use]
+    fn sub_rng(&mut self) -> Self {
+        let mut sub = self.clone();
+        sub.set_seed(self.next());
+        sub
+    }
+}
+
+impl<R: Rand + Sized + Clone> SubRng for R {}
 
 macro_rules! impl_default_new {
     ($rand:ty) => {
@@ -741,7 +744,7 @@ mod tests {
     use core::num::NonZero;
 
     use crate::{
-        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
+        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, SubRng, XorShift64Rand,
         Xoshiro256PlusPlusRand,
     };
 
@@ -902,13 +905,12 @@ mod tests {
         let mut parent_b = StdRand::with_seed(0);
         let mut parent_c = StdRand::with_seed(1);
 
-        let mut sub_a = parent_a.create_sub_rng();
-        let mut sub_b = parent_b.create_sub_rng();
-        let mut sub_c = parent_c.create_sub_rng();
+        let mut sub_a = parent_a.sub_rng();
+        let mut sub_b = parent_b.sub_rng();
+        let mut sub_c = parent_c.sub_rng();
 
         assert_ne!(sub_a.next(), sub_c.next());
         sub_b.next();
         assert_eq!(sub_a.next(), sub_b.next());
     }
-
 }
