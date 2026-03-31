@@ -897,7 +897,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "rand_trait")]
     fn test_sub_rng_seed() {
         let mut parent_a = StdRand::with_seed(0);
         let mut parent_b = StdRand::with_seed(0);

@@ -17,6 +17,8 @@
   - Instead of names, `MultipartInput` uses generic `key`s (function names were changed accordingly).
   - If you don't need the keys to identify individual parts, consider using `ListInput` directly.
   - `StdScheduledMutator` has been renamed to `HavocScheduledMutator`.
+- `Rand` trait now has a default `create_sub_rng` method that produces a sub-RNG that derives its initial state from the current RNG state.
+- `HasRand` trait now has a default `sub_rand` method (for convenient access).
 
 ## 0.14.1 -> 0.15.0
 
