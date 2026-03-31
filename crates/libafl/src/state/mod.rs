@@ -103,6 +103,14 @@ pub trait HasRand {
     fn rand(&self) -> &Self::Rand;
     /// The rand instance (mutable)
     fn rand_mut(&mut self) -> &mut Self::Rand;
+
+    /// TODO: add documentation
+    fn sub_rand(&mut self) -> Self:: Rand
+    where
+        Self::Rand: Clone,
+        {
+            self.rand_mut().create_sub_rng()
+        }
 }
 
 #[cfg(feature = "introspection")]
