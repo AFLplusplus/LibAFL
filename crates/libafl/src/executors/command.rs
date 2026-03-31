@@ -878,12 +878,10 @@ fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use libafl_bolts::StdTargetArgs;
-    #[cfg(unix)]
     use libafl_bolts::tuples::Handled;
-    #[cfg(unix)]
     use tuple_list::tuple_list;
 
     use crate::{
@@ -897,12 +895,10 @@ mod tests {
         monitors::SimpleMonitor,
         state::NopState,
     };
-    #[cfg(unix)]
     use crate::{executors::StdChildArgs, observers::StdOutObserver};
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    #[cfg(unix)]
     fn test_builder() {
         let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
             SimpleEventManager::new(SimpleMonitor::new(|status| {
@@ -928,7 +924,6 @@ mod tests {
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    #[cfg(unix)]
     fn test_capture() {
         let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
             SimpleEventManager::new(SimpleMonitor::new(|status| {
