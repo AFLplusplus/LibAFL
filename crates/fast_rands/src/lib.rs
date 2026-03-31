@@ -156,6 +156,7 @@ fn fast_bound_usize(rand: u64, n: usize) -> usize {
 /// Please note that these are not cryptographically secure.
 /// Or, even if some might be by accident, at least they are not seeded in a cryptographically secure fashion.
 pub trait Rand {
+    
     /// Sets the seed of this Rand
     fn set_seed(&mut self, seed: u64);
 
@@ -171,6 +172,15 @@ pub trait Rand {
         const MAX_DIV: f64 = 1.0 / (MAX as f64);
         let u = self.next() & MAX.wrapping_sub(1);
         u as f64 * MAX_DIV
+    }
+
+    /// TODO: add documentation
+    fn create_sub_rng(&mut self) -> Self 
+    where Self: Sized + Clone, 
+    {
+        let mut sub = self.clone();
+        sub.set_seed(self.next());
+        sub
     }
 
     /// Returns true with specified probability
