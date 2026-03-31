@@ -8,13 +8,13 @@ use crate::executors::hooks::ExecutorHook;
 
 /// Hook to enable Intel Processor Trace (PT) tracing
 #[derive(Debug, TypedBuilder)]
-pub struct IntelPTHook<T> {
-    intel_pt: IntelPT,
+pub struct IntelPTHook<'a, T> {
+    intel_pt: IntelPT<'a>,
     map_ptr: *mut T,
     map_len: usize,
 }
 
-impl<I, S, T> ExecutorHook<I, S> for IntelPTHook<T>
+impl<I, S, T> ExecutorHook<I, S> for IntelPTHook<'_, T>
 where
     S: Serialize,
     T: CoverageEntry,
