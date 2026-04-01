@@ -286,17 +286,19 @@ where
 
 /// Produce a sub-RNG seeded from the current RNG state.
 /// Useful when sampling random data while also accessing the state.
-pub trait SubRng: Rand + Sized + Clone {
+pub trait SubRng {
     /// Creates and returns a sub-RNG.
-    #[must_use]
+    fn sub_rng(&mut self) -> Self;
+}
+
+impl<R: Rand + Sized + Clone> SubRng for R {
+    /// Creates and returns a sub-RNG.
     fn sub_rng(&mut self) -> Self {
         let mut sub = self.clone();
         sub.set_seed(self.next());
         sub
     }
 }
-
-impl<R: Rand + Sized + Clone> SubRng for R {}
 
 macro_rules! impl_default_new {
     ($rand:ty) => {
