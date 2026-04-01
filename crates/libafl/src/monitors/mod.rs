@@ -51,23 +51,27 @@ pub use statsd::StatsdMonitor;
 pub(crate) fn pizza_is_served() -> bool {
     static PIZZA_IS_SERVED: OnceLock<bool> = OnceLock::new();
     *PIZZA_IS_SERVED.get_or_init(|| {
-        std::env::var("AFL_PIZZA_MODE").is_ok_and(|v| v != "0") || {
-            #[cfg(unix)]
-            // SAFETY: `localtime` and `time` are standard libc functions. `t` is initialized.
-            unsafe {
-                let mut t = 0;
-                libc::time(&raw mut t);
-                let tm = libc::localtime(&raw const t);
-                !tm.is_null() && (*tm).tm_mon == 3 && (*tm).tm_mday == 1
+        match std::env::var("AFL_PIZZA_MODE") {
+            Ok(v) if v == "0" => false,
+            Ok(_) => true,
+            Err(_) => {
+                #[cfg(unix)]
+                // SAFETY: `localtime` and `time` are standard libc functions. `t` is initialized.
+                unsafe {
+                    let mut t = 0;
+                    libc::time(&raw mut t);
+                    let tm = libc::localtime(&raw const t);
+                    !tm.is_null() && (*tm).tm_mon == 3 && (*tm).tm_mday == 1
+                }
+                #[cfg(windows)]
+                // SAFETY: `GetLocalTime` is a standard Win32 API.
+                unsafe {
+                    let lt = windows::Win32::System::SystemInformation::GetLocalTime();
+                    lt.wMonth == 4 && lt.wDay == 1
+                }
+                #[cfg(not(any(unix, windows)))]
+                false
             }
-            #[cfg(windows)]
-            // SAFETY: `GetLocalTime` is a standard Win32 API.
-            unsafe {
-                let lt = windows::Win32::System::SystemInformation::GetLocalTime();
-                lt.wMonth == 4 && lt.wDay == 1
-            }
-            #[cfg(not(any(unix, windows)))]
-            false
         }
     })
 }
