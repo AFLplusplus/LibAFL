@@ -288,6 +288,7 @@ where
 /// Useful when sampling random data while also accessing the state.
 pub trait SubRng {
     /// Creates and returns a sub-RNG.
+    #[must_use]
     fn sub_rng(&mut self) -> Self;
 }
 
