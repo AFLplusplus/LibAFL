@@ -291,7 +291,10 @@ pub trait SubRng {
     fn sub_rng(&mut self) -> Self;
 }
 
-impl<R: Rand + Sized + Clone> SubRng for R {
+impl<R> SubRng for R
+where
+    R: Rand + Sized + Clone
+{
     /// Creates and returns a sub-RNG.
     fn sub_rng(&mut self) -> Self {
         let mut sub = self.clone();
