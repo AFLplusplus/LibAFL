@@ -294,7 +294,7 @@ pub trait SubRng {
 
 impl<R> SubRng for R
 where
-    R: Rand + Sized + Clone
+    R: Rand + Sized + Clone,
 {
     /// Creates and returns a sub-RNG.
     fn sub_rng(&mut self) -> Self {
