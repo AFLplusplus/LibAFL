@@ -4,6 +4,9 @@ version = "0.16.0"
 edition = "2024"
 publish = false
 
+[lints.clippy]
+negative_feature_names = "allow"
+
 [features]
 default = ["interceptors"]
 ## Enables forking mode for the LibAFL launcher (instead of starting new processes)
