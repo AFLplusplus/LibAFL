@@ -339,7 +339,14 @@ where
                 None => {
                     log::info!("First run. Let's set it all up");
                     // Mgr to send and receive msgs from/to all other fuzzer instances
-                    (None::<S>, mgr_constructor(None)?)
+                    match mgr_constructor(None) {
+                        Ok(mgr) => (None::<S>, mgr),
+                        Err(Error::ShuttingDown) => {
+                            staterestorer.send_exiting();
+                            return Err(Error::shutting_down());
+                        }
+                        Err(e) => return Err(e),
+                    }
                 }
                 // Restoring from a previous run, deserialize state and corpus.
                 Some((state, inner_state)) => {
