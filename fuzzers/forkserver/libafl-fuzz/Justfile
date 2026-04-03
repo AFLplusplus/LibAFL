@@ -201,6 +201,8 @@ test_unicorn_mode: build_libafl_fuzz build_afl build_unicorn_mode
     export AFL_CORES=0
     export AFL_STATS_INTERVAL=1
 
+    source {{ AFL_DIR }}/unicorn_mode/.venv/bin/activate
+
     # TODO: test unicorn persistent mode once it's fixed on AFL++
 
     LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_DEBUG_CHILD=1 timeout 15s {{ FUZZER }} -m 0 -U -i ./test/seeds_unicorn -o ./test/output-unicorn-python -- python3 {{ AFL_DIR }}/unicorn_mode/samples/python_simple/simple_test_harness.py @@ || true
