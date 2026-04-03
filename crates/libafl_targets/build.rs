@@ -5,6 +5,7 @@ use std::{env, fs::File, io::Write, path::Path};
 const TWO_MIB: usize = 2_097_152;
 const SIXTY_FOUR_KIB: usize = 65_536;
 
+#[cfg(any(feature = "sancov_value_profile", feature = "sancov_cmplog"))]
 fn force_undefined(symbol: &str) {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     if target_os == "macos" || target_os == "ios" {
