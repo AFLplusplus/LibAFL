@@ -376,7 +376,7 @@ mod tests {
         assert_eq!(edge.successor_edges.len(), 0);
         assert_eq!(edge.successor_basic_blocks.len(), 0);
 
-        edge = cfg.get_edge((26911 >> 1) ^ 0xcde2).unwrap();
+        edge = cfg.get_edge((0x691f >> 1) ^ 0xcde2).unwrap();
         assert_eq!(edge.calling_func, "main");
         assert_eq!(edge.successor_edges.len(), 0);
         assert_eq!(edge.successor_basic_blocks.len(), 0);
@@ -386,10 +386,10 @@ mod tests {
         assert_eq!(edge.successor_edges.len(), 2);
         assert_eq!(
             *edge.successor_edges.first().unwrap(),
-            (26911 >> 1) ^ 0xcde2
+            (0x691f >> 1) ^ 0xcde2
         );
 
-        assert!(cfg.get_edge(26911).is_none());
+        assert!(cfg.get_edge(0x691f).is_none());
         assert!(cfg.get_edge(41864).is_some());
     }
 
@@ -399,8 +399,8 @@ mod tests {
         let cfg: ControlFlowGraph<TestMetadata> = ControlFlowGraph::from_content(TEST_GRAPH_STR);
         let distances = cfg.calculate_distances_to_all_edges((41864 >> 1) ^ 0x691f);
         assert_eq!(*distances.get(&((41864 >> 1) ^ 0x691f)).unwrap(), 1);
-        assert_eq!(*distances.get(&((26911 >> 1) ^ 0xcde2)).unwrap(), 2);
-        assert_eq!(*distances.get(&((26911 >> 1) ^ 0xa3c5)).unwrap(), 2);
+        assert_eq!(*distances.get(&((0x691f >> 1) ^ 0xcde2)).unwrap(), 2);
+        assert_eq!(*distances.get(&((0x691f >> 1) ^ 0xa3c5)).unwrap(), 2);
         assert!(!distances.contains_key(&((41864 >> 1) ^ 0xcde2)));
     }
 }

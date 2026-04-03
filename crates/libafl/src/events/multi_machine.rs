@@ -1,3 +1,6 @@
+//! Event manager for forwarding events between fuzzers on different machines.
+//! This one uses TCP to connect the parent and child nodes and exchange
+//! interesting inputs between them.
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::{
     fmt::Display,

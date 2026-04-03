@@ -29,9 +29,15 @@ feel free to add an AST-based input for structured fuzzing, and more.
 
 - **The Rust development language**
   - We highly recommend *not* to use e.g. your Linux distribution package as this is likely outdated. So rather install Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
+  - The minimum supported Rust version is defined. You can always check the currently required version in LibAFL’s [Cargo.toml](https://github.com/AFLplusplus/LibAFL/blob/main/crates/libafl/Cargo.toml):
+
+    If your installed Rust version is older than the one listed in Cargo.toml, update to the latest stable toolchain:
+
+    ```bash
+    rustup update stable
+    ```
 - **LLVM tools**
   - The LLVM tools (including clang, clang++) are needed (newer than LLVM 15.0.0 up to LLVM 18.1.3) If you are using Debian/Ubuntu, again, we highly recommmend that you install the package from [here](https://apt.llvm.org/)
-  - (In `libafl_concolic`, we only support LLVM version newer than 18)
 - Just:
   - We use [just](https://github.com/casey/just) to build the fuzzers in `fuzzers/` directory. You can find instructions to install it in your environment [in the Just Programmer's Manual](https://just.systems/man/en/packages.html).
 

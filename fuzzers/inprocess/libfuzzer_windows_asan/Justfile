@@ -11,33 +11,27 @@ alias cc := cxx
 
 [windows]
 cxx:
-    cargo build --profile {{PROFILE}}
+    cargo build --profile {{ PROFILE }}
 
 [linux]
 [macos]
 cxx:
     echo "Unsupported on this platform"
 
-[linux]
-[macos]
-cxx:
-    cargo build --profile {{PROFILE}}
-
 [windows]
 fuzzer: cxx
-    .\target\{{PROFILE}}\libafl_cxx .\harness.cpp -o {{FUZZER_NAME}}.exe
+    .\target\{{ PROFILE }}\libafl_cxx .\harness.cpp -o {{ FUZZER_NAME }}.exe
 
 [linux]
 [macos]
 fuzzer:
     echo "Unsupported on this platform"
 
-    
 [windows]
 test: fuzzer
-    start {{FUZZER_NAME}}.exe
-    start {{FUZZER_NAME}}.exe
-    ping -n 10 127.0.0.1>NUL && taskkill /im {{FUZZER_NAME}}.exe /F
+    start {{ FUZZER_NAME }}.exe
+    start {{ FUZZER_NAME }}.exe
+    ping -n 10 127.0.0.1>NUL && taskkill /im {{ FUZZER_NAME }}.exe /F
     dir /a-d crashes && (echo Files exist) || (exit /b 1337)
 
 [linux]
@@ -45,10 +39,9 @@ test: fuzzer
 test:
     echo "Unsupported on this platform"
 
-
 [windows]
 clean:
-    del ./{{FUZZER_NAME}}
+    del ./{{ FUZZER_NAME }}
     cargo clean
 
 [linux]

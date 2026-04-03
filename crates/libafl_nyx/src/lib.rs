@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 #[cfg(target_os = "linux")]
 pub mod cmplog;
 #[cfg(target_os = "linux")]

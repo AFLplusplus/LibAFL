@@ -5,13 +5,6 @@ Modified to add the `__libqasan_` prefix to avoid stdlib conflicts and an intern
 
 # A printf / sprintf Implementation for Embedded Systems
 
-[![Build Status](https://travis-ci.org/mpaland/printf.svg?branch=master)](https://travis-ci.org/mpaland/printf)
-[![codecov](https://codecov.io/gh/mpaland/printf/branch/master/graph/badge.svg)](https://codecov.io/gh/mpaland/printf)
-[![Coverity Status](https://img.shields.io/coverity/scan/14180.svg)](https://scan.coverity.com/projects/mpaland-printf)
-[![Github Issues](https://img.shields.io/github/issues/mpaland/printf.svg)](http://github.com/mpaland/printf/issues)
-[![Github Releases](https://img.shields.io/github/release/mpaland/printf.svg)](https://github.com/mpaland/printf/releases)
-[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/mpaland/avl_array/master/LICENSE)
-
 This is a tiny but **fully loaded** printf, sprintf and (v)snprintf implementation.
 Primarily designed for usage in embedded systems, where printf is not available due to memory issues or in avoidance of linking against libc.
 Using the standard libc printf may pull **a lot** of unwanted library stuff and can bloat code size about 20k or is not 100% thread safe. In this cases the following implementation can be used.

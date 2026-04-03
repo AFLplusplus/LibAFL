@@ -1,6 +1,6 @@
 # `LibAFL_CC`: The `LibAFL` compiler wrapper
 
-`LibAFL` CC probives a convenient compiler wrapper toolkit for `LibAFL` users.
+`LibAFL` CC provides a convenient compiler wrapper toolkit for `LibAFL` users.
 
 It's advisable to use this crate together with a fairly recent `LLVM` version.
 To install LLVM, use the official [download page](https://releases.llvm.org/download.html).

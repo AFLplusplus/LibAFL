@@ -24,6 +24,7 @@ runs:
         sudo apt-get install -y \
           curl lsb-release wget software-properties-common gnupg shellcheck pax-utils \
           libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev
+        echo "export LLVM_CONFIG_PATH=$(which llvm-config-${{ env.MAIN_LLVM_VERSION }})" | sudo tee -a /etc/environment
 
     # ---------- toolchain selection ----------
     - name: Install Rust (stable)

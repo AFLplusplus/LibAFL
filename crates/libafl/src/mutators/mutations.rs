@@ -476,7 +476,7 @@ macro_rules! interesting_mutator_impl {
                     // the length is at least as large as the size here (checked above), and we add a 1 -> never zero.
                     let idx = state
                         .rand_mut()
-                        .below(unsafe { NonZero::new(upper_bound).unwrap_unchecked() });
+                        .below(unsafe { NonZero::new_unchecked(upper_bound) });
                     let val = *state.rand_mut().choose(&$interesting).unwrap() as $size;
                     let new_bytes = match state.rand_mut().choose(&[0, 1]).unwrap() {
                         0 => val.to_be_bytes(),
@@ -534,9 +534,7 @@ where
 
         // # Safety
         // size - 1 is guaranteed to be larger than 0 because we abort on size <= 2 above.
-        let range = rand_range(state, size, unsafe {
-            NonZero::new(size - 1).unwrap_unchecked()
-        });
+        let range = rand_range(state, size, unsafe { NonZero::new_unchecked(size - 1) });
 
         input.drain(range);
 
@@ -586,7 +584,7 @@ where
         // # Safety
         // max_size - size is larger than 0 because we check that size < max_size above
         let range = rand_range(state, size, unsafe {
-            NonZero::new(min(16, max_size - size)).unwrap_unchecked()
+            NonZero::new_unchecked(min(16, max_size - size))
         });
 
         input.resize(size + range.len(), 0);
@@ -648,7 +646,7 @@ where
         // If we wrap around we have _a lot_ of elements - and the code will break later anyway.
         let offset = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size + 1).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size + 1) });
 
         if size + amount > max_size {
             if max_size > size {
@@ -662,7 +660,7 @@ where
         // size is larger than 0, checked above.
         let val = input.mutator_bytes()[state
             .rand_mut()
-            .below(unsafe { NonZero::new(size).unwrap_unchecked() })];
+            .below(unsafe { NonZero::new_unchecked(size) })];
 
         input.resize(size + amount, 0);
         unsafe {
@@ -723,7 +721,7 @@ where
         // size + 1 can never be 0
         let offset = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size.wrapping_add(1)).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size.wrapping_add(1)) });
 
         if size + amount > max_size {
             if max_size > size {
@@ -790,7 +788,7 @@ where
         // # Safety
         // Size is larger than 0, checked above (and 16 is also lager than 0 FWIW)
         let range = rand_range(state, size, unsafe {
-            NonZero::new(min(size, 16)).unwrap_unchecked()
+            NonZero::new_unchecked(min(size, 16))
         });
 
         let val = *state.rand_mut().choose(input.mutator_bytes()).unwrap();
@@ -841,7 +839,7 @@ where
         // # Safety
         // Size is larger than 0, checked above. 16 is larger than 0, according to my math teacher.
         let range = rand_range(state, size, unsafe {
-            NonZero::new(min(size, 16)).unwrap_unchecked()
+            NonZero::new_unchecked(min(size, 16))
         });
 
         let val = state.rand_mut().next() as u8;
@@ -894,11 +892,11 @@ where
         // size is always larger than 0 here (checked above)
         let target = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size) });
         // # Safety
         // target is smaller than size (`below` is exclusive) -> The subtraction is always larger than 0
         let range = rand_range(state, size, unsafe {
-            NonZero::new(size - target).unwrap_unchecked()
+            NonZero::new_unchecked(size - target)
         });
 
         unsafe {
@@ -953,14 +951,14 @@ where
         // We checked that size is larger than 0 above.
         let target = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size) });
         // make sure that the sampled range is both in bounds and of an acceptable size
         let max_insert_len = min(size - target, state.max_size() - size);
         let max_insert_len = min(16, max_insert_len);
 
         // # Safety
         // size > target and state.max_size() > size
-        let max_insert_len = unsafe { NonZero::new(max_insert_len).unwrap_unchecked() };
+        let max_insert_len = unsafe { NonZero::new_unchecked(max_insert_len) };
 
         let range = rand_range(state, size, max_insert_len);
 
@@ -1036,16 +1034,14 @@ where
 
         // # Safety
         // size is larger than 0, checked above.
-        let first = rand_range(state, size, unsafe {
-            NonZero::new(size).unwrap_unchecked()
-        });
+        let first = rand_range(state, size, unsafe { NonZero::new_unchecked(size) });
         if state.rand_mut().next() & 1 == 0 && first.start != 0 {
             // The second range comes before first.
 
             // # Safety
             // first.start is larger than 0, checked above.
             let second = rand_range(state, first.start, unsafe {
-                NonZero::new(first.start).unwrap_unchecked()
+                NonZero::new_unchecked(first.start)
             });
             self.tmp_buf.resize(first.len(), 0);
             unsafe {
@@ -1129,7 +1125,7 @@ where
             // # Safety
             // first.end is not equal to size, so subtracting them can never be 0.
             let mut second = rand_range(state, size - first.end, unsafe {
-                NonZero::new(size - first.end).unwrap_unchecked()
+                NonZero::new_unchecked(size - first.end)
             });
             second.start += first.end;
             second.end += first.end;
@@ -1317,7 +1313,7 @@ where
         // other_size is checked above.
         // size is smaller than max_size (also checked above) -> the subtraction result is larger than 0.
         let range = rand_range(state, other_size, unsafe {
-            NonZero::new(min(other_size, max_size - size)).unwrap_unchecked()
+            NonZero::new_unchecked(min(other_size, max_size - size))
         });
         let target = state.rand_mut().below(nonzero_size);
 
@@ -1417,12 +1413,12 @@ where
         // Size is > 0 here (checked above)
         let target = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size) });
         // # Safety
         // other_size is checked above.
         // target is smaller than size (since below is exclusive) -> the subtraction result is larger than 0.
         let range = rand_range(state, other_size, unsafe {
-            NonZero::new(min(other_size, size - target)).unwrap_unchecked()
+            NonZero::new_unchecked(min(other_size, size - target))
         });
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
@@ -1532,13 +1528,13 @@ where
         // other_size is checked to be larger than 0
         // max_size is checked to be larger than size, so the subtraction will always be positive and non-0
         let range = rand_range(state, other_size, unsafe {
-            NonZero::new(min(other_size, max_size - size)).unwrap_unchecked()
+            NonZero::new_unchecked(min(other_size, max_size - size))
         });
         // # Safety
         // size is checked above to never be 0.
         let target = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size) });
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
@@ -1627,12 +1623,12 @@ where
         // We checked for size == 0 above.
         let target = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+            .below(unsafe { NonZero::new_unchecked(size) });
         // # Safety
         // other_size is checked above to not be 0.
         // size is larger than target since below is exclusive -> subtraction is always non-0.
         let range = rand_range(state, other_size, unsafe {
-            NonZero::new(min(other_size, size - target)).unwrap_unchecked()
+            NonZero::new_unchecked(min(other_size, size - target))
         });
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();

@@ -85,8 +85,7 @@ fn choose_start<R: Rand>(
         options_len => {
             // # Safety
             // options.len() is checked above.
-            let options_len_squared =
-                unsafe { NonZero::new(options_len * options_len).unwrap_unchecked() };
+            let options_len_squared = unsafe { NonZero::new_unchecked(options_len * options_len) };
             // bias towards longer strings
             options.sort_by_cached_key(|(_, entries)| entries.count_ones());
             let selected =

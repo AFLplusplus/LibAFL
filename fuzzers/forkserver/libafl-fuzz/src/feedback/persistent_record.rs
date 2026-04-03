@@ -10,17 +10,17 @@ use libafl::{
 use libafl_bolts::{Error, Named};
 use serde::{Deserialize, Serialize};
 
-/// A [`PersitentRecordFeedback`] tracks the last N inputs that the fuzzer has run.
+/// A [`PersistentRecordFeedback`] tracks the last N inputs that the fuzzer has run.
 /// TODO: Kept in memory for now but should write to disk.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct PersitentRecordFeedback<I> {
+pub struct PersistentRecordFeedback<I> {
     /// Vec that tracks the last `record_size` [`Input`]
     record: VecDeque<I>,
     record_size: usize,
 }
 
-impl<I> PersitentRecordFeedback<I> {
-    /// Create a new [`PersitentRecordFeedback`].
+impl<I> PersistentRecordFeedback<I> {
+    /// Create a new [`PersistentRecordFeedback`].
     pub fn new(record_size: usize) -> Self {
         Self {
             record_size,
@@ -29,11 +29,11 @@ impl<I> PersitentRecordFeedback<I> {
     }
 }
 
-impl<I, T> FeedbackFactory<PersitentRecordFeedback<I>, T> for PersitentRecordFeedback<I>
+impl<I, T> FeedbackFactory<PersistentRecordFeedback<I>, T> for PersistentRecordFeedback<I>
 where
     I: Clone,
 {
-    fn create_feedback(&self, _ctx: &T) -> PersitentRecordFeedback<I> {
+    fn create_feedback(&self, _ctx: &T) -> PersistentRecordFeedback<I> {
         Self {
             record_size: self.record_size,
             record: self.record.clone(),
@@ -41,16 +41,16 @@ where
     }
 }
 
-impl<I> Named for PersitentRecordFeedback<I> {
+impl<I> Named for PersistentRecordFeedback<I> {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("PersitentRecordFeedback");
+        static NAME: Cow<'static, str> = Cow::Borrowed("PersistentRecordFeedback");
         &NAME
     }
 }
 
-impl<I, S> StateInitializer<S> for PersitentRecordFeedback<I> {}
+impl<I, S> StateInitializer<S> for PersistentRecordFeedback<I> {}
 
-impl<EM, I, OT, S> Feedback<EM, I, OT, S> for PersitentRecordFeedback<I>
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for PersistentRecordFeedback<I>
 where
     S: HasCorpus<I>,
     I: Input,
@@ -111,7 +111,7 @@ where
     }
 }
 
-impl<I> PersitentRecordFeedback<I> {
+impl<I> PersistentRecordFeedback<I> {
     fn should_run(&self) -> bool {
         self.record_size > 0
     }

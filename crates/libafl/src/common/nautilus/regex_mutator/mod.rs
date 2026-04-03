@@ -31,7 +31,7 @@ impl RegexScript {
         } else {
             // # Safety
             // This is checked above to be non-null.
-            rand.below(unsafe { NonZero::new(val).unwrap_unchecked() })
+            rand.below(unsafe { NonZero::new_unchecked(val) })
         }
     }
 

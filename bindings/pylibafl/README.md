@@ -3,17 +3,14 @@
 ## First time setup
 
 ```bash
-# Install maturin
-pip install maturin
+# Navigate to the pylibafl directory
+cd LibAFL/bindings/pylibafl
 # Create virtual environment
 python3 -m venv .env
-```
-
-## Build bindings
-
-```sh
 # Activate virtual environment
 source .env/bin/activate
+# Install maturin
+pip install maturin
 # Build python module
 maturin develop
 ```

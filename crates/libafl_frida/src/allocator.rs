@@ -314,7 +314,7 @@ impl Allocator {
         hint_base: usize,
     ) -> Option<&mut AllocationMetadata> {
         let mut metadatas: Vec<&mut AllocationMetadata> = self.allocations.values_mut().collect();
-        metadatas.sort_by(|a, b| a.address.cmp(&b.address));
+        metadatas.sort_by_key(|a| a.address);
         let mut offset_to_closest = i64::MAX;
         let mut closest = None;
         let ptr: i64 = ptr.try_into().unwrap();

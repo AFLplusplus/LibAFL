@@ -364,7 +364,7 @@ impl<I, S> InProcessHooks<I, S> {
             #[cfg(feature = "std")]
             timeout_handler: null(),
             #[cfg(feature = "std")]
-            timer: TimerStruct::new(Duration::from_millis(5000)),
+            timer: TimerStruct::new(Duration::from_secs(5)),
             phantom: PhantomData,
         }
     }

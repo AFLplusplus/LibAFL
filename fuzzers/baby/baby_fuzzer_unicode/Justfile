@@ -8,31 +8,31 @@ FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 alias build := fuzzer
 
 fuzzer:
-	cargo build --profile={{PROFILE}} --features=tui
+    cargo build --profile={{ PROFILE }} --features=tui
 
 run: fuzzer
-	{{FUZZER}}
+    {{ FUZZER }}
 
 [linux]
 [macos]
 test: fuzzer
-	#!/bin/bash
-	# Use timeout to run the fuzzer for a short time to verify TUI startup
-	# We use 'script' or similar to fake TTY if needed, but for now just running it is a good check.
-	# However, TUI might mess up stdout.
-	# The user specifically asked to "add the tui feature build to just test".
-	# So we ensure it BUILDS with TUI.
-	# And we can check if it runs.
-	cargo build --profile={{PROFILE}} --features=tui
-	timeout 5s {{FUZZER}} || true
-	# Test introspection build
-	cargo build --profile={{PROFILE}} --features=introspection
-	timeout 5s {{FUZZER}} || true
-	echo "Fuzzer TUI and Introspection build verification completed."
+    #!/bin/bash
+    # Use timeout to run the fuzzer for a short time to verify TUI startup
+    # We use 'script' or similar to fake TTY if needed, but for now just running it is a good check.
+    # However, TUI might mess up stdout.
+    # The user specifically asked to "add the tui feature build to just test".
+    # So we ensure it BUILDS with TUI.
+    # And we can check if it runs.
+    cargo build --profile={{ PROFILE }} --features=tui
+    timeout 5s {{ FUZZER }} || true
+    # Test introspection build
+    cargo build --profile={{ PROFILE }} --features=introspection
+    timeout 5s {{ FUZZER }} || true
+    echo "Fuzzer TUI and Introspection build verification completed."
 
 [windows]
 test: fuzzer
-	echo "Unsupported on this platform"
+    echo "Unsupported on this platform"
 
 clean:
-	cargo clean
+    cargo clean

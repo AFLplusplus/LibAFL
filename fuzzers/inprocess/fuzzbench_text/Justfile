@@ -5,113 +5,110 @@ PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { 
 CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
 FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 
-
 alias build := fuzzer
-
 alias cc := cxx
 
 [linux]
 [macos]
 cxx:
-	cargo build --profile={{PROFILE}}
+    cargo build --profile={{ PROFILE }}
 
 [windows]
 cxx:
-	echo "Unsupported on this platform"
+    echo "Unsupported on this platform"
 
 [linux]
 [macos]
 fuzz_o: cxx
-	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
+    {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
 
 [windows]
 fuzz_o:
-	echo "Unsupported on this platform"
+    echo "Unsupported on this platform"
 
 [linux]
 [macos]
 fuzzer: cxx fuzz_o
-	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cxx --libafl fuzz.o -o {{FUZZER_NAME}} -lm -lz
+    {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/libafl_cxx --libafl fuzz.o -o {{ FUZZER_NAME }} -lm -lz
 
 [windows]
 fuzzer:
-	echo "Unsupported on this platform"
-	
+    echo "Unsupported on this platform"
 
 [linux]
 [macos]
 run: cxx fuzz_o
-	#!/bin/bash
-	rm -rf libafl_unix_shmem_server || true
-	mkdir in || true
-	echo a > in/a
-	./{{FUZZER_NAME}} -o out -i in
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    mkdir in || true
+    echo a > in/a
+    ./{{ FUZZER_NAME }} -o out -i in
 
 [windows]
 run:
-	echo "Unsupported on this platform"
+    echo "Unsupported on this platform"
 
 [linux]
 [macos]
 test: fuzzer test-dump-cov test-dump-cov-fuzz
-	#!/bin/bash
-	rm -rf libafl_unix_shmem_server || true
-	mkdir in || true
-	echo a > in/a
-	# Allow sigterm as exit code 
-	timeout 31s ./{{FUZZER_NAME}} -o out -i in | tee fuzz_stdout.log || true
-	if grep -qa "objectives: 1" fuzz_stdout.log; then
-		echo "Fuzzer is working"
-	else
-		echo "Fuzzer does not generate any testcases or any crashes"
-		exit 1
-	fi
-	rm -rf out || true
-	rm -rf in || true
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    mkdir in || true
+    echo a > in/a
+    # Allow sigterm as exit code 
+    timeout 31s ./{{ FUZZER_NAME }} -o out -i in | tee fuzz_stdout.log || true
+    if grep -qa "objectives: 1" fuzz_stdout.log; then
+    	echo "Fuzzer is working"
+    else
+    	echo "Fuzzer does not generate any testcases or any crashes"
+    	exit 1
+    fi
+    rm -rf out || true
+    rm -rf in || true
 
 [windows]
 test: fuzzer
-	echo "Unsupported on this platform"
+    echo "Unsupported on this platform"
 
 clean:
-	cargo clean
+    cargo clean
 
 test-dump-cov:
-	cargo build --profile={{PROFILE}} --features dump_cov
-	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
-	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cxx -g -rdynamic --libafl fuzz.o -o {{FUZZER_NAME}} -lm -lz
-	# Create a dummy seed
-	mkdir -p seeds_dump
-	mkdir -p coverage_dump
-	echo "dummy" > seeds_dump/dummy
-	# Run with --dump-cov
-	./fuzzbench -i seeds_dump -o corpus_dump --dump-cov coverage_dump seeds_dump/dummy
-	# Verify output
-	ls -l coverage_dump/dummy.info
-	grep "TN:" coverage_dump/dummy.info
-	grep "TN:" coverage_dump/dummy.info
-	if command -v genhtml >/dev/null 2>&1; then \
-		genhtml coverage_dump/dummy.info --output-directory coverage_dump/html; \
-		ls coverage_dump/html/index.html; \
-	else \
-		echo "genhtml not found, skipping HTML report generation"; \
-	fi
-	# Clean up
-	rm -rf seeds_dump corpus_dump coverage_dump
+    cargo build --profile={{ PROFILE }} --features dump_cov
+    {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
+    {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/libafl_cxx -g -rdynamic --libafl fuzz.o -o {{ FUZZER_NAME }} -lm -lz
+    # Create a dummy seed
+    mkdir -p seeds_dump
+    mkdir -p coverage_dump
+    echo "dummy" > seeds_dump/dummy
+    # Run with --dump-cov
+    ./fuzzbench -i seeds_dump -o corpus_dump --dump-cov coverage_dump seeds_dump/dummy
+    # Verify output
+    ls -l coverage_dump/dummy.info
+    grep "TN:" coverage_dump/dummy.info
+    grep "TN:" coverage_dump/dummy.info
+    if command -v genhtml >/dev/null 2>&1; then \
+    	genhtml coverage_dump/dummy.info --output-directory coverage_dump/html; \
+    	ls coverage_dump/html/index.html; \
+    else \
+    	echo "genhtml not found, skipping HTML report generation"; \
+    fi
+    # Clean up
+    rm -rf seeds_dump corpus_dump coverage_dump
 
 test-dump-cov-fuzz:
-	cargo build --profile={{PROFILE}} --features dump_cov
-	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
-	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cxx -g -rdynamic --libafl fuzz.o -o {{FUZZER_NAME}} -lm -lz
-	# Run fuzzing with dump_cov enabled but not active
-	rm -rf libafl_unix_shmem_server || true
-	mkdir -p in_dump_fuzz
-	echo a > in_dump_fuzz/a
-	timeout 31s ./{{FUZZER_NAME}} -o out_dump_fuzz -i in_dump_fuzz | tee fuzz_dump_stdout.log || true
-	if grep -qa "corpus: [2-9]" fuzz_dump_stdout.log || grep -qa "corpus: [1-9][0-9]" fuzz_dump_stdout.log; then \
-		echo "Fuzzer with dump_cov enabled is working (found multiple corpus entries)"; \
-	else \
-		echo "Fuzzer with dump_cov enabled failed to find multiple corpus entries"; \
-		exit 1; \
-	fi
-	rm -rf out_dump_fuzz in_dump_fuzz fuzz_dump_stdout.log
+    cargo build --profile={{ PROFILE }} --features dump_cov
+    {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
+    {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/libafl_cxx -g -rdynamic --libafl fuzz.o -o {{ FUZZER_NAME }} -lm -lz
+    # Run fuzzing with dump_cov enabled but not active
+    rm -rf libafl_unix_shmem_server || true
+    mkdir -p in_dump_fuzz
+    echo a > in_dump_fuzz/a
+    timeout 31s ./{{ FUZZER_NAME }} -o out_dump_fuzz -i in_dump_fuzz | tee fuzz_dump_stdout.log || true
+    if grep -qa "corpus: [2-9]" fuzz_dump_stdout.log || grep -qa "corpus: [1-9][0-9]" fuzz_dump_stdout.log; then \
+    	echo "Fuzzer with dump_cov enabled is working (found multiple corpus entries)"; \
+    else \
+    	echo "Fuzzer with dump_cov enabled failed to find multiple corpus entries"; \
+    	exit 1; \
+    fi
+    rm -rf out_dump_fuzz in_dump_fuzz fuzz_dump_stdout.log

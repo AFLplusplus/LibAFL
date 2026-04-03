@@ -21,13 +21,13 @@ In this case, again, what usually should do is to run the fuzzer with gdb and se
 
 First, verify that your stdout and stderr are not redirected to `/dev/null`. If you get the log, then it should either fall into the previous 2 cases. Either the fuzzer crashed because you didn't have the initial seeds, or the coverage feedback is not working.
 
-In Launcher, a helpful way to debug this is to set the `LIBAFL_DEBUG_OUTPUT` environment variable that enabled child debug output. Ideally without a TUI monigor.
+In Launcher, a helpful way to debug this is to set the `LIBAFL_DEBUG_OUTPUT` environment variable that enabled child debug output. Ideally without a TUI monitor.
 
 ## Q. I don't see any output from my fuzzer (println!() or logging)
 
 First, check that you are not redirecting things to `/dev/null` else you will see nothing.
 To see the log that you added with `log::trace!();`, you need to initialize the logger (any logger, `env_logger` or `SimpleStdoutLogger` from `libafl_bolts`) before the fuzzer starts.
-Also you have to make sure that you are runing with `RUST_LOG=<log_level>` and you are *NOT* using `release_max_level_info` feature of `log` crate in your `Cargo.toml` of your fuzzer
+Also you have to make sure that you are running with `RUST_LOG=<log_level>` and you are *NOT* using `release_max_level_info` feature of `log` crate in your `Cargo.toml` of your fuzzer
 
 ## Q. My fuzzer is slow
 
@@ -54,3 +54,4 @@ Type `q` to leave TUI.
 ## Q. I see `QEMU internal SIGSEGV {code=MAPERR, addr=0x48}` and my QEMU fuzzer doesn't run
 
 Are you running QEMU fuzzer on WSL? You have to enable vsyscall <https://github.com/microsoft/WSL/issues/4694#issuecomment-556095344>.
+

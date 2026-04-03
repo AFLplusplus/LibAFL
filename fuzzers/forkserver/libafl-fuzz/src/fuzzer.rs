@@ -65,7 +65,7 @@ use crate::{
     env_parser::AFL_DEFAULT_MAP_SIZE,
     executor::{find_afl_binary, SupportedExecutors},
     feedback::{
-        filepath::CustomFilepathToTestcaseFeedback, persistent_record::PersitentRecordFeedback,
+        filepath::CustomFilepathToTestcaseFeedback, persistent_record::PersistentRecordFeedback,
         seed::SeedFeedback,
     },
     scheduler::SupportedSchedulers,
@@ -246,7 +246,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
             MaxMapFeedback::with_name("edges_objective", &edges_observer)
         ),
         CustomFilepathToTestcaseFeedback::new(set_solution_filepath, fuzzer_dir.to_path_buf()),
-        PersitentRecordFeedback::new(opt.persistent_record),
+        PersistentRecordFeedback::new(opt.persistent_record),
     );
 
     // Initialize our State if necessary

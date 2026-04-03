@@ -199,9 +199,7 @@ pub trait Rand {
         // We check that the upper_bound_incl <= lower_bound_incl above (alas only in debug), so the below is fine.
         // Even if we encounter a 0 in release here, the worst-case scenario should be an invalid return value.
         lower_bound_incl
-            + self.below(unsafe {
-                NonZero::new(upper_bound_incl - lower_bound_incl + 1).unwrap_unchecked()
-            })
+            + self.below(unsafe { NonZero::new_unchecked(upper_bound_incl - lower_bound_incl + 1) })
     }
 
     /// Convenient variant of [`choose`].
@@ -238,7 +236,7 @@ pub trait Rand {
             if lower > 1 {
                 // # Safety
                 // lower is > 1, we don't consume more than usize elements, so this should always be non-0.
-                let ix = self.below(unsafe { NonZero::new(lower + consumed).unwrap_unchecked() });
+                let ix = self.below(unsafe { NonZero::new_unchecked(lower + consumed) });
                 let skip = if ix < lower {
                     result = iter.nth(ix);
                     lower - (ix + 1)
@@ -260,7 +258,7 @@ pub trait Rand {
                 consumed += 1;
                 // # SAFETY
                 // `consumed` can never be 0 here. We just increased it by 1 above.
-                if self.below(unsafe { NonZero::new(consumed).unwrap_unchecked() }) == 0 {
+                if self.below(unsafe { NonZero::new_unchecked(consumed) }) == 0 {
                     result = elem;
                 }
             }
@@ -283,6 +281,26 @@ where
 
     fn next(&mut self) -> u64 {
         self.next_u64()
+    }
+}
+
+/// Produce a sub-RNG seeded from the current RNG state.
+/// Useful when sampling random data while also accessing the state.
+pub trait SubRng {
+    /// Creates and returns a sub-RNG.
+    #[must_use]
+    fn sub_rng(&mut self) -> Self;
+}
+
+impl<R> SubRng for R
+where
+    R: Rand + Sized + Clone,
+{
+    /// Creates and returns a sub-RNG.
+    fn sub_rng(&mut self) -> Self {
+        let mut sub = self.clone();
+        sub.set_seed(self.next());
+        sub
     }
 }
 
@@ -732,7 +750,7 @@ mod tests {
     use core::num::NonZero;
 
     use crate::{
-        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
+        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, SubRng, XorShift64Rand,
         Xoshiro256PlusPlusRand,
     };
 
@@ -885,5 +903,20 @@ mod tests {
 
         // LibAFL's Rand trait is auto-implemented for all SeedableRng + RngCore types.
         assert!(CountingRng(0).coinflip(0.1));
+    }
+
+    #[test]
+    fn test_sub_rng_seed() {
+        let mut parent_a = StdRand::with_seed(0);
+        let mut parent_b = StdRand::with_seed(0);
+        let mut parent_c = StdRand::with_seed(1);
+
+        let mut sub_a = parent_a.sub_rng();
+        let mut sub_b = parent_b.sub_rng();
+        let mut sub_c = parent_c.sub_rng();
+
+        assert_ne!(sub_a.next(), sub_c.next());
+        sub_b.next();
+        assert_eq!(sub_a.next(), sub_b.next());
     }
 }

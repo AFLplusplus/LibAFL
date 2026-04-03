@@ -81,7 +81,7 @@ macro_rules! random_corpus_id {
         // The worst that can happen is a wrong integer to get returned.
         // In this case, the call below will fail.
         #[cfg(not(debug_assertions))]
-        let nth = $rand.below(unsafe { core::num::NonZero::new(cnt).unwrap_unchecked() });
+        let nth = $rand.below(unsafe { core::num::NonZero::new_unchecked(cnt) });
         $corpus.nth(nth)
     }};
 }
@@ -100,7 +100,7 @@ macro_rules! random_corpus_id_with_disabled {
         // The worst that can happen is a wrong integer to get returned.
         // In this case, the call below will fail.
         #[cfg(not(debug_assertions))]
-        let nth = $rand.below(unsafe { core::num::NonZero::new(cnt).unwrap_unchecked() });
+        let nth = $rand.below(unsafe { core::num::NonZero::new_unchecked(cnt) });
         $corpus.nth_from_all(nth)
     }};
 }
