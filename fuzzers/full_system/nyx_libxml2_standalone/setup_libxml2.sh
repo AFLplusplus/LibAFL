@@ -27,6 +27,8 @@ fi
 QEMU_NYX_BIN="$SCRIPT_DIR/../../../target/debug/QEMU-Nyx/x86_64-softmmu/qemu-system-x86_64"
 if [ ! -f "$QEMU_NYX_BIN" ]; then
     echo "QEMU-Nyx not found at $QEMU_NYX_BIN. Building libafl_nyx..."
+    # force cargo to re-run it.
+    touch "$SCRIPT_DIR/../../../crates/libafl_nyx/build.rs"
     pushd "$SCRIPT_DIR/../../.." > /dev/null
     cargo build -p libafl_nyx || echo "Failed to build libafl_nyx, continuing anyway..."
     popd > /dev/null
