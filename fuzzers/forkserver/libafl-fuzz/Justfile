@@ -5,7 +5,7 @@ PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { 
 FUZZER_NAME := 'libafl-fuzz'
 FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 LLVM_CONFIG := env("LLVM_CONFIG", "llvm-config-18")
-AFL_VERSION := "v4.40c"
+AFL_VERSION := "e4857af6d9c95186c817c31261e6934eece94259"
 AFL_DIR := PROJECT_DIR / "AFLplusplus"
 AFL_CC_PATH := AFL_DIR / "afl-clang-fast"
 CC := "clang"
