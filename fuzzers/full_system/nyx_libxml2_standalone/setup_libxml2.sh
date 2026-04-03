@@ -67,7 +67,7 @@ fi
 # Use libafl_cc
 # We build it from the current crate (nyx_libxml2_parallel) which has src/bin/libafl_cc.rs
 echo "Building libafl_cc..."
-cargo build --bin libafl_cc
+cargo build --bin libafl_cc --target-dir "$SCRIPT_DIR/target"
 
 LIBAFL_CC="$SCRIPT_DIR/target/debug/libafl_cc"
 LIBAFL_CXX="$SCRIPT_DIR/target/debug/libafl_cxx"

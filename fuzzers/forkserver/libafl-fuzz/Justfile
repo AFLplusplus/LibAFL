@@ -35,7 +35,7 @@ build_qemuafl: build_afl
 build_unicorn_mode: build_afl
     #!/bin/bash
     cd {{ AFL_DIR }}/unicorn_mode
-    ./build_unicorn_support.sh
+    python3 build_unicorn_support.py
     cd ../..
 
 test: build_afl test_instr test_cmplog test_frida test_qemu test_unicorn_mode test_instr_fuzzbench
