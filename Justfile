@@ -8,6 +8,9 @@ export LIBAFL_BOLTS_DIR := join(justfile_directory(), "crates/libafl_bolts")
 export LIBAFL_TARGETS_DIR := join(justfile_directory(), "crates/libafl_targets")
 MSRV := env_var_or_default('MSRV', "")
 
+# Crates with mutually exclusive features (e.g. usermode/systemmode) that cannot be built with --all-features
+QEMU_EXCLUDES := "--exclude libafl_qemu --exclude libafl_qemu_sys --exclude libafl_qemu_build --exclude libafl_qemu_runner --exclude libvharness_sys --exclude libafl_sugar"
+
 # List all available just targets in this justfile
 @help *PAT:
     if [[ '{{ PAT }}' =~ '' ]]; then just -l; else just -l | rg -i '{{ PAT }}'; fi
@@ -32,15 +35,15 @@ no-default-features: (default "--no-default-features")
 
 # Run check on all projects in the workspace
 check feature='' ignore='':
-    cargo {{ MSRV }} check --workspace --all-targets --exclude libafl_asan_libc {{ feature }}
+    cargo {{ MSRV }} check --workspace --all-targets --exclude libafl_asan_libc {{ if feature == "--all-features" { QEMU_EXCLUDES } else { "" } }} {{ feature }}
 
 # Run build on all projects in the workspace
 build feature='' ignore='':
-    cargo {{ MSRV }} build --workspace --all-targets --exclude libafl_asan_libc {{ feature }}
+    cargo {{ MSRV }} build --workspace --all-targets --exclude libafl_asan_libc {{ if feature == "--all-features" { QEMU_EXCLUDES } else { "" } }} {{ feature }}
 
 # Run tests on all projects in the workspace
 test feature='' ignore='':
-    cargo {{ MSRV }} test --workspace --all-targets --exclude libafl_asan_libc --exclude libafl_asan --exclude libafl_asan_fuzz {{ feature }}
+    cargo {{ MSRV }} test --workspace --all-targets --exclude libafl_asan_libc --exclude libafl_asan --exclude libafl_asan_fuzz {{ if feature == "--all-features" { QEMU_EXCLUDES } else { "" } }} {{ feature }}
     # Run libafl_asan tests serially to avoid address conflicts
     RUST_TEST_THREADS=1 cargo {{ MSRV }} test -p libafl_asan -j 1 {{ feature }}
 
@@ -74,7 +77,7 @@ test-docs-internal: all-features
 [linux]
 [private]
 test-docs-internal: all-features
-    RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features --exclude libafl_qemu --exclude libafl_qemu_sys --exclude libafl_qemu_build --exclude libafl_qemu_runner --exclude libvharness_sys --exclude libafl_sugar
+    RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features {{ QEMU_EXCLUDES }}
     RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc -p libafl_qemu --no-default-features --features usermode,python
     RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc -p libafl_qemu --no-default-features --features systemmode
     cd {{ DOCS_DIR }} && mdbook test -L ../target/debug/deps
@@ -86,7 +89,7 @@ test-docs-internal:
 
 # Tests all code in docs
 test-docs: test-docs-internal
-    RUSTDOCFLAGS="-Dwarnings" cargo {{ MSRV }} doc --workspace --all-features --no-deps --document-private-items --exclude libafl_qemu
+    RUSTDOCFLAGS="-Dwarnings" cargo {{ MSRV }} doc --workspace --all-features --no-deps --document-private-items {{ QEMU_EXCLUDES }}
     RUSTDOCFLAGS="-Dwarnings" cargo {{ MSRV }} doc -p libafl_qemu --no-default-features --features usermode,python --no-deps --document-private-items
 
 # Build documentation
