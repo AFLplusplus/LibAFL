@@ -211,7 +211,7 @@ test_unicorn_mode: build_libafl_fuzz build_afl build_unicorn_mode
         exit 1
     }
 
-    export AFL_COMPCOV_LEVEL=2
+    export UNICORN_AFL_CMPCOV=1
     LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_DEBUG_CHILD=1 timeout 15s {{ FUZZER }} -m 0 -U -i ./test/seeds_unicorn_cmpcov -o ./test/output-unicorn-cmpcov -- python3 {{ AFL_DIR }}/unicorn_mode/samples/compcov_x64/compcov_test_harness.py @@ || true
     test -n "$( ls ./test/output-unicorn-cmpcov/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
         echo "No new corpus entries found for Unicorn cmpcov mode"
