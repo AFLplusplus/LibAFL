@@ -353,8 +353,14 @@ where
                     log::info!("Subsequent run. Loaded previous state.");
                     // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
 
-                    let mgr = mgr_constructor(Some(inner_state))?;
-                    (state, mgr)
+                    match mgr_constructor(Some(inner_state)) {
+                        Ok(mgr) => (state, mgr),
+                        Err(Error::ShuttingDown) => {
+                            staterestorer.send_exiting();
+                            return Err(Error::shutting_down());
+                        }
+                        Err(e) => return Err(e),
+                    }
                 }
             };
 
