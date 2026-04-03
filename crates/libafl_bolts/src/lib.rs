@@ -568,7 +568,7 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
     // Make sure potential errors get printed to the correct (non-closed) stderr
     panic::set_hook(Box::new(move |panic_info| {
         let mut f = unsafe { File::from_raw_fd(new_stderr) };
-        writeln!(f, "{panic_info}",)
+        writeln!(f, "{panic_info}")
             .unwrap_or_else(|err| println!("Failed to log to fd {new_stderr}: {err}"));
         mem::forget(f);
     }));
