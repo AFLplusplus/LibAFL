@@ -74,7 +74,7 @@ test-docs-internal: all-features
 [linux]
 [private]
 test-docs-internal: all-features
-    RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features --exclude libafl_qemu --exclude libafl_qemu_sys
+    RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features --exclude libafl_qemu --exclude libafl_qemu_sys --exclude libafl_qemu_build --exclude libafl_qemu_runner --exclude libvharness_sys --exclude libafl_sugar
     RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc -p libafl_qemu --no-default-features --features usermode,python
     RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc -p libafl_qemu --no-default-features --features systemmode
     cd {{ DOCS_DIR }} && mdbook test -L ../target/debug/deps
