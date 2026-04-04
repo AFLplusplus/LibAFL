@@ -1,6 +1,5 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
-#[cfg(feature = "sancov_pcguard_dump_cov")]
 #[rustversion::nightly]
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 use core::simd::num::SimdUint;

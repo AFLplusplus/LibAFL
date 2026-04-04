@@ -2,9 +2,12 @@
 #![doc = include_str!("../README.md")]
 // Force a newline, otherwise the "feature flags" section doesn't format correctly in the docs
 #![doc = "\n"]
-#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![no_std]
-// For `std::simd`
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
+#![cfg_attr(
+    all(nightly, any(feature = "sancov_ngram4", feature = "sancov_ngram8")),
+    feature(portable_simd)
+)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
