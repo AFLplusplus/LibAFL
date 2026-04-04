@@ -24,7 +24,7 @@ It provides a unified interface for handling signals on Unix-like systems and ex
 
 ### Unix Signal Handling
 
-```rust
+```rust,no_run
 use exceptional::unix_signals::{Signal, SignalHandler, setup_signal_handler};
 use libc::{siginfo_t, ucontext_t};
 use std::ptr;
@@ -57,7 +57,7 @@ unsafe {
 
 ### Windows Exception Handling
 
-```rust
+```rust,ignore
 use exceptional::windows_exceptions::{ExceptionCode, ExceptionHandler, setup_exception_handler};
 use windows::Win32::System::Diagnostics::Debug::EXCEPTION_POINTERS;
 use std::ptr;
