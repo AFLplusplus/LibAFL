@@ -1994,7 +1994,7 @@ mod tests {
                             .unwrap(),
                     )
                     .env("SHMEM_SIZE", description.size.to_string())
-                    .arg("shmem::tests::test_persist_shmem")
+                    .arg("tests::test_persist_shmem")
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status()
