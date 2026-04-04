@@ -24,7 +24,6 @@ runs:
         sudo apt-get install -y \
           curl lsb-release wget software-properties-common gnupg shellcheck pax-utils \
           libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev meson
-        echo "export LLVM_CONFIG_PATH=$(which llvm-config-${{ env.MAIN_LLVM_VERSION }})" | sudo tee -a /etc/environment
 
     # ---------- toolchain selection ----------
     - name: Install Rust (stable)
@@ -52,6 +51,7 @@ runs:
         chmod +x llvm.sh
         sudo ./llvm.sh ${{ env.MAIN_LLVM_VERSION }} all
         sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ env.MAIN_LLVM_VERSION }} 200
+        echo "export LLVM_CONFIG_PATH=$(which llvm-config-${{ env.MAIN_LLVM_VERSION }})" | sudo tee -a /etc/environment
 
     - name: Symlink headers
       shell: bash

@@ -32,7 +32,7 @@ use std::ptr;
 struct MySignalHandler;
 
 impl SignalHandler for MySignalHandler {
-    fn handle(&mut self, signal: Signal, _info: &mut siginfo_t, _context: Option<&mut ucontext_t>) {
+    unsafe fn handle(&mut self, signal: Signal, _info: &mut siginfo_t, _context: Option<&mut ucontext_t>) {
         println!("Caught signal: {:?}", signal);
         // In a real scenario, you might longjmp or do something else to recover.
         std::process::exit(0);
