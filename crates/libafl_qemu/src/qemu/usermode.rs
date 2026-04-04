@@ -537,13 +537,13 @@ pub mod pybind {
                     if any.is_none() {
                         hooks::SyscallHookResult::Run
                     } else {
-                        let a: Result<&Bound<'_, PyInt>, _> = any.downcast_exact();
+                        let a: Result<&Bound<'_, PyInt>, _> = any.cast_exact();
                         if let Ok(i) = a {
                             hooks::SyscallHookResult::Skip(
                                 i.extract().expect("Invalid syscall hook return value"),
                             )
                         } else {
-                            let syscall = SyscallHookResult::extract_bound(ret.bind(py))
+                            let syscall = SyscallHookResult::extract(ret.bind(py).into())
                                 .expect("The syscall hook must return a SyscallHookResult");
 
                             if let Some(ret) = syscall.skip {

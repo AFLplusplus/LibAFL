@@ -633,7 +633,7 @@ pub mod pybind {
 
     use super::{Rand, StdRand, random_seed};
 
-    #[pyclass(unsendable, name = "StdRand")]
+    #[pyclass(unsendable, from_py_object, name = "StdRand")]
     #[expect(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for `StdRand`
@@ -731,7 +731,7 @@ pub mod pybind {
             match &mut $wrapper {
                 $(
                     $wrapper_type::$wrapper_option(py_wrapper) => {
-                        Python::with_gil(|py| -> PyResult<_> {
+                        Python::attach(|py| -> PyResult<_> {
                             let mut borrowed = py_wrapper.borrow_mut(py);
                             let $name = &mut borrowed.inner;
                             Ok($body)
