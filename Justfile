@@ -164,7 +164,7 @@ build-libafl:
 
 # Run tests serially
 test-serial:
-    cargo test -- --test-threads 1
+    cargo test --release -- --test-threads 1
 
 # Check sancov pcguard edges
 check-sancov-edges:
