@@ -1,12 +1,15 @@
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::io::Error;
 
 use anyhow::{Result, anyhow};
 use libc::_exit;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use libc::{PR_SET_PDEATHSIG, prctl};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::sys::signal::SIGKILL;
 use nix::{
     sys::{
-        signal::{SIGCHLD, SIGKILL, SaFlags, SigAction, SigHandler, SigSet, sigaction},
+        signal::{SIGCHLD, SaFlags, SigAction, SigHandler, SigSet, sigaction},
         wait::{WaitStatus::Exited, waitpid},
     },
     unistd::Pid,
