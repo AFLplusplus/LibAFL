@@ -14,10 +14,10 @@ const WRAPPER_HEADER: &str = r#"
 #undef QEMU_BUILD_BUG_ON
 #undef QEMU_BUILD_BUG_ON_ZERO
 
-#define QEMU_BUILD_BUG_MSG(x, msg) 
+#define QEMU_BUILD_BUG_MSG(x, msg)
 #define QEMU_BUILD_BUG_ON_STRUCT(x)
-#define QEMU_BUILD_BUG_ON(x) 
-#define QEMU_BUILD_BUG_ON_ZERO(x) 
+#define QEMU_BUILD_BUG_ON(x)
+#define QEMU_BUILD_BUG_ON_ZERO(x)
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
@@ -182,6 +182,9 @@ pub fn generate(
         bindings
             .allowlist_type("CPUX86State")
             .allowlist_type("X86CPU")
+            // mmintrin.h has some errors, check llvm #137484.
+            // TODO: remove when fixed in llvm.
+            .clang_arg("-msse2")
     } else if cpu_target == "arm" {
         bindings
             .allowlist_type("ARMCPU")
