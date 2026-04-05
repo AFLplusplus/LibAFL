@@ -923,7 +923,7 @@ jobs:
         # Needs to match version in tinyinst-rs
         run: cargo install cxxbridge-cmd@=1.0.190
       - name: Install vcpkg dependencies
-        run: vcpkg install zlib:x64-windows
+        run: vcpkg install zlib:x64-windows-static-md
         env:
           VCPKG_ROOT: C:\vcpkg
       - name: Configure Cache
