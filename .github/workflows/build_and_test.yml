@@ -103,10 +103,11 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: mdbook
-      - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Test Docs
         run: just test-docs
+      # DO NOT move the cache pull before this point, as it causes mdbook to fail due to duplicated deps
+      - uses: Swatinem/rust-cache@v2
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
