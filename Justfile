@@ -82,7 +82,7 @@ test-docs-internal: all-features
     RUSTDOCFLAGS="--cfg docsrs" cargo +nightly test --doc -p libafl_qemu --no-default-features --features usermode,python
     RUSTDOCFLAGS="--cfg docsrs" cargo +nightly test --doc -p libafl_qemu --no-default-features --features systemmode
     cargo clean
-    cargo build --workspace --all-features {{ ALL_FEATURES_EXCLUDES }}
+    cargo build -p libafl
     cd {{ DOCS_DIR }} && mdbook test -L ../target/debug/deps
 
 [private]
