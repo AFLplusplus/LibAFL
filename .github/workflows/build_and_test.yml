@@ -922,6 +922,10 @@ jobs:
       - name: install cxx bridge
         # Needs to match version in tinyinst-rs
         run: cargo install cxxbridge-cmd@=1.0.190
+      - name: Install vcpkg dependencies
+        run: vcpkg install zlib:x64-windows
+        env:
+          VCPKG_ROOT: C:\vcpkg
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -938,6 +942,8 @@ jobs:
             fuzzers/${{ matrix.fuzzer }}
       - name: Test
         run: cd fuzzers/${{ matrix.fuzzer }} && just test
+        env:
+          VCPKG_ROOT: C:\vcpkg
 
   windows-clippy:
     runs-on: windows-latest
