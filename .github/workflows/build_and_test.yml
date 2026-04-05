@@ -99,6 +99,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
+      - name: install mdbook
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: mdbook
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Test Docs
