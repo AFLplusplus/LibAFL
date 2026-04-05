@@ -349,7 +349,7 @@ pub struct Forkserver {
     status: i32,
     /// If the last run timed out (in in-target i32)
     last_run_timed_out: i32,
-    /// The signal this [`Forkserver`] will use to kill (defaults to [`self.kill_signal`])
+    /// The signal this [`Forkserver`] will use to kill
     kill_signal: Signal,
 }
 

@@ -1146,7 +1146,7 @@ pub mod unix_shmem {
                 }
             }
 
-            /// Get a [`UnixShMem`] of the existing shared memory mapping identified by id
+            /// Get a [`CommonUnixShMem`] of the existing shared memory mapping identified by id
             pub fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let id_int: i32 = id.into();
@@ -1184,7 +1184,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// [`Drop`] implementation for [`UnixShMem`], which detaches the memory and cleans up the mapping.
+        /// [`Drop`] implementation for [`CommonUnixShMem`], which detaches the memory and cleans up the mapping.
         #[cfg(unix)]
         impl Drop for CommonUnixShMem {
             fn drop(&mut self) {
@@ -1211,7 +1211,7 @@ pub mod unix_shmem {
             }
         }
 
-        /// Implement [`ShMemProvider`] for [`UnixShMemProvider`].
+        /// Implement [`ShMemProvider`] for [`CommonUnixShMemProvider`].
         #[cfg(unix)]
         impl ShMemProvider for CommonUnixShMemProvider {
             type ShMem = CommonUnixShMem;

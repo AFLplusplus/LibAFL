@@ -272,7 +272,7 @@ impl<E, EM, S, ST, Z> RestartableStage<E, EM, S, Z> for ST
 where
     ST: Stage<E, EM, S, Z> + Restartable<S>,
 {
-    /// Run the stage, calling [`Stage::should_restart`] and [`Stage::clear_progress`] appropriately
+    /// Run the stage, calling [`Restartable::should_restart`] and [`Restartable::clear_progress`] appropriately
     fn perform_restartable(
         &mut self,
         fuzzer: &mut Z,
@@ -495,7 +495,7 @@ pub struct ExecutionCountRestartHelperMetadata {
 #[derive(Debug, Default, Clone)]
 pub struct ExecutionCountRestartHelper {
     /// At what exec count this Stage was started (cache)
-    /// Only used as cache for the value stored in [`MutationalStageMetadata`].
+    /// Only used as cache for the value stored in [`ExecutionCountRestartHelperMetadata`].
     started_at_execs: Option<u64>,
 }
 
