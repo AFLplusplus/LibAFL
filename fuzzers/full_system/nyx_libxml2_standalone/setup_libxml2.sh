@@ -24,18 +24,18 @@ if [ -z "$LLVM_CONFIG" ]; then
 fi
 
 # Ensure QEMU-Nyx is available
-QEMU_NYX_BIN="$SCRIPT_DIR/../../../target/debug/QEMU-Nyx/x86_64-softmmu/qemu-system-x86_64"
+TARGET_DIR="${CARGO_TARGET_DIR:-$SCRIPT_DIR/../../../target}"
+QEMU_NYX_BIN="$TARGET_DIR/QEMU-Nyx/x86_64-softmmu/qemu-system-x86_64"
 if [ ! -f "$QEMU_NYX_BIN" ]; then
     echo "QEMU-Nyx not found at $QEMU_NYX_BIN. Building libafl_nyx..."
+    # force cargo to re-run it.
+    touch "$SCRIPT_DIR/../../../crates/libafl_nyx/build.rs"
     pushd "$SCRIPT_DIR/../../.." > /dev/null
     cargo build -p libafl_nyx || echo "Failed to build libafl_nyx, continuing anyway..."
     popd > /dev/null
 fi
 
-PACKER_DIR="$SCRIPT_DIR/../../../libafl_nyx/packer/packer"
-if [ ! -d "$PACKER_DIR" ]; then
-    PACKER_DIR="$SCRIPT_DIR/target/debug/packer/packer"
-fi
+PACKER_DIR="$TARGET_DIR/packer/packer"
 
 if [ ! -f "$PACKER_DIR/nyx_packer.py" ]; then
     echo "nyx_packer.py not found in $PACKER_DIR or source."
@@ -67,7 +67,7 @@ fi
 # Use libafl_cc
 # We build it from the current crate (nyx_libxml2_parallel) which has src/bin/libafl_cc.rs
 echo "Building libafl_cc..."
-cargo build --bin libafl_cc
+cargo build --bin libafl_cc --target-dir "$SCRIPT_DIR/target"
 
 LIBAFL_CC="$SCRIPT_DIR/target/debug/libafl_cc"
 LIBAFL_CXX="$SCRIPT_DIR/target/debug/libafl_cxx"

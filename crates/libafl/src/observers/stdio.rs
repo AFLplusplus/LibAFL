@@ -219,7 +219,7 @@ impl<T> OutputObserver<T> {
         Ok(Some(fp))
     }
 
-    /// Cool, we can have [`MemfdShMemProvider`] to create a memfd.
+    /// Cool, we can have `MemfdShMemProvider` to create a memfd.
     #[cfg(target_os = "linux")]
     fn file() -> Result<Option<File>, Error> {
         Ok(Some(
