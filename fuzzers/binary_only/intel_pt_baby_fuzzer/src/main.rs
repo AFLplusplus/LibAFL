@@ -1,17 +1,7 @@
 use std::{
-    fs::File,
-    hint::black_box,
-    io::{Read, Seek, SeekFrom},
-    num::NonZero,
-    path::PathBuf,
-    process,
-    time::Duration,
+    hint::black_box, num::NonZero, path::PathBuf, process, ptr::copy_nonoverlapping, time::Duration,
 };
 
-#[cfg(feature = "tui")]
-use libafl::monitors::tui::TuiMonitor;
-#[cfg(not(feature = "tui"))]
-use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -24,26 +14,27 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::ConstMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{current_nanos, nonnull_raw_mut, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{current_nanos, nonnull_raw_mut, rands::StdRand, tuples::tuple_list};
 use proc_maps::get_process_maps;
 
-// Coverage map
+// Edge coverage map.
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
 static mut MAP_PTR: *mut u8 = &raw mut MAP as _;
 
 pub fn main() {
-    // The closure that we want to fuzz
+    // The function that we want to fuzz
     let mut harness = |input: &BytesInput| {
-        let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = input.target_bytes();
         if !buf.is_empty() && buf[0] == b'a' {
+            // Avoid compiler optimizations
             let _do_something = black_box(0);
             if buf.len() > 1 && buf[1] == b'b' {
                 let _do_something = black_box(0);
@@ -56,7 +47,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the map
-    let observer = unsafe { ConstMapObserver::from_mut_ptr("signals", nonnull_raw_mut!(MAP)) };
+    let observer = unsafe { ConstMapObserver::from_mut_ptr("edges", nonnull_raw_mut!(MAP)) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -64,9 +55,8 @@ pub fn main() {
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
 
-    // create a State from scratch
     let mut state = StdState::new(
-        // RNG
+        // Random Number Generator
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
         InMemoryCorpus::new(),
@@ -81,14 +71,8 @@ pub fn main() {
     )
     .unwrap();
 
-    // The Monitor trait define how the fuzzer stats are displayed to the user
-    #[cfg(not(feature = "tui"))]
+    // The Monitor define how the fuzzer stats are displayed to the user, here we simply print
     let mon = SimpleMonitor::new(|s| println!("{s}"));
-    #[cfg(feature = "tui")]
-    let mon = TuiMonitor::builder()
-        .title("Baby Fuzzer Intel PT")
-        .enhanced_graphics(false)
-        .build();
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
@@ -100,17 +84,18 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    // Get the memory map of the current process
+    // Get the memory map of the current process, copy the executable memory that will be
+    // disassembled and used for Intel PT trace decoding
     let my_pid = i32::try_from(process::id()).unwrap();
     let process_maps = get_process_maps(my_pid).unwrap();
     let images = process_maps
         .iter()
         .filter_map(|pm| {
             if pm.is_exec() && pm.filename().is_some() && pm.inode != 0 {
-                let mut file = File::open(pm.filename().unwrap()).unwrap();
                 let mut data = vec![0; pm.size()];
-                file.seek(SeekFrom::Start(pm.offset as u64)).unwrap();
-                file.read_exact(&mut data).unwrap();
+                unsafe {
+                    copy_nonoverlapping(pm.start() as *const u8, data.as_mut_ptr(), data.len())
+                }
                 Some(PtImage::new(data, pm.start() as u64))
             } else {
                 None
@@ -118,6 +103,7 @@ pub fn main() {
         })
         .collect::<Vec<_>>();
 
+    // Pass the executable memory to the code responsible for Intel PT trace decoding
     let pt = IntelPT::builder().images(images).build().unwrap();
     // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
     let pt_hook = unsafe {

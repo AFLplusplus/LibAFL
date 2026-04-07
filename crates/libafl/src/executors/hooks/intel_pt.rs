@@ -1,6 +1,6 @@
-use core::{fmt::Debug, ops::AddAssign};
+use core::fmt::Debug;
 
-pub use libafl_intelpt::{IntelPT, PAGE_SIZE, PtImage};
+pub use libafl_intelpt::{CoverageEntry, IntelPT, PAGE_SIZE, PtImage};
 use serde::Serialize;
 use typed_builder::TypedBuilder;
 
@@ -17,7 +17,7 @@ pub struct IntelPTHook<T> {
 impl<I, S, T> ExecutorHook<I, S> for IntelPTHook<T>
 where
     S: Serialize,
-    T: AddAssign + Copy + Debug + From<u8>,
+    T: CoverageEntry,
 {
     fn init(&mut self, _state: &mut S) {}
 

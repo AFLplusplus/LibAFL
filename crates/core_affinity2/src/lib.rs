@@ -96,6 +96,13 @@ pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
     get_core_ids_helper()
 }
 
+/// Checks the current process/thread affinity.
+/// Returns the [`CoreId`] that this process is allowed to run on.
+/// Returns `Ok(None)` if no specific affinity is set (i.e., allowed to run on all cores).
+pub fn get_affinity() -> Result<Option<CoreId>, Error> {
+    get_affinity_helper()
+}
+
 /// This represents a CPU core.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[repr(transparent)]
@@ -260,7 +267,7 @@ impl TryFrom<&str> for Cores {
 ))]
 #[inline]
 fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
-    linux::get_core_ids()
+    unix::get_core_ids()
 }
 
 #[cfg(any(
@@ -271,7 +278,7 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 ))]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
-    linux::set_for_current(core_id)
+    unix::set_for_current(core_id)
 }
 
 #[cfg(any(
@@ -280,7 +287,24 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
     target_os = "dragonfly",
     target_os = "freebsd"
 ))]
-mod linux {
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd"
+))]
+#[inline]
+fn get_affinity_helper() -> Result<Option<CoreId>, Error> {
+    unix::get_affinity()
+}
+
+#[cfg(any(
+    target_os = "android",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd"
+))]
+mod unix {
     use alloc::{string::ToString, vec::Vec};
     use core::mem::{size_of, zeroed};
 
@@ -363,19 +387,91 @@ mod linux {
         unsafe { zeroed::<cpu_set_t>() }
     }
 
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub fn get_affinity() -> Result<Option<CoreId>, Error> {
+        let status = std::fs::read_to_string("/proc/self/status").unwrap();
+        let mut affinity = None;
+        for line in status.lines() {
+            if line.starts_with("Cpus_allowed_list:") {
+                let val = line.split(':').nth(1).unwrap().trim();
+                affinity = Some(val.to_string());
+                break;
+            }
+        }
+        let Some(affinity) = affinity else {
+            return Err(Error::unknown(
+                "Could not find Cpus_allowed_list in /proc/self/status",
+            ));
+        };
+
+        // Parse list (e.g., "0-3,5")
+        let mut count = 0;
+        let mut first_core = None;
+
+        for part in affinity.split(',') {
+            if let Some((start, end)) = part.split_once('-') {
+                let start: usize = start.trim().parse().unwrap();
+                let end: usize = end.trim().parse().unwrap();
+                for i in start..=end {
+                    count += 1;
+                    if first_core.is_none() {
+                        first_core = Some(CoreId(i));
+                    }
+                }
+            } else {
+                let core: usize = part.trim().parse().unwrap();
+                count += 1;
+                if first_core.is_none() {
+                    first_core = Some(CoreId(core));
+                }
+            }
+        }
+
+        let all_cores_count = std::thread::available_parallelism()?.get();
+        if count == all_cores_count {
+            Ok(None)
+        } else {
+            Ok(first_core)
+        }
+    }
+
+    #[cfg(any(target_os = "netbsd", target_os = "freebsd", target_os = "dragonfly"))]
+    pub fn get_affinity() -> Result<Option<CoreId>, Error> {
+        let mask = get_affinity_mask()?;
+
+        let mut count = 0;
+        let mut first_core = None;
+
+        for i in 0..CPU_SETSIZE as usize {
+            if unsafe { CPU_ISSET(i, &mask) } {
+                count += 1;
+                if first_core.is_none() {
+                    first_core = Some(CoreId(i));
+                }
+            }
+        }
+
+        let all_cores_count = std::thread::available_parallelism()?.get();
+        if count == all_cores_count {
+            Ok(None)
+        } else {
+            Ok(first_core)
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
 
         #[test]
         #[cfg_attr(miri, ignore)]
-        fn test_linux_get_affinity_mask() {
+        fn test_unix_get_affinity_mask() {
             get_affinity_mask().unwrap();
         }
 
         #[test]
         #[cfg_attr(miri, ignore)]
-        fn test_linux_set_for_current() {
+        fn test_unix_set_for_current() {
             let ids = get_core_ids().unwrap();
 
             assert!(!ids.is_empty());
@@ -423,6 +519,15 @@ fn set_for_current_helper(_core_id: CoreId) -> Result<(), Error> {
 }
 
 #[cfg(target_os = "haiku")]
+#[expect(clippy::unnecessary_wraps)]
+#[inline]
+fn get_affinity_helper() -> Result<Option<CoreId>, Error> {
+    Err(Error::not_implemented(
+        "Target OS \"Haiku\" not supported for get_affinity",
+    ))
+}
+
+#[cfg(target_os = "haiku")]
 mod haiku {
     use alloc::vec::Vec;
     use std::thread::available_parallelism;
@@ -449,6 +554,12 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 #[inline]
 fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
     windows::set_for_current(core_id)
+}
+
+#[cfg(target_os = "windows")]
+#[inline]
+fn get_affinity_helper() -> Result<Option<CoreId>, Error> {
+    windows::get_affinity()
 }
 
 #[cfg(target_os = "windows")]
@@ -509,7 +620,6 @@ mod windows {
         }
     }
 
-    #[expect(clippy::cast_ptr_alignment)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
         use core::{ptr, slice};
 
@@ -590,6 +700,7 @@ mod windows {
             unsafe {
                 // interpret this byte-array as SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX struct
                 let part_ptr_raw: *const u8 = buffer.as_ptr().add(byte_offset);
+                #[allow(clippy::cast_ptr_alignment)]
                 let part_ptr: *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX =
                     part_ptr_raw as *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
                 let part: &SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX = &*part_ptr;
@@ -620,6 +731,37 @@ mod windows {
 
         Some(n_logical_procs)
     }
+
+    pub fn get_affinity() -> Result<Option<CoreId>, Error> {
+        use windows::Win32::System::Threading::GetThreadGroupAffinity;
+
+        unsafe {
+            let mut ga = GROUP_AFFINITY::default();
+            if GetThreadGroupAffinity(GetCurrentThread(), &raw mut ga).as_bool() {
+                let mut count = 0;
+                let mut first_core = None;
+
+                let group_base = (ga.Group as usize) * 64;
+                let mask = ga.Mask;
+                for i in 0..usize::BITS {
+                    if (mask & (1 << i)) != 0 {
+                        count += 1;
+                        if first_core.is_none() {
+                            first_core = Some(CoreId(group_base + (i as usize)));
+                        }
+                    }
+                }
+
+                if get_num_logical_cpus_ex_windows() == Some(count) {
+                    return Ok(None);
+                }
+
+                Ok(first_core)
+            } else {
+                Err(Error::unknown("Failed to get thread group affinity"))
+            }
+        }
+    }
 }
 
 // Apple Section
@@ -634,6 +776,12 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 #[inline]
 fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
     apple::set_for_current(core_id)
+}
+
+#[cfg(target_vendor = "apple")]
+#[inline]
+fn get_affinity_helper() -> Result<Option<CoreId>, Error> {
+    apple::get_affinity()
 }
 
 #[cfg(target_vendor = "apple")]
@@ -717,6 +865,46 @@ mod apple {
 
         Ok(())
     }
+
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn get_affinity() -> Result<Option<CoreId>, Error> {
+        #[cfg(target_arch = "x86_64")]
+        {
+            let mut info = thread_affinity_policy_data_t { affinity_tag: 0 };
+            let mut count = THREAD_AFFINITY_POLICY_COUNT;
+            let mut get_default = false;
+
+            unsafe {
+                use libc::{
+                    THREAD_AFFINITY_POLICY, pthread_mach_thread_np, pthread_self, thread_policy_get,
+                };
+                let result = thread_policy_get(
+                    pthread_mach_thread_np(pthread_self()),
+                    THREAD_AFFINITY_POLICY as _,
+                    &raw mut info as thread_policy_t,
+                    &mut count,
+                    &mut get_default,
+                );
+                if result == KERN_SUCCESS {
+                    if info.affinity_tag == 0 {
+                        Ok(None)
+                    } else {
+                        // On macOS, affinity tag is just a number grouping threads.
+                        match info.affinity_tag.try_into() {
+                            Ok(tag) => Ok(Some(CoreId(tag))),
+                            Err(_) => Ok(None),
+                        }
+                    }
+                } else {
+                    Err(Error::unknown("Failed to get thread policy"))
+                }
+            }
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            Err(Error::unsupported("Core affinity not supported on arm"))
+        }
+    }
 }
 
 // NetBSD Section
@@ -734,6 +922,12 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 }
 
 #[cfg(target_os = "netbsd")]
+#[inline]
+fn get_affinity_helper() -> Result<Option<CoreId>, Error> {
+    netbsd::get_affinity()
+}
+
+#[cfg(target_os = "netbsd")]
 mod netbsd {
     use alloc::vec::Vec;
     use std::thread::available_parallelism;
@@ -746,7 +940,6 @@ mod netbsd {
 
     use super::CoreId;
 
-    #[expect(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .map(CoreId)
@@ -775,6 +968,41 @@ mod netbsd {
         }
     }
 
+    pub fn get_affinity() -> Result<Option<CoreId>, Error> {
+        use libc::{_cpuset_isset, _cpuset_size, pthread_getaffinity_np, pthread_self};
+        let set = new_cpuset();
+        unsafe {
+            if pthread_getaffinity_np(pthread_self(), _cpuset_size(set), set) != 0 {
+                _cpuset_destroy(set);
+                return Err(Error::unknown("pthread_getaffinity_np failed"));
+            }
+        }
+
+        let mut set_count = 0;
+        let mut first_core = None;
+
+        let core_count = available_parallelism()?.get();
+
+        for i in 0..core_count {
+            if unsafe { _cpuset_isset(i as u64, set) } != 0 {
+                set_count += 1;
+                if first_core.is_none() {
+                    first_core = Some(CoreId(i));
+                }
+            }
+        }
+
+        // # Safety
+        // Valid set we just created
+        unsafe { _cpuset_destroy(set) };
+
+        if set_count == core_count {
+            Ok(None)
+        } else {
+            Ok(first_core)
+        }
+    }
+
     fn new_cpuset() -> *mut _cpuset {
         // # Safety
         // Simply creating new empty cpuset. No user-provided params.
@@ -789,10 +1017,16 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 }
 
 #[cfg(target_os = "openbsd")]
+#[inline]
+fn get_affinity_helper() -> Result<Option<CoreId>, Error> {
+    openbsd::get_affinity()
+}
+
+#[cfg(target_os = "openbsd")]
 #[expect(clippy::unnecessary_wraps)]
 #[inline]
-fn set_for_current_helper(_: CoreId) -> Result<(), Error> {
-    Ok(()) // There is no notion of cpu affinity on this platform
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    openbsd::set_for_current(core_id)
 }
 
 #[cfg(target_os = "openbsd")]
@@ -804,11 +1038,22 @@ mod openbsd {
 
     use super::CoreId;
 
-    #[expect(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .map(CoreId)
             .collect::<Vec<_>>())
+    }
+
+    pub fn set_for_current(_core_id: CoreId) -> Result<(), Error> {
+        Err(Error::unsupported(
+            "OpenBSD affinity not supported yet (missing libc bindings)",
+        ))
+    }
+
+    pub fn get_affinity() -> Result<Option<CoreId>, Error> {
+        Err(Error::unsupported(
+            "OpenBSD affinity not supported yet (missing libc bindings)",
+        ))
     }
 }
 
@@ -822,6 +1067,12 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 #[inline]
 fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
     solaris::set_for_current(core_id)
+}
+
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
+#[inline]
+fn get_affinity_helper() -> Result<Option<CoreId>, Error> {
+    solaris::get_affinity()
 }
 
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
@@ -855,6 +1106,38 @@ mod solaris {
             Ok(())
         }
     }
+
+    pub fn get_affinity() -> Result<Option<CoreId>, Error> {
+        // Solaris/Illumos processor_bind query
+        // processor_bind(P_LWPID, P_MYID, PBIND_QUERY, &binding)
+        // PBIND_QUERY is -2. PBIND_NONE is -1.
+
+        let mut binding: libc::processorid_t = 0;
+        let result = unsafe {
+            libc::processor_bind(
+                libc::P_LWPID,
+                libc::PS_MYID,
+                -2, // PBIND_QUERY
+                &mut binding,
+            )
+        };
+
+        if result < 0 {
+            Err(Error::unknown("Failed to query processor_bind"))
+        } else {
+            const PBIND_NONE: libc::processorid_t = -1;
+            if binding == PBIND_NONE {
+                Ok(None)
+            } else {
+                if binding < 0 {
+                    // Should not happen if not none/error
+                    Err(Error::unknown("Invalid binding id"))
+                } else {
+                    Ok(Some(CoreId(binding as usize)))
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -878,5 +1161,18 @@ mod tests {
         assert!(!ids.is_empty());
 
         ids[0].set_affinity().unwrap();
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_set_get_affinity() {
+        let ids = get_core_ids().unwrap();
+        assert!(!ids.is_empty());
+
+        ids[0].set_affinity().expect("Failed to set affinity");
+        let affinity = get_affinity()
+            .expect("Failed to get affinity")
+            .expect("Affinity should be set");
+        assert_eq!(affinity, ids[0]);
     }
 }

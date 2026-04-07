@@ -2,8 +2,8 @@ import "../../just/libafl.just"
 
 DEMO_TARGET := "powerpc-unknown-linux-gnu"
 HOST_TARGET := "x86_64-unknown-linux-gnu"
-DEMO_DIR := TARGET_DIR/DEMO_TARGET/PROFILE_DIR
-HOST_DIR := TARGET_DIR/HOST_TARGET/PROFILE_DIR
+DEMO_DIR := TARGET_DIR / DEMO_TARGET / PROFILE_DIR
+HOST_DIR := TARGET_DIR / HOST_TARGET / PROFILE_DIR
 FUZZER_NAME := ""
 
 clean:
@@ -13,32 +13,32 @@ format:
     cargo fmt -- --emit=files
 
 demo: format
-    cargo build -p gdb_demo --profile {{PROFILE}} --target powerpc-unknown-linux-gnu
+    cargo build -p gdb_demo --profile {{ PROFILE }} --target powerpc-unknown-linux-gnu
 
 run_demo: demo
-    cargo run -p gdb_demo --profile {{PROFILE}} --target powerpc-unknown-linux-gnu
+    cargo run -p gdb_demo --profile {{ PROFILE }} --target powerpc-unknown-linux-gnu
 
 build: format
-    cargo build -p gdb_qemu --profile {{PROFILE}}
+    cargo build -p gdb_qemu --profile {{ PROFILE }}
 
 run: demo
-    cargo run -p gdb_qemu --profile {{PROFILE}} -- -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{DEMO_DIR}}/gdb_demo
+    cargo run -p gdb_qemu --profile {{ PROFILE }} -- -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{ DEMO_DIR }}/gdb_demo
 
 gdb: demo build
     gdb-multiarch \
         -ex "set architecture powerpc:MPC8XX" \
         -ex "set pagination off" \
         -ex "set confirm off" \
-        -ex "file {{DEMO_DIR}}/gdb_demo" \
-        -ex "target remote | {{HOST_DIR}}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{DEMO_DIR}}/gdb_demo"
+        -ex "file {{ DEMO_DIR }}/gdb_demo" \
+        -ex "target remote | {{ HOST_DIR }}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{ DEMO_DIR }}/gdb_demo"
 
 test: demo build
     gdb-multiarch \
         -ex "set architecture powerpc:MPC8XX" \
         -ex "set pagination off" \
         -ex "set confirm off" \
-        -ex "file {{DEMO_DIR}}/gdb_demo" \
-        -ex "target remote | {{HOST_DIR}}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{DEMO_DIR}}/gdb_demo" \
+        -ex "file {{ DEMO_DIR }}/gdb_demo" \
+        -ex "target remote | {{ HOST_DIR }}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{ DEMO_DIR }}/gdb_demo" \
         -ex "c" \
         -ex "q"
 

@@ -76,7 +76,7 @@ RUN apt-get update && \
 
 # Install a modern version of QEMU
 WORKDIR /root
-ENV QEMU_VER=10.0.0
+ENV QEMU_VER=10.2.0
 RUN wget https://download.qemu.org/qemu-${QEMU_VER}.tar.xz && \
     tar xvJf qemu-${QEMU_VER}.tar.xz && \
     cd /root/qemu-${QEMU_VER} && \

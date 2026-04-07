@@ -1,2 +1,2 @@
 doc:
-  DOCS_RS=1 cargo doc -p libafl_qemu --no-deps --no-default-features --features x86_64,usermode,python,document-features
+    DOCS_RS=1 cargo doc -p libafl_qemu --no-deps --no-default-features --features x86_64,usermode,python,document-features

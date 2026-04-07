@@ -3,7 +3,7 @@
 use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
 
 use libafl::{executors::ExitKind, observers::ObserversTuple};
-use libafl_qemu_sys::{CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
+use libafl_qemu_sys::{CPUStatePtr, FatPtr, GuestAddr, TCGTemp};
 
 #[cfg(feature = "usermode")]
 use crate::qemu::{
@@ -164,6 +164,12 @@ impl<ET, I, S> Default for EmulatorHookCollection<ET, I, S> {
 }
 
 /// Hook collection,
+///
+/// `EmulatorHooks` provides the standard interface for registering QEMU-based
+/// instrumentation in `LibAFL` from a high-level perspective.
+///
+/// It integrates with emulator modules to ensure hooks are registered
+/// safely and at the correct time.
 #[derive(Debug)]
 pub struct EmulatorHooks<ET, I, S> {
     qemu_hooks: QemuHooks,
@@ -336,7 +342,7 @@ where
                 unsafe extern "C" fn(
                     &mut TcgHookState<1, BlockHookId>,
                     pc: GuestAddr,
-                    block_length: GuestUsize,
+                    block_length: GuestAddr,
                 )
             );
 

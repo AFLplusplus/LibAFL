@@ -7,20 +7,19 @@ FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 LIBAFL_CC := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
 
 build:
-    cargo build --profile={{PROFILE}} -Zbuild-std=core,alloc --target x86_64-unknown-linux-gnu
+    cargo build --profile={{ PROFILE }} -Zbuild-std=core,alloc --target x86_64-unknown-linux-gnu
 
 build_aarch:
-	cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --profile {{PROFILE}}
+    cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --profile {{ PROFILE }}
 
 [linux]
 test: build
-	cargo run -Zbuild-std=core,alloc --target x86_64-unknown-linux-gnu || true
+    cargo run -Zbuild-std=core,alloc --target x86_64-unknown-linux-gnu || true
 
 [macos]
 [windows]
 test: build
-	echo "Unsupported on this platform"
-
+    echo "Unsupported on this platform"
 
 clean:
-	cargo clean
+    cargo clean

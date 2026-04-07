@@ -1,8 +1,8 @@
-use std::{fmt::Debug, ops::AddAssign};
+use std::fmt::Debug;
 
 use libafl::{HasMetadata, observers::ObserversTuple};
 pub use libafl_intelpt::PtImage;
-use libafl_intelpt::{IntelPT, IntelPTBuilder};
+use libafl_intelpt::{CoverageEntry, IntelPT, IntelPTBuilder};
 use libafl_qemu_sys::CPUArchStatePtr;
 use typed_builder::TypedBuilder;
 
@@ -39,7 +39,7 @@ impl<I, S, T> EmulatorModule<I, S> for IntelPTModule<T>
 where
     I: Unpin,
     S: Unpin + HasMetadata,
-    T: AddAssign + From<u8> + Debug + 'static,
+    T: CoverageEntry + 'static,
 {
     fn pre_qemu_init<ET>(
         &mut self,
@@ -51,6 +51,7 @@ where
         emulator_modules
             .thread_creation(NewThreadHook::Function(intel_pt_new_thread::<ET, I, S, T>))
             .unwrap();
+        log::trace!("Intel PT thread creation hook added.");
         // fixme: consider implementing a clean emulator_modules.thread_teradown
     }
 
@@ -124,6 +125,8 @@ where
         .unwrap();
 
     intel_pt_module.pt = Some(pt);
+
+    log::trace!("Intel PT attached to thread {tid}");
 
     true
 }

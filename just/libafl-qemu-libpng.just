@@ -25,7 +25,7 @@ zlib_wget: deps_dir
 
     wget \
         -O "{{ DEPS_DIR }}/zlib-1.2.13.tar.gz" \
-        https://zlib.net/fossils/zlib-1.2.13.tar.gz
+        https://github.com/madler/zlib/releases/download/v1.2.13/zlib-1.2.13.tar.gz
 
     tar \
         zxvf {{ DEPS_DIR }}/zlib-1.2.13.tar.gz \

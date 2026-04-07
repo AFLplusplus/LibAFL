@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, ptr};
 
 use libafl::{HasMetadata, observers::VarLenMapObserver};
 use libafl_bolts::Error;
@@ -175,7 +175,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
     {
         let map_ptr = map_observer.map_slice_mut().as_mut_ptr() as *mut u8;
         let map_max_size = map_observer.map_slice_mut().len();
-        let size_ptr = map_observer.as_mut().size_mut() as *mut usize;
+        let size_ptr = ptr::from_mut::<usize>(map_observer.as_mut().size_mut());
 
         unsafe {
             LIBAFL_QEMU_EDGES_MAP_PTR = map_ptr;
