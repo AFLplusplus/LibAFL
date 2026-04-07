@@ -71,19 +71,20 @@ pub fn capstone() -> capstone::arch::x86::ArchCapstoneBuilder {
 pub type GuestReg = u64;
 
 impl crate::ArchExtras for crate::CPU {
-    fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
-        let stack_ptr: GuestReg = self.read_reg(Regs::Rsp)?;
+    fn read_return_address(&self) -> Result<GuestAddr, QemuRWError> {
+        let stack_ptr: GuestAddr = self.read_reg(Regs::Rsp)? as GuestAddr;
         let mut ret_addr = [0; size_of::<GuestReg>()];
         unsafe { self.read_mem_unchecked(stack_ptr, &mut ret_addr) };
-        Ok(GuestReg::from_le_bytes(ret_addr))
+        Ok(GuestReg::from_le_bytes(ret_addr) as GuestAddr)
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
-        T: Into<GuestReg>,
+        T: Into<GuestAddr>,
     {
-        let stack_ptr: GuestReg = self.read_reg(Regs::Rsp)?;
-        let val: GuestReg = val.into();
+        let stack_ptr: GuestAddr = self.read_reg(Regs::Rsp)? as GuestAddr;
+        let addr: GuestAddr = val.into();
+        let val: GuestReg = addr as GuestReg;
         let ret_addr = val.to_le_bytes();
         unsafe { self.write_mem_unchecked(stack_ptr, &ret_addr) };
         Ok(())
@@ -105,7 +106,7 @@ impl crate::ArchExtras for crate::CPU {
             5 => self.read_reg(Regs::R9),
             _ => {
                 const SIZE: usize = size_of::<GuestReg>();
-                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)? as GuestAddr;
                 /*
                  * Stack is full and descending. SP points to return address, arguments
                  * are in reverse order above that. 6th argument is at SP + 8.
@@ -115,7 +116,7 @@ impl crate::ArchExtras for crate::CPU {
                 let mut buf = [0; SIZE];
                 self.read_mem(stack_ptr + offset, &mut buf)?;
 
-                Ok(GuestAddr::from_le_bytes(buf))
+                Ok(GuestReg::from_le_bytes(buf))
             }
         }
     }
@@ -141,7 +142,7 @@ impl crate::ArchExtras for crate::CPU {
             5 => self.write_reg(Regs::R9, val),
             _ => {
                 let val: GuestReg = val.into();
-                let stack_ptr: GuestAddr = self.read_reg(Regs::Rsp)?;
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Rsp)? as GuestAddr;
                 /*
                  * Stack is full and descending. SP points to return address, arguments
                  * are in reverse order above that. 6th argument is at SP + 8.

@@ -36,7 +36,6 @@
 
 - [Advanced Features](./advanced_features/advanced_features.md)
   - [Binary-Only Fuzzing with `Frida`](./advanced_features/frida.md)
-  - [Concolic Tracing & Hybrid Fuzzing](./advanced_features/concolic.md)
   - [LibAFL in `no_std` environments (Kernels, Hypervisors, ...)](./advanced_features/no_std.md)
   - [Snapshot Fuzzing in Nyx](./advanced_features/nyx.md)
   - [StatsD Monitor](./advanced_features/statsd_monitor.md)
