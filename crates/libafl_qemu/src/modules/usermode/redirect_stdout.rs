@@ -4,7 +4,7 @@ use core::{
 };
 
 use libafl_bolts::HasLen;
-use libafl_qemu_sys::GuestAddr;
+use libafl_qemu_sys::GuestUlong;
 
 #[cfg(not(cpu_target = "hexagon"))]
 use crate::SYS_write;
@@ -117,14 +117,14 @@ fn syscall_write_hook<F, ET, I, S>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     syscall: i32,
-    x0: GuestAddr,
-    x1: GuestAddr,
-    x2: GuestAddr,
-    _x3: GuestAddr,
-    _x4: GuestAddr,
-    _x5: GuestAddr,
-    _x6: GuestAddr,
-    _x7: GuestAddr,
+    x0: GuestUlong,
+    x1: GuestUlong,
+    x2: GuestUlong,
+    _x3: GuestUlong,
+    _x4: GuestUlong,
+    _x5: GuestUlong,
+    _x6: GuestUlong,
+    _x7: GuestUlong,
 ) -> SyscallHookResult
 where
     ET: EmulatorModuleTuple<I, S>,

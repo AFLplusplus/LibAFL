@@ -349,14 +349,14 @@ pub struct Forkserver {
     status: i32,
     /// If the last run timed out (in in-target i32)
     last_run_timed_out: i32,
-    /// The signal this [`Forkserver`] will use to kill (defaults to [`self.kill_signal`])
+    /// The signal this [`Forkserver`] will use to kill
     kill_signal: Signal,
 }
 
 impl Drop for Forkserver {
     fn drop(&mut self) {
         // Modelled after <https://github.com/AFLplusplus/AFLplusplus/blob/dee76993812fa9b5d8c1b75126129887a10befae/src/afl-forkserver.c#L1429>
-        log::debug!("Dropping forkserver",);
+        log::debug!("Dropping forkserver");
 
         if let Some(pid) = self.child_pid {
             log::debug!("Sending {} to child {pid}", self.kill_signal);

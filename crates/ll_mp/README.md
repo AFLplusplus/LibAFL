@@ -57,7 +57,7 @@ Here is a simple example of a broker and a client communicating in the same proc
 
 This example requires the `llmp_serde` feature to be enabled, which allows sending and receiving `serde`-serializable structs.
 
-```rust
+```rust,ignore
 use libafl_bolts::llmp;
 use serde::{Serialize, Deserialize};
 use std::{thread, time::Duration};

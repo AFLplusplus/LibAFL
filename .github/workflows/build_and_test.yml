@@ -4,16 +4,17 @@ permissions:
 
 on:
   push:
-    branches: [ main, "pr/**" ]
+    branches: [main, "pr/**"]
   pull_request:
-    branches: [ main ]
+    branches: [main]
     types: ["labeled", "opened", "synchronize", "reopened"]
   workflow_dispatch:
   merge_group:
 env:
+  AFL_PIZZA_MODE: "-1" # this is sad, I know, but it breaks on a certain spring day otherwise :(
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-  MAIN_LLVM_VERSION: 18
+  MAIN_LLVM_VERSION: 21
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,7 +24,7 @@ jobs:
   common:
     strategy:
       matrix:
-        os: [ ubuntu-24.04, windows-latest, macOS-latest ]
+        os: [ubuntu-24.04, windows-latest, macOS-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install mimetype
@@ -50,14 +51,11 @@ jobs:
       - name: Install LLVM
         if: runner.os == 'MacOS'
         run: brew install llvm@${{env.MAIN_LLVM_VERSION}}
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "ubuntu" }
-        if: runner.os == 'Linux'
-      - uses: Swatinem/rust-cache@v2
-        if: runner.os != 'Linux'
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: just check-blobs
+      - name: Check for conflicting versions
+        run: cargo tree -d --workspace
       - name: Build libafl debug
         run: just build-libafl
       - name: Test the book (Linux)
@@ -73,13 +71,18 @@ jobs:
       - name: Doc
         if: runner.os == 'Linux'
         run: just doc
+      # DO NOT move the cache pull before this point, as it causes mdbook to fail due to duplicated deps
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
+        if: runner.os == 'Linux'
+      - uses: Swatinem/rust-cache@v2
+        if: runner.os != 'Linux'
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: just test-serial
       - name: Run tests (Linux)
         if: runner.os != 'Windows'
         run: just test-serial
-
 
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
@@ -96,10 +99,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
-      - uses: Swatinem/rust-cache@v2
+      - name: install mdbook
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: mdbook
       # ---- doc check ----
       - name: Test Docs
         run: just test-docs
+      # DO NOT move the cache pull before this point, as it causes mdbook to fail due to duplicated deps
+      - uses: Swatinem/rust-cache@v2
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
@@ -108,7 +116,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
         with:
-          use_nightly: 'true'
+          use_nightly: "true"
       - name: Add miri
         run: rustup +nightly component add miri
       - uses: Swatinem/rust-cache@v2
@@ -164,7 +172,27 @@ jobs:
     needs: ubuntu
     strategy:
       matrix:
-        instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17" ]
+        instance_idx:
+          [
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16",
+            "17",
+          ]
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
@@ -189,20 +217,6 @@ jobs:
         # `sancov_pcguard_edges` is tested seperatelyc
         run: just check-features ${{ matrix.instance_idx }}
 
-#  idk why bindgen generates a corrupted file only on CI.
-#  ubuntu-concolic:
-#    runs-on: ubuntu-24.04
-#    needs: ubuntu
-#    steps:
-#      - uses: dtolnay/rust-toolchain@stable
-#      - uses: actions/checkout@v4
-#      - uses: Swatinem/rust-cache@v2
-#        with: { shared-key: "ubuntu" }
-#      - name: Install smoke test deps
-#        run: sudo ./crates/libafl_concolic/test/smoke_test_ubuntu_deps.sh
-#      - name: Run smoke test
-#        run: ./crates/libafl_concolic/test/smoke_test.sh
-#
   python-bindings:
     runs-on: ubuntu-24.04
     steps:
@@ -244,8 +258,8 @@ jobs:
       - name: Run linkspector
         uses: umbrelladocs/action-linkspector@v1
         with:
-          fail_on_error: 'true'
-          config_file: '.github/.linkspector.yml'
+          fail_on_error: "true"
+          config_file: ".github/.linkspector.yml"
 
   msrv:
     runs-on: ubuntu-latest
@@ -340,7 +354,6 @@ jobs:
           # - inprocess/libfuzzer_windows_asan
           - inprocess/libfuzzer_stb_image_sugar
           - inprocess/libfuzzer_stb_image
-          - structure_aware/libfuzzer_stb_image_concolic
           # - inprocess/sqlite_centralized_multi_machine
           # - inprocess/libafl_libfuzzer_windows
 
@@ -353,8 +366,8 @@ jobs:
 
     runs-on: ubuntu-24.04
     steps:
-        # Get the name of the fuzzer so that we can use it as the key for a cache
-        # of the built artefacts. The key cannot have any special characters.
+      # Get the name of the fuzzer so that we can use it as the key for a cache
+      # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
         id: fuzzer_name
         run: |
@@ -427,7 +440,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-24.04 ]
+        os: [ubuntu-24.04]
         fuzzer:
           - fuzzers/full_system/unicorn
     steps:
@@ -452,17 +465,17 @@ jobs:
     strategy:
       matrix:
         fuzzer:
-            - binary_only/qemu_cmin
-            - binary_only/qemu_tmin
-            - binary_only/qemu_coverage
-            - binary_only/qemu_launcher
-            # - full_system/qemu_linux_kernel
-            # - full_system/qemu_linux_process
+          - binary_only/qemu_cmin
+          - binary_only/qemu_tmin
+          - binary_only/qemu_coverage
+          - binary_only/qemu_launcher
+          # - full_system/qemu_linux_kernel
+          # - full_system/qemu_linux_process
     runs-on: ubuntu-24.04
     # container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
-        # Get the name of the fuzzer so that we can use it as the key for a cache
-        # of the built artefacts. The key cannot have any special characters.
+      # Get the name of the fuzzer so that we can use it as the key for a cache
+      # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
         id: fuzzer_name
         run: |
@@ -475,7 +488,7 @@ jobs:
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
-          # We will have each of these fuzzers have it's own cache since these
+          # We will have each of these fuzzers have its own cache since these
           # are some of the heaviest fuzzers to build.
           shared-key: qemu-${{ steps.fuzzer_name.outputs.fuzzer_name }}-x86_64
           # We want to include the commit hash to ensure the cache is replaced
@@ -494,7 +507,6 @@ jobs:
           LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} \
           just test-fuzzer fuzzers/${{ matrix.fuzzer }}
 
-
   # Job to build and test the QEMU fuzzers
   qemu-system:
     name: 🤖 ${{ matrix.fuzzer }}
@@ -505,14 +517,14 @@ jobs:
     strategy:
       matrix:
         fuzzer:
-            - full_system/qemu_baremetal
-            - full_system/qemu_linux_kernel
-            # - full_system/qemu_linux_process
+          - full_system/qemu_baremetal
+          - full_system/qemu_linux_kernel
+          # - full_system/qemu_linux_process
     runs-on: ubuntu-24.04
     # container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
-        # Get the name of the fuzzer so that we can use it as the key for a cache
-        # of the built artefacts. The key cannot have any special characters.
+      # Get the name of the fuzzer so that we can use it as the key for a cache
+      # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
         id: fuzzer_name
         run: |
@@ -525,7 +537,7 @@ jobs:
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
-          # We will have each of these fuzzers have it's own cache since these
+          # We will have each of these fuzzers have its own cache since these
           # are some of the heaviest fuzzers to build.
           shared-key: qemu-${{ steps.fuzzer_name.outputs.fuzzer_name }}-arm
           # We want to include the commit hash to ensure the cache is replaced
@@ -554,12 +566,12 @@ jobs:
     strategy:
       matrix:
         fuzzer:
-            - full_system/qemu_baremetal
+          - full_system/qemu_baremetal
     runs-on: ubuntu-24.04
     # container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
-        # Get the name of the fuzzer so that we can use it as the key for a cache
-        # of the built artefacts. The key cannot have any special characters.
+      # Get the name of the fuzzer so that we can use it as the key for a cache
+      # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
         id: fuzzer_name
         run: |
@@ -613,6 +625,62 @@ jobs:
         shell: bash
         run: just -d utils/${{ matrix.util }} --justfile utils/${{ matrix.util }}/Justfile test
 
+  libafl_qemu-full:
+    if: contains(github.event.pull_request.labels.*.name, 'qemu-full')
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        mode:
+          - usermode
+          - systemmode
+        arch:
+          - aarch64
+          - arm
+          - i386
+          - mips
+          - ppc
+          - riscv32
+          - riscv64
+          - x86_64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare
+        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+      # ---- build normal and examples ----
+      - name: Build LibAFL QEMU (${{ matrix.mode }} - ${{ matrix.arch }})
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
+        run: cargo build --verbose --package libafl_qemu --no-default-features --features ${{ matrix.mode }},${{ matrix.arch }}
+      - name: Test LibAFL QEMU (${{ matrix.mode }} - ${{ matrix.arch }})
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
+        run: cargo test --package libafl_qemu --no-default-features --features ${{ matrix.mode }},${{ matrix.arch }}
+
+  # hexagon systemmode is not available yet in qemu upstream.
+  # in the meantime, we only test usermode
+  libafl_qemu-hexagon:
+    if: contains(github.event.pull_request.labels.*.name, 'qemu-full')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare
+        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+      - name: Configure Cache
+        uses: Swatinem/rust-cache@v2
+      # ---- build normal and examples ----
+      - name: Build LibAFL QEMU (usermode - hexagon)
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
+        run: cargo build --verbose --package libafl_qemu --no-default-features --features usermode,hexagon
+      - name: Test LibAFL QEMU (usermode - hexagon)
+        env:
+          LLVM_CONFIG: llvm-config-${{env.MAIN_LLVM_VERSION}}
+        run: cargo test --package libafl_qemu --no-default-features --features usermode,hexagon
+
   libafl_asan:
     name: 🔧 libafl_asan
     runs-on: ubuntu-24.04
@@ -651,7 +719,7 @@ jobs:
   libafl_qemu_asan:
     name: 🔧 libafl_qemu_asan
     needs:
-        - qemu-changes
+      - qemu-changes
     if: ${{ needs.qemu-changes.outputs.qemu == 'true' }}
     runs-on: ubuntu-24.04
     steps:
@@ -704,7 +772,7 @@ jobs:
         run: just test-no-std
       - name: Build aarch64-unknown-none
         run: just build-aarch64-unknown-none
-  
+
   x86-i686-build:
     runs-on: ubuntu-24.04
 
@@ -723,7 +791,6 @@ jobs:
           shared-key: x86-i686
       - name: test
         run: just check-i686
-        
 
   nostd-clippy:
     runs-on: ubuntu-24.04
@@ -808,8 +875,7 @@ jobs:
           file: ./Dockerfile
           push: ${{ github.ref == 'refs/heads/main' }}
           load: ${{ github.ref != 'refs/heads/main' }}
-          tags:
-            ghcr.io/aflplusplus/libafl:latest
+          tags: ghcr.io/aflplusplus/libafl:latest
           cache-from: |
             type=registry,ref=ghcr.io/aflplusplus/libafl:cache
             type=local,src=/tmp/.buildx-cache
@@ -834,20 +900,20 @@ jobs:
     strategy:
       matrix:
         fuzzer:
-            - binary_only/frida_libpng
-            - inprocess/libafl_libfuzzer_windows
-            - inprocess/libfuzzer_stb_image
-            - binary_only/frida_windows_gdiplus
-            - binary_only/tinyinst_simple
-            # - inprocess/libfuzzer_windows_asan
+          - binary_only/frida_libpng
+          - inprocess/libafl_libfuzzer_windows
+          - inprocess/libfuzzer_stb_image
+          - binary_only/frida_windows_gdiplus
+          - binary_only/tinyinst_simple
+          # - inprocess/libfuzzer_windows_asan
       fail-fast: false
     runs-on: windows-latest
     needs:
       - fuzzers-preflight
       - common
     steps:
-        # Get the name of the fuzzer so that we can use it as the key for a cache
-        # of the built artefacts. The key cannot have any special characters.
+      # Get the name of the fuzzer so that we can use it as the key for a cache
+      # of the built artefacts. The key cannot have any special characters.
       - name: Get fuzzer name
         id: fuzzer_name
         shell: pwsh
@@ -861,6 +927,10 @@ jobs:
       - name: install cxx bridge
         # Needs to match version in tinyinst-rs
         run: cargo install cxxbridge-cmd@=1.0.190
+      - name: Install vcpkg dependencies
+        run: vcpkg install zlib:x64-windows-static-md
+        env:
+          VCPKG_ROOT: C:\vcpkg
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -877,6 +947,8 @@ jobs:
             fuzzers/${{ matrix.fuzzer }}
       - name: Test
         run: cd fuzzers/${{ matrix.fuzzer }} && just test
+        env:
+          VCPKG_ROOT: C:\vcpkg
 
   windows-clippy:
     runs-on: windows-latest
@@ -904,6 +976,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - name: Install nightly
+        run: rustup toolchain install nightly --component clippy
       - name: Install deps
         run: brew install z3 gtk+3 python llvm@${{env.MAIN_LLVM_VERSION}}
       - name: Install cxxbridge

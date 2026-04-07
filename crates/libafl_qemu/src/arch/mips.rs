@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::mips::*;
 
-use crate::{CallingConvention, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
+use crate::{CallingConvention, GuestAddr, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
 
 #[expect(non_upper_case_globals)]
 impl CallingConvention {
@@ -85,15 +85,16 @@ pub fn capstone() -> capstone::arch::mips::ArchCapstoneBuilder {
 pub type GuestReg = u32;
 
 impl crate::ArchExtras for crate::CPU {
-    fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
-        self.read_reg(Regs::Ra)
+    fn read_return_address(&self) -> Result<GuestAddr, QemuRWError> {
+        self.read_reg(Regs::Ra).map(|res| res as GuestAddr)
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
-        T: Into<GuestReg>,
+        T: Into<GuestAddr>,
     {
-        self.write_reg(Regs::Ra, val)
+        let addr: GuestAddr = val.into();
+        self.write_reg(Regs::Ra, addr as GuestReg)
     }
 
     fn read_function_argument_with_cc(

@@ -267,17 +267,14 @@ where
         let mut res: Vec<Range<usize>> = Vec::new();
         for item in ok_ranges.into_sorted_vec().into_iter().rev() {
             match res.last_mut() {
-                Some(last) => {
-                    // Try merge
-                    if last.end == item.0.start {
-                        // The last one in `res` is the start of the new one
-                        // so merge
-                        last.end = item.0.end;
-                    } else {
-                        res.push(item.0);
-                    }
+                // Try merge
+                Some(last) if last.end == item.0.start => {
+                    // The last one in `res` is the start of the new one
+                    // so merge
+                    last.end = item.0.end;
                 }
-                None => {
+
+                _ => {
                     res.push(item.0);
                 }
             }

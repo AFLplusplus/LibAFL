@@ -55,7 +55,7 @@ pub struct TcpMultiMachineLlmpReceiverHook<A, I> {
 }
 
 impl<A, I> TcpMultiMachineLlmpSenderHook<A, I> {
-    /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
+    /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`](crate::events::multi_machine::TcpMultiMachineHooksBuilder) instead.
     pub(crate) fn new(
         shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
         rt: Arc<Runtime>,
@@ -73,7 +73,7 @@ where
     A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
     I: Serialize,
 {
-    /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
+    /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`](crate::events::multi_machine::TcpMultiMachineHooksBuilder) instead.
     ///
     /// # Safety
     /// For [`Self::on_new_message`], this struct assumes that the `msg` parameter
