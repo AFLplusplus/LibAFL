@@ -65,19 +65,20 @@ pub fn capstone() -> capstone::arch::x86::ArchCapstoneBuilder {
 pub type GuestReg = u32;
 
 impl crate::ArchExtras for crate::CPU {
-    fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
-        let stack_ptr: GuestReg = self.read_reg(Regs::Esp)?;
+    fn read_return_address(&self) -> Result<GuestAddr, QemuRWError> {
+        let stack_ptr: GuestAddr = self.read_reg(Regs::Esp)? as GuestAddr;
         let mut ret_addr = [0; size_of::<GuestReg>()];
         self.read_mem(stack_ptr, &mut ret_addr)?;
-        Ok(GuestReg::from_le_bytes(ret_addr))
+        Ok(GuestReg::from_le_bytes(ret_addr) as GuestAddr)
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
-        T: Into<GuestReg>,
+        T: Into<GuestAddr>,
     {
-        let stack_ptr: GuestReg = self.read_reg(Regs::Esp)?;
-        let val: GuestReg = val.into();
+        let stack_ptr: GuestAddr = self.read_reg(Regs::Esp)? as GuestAddr;
+        let addr: GuestAddr = val.into();
+        let val: GuestReg = addr as GuestReg;
         let ret_addr = val.to_le_bytes();
         self.write_mem(stack_ptr, &ret_addr)?;
         Ok(())
@@ -91,7 +92,7 @@ impl crate::ArchExtras for crate::CPU {
         QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
 
         let size: usize = size_of::<GuestReg>();
-        let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+        let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)? as GuestAddr;
         /*
          * Stack is full and descending. SP points to return address, arguments
          * are in reverse order above that.
@@ -115,7 +116,7 @@ impl crate::ArchExtras for crate::CPU {
         QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
 
         let val: GuestReg = val.into();
-        let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+        let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)? as GuestAddr;
         /*
          * Stack is full and descending. SP points to return address, arguments
          * are in reverse order above that.

@@ -350,7 +350,7 @@ where
         &self.compressor
     }
 
-    /// Read a [`TcpMultiMachineMsg`] from a stream.
+    /// Read a [`MultiMachineMsg`] from a stream.
     /// Expects a message written by [`TcpMultiMachineState::write_msg`].
     /// If there is nothing to read from the stream, return asap with Ok(None).
     #[expect(clippy::uninit_vec)]
@@ -403,7 +403,7 @@ where
         Ok(Some(MultiMachineMsg::from_llmp_msg(node_msg)))
     }
 
-    /// Write an [`OwnedTcpMultiMachineMsg`] to a stream.
+    /// Write a [`MultiMachineMsg`] to a stream.
     /// Can be read back using [`TcpMultiMachineState::read_msg`].
     async fn write_msg<I: Input>(
         stream: &mut TcpStream,

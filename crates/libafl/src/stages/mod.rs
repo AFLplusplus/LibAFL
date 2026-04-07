@@ -17,9 +17,6 @@ pub use afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime};
 pub use calibrate::{CalibrationStage, run_target_with_timing};
 pub use colorization::*;
 #[cfg(all(feature = "std", unix))]
-pub use concolic::ConcolicTracingStage;
-#[cfg(all(feature = "std", feature = "concolic_mutation", unix))]
-pub use concolic::SimpleConcolicMutationalStage;
 #[cfg(feature = "std")]
 pub use dump::*;
 pub use generalization::GeneralizationStage;
@@ -67,8 +64,6 @@ pub use replay::*;
 pub mod afl_stats;
 pub mod calibrate;
 pub mod colorization;
-#[cfg(all(feature = "std", unix))]
-pub mod concolic;
 #[cfg(feature = "std")]
 pub mod dump;
 pub mod dynamic;
@@ -277,7 +272,7 @@ impl<E, EM, S, ST, Z> RestartableStage<E, EM, S, Z> for ST
 where
     ST: Stage<E, EM, S, Z> + Restartable<S>,
 {
-    /// Run the stage, calling [`Stage::should_restart`] and [`Stage::clear_progress`] appropriately
+    /// Run the stage, calling [`Restartable::should_restart`] and [`Restartable::clear_progress`] appropriately
     fn perform_restartable(
         &mut self,
         fuzzer: &mut Z,
@@ -500,7 +495,7 @@ pub struct ExecutionCountRestartHelperMetadata {
 #[derive(Debug, Default, Clone)]
 pub struct ExecutionCountRestartHelper {
     /// At what exec count this Stage was started (cache)
-    /// Only used as cache for the value stored in [`MutationalStageMetadata`].
+    /// Only used as cache for the value stored in [`ExecutionCountRestartHelperMetadata`].
     started_at_execs: Option<u64>,
 }
 

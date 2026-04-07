@@ -24,7 +24,7 @@ It provides a unified interface for handling signals on Unix-like systems and ex
 
 ### Unix Signal Handling
 
-```rust
+```rust,no_run
 use exceptional::unix_signals::{Signal, SignalHandler, setup_signal_handler};
 use libc::{siginfo_t, ucontext_t};
 use std::ptr;
@@ -32,7 +32,7 @@ use std::ptr;
 struct MySignalHandler;
 
 impl SignalHandler for MySignalHandler {
-    fn handle(&mut self, signal: Signal, _info: &mut siginfo_t, _context: Option<&mut ucontext_t>) {
+    unsafe fn handle(&mut self, signal: Signal, _info: &mut siginfo_t, _context: Option<&mut ucontext_t>) {
         println!("Caught signal: {:?}", signal);
         // In a real scenario, you might longjmp or do something else to recover.
         std::process::exit(0);
@@ -57,7 +57,7 @@ unsafe {
 
 ### Windows Exception Handling
 
-```rust
+```rust,ignore
 use exceptional::windows_exceptions::{ExceptionCode, ExceptionHandler, setup_exception_handler};
 use windows::Win32::System::Diagnostics::Debug::EXCEPTION_POINTERS;
 use std::ptr;

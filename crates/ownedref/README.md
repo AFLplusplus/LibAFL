@@ -68,6 +68,7 @@ match deserialized_struct.data {
 
 ```rust
 use ownedref::OwnedSlice;
+use libafl_core::IntoOwned;
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -1,6 +1,5 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
-#[cfg(feature = "sancov_pcguard_dump_cov")]
 #[rustversion::nightly]
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 use core::simd::num::SimdUint;
@@ -331,7 +330,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(
     while start < stop {
         unsafe {
             *start = MAX_EDGES_FOUND as u32;
-            start = start.offset(1);
+            start = start.add(1);
         }
 
         #[cfg(feature = "pointer_maps")]

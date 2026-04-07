@@ -159,7 +159,7 @@ use shmem_providers::{ShMem, ShMemDescription, ShMemId, ShMemProvider};
 #[cfg(feature = "std")]
 use tuple_list::tuple_list;
 
-/// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
+/// The max number of pages a client may have mapped that were not yet read by the broker
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
 /// Instead of increasing this value, you may consider sending new messages at a lower rate, else your Sender will eventually `OOM`.
 const LLMP_CFG_MAX_PENDING_UNREAD_PAGES: usize = 3;
@@ -941,7 +941,6 @@ impl LlmpPage {
 
 /// Message payload when a client got added */
 /// This is an internal message!
-/// [`LLMP_TAG_END_OF_PAGE_V1`]
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
 struct LlmpPayloadSharedMapInfo {
@@ -953,7 +952,6 @@ struct LlmpPayloadSharedMapInfo {
 
 /// Message payload when a client got removed
 /// This is an internal message!
-/// [`LLMP_TAG_END_OF_PAGE_V1`]
 #[derive(Debug, Copy, Clone)]
 #[repr(C, align(8))]
 struct LlmpClientExitInfo {
@@ -1515,7 +1513,7 @@ where
 
     /// Intern: Special allocation function for `EOP` messages (and nothing else!)
     /// The normal alloc will fail if there is not enough space for `buf_len_padded + EOP`
-    /// So if [`alloc_next`] fails, create new page if necessary, use this function,
+    /// So if [`Self::alloc_next`] fails, create new page if necessary, use this function,
     /// place `EOP`, commit `EOP`, reset, alloc again on the new space.
     unsafe fn alloc_eop(&mut self) -> Result<*mut LlmpMsg, Error> {
         unsafe {
@@ -1555,7 +1553,7 @@ where
     }
 
     /// Intern: Will return a ptr to the next msg buf, or None if map is full.
-    /// Never call [`alloc_next`] without either sending or cancelling the last allocated message for this page!
+    /// Never call [`Self::alloc_next`] without either sending or cancelling the last allocated message for this page!
     /// There can only ever be up to one message allocated per page at each given time.
     unsafe fn alloc_next_if_space(&mut self, buf_len: usize) -> Option<*mut LlmpMsg> {
         unsafe {
@@ -1641,7 +1639,7 @@ where
         }
     }
 
-    /// Commit the message last allocated by [`alloc_next`] to the queue.
+    /// Commit the message last allocated by [`Self::alloc_next`] to the queue.
     /// After commiting, the msg shall no longer be altered!
     /// It will be read by the consuming threads (`broker->clients` or `client->broker`)
     /// If `overwrite_client_id` is `false`, the message's `sender` won't be touched (for broker forwarding)
