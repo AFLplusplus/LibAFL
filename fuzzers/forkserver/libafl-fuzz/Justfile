@@ -5,7 +5,7 @@ PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { 
 FUZZER_NAME := 'libafl-fuzz'
 FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 LLVM_CONFIG := env("LLVM_CONFIG", "llvm-config-18")
-AFL_VERSION := "5777ceaf23f48ae4ceae60e4f3a79263802633c6"
+AFL_VERSION := "e4857af6d9c95186c817c31261e6934eece94259"
 AFL_DIR := PROJECT_DIR / "AFLplusplus"
 AFL_CC_PATH := AFL_DIR / "afl-clang-fast"
 CC := "clang"
@@ -16,7 +16,7 @@ build_afl:
         git clone https://github.com/AFLplusplus/AFLplusplus.git
         cd {{ AFL_DIR }}
         git checkout {{ AFL_VERSION }}
-        LLVM_CONFIG={{ LLVM_CONFIG }} make 
+        LLVM_CONFIG={{ LLVM_CONFIG }} make
     fi
 
 build_frida_mode:
@@ -35,7 +35,7 @@ build_qemuafl: build_afl
 build_unicorn_mode: build_afl
     #!/bin/bash
     cd {{ AFL_DIR }}/unicorn_mode
-    ./build_unicorn_support.sh
+    python3 build_unicorn_support.py
     cd ../..
 
 test: build_afl test_instr test_cmplog test_frida test_qemu test_unicorn_mode test_instr_fuzzbench
@@ -54,9 +54,9 @@ test_instr: build_afl build_libafl_fuzz
     #!/bin/bash
     AFL_PATH={{ AFL_DIR }} {{ AFL_CC_PATH }} -O0 ./test/test-instr.c -o ./test/out-instr
 
-    export LIBAFL_DEBUG_OUTPUT=1 
+    export LIBAFL_DEBUG_OUTPUT=1
     export AFL_CORES=0
-    export AFL_STATS_INTERVAL=1 
+    export AFL_STATS_INTERVAL=1
 
     timeout 5 {{ FUZZER }} -i ./test/seeds -o ./test/output ./test/out-instr || true
     test -n "$( ls ./test/output/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
@@ -84,9 +84,9 @@ test_instr_fuzzbench: build_afl build_libafl_fuzz_fuzzbench
     #!/bin/bash
     AFL_PATH={{ AFL_DIR }} {{ AFL_CC_PATH }} ./test/test-instr.c -o ./test/out-instr
 
-    export LIBAFL_DEBUG_OUTPUT=1 
+    export LIBAFL_DEBUG_OUTPUT=1
     export AFL_CORES=0
-    export AFL_STATS_INTERVAL=1 
+    export AFL_STATS_INTERVAL=1
 
     timeout 5 {{ FUZZER }} -i ./test/seeds -o ./test/output-fuzzbench ./test/out-instr || true
     test -n "$( ls ./test/output-fuzzbench/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
@@ -126,7 +126,7 @@ test_frida: build_afl build_frida_mode build_libafl_fuzz
 
     export AFL_PATH={{ AFL_DIR }}
     export AFL_CORES=0
-    export AFL_STATS_INTERVAL=1 
+    export AFL_STATS_INTERVAL=1
 
     timeout 15 {{ FUZZER }} -m 0  -O -i ./test/seeds_frida -o ./test/output-frida -- ./test/out-frida || true
     test -n "$( ls ./test/output-frida/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
@@ -201,6 +201,8 @@ test_unicorn_mode: build_libafl_fuzz build_afl build_unicorn_mode
     export AFL_CORES=0
     export AFL_STATS_INTERVAL=1
 
+    source {{ AFL_DIR }}/unicorn_mode/.venv/bin/activate
+
     # TODO: test unicorn persistent mode once it's fixed on AFL++
 
     LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_DEBUG_CHILD=1 timeout 15s {{ FUZZER }} -m 0 -U -i ./test/seeds_unicorn -o ./test/output-unicorn-python -- python3 {{ AFL_DIR }}/unicorn_mode/samples/python_simple/simple_test_harness.py @@ || true
@@ -209,7 +211,7 @@ test_unicorn_mode: build_libafl_fuzz build_afl build_unicorn_mode
         exit 1
     }
 
-    export AFL_COMPCOV_LEVEL=2
+    export UNICORN_AFL_CMPCOV=1
     LIBAFL_DEBUG_OUTPUT=1 AFL_DEBUG=1 AFL_DEBUG_CHILD=1 timeout 15s {{ FUZZER }} -m 0 -U -i ./test/seeds_unicorn_cmpcov -o ./test/output-unicorn-cmpcov -- python3 {{ AFL_DIR }}/unicorn_mode/samples/compcov_x64/compcov_test_harness.py @@ || true
     test -n "$( ls ./test/output-unicorn-cmpcov/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
         echo "No new corpus entries found for Unicorn cmpcov mode"

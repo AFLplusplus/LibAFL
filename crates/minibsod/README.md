@@ -20,7 +20,7 @@ To use `minibsod`, you need to set up a signal handler (on Unix-like systems) or
 
 Here is a conceptual example for Unix-like systems:
 
-```rust
+```rust,ignore
 use std::io::{stdout, BufWriter};
 use exceptional::unix_signals::{ucontext_t, Sig, Signal, SignalHandler, SignalHandlerFlags};
 use libc::siginfo_t;

@@ -224,8 +224,8 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let vaddr_start: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
-        let vaddr_end: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
+        let vaddr_start: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])? as GuestAddr;
+        let vaddr_end: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])? as GuestAddr;
 
         Ok(AddressAllowCommand::new(vaddr_start..vaddr_end))
     }
@@ -245,7 +245,7 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let buf_addr: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+        let buf_addr: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])? as GuestAddr;
         let str_size: usize = qemu
             .read_reg(arch_regs_map[ExitArgs::Arg2])?
             .try_into()
@@ -305,7 +305,7 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let map_addr: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+        let map_addr: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])? as GuestAddr;
         let map: libvharness_sys::lqemu_map = unsafe { qemu.read_mem_val(map_addr)? };
 
         let kind = match map.map_kind {
@@ -319,13 +319,13 @@ where
         let map = match map.addr_kind {
             libvharness_sys::lqemu_addr_kind_LQEMU_ADDR_PHYS => QemuMemoryChunk::phys(
                 GuestPhysAddr::from(map.addr),
-                map.len as GuestAddr,
+                map.len as GuestReg,
                 qemu.current_cpu().unwrap(),
             ),
 
             libvharness_sys::lqemu_addr_kind_LQEMU_ADDR_VIRT => QemuMemoryChunk::virt(
                 map.addr as GuestVirtAddr,
-                map.len as GuestAddr,
+                map.len as GuestReg,
                 qemu.current_cpu().unwrap(),
             ),
 

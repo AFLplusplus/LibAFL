@@ -239,7 +239,7 @@ where
     I: MutatedTransform<I, S> + Clone,
 {
     /// Runs this (mutational) stage for the given `testcase`
-    /// Exactly the same functionality as [`MutationalStage::perform_mutational`], but with added timeout support.
+    /// Exactly the same functionality as [`MutationalStage`]'s `perform_mutational`, but with added timeout support.
     fn perform_mutational(
         &mut self,
         fuzzer: &mut Z,

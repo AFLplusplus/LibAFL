@@ -40,34 +40,33 @@ pub struct SrcLoc {
 /// * `Vec<SrcLoc>` - The covered lines, location and symbol
 pub fn dump_covered_lines(clear: bool) -> Vec<SrcLoc> {
     let mut res = Vec::new();
-    #[allow(clippy::collapsible_if)]
-    if let Ok(mut guard) = COVERED_PCS.lock() {
-        if let Some(map) = guard.as_mut() {
-            for (&pc, &hits) in map.iter() {
-                let mut loc = SrcLoc {
-                    pc,
-                    function: None,
-                    filename: None,
-                    line: None,
-                    hits,
-                };
+    if let Ok(mut guard) = COVERED_PCS.lock()
+        && let Some(map) = guard.as_mut()
+    {
+        for (&pc, &hits) in map.iter() {
+            let mut loc = SrcLoc {
+                pc,
+                function: None,
+                filename: None,
+                line: None,
+                hits,
+            };
 
-                backtrace::resolve(pc as *mut _, |symbol| {
-                    if let Some(name) = symbol.name() {
-                        loc.function = Some(name.to_string());
-                    }
-                    if let Some(filename) = symbol.filename() {
-                        loc.filename = Some(filename.display().to_string());
-                    }
-                    if let Some(lineno) = symbol.lineno() {
-                        loc.line = Some(lineno);
-                    }
-                });
-                res.push(loc);
-            }
-            if clear {
-                map.clear();
-            }
+            backtrace::resolve(pc as *mut _, |symbol| {
+                if let Some(name) = symbol.name() {
+                    loc.function = Some(name.to_string());
+                }
+                if let Some(filename) = symbol.filename() {
+                    loc.filename = Some(filename.display().to_string());
+                }
+                if let Some(lineno) = symbol.lineno() {
+                    loc.line = Some(lineno);
+                }
+            });
+            res.push(loc);
+        }
+        if clear {
+            map.clear();
         }
     }
     res
