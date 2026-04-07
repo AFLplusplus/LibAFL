@@ -14,10 +14,10 @@ const WRAPPER_HEADER: &str = r#"
 #undef QEMU_BUILD_BUG_ON
 #undef QEMU_BUILD_BUG_ON_ZERO
 
-#define QEMU_BUILD_BUG_MSG(x, msg) 
+#define QEMU_BUILD_BUG_MSG(x, msg)
 #define QEMU_BUILD_BUG_ON_STRUCT(x)
-#define QEMU_BUILD_BUG_ON(x) 
-#define QEMU_BUILD_BUG_ON_ZERO(x) 
+#define QEMU_BUILD_BUG_ON(x)
+#define QEMU_BUILD_BUG_ON_ZERO(x)
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
@@ -52,7 +52,6 @@ const WRAPPER_HEADER: &str = r#"
 #include "migration/vmstate.h"
 #include "migration/savevm.h"
 #include "hw/core/sysemu-cpu-ops.h"
-#include "exec/address-spaces.h"
 #include "exec/target_page.h"
 #include "system/system.h"
 
@@ -65,7 +64,6 @@ const WRAPPER_HEADER: &str = r#"
 
 #include "exec/cpu-common.h"
 #include "exec/cpu-all.h"
-#include "exec/exec-all.h"
 #include "exec/log.h"
 #include "trace/trace-root.h"
 #include "qemu/accel.h"
@@ -155,7 +153,8 @@ pub fn generate(
         .allowlist_function("target_munmap")
         .allowlist_function("page_check_range")
         .allowlist_function("cpu_memory_rw_debug")
-        .allowlist_function("cpu_physical_memory_rw")
+        .allowlist_function("cpu_physical_memory_read")
+        .allowlist_function("cpu_physical_memory_write")
         .allowlist_function("cpu_reset")
         .allowlist_function("cpu_synchronize_state")
         .allowlist_function("cpu_get_phys_page_attrs_debug")
@@ -183,6 +182,9 @@ pub fn generate(
         bindings
             .allowlist_type("CPUX86State")
             .allowlist_type("X86CPU")
+            // mmintrin.h has some errors, check llvm #137484.
+            // TODO: remove when fixed in llvm.
+            .clang_arg("-msse2")
     } else if cpu_target == "arm" {
         bindings
             .allowlist_type("ARMCPU")

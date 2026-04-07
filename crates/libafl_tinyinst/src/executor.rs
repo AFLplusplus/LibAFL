@@ -118,7 +118,7 @@ impl Default for TinyInstExecutorBuilder<'_, NopShMemProvider> {
 }
 
 impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
-    /// Constructor
+    /// Creates a new `TinyInstExecutorBuilder`
     #[must_use]
     pub fn new() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
         Self {

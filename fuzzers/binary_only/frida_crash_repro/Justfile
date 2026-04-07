@@ -23,4 +23,9 @@ build:
 
 [unix]
 run: build harness
-    {{ FUZZER }} -H ./test-harness.so -l ./test-harness.so ./corpus
+    {{ FUZZER }} -i ./corpus -H ./test-harness.so -l ./test-harness.so
+
+[unix]
+test: build harness
+    timeout 10s {{ FUZZER }} -H ./test-harness.so -l ./test-harness.so || true
+    test -n "$(ls solutions)"

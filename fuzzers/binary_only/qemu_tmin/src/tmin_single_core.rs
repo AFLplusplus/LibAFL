@@ -192,7 +192,7 @@ pub fn fuzz() -> Result<(), Error> {
     // Run target until the target function, and store important registers.
     // Set a breakpoint on target function return.
     qemu.entry_break(test_one_input_ptr);
-    let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
+    let stack_ptr = qemu.read_reg(Regs::Sp).unwrap();
     let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
     let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
     log::info!("Break at {pc:#x}");
@@ -200,7 +200,7 @@ pub fn fuzz() -> Result<(), Error> {
     qemu.set_breakpoint(ret_addr);
 
     // Map a private region for input buffer
-    let input_addr = qemu
+    let input_addr: GuestAddr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
         .unwrap();
     log::info!("Placing input at {input_addr:#x}");
@@ -222,10 +222,12 @@ pub fn fuzz() -> Result<(), Error> {
             unsafe {
                 qemu.write_mem(input_addr, buf).expect("qemu write failed.");
 
-                qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
-                qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
+                qemu.write_reg(Regs::Pc, test_one_input_ptr as GuestReg)
+                    .unwrap();
+                qemu.write_reg(Regs::Sp, stack_ptr as GuestReg).unwrap();
                 qemu.write_return_address(ret_addr).unwrap();
-                qemu.write_function_argument(0, input_addr).unwrap();
+                qemu.write_function_argument(0, input_addr as GuestReg)
+                    .unwrap();
                 qemu.write_function_argument(1, len).unwrap();
 
                 match qemu.run() {

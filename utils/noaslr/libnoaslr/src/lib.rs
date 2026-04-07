@@ -1,19 +1,20 @@
+#[cfg(any(
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "netbsd"
+))]
+use {anyhow::{anyhow, Result}, ctor::ctor};
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use {
-    anyhow::{anyhow, Result},
-    ctor::ctor,
     nix::{
         sys::{personality, personality::Persona},
         unistd::execvpe,
     },
     std::{ffi::CString, fs::File, io::Read},
 };
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-use {
-    anyhow::{anyhow, Result},
-    ctor::ctor,
-    std::ffi::CString,
-};
+#[cfg(target_os = "netbsd")]
+use std::ffi::CString;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 fn read_null_lines(path: &str) -> Result<Vec<CString>> {

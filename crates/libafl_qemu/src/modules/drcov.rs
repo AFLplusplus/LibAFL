@@ -447,7 +447,7 @@ impl<F> DrCovModule<F> {
                         unsafe {
                             for module in self.module_mapping.as_ref().unwrap_unchecked().iter() {
                                 let (range, (_, _)) = module;
-                                if range.contains(&u64::from(*pc)) {
+                                if range.contains(&(*pc as u64)) {
                                     module_found = true;
                                     break;
                                 }
@@ -461,8 +461,8 @@ impl<F> DrCovModule<F> {
                             match lengths.get(pc) {
                                 Some(block_length) => {
                                     drcov_vec.push(DrCovBasicBlock::new(
-                                        u64::from(*pc),
-                                        u64::from(*pc) + u64::from(*block_length),
+                                        *pc as u64,
+                                        *pc as u64 + *block_length as u64,
                                     ));
                                 }
                                 None => {
@@ -514,8 +514,8 @@ impl<F> DrCovModule<F> {
                     match lengths.get(pc) {
                         Some(block_length) => {
                             drcov_vec.push(DrCovBasicBlock::new(
-                                u64::from(*pc),
-                                u64::from(*pc) + u64::from(*block_length),
+                                *pc as u64,
+                                *pc as u64 + *block_length as u64,
                             ));
                         }
                         None => {
