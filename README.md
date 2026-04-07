@@ -38,7 +38,6 @@ feel free to add an AST-based input for structured fuzzing, and more.
     ```
 - **LLVM tools**
   - The LLVM tools (including clang, clang++) are needed (newer than LLVM 15.0.0 up to LLVM 18.1.3) If you are using Debian/Ubuntu, again, we highly recommmend that you install the package from [here](https://apt.llvm.org/)
-  - (In `libafl_concolic`, we only support LLVM version newer than 18)
 - Just:
   - We use [just](https://github.com/casey/just) to build the fuzzers in `fuzzers/` directory. You can find instructions to install it in your environment [in the Just Programmer's Manual](https://just.systems/man/en/packages.html).
 

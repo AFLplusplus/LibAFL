@@ -284,6 +284,26 @@ where
     }
 }
 
+/// Produce a sub-RNG seeded from the current RNG state.
+/// Useful when sampling random data while also accessing the state.
+pub trait SubRng {
+    /// Creates and returns a sub-RNG.
+    #[must_use]
+    fn sub_rng(&mut self) -> Self;
+}
+
+impl<R> SubRng for R
+where
+    R: Rand + Sized + Clone,
+{
+    /// Creates and returns a sub-RNG.
+    fn sub_rng(&mut self) -> Self {
+        let mut sub = self.clone();
+        sub.set_seed(self.next());
+        sub
+    }
+}
+
 macro_rules! impl_default_new {
     ($rand:ty) => {
         impl Default for $rand {
@@ -613,7 +633,7 @@ pub mod pybind {
 
     use super::{Rand, StdRand, random_seed};
 
-    #[pyclass(unsendable, name = "StdRand")]
+    #[pyclass(unsendable, from_py_object, name = "StdRand")]
     #[expect(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for `StdRand`
@@ -711,7 +731,7 @@ pub mod pybind {
             match &mut $wrapper {
                 $(
                     $wrapper_type::$wrapper_option(py_wrapper) => {
-                        Python::with_gil(|py| -> PyResult<_> {
+                        Python::attach(|py| -> PyResult<_> {
                             let mut borrowed = py_wrapper.borrow_mut(py);
                             let $name = &mut borrowed.inner;
                             Ok($body)
@@ -730,7 +750,7 @@ mod tests {
     use core::num::NonZero;
 
     use crate::{
-        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
+        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, SubRng, XorShift64Rand,
         Xoshiro256PlusPlusRand,
     };
 
@@ -883,5 +903,20 @@ mod tests {
 
         // LibAFL's Rand trait is auto-implemented for all SeedableRng + RngCore types.
         assert!(CountingRng(0).coinflip(0.1));
+    }
+
+    #[test]
+    fn test_sub_rng_seed() {
+        let mut parent_a = StdRand::with_seed(0);
+        let mut parent_b = StdRand::with_seed(0);
+        let mut parent_c = StdRand::with_seed(1);
+
+        let mut sub_a = parent_a.sub_rng();
+        let mut sub_b = parent_b.sub_rng();
+        let mut sub_c = parent_c.sub_rng();
+
+        assert_ne!(sub_a.next(), sub_c.next());
+        sub_b.next();
+        assert_eq!(sub_a.next(), sub_b.next());
     }
 }

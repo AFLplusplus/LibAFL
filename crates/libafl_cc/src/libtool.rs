@@ -89,24 +89,20 @@ impl ToolWrapper for LibtoolWrapper {
                     i += 1;
                     continue;
                 }
-                "--libafl-configurations" => {
-                    if i + 1 < args.len() {
-                        self.configurations.extend(
-                            args[i + 1]
-                                .as_ref()
-                                .split(',')
-                                .map(|x| crate::Configuration::from_str(x).unwrap()),
-                        );
-                        i += 2;
-                        continue;
-                    }
+                "--libafl-configurations" if i + 1 < args.len() => {
+                    self.configurations.extend(
+                        args[i + 1]
+                            .as_ref()
+                            .split(',')
+                            .map(|x| crate::Configuration::from_str(x).unwrap()),
+                    );
+                    i += 2;
+                    continue;
                 }
-                "-o" => {
-                    if i + 1 < args.len() {
-                        self.output = Some(PathBuf::from(args[i + 1].as_ref()));
-                        i += 2;
-                        continue;
-                    }
+                "-o" if i + 1 < args.len() => {
+                    self.output = Some(PathBuf::from(args[i + 1].as_ref()));
+                    i += 2;
+                    continue;
                 }
                 _ => (),
             }
