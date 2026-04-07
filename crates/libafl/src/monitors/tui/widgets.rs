@@ -407,22 +407,37 @@ pub fn draw_item_geometry_text(
     hint: &str,
     scroll: usize,
     force_hint: bool,
+    pizza_mode: bool,
 ) -> usize {
+    let (pending, pend_fav, owns, imported, stability) = if pizza_mode {
+        (
+            "waiting orders",
+            "chef's specials",
+            "fresh ingredients",
+            "takeouts",
+            "dough consistency",
+        )
+    } else {
+        ("pending", "pend fav", "own finds", "imported", "stability")
+    };
+
     let data = vec![
-        (Span::raw("pending"), format!("{}", item_geometry.pending)),
-        (Span::raw("pend fav"), format!("{}", item_geometry.pend_fav)),
+        (Span::raw(pending), format!("{}", item_geometry.pending)),
+        (Span::raw(pend_fav), format!("{}", item_geometry.pend_fav)),
+        (Span::raw(owns), format!("{}", item_geometry.own_finds)),
+        (Span::raw(imported), format!("{}", item_geometry.imported)),
         (
-            Span::raw("own finds"),
-            format!("{}", item_geometry.own_finds),
-        ),
-        (Span::raw("imported"), format!("{}", item_geometry.imported)),
-        (
-            Span::raw("stability"),
+            Span::raw(stability),
             format!("{:.2}%", item_geometry.stability.unwrap_or(0.0) * 100.0),
         ),
     ];
 
-    draw_scrolled_stats(f, area, "item geometry", &data, scroll, hint, force_hint)
+    let title = if pizza_mode {
+        "pizza shapes"
+    } else {
+        "item geometry"
+    };
+    draw_scrolled_stats(f, area, title, &data, scroll, hint, force_hint)
 }
 
 /// Draw the process timing information
@@ -432,16 +447,25 @@ pub fn draw_process_timing_text(
     title: &str,
     data: &ProcessTiming,
     run_time: Duration,
+    pizza_mode: bool,
 ) {
+    let (run, speed, entry, solution) = if pizza_mode {
+        (
+            "open time",
+            "baking speed",
+            "last pizza baked",
+            "last delivery",
+        )
+    } else {
+        ("run time", "exec speed", "last new entry", "last solution")
+    };
+
     let rows = [
-        (Span::raw("run time"), format_duration(&run_time)),
-        (Span::raw("exec speed"), data.exec_speed.clone()),
+        (Span::raw(run), format_duration(&run_time)),
+        (Span::raw(speed), data.exec_speed.clone()),
+        (Span::raw(entry), format_duration(&(data.last_new_entry))),
         (
-            Span::raw("last new entry"),
-            format_duration(&(data.last_new_entry)),
-        ),
-        (
-            Span::raw("last solution"),
+            Span::raw(solution),
             format_duration(&(data.last_saved_solution)),
         ),
     ];
@@ -457,14 +481,32 @@ pub fn draw_process_timing_text(
 
 /// Draw the client logs
 #[allow(deprecated)]
-pub fn draw_logs(f: &mut Frame, area: Rect, logs: &[String], enable_wrap: bool) {
+pub fn draw_logs(f: &mut Frame, area: Rect, logs: &[String], enable_wrap: bool, pizza_mode: bool) {
     let num_lines = area.height.saturating_sub(2) as usize;
     let mut list_items: Vec<ListItem> = Vec::with_capacity(num_lines);
+
+    let themed_logs: Vec<String> = if pizza_mode {
+        logs.iter()
+            .map(|msg| {
+                msg.replace("corpus", "pizzas")
+                    .replace("objectives", "deliveries")
+                    .replace("executions", "doughs")
+                    .replace("exec/sec", "p/s")
+                    .replace("current_testcase", "current_order")
+                    .replace("imported", "takeouts")
+                    .replace("signals_stability", "dough_consistency")
+                    .replace("cycles_wo_finds", "ovens_empty")
+                    .replace("pending", "waiting_orders")
+            })
+            .collect()
+    } else {
+        logs.to_vec()
+    };
 
     if enable_wrap {
         let width = area.width.saturating_sub(2) as usize;
         if width > 0 {
-            for msg in logs.iter().rev() {
+            for msg in themed_logs.iter().rev() {
                 let mut lines = vec![];
                 let chars: Vec<char> = msg.chars().collect();
                 if chars.len() <= width {
@@ -519,18 +561,24 @@ pub fn draw_logs(f: &mut Frame, area: Rect, logs: &[String], enable_wrap: bool) 
             list_items.reverse();
         }
     } else {
-        let start_index = logs.len().saturating_sub(num_lines);
-        list_items = logs[start_index..]
+        let start_index = themed_logs.len().saturating_sub(num_lines);
+        list_items = themed_logs[start_index..]
             .iter()
             .map(|msg| ListItem::new(Span::raw(msg)))
             .collect();
     }
 
+    let title = if pizza_mode {
+        "kitchen logs (`t` to show/hide, `w` to wrap)"
+    } else {
+        "clients logs (`t` to show/hide, `w` to wrap)"
+    };
+
     let logs_widget = List::new(list_items).block(
         Block::default()
             .borders(Borders::ALL)
             .title(Span::styled(
-                "clients logs (`t` to show/hide, `w` to wrap)",
+                title,
                 Style::default()
                     .fg(Color::LightCyan)
                     .add_modifier(Modifier::BOLD),

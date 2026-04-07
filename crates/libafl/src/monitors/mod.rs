@@ -31,17 +31,61 @@ pub mod statsd;
 
 #[cfg(feature = "std")]
 use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use core::str::FromStr;
 use core::{
     fmt,
     fmt::{Debug, Write},
     time::Duration,
 };
+#[cfg(feature = "std")]
+use std::sync::OnceLock;
 
 use libafl_bolts::ClientId;
 #[cfg(feature = "prometheus_monitor")]
 pub use prometheus::PrometheusMonitor;
 #[cfg(feature = "statsd_monitor")]
 pub use statsd::StatsdMonitor;
+
+/// Returns if we're cooking.
+#[cfg(feature = "std")]
+#[must_use]
+pub(crate) fn pizza_is_served() -> bool {
+    static PIZZA_IS_SERVED: OnceLock<bool> = OnceLock::new();
+    *PIZZA_IS_SERVED.get_or_init(|| {
+        match std::env::var("AFL_PIZZA_MODE")
+            .map(|s| i64::from_str(&s).expect("AFL_PIZZA_MODE must be set to a signed integer!"))
+        {
+            Ok(v) if v < 1 => false,
+            Ok(_) => true,
+            Err(_) => {
+                #[cfg(unix)]
+                // SAFETY: `localtime` and `time` are standard libc functions. `t` is initialized.
+                unsafe {
+                    let mut t = 0;
+                    libc::time(&raw mut t);
+                    let tm = libc::localtime(&raw const t);
+                    !tm.is_null() && (*tm).tm_mon == 3 && (*tm).tm_mday == 1
+                }
+                #[cfg(windows)]
+                // SAFETY: `GetLocalTime` is a standard Win32 API.
+                unsafe {
+                    let lt = windows::Win32::System::SystemInformation::GetLocalTime();
+                    lt.wMonth == 4 && lt.wDay == 1
+                }
+                #[cfg(not(any(unix, windows)))]
+                false
+            }
+        }
+    })
+}
+
+#[cfg(not(feature = "std"))]
+/// Returns `true` if it is currently pizza mode.
+#[must_use]
+pub fn pizza_is_served() -> bool {
+    false
+}
 
 use crate::monitors::stats::ClientStatsManager;
 
@@ -117,15 +161,40 @@ impl Monitor for SimplePrintingMonitor {
             .collect::<Vec<_>>();
         userstats.sort();
         let global_stats = client_stats_manager.global_stats();
+        let (run, customers, corpus, objectives, executions, speed) = if pizza_is_served() {
+            (
+                "time to bake",
+                "customers",
+                "pizzas",
+                "deliveries",
+                "doughs",
+                "p/s",
+            )
+        } else {
+            (
+                "run time",
+                "clients",
+                "corpus",
+                "objectives",
+                "executions",
+                "exec/sec",
+            )
+        };
         println!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}, {}",
+            "[{} #{}] {}: {}, {}: {}, {}: {}, {}: {}, {}: {}, {}: {}, {}",
             event_msg,
             sender_id.0,
+            run,
             global_stats.run_time_pretty,
+            customers,
             global_stats.client_stats_count,
+            corpus,
             global_stats.corpus_size,
+            objectives,
             global_stats.objective_size,
+            executions,
             global_stats.total_execs,
+            speed,
             global_stats.execs_per_sec_pretty,
             userstats.join(", ")
         );
@@ -175,15 +244,40 @@ where
         sender_id: ClientId,
     ) -> Result<(), Error> {
         let global_stats = client_stats_manager.global_stats();
+        let (run, customers, corpus, objectives, executions, speed) = if pizza_is_served() {
+            (
+                "time to bake",
+                "customers",
+                "pizzas",
+                "deliveries",
+                "doughs",
+                "p/s",
+            )
+        } else {
+            (
+                "run time",
+                "clients",
+                "corpus",
+                "objectives",
+                "executions",
+                "exec/sec",
+            )
+        };
         let mut fmt = format!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{} #{}] {}: {}, {}: {}, {}: {}, {}: {}, {}: {}, {}: {}",
             event_msg,
             sender_id.0,
+            run,
             global_stats.run_time_pretty,
+            customers,
             global_stats.client_stats_count,
+            corpus,
             global_stats.corpus_size,
+            objectives,
             global_stats.objective_size,
+            executions,
             global_stats.total_execs,
+            speed,
             global_stats.execs_per_sec_pretty
         );
 
@@ -308,5 +402,20 @@ mod test {
             NopMonitor::default(),
         );
         let _ = mgr_list.display(&mut client_stats, "test", ClientId(0));
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_pizza_mode() {
+        let _ = super::pizza_is_served();
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_multi_monitor_pizza_mode() {
+        use alloc::string::String;
+        use core::cell::RefCell;
+        let output = RefCell::new(String::new());
+        let _monitor = super::MultiMonitor::new(|s| output.borrow_mut().push_str(s));
     }
 }

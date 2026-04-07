@@ -75,6 +75,8 @@ pub struct TuiUi {
     show_geometry: bool,
     item_geometry_scroll: usize,
     pub(crate) item_geometry_page_size: usize,
+
+    pizza_mode: bool,
 }
 
 #[derive(Debug)]
@@ -84,6 +86,7 @@ struct GenericStats {
 
 #[derive(Debug)]
 struct PreparedFrameData {
+    pizza_mode: bool,
     // Overall
     generic_stats: GenericStats,
     total_timing: Option<(ProcessTiming, Duration)>,
@@ -140,7 +143,11 @@ impl TuiUi {
 
     /// create a new [`TuiUi`] with a given `version` string.
     #[must_use]
-    pub fn with_version(title: String, version: String, enhanced_graphics: bool) -> Self {
+    pub fn with_version(mut title: String, version: String, enhanced_graphics: bool) -> Self {
+        let pizza_mode = crate::monitors::pizza_is_served();
+        if pizza_mode {
+            title = "Mozzarbella Pizzeria management system".into();
+        }
         Self {
             title,
             version,
@@ -165,12 +172,34 @@ impl TuiUi {
             show_geometry: false,
             item_geometry_scroll: 0,
             item_geometry_page_size: 10,
+            pizza_mode: crate::monitors::pizza_is_served(),
         }
     }
 
-    fn get_tabs(ctx: &TuiContext) -> Vec<String> {
-        let mut tabs = vec!["Overview".to_string()];
-        tabs.extend(ctx.graphs.clone());
+    /// Adds pineapple.
+    pub fn add_pineapple(&mut self) {
+        self.pizza_mode = false;
+    }
+
+    fn get_tabs(&self, ctx: &TuiContext) -> Vec<String> {
+        let mut tabs = vec![if self.pizza_mode {
+            "Baking overview".to_string()
+        } else {
+            "Overview".to_string()
+        }];
+        if self.pizza_mode {
+            for graph in &ctx.graphs {
+                tabs.push(match graph.as_str() {
+                    "corpus" => "pizzas".to_string(),
+                    "objectives" => "deliveries".to_string(),
+                    "exec/sec" => "p/s".to_string(),
+                    "User Stats" => "Kitchen Stats".to_string(),
+                    _ => graph.clone(),
+                });
+            }
+        } else {
+            tabs.extend(ctx.graphs.clone());
+        }
         tabs
     }
 
@@ -203,21 +232,35 @@ impl TuiUi {
         }
     }
 
-    fn prepare_overall_stats(ctx: &TuiContext) -> GenericStats {
-        GenericStats {
-            labels: vec![
-                (Span::raw("clients"), format!("{}", ctx.clients.len())),
-                (Span::raw("total execs"), format_big_number(ctx.total_execs)),
-                (
-                    Span::raw("solutions"),
-                    format_big_number(ctx.total_solutions),
-                ),
-                (
-                    Span::raw("corpus count"),
-                    format_big_number(ctx.total_corpus_count),
-                ),
-            ],
+    fn prepare_overall_stats(&self, ctx: &TuiContext) -> GenericStats {
+        let (corpus, objectives, executions) = if self.pizza_mode {
+            ("pizzas on the menu", "deliveries", "doughs")
+        } else {
+            ("corpus count", "solutions", "total execs")
+        };
+
+        let mut labels = vec![
+            (
+                Span::raw(if self.pizza_mode {
+                    "customers"
+                } else {
+                    "clients"
+                }),
+                format!("{}", ctx.clients.len()),
+            ),
+            (Span::raw(executions), format_big_number(ctx.total_execs)),
+            (
+                Span::raw(objectives),
+                format_big_number(ctx.total_solutions),
+            ),
+            (Span::raw(corpus), format_big_number(ctx.total_corpus_count)),
+        ];
+
+        if self.pizza_mode {
+            labels.push((Span::raw("Pineapple pizzas"), "0".to_string()));
         }
+
+        GenericStats { labels }
     }
 
     fn prepare_total_timing(
@@ -257,28 +300,42 @@ impl TuiUi {
                 ))
             };
 
+            let (corpus, objectives, executions) = if self.pizza_mode {
+                ("pizzas", "deliveries", "doughs")
+            } else {
+                ("corpus count", "solutions", "total execs")
+            };
+
             let generic = GenericStats {
                 labels: vec![
                     (
-                        Span::raw("corpus count"),
+                        Span::raw(corpus),
                         format_big_number(client.client_stats.corpus_size()),
                     ),
                     (
-                        Span::raw("total execs"),
+                        Span::raw(executions),
                         format_big_number(client.client_stats.executions()),
                     ),
                     (
-                        Span::raw("cycles done"),
+                        Span::raw(if self.pizza_mode {
+                            "ovens heated"
+                        } else {
+                            "cycles done"
+                        }),
                         client
                             .cycles_done()
                             .map_or(String::new(), |c| c.to_string()),
                     ),
                     (
-                        Span::raw("solutions"),
+                        Span::raw(objectives),
                         format_big_number(client.client_stats.objective_size()),
                     ),
                     (
-                        Span::raw("current testcase"),
+                        Span::raw(if self.pizza_mode {
+                            "current order"
+                        } else {
+                            "current testcase"
+                        }),
                         client
                             .client_stats
                             .user_stats()
@@ -326,7 +383,27 @@ impl TuiUi {
                     let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
                     let style = Style::default().fg(colors[color_idx]);
 
-                    (Span::styled(k.to_string(), style), val_str)
+                    // Map keys if pizza mode is active
+                    let key_str = if self.pizza_mode {
+                        match k.as_ref() {
+                            "cycles done" => "seasons done",
+                            "unique crashes" => "at table",
+                            "unique hangs" => "number of Peroni",
+                            "map density" => "Baking progress",
+                            "edges" => "toppings",
+                            "stability" => "dough consistency",
+                            "havoc_inc" => "spice level",
+                            "havoc_mod" => "topping variety",
+                            "imported" => "takeouts",
+                            "favored" => "chef's choice",
+                            "pending" => "waiting orders",
+                            _ => k.as_ref(),
+                        }
+                    } else {
+                        k.as_ref()
+                    };
+
+                    (Span::styled(key_str.to_string(), style), val_str)
                 })
                 .collect();
 
@@ -354,7 +431,11 @@ impl TuiUi {
                 stats.scheduler_cycles() as f64 / elapsed
             };
             vec.push((
-                Span::raw("scheduler"),
+                Span::raw(if self.pizza_mode {
+                    "pizza chef"
+                } else {
+                    "scheduler"
+                }),
                 format!("{:.2}%", scheduler_percent * 100.0),
             ));
 
@@ -364,7 +445,11 @@ impl TuiUi {
                 stats.manager_cycles() as f64 / elapsed
             };
             vec.push((
-                Span::raw("manager"),
+                Span::raw(if self.pizza_mode {
+                    "delivery boy"
+                } else {
+                    "manager"
+                }),
                 format!("{:.2}%", manager_percent * 100.0),
             ));
 
@@ -374,8 +459,13 @@ impl TuiUi {
                         let feature_percent = *feature as f64 / elapsed;
                         if feature_percent > 0.0 {
                             let feature_name: PerfFeature = feature_index.into();
+                            let label = if self.pizza_mode {
+                                format!("topping {stage_index}: {feature_name:?}")
+                            } else {
+                                format!("stage {stage_index}: {feature_name:?}")
+                            };
                             vec.push((
-                                Span::raw(format!("stage {stage_index}: {feature_name:?}")),
+                                Span::raw(label),
                                 format!("{:.2}%", feature_percent * 100.0),
                             ));
                         }
@@ -385,8 +475,13 @@ impl TuiUi {
                 for (name, val) in stats.feedbacks() {
                     let feedback_percent = *val as f64 / elapsed;
                     if feedback_percent > 0.0 {
+                        let label = if self.pizza_mode {
+                            format!("taste test: {name}")
+                        } else {
+                            format!("feedback: {name}")
+                        };
                         vec.push((
-                            Span::raw(format!("feedback: {name}")),
+                            Span::raw(label),
                             format!("{:.2}%", feedback_percent * 100.0),
                         ));
                     }
@@ -403,7 +498,7 @@ impl TuiUi {
         ctx: &TuiContext,
         run_time: Duration,
     ) -> (Vec<String>, Option<ChartKind>) {
-        let tabs = Self::get_tabs(ctx);
+        let tabs = self.get_tabs(ctx);
         if self.charts_tab_idx >= tabs.len() {
             self.charts_tab_idx = 0;
         }
@@ -420,8 +515,8 @@ impl TuiUi {
                 let key = &tabs[chart_idx];
 
                 active_chart = match key.as_str() {
-                    "Overview" => None,
-                    "User Stats" => {
+                    "Overview" | "Baking overview" => None,
+                    "User Stats" | "Kitchen Stats" => {
                         let mut series = vec![];
                         let colors = [Color::Green, Color::Blue, Color::Magenta, Color::Cyan];
                         for (key, stats) in &ctx.custom_timed {
@@ -438,13 +533,21 @@ impl TuiUi {
                         }
                         series.sort_by(|a, b| a.0.cmp(&b.0));
                         Some(ChartKind::Multi {
-                            name: "User Stats".to_string(),
+                            name: if self.pizza_mode {
+                                "Kitchen Stats".to_string()
+                            } else {
+                                "User Stats".to_string()
+                            },
                             series,
                             run_time,
                         })
                     }
-                    "corpus" => Some(ChartKind::Single {
-                        name: "corpus".to_string(),
+                    "corpus" | "pizzas" => Some(ChartKind::Single {
+                        name: if self.pizza_mode {
+                            "pizzas".to_string()
+                        } else {
+                            "corpus".to_string()
+                        },
                         series: ctx.corpus_size_timed.series.clone().into(),
                         window: ctx.corpus_size_timed.window,
                         run_time,
@@ -452,8 +555,12 @@ impl TuiUi {
                             .fg(Color::LightYellow)
                             .add_modifier(Modifier::BOLD),
                     }),
-                    "objectives" => Some(ChartKind::Single {
-                        name: "objectives".to_string(),
+                    "objectives" | "deliveries" => Some(ChartKind::Single {
+                        name: if self.pizza_mode {
+                            "deliveries".to_string()
+                        } else {
+                            "objectives".to_string()
+                        },
                         series: ctx.objective_size_timed.series.clone().into(),
                         window: ctx.objective_size_timed.window,
                         run_time,
@@ -461,8 +568,12 @@ impl TuiUi {
                             .fg(Color::LightYellow)
                             .add_modifier(Modifier::BOLD),
                     }),
-                    "exec/sec" => Some(ChartKind::Single {
-                        name: "exec/sec".to_string(),
+                    "exec/sec" | "p/s" => Some(ChartKind::Single {
+                        name: if self.pizza_mode {
+                            "p/s".to_string()
+                        } else {
+                            "exec/sec".to_string()
+                        },
                         series: ctx.execs_per_sec_timed.series.clone().into(),
                         window: ctx.execs_per_sec_timed.window,
                         run_time,
@@ -503,7 +614,7 @@ impl TuiUi {
         let run_time = current_time().saturating_sub(ctx.start_time);
 
         // 1. Overall Stats
-        let generic_stats = Self::prepare_overall_stats(ctx);
+        let generic_stats = self.prepare_overall_stats(ctx);
 
         let total_timing = Self::prepare_total_timing(ctx, run_time);
 
@@ -523,6 +634,7 @@ impl TuiUi {
         let (tabs, active_chart) = self.prepare_charts(ctx, run_time);
 
         PreparedFrameData {
+            pizza_mode: self.pizza_mode,
             generic_stats,
             total_timing,
             total_geometry,
@@ -831,7 +943,13 @@ impl TuiUi {
             );
 
             self.draw_overall_ui(f, top_body, has_charts, &prepared);
-            draw_logs(f, logs_area, &prepared.logs, self.logs_wrap);
+            draw_logs(
+                f,
+                logs_area,
+                &prepared.logs,
+                self.logs_wrap,
+                prepared.pizza_mode,
+            );
         } else {
             let body = split_main(area, self.show_logs, introspection, has_charts);
             let top_body = body[0];
@@ -841,7 +959,13 @@ impl TuiUi {
             self.draw_client_ui(f, mid_body, self.show_logs, &prepared);
 
             if self.show_logs && body.len() > 2 {
-                draw_logs(f, body[2], &prepared.logs, self.logs_wrap);
+                draw_logs(
+                    f,
+                    body[2],
+                    &prepared.logs,
+                    self.logs_wrap,
+                    prepared.pizza_mode,
+                );
             }
         }
     }
@@ -978,7 +1102,13 @@ impl TuiUi {
             .constraints(constraints)
             .split(area);
 
-        let title = if is_narrow { "" } else { "Overview" };
+        let title = if is_narrow {
+            ""
+        } else if data.pizza_mode {
+            "Baking overview"
+        } else {
+            "Overview"
+        };
         draw_key_value_block(
             f,
             chunks[0],
@@ -994,12 +1124,24 @@ impl TuiUi {
 
         let mut next_idx = 1;
         if let Some((timing, run_time)) = &data.total_timing {
-            draw_process_timing_text(f, chunks[next_idx], "General", timing, *run_time);
+            let title = if data.pizza_mode {
+                "Baking status"
+            } else {
+                "General"
+            };
+            draw_process_timing_text(
+                f,
+                chunks[next_idx],
+                title,
+                timing,
+                *run_time,
+                data.pizza_mode,
+            );
             next_idx += 1;
         }
 
         if let (Some(geometry), Some(chunk)) = (&data.total_geometry, chunks.get(next_idx)) {
-            draw_item_geometry_text(f, *chunk, geometry, "", 0, false);
+            draw_item_geometry_text(f, *chunk, geometry, "", 0, false, data.pizza_mode);
         }
     }
 
@@ -1067,8 +1209,14 @@ impl TuiUi {
         show_logs: bool,
         data: &PreparedFrameData,
     ) {
+        let client_pfx = if self.pizza_mode {
+            "customer"
+        } else {
+            "client"
+        };
         let title = format!(
-            "client #{}{}",
+            "{} #{}{}",
+            client_pfx,
             data.client_idx,
             if self.clients.len() > 1 {
                 " (←/→ arrows to switch)"
@@ -1103,10 +1251,11 @@ impl TuiUi {
             .constraints([Constraint::Length(6), Constraint::Min(0)])
             .split(left);
 
+        let title = if self.pizza_mode { "Stats" } else { "Overview" };
         draw_key_value_block(
             f,
             left_chunks[0],
-            "Overview",
+            title,
             data.client_generic_stats.labels.clone(),
             &[Constraint::Length(20), Constraint::Min(5)],
         );
@@ -1133,7 +1282,19 @@ impl TuiUi {
 
         let mut next_idx = 0;
         if let Some((timing, run_time)) = &data.client_timing {
-            draw_process_timing_text(f, right_chunks[next_idx], "General", timing, *run_time);
+            let title = if self.pizza_mode {
+                "Baking status"
+            } else {
+                "General"
+            };
+            draw_process_timing_text(
+                f,
+                right_chunks[next_idx],
+                title,
+                timing,
+                *run_time,
+                self.pizza_mode,
+            );
             next_idx += 1;
         }
 
@@ -1156,15 +1317,21 @@ impl TuiUi {
                         hint,
                         self.item_geometry_scroll,
                         has_perf_stats,
+                        self.pizza_mode,
                     );
                 }
             } else {
                 #[cfg(feature = "introspection")]
                 if has_perf_stats {
+                    let title = if self.pizza_mode {
+                        "chef's performance"
+                    } else {
+                        "Client Perf Stats"
+                    };
                     self.perf_stats_page_size = draw_scrolled_stats(
                         f,
                         *chunk,
-                        "Client Perf Stats",
+                        title,
                         &data.client_perf_stats,
                         self.perf_stats_scroll,
                         " (i/I)",

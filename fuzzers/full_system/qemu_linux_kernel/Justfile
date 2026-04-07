@@ -1,6 +1,6 @@
 import "../../../just/libafl-qemu.just"
-FUZZER_NAME := "qemu_linux_kernel"
 
+FUZZER_NAME := "qemu_linux_kernel"
 LINUX_BUILDER_URL := "https://github.com/AFLplusplus/linux-qemu-image-builder.git"
 LINUX_BUILDER_DIR := TARGET_DIR / "linux_builder"
 LINUX_BUILDER_OUT := LINUX_BUILDER_DIR / "output"
@@ -34,14 +34,14 @@ set_harness_api api="lqemu": target_dir linux_builder_dir
     elif [[ "{{ api }}" == "nyx" ]]; then
         echo "export HARNESS_API=NYX" > "{{ LINUX_BUILDER_DIR }}/hooks/setup/api.sh"
     else
-        echo "[!] Incorrect API: {{api}}"
+        echo "[!] Incorrect API: {{ api }}"
     fi
 
 update api="lqemu": (update_files api) (set_harness_api api)
-    {{LINUX_BUILDER_DIR}}/update.sh
+    {{ LINUX_BUILDER_DIR }}/update.sh
 
 target api="lqemu": linux_builder_dir update_files
-    {{LINUX_BUILDER_DIR}}/build.sh
+    {{ LINUX_BUILDER_DIR }}/build.sh
 
 build api="lqemu":
     cargo build \
@@ -65,7 +65,7 @@ run api="lqemu": (build api)
     qemu-img create -f qcow2 -o backing_file={{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.fd -F raw {{ LINUX_BUILDER_OUT }}/OVMF_VARS.4m.qcow2
     qemu-img create -f qcow2 -o backing_file={{ LINUX_BUILDER_OUT }}/linux.qcow2 -F qcow2 {{ LINUX_BUILDER_OUT }}/linux.tmp.qcow2
 
-    {{FUZZER}} \
+    {{ FUZZER }} \
       -accel tcg \
       -m 4G \
       -drive if=pflash,format=qcow2,file="{{ LINUX_BUILDER_OUT }}/OVMF_CODE.4m.qcow2" `# OVMF code pflash` \

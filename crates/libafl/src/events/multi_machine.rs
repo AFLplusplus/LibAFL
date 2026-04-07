@@ -1,3 +1,6 @@
+//! Event manager for forwarding events between fuzzers on different machines.
+//! This one uses TCP to connect the parent and child nodes and exchange
+//! interesting inputs between them.
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::{
     fmt::Display,
@@ -347,7 +350,7 @@ where
         &self.compressor
     }
 
-    /// Read a [`TcpMultiMachineMsg`] from a stream.
+    /// Read a [`MultiMachineMsg`] from a stream.
     /// Expects a message written by [`TcpMultiMachineState::write_msg`].
     /// If there is nothing to read from the stream, return asap with Ok(None).
     #[expect(clippy::uninit_vec)]
@@ -400,7 +403,7 @@ where
         Ok(Some(MultiMachineMsg::from_llmp_msg(node_msg)))
     }
 
-    /// Write an [`OwnedTcpMultiMachineMsg`] to a stream.
+    /// Write a [`MultiMachineMsg`] to a stream.
     /// Can be read back using [`TcpMultiMachineState::read_msg`].
     async fn write_msg<I: Input>(
         stream: &mut TcpStream,

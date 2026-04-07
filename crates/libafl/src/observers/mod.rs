@@ -14,7 +14,6 @@ pub mod stacktrace;
 #[cfg(feature = "regex")]
 pub use stacktrace::*;
 
-pub mod concolic;
 pub mod map;
 pub use map::*;
 

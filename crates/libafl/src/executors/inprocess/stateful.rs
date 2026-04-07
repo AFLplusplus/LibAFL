@@ -152,7 +152,7 @@ where
             fuzzer,
             state,
             event_mgr,
-            Duration::from_millis(5000),
+            Duration::from_secs(5),
         )
     }
 
@@ -243,7 +243,7 @@ where
             fuzzer,
             state,
             event_mgr,
-            Duration::from_millis(5000),
+            Duration::from_secs(5),
         )
     }
 

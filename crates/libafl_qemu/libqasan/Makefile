@@ -15,7 +15,7 @@
 
 OUT_DIR     ?= .
 
-override CFLAGS      += -Wno-int-to-void-pointer-cast -ggdb -O1 -fno-builtin -Wno-unused-result
+override CFLAGS      += -Wno-int-to-void-pointer-cast -ggdb -O1 -fno-builtin -Wno-unused-result -Werror -Wall
 override LDFLAGS     += -ldl -pthread
 
 SRC := libqasan.c hooks.c malloc.c mmap.c string.c uninstrument.c patch.c dlmalloc.c printf/printf.c

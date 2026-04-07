@@ -136,7 +136,7 @@ strum_macros = "0.27.2"
 syscall-numbers = "4.0.2"
 meminterval = { workspace = true }
 thread_local = "1.1.9"
-capstone = "0.13.0"
+capstone = "0.14.0"
 rangemap = { workspace = true }
 log = { workspace = true }
 object = "0.38.0"

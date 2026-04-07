@@ -3,11 +3,10 @@ PROJECT_DIR := absolute_path(".")
 PROFILE := env("PROFILE", "release")
 PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
 CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
-FUZZER := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
-LIBAFL_CC := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
-LIBAFL_CXX := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
-LIBTOOL := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_libtool"
-
+FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
+LIBAFL_CC := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
+LIBAFL_CXX := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
+LIBTOOL := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_libtool"
 
 alias cc := cxx
 
@@ -27,7 +26,7 @@ libpng:
 [linux]
 [macos]
 cxx:
-    cargo build --profile {{PROFILE}}
+    cargo build --profile {{ PROFILE }}
 
 [windows]
 cxx:
@@ -37,11 +36,11 @@ cxx:
 [macos]
 lib: libpng cxx
     #!/bin/bash
-    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}"
-    cd {{PROJECT_DIR}}
+    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes CC="{{ LIBAFL_CC }}" CXX="{{ LIBAFL_CXX }}"
+    cd {{ PROJECT_DIR }}
     # Patch for macOS: fp.h is missing in newer SDKs, use math.h instead
     sed -i.bak 's|include <fp.h>|include <math.h>|g' libpng-1.6.37/pngpriv.h
-    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}" LIBTOOL="{{LIBTOOL}}" || true
+    make -C libpng-1.6.37 CC="{{ LIBAFL_CC }}" CXX="{{ LIBAFL_CXX }}" LIBTOOL="{{ LIBTOOL }}" || true
 
 [windows]
 lib:
@@ -49,13 +48,13 @@ lib:
 
 [linux]
 fuzzer: lib cxx
-    cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc -Wl,--whole-archive {{PROJECT_DIR}}/target/{{PROFILE_DIR}}/liblibfuzzer_libpng.a -Wl,--no-whole-archive -Wl,--whole-archive {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -Wl,--no-whole-archive -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz --libafl-ignore-configurations -fsanitize=undefined --libafl-no-link
+    cp {{ PROJECT_DIR }}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{ PROJECT_DIR }}/libpng-1.6.37/.libs/libpng16.a
+    {{ LIBAFL_CXX }} {{ PROJECT_DIR }}/harness.cc -Wl,--whole-archive {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/liblibfuzzer_libpng.a -Wl,--no-whole-archive -Wl,--whole-archive {{ PROJECT_DIR }}/libpng-1.6.37/.libs/libpng16.a -Wl,--no-whole-archive -I {{ PROJECT_DIR }}/libpng-1.6.37/ -o {{ FUZZER_NAME }} -lm -lz --libafl-ignore-configurations -fsanitize=undefined --libafl-no-link
 
 [macos]
 fuzzer: lib cxx
-    cp {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/target/{{PROFILE_DIR}}/liblibfuzzer_libpng.a -Wl,-force_load,{{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz -framework CoreFoundation -framework Security
+    cp {{ PROJECT_DIR }}/libpng-1.6.37/.libs/libpng16.coverage_ubsan.a {{ PROJECT_DIR }}/libpng-1.6.37/.libs/libpng16.a
+    {{ LIBAFL_CXX }} {{ PROJECT_DIR }}/harness.cc {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/liblibfuzzer_libpng.a -Wl,-force_load,{{ PROJECT_DIR }}/libpng-1.6.37/.libs/libpng16.a -I {{ PROJECT_DIR }}/libpng-1.6.37/ -o {{ FUZZER_NAME }} -lm -lz -framework CoreFoundation -framework Security
 
 [windows]
 fuzzer:
@@ -64,7 +63,7 @@ fuzzer:
 [linux]
 [macos]
 run: fuzzer
-    ./{{FUZZER_NAME}} --cores 0-1 --input ./corpus
+    ./{{ FUZZER_NAME }} --cores 0-1 --input ./corpus
 
 [windows]
 run: fuzzer
@@ -78,7 +77,7 @@ test: fuzzer
     rm -rf out corpus
     mkdir -p corpus
     printf "\x89PNG\r\n\x1a\n" > corpus/seed.png
-    timeout 120s ./{{FUZZER_NAME}} --cores 0-1 --input ./corpus > fuzz_stdout.log 2>&1 || true
+    timeout -s KILL 120s ./{{ FUZZER_NAME }} --cores 0-1 --input ./corpus > fuzz_stdout.log 2>&1 || true
     if grep -Eqa "(corpus|objectives): [1-9]" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
@@ -91,7 +90,6 @@ test: fuzzer
     echo "Unsupported on this platform"
 
 clean:
-    rm -rf {{FUZZER_NAME}}
+    rm -rf {{ FUZZER_NAME }}
     make -C libpng-1.6.37 clean || true
     cargo clean
-
