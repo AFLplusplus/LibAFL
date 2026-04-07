@@ -3,7 +3,7 @@ mod args;
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 use {
     crate::args::Args,
-    anyhow::{Result, anyhow},
+    anyhow::{anyhow, Result},
     clap::Parser,
     nix::unistd::execvp,
     std::ffi::CString,
@@ -11,7 +11,7 @@ use {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use {
     crate::args::Args,
-    anyhow::{Result, anyhow},
+    anyhow::{anyhow, Result},
     clap::Parser,
     nix::{
         sys::{personality, personality::Persona},
@@ -93,6 +93,11 @@ fn disable_aslr() -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn disable_aslr() -> Result<()> {
+    panic!("ASLR disable not implemented for macos");
 }
 
 fn main() -> Result<()> {

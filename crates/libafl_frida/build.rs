@@ -81,11 +81,18 @@ fn main() {
         let compiler = cc::Build::new().cpp(true).opt_level(0).get_compiler();
         let clangpp = compiler.path();
         let mut cmd = std::process::Command::new(clangpp);
-        cmd.args(compiler.args())
+        let status = cmd
+            .args(compiler.args())
+            .arg("-shared")
+            .arg("-fPIC")
             .arg("test_harness.cpp")
             .arg("-o")
             .arg(Path::new(&out_dir).join("test_harness.so"))
             .status()
             .expect("Failed to link test_harness");
+        assert!(
+            status.success(),
+            "Failed to compile test_harness.so with command: {cmd:?}"
+        );
     }
 }

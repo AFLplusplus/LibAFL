@@ -103,19 +103,19 @@ impl AddressResolver {
     pub fn resolve(&self, pc: GuestAddr) -> String {
         let resolve_addr = |addr: GuestAddr| -> String {
             let mut info = String::new();
-            if let Some((range, idx)) = self.ranges.get_key_value(&u64::from(addr)) {
+            if let Some((range, idx)) = self.ranges.get_key_value(&(addr as u64)) {
                 if let Some((ctx, is_pie)) = self.resolvers[*idx].as_ref() {
                     let raddr = if *is_pie {
                         addr - (range.start as GuestAddr)
                     } else {
                         addr
                     };
-                    let mut frames = ctx.find_frames(raddr.into()).unwrap().peekable();
+                    let mut frames = ctx.find_frames(raddr as u64).unwrap().peekable();
                     let mut fname = None;
                     while let Some(frame) = frames.next().unwrap() {
                         // Only use the symbol table if this isn't an inlined function.
                         let symbol = if matches!(frames.peek(), Ok(None)) {
-                            ctx.find_symbol(raddr.into())
+                            ctx.find_symbol(raddr as u64)
                         } else {
                             None
                         };
@@ -139,7 +139,7 @@ impl AddressResolver {
                         info += &name;
                     }
 
-                    if let Some(loc) = ctx.find_location(raddr.into()).unwrap_or(None) {
+                    if let Some(loc) = ctx.find_location(raddr as u64).unwrap_or(None) {
                         if info.is_empty() {
                             info += " in";
                         }

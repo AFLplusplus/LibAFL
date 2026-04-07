@@ -8,28 +8,24 @@ use libafl::{
     events::{
         launcher::Launcher, llmp::LlmpRestartingEventManager, ClientDescription, EventConfig,
     },
-    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
+    executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::{
-        havoc_mutations::havoc_mutations,
-        scheduled::{tokens_mutations, HavocScheduledMutator},
-        token_mutations::{I2SRandReplace, Tokens},
-    },
+    mutators::mutations::ByteRandMutator,
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{IfElseStage, ShadowTracingStage, StdMutationalStage},
+    stages::StdMutationalStage,
     state::{HasCorpus, StdState},
-    Error, HasMetadata,
+    Error,
 };
 use libafl_bolts::{
     cli::{parse_args, FuzzerOptions},
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
+    tuples::tuple_list,
     AsSlice,
 };
 use libafl_frida::{
@@ -37,13 +33,11 @@ use libafl_frida::{
         asan_rt::AsanRuntime,
         errors::{AsanErrorsFeedback, AsanErrorsObserver},
     },
-    cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
     frida_helper_shutdown_observer::FridaHelperObserver,
     helper::{FridaInstrumentationHelper, IfElseRuntime},
 };
-use libafl_targets::cmplog::CmpLogObserver;
 use mimalloc::MiMalloc;
 
 #[global_allocator]
@@ -72,9 +66,6 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     let is_asan = |options: &FuzzerOptions, client_description: &ClientDescription| {
         options.asan && options.asan_cores.contains(client_description.core_id())
     };
-    let is_cmplog = |options: &FuzzerOptions, client_description: &ClientDescription| {
-        options.cmplog && options.cmplog_cores.contains(client_description.core_id())
-    };
 
     let mut run_client = |state: Option<_>,
                           mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
@@ -102,12 +93,9 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         let coverage = CoverageRuntime::new();
         let asan = AsanRuntime::new(options);
-        let cmplog = CmpLogRuntime::new();
 
         let client_description_clone = client_description.clone();
         let options_clone = options.clone();
-        let client_description_clone2 = client_description.clone();
-        let options_clone2 = options.clone();
         let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
             &gum,
             options,
@@ -115,11 +103,6 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 IfElseRuntime::new(
                     move || Ok(is_asan(&options_clone, &client_description_clone)),
                     tuple_list!(asan),
-                    tuple_list!()
-                ),
-                IfElseRuntime::new(
-                    move || Ok(is_cmplog(&options_clone2, &client_description_clone2)),
-                    tuple_list!(cmplog),
                     tuple_list!()
                 ),
                 coverage
@@ -175,8 +158,9 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         println!("We're a client, let's fuzz :)");
 
-        // Setup a basic mutator with a mutational stage
-        let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+        // Setup a mutator specifically for solving this crash
+        // You probably want to use HavocScheduledMutator with a list instead
+        let mutator = ByteRandMutator::new();
 
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler =
@@ -185,10 +169,15 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let observers = tuple_list!(edges_observer, time_observer, frida_helper_observer);
+        let observers = tuple_list!(
+            edges_observer,
+            time_observer,
+            asan_observer,
+            frida_helper_observer
+        );
 
         // Create the executor for an in-process function with just one observer for edge coverage
-        let executor = FridaInProcessExecutor::new(
+        let mut executor = FridaInProcessExecutor::new(
             &gum,
             InProcessExecutor::with_timeout(
                 &mut frida_harness,
@@ -200,17 +189,6 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             )?,
             Rc::clone(&frida_helper),
         );
-        // Create an observation channel using cmplog map
-        let cmplog_observer = CmpLogObserver::new("cmplog", true);
-
-        let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
-
-        let tracing = ShadowTracingStage::new();
-
-        // Setup a randomic Input2State stage
-        let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
-            I2SRandReplace::new()
-        )));
 
         // In case the corpus is empty (on first run), reset
         if state.must_load_initial_inputs() {
@@ -229,14 +207,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        let mut stages = tuple_list!(
-            IfElseStage::new(
-                |_, _, _, _| Ok(is_cmplog(options, &client_description)),
-                tuple_list!(tracing, i2s),
-                tuple_list!()
-            ),
-            StdMutationalStage::new(mutator)
-        );
+        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 

@@ -22,5 +22,4 @@ repository = "https://github.com/AFLplusplus/LibAFL.git"
 [tool.maturin]
 bindings = "pyo3"
 manifest-path = "Cargo.toml"
-python-source = "src"
 all-features = true

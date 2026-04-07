@@ -20,7 +20,7 @@ pub const SYS_riscv_flush_icache: c_long = SYS_arch_specific_syscall + 15;
 #[expect(non_upper_case_globals)]
 pub const SYS_riscv_hwprobe: c_long = SYS_arch_specific_syscall + 14;
 
-use crate::{CallingConvention, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
+use crate::{CallingConvention, GuestAddr, QemuRWError, QemuRWErrorKind, sync_exit::ExitArgs};
 
 #[expect(non_upper_case_globals)]
 impl CallingConvention {
@@ -100,15 +100,16 @@ pub fn capstone() -> capstone::arch::riscv::ArchCapstoneBuilder {
 }
 
 impl crate::ArchExtras for crate::CPU {
-    fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
-        self.read_reg(Regs::Ra)
+    fn read_return_address(&self) -> Result<GuestAddr, QemuRWError> {
+        self.read_reg(Regs::Ra).map(|res| res as GuestAddr)
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
-        T: Into<GuestReg>,
+        T: Into<GuestAddr>,
     {
-        self.write_reg(Regs::Ra, val)
+        let addr: GuestAddr = val.into();
+        self.write_reg(Regs::Ra, addr as GuestReg)
     }
 
     fn read_function_argument_with_cc(
