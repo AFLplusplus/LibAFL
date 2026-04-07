@@ -8,11 +8,27 @@ use libafl_bolts::simd::{
 };
 use rand::{RngCore, rngs::ThreadRng};
 
+fn default_map_size() -> usize {
+    if std::env::var("CI").is_ok() {
+        65536
+    } else {
+        2097152
+    }
+}
+
+fn default_rounds() -> usize {
+    if std::env::var("CI").is_ok() {
+        256
+    } else {
+        32768
+    }
+}
+
 #[derive(Parser)]
 struct Cli {
-    #[arg(short, long, default_value_t = 2097152, env = "LIBAFL_BENCH_MAP_SIZE")]
+    #[arg(short, long, default_value_t = default_map_size(), env = "LIBAFL_BENCH_MAP_SIZE")]
     pub map: usize,
-    #[arg(short, long, default_value_t = 32768, env = "LIBAFL_BENCH_ROUNDS")]
+    #[arg(short, long, default_value_t = default_rounds(), env = "LIBAFL_BENCH_ROUNDS")]
     pub rounds: usize,
     #[arg(short, long, env = "LIBAFL_BENCH_CORRECTNESS")]
     pub validate: bool,

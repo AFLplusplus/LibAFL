@@ -430,7 +430,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
             };
             let metafile_path = self.dir_path.join(&metafile_name);
             let mut tmpfile_path = metafile_path.clone();
-            tmpfile_path.set_file_name(format!(".{metafile_name}.tmp",));
+            tmpfile_path.set_file_name(format!(".{metafile_name}.tmp"));
 
             let ondisk_meta = OnDiskMetadata {
                 metadata: testcase.metadata_map(),

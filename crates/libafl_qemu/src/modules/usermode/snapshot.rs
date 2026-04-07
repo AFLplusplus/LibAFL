@@ -3,7 +3,7 @@
 use std::{cell::UnsafeCell, mem::MaybeUninit, ops::Range, sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
-use libafl_qemu_sys::{GuestAddr, MmapPerms};
+use libafl_qemu_sys::{GuestAddr, GuestUlong, MmapPerms};
 use meminterval::{Interval, IntervalTree};
 use thread_local::ThreadLocal;
 
@@ -547,7 +547,7 @@ impl SnapshotModule {
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
-                        if self.interval_filter.to_zero(u64::from(*page)).is_some() {
+                        if self.interval_filter.to_zero(*page as u64).is_some() {
                             if !Self::modify_mapping(qemu, new_maps, *page) {
                                 return true; // Restore later
                             }
@@ -577,7 +577,7 @@ impl SnapshotModule {
                 for entry in self
                     .maps
                     .tree
-                    .query_mut(u64::from(*page)..(u64::from(*page) + SNAPSHOT_PAGE_SIZE as u64))
+                    .query_mut(*page as u64..(*page as u64 + SNAPSHOT_PAGE_SIZE as u64))
                 {
                     if !entry.value.perms.unwrap_or(MmapPerms::None).writable()
                         && !entry.value.changed
@@ -592,7 +592,7 @@ impl SnapshotModule {
                     }
                 }
 
-                if self.interval_filter.to_zero(u64::from(*page)).is_some() {
+                if self.interval_filter.to_zero(*page as u64).is_some() {
                     unsafe { qemu.write_mem_unchecked(*page, &SNAPSHOT_PAGE_ZEROES) };
                 } else if let Some(info) = self.pages.get_mut(page) {
                     // TODO avoid duplicated memcpy
@@ -606,7 +606,7 @@ impl SnapshotModule {
             unsafe { (*acc.get()).clear() };
         }
 
-        for entry in self.maps.tree.query_mut(0..u64::from(GuestAddr::MAX)) {
+        for entry in self.maps.tree.query_mut(0..GuestAddr::MAX as u64) {
             if entry.value.changed {
                 qemu.mprotect(
                     entry.interval.start as GuestAddr,
@@ -631,7 +631,7 @@ impl SnapshotModule {
         let mut found = false;
         for entry in maps
             .tree
-            .query_mut(u64::from(page)..(u64::from(page) + SNAPSHOT_PAGE_SIZE as u64))
+            .query_mut(page as u64..(page as u64 + SNAPSHOT_PAGE_SIZE as u64))
         {
             if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
                 drop(qemu.mprotect(
@@ -656,7 +656,7 @@ impl SnapshotModule {
 
         self.maps
             .tree
-            .query(u64::from(start)..(u64::from(start) + (size as u64)))
+            .query(start as u64..(start as u64 + size as u64))
             .next()
             .is_none()
     }
@@ -672,7 +672,7 @@ impl SnapshotModule {
             }
             let mut mapping = self.new_maps.lock().unwrap();
             mapping.tree.insert(
-                u64::from(start)..(u64::from(start) + (size as u64)),
+                start as u64..(start as u64 + size as u64),
                 MemoryRegionInfo {
                     perms,
                     changed: true,
@@ -701,7 +701,7 @@ impl SnapshotModule {
         }
         let mut mapping = self.new_maps.lock().unwrap();
 
-        let interval = Interval::new(u64::from(start), u64::from(start) + (size as u64));
+        let interval = Interval::new(start as u64, start as u64 + size as u64);
         let mut found = vec![]; //  TODO optimize
         for entry in mapping.tree.query(interval) {
             found.push((*entry.interval, entry.value.perms));
@@ -748,7 +748,7 @@ impl SnapshotModule {
 
         let mut mapping = self.new_maps.lock().unwrap();
 
-        let interval = Interval::new(u64::from(start), u64::from(start) + (size as u64));
+        let interval = Interval::new(start as u64, start as u64 + size as u64);
         let mut found = vec![]; //  TODO optimize
         for entry in mapping.tree.query(interval) {
             found.push((*entry.interval, entry.value.perms));
@@ -786,7 +786,7 @@ impl SnapshotModule {
     pub fn reset_maps(&mut self, qemu: Qemu) {
         let new_maps = self.new_maps.get_mut().unwrap();
 
-        for entry in self.maps.tree.query(0..u64::from(GuestAddr::MAX)) {
+        for entry in self.maps.tree.query(0..(GuestAddr::MAX as u64)) {
             let mut found = vec![]; //  TODO optimize
             for overlap in new_maps.tree.query(*entry.interval) {
                 found.push((
@@ -829,7 +829,7 @@ impl SnapshotModule {
         }
 
         let mut to_unmap = vec![];
-        for entry in new_maps.tree.query(0..u64::from(GuestAddr::MAX)) {
+        for entry in new_maps.tree.query(0..(GuestAddr::MAX as u64)) {
             to_unmap.push((*entry.interval, entry.value.changed, entry.value.perms));
         }
         for (i, ..) in to_unmap {
@@ -944,14 +944,14 @@ pub fn filter_mmap_snapshot<ET, I, S>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     sys_num: i32,
-    a0: GuestAddr,
-    a1: GuestAddr,
-    _a2: GuestAddr,
-    _a3: GuestAddr,
-    _a4: GuestAddr,
-    _a5: GuestAddr,
-    _a6: GuestAddr,
-    _a7: GuestAddr,
+    a0: GuestUlong,
+    a1: GuestUlong,
+    _a2: GuestUlong,
+    _a3: GuestUlong,
+    _a4: GuestUlong,
+    _a5: GuestUlong,
+    _a6: GuestUlong,
+    _a7: GuestUlong,
 ) -> SyscallHookResult
 where
     ET: EmulatorModuleTuple<I, S>,
@@ -990,17 +990,17 @@ pub fn trace_mmap_snapshot<ET, I, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
-    result: GuestAddr,
+    result: GuestUlong,
     sys_num: i32,
-    a0: GuestAddr,
-    a1: GuestAddr,
-    a2: GuestAddr,
-    a3: GuestAddr,
-    _a4: GuestAddr,
-    _a5: GuestAddr,
-    _a6: GuestAddr,
-    _a7: GuestAddr,
-) -> GuestAddr
+    a0: GuestUlong,
+    a1: GuestUlong,
+    a2: GuestUlong,
+    a3: GuestUlong,
+    _a4: GuestUlong,
+    _a5: GuestUlong,
+    _a6: GuestUlong,
+    _a7: GuestUlong,
+) -> GuestUlong
 where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
@@ -1014,18 +1014,18 @@ where
              * Only note the access if the call is successful. And only mark the
              * portion of the buffer which has actually been modified.
              */
-            if result != GuestAddr::MAX {
-                h.access(a1, result as usize);
+            if result != GuestUlong::MAX {
+                h.access(a1 as GuestAddr, result as usize);
             }
         }
         SYS_readlinkat => {
             let h = get_snapshot_module_mut(emulator_modules).unwrap();
-            h.access(a2, a3 as usize);
+            h.access(a2 as GuestAddr, a3 as usize);
         }
         #[cfg(not(cpu_target = "riscv32"))]
         SYS_futex => {
             let h = get_snapshot_module_mut(emulator_modules).unwrap();
-            h.access(a0, a3 as usize);
+            h.access(a0 as GuestAddr, a3 as usize);
         }
         #[cfg(not(any(
             cpu_target = "arm",
@@ -1037,25 +1037,25 @@ where
         SYS_newfstatat => {
             if a2 != 0 {
                 let h = get_snapshot_module_mut(emulator_modules).unwrap();
-                h.access(a2, 4096); // stat is not greater than a page
+                h.access(a2 as GuestAddr, 4096); // stat is not greater than a page
             }
         }
         #[cfg(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "i386"))]
         SYS_fstatat64 => {
             if a2 != 0 {
                 let h = get_snapshot_module_mut(emulator_modules).unwrap();
-                h.access(a2, 4096); // stat is not greater than a page
+                h.access(a2 as GuestAddr, 4096); // stat is not greater than a page
             }
         }
         #[cfg(not(cpu_target = "riscv32"))]
         SYS_statfs | SYS_fstat | SYS_fstatfs => {
             let h = get_snapshot_module_mut(emulator_modules).unwrap();
-            h.access(a1, 4096); // stat is not greater than a page
+            h.access(a1 as GuestAddr, 4096); // stat is not greater than a page
         }
         #[cfg(not(cpu_target = "riscv32"))]
         SYS_getrandom => {
             let h = get_snapshot_module_mut(emulator_modules).unwrap();
-            h.access(a0, a1 as usize);
+            h.access(a0 as GuestAddr, a1 as usize);
         }
         SYS_openat | SYS_dup | SYS_dup3 | SYS_epoll_create1 | SYS_eventfd2 | SYS_socket
         | SYS_accept | SYS_accept4 | SYS_memfd_create => {
@@ -1117,7 +1117,7 @@ where
         }
         // mmap syscalls
         sys_const => {
-            if result == GuestAddr::MAX
+            if result == GuestUlong::MAX
             /* -1 */
             {
                 return result;
@@ -1129,7 +1129,7 @@ where
             if sys_const == SYS_mmap2 {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = get_snapshot_module_mut(emulator_modules).unwrap();
-                    h.add_mapped(result, a1 as usize, Some(prot));
+                    h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
                 }
             }
 
@@ -1138,23 +1138,23 @@ where
                 && let Ok(prot) = MmapPerms::try_from(a2 as i32)
             {
                 let h = get_snapshot_module_mut(emulator_modules).unwrap();
-                h.add_mapped(result, a1 as usize, Some(prot));
+                h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
             }
 
             if sys_const == SYS_mremap {
                 let h = get_snapshot_module_mut(emulator_modules).unwrap();
                 // TODO get the old permissions from the removed mapping
-                h.remove_mapped(a0, a1 as usize);
-                h.add_mapped(result, a2 as usize, None);
+                h.remove_mapped(a0 as GuestAddr, a1 as usize);
+                h.add_mapped(result as GuestAddr, a2 as usize, None);
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = get_snapshot_module_mut(emulator_modules).unwrap();
-                    h.change_mapped_perms(a0, a1 as usize, Some(prot));
+                    h.change_mapped_perms(a0 as GuestAddr, a1 as usize, Some(prot));
                 }
             } else if sys_const == SYS_munmap {
                 let h = get_snapshot_module_mut(emulator_modules).unwrap();
-                if h.is_unmap_allowed(a0, a1 as usize) {
-                    h.remove_mapped(a0, a1 as usize);
+                if h.is_unmap_allowed(a0 as GuestAddr, a1 as usize) {
+                    h.remove_mapped(a0 as GuestAddr, a1 as usize);
                 }
             }
         }

@@ -283,7 +283,7 @@ pub enum ServedShMemRequest {
     Exit,
 }
 
-/// Client side communicating with the [`ShMemServer`]
+/// Client side communicating with the [`ShMemServiceThread`]
 #[derive(Debug)]
 struct SharedShMemClient<SHM> {
     stream: UnixStream,

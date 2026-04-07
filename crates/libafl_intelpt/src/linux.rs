@@ -776,9 +776,22 @@ fn current_cpu() -> Option<PtCpu> {
 
 #[cfg(test)]
 mod test {
+    use std::path::PathBuf;
+
     use arbitrary_int::prelude::*;
 
     use super::*;
+
+    fn get_intel_pt() -> Option<PathBuf> {
+        let intel_pt = PathBuf::from(PT_EVENT_PATH);
+
+        if intel_pt.exists() {
+            Some(intel_pt)
+        } else {
+            None
+        }
+    }
+
     #[test]
     fn intel_pt_builder_default_values_are_valid() {
         let default = IntelPT::builder();
@@ -792,48 +805,57 @@ mod test {
 
     #[test]
     fn intel_pt_pt_config_noretcomp_format() {
-        let ptconfig_noretcomp = PtConfig::DEFAULT.with_noretcomp(true).raw_value;
-        let path = format!("{PT_EVENT_PATH}/format/noretcomp");
-        let s = fs::read_to_string(&path).expect("Failed to read Intel PT config noretcomp format");
-        assert!(
-            s.starts_with("config:"),
-            "Unexpected Intel PT config noretcomp format"
-        );
-        let bit = s["config:".len()..]
-            .trim()
-            .parse::<u32>()
-            .expect("Failed to parse Intel PT config noretcomp format");
-        assert_eq!(
-            ptconfig_noretcomp,
-            0b1 << bit,
-            "Unexpected Intel PT config noretcomp format"
-        );
+        if let Some(pt_path) = get_intel_pt() {
+            let ptconfig_noretcomp = PtConfig::DEFAULT.with_noretcomp(true).raw_value;
+            let path = pt_path.join("format/noretcomp");
+            let s =
+                fs::read_to_string(&path).expect("Failed to read Intel PT config noretcomp format");
+            assert!(
+                s.starts_with("config:"),
+                "Unexpected Intel PT config noretcomp format"
+            );
+            let bit = s["config:".len()..]
+                .trim()
+                .parse::<u32>()
+                .expect("Failed to parse Intel PT config noretcomp format");
+            assert_eq!(
+                ptconfig_noretcomp,
+                0b1 << bit,
+                "Unexpected Intel PT config noretcomp format"
+            );
+        } else {
+            println!("Intel PT not available, skipping...");
+        }
     }
 
     #[test]
     fn intel_pt_pt_config_psb_period_format() {
-        let ptconfig_psb_period = PtConfig::DEFAULT.with_psb_period(u4::MAX).raw_value;
-        let path = format!("{PT_EVENT_PATH}/format/psb_period");
-        let s =
-            fs::read_to_string(&path).expect("Failed to read Intel PT config psb_period format");
-        assert!(
-            s.starts_with("config:"),
-            "Unexpected Intel PT config psb_period format"
-        );
-        let from = s["config:".len().."config:".len() + 2]
-            .parse::<u32>()
-            .expect("Failed to parse Intel PT config psb_period format");
-        let to = s["config:".len() + 3..]
-            .trim()
-            .parse::<u32>()
-            .expect("Failed to parse Intel PT config psb_period format");
-        let mut format = 0;
-        for bit in from..=to {
-            format |= 0b1 << bit;
+        if let Some(pt_path) = get_intel_pt() {
+            let ptconfig_psb_period = PtConfig::DEFAULT.with_psb_period(u4::MAX).raw_value;
+            let path = pt_path.join("format/psb_period");
+            let s = fs::read_to_string(&path)
+                .expect("Failed to read Intel PT config psb_period format");
+            assert!(
+                s.starts_with("config:"),
+                "Unexpected Intel PT config psb_period format"
+            );
+            let from = s["config:".len().."config:".len() + 2]
+                .parse::<u32>()
+                .expect("Failed to parse Intel PT config psb_period format");
+            let to = s["config:".len() + 3..]
+                .trim()
+                .parse::<u32>()
+                .expect("Failed to parse Intel PT config psb_period format");
+            let mut format = 0;
+            for bit in from..=to {
+                format |= 0b1 << bit;
+            }
+            assert_eq!(
+                ptconfig_psb_period, format,
+                "Unexpected Intel PT config psb_period format"
+            );
+        } else {
+            println!("Intel PT not available, skipping...");
         }
-        assert_eq!(
-            ptconfig_psb_period, format,
-            "Unexpected Intel PT config psb_period format"
-        );
     }
 }

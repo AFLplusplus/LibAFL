@@ -190,37 +190,33 @@ impl ToolWrapper for ClangWrapper {
                     i += 1;
                     continue;
                 }
-                "-z" | "-Wl,-z" => {
+                "-z" | "-Wl,-z"
                     if i + 1 < args.len()
-                        && (args[i + 1].as_ref() == "defs" || args[i + 1].as_ref() == "-Wl,defs")
-                    {
-                        i += 2;
-                        continue;
-                    }
+                        && (args[i + 1].as_ref() == "defs"
+                            || args[i + 1].as_ref() == "-Wl,defs") =>
+                {
+                    i += 2;
+                    continue;
                 }
                 "--libafl-ignore-configurations" | "-print-prog-name=ld" => {
                     self.ignoring_configurations = true;
                     i += 1;
                     continue;
                 }
-                "--libafl-configurations" => {
-                    if i + 1 < args.len() {
-                        self.configurations.extend(
-                            args[i + 1]
-                                .as_ref()
-                                .split(',')
-                                .map(|x| crate::Configuration::from_str(x).unwrap()),
-                        );
-                        i += 2;
-                        continue;
-                    }
+                "--libafl-configurations" if i + 1 < args.len() => {
+                    self.configurations.extend(
+                        args[i + 1]
+                            .as_ref()
+                            .split(',')
+                            .map(|x| crate::Configuration::from_str(x).unwrap()),
+                    );
+                    i += 2;
+                    continue;
                 }
-                "-o" => {
-                    if i + 1 < args.len() {
-                        self.output = Some(PathBuf::from(args[i + 1].as_ref()));
-                        i += 2;
-                        continue;
-                    }
+                "-o" if i + 1 < args.len() => {
+                    self.output = Some(PathBuf::from(args[i + 1].as_ref()));
+                    i += 2;
+                    continue;
                 }
                 "-x" => self.x_set = true,
                 "-m32" => self.bit_mode = 32,
