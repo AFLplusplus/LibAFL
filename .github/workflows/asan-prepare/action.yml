@@ -55,7 +55,7 @@ runs:
     - name: Install nextest
       shell: bash
       run: |
-        cargo binstall --no-confirm cargo-nextest
+        cargo binstall --no-confirm --locked cargo-nextest
     - name: Install Rust Targets
       shell: bash
       run: |

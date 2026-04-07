@@ -25,8 +25,6 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
       "crates/libafl"
       "crates/libafl_bolts"
       "crates/libafl_cc"
-      "crates/libafl_concolic/symcc_runtime"
-      "crates/libafl_concolic/symcc_libafl"
       "crates/libafl_frida"
       "crates/libafl_libfuzzer"
       "crates/libafl_libfuzzer_runtime"

@@ -66,7 +66,7 @@ use libafl_core::Named;
 use std::borrow::Cow;
 
 struct MyNamed {
-    name: &'static str,
+    name: Cow<'static, str>,
 }
 
 impl Named for MyNamed {
@@ -75,7 +75,7 @@ impl Named for MyNamed {
     }
 }
 
-let named_tuple = tuple_list!(MyNamed { name: "first" }, MyNamed { name: "second" });
+let named_tuple = tuple_list!(MyNamed { name: Cow::Borrowed("first") }, MyNamed { name: Cow::Borrowed("second") });
 
 // Get names
 let names = named_tuple.names();
