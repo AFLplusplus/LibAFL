@@ -11,7 +11,6 @@ This directory contains the various crates that make up the LibAFL ecosystem. He
 
 ## Backends & Instrumentation
 
-- **[libafl_concolic](./libafl_concolic)**: Concolic execution related crates (SymCC integration).
 - **[libafl_frida](./libafl_frida)**: Frida backend library for LibAFL.
 - **[libafl_intelpt](./libafl_intelpt)**: Intel Processor Trace wrapper for libafl.
 - **[libafl_nyx](./libafl_nyx)**: libafl using nyx, only avaliable on linux.

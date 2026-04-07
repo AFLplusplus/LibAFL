@@ -126,7 +126,7 @@ With this feature, you don't need to do anything else. Just use `impl_serdeany!`
 
 If you cannot use `serdeany_autoreg`, you must register your types manually at the start of your program.
 
-```rust
+```rust,ignore
 use serde_anymap::serdeany::RegistryBuilder;
 
 // This must be done before any deserialization happens.

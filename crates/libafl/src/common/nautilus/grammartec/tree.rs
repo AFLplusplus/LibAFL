@@ -8,7 +8,7 @@ use libafl_bolts::rands::Rand;
 use pyo3::{
     PyTypeInfo,
     prelude::{Py, PyAny, PyResult, Python},
-    types::{PyAnyMethods, PyBytes, PyBytesMethods, PyString, PyStringMethods, PyTuple},
+    types::{PyBytes, PyBytesMethods, PyString, PyStringMethods, PyTuple},
 };
 use serde::{Deserialize, Serialize};
 
@@ -99,10 +99,10 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
         let res = expr.call1(py, PyTuple::new(py, byte_arrays)?)?;
         let bound = res.bind(py);
         if PyString::is_type_of(bound) {
-            let pystr = bound.downcast::<PyString>()?;
+            let pystr = bound.cast::<PyString>()?;
             self.write(pystr.to_string_lossy().as_bytes());
         } else if PyBytes::is_type_of(bound) {
-            let pybytes = bound.downcast::<PyBytes>()?;
+            let pybytes = bound.cast::<PyBytes>()?;
             self.write(pybytes.as_bytes());
         } else {
             return Err(pyo3::exceptions::PyValueError::new_err(

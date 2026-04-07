@@ -32,11 +32,11 @@ pub trait HasTestcase<I> {
 /// An entry in the [`Testcase`] Corpus
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Testcase<I> {
-    /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
+    /// The input of this [`Testcase`], or `None`, if it is not currently in memory
     input: Option<I>,
     /// The filename for this [`Testcase`]
     filename: Option<String>,
-    /// Complete path to the [`Input`] on disk, if this [`Testcase`] is backed by a file in the filesystem
+    /// Complete path to the input on disk, if this [`Testcase`] is backed by a file in the filesystem
     #[cfg(feature = "std")]
     file_path: Option<PathBuf>,
     /// Map of metadata associated with this [`Testcase`]
