@@ -261,8 +261,8 @@ void qasan_unpoison(const char *start, size_t len) {
     abort();
   }
 
-  char *k_start_aligned = qasan_get_shadow(k_start_aligned);
-  char *k_end_aligned = qasan_get_shadow(k_end_aligned);
+  char *k_start_aligned = qasan_get_shadow(start_aligned);
+  char *k_end_aligned = qasan_get_shadow(end_aligned);
 
   QASAN_DEBUG("UNPOISONk: %p-%p\n", k_start_aligned, k_end_aligned);
 

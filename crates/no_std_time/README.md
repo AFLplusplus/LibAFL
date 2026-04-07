@@ -26,7 +26,7 @@ In a `no_std` environment, you must provide an implementation for `external_curr
 
 ```rust
 // In your no_std binary:
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn external_current_millis() -> u64 {
     // Return time from your platform-specific source, e.g., an RTC.
     1678886400000
