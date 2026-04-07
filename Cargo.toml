@@ -121,7 +121,7 @@ capstone = "0.14.0" # Disassembler used in libafl_unicorn to provide disassembly
 clap = "4.5.52"
 cc = "1.2.53"
 cmake = "0.1.57"
-ctor = "0.6.3"
+ctor = "0.8.0"
 document-features = "0.2.11"
 erased-serde = { version = "0.4.5", default-features = false } # erased serde
 fastbloom = { version = "0.17.0", default-features = false }
