@@ -76,9 +76,14 @@ where
             )));
         };
 
-        let val = observer.value.as_ref();
+        let val = *observer.value.as_ref();
 
-        Ok(*val)
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(val);
+        }
+
+        Ok(val)
     }
 
     fn append_metadata(

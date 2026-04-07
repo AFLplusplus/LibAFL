@@ -9,8 +9,8 @@ use libafl_qemu::{elf::EasyElf, ArchExtras, GuestAddr, GuestReg, MmapPerms, Qemu
 pub struct Harness {
     qemu: Qemu,
     input_addr: GuestAddr,
-    pc: GuestAddr,
-    stack_ptr: GuestAddr,
+    pc: GuestReg,
+    stack_ptr: GuestReg,
     ret_addr: GuestAddr,
 }
 
@@ -57,7 +57,7 @@ impl Harness {
             .read_reg(Regs::Pc)
             .map_err(|e| Error::unknown(format!("Failed to read PC: {e:?}")))?;
 
-        let stack_ptr: GuestAddr = qemu
+        let stack_ptr = qemu
             .read_reg(Regs::Sp)
             .map_err(|e| Error::unknown(format!("Failed to read stack pointer: {e:?}")))?;
 
@@ -114,7 +114,7 @@ impl Harness {
             .map_err(|e| Error::unknown(format!("Failed to write return address: {e:?}")))?;
 
         self.qemu
-            .write_function_argument(0, self.input_addr)
+            .write_function_argument(0, self.input_addr as GuestReg)
             .map_err(|e| Error::unknown(format!("Failed to write argument 0: {e:?}")))?;
 
         self.qemu

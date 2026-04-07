@@ -83,7 +83,7 @@ impl UserStats {
         self.tag
     }
 
-    /// Constructor
+    /// Creates a new `UserStats` with values given
     #[must_use]
     pub fn new(value: UserStatsValue, aggregator_op: AggregatorOps) -> Self {
         Self {
@@ -93,7 +93,7 @@ impl UserStats {
         }
     }
 
-    /// Constructor with a tag
+    /// Creates a new `UserStats` with values given
     #[must_use]
     pub fn with_tag(
         value: UserStatsValue,

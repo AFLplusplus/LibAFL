@@ -333,7 +333,7 @@ where
 
             let mut iaddr = pc;
 
-            'disasm: while let Ok(insns) = h.cs.disasm_count(code, iaddr.into(), 1) {
+            'disasm: while let Ok(insns) = h.cs.disasm_count(code, iaddr as u64, 1) {
                 if insns.is_empty() {
                     break;
                 }
@@ -533,7 +533,7 @@ where
         I: Unpin,
         S: Unpin,
     {
-        self.callstack_hash ^= u64::from(pc) + call_len as u64;
+        self.callstack_hash ^= (pc as u64) + call_len as u64;
     }
 
     #[allow(clippy::unnecessary_cast)]
@@ -548,7 +548,7 @@ where
         I: Unpin,
         S: Unpin,
     {
-        self.callstack_hash ^= u64::from(ret_addr);
+        self.callstack_hash ^= ret_addr as u64;
     }
 
     fn pre_exec<I>(&mut self, _qemu: Qemu, _input: &I)
