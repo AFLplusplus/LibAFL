@@ -29,6 +29,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <unistd.h>
 #include <sys/syscall.h>
 
+// glibc now uses _Generic macros for these functions
+#undef memchr
+#undef strchr
+#undef strrchr
+#undef strstr
+
 char *(*__lq_libc_fgets)(char *, int, FILE *);
 int (*__lq_libc_atoi)(const char *);
 long (*__lq_libc_atol)(const char *);

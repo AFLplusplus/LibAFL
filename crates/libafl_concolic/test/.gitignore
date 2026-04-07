@@ -1,7 +1,0 @@
-symcc
-symcc_build
-symqemu_build
-if
-constraints.txt
-constraints_filtered.txt
-expected_constraints_filtered.txt

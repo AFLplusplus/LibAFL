@@ -248,7 +248,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
             });
 
             if num_transition % 4096 == 0 {
-                println!("processed {num_transition} transitions over {culled_pda_len}",);
+                println!("processed {num_transition} transitions over {culled_pda_len}");
             }
         }
 

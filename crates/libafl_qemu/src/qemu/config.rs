@@ -544,11 +544,11 @@ pub struct QemuConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    #[cfg(feature = "usermode")]
+    #[cfg(all(feature = "usermode", feature = "x86_64"))]
     use crate::Qemu;
 
     #[test]
-    #[cfg(feature = "usermode")]
+    #[cfg(all(feature = "usermode", feature = "x86_64"))]
     fn usermode() {
         let program = "/bin/pwd";
         let qemu_config = QemuConfig::builder().program("/bin/pwd").build();

@@ -1,10 +1,15 @@
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::io::Error;
 
 use anyhow::{Result, anyhow};
-use libc::{_exit, PR_SET_PDEATHSIG, prctl};
+use libc::_exit;
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use libc::{PR_SET_PDEATHSIG, prctl};
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use nix::sys::signal::SIGKILL;
 use nix::{
     sys::{
-        signal::{SIGCHLD, SIGKILL, SaFlags, SigAction, SigHandler, SigSet, sigaction},
+        signal::{SIGCHLD, SaFlags, SigAction, SigHandler, SigSet, sigaction},
         wait::{WaitStatus::Exited, waitpid},
     },
     unistd::Pid,
@@ -13,6 +18,7 @@ use nix::{
 pub struct Exit;
 
 impl Exit {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn die_on_parent_exit() -> Result<()> {
         if unsafe { prctl(PR_SET_PDEATHSIG, SIGKILL) } != 0 {
             Err(anyhow!(
@@ -21,6 +27,11 @@ impl Exit {
             ))?;
         }
         Ok(())
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    pub fn die_on_parent_exit() -> Result<()> {
+        panic!("Only supported for Linux and Android");
     }
 
     pub fn die_on_child_exit() -> Result<()> {

@@ -29,8 +29,8 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     config, config::QemuConfig, elf::EasyElf, executor::QemuExecutor,
-    modules::edges::StdEdgeCoverageModuleBuilder, Emulator, GuestPhysAddr, QemuExitError,
-    QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
+    modules::edges::StdEdgeCoverageModuleBuilder, Emulator, GuestAddr, GuestPhysAddr,
+    QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
@@ -57,13 +57,14 @@ pub fn fuzz() {
     )
     .unwrap();
 
-    let input_addr = GuestPhysAddr::from(
+    let input_addr = GuestPhysAddr::try_from(
         elf.resolve_symbol(
             &env::var("FUZZ_INPUT").unwrap_or_else(|_| "FUZZ_INPUT".to_owned()),
             0,
         )
         .expect("Symbol or env FUZZ_INPUT not found"),
-    );
+    )
+    .unwrap();
     println!("FUZZ_INPUT @ {input_addr:#x}");
 
     let main_addr = elf
@@ -166,7 +167,10 @@ pub fn fuzz() {
                     // If the execution stops at any point other than the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                     let mut pcs = (0..qemu.num_cpus())
                         .map(|i| qemu.cpu_from_index(i).unwrap())
-                        .map(|cpu| -> Result<u32, QemuRWError> { cpu.read_reg(Regs::Pc) });
+                        .map(|cpu| -> Result<GuestAddr, QemuRWError> {
+                            cpu.read_reg(Regs::Pc).map(|res| res as GuestAddr)
+                        });
+
                     let ret = match pcs
                         .find(|pc| (breakpoint..breakpoint + 5).contains(pc.as_ref().unwrap_or(&0)))
                     {
