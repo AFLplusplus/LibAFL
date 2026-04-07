@@ -23,7 +23,7 @@ runs:
         sudo apt-get update
         sudo apt-get install -y \
           curl lsb-release wget software-properties-common gnupg shellcheck pax-utils \
-          libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev
+          libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev meson
 
     # ---------- toolchain selection ----------
     - name: Install Rust (stable)
@@ -51,6 +51,8 @@ runs:
         chmod +x llvm.sh
         sudo ./llvm.sh ${{ env.MAIN_LLVM_VERSION }} all
         sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ env.MAIN_LLVM_VERSION }} 200
+        echo "LLVM_CONFIG_PATH=$(which llvm-config-${{ env.MAIN_LLVM_VERSION }})" >> "$GITHUB_ENV"
+        echo "LIBCLANG_PATH=/usr/lib/llvm-${{ env.MAIN_LLVM_VERSION }}/lib" >> "$GITHUB_ENV"
 
     - name: Symlink headers
       shell: bash

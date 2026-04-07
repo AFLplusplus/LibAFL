@@ -2,13 +2,14 @@
 
 ## 0.15.0 -> 0.16.0
 
+### LibAFL
+
 - `EventManager` is refactored to avoid calling function from `Fuzzer`, thus we do not evaluate testcases in `EventManager` anymore.
   - Now we have `EventReceiver` in `events` module, and `EventProcessor` in `fuzzer` module.
   - `EventReceiver` is responsible for receiving testcases and delegates its evaluation to `EventProcessor`.
   - `EventProcessor` is responsible for evaluating the testcases passed by the `EventReceiver`.
   - Since we don't evaluate testcases in the `EventManager` anymore. `on_fire` and `post_exec` have been deleted from `EventManagerHook`.
   - Similarly `pre_exec` has been renamed to `pre_receive`.
-- `AsanModule` now uses a `builder()` method for constructing its instances.
 - `Monitor` is refactored. Most statistics have been extracted into an individual `stats` module under `monitors`.
   - There is a `ClientStatsManager` to manage client statistics, and is owned by `EventManager`. Most of previous `Monitor`'s trait methods have been moved to the `ClientStatsManager`.
   - `user_monitor` has been renamed to `user_stats`, `introspection_monitor` has been renamed to `introspection_stats`, perf-related structure definitions have been renamed, and all were moved to the `stats` module.
@@ -17,6 +18,12 @@
   - Instead of names, `MultipartInput` uses generic `key`s (function names were changed accordingly).
   - If you don't need the keys to identify individual parts, consider using `ListInput` directly.
   - `StdScheduledMutator` has been renamed to `HavocScheduledMutator`.
+
+### LibAFL QEMU
+- `AsanModule` now uses a `builder()` method for constructing its instances.
+
+- `GuestAddr` changed its internal type alias, causing some minor type mismatches.
+It should be safe to cast to `GuestAddr` in most cases where it was used before.
 
 ## 0.14.1 -> 0.15.0
 
