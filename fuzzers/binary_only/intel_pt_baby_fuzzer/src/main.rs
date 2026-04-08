@@ -1,6 +1,4 @@
-use std::{
-    hint::black_box, num::NonZero, path::PathBuf, process, ptr::copy_nonoverlapping, time::Duration,
-};
+use std::{hint::black_box, num::NonZero, path::PathBuf, process, slice, time::Duration};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -92,10 +90,7 @@ pub fn main() {
         .iter()
         .filter_map(|pm| {
             if pm.is_exec() && pm.filename().is_some() && pm.inode != 0 {
-                let mut data = vec![0; pm.size()];
-                unsafe {
-                    copy_nonoverlapping(pm.start() as *const u8, data.as_mut_ptr(), data.len())
-                }
+                let data = unsafe { slice::from_raw_parts(pm.start() as *const u8, pm.size()) };
                 Some(PtImage::new(data, pm.start() as u64))
             } else {
                 None
@@ -104,7 +99,7 @@ pub fn main() {
         .collect::<Vec<_>>();
 
     // Pass the executable memory to the code responsible for Intel PT trace decoding
-    let pt = IntelPT::builder().images(images).build().unwrap();
+    let pt = IntelPT::builder().images(&images).build().unwrap();
     // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
     let pt_hook = unsafe {
         IntelPTHook::builder()
@@ -114,8 +109,8 @@ pub fn main() {
     }
     .build();
 
-    type PTInProcessExecutor<'a, EM, H, I, OT, S, T, Z> =
-        GenericInProcessExecutor<EM, H, &'a mut H, (IntelPTHook<T>, ()), I, OT, S, Z>;
+    type PTInProcessExecutor<'a, 'b, EM, H, I, OT, S, T, Z> =
+        GenericInProcessExecutor<EM, H, &'a mut H, (IntelPTHook<'b, T>, ()), I, OT, S, Z>;
     // Create the executor for an in-process function with just one observer
     let mut executor = PTInProcessExecutor::with_timeout_generic(
         tuple_list!(pt_hook),
