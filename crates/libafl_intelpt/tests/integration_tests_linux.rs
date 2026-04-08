@@ -1,8 +1,10 @@
 #![cfg(feature = "std")]
 #![cfg(target_os = "linux")]
 
+extern crate alloc;
+use alloc::slice;
 use core::arch::asm;
-use std::{process, slice};
+use std::process;
 
 use libafl_intelpt::{IntelPT, availability};
 use nix::{
