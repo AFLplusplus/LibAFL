@@ -11,7 +11,7 @@ build-test-bin: build
 test-helper env_var lib:
     #!/usr/bin/env bash
     echo "Running test..."
-    {{env_var}}="{{lib}}" ../../target/debug/exit_test
+    {{ env_var }}="{{ lib }}" ../../target/debug/exit_test
     CODE=$?
 
     if [ $CODE -eq 134 ]; then

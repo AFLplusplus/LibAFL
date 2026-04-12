@@ -30,7 +30,6 @@ ctor = { workspace = true }
 fishhook = "0.3"
 
 
-
 [lib]
 name = "deexit"
 crate-type = ["cdylib"]
