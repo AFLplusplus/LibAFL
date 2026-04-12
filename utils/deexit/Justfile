@@ -1,2 +1,34 @@
+build:
+    cargo build --lib
+
 doc:
     cargo doc --no-deps --all-features
+
+build-test-bin: build
+    cargo build --bin exit_test
+
+[private]
+test-helper env_var lib:
+    #!/usr/bin/env bash
+    echo "Running test..."
+    {{env_var}}="{{lib}}" ../../target/debug/exit_test
+    CODE=$?
+
+    if [ $CODE -eq 134 ]; then
+        echo "SUCCESS: Process aborted as expected (Exit code 134)"
+        exit 0
+    elif [ $CODE -eq 42 ]; then
+        echo "FAILURE: Process exited normally with code 42 (Hook failed)"
+        exit 1
+    else
+        echo "FAILURE: Process exited with unexpected code $CODE"
+        exit 1
+    fi
+
+[macos]
+test: build-test-bin
+    just test-helper DYLD_INSERT_LIBRARIES ../../target/debug/libdeexit.dylib
+
+[linux]
+test: build-test-bin
+    just test-helper LD_PRELOAD ../../target/debug/libdeexit.so

@@ -24,6 +24,12 @@ categories = [
 
 [dependencies]
 log = { workspace = true }
+ctor = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+fishhook = "0.3"
+
+
 
 [lib]
 name = "deexit"
