@@ -939,8 +939,7 @@ where
 
         if crash_count > 0 {
             return Err(Error::unknown(format!(
-                "{} child processes crashed. Reasons: {:?}",
-                crash_count, reasons
+                "{crash_count} child processes crashed. Reasons: {reasons:?}"
             )));
         }
         Ok(())
@@ -988,8 +987,7 @@ where
 
         if crash_count > 0 {
             return Err(Error::unknown(format!(
-                "{} child processes crashed. Reasons: {:?}",
-                crash_count, reasons
+                "{crash_count} child processes crashed. Reasons: {reasons:?}"
             )));
         }
         Ok(())
