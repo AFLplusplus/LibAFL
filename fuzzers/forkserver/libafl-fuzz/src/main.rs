@@ -198,7 +198,7 @@ fn main() {
         res
     };
     match res {
-        Ok(()) => unreachable!(),
+        Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
         Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
