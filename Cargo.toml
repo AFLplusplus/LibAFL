@@ -153,7 +153,7 @@ serde_yaml = { version = "0.9.34" } # For parsing the injections yaml file
 serial_test = { version = "3.2.0", default-features = false }
 static_assertions = "1.1.0"
 strum = "0.28.0"
-strum_macros = "0.27.2"
+strum_macros = "0.28.0"
 tinyinst = "0.1.1"
 toml = "0.9.10" # For parsing the injections toml file
 tuple_list = { version = "0.1.3" }
