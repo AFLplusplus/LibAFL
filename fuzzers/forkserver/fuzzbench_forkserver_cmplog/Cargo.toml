@@ -26,6 +26,5 @@ which = "6.0.3"
 libafl = { path = "../../../crates/libafl" }
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
 libafl_targets = { path = "../../../crates/libafl_targets" }
-log = { version = "0.4.22", features = ["release_max_level_info"] }
 clap = { version = "4.5.18", features = ["default"] }
 nix = { version = "0.30.1", features = ["signal"] }

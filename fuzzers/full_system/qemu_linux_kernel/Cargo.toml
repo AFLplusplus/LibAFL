@@ -39,3 +39,6 @@ log = "0.4.22"
 
 [build-dependencies]
 libafl_qemu_build = { path = "../../../crates/libafl_qemu/libafl_qemu_build" }
+
+[package.metadata.cargo-machete]
+ignored = ["log"]
