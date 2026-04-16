@@ -59,7 +59,7 @@ use core::{
 };
 
 #[cfg(feature = "rand_trait")]
-use rand_core::{RngCore, SeedableRng};
+use rand_core::{Rng, SeedableRng, TryRng};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "alloc")]
@@ -273,7 +273,7 @@ pub trait Rand {
 #[cfg(feature = "rand_trait")]
 impl<T> Rand for T
 where
-    T: RngCore + SeedableRng + Serialize + for<'de> Deserialize<'de> + Debug,
+    T: Rng + SeedableRng + Serialize + for<'de> Deserialize<'de> + Debug,
 {
     fn set_seed(&mut self, seed: u64) {
         *self = Self::seed_from_u64(seed);
@@ -333,17 +333,19 @@ impl_default_new!(Sfc64Rand);
 macro_rules! impl_rng_core {
     ($rand:ty) => {
         #[cfg(feature = "rand_trait")]
-        impl rand_core::RngCore for $rand {
-            fn next_u32(&mut self) -> u32 {
-                self.next() as u32
+        impl TryRng for $rand {
+            type Error = core::convert::Infallible;
+
+            fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+                Ok(self.next() as u32)
             }
 
-            fn next_u64(&mut self) -> u64 {
-                self.next()
+            fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+                Ok(self.next())
             }
 
-            fn fill_bytes(&mut self, dest: &mut [u8]) {
-                rand_core::impls::fill_bytes_via_next(self, dest)
+            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
+                rand_core::utils::fill_bytes_via_next_word(dest, || self.try_next_u64())
             }
         }
     };
@@ -872,24 +874,26 @@ mod tests {
     #[test]
     #[cfg(feature = "rand_trait")]
     fn test_rand_trait() {
-        use rand_core::{RngCore, SeedableRng};
+        use rand_core::{Rng, SeedableRng, TryRng};
         use serde::{Deserialize, Serialize};
 
         #[derive(Debug, Serialize, Deserialize)]
         struct CountingRng(u64);
 
-        impl RngCore for CountingRng {
-            fn next_u32(&mut self) -> u32 {
-                self.next_u64() as u32
+        impl TryRng for CountingRng {
+            type Error = core::convert::Infallible;
+
+            fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+                Ok(self.try_next_u64()? as u32)
             }
 
-            fn next_u64(&mut self) -> u64 {
+            fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
                 self.0 += 1;
-                self.0
+                Ok(self.0)
             }
 
-            fn fill_bytes(&mut self, dst: &mut [u8]) {
-                rand_core::impls::fill_bytes_via_next(self, dst);
+            fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
+                rand_core::utils::fill_bytes_via_next_word(dst, || self.try_next_u64())
             }
         }
 
@@ -901,7 +905,7 @@ mod tests {
             }
         }
 
-        // LibAFL's Rand trait is auto-implemented for all SeedableRng + RngCore types.
+        // LibAFL's Rand trait is auto-implemented for all SeedableRng + Rng types.
         assert!(CountingRng(0).coinflip(0.1));
     }
 
