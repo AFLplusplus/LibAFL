@@ -325,7 +325,7 @@ where
                 };
 
                 if hook_addrs.is_empty() {
-                    log::warn!("Injections: Function not found for {lib_name}: {name}",);
+                    log::warn!("Injections: Function not found for {lib_name}: {name}");
                 }
 
                 let param = func_definition.param;
