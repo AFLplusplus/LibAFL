@@ -24,6 +24,11 @@ mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::*;
 
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
+pub use windows::*;
+
 /// Size of a memory page
 pub const PAGE_SIZE: usize = 4096;
 
@@ -41,6 +46,7 @@ pub fn availability() -> Result<(), String> {
     let mut reasons = Vec::new();
 
     let cpuid = CpuId::new();
+
     if let Some(vendor) = cpuid.get_vendor_info() {
         if vendor.as_str() != "GenuineIntel" && vendor.as_str() != "GenuineIotel" {
             reasons.push("Only Intel CPUs are supported".to_owned());
@@ -57,11 +63,22 @@ pub fn availability() -> Result<(), String> {
         reasons.push("Failed to read CPU Extended Features".to_owned());
     }
 
+    if let Some(pti) = cpuid.get_processor_trace_info() {
+        if pti.configurable_address_ranges() == 0 {
+            reasons.push(
+                "The current CPU does not support Intel PT filtering: no address filters available"
+                    .to_owned(),
+            );
+        }
+    } else {
+        reasons.push("Failed to read CPU Processor Trace Info".to_owned());
+    }
+
     #[cfg(target_os = "linux")]
     if let Err(r) = availability_in_linux() {
         reasons.push(r);
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     reasons.push("Only linux hosts are supported at the moment".to_owned());
 
     if reasons.is_empty() {
