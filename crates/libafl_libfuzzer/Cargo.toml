@@ -25,7 +25,7 @@ include = [
 cc = "1.2.53"
 rustversion = "1.0.22"
 toml = { version = "0.9.10", features = ["preserve_order"] }
-which = "6.0.3"
+which = "8.0.2"
 libafl_build = { workspace = true }
 
 [features]

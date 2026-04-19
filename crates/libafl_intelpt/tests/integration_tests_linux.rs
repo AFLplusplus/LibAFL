@@ -1,12 +1,10 @@
 #![cfg(feature = "std")]
 #![cfg(target_os = "linux")]
 
+extern crate alloc;
+use alloc::slice;
 use core::arch::asm;
-use std::{
-    fs::File,
-    io::{Read, Seek, SeekFrom},
-    process,
-};
+use std::process;
 
 use libafl_intelpt::{IntelPT, availability};
 use nix::{
@@ -58,16 +56,13 @@ fn intel_pt_trace_fork() {
     let images = maps
         .iter()
         .filter(|map| map.is_exec() && map.filename().is_some() && map.inode != 0)
-        .map(|map| {
-            let mut file = File::open(map.filename().unwrap()).unwrap();
-            let mut data = vec![0; map.size()];
-            file.seek(SeekFrom::Start(map.offset as u64)).unwrap();
-            file.read_exact(&mut data).unwrap();
-            PtImage::new(data, map.start() as u64)
+        .map(|pm| {
+            let data = unsafe { slice::from_raw_parts(pm.start() as *const u8, pm.size()) };
+            PtImage::new(data, pm.start() as u64)
         })
         .collect::<Vec<_>>();
 
-    let pt_builder = IntelPT::builder().pid(Some(pid.as_raw())).images(images);
+    let pt_builder = IntelPT::builder().pid(Some(pid.as_raw())).images(&images);
     let mut pt = pt_builder.build().expect("Failed to create IntelPT");
     pt.enable_tracing().expect("Failed to enable tracing");
 

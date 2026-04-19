@@ -34,7 +34,5 @@ libafl_bolts = { path = "../../../crates/libafl_bolts", features = [
   "errors_backtrace",
 ] }
 libafl_nyx = { path = "../../../crates/libafl_nyx/" }
-log = { version = "0.4.20" }
-rangemap = { version = "1.5.1" }
 readonly = { version = "0.2.12" }
 typed-builder = { version = "0.20.0" }

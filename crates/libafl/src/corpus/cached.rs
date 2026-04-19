@@ -88,11 +88,12 @@ where
         self.inner.add_disabled(testcase)
     }
 
-    /// Replaces the testcase at the given idx
-    #[inline]
+    /// Replaces the testcase at `id` (same id, new testcase).
+    /// Inner save clears the in-memory input, drop `id` from `cached_indexes` so the RAM cache list matches.
     fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        // TODO finish
-        self.inner.replace(id, testcase)
+        let old = self.inner.replace(id, testcase)?;
+        self.cached_indexes.borrow_mut().retain(|e| *e != id);
+        Ok(old)
     }
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases.
@@ -291,5 +292,55 @@ impl<I> CachedOnDiskCorpus<I> {
     /// Fetch the inner corpus
     pub fn inner(&self) -> &InMemoryOnDiskCorpus<I> {
         &self.inner
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+    use std::fs;
+
+    use crate::{
+        corpus::{Corpus, HasTestcase, Testcase, cached::CachedOnDiskCorpus},
+        inputs::BytesInput,
+    };
+
+    #[test]
+    fn cached_on_disk_replace_drops_cached_index() {
+        //temporary directory
+        let mut dir = std::env::temp_dir();
+        dir.push("libafl_cached_on_disk_replace_test");
+        let _ = fs::remove_dir_all(&dir);
+
+        let mut corpus =
+            CachedOnDiskCorpus::<BytesInput>::new(&dir, 2).expect("failed to create corpus");
+
+        // Add a testcase and force it into the cache by loading its input
+        let id = corpus
+            .add(Testcase::new(BytesInput::from(vec![0x41])))
+            .expect("failed to add testcase");
+        {
+            let mut tc = corpus.testcase_mut(id).expect("failed to get testcase mut");
+            corpus
+                .load_input_into(&mut tc)
+                .expect("failed to load input into cache");
+        }
+
+        // Sanity check: the id should be marked as cached.
+        assert!(
+            corpus.cached_indexes.borrow().contains(&id),
+            "id should be present in cached_indexes before replace"
+        );
+
+        // Replace the testcase at `id`. The inner corpus clears the in-memory input,
+        // so CachedOnDiskCorpus::replace is expected to drop `id` from cached_indexes
+        let _old = corpus
+            .replace(id, Testcase::new(BytesInput::from(vec![0x42])))
+            .expect("replace should succeed");
+
+        assert!(
+            !corpus.cached_indexes.borrow().contains(&id),
+            "id must be removed from cached_indexes after replace"
+        );
     }
 }

@@ -10,8 +10,6 @@ libafl_bolts = { path = "../../../crates/libafl_bolts" }
 libafl_cc = { path = "../../../crates/libafl_cc" }
 libafl_nyx = { path = "../../../crates/libafl_nyx" }
 
-log = { version = "0.4.22", features = ["release_max_level_info"] }
-
 [profile.release]
 codegen-units = 1
 opt-level = 3
