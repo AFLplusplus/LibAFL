@@ -762,7 +762,7 @@ where
                     }
                 }
 
-                Self::wait_for_pids(&handles, self.spawn_broker);
+                Self::wait_for_pids(&handles, self.spawn_broker)?;
             }
             // This is the fork part for unix
             #[cfg(not(unix))]
@@ -892,13 +892,16 @@ where
                 spawn_mgr(&self, None, monitor)?;
             }
 
-            Self::wait_for_child_processes(&mut handles, self.spawn_broker);
+            Self::wait_for_child_processes(&mut handles, self.spawn_broker)?;
         }
-        Ok(())
+        Err(Error::shutting_down())
     }
 
     #[cfg(unix)]
-    fn wait_for_pids(handles: &[i32], spawn_broker: bool) {
+    fn wait_for_pids(handles: &[i32], spawn_broker: bool) -> Result<(), Error> {
+        let mut crash_count = 0;
+        let mut reasons = vec![];
+
         if spawn_broker {
             // Broker exited. kill all clients and wait for them to avoid zombies.
             for handle in handles {
@@ -927,13 +930,28 @@ where
                         );
                     } else {
                         log::info!("Client with pid {handle} exited with status {status}");
+                        crash_count += 1;
+                        reasons.push(format!("Exited with status {status}"));
                     }
                 }
             }
         }
+
+        if crash_count > 0 {
+            return Err(Error::unknown(format!(
+                "{crash_count} child processes crashed. Reasons: {reasons:?}"
+            )));
+        }
+        Ok(())
     }
 
-    fn wait_for_child_processes(handles: &mut [std::process::Child], spawn_broker: bool) {
+    fn wait_for_child_processes(
+        handles: &mut [std::process::Child],
+        spawn_broker: bool,
+    ) -> Result<(), Error> {
+        let mut crash_count = 0;
+        let mut reasons = vec![];
+
         if spawn_broker {
             for handle in &mut *handles {
                 let _ = handle.kill();
@@ -941,12 +959,38 @@ where
             }
         } else {
             for handle in &mut *handles {
-                let ecode = handle.wait();
-                if ecode.as_ref().is_ok_and(|e| !e.success()) {
-                    log::info!("Client with handle {handle:?} exited with {ecode:?}");
+                let ecode = handle.wait()?;
+                if !ecode.success() {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::process::ExitStatusExt;
+                        if let Some(sig) = ecode.signal() {
+                            if sig != libc::SIGINT && sig != libc::SIGTERM {
+                                crash_count += 1;
+                                reasons.push(format!("Killed by signal {sig}"));
+                            }
+                        } else if let Some(code) = ecode.code() {
+                            crash_count += 1;
+                            reasons.push(format!("Exited with code {code}"));
+                        }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        if let Some(code) = ecode.code() {
+                            crash_count += 1;
+                            reasons.push(format!("Exited with code {code}"));
+                        }
+                    }
                 }
             }
         }
+
+        if crash_count > 0 {
+            return Err(Error::unknown(format!(
+                "{crash_count} child processes crashed. Reasons: {reasons:?}"
+            )));
+        }
+        Ok(())
     }
 
     /// Launch the common broker logic
