@@ -27,7 +27,7 @@ impl UnicodeIdentificationMetadata {
     #[must_use]
     pub fn new(bytes: &[u8]) -> Self {
         Self {
-            ranges: Rc::new(extract_ranges(bytes))
+            ranges: Rc::new(extract_ranges(bytes)),
         }
     }
 
