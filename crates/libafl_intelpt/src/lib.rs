@@ -29,6 +29,9 @@ mod windows;
 #[cfg(target_os = "windows")]
 pub use windows::*;
 
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+mod utils;
+
 /// Size of a memory page
 pub const PAGE_SIZE: usize = 4096;
 

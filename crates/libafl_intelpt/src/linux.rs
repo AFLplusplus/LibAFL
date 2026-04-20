@@ -36,6 +36,7 @@ use ptcov::{PtCpu, PtCpuVendor};
 use raw_cpuid::CpuId;
 
 use super::{PAGE_SIZE, availability};
+use crate::utils::current_cpu;
 
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
@@ -107,7 +108,6 @@ impl<'a> IntelPT<'a> {
     /// Set filters based on Instruction Pointer (IP)
     ///
     /// Only instructions in `filters` ranges will be traced.
-    /// NOTE: only filters of type `AddrFilterType::FILTER` are supported.
     fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
         let str_filter = filters
             .iter()
@@ -759,18 +759,6 @@ fn smp_rmb() {
 
 const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
     ptr & (perf_aux_buffer_size as u64 - 1)
-}
-
-fn current_cpu() -> Option<PtCpu> {
-    let cpuid = CpuId::new();
-    cpuid.get_feature_info().map(|fi| {
-        PtCpu::new(
-            PtCpuVendor::Intel,
-            fi.family_id().into(),
-            fi.model_id(),
-            fi.stepping_id(),
-        )
-    })
 }
 
 #[cfg(test)]
