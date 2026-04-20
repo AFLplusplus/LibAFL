@@ -25,4 +25,4 @@ libafl = { path = "../../../crates/libafl", features = [
   "nautilus_py",
 ] }
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
-nix = { version = "0.30.1", features = ["signal"] }
+nix = { version = "0.31.2", features = ["signal"] }
