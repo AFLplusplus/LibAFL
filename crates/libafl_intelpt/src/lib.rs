@@ -78,6 +78,10 @@ pub fn availability() -> Result<(), String> {
     if let Err(r) = availability_in_linux() {
         reasons.push(r);
     }
+    #[cfg(target_os = "windows")]
+    if let Err(r) = availability_in_windows() {
+        reasons.push(r);
+    }
     #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     reasons.push("Only linux hosts are supported at the moment".to_owned());
 
