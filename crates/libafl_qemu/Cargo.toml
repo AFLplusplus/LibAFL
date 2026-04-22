@@ -132,7 +132,7 @@ num_enum = { workspace = true, default-features = true }
 goblin = "0.10.4"
 libc = { workspace = true }
 strum = "0.28.0"
-strum_macros = "0.27.2"
+strum_macros = "0.28.0"
 syscall-numbers = "4.0.2"
 meminterval = { workspace = true }
 thread_local = "1.1.9"

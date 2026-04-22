@@ -424,7 +424,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                 .artifact_prefix
                 .map(ArtifactPrefix::new)
                 .unwrap_or_default(),
-            timeout: self.timeout.unwrap_or(Duration::from_secs(1200)),
+            timeout: self.timeout.unwrap_or(Duration::from_mins(20)),
             grimoire: self.grimoire,
             use_value_profile: self.use_value_profile.unwrap_or(false),
             unicode: self.unicode.unwrap_or(true),

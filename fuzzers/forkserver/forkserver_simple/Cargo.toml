@@ -20,4 +20,4 @@ clap = { version = "4.5.18", features = ["derive"] }
 env_logger = "0.11.5"
 libafl = { path = "../../../crates/libafl", features = ["std", "derive"] }
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
-nix = { version = "0.30.1", features = ["signal"] }
+nix = { version = "0.31.2", features = ["signal"] }

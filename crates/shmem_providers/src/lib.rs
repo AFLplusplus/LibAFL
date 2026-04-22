@@ -282,7 +282,7 @@ impl Display for ShMemId {
 ///
 /// They are the backbone of `llmp` for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
-pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
+pub trait ShMem: Sized + Debug + DerefMut<Target = [u8]> {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
@@ -757,7 +757,7 @@ pub mod unix_shmem {
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
         /// Default on `MacOS` and `iOS`, where we need a central point to unmap
         /// shared mem segments for dubious Mach kernel reasons.
-        #[derive(Debug, Clone)]
+        #[derive(Debug)]
         pub struct MmapShMem {
             /// The path of this shared memory segment.
             /// None in case we didn't [`shm_open`] this ourselves, but someone sent us the FD.
@@ -1098,7 +1098,7 @@ pub mod unix_shmem {
         }
 
         /// The default sharedmap impl for unix using shmctl & shmget
-        #[derive(Debug, Clone)]
+        #[derive(Debug)]
         pub struct CommonUnixShMem {
             id: ShMemId,
             map: *mut u8,
@@ -1250,7 +1250,7 @@ pub mod unix_shmem {
         use crate::{Error, ShMem, ShMemId, ShMemProvider};
 
         /// An ashmem based impl for linux/android
-        #[derive(Debug, Clone)]
+        #[derive(Debug)]
         pub struct AshmemShMem {
             id: ShMemId,
             map: *mut u8,
@@ -1469,7 +1469,7 @@ pub mod unix_shmem {
 
         /// An memfd based impl for linux/android
         #[cfg(unix)]
-        #[derive(Debug, Clone)]
+        #[derive(Debug)]
         pub struct MemfdShMem {
             id: ShMemId,
             map: *mut u8,
@@ -1667,7 +1667,6 @@ pub mod win32_shmem {
     const INVALID_HANDLE_VALUE: *mut c_void = -1isize as *mut c_void;
 
     /// The default [`ShMem`] impl for Windows using `shmctl` & `shmget`
-    #[derive(Clone)]
     pub struct Win32ShMem {
         id: ShMemId,
         handle: HANDLE,

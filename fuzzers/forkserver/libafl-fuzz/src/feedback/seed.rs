@@ -61,15 +61,13 @@ where
     ) -> Result<bool, Error> {
         if !self.done_loading_seeds {
             match exit_kind {
-                ExitKind::Timeout => {
-                    if !self.ignore_timeouts {
-                        if !self.ignore_seed_issues || self.exit_on_seed_issues {
-                            return Err(Error::invalid_corpus(
-                                "input led to a timeout; use AFL_IGNORE_SEED_ISSUES=1",
-                            ));
-                        }
-                        return Ok(false);
+                ExitKind::Timeout if !self.ignore_timeouts => {
+                    if !self.ignore_seed_issues || self.exit_on_seed_issues {
+                        return Err(Error::invalid_corpus(
+                            "input led to a timeout; use AFL_IGNORE_SEED_ISSUES=1",
+                        ));
                     }
+                    return Ok(false);
                 }
                 ExitKind::Crash => {
                     if self.exit_on_seed_issues {
