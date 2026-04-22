@@ -20,7 +20,6 @@ use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 /// This is necessary as we don't want to keep the instrumentation around when processing the crash
 pub struct FridaHelperObserver<'a, RT, Z = BytesInputConverter> {
     #[serde(skip)]
-    // helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>,
     helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
     #[serde(skip)]
     converter: Z,
