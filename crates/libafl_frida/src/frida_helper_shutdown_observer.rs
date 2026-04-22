@@ -1,8 +1,12 @@
 use alloc::{borrow::Cow, rc::Rc};
 use core::{cell::RefCell, fmt};
 
-use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::Observer};
-use libafl_bolts::{Error, Named};
+use libafl::{
+    executors::ExitKind,
+    inputs::{BytesInputConverter, Input, ToTargetBytesConverter},
+    observers::Observer,
+};
+use libafl_bolts::{Error, Named, AsSlice};
 use serde::{
     Serialize,
     de::{self, Deserialize, Deserializer, MapAccess, Visitor},
@@ -14,62 +18,80 @@ use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[derive(Serialize, Debug)]
 /// An observer that shuts down the Frida helper upon crash
 /// This is necessary as we don't want to keep the instrumentation around when processing the crash
-pub struct FridaHelperObserver<'a, RT> {
+pub struct FridaHelperObserver<'a, RT, Z = BytesInputConverter> {
     #[serde(skip)]
     // helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>,
     helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
+    #[serde(skip)]
+    converter: Z,
 }
 
-impl<'a, RT> FridaHelperObserver<'a, RT>
+impl<'a, RT> FridaHelperObserver<'a, RT, BytesInputConverter>
 where
     RT: FridaRuntimeTuple + 'a,
 {
-    /// Creates a new [`FridaHelperObserver`] with the given name.
+    /// Creates a new FridaHelperObserver with a default byte converter
     #[must_use]
-    pub fn new(
-        // helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>,
-        helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
-    ) -> Self {
-        Self { helper }
+    pub fn new(helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>) -> Self {
+        Self {
+            helper,
+            converter: BytesInputConverter::new(),
+        }
     }
 }
 
-impl<'a, I, S, RT> Observer<I, S> for FridaHelperObserver<'a, RT>
+impl<'a, RT, Z> FridaHelperObserver<'a, RT, Z>
+where
+    RT: FridaRuntimeTuple + 'a,
+{
+    /// Creates a new FridaHelperObserver with a custom converter
+    #[must_use]
+    pub fn with_converter(
+        helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
+        converter: Z,
+    ) -> Self {
+        Self { helper, converter }
+    }
+}
+
+impl<'a, I, S, RT, Z> Observer<I, S> for FridaHelperObserver<'a, RT, Z>
 where
     // S: UsesInput,
     // S::Input: HasTargetBytes,
     RT: FridaRuntimeTuple + 'a,
-    I: HasTargetBytes,
+    I: Input,
+    Z: ToTargetBytesConverter<I, S>,
 {
-    fn post_exec(&mut self, _state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         if *exit_kind == ExitKind::Crash {
             // Custom implementation logic for `FridaInProcessExecutor`
             log::error!("Custom post_exec called for FridaInProcessExecutorHelper");
             // Add any custom logic specific to FridaInProcessExecutor
-            return self.helper.borrow_mut().post_exec(&input.target_bytes());
+            let target_bytes = self.converter.convert_to_target_bytes(state, input);
+            return self.helper.borrow_mut().post_exec(target_bytes.as_slice());
         }
         Ok(())
     }
 }
 
-impl<RT> Named for FridaHelperObserver<'_, RT> {
+impl<RT, Z> Named for FridaHelperObserver<'_, RT, Z> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("FridaHelperObserver");
         &NAME
     }
 }
 
-impl<'de, RT> Deserialize<'de> for FridaHelperObserver<'_, RT> {
+impl<'de, RT, Z> Deserialize<'de> for FridaHelperObserver<'_, RT, Z> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct FridaHelperObserverVisitor<'a, RT> {
-            phantom: core::marker::PhantomData<&'a RT>,
+        struct FridaHelperObserverVisitor<'a, RT, Z> {
+            phantom: core::marker::PhantomData<(&'a RT, Z)>,
         }
 
-        impl<'de, 'a, RT> Visitor<'de> for FridaHelperObserverVisitor<'a, RT> {
-            type Value = FridaHelperObserver<'a, RT>;
+        impl<'de, 'a, RT, Z> Visitor<'de> for FridaHelperObserverVisitor<'a, RT, Z> {
+            type Value = FridaHelperObserver<'a, RT, Z>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a FridaHelperObserver struct")
