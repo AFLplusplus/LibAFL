@@ -58,8 +58,9 @@ impl<'a, I, S, RT, Z> Observer<I, S> for FridaHelperObserver<'a, RT, Z>
 where
     // S: UsesInput,
     // S::Input: HasTargetBytes,
-    RT: FridaRuntimeTuple + 'a,
+    
     I: Input,
+    RT: FridaRuntimeTuple + 'a,
     Z: ToTargetBytesConverter<I, S>,
 {
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
