@@ -1,26 +1,38 @@
 #![allow(dead_code)] // todo remove
 #![allow(unused_imports)] // todo remove
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::ptr;
-use std::{io, prelude::rust_2015::String};
-use std::ops::RangeInclusive;
+use std::{io, mem::MaybeUninit, ops::RangeInclusive};
+
 pub use ptcov::PtCoverageDecoder;
 use ptcov::{PtCoverageDecoderBuilder, PtImage};
 use raw_cpuid::CpuId;
-use windows_sys::Win32::{
-    Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE},
-    Storage::FileSystem::{
-        CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_FLAG_NO_BUFFERING, FILE_FLAG_SEQUENTIAL_SCAN,
-        FILE_GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
+use windows::{
+    Win32::{
+        Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE},
+        Storage::FileSystem::{
+            CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_FLAG_NO_BUFFERING, FILE_FLAG_SEQUENTIAL_SCAN,
+            FILE_GENERIC_READ, FILE_SHARE_MODE, FILE_SHARE_READ, OPEN_EXISTING,
+        },
+        System::{
+            IO::DeviceIoControl,
+            Threading::{GetCurrentThreadId, OpenThread, THREAD_GET_CONTEXT},
+        },
     },
+    core::{HSTRING, w},
 };
-use libafl_bolts::Error;
+
 use crate::utils::current_cpu;
+
+#[repr(u32)]
+enum IptIoctl {
+    Request = 0x220004,
+}
 
 #[derive(Debug)]
 #[repr(u32)]
-pub enum IptInputType {
+enum IptInputType {
     GetTraceVersion = 0,
     GetProcessTraceSize,
     GetProcessTrace,
@@ -38,12 +50,20 @@ pub enum IptInputType {
     QueryThreadTraceStopRangeEntered,
 }
 
+#[repr(u32)]
+#[derive(Debug, Clone, Copy)]
+enum IptFilterRangeSettings {
+    IptFilterRangeDisable = 0,
+    IptFilterRangeIp = 1,
+    IptFilterRangeTraceStop = 2,
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct ConfigureThreadAddressFilterRange {
     thread_handle: u64,
     range_index: u32,
-    range_config: u32,
+    range_config: IptFilterRangeSettings,
     start_address: u64,
     end_address: u64,
 }
@@ -51,12 +71,13 @@ struct ConfigureThreadAddressFilterRange {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct IptBufferVersion {
-    buffer_major_version: u32,
-    buffer_minor_version: u32,
+    major: u32,
+    minor: u32,
 }
+const IPT_BUFFER_VERSION: IptBufferVersion = IptBufferVersion { major: 1, minor: 0 };
 
 #[repr(C)]
-union IptInputUnion {
+union IptInputPayload {
     // get_trace_size: GetProcessTraceSize,
     // get_trace: GetProcessTrace,
     // start_trace: StartProcessTrace,
@@ -67,19 +88,48 @@ union IptInputUnion {
     _pad: [u8; 32],
 }
 
+impl From<ConfigureThreadAddressFilterRange> for IptInputPayload {
+    fn from(value: ConfigureThreadAddressFilterRange) -> Self {
+        Self {
+            configure_thread_address_filter_range: value,
+        }
+    }
+}
+
 #[repr(C)]
-pub struct IptInputBuffer {
+struct IptInputBuffer {
     version: IptBufferVersion,
     input_type: IptInputType,
     _padding: u32,
-    u: IptInputUnion,
+    payload: IptInputPayload,
+}
+
+impl IptInputBuffer {
+    fn new(input_type: IptInputType, payload: IptInputPayload) -> Self {
+        IptInputBuffer {
+            version: IPT_BUFFER_VERSION,
+            input_type,
+            _padding: 0,
+            payload,
+        }
+    }
+}
+
+#[repr(C)]
+union IptOutputBuffer {
+    // pub get_trace_version: OutGetTraceVersion,
+    // pub get_trace_size: OutGetTraceSize,
+    // pub query_filter: OutQueryThreadFilter,
+    // pub pause_trace: OutPauseResumeTrace,
+    // pub resume_trace: OutPauseResumeTrace,
+    _pad: [u8; 24],
 }
 
 /// Intel Processor Trace (PT)
 #[derive(Debug)]
 pub struct IntelPT<'a> {
     ipt_handle: PtHandle,
-
+    target_thread_handle: PtHandle,
     // previous_decode_head: u64,
     ptcov_decoder: PtCoverageDecoder<'a>,
     #[cfg(feature = "export_raw")]
@@ -95,32 +145,98 @@ impl<'a> IntelPT<'a> {
         IntelPTBuilder::default()
     }
 
-    // /// Set filters based on Instruction Pointer (IP)
-    // ///
-    // /// Only instructions in `filters` ranges will be traced.
-    // fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
-    //     Ok(())
-    // }
+    /// Set filters based on Instruction Pointer (IP)
+    ///
+    /// Only instructions in `filters` ranges will be traced.
+    fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> windows::core::Result<()> {
+        for (i, filter) in filters.iter().enumerate() {
+            let ipt_payload = ConfigureThreadAddressFilterRange {
+                thread_handle: 0, // todo
+                range_index: i.try_into()?,
+                range_config: IptFilterRangeSettings::IptFilterRangeIp,
+                start_address: *filter.start(),
+                end_address: *filter.end(),
+            };
+            let input = IptInputBuffer::new(
+                IptInputType::ConfigureThreadAddressFilterRange,
+                ipt_payload.into(),
+            );
+
+            let mut out = MaybeUninit::<IptOutputBuffer>::uninit();
+            let mut out_size = 0;
+            unsafe {
+                DeviceIoControl(
+                    self.ipt_handle.inner,
+                    IptIoctl::Request as u32,
+                    Some(&raw const input as *const std::ffi::c_void),
+                    size_of::<IptInputBuffer>() as u32,
+                    Some(out.as_mut_ptr() as *mut std::ffi::c_void),
+                    size_of::<IptOutputBuffer>() as u32,
+                    Some(&mut out_size),
+                    None,
+                )
+            }?;
+        }
+        Ok(())
+    }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct IntelPTBuilder<'a> {
+    ip_filters: Vec<RangeInclusive<u64>>,
     images: &'a [PtImage<'a>],
+    target_thread_id: u32,
+}
+
+impl Default for IntelPTBuilder<'_> {
+    fn default() -> Self {
+        let target_thread_id = unsafe { GetCurrentThreadId() };
+        Self {
+            ip_filters: Vec::new(),
+            images: &[],
+            target_thread_id,
+        }
+    }
 }
 
 impl<'a> IntelPTBuilder<'a> {
-    pub fn build(self) -> io::Result<IntelPT<'a>> {
+    pub fn build(self) -> Result<IntelPT<'a>, libafl_bolts::Error> {
         let ipt_handle = open_ipt_handle()?;
+
+        let target_thread_handle =
+            unsafe { OpenThread(THREAD_GET_CONTEXT, false, self.target_thread_id) }
+                .map(|h| PtHandle { inner: h })
+                .map_err(|e| {
+                    libafl_bolts::Error::os_error(e.into(), "Failed to get target thread handle")
+                })?;
 
         let ptcov_decoder = PtCoverageDecoderBuilder::new()
             .cpu(current_cpu())
             .images(self.images)
             .build();
 
-        Ok(IntelPT {
+        let mut intel_pt = IntelPT {
             ipt_handle,
+            target_thread_handle,
             ptcov_decoder,
-        })
+        };
+        intel_pt.set_ip_filters(&self.ip_filters).map_err(|e| {
+            libafl_bolts::Error::os_error(e.into(), "Failed to set IntelPT ip filters")
+        })?;
+        Ok(intel_pt)
+    }
+
+    #[must_use]
+    pub fn thread_id(mut self, thread_id: u32) -> Self {
+        self.target_thread_id = thread_id;
+        self
+    }
+
+    #[must_use]
+    /// Set filters based on Instruction Pointer (IP)
+    pub fn ip_filters(mut self, filters: Vec<RangeInclusive<u64>>) -> Self {
+        self.ip_filters = filters;
+        self
     }
 
     #[must_use]
@@ -137,9 +253,8 @@ struct PtHandle {
 
 impl Drop for PtHandle {
     fn drop(&mut self) {
-        if unsafe { CloseHandle(self.inner) } == 0 {
-            let err = io::Error::last_os_error();
-            panic!("Failed to close ipt handle: {}", err);
+        if let Err(err) = unsafe { CloseHandle(self.inner) } {
+            panic!("Failed to close handle: {}", err);
         }
     }
 }
@@ -171,32 +286,26 @@ fn nr_addr_filters() -> Result<u8, &'static str> {
         .map(|pti| pti.configurable_address_ranges())
 }
 
-fn open_ipt_handle() -> io::Result<PtHandle> {
-    let ipt_path: Vec<u16> = "\\??\\IPT\0".encode_utf16().collect();
+fn open_ipt_handle() -> windows::core::Result<PtHandle> {
+    let ipt_path = w!("\\??\\IPT\0");
 
-    let handle = unsafe {
+    unsafe {
         CreateFileW(
-            ipt_path.as_ptr(),
-            FILE_GENERIC_READ,
+            ipt_path,
+            FILE_GENERIC_READ.0,
             FILE_SHARE_READ,
-            ptr::null(),
+            None,
             OPEN_EXISTING,
             FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN | FILE_FLAG_NO_BUFFERING,
-            ptr::null_mut(),
+            None,
         )
-    };
-
-    if handle == INVALID_HANDLE_VALUE {
-        let err = io::Error::last_os_error();
-        return Err(err);
     }
-
-    Ok(PtHandle { inner: handle })
+    .map(|h| PtHandle { inner: h })
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::*;
+    use super::*;
 
     #[test]
     fn ipt_input_buffer_size() {
