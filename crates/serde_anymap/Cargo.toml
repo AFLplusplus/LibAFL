@@ -37,12 +37,12 @@ serdeany_autoreg = ["ctor"]
 rustversion = { workspace = true }
 
 [dev-dependencies]
+serde_json = { workspace = true, features = ["std"] }
 
 [dependencies]
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
 
-ahash = { workspace = true }
 ctor = { workspace = true, optional = true }
 erased-serde = { workspace = true, default-features = false, features = [
   "alloc",

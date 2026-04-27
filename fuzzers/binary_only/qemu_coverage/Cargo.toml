@@ -27,7 +27,7 @@ ppc = ["libafl_qemu/ppc", "be"]
 
 [build-dependencies]
 vergen = { version = "9.0.1", features = ["build", "cargo", "rustc", "si"] }
-vergen-git2 = "1.0.1"
+vergen-git2 = "9.0.1"
 
 [dependencies]
 clap = { version = "4.5.18", features = ["derive", "string"] }
@@ -37,5 +37,4 @@ libafl_bolts = { path = "../../../crates/libafl_bolts" }
 libafl_qemu = { path = "../../../crates/libafl_qemu", features = ["usermode"] }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 mimalloc = "0.1.48"
-rangemap = { version = "1.5.1" }
 scudo = "0.1.3"

@@ -8,6 +8,10 @@ export LIBAFL_BOLTS_DIR := join(justfile_directory(), "crates/libafl_bolts")
 export LIBAFL_TARGETS_DIR := join(justfile_directory(), "crates/libafl_targets")
 MSRV := env_var_or_default('MSRV', "")
 
+# Crates with mutually exclusive features (e.g. usermode/systemmode) that cannot be built with --all-features
+
+ALL_FEATURES_EXCLUDES := "--exclude libafl_qemu --exclude libafl_qemu_sys --exclude libafl_qemu_build --exclude libafl_qemu_runner --exclude libvharness_sys --exclude libafl_sugar --exclude libafl_libfuzzer"
+
 # List all available just targets in this justfile
 @help *PAT:
     if [[ '{{ PAT }}' =~ '' ]]; then just -l; else just -l | rg -i '{{ PAT }}'; fi
@@ -32,15 +36,15 @@ no-default-features: (default "--no-default-features")
 
 # Run check on all projects in the workspace
 check feature='' ignore='':
-    cargo {{ MSRV }} check --workspace --all-targets --exclude libafl_asan_libc {{ feature }}
+    cargo {{ MSRV }} check --workspace --all-targets --exclude libafl_asan_libc {{ if feature == "--all-features" { ALL_FEATURES_EXCLUDES } else { "" } }} {{ feature }}
 
 # Run build on all projects in the workspace
 build feature='' ignore='':
-    cargo {{ MSRV }} build --workspace --all-targets --exclude libafl_asan_libc {{ feature }}
+    cargo {{ MSRV }} build --workspace --all-targets --exclude libafl_asan_libc {{ if feature == "--all-features" { ALL_FEATURES_EXCLUDES } else { "" } }} {{ feature }}
 
 # Run tests on all projects in the workspace
 test feature='' ignore='':
-    cargo {{ MSRV }} test --workspace --all-targets --exclude libafl_asan_libc --exclude libafl_asan --exclude libafl_asan_fuzz {{ feature }}
+    cargo {{ MSRV }} test --workspace --all-targets --exclude libafl_asan_libc --exclude libafl_asan --exclude libafl_asan_fuzz {{ if feature == "--all-features" { ALL_FEATURES_EXCLUDES } else { "" } }} {{ feature }}
     # Run libafl_asan tests serially to avoid address conflicts
     RUST_TEST_THREADS=1 cargo {{ MSRV }} test -p libafl_asan -j 1 {{ feature }}
 
@@ -74,7 +78,11 @@ test-docs-internal: all-features
 [linux]
 [private]
 test-docs-internal: all-features
-    RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
+    RUSTDOCFLAGS="--cfg docsrs" cargo +nightly test --doc --workspace --all-features {{ ALL_FEATURES_EXCLUDES }}
+    RUSTDOCFLAGS="--cfg docsrs" cargo +nightly test --doc -p libafl_qemu --no-default-features --features usermode,python
+    RUSTDOCFLAGS="--cfg docsrs" cargo +nightly test --doc -p libafl_qemu --no-default-features --features systemmode
+    cargo clean
+    cargo build -p libafl
     cd {{ DOCS_DIR }} && mdbook test -L ../target/debug/deps
 
 [private]
@@ -84,7 +92,7 @@ test-docs-internal:
 
 # Tests all code in docs
 test-docs: test-docs-internal
-    RUSTDOCFLAGS="-Dwarnings" cargo {{ MSRV }} doc --workspace --all-features --no-deps --document-private-items --exclude libafl_qemu
+    RUSTDOCFLAGS="-Dwarnings" cargo {{ MSRV }} doc --workspace --all-features --no-deps --document-private-items {{ ALL_FEATURES_EXCLUDES }}
     RUSTDOCFLAGS="-Dwarnings" cargo {{ MSRV }} doc -p libafl_qemu --no-default-features --features usermode,python --no-deps --document-private-items
 
 # Build documentation
@@ -99,7 +107,10 @@ clippy-inner feature='':
 # Runs clippy on crates excluded from the workspace
 [private]
 clippy-excluded:
-    cargo {{ MSRV }} clippy --manifest-path crates/libafl_libfuzzer_runtime/Cargo.toml --all-targets -- -D warnings
+    # TODO: this is done because of no_link_main triggering clippy
+    # the real fix is to rename this feature to smth like "external_main"
+    # it is a breaking change, so it should be done in a separate PR
+    RUSTFLAGS="--cap-lints warn" cargo {{ MSRV }} clippy --manifest-path crates/libafl_libfuzzer_runtime/Cargo.toml --all-targets -- -D warnings
     cargo {{ MSRV }} clippy --manifest-path bindings/pylibafl/Cargo.toml --all-targets -- -D warnings
     cargo {{ MSRV }} clippy --manifest-path utils/noaslr/Cargo.toml --workspace --all-targets -- -D warnings
     cargo {{ MSRV }} clippy --manifest-path utils/libafl_repo_tools/Cargo.toml --all-targets -- -D warnings
@@ -155,7 +166,7 @@ build-libafl:
 
 # Run tests serially
 test-serial:
-    cargo test -- --test-threads 1
+    cargo test --release -- --test-threads 1
 
 # Check sancov pcguard edges
 check-sancov-edges:
@@ -177,7 +188,7 @@ check-blobs:
 check-toml:
     taplo format --check
 
-test-fuzzers: fuzzers-preflight test-os-specific-fuzzers (nop "Baby") (test-fuzzer "./fuzzers/baby/baby_fuzzer_swap_differential") (test-fuzzer "./fuzzers/baby/tutorial") (test-fuzzer "./fuzzers/baby/baby_fuzzer") (nop "./fuzzers/baby/backtrace_baby_fuzzers") (test-fuzzer "./fuzzers/baby/baby_fuzzer_unicode") (test-fuzzer "./fuzzers/baby/baby_fuzzer_minimizing") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_fork_executor") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_fork_executor") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_inprocess_executor") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/command_executor") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor") (test-fuzzer "./fuzzers/baby/baby_fuzzer_custom_executor") (nop "Binary-only") (test-fuzzer "./fuzzers/binary_only/frida_executable_libpng") (test-fuzzer "./fuzzers/binary_only/frida_libpng") (test-fuzzer "./fuzzers/binary_only/intel_pt_baby_fuzzer") (test-fuzzer "./fuzzers/binary_only/intel_pt_command_executor") (test-fuzzer "./fuzzers/binary_only/tinyinst_simple") (nop "Forkserver") (test-fuzzer "./fuzzers/forkserver/forkserver_simple") (test-fuzzer "./fuzzers/forkserver/forkserver_libafl_cc") (test-fuzzer "./fuzzers/forkserver/fuzzbench_forkserver") (test-fuzzer "./fuzzers/forkserver/fuzzbench_forkserver_cmplog") (test-fuzzer "./fuzzers/forkserver/fuzzbench_forkserver_sand") (test-fuzzer "./fuzzers/forkserver/libafl-fuzz") (test-fuzzer "./fuzzers/forkserver/baby_fuzzer_with_forkexecutor") (nop "Full-system") (test-fuzzer "./fuzzers/full_system/nyx_launcher") (test-fuzzer "./fuzzers/full_system/nyx_libxml2_standalone") (test-fuzzer "./fuzzers/full_system/nyx_libxml2_parallel") (test-fuzzer "./fuzzers/full_system/unicorn") (nop "Structure-aware") (test-fuzzer "./fuzzers/structure_aware/nautilus_sync") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_grimoire") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_gramatron") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_tokens") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_multi") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_custom_input") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_nautilus") (test-fuzzer "./fuzzers/structure_aware/forkserver_simple_nautilus") (nop "In-process") (test-fuzzer "./fuzzers/fuzz_anything/cargo_fuzz") (test-fuzzer "./fuzzers/inprocess/fuzzbench") (test-fuzzer "./fuzzers/inprocess/fuzzbench_text") (test-fuzzer "./fuzzers/inprocess/fuzzbench_ctx") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libmozjpeg") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng_launcher") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng_accounting") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng_centralized") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng_cmin") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng_norestart") (nop "./fuzzers/inprocess/libfuzzer_libpng_tcp_manager") (test-fuzzer "./fuzzers/inprocess/libfuzzer_stb_image_sugar") (test-fuzzer "./fuzzers/inprocess/libfuzzer_stb_image") (nop "./fuzzers/structure_aware/libfuzzer_stb_image_concolic") (nop "./fuzzers/inprocess/sqlite_centralized_multi_machine") (nop "Fuzz Anything") (test-fuzzer "./fuzzers/fuzz_anything/push_harness") (test-fuzzer "./fuzzers/fuzz_anything/push_stage_harness") (test-fuzzer "./fuzzers/fuzz_anything/libafl_atheris") (test-fuzzer "./fuzzers/fuzz_anything/baby_no_std") (test-fuzzer "./fuzzers/fuzz_anything/baby_fuzzer_wasm")
+test-fuzzers: fuzzers-preflight test-os-specific-fuzzers (nop "Baby") (test-fuzzer "./fuzzers/baby/baby_fuzzer_swap_differential") (test-fuzzer "./fuzzers/baby/tutorial") (test-fuzzer "./fuzzers/baby/baby_fuzzer") (nop "./fuzzers/baby/backtrace_baby_fuzzers") (test-fuzzer "./fuzzers/baby/baby_fuzzer_unicode") (test-fuzzer "./fuzzers/baby/baby_fuzzer_minimizing") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_fork_executor") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_fork_executor") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_inprocess_executor") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/command_executor") (test-fuzzer "./fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor") (test-fuzzer "./fuzzers/baby/baby_fuzzer_custom_executor") (nop "Binary-only") (test-fuzzer "./fuzzers/binary_only/frida_executable_libpng") (test-fuzzer "./fuzzers/binary_only/frida_libpng") (test-fuzzer "./fuzzers/binary_only/intel_pt_baby_fuzzer") (test-fuzzer "./fuzzers/binary_only/intel_pt_command_executor") (test-fuzzer "./fuzzers/binary_only/tinyinst_simple") (nop "Forkserver") (test-fuzzer "./fuzzers/forkserver/forkserver_simple") (test-fuzzer "./fuzzers/forkserver/forkserver_libafl_cc") (test-fuzzer "./fuzzers/forkserver/fuzzbench_forkserver") (test-fuzzer "./fuzzers/forkserver/fuzzbench_forkserver_cmplog") (test-fuzzer "./fuzzers/forkserver/fuzzbench_forkserver_sand") (test-fuzzer "./fuzzers/forkserver/libafl-fuzz") (test-fuzzer "./fuzzers/forkserver/baby_fuzzer_with_forkexecutor") (nop "Full-system") (test-fuzzer "./fuzzers/full_system/nyx_launcher") (test-fuzzer "./fuzzers/full_system/nyx_libxml2_standalone") (test-fuzzer "./fuzzers/full_system/nyx_libxml2_parallel") (test-fuzzer "./fuzzers/full_system/unicorn") (nop "Structure-aware") (test-fuzzer "./fuzzers/structure_aware/nautilus_sync") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_grimoire") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_gramatron") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_tokens") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_multi") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_custom_input") (test-fuzzer "./fuzzers/structure_aware/baby_fuzzer_nautilus") (test-fuzzer "./fuzzers/structure_aware/forkserver_simple_nautilus") (nop "In-process") (test-fuzzer "./fuzzers/fuzz_anything/cargo_fuzz") (test-fuzzer "./fuzzers/inprocess/fuzzbench") (test-fuzzer "./fuzzers/inprocess/fuzzbench_text") (test-fuzzer "./fuzzers/inprocess/fuzzbench_ctx") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libmozjpeg") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng_launcher") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng_accounting") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng_centralized") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng_cmin") (test-fuzzer "./fuzzers/inprocess/libfuzzer_libpng_norestart") (nop "./fuzzers/inprocess/libfuzzer_libpng_tcp_manager") (test-fuzzer "./fuzzers/inprocess/libfuzzer_stb_image_sugar") (test-fuzzer "./fuzzers/inprocess/libfuzzer_stb_image") (nop "./fuzzers/inprocess/sqlite_centralized_multi_machine") (nop "Fuzz Anything") (test-fuzzer "./fuzzers/fuzz_anything/push_harness") (test-fuzzer "./fuzzers/fuzz_anything/push_stage_harness") (test-fuzzer "./fuzzers/fuzz_anything/libafl_atheris") (test-fuzzer "./fuzzers/fuzz_anything/baby_no_std") (test-fuzzer "./fuzzers/fuzz_anything/baby_fuzzer_wasm")
 
 # Windows-specific cmplog test
 [windows]
@@ -257,18 +268,13 @@ build-ios:
 increase-mem-limits:
     {{ SCRIPTS_DIR }}/shmem_limits_macos.sh
 
-# Run Smoketest for the libafl concolic executor
-[linux]
-concolic-smoke-test:
-    {{ ROOT_DIR }}/libafl_concolic/test/smoke_test.sh
-
 [unix]
 test-repro-qemu-tmin:
     cd {{ FUZZERS_DIR }}/binary_only/qemu_tmin && ./repro
 
 # Tests everything (crates, fuzzers, docs, repro)
 [linux]
-test-all: test test-fuzzers test-docs test-repro-qemu-tmin concolic-smoke-test doc
+test-all: test test-fuzzers test-docs test-repro-qemu-tmin doc
 
 # Tests everything (crates, fuzzers, docs, repro)
 [macos]

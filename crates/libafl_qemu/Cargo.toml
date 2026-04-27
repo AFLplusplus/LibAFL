@@ -131,8 +131,8 @@ num-traits = { workspace = true, default-features = true }
 num_enum = { workspace = true, default-features = true }
 goblin = "0.10.4"
 libc = { workspace = true }
-strum = "0.27.2"
-strum_macros = "0.27.2"
+strum = "0.28.0"
+strum_macros = "0.28.0"
 syscall-numbers = "4.0.2"
 meminterval = { workspace = true }
 thread_local = "1.1.9"
@@ -140,13 +140,12 @@ capstone = "0.14.0"
 rangemap = { workspace = true }
 log = { workspace = true }
 object = "0.38.0"
-addr2line = "0.25.0"
+addr2line = "0.26.1"
 paste = { workspace = true }
 enum-map = "2.7.3"
 serde_yaml = { workspace = true, optional = true } # For parsing the injections yaml file
 toml = { workspace = true, optional = true } # For parsing the injections toml file
 pyo3 = { workspace = true, optional = true, features = ["multiple-pymethods"] }
-bytes-utils = "0.1.4"
 typed-builder = { workspace = true }
 getset = "0.1.6"
 libvharness_sys = { workspace = true }

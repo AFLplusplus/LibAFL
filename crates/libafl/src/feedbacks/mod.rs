@@ -8,8 +8,6 @@ use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use core::{fmt::Debug, marker::PhantomData};
 
-#[cfg(feature = "std")]
-pub use concolic::ConcolicFeedback;
 pub use differential::DiffFeedback;
 use libafl_bolts::{
     Named,
@@ -33,8 +31,6 @@ pub mod capture_feedback;
 pub mod bool;
 pub use bool::BoolValueFeedback;
 
-#[cfg(feature = "std")]
-pub mod concolic;
 #[cfg(feature = "std")]
 /// The module for `CustomFilenameToTestcaseFeedback`
 pub mod custom_filename;

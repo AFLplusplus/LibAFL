@@ -656,24 +656,19 @@ impl TuiUi {
         match c {
             'q' => self.should_quit = true,
             'r' => self.should_refresh = true,
-            'g' => {
-                if !self.tabs.is_empty() {
-                    self.charts_tab_idx = (self.charts_tab_idx + 1) % self.tabs.len();
-                    // In wide mode, index 0 (Overview) and index 1 (First Chart) show the same thing on the right pane.
-                    // So we skip 0 to prevent "double press" feeling.
-                    if !self.is_narrow && self.charts_tab_idx == 0 && self.tabs.len() > 1 {
-                        self.charts_tab_idx = 1;
-                    }
+            'g' if !self.tabs.is_empty() => {
+                self.charts_tab_idx = (self.charts_tab_idx + 1) % self.tabs.len();
+                // In wide mode, index 0 (Overview) and index 1 (First Chart) show the same thing on the right pane.
+                // So we skip 0 to prevent "double press" feeling.
+                if !self.is_narrow && self.charts_tab_idx == 0 && self.tabs.len() > 1 {
+                    self.charts_tab_idx = 1;
                 }
             }
-            'G' => {
-                if !self.tabs.is_empty() {
-                    self.charts_tab_idx =
-                        (self.charts_tab_idx + self.tabs.len() - 1) % self.tabs.len();
-                    // In wide mode, skip 0 when going backwards too
-                    if !self.is_narrow && self.charts_tab_idx == 0 && self.tabs.len() > 1 {
-                        self.charts_tab_idx = self.tabs.len() - 1;
-                    }
+            'G' if !self.tabs.is_empty() => {
+                self.charts_tab_idx = (self.charts_tab_idx + self.tabs.len() - 1) % self.tabs.len();
+                // In wide mode, skip 0 when going backwards too
+                if !self.is_narrow && self.charts_tab_idx == 0 && self.tabs.len() > 1 {
+                    self.charts_tab_idx = self.tabs.len() - 1;
                 }
             }
             't' => {

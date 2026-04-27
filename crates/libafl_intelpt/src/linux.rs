@@ -81,7 +81,7 @@ pub enum KvmPTMode {
 
 /// Intel Processor Trace (PT)
 #[derive(Debug)]
-pub struct IntelPT {
+pub struct IntelPT<'a> {
     fd: OwnedFd,
     perf_buffer: *mut c_void,
     perf_aux_buffer: *mut c_void,
@@ -90,17 +90,17 @@ pub struct IntelPT {
     aux_head: *mut u64,
     aux_tail: *mut u64,
     previous_decode_head: u64,
-    ptcov_decoder: PtCoverageDecoder,
+    ptcov_decoder: PtCoverageDecoder<'a>,
     #[cfg(feature = "export_raw")]
     last_decode_trace: Vec<u8>,
 }
 
-impl IntelPT {
+impl<'a> IntelPT<'a> {
     /// Create a default builder
     ///
     /// Checkout [`IntelPTBuilder::default()`] for more details
     #[must_use]
-    pub fn builder() -> IntelPTBuilder {
+    pub fn builder() -> IntelPTBuilder<'a> {
         IntelPTBuilder::default()
     }
 
@@ -313,7 +313,7 @@ impl IntelPT {
     }
 }
 
-impl Drop for IntelPT {
+impl Drop for IntelPT<'_> {
     fn drop(&mut self) {
         unsafe {
             let ret = libc::munmap(self.perf_aux_buffer, self.perf_aux_buffer_size);
@@ -326,7 +326,7 @@ impl Drop for IntelPT {
 
 /// Builder for [`IntelPT`]
 #[derive(Debug, Clone, PartialEq)]
-pub struct IntelPTBuilder {
+pub struct IntelPTBuilder<'a> {
     pid: Option<i32>,
     cpu: i32,
     exclude_kernel: bool,
@@ -335,10 +335,10 @@ pub struct IntelPTBuilder {
     perf_buffer_size: usize,
     perf_aux_buffer_size: usize,
     ip_filters: Vec<RangeInclusive<u64>>,
-    images: Vec<PtImage>,
+    images: &'a [PtImage<'a>],
 }
 
-impl Default for IntelPTBuilder {
+impl Default for IntelPTBuilder<'_> {
     /// Create a default builder for [`IntelPT`]
     ///
     /// The default configuration corresponds to:
@@ -354,7 +354,7 @@ impl Default for IntelPTBuilder {
     ///     .unwrap()
     ///     .perf_aux_buffer_size(16 * 1024 * 1024)
     ///     .unwrap()
-    ///     .images(Vec::new())
+    ///     .images(&[])
     ///     .ip_filters(Default::default());
     /// assert_eq!(builder, IntelPTBuilder::default());
     /// ```
@@ -368,14 +368,14 @@ impl Default for IntelPTBuilder {
             perf_buffer_size: 128 * PAGE_SIZE + PAGE_SIZE,
             perf_aux_buffer_size: 16 * 1024 * 1024,
             ip_filters: Vec::new(),
-            images: Vec::new(),
+            images: &[],
         }
     }
 }
 
-impl IntelPTBuilder {
+impl<'a> IntelPTBuilder<'a> {
     /// Build the [`IntelPT`] struct
-    pub fn build(self) -> Result<IntelPT, Error> {
+    pub fn build(self) -> Result<IntelPT<'a>, Error> {
         self.check_config();
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
         perf_event_attr.set_exclude_kernel(self.exclude_kernel.into());
@@ -435,8 +435,7 @@ impl IntelPTBuilder {
             .cpu(current_cpu())
             .filter_vmx_non_root(self.exclude_hv)
             .images(self.images)
-            .build()
-            .unwrap();
+            .build();
 
         let mut intel_pt = IntelPT {
             fd,
@@ -554,7 +553,7 @@ impl IntelPTBuilder {
     }
 
     #[must_use]
-    pub fn images(mut self, images: Vec<PtImage>) -> Self {
+    pub fn images(mut self, images: &'a [PtImage<'_>]) -> Self {
         self.images = images;
         self
     }
@@ -776,9 +775,22 @@ fn current_cpu() -> Option<PtCpu> {
 
 #[cfg(test)]
 mod test {
+    use std::path::PathBuf;
+
     use arbitrary_int::prelude::*;
 
     use super::*;
+
+    fn get_intel_pt() -> Option<PathBuf> {
+        let intel_pt = PathBuf::from(PT_EVENT_PATH);
+
+        if intel_pt.exists() {
+            Some(intel_pt)
+        } else {
+            None
+        }
+    }
+
     #[test]
     fn intel_pt_builder_default_values_are_valid() {
         let default = IntelPT::builder();
@@ -792,48 +804,57 @@ mod test {
 
     #[test]
     fn intel_pt_pt_config_noretcomp_format() {
-        let ptconfig_noretcomp = PtConfig::DEFAULT.with_noretcomp(true).raw_value;
-        let path = format!("{PT_EVENT_PATH}/format/noretcomp");
-        let s = fs::read_to_string(&path).expect("Failed to read Intel PT config noretcomp format");
-        assert!(
-            s.starts_with("config:"),
-            "Unexpected Intel PT config noretcomp format"
-        );
-        let bit = s["config:".len()..]
-            .trim()
-            .parse::<u32>()
-            .expect("Failed to parse Intel PT config noretcomp format");
-        assert_eq!(
-            ptconfig_noretcomp,
-            0b1 << bit,
-            "Unexpected Intel PT config noretcomp format"
-        );
+        if let Some(pt_path) = get_intel_pt() {
+            let ptconfig_noretcomp = PtConfig::DEFAULT.with_noretcomp(true).raw_value;
+            let path = pt_path.join("format/noretcomp");
+            let s =
+                fs::read_to_string(&path).expect("Failed to read Intel PT config noretcomp format");
+            assert!(
+                s.starts_with("config:"),
+                "Unexpected Intel PT config noretcomp format"
+            );
+            let bit = s["config:".len()..]
+                .trim()
+                .parse::<u32>()
+                .expect("Failed to parse Intel PT config noretcomp format");
+            assert_eq!(
+                ptconfig_noretcomp,
+                0b1 << bit,
+                "Unexpected Intel PT config noretcomp format"
+            );
+        } else {
+            println!("Intel PT not available, skipping...");
+        }
     }
 
     #[test]
     fn intel_pt_pt_config_psb_period_format() {
-        let ptconfig_psb_period = PtConfig::DEFAULT.with_psb_period(u4::MAX).raw_value;
-        let path = format!("{PT_EVENT_PATH}/format/psb_period");
-        let s =
-            fs::read_to_string(&path).expect("Failed to read Intel PT config psb_period format");
-        assert!(
-            s.starts_with("config:"),
-            "Unexpected Intel PT config psb_period format"
-        );
-        let from = s["config:".len().."config:".len() + 2]
-            .parse::<u32>()
-            .expect("Failed to parse Intel PT config psb_period format");
-        let to = s["config:".len() + 3..]
-            .trim()
-            .parse::<u32>()
-            .expect("Failed to parse Intel PT config psb_period format");
-        let mut format = 0;
-        for bit in from..=to {
-            format |= 0b1 << bit;
+        if let Some(pt_path) = get_intel_pt() {
+            let ptconfig_psb_period = PtConfig::DEFAULT.with_psb_period(u4::MAX).raw_value;
+            let path = pt_path.join("format/psb_period");
+            let s = fs::read_to_string(&path)
+                .expect("Failed to read Intel PT config psb_period format");
+            assert!(
+                s.starts_with("config:"),
+                "Unexpected Intel PT config psb_period format"
+            );
+            let from = s["config:".len().."config:".len() + 2]
+                .parse::<u32>()
+                .expect("Failed to parse Intel PT config psb_period format");
+            let to = s["config:".len() + 3..]
+                .trim()
+                .parse::<u32>()
+                .expect("Failed to parse Intel PT config psb_period format");
+            let mut format = 0;
+            for bit in from..=to {
+                format |= 0b1 << bit;
+            }
+            assert_eq!(
+                ptconfig_psb_period, format,
+                "Unexpected Intel PT config psb_period format"
+            );
+        } else {
+            println!("Intel PT not available, skipping...");
         }
-        assert_eq!(
-            ptconfig_psb_period, format,
-            "Unexpected Intel PT config psb_period format"
-        );
     }
 }

@@ -9,7 +9,6 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-arbitrary = { version = "1.4.1" }
 libafl_asan = { path = "../", default-features = false, features = [
   "dlmalloc",
   "guest",

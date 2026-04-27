@@ -2664,7 +2664,6 @@ impl AsanRuntime {
 
         // println!("{:?} {}", instr, memory_access_size);
         //abuse the fact that the last operand is always the mem operand
-        #[expect(clippy::let_and_return)]
         match instr.operands[operands_len - 1] {
             Operand::RegRegOffset(reg1, reg2, size, shift, shift_size) => {
                 let ret = Some((
