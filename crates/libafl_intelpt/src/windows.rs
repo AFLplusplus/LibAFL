@@ -5,6 +5,8 @@ use alloc::{string::String, vec::Vec};
 use core::ptr;
 use std::{io, mem::MaybeUninit, ops::RangeInclusive};
 
+use arbitrary_int::{u3, u4, u36};
+use bitbybit::bitfield;
 pub use ptcov::PtCoverageDecoder;
 use ptcov::{PtCoverageDecoderBuilder, PtImage};
 use raw_cpuid::CpuId;
@@ -17,7 +19,10 @@ use windows::{
         },
         System::{
             IO::DeviceIoControl,
-            Threading::{GetCurrentThreadId, OpenThread, THREAD_GET_CONTEXT},
+            Threading::{
+                GetCurrentThreadId, GetProcessIdOfThread, OpenProcess, OpenThread,
+                PROCESS_QUERY_INFORMATION, THREAD_GET_CONTEXT, THREAD_QUERY_LIMITED_INFORMATION,
+            },
         },
     },
     core::{HSTRING, w},
@@ -68,6 +73,48 @@ struct ConfigureThreadAddressFilterRange {
     end_address: u64,
 }
 
+/// Layout (from winipt):
+/// - OptionVersion:   bits 0-3   (4 bits) - Must be set to 1
+/// - TimingSettings:  bits 4-7   (4 bits) - IPT_TIMING_SETTINGS
+/// - MtcFrequency:    bits 8-11  (4 bits) - Bits 14:17 in IA32_RTIT_CTL
+/// - CycThreshold:    bits 12-15 (4 bits) - Bits 19:22 in IA32_RTIT_CTL
+/// - TopaPagesPow2:   bits 16-19 (4 bits) - Size of buffer as 4KB powers of 2 (4KB->128MB)
+/// - MatchSettings:   bits 20-22 (3 bits) - IPT_MATCH_SETTINGS
+/// - Inherit:         bit 23     (1 bit)  - Children will be automatically traced
+/// - ModeSettings:    bits 24-27 (4 bits) - IPT_MODE_SETTINGS
+/// - Reserved:        bits 28-63 (36 bits)
+#[bitfield(u64, default = 0)]
+#[derive(Debug)]
+pub struct IptOptions {
+    #[bits(0..=3, rw)]
+    pub option_version: u4,
+    #[bits(4..=7, rw)]
+    pub timing_settings: u4,
+    #[bits(8..=11, rw)]
+    pub mtc_frequency: u4,
+    #[bits(12..=15, rw)]
+    pub cyc_threshold: u4,
+    #[bits(16..=19, rw)]
+    pub topa_pages_pow2: u4,
+    /// Not relevant when tracing by process handle
+    #[bits(20..=22, rw)]
+    pub match_settings: u3,
+    #[bits(23..=23, rw)]
+    pub inherit: bool,
+    #[bits(24..=27, rw)]
+    pub mode_settings: u4,
+    #[bits(28..=63)]
+    reserved: u36,
+}
+const IPT_OPTION_VERSION: u4 = u4::new(4);
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct StartProcessTrace {
+    pub process_handle: u64,
+    pub options: IptOptions,
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct IptBufferVersion {
@@ -80,7 +127,7 @@ const IPT_BUFFER_VERSION: IptBufferVersion = IptBufferVersion { major: 1, minor:
 union IptInputPayload {
     // get_trace_size: GetProcessTraceSize,
     // get_trace: GetProcessTrace,
-    // start_trace: StartProcessTrace,
+    start_trace: StartProcessTrace,
     // stop_trace: StopProcessTrace,
     configure_thread_address_filter_range: ConfigureThreadAddressFilterRange,
     // query_filter: QueryThreadFilter,
@@ -93,6 +140,12 @@ impl From<ConfigureThreadAddressFilterRange> for IptInputPayload {
         Self {
             configure_thread_address_filter_range: value,
         }
+    }
+}
+
+impl From<StartProcessTrace> for IptInputPayload {
+    fn from(value: StartProcessTrace) -> Self {
+        Self { start_trace: value }
     }
 }
 
@@ -129,6 +182,7 @@ union IptOutputBuffer {
 #[derive(Debug)]
 pub struct IntelPT<'a> {
     ipt_handle: PtHandle,
+    target_process_handle: PtHandle,
     target_thread_handle: PtHandle,
     // previous_decode_head: u64,
     ptcov_decoder: PtCoverageDecoder<'a>,
@@ -179,6 +233,39 @@ impl<'a> IntelPT<'a> {
         }
         Ok(())
     }
+
+    fn enable_tracing(&mut self) -> windows::core::Result<()> {
+        let options = IptOptions::builder()
+            .with_inherit(false)
+            .with_option_version(IPT_OPTION_VERSION)
+            .with_mode_settings(u4::new(0)) // todo: better understand IPT_MODE_SETTINGS difference between Ctl and Reg
+            .value;
+
+        let ipt_payload = StartProcessTrace {
+            process_handle: self.target_process_handle.inner.0 as u64,
+            options,
+        };
+
+        let input = IptInputBuffer::new(IptInputType::StartProcessTrace, ipt_payload.into());
+        let mut out = MaybeUninit::<IptOutputBuffer>::uninit();
+        let mut out_size = 0;
+        unsafe {
+            DeviceIoControl(
+                self.ipt_handle.inner,
+                IptIoctl::Request as u32,
+                Some(&raw const input as *const std::ffi::c_void),
+                size_of::<IptInputBuffer>() as u32,
+                Some(out.as_mut_ptr() as *mut std::ffi::c_void),
+                size_of::<IptOutputBuffer>() as u32,
+                Some(&mut out_size),
+                None,
+            )
+        }?;
+
+        // todo
+
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -203,12 +290,25 @@ impl<'a> IntelPTBuilder<'a> {
     pub fn build(self) -> Result<IntelPT<'a>, libafl_bolts::Error> {
         let ipt_handle = open_ipt_handle()?;
 
-        let target_thread_handle =
-            unsafe { OpenThread(THREAD_GET_CONTEXT, false, self.target_thread_id) }
-                .map(|h| PtHandle { inner: h })
-                .map_err(|e| {
-                    libafl_bolts::Error::os_error(e.into(), "Failed to get target thread handle")
-                })?;
+        let target_thread_handle = unsafe {
+            OpenThread(
+                THREAD_GET_CONTEXT | THREAD_QUERY_LIMITED_INFORMATION,
+                false,
+                self.target_thread_id,
+            )
+        }
+        .map(|h| PtHandle { inner: h })
+        .map_err(|e| {
+            libafl_bolts::Error::os_error(e.into(), "Failed to get target thread handle")
+        })?;
+
+        let pid = unsafe { GetProcessIdOfThread(target_thread_handle.inner) };
+
+        let target_process_handle = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, false, pid) }
+            .map(|h| PtHandle { inner: h })
+            .map_err(|e| {
+                libafl_bolts::Error::os_error(e.into(), "Failed to get target process handle")
+            })?;
 
         let ptcov_decoder = PtCoverageDecoderBuilder::new()
             .cpu(current_cpu())
@@ -217,6 +317,7 @@ impl<'a> IntelPTBuilder<'a> {
 
         let mut intel_pt = IntelPT {
             ipt_handle,
+            target_process_handle,
             target_thread_handle,
             ptcov_decoder,
         };
