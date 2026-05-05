@@ -25,7 +25,11 @@ constexpr std::nullopt_t None = std::nullopt;
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IR/CFG.h"
-#include "llvm/Passes/PassPlugin.h"
+#if LLVM_VERSION_MAJOR >= 22
+  #include "llvm/Plugins/PassPlugin.h"
+#else
+  #include "llvm/Passes/PassPlugin.h"
+#endif
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/IR/PassManager.h"
 
