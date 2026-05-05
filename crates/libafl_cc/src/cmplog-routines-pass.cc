@@ -75,7 +75,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
   IntegerType *Int64Ty = IntegerType::getInt64Ty(C);
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
-  PointerType *i8PtrTy = PointerType::get(Int8Ty, 0);
+  PointerType *i8PtrTy = PointerType::get(M.getContext(), 0);
 
   FunctionCallee cmplogHookFn;
   FunctionCallee cmplogLlvmStdStd;
@@ -229,8 +229,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
           isStrcmp &=
               FT->getNumParams() == 2 && FT->getReturnType()->isIntegerTy(32) &&
               FT->getParamType(0) == FT->getParamType(1) &&
-              FT->getParamType(0) ==
-                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0);
+              FT->getParamType(0) == PointerType::get(M.getContext(), 0);
 
           bool isStrncmp = (!FuncName.compare("strncmp") ||
                             !FuncName.compare("xmlStrncmp") ||
@@ -246,8 +245,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
           isStrncmp &=
               FT->getNumParams() == 3 && FT->getReturnType()->isIntegerTy(32) &&
               FT->getParamType(0) == FT->getParamType(1) &&
-              FT->getParamType(0) ==
-                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0) &&
+              FT->getParamType(0) == PointerType::get(M.getContext(), 0) &&
               FT->getParamType(2)->isIntegerTy();
 
           bool isGccStdStringStdString =
