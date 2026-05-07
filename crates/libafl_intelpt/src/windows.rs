@@ -21,7 +21,8 @@ use windows::{
             IO::DeviceIoControl,
             Threading::{
                 GetCurrentThreadId, GetProcessIdOfThread, OpenProcess, OpenThread,
-                PROCESS_QUERY_INFORMATION, THREAD_GET_CONTEXT, THREAD_QUERY_LIMITED_INFORMATION,
+                PROCESS_QUERY_INFORMATION, PROCESS_VM_READ, THREAD_GET_CONTEXT,
+                THREAD_QUERY_LIMITED_INFORMATION,
             },
         },
     },
@@ -33,6 +34,7 @@ use crate::utils::current_cpu;
 #[repr(u32)]
 enum IptIoctl {
     Request = 0x220004,
+    ReadTrace = 0x220006,
 }
 
 #[derive(Debug)]
@@ -106,13 +108,22 @@ pub struct IptOptions {
     #[bits(28..=63)]
     reserved: u36,
 }
-const IPT_OPTION_VERSION: u4 = u4::new(4);
+const IPT_OPTION_VERSION: u4 = u4::new(1);
+const IPT_TRACE_VERSION: u16 = 1;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct StartProcessTrace {
+    process_handle: u64,
+    options: IptOptions,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct GetProcessTrace {
+    pub trace_version: u16,
+    _padding: [u8; 6],
     pub process_handle: u64,
-    pub options: IptOptions,
 }
 
 #[repr(C)]
@@ -125,8 +136,7 @@ const IPT_BUFFER_VERSION: IptBufferVersion = IptBufferVersion { major: 1, minor:
 
 #[repr(C)]
 union IptInputPayload {
-    // get_trace_size: GetProcessTraceSize,
-    // get_trace: GetProcessTrace,
+    get_trace: GetProcessTrace,
     start_trace: StartProcessTrace,
     // stop_trace: StopProcessTrace,
     configure_thread_address_filter_range: ConfigureThreadAddressFilterRange,
@@ -146,6 +156,12 @@ impl From<ConfigureThreadAddressFilterRange> for IptInputPayload {
 impl From<StartProcessTrace> for IptInputPayload {
     fn from(value: StartProcessTrace) -> Self {
         Self { start_trace: value }
+    }
+}
+
+impl From<GetProcessTrace> for IptInputPayload {
+    fn from(value: GetProcessTrace) -> Self {
+        Self { get_trace: value }
     }
 }
 
@@ -169,9 +185,18 @@ impl IptInputBuffer {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct OutGetTraceSize {
+    pub trace_version: u16,
+    pub _padding: [u8; 6],
+    pub trace_size: u64,
+}
+
+#[repr(C)]
+
 union IptOutputBuffer {
     // pub get_trace_version: OutGetTraceVersion,
-    // pub get_trace_size: OutGetTraceSize,
+    pub get_trace_size: OutGetTraceSize,
     // pub query_filter: OutQueryThreadFilter,
     // pub pause_trace: OutPauseResumeTrace,
     // pub resume_trace: OutPauseResumeTrace,
@@ -215,26 +240,12 @@ impl<'a> IntelPT<'a> {
                 IptInputType::ConfigureThreadAddressFilterRange,
                 ipt_payload.into(),
             );
-
-            let mut out = MaybeUninit::<IptOutputBuffer>::uninit();
-            let mut out_size = 0;
-            unsafe {
-                DeviceIoControl(
-                    self.ipt_handle.inner,
-                    IptIoctl::Request as u32,
-                    Some(&raw const input as *const std::ffi::c_void),
-                    size_of::<IptInputBuffer>() as u32,
-                    Some(out.as_mut_ptr() as *mut std::ffi::c_void),
-                    size_of::<IptOutputBuffer>() as u32,
-                    Some(&mut out_size),
-                    None,
-                )
-            }?;
+            self.send_device_io_request(input)?;
         }
         Ok(())
     }
 
-    fn enable_tracing(&mut self) -> windows::core::Result<()> {
+    pub fn enable_tracing(&mut self) -> windows::core::Result<()> {
         let options = IptOptions::builder()
             .with_inherit(false)
             .with_option_version(IPT_OPTION_VERSION)
@@ -245,10 +256,79 @@ impl<'a> IntelPT<'a> {
             process_handle: self.target_process_handle.inner.0 as u64,
             options,
         };
-
         let input = IptInputBuffer::new(IptInputType::StartProcessTrace, ipt_payload.into());
+        let (_, out_size) = self.send_device_io_request(input)?;
+        debug_assert_eq!(out_size, 0);
+
+        Ok(())
+    }
+
+    // todo: must not be public, or even exist?
+    pub fn get_raw_trace(&mut self) -> windows::core::Result<Vec<u8>> {
+        // todo: this looks pretty racy, size might increas ebetween get_trace_size and the actual
+        // get trace
+        let trace_size = self.get_trace_size()?;
+        let mut trace_buffer = Vec::with_capacity(trace_size as usize);
+
+        let ipt_payload = GetProcessTrace {
+            trace_version: IPT_TRACE_VERSION,
+            _padding: [0u8; 6],
+            process_handle: self.target_process_handle.inner.0 as u64,
+        };
+        let input = IptInputBuffer::new(
+            IptInputType::GetProcessTrace,
+            IptInputPayload {
+                get_trace: ipt_payload.into(),
+            },
+        );
+
+        let mut out_size = 0;
+        unsafe {
+            DeviceIoControl(
+                self.ipt_handle.inner,
+                IptIoctl::ReadTrace as u32,
+                Some(&raw const input as *const std::ffi::c_void),
+                size_of::<IptInputBuffer>() as u32,
+                Some(trace_buffer.as_mut_ptr() as *mut std::ffi::c_void),
+                trace_buffer.capacity() as u32,
+                Some(&mut out_size),
+                None,
+            )
+        }?;
+
+        assert!((out_size as usize) <= trace_buffer.capacity());
+        unsafe{trace_buffer.set_len(out_size as usize);};
+
+        //todo trace_buffer has a header in it
+
+        Ok(trace_buffer)
+    }
+
+    fn get_trace_size(&self) -> windows::core::Result<u64> {
+        let ipt_payload = GetProcessTrace {
+            trace_version: IPT_TRACE_VERSION,
+            _padding: [0; 6],
+            process_handle: self.target_process_handle.inner.0 as u64,
+        };
+        let input = IptInputBuffer::new(IptInputType::GetProcessTraceSize, ipt_payload.into());
+        let (out, out_size) = self.send_device_io_request(input)?;
+
+        debug_assert_eq!(out_size, size_of::<IptOutputBuffer>() as u32);
+
+        Ok(unsafe { out.get_trace_size.trace_size })
+    }
+
+    // pub fn disable_tracing(&mut self) -> windows::core::Result<()> {
+    //
+    // }
+
+    fn send_device_io_request(
+        &self,
+        input: IptInputBuffer,
+    ) -> windows::core::Result<(IptOutputBuffer, u32)> {
         let mut out = MaybeUninit::<IptOutputBuffer>::uninit();
         let mut out_size = 0;
+
         unsafe {
             DeviceIoControl(
                 self.ipt_handle.inner,
@@ -262,9 +342,7 @@ impl<'a> IntelPT<'a> {
             )
         }?;
 
-        // todo
-
-        Ok(())
+        Ok((unsafe { out.assume_init() }, out_size))
     }
 }
 
@@ -304,11 +382,12 @@ impl<'a> IntelPTBuilder<'a> {
 
         let pid = unsafe { GetProcessIdOfThread(target_thread_handle.inner) };
 
-        let target_process_handle = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, false, pid) }
-            .map(|h| PtHandle { inner: h })
-            .map_err(|e| {
-                libafl_bolts::Error::os_error(e.into(), "Failed to get target process handle")
-            })?;
+        let target_process_handle =
+            unsafe { OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid) }
+                .map(|h| PtHandle { inner: h })
+                .map_err(|e| {
+                    libafl_bolts::Error::os_error(e.into(), "Failed to get target process handle")
+                })?;
 
         let ptcov_decoder = PtCoverageDecoderBuilder::new()
             .cpu(current_cpu())
