@@ -1,7 +1,7 @@
 #![cfg(feature = "std")]
 #![cfg(target_os = "windows")]
 
-use std::ffi::c_void;
+use std::{ffi::c_void, fs::File, io::Write};
 
 use libafl_intelpt::{IntelPT, availability};
 use windows::Win32::{
@@ -42,17 +42,25 @@ fn intel_pt_trace_thread() {
         "Failed to read worker thread ID from parent"
     );
 
-    let _pt = IntelPT::builder()
+    let mut pt = IntelPT::builder()
         .thread_id(thread_id)
         .images(&[])
         .build()
         .expect("Failed to create IntelPT for worker thread");
+    pt.enable_tracing().expect("Failed to enable tracing");
 
     let wait_result = unsafe { WaitForSingleObject(thread_handle, INFINITE) };
     assert_eq!(
         wait_result, WAIT_OBJECT_0,
         "Worker thread did not terminate cleanly"
     );
+
+    let trace = pt
+        .get_raw_trace()
+        .expect("Failed to get raw trace from raw trace");
+
+    let mut file = File::create("output.bin").unwrap();
+    file.write_all(&trace).unwrap();
 
     let _ = unsafe { CloseHandle(thread_handle) };
 }
