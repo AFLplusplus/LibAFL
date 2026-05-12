@@ -130,7 +130,7 @@ clippy:
 # Run clippy on.. some things?
 [macos]
 clippy:
-    cargo +nightly clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
+    cargo clippy --tests --all --exclude libafl_nyx --exclude symcc_runtime --exclude runtime_test
     just clippy-excluded
 
 # Run clippy powershell script
