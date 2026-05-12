@@ -14,6 +14,7 @@ env:
   AFL_PIZZA_MODE: "-1" # this is sad, I know, but it breaks on a certain spring day otherwise :(
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
+  # FIXME: please unpin macos rust stable toolchain once LLVM is bumped to version 22
   MAIN_LLVM_VERSION: 21
 
 concurrency:
@@ -973,7 +974,7 @@ jobs:
   macos:
     runs-on: macOS-latest
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.94.1
         with:
           components: clippy
       - name: Install nightly
