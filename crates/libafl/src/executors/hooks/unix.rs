@@ -237,7 +237,7 @@ pub mod unix_signal_handler {
 
                 log::error!("Child crashed!");
 
-                {
+                if std::env::var("LIBAFL_MINIBSOD").is_ok() {
                     let mut bsod = Vec::new();
                     {
                         let mut writer = std::io::BufWriter::new(&mut bsod);
@@ -278,7 +278,7 @@ pub mod unix_signal_handler {
                         "We crashed at addr 0x{si_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
                     );
 
-                    {
+                    if std::env::var("LIBAFL_MINIBSOD").is_ok() {
                         let mut bsod = Vec::new();
                         {
                             let mut writer = std::io::BufWriter::new(&mut bsod);
