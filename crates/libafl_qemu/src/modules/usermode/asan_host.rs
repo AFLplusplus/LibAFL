@@ -207,7 +207,7 @@ impl Display for AsanError {
                 write!(fmt, "Invalid {len} bytes write at {addr:#x}")
             }
             AsanError::BadFree(addr, interval) => match interval {
-                Some(chunk) => write!(fmt, "Bad free at {addr:#x} in the allocated chunk {chunk}",),
+                Some(chunk) => write!(fmt, "Bad free at {addr:#x} in the allocated chunk {chunk}"),
                 None => write!(fmt, "Bad free at {addr:#x} (wild pointer)"),
             },
             AsanError::MemLeak(interval) => write!(fmt, "Memory leak of chunk {interval}"),
@@ -569,10 +569,10 @@ impl AsanGiovese {
                 QasanAction::UnPoison => {
                     Self::unpoison(qemu, a1 as GuestAddr, a2 as usize);
                 }
-                QasanAction::IsPoison => {
-                    if Self::is_invalid_access_n(qemu, a1 as GuestAddr, a2 as usize) {
-                        r = 1;
-                    }
+                QasanAction::IsPoison
+                    if Self::is_invalid_access_n(qemu, a1 as GuestAddr, a2 as usize) =>
+                {
+                    r = 1;
                 }
                 QasanAction::Alloc => {
                     let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap() as GuestAddr;

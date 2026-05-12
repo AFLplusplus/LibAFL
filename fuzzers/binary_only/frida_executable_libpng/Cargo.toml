@@ -36,13 +36,5 @@ libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_cmplog",
 ] }
 libc = "0.2.159"
-libloading = "0.8.5"
-log = { version = "0.4.22", features = ["release_max_level_info"] }
-num-traits = "0.2.19"
-rangemap = "1.5.1"
-clap = { version = "4.5.18", features = ["derive"] }
-serde = "1.0.228"
 mimalloc = { version = "0.1.43", default-features = false }
-
-backtrace = "0.3.74"
 color-backtrace = "0.6.1"

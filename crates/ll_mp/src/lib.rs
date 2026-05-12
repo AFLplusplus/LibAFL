@@ -3638,13 +3638,10 @@ where
     }
 
     /// Create a point-to-point channel instead of using a broker-client channel
-    pub fn new_p2p(shmem_provider: SP, sender_id: ClientId) -> Result<Self, Error> {
+    pub fn new_p2p(mut shmem_provider: SP, sender_id: ClientId) -> Result<Self, Error> {
         let sender = LlmpSender::new(shmem_provider.clone(), sender_id, false)?;
-        let receiver = LlmpReceiver::on_existing_shmem(
-            shmem_provider,
-            sender.out_shmems[0].shmem.clone(),
-            None,
-        )?;
+        let shmem = shmem_provider.clone_ref(&sender.out_shmems[0].shmem)?;
+        let receiver = LlmpReceiver::on_existing_shmem(shmem_provider, shmem, None)?;
         Ok(Self { sender, receiver })
     }
 
@@ -3653,7 +3650,7 @@ where
     /// else reattach will get a new, empty page, from the OS, or fail
     #[allow(clippy::needless_pass_by_value)] // no longer necessary on nightly
     pub fn on_existing_shmem(
-        shmem_provider: SP,
+        mut shmem_provider: SP,
         _current_out_shmem: SHM,
         _last_msg_sent_offset: Option<u64>,
         current_broker_shmem: SHM,
@@ -3662,7 +3659,7 @@ where
         Ok(Self {
             receiver: LlmpReceiver::on_existing_shmem(
                 shmem_provider.clone(),
-                current_broker_shmem.clone(),
+                shmem_provider.clone_ref(&current_broker_shmem)?,
                 last_msg_recvd_offset,
             )?,
             sender: LlmpSender::on_existing_shmem(

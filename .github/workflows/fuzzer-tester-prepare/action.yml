@@ -48,3 +48,7 @@ runs:
       uses: browser-actions/setup-chrome@v1
       with:
         chrome-version: stable
+    - name: install nasm
+      if: ${{ inputs.fuzzer-name == 'full_system/qemu_intel_pt_bootloader' }}
+      shell: bash
+      run: sudo apt install nasm

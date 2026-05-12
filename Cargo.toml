@@ -116,15 +116,15 @@ ahash = { version = "0.8.12", default-features = false } # The hash function alr
 arbitrary-int = "2.0.0" # arbitrary sized integers, useful in combination with bitfields (bitbybit crate)
 backtrace = { version = "0.3.74", default-features = false } # Used to get the stacktrace in StacktraceObserver
 bindgen = "0.72.1"
-bitbybit = "1.4.0" # bitfields, use this for bit fields and bit enums
+bitbybit = "2.0.0" # bitfields, use this for bit fields and bit enums
 capstone = "0.14.0" # Disassembler used in libafl_unicorn to provide disassembly on crash
 clap = "4.5.52"
 cc = "1.2.53"
 cmake = "0.1.57"
-ctor = "0.6.3"
+ctor = "0.10.0"
 document-features = "0.2.11"
 erased-serde = { version = "0.4.5", default-features = false } # erased serde
-fastbloom = { version = "0.14.1", default-features = false }
+fastbloom = { version = "0.17.0", default-features = false }
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
 glob = "0.3"
 hashbrown = { version = "0.16.1", default-features = false } # A faster hashmap, nostd compatible
@@ -135,7 +135,7 @@ libvharness_sys = { path = "./crates/libafl_qemu/libvharness_sys", version = "0.
 log = "0.4.29"
 meminterval = "0.4.2"
 mimalloc = { version = "0.1.48", default-features = false }
-nix = { version = "0.30.1", default-features = false }
+nix = { version = "0.31.2", default-features = false }
 num_enum = { version = "0.7.4", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 paste = "1.0.15"
@@ -152,8 +152,8 @@ serde_json = { version = "1.0.149", default-features = false }
 serde_yaml = { version = "0.9.34" } # For parsing the injections yaml file
 serial_test = { version = "3.2.0", default-features = false }
 static_assertions = "1.1.0"
-strum = "0.27.2"
-strum_macros = "0.27.2"
+strum = "0.28.0"
+strum_macros = "0.28.0"
 tinyinst = "0.1.1"
 toml = "0.9.10" # For parsing the injections toml file
 tuple_list = { version = "0.1.3" }

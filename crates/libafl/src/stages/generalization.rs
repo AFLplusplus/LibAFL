@@ -14,9 +14,9 @@ use libafl_bolts::{
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
-    Error, HasMetadata, HasNamedMetadata,
+    Error, ExecutionProcessor, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, HasCurrentCorpusId},
-    executors::{Executor, HasObservers},
+    executors::{Executor, ExitKind, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{
         BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes, ResizableMutator,
@@ -92,6 +92,7 @@ where
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
+    Z: ExecutionProcessor<EM, BytesInput, E::Observers, S>,
 {
     #[inline]
     #[expect(clippy::too_many_lines)]
@@ -377,6 +378,7 @@ where
     where
         E: Executor<EM, BytesInput, S, Z> + HasObservers,
         E::Observers: ObserversTuple<BytesInput, S>,
+        Z: ExecutionProcessor<EM, BytesInput, E::Observers, S>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -391,6 +393,12 @@ where
             .observers_mut()
             .post_exec_all(state, input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
+
+        if exit_kind != ExitKind::Ok {
+            let observers = executor.observers();
+            fuzzer.evaluate_execution(state, manager, input, &*observers, &exit_kind, true)?;
+            return Ok(false);
+        }
 
         let cnt = executor.observers()[&self.map_observer_handle]
             .as_ref()
@@ -418,6 +426,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, BytesInput, S, Z> + HasObservers<Observers = OT>,
+        Z: ExecutionProcessor<EM, BytesInput, OT, S>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -456,6 +465,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, BytesInput, S, Z> + HasObservers<Observers = OT>,
+        Z: ExecutionProcessor<EM, BytesInput, OT, S>,
     {
         let mut index = 0;
         while index < payload.len() {

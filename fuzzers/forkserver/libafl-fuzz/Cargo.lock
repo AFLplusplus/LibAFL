@@ -413,19 +413,20 @@ dependencies = [
 
 [[package]]
 name = "ctor"
-version = "0.6.3"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "424e0138278faeb2b401f174ad17e715c829512d74f3d1e81eb43365c2e0590e"
+checksum = "95d0d11eb38e7642efca359c3cf6eb7b2e528182d09110165de70192b0352775"
 dependencies = [
  "ctor-proc-macro",
  "dtor",
+ "link-section",
 ]
 
 [[package]]
 name = "ctor-proc-macro"
-version = "0.0.7"
+version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52560adf09603e58c9a7ee1fe1dcb95a16927b17c127f0ac02d6e768a0e25bc1"
+checksum = "a7ab264ea985f1bd27887d7b21ea2bb046728e05d11909ca138d700c494730db"
 
 [[package]]
 name = "derivative"
@@ -452,18 +453,18 @@ checksum = "780955b8b195a21ab8e4ac6b60dd1dbdcec1dc6c51c0617964b08c81785e12c9"
 
 [[package]]
 name = "dtor"
-version = "0.1.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "404d02eeb088a82cfd873006cb713fe411306c7d182c344905e101fb1167d301"
+checksum = "17f72721db8027a4e96dd6fb50d2a1d32259c9d3da1b63dee612ccd981e14293"
 dependencies = [
  "dtor-proc-macro",
 ]
 
 [[package]]
 name = "dtor-proc-macro"
-version = "0.0.6"
+version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f678cf4a922c215c63e0de95eb1ff08a958a81d47e485cf9da1e27bf6305cfa5"
+checksum = "8c98b077c7463d01d22dde8a24378ddf1ca7263dc687cffbed38819ea6c21131"
 
 [[package]]
 name = "either"
@@ -558,12 +559,13 @@ dependencies = [
 
 [[package]]
 name = "fastbloom"
-version = "0.14.1"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e7f34442dbe69c60fe8eaf58a8cafff81a1f278816d8ab4db255b3bef4ac3c4"
+checksum = "ef975e30683b2d965054bb0a836f8973857c4ebf6acf274fe46617cd285060d8"
 dependencies = [
- "getrandom 0.3.4",
+ "foldhash 0.2.0",
  "libm",
+ "portable-atomic",
  "siphasher",
 ]
 
@@ -850,7 +852,6 @@ dependencies = [
  "libafl_bolts",
  "libafl_nyx",
  "libafl_targets",
- "log",
  "memmap2",
  "nix 0.30.1",
  "regex",
@@ -882,7 +883,6 @@ dependencies = [
  "nix 0.30.1",
  "no_std_time",
  "nonzero_macros",
- "num_enum",
  "ownedref",
  "postcard",
  "rustversion",
@@ -893,7 +893,6 @@ dependencies = [
  "static_assertions",
  "tuple_list",
  "tuple_list_ex",
- "typeid",
  "uds",
  "wide",
  "winapi",
@@ -1028,6 +1027,12 @@ dependencies = [
  "time",
  "timeout-readwrite",
 ]
+
+[[package]]
+name = "link-section"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "468808413fa8bdf0edbe61c2bbc182dfc59885b94f496cf3fb42c9c96b1e0149"
 
 [[package]]
 name = "linux-raw-sys"
@@ -1584,7 +1589,6 @@ dependencies = [
 name = "serde_anymap"
 version = "0.16.0"
 dependencies = [
- "ahash",
  "ctor",
  "erased-serde",
  "hashbrown 0.16.1",

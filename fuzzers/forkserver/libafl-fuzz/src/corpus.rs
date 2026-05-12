@@ -25,7 +25,7 @@ pub fn generate_base_filename(state: &mut LibaflFuzzState, id: CorpusId) -> Stri
     let is_seed = state.must_load_initial_inputs();
     let name = if is_seed {
         // TODO set orig filename
-        format!("id:{id:0>6},time:0,execs:0,orig:TODO",)
+        format!("id:{id:0>6},time:0,execs:0,orig:TODO")
     } else {
         // TODO: change hardcoded values of op (operation aka stage_name) & rep (amount of stacked mutations applied)
         let src = if let Some(parent_id) = state.corpus().current() {
@@ -38,7 +38,7 @@ pub fn generate_base_filename(state: &mut LibaflFuzzState, id: CorpusId) -> Stri
             .checked_sub(*state.start_time())
             .unwrap_or_default())
         .as_secs();
-        format!("id:{id:0>6},src:{src:0>6},time:{time},execs:{execs},op:havoc,rep:0",)
+        format!("id:{id:0>6},src:{src:0>6},time:{time},execs:{execs},op:havoc,rep:0")
     };
     name
 }

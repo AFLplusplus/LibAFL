@@ -32,12 +32,15 @@ libc = { workspace = true }
 log = { workspace = true }
 num_enum = { workspace = true, default-features = false }
 num-traits = { workspace = true, default-features = false }
-ptcov = { version = "0.0.6" }
+ptcov = { version = "0.1.0" }
 raw-cpuid = { version = "11.1.0" }
 
 [target.'cfg(target_os = "linux" )'.dependencies]
 caps = { version = "0.5.5" }
 perf-event-open-sys = { version = "5.0.0" }
+
+[target.'cfg(target_os = "windows" )'.dependencies]
+ptcov = { version = "0.1.0", features = ["retc"] }
 
 [lints]
 workspace = true
