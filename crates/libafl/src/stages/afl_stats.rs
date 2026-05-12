@@ -599,6 +599,7 @@ where
             .hit_objectives()
             .contains(&Cow::Borrowed(CRASH_FEEDBACK_NAME))
         {
+            self.saved_crashes += 1;
             self.last_crash = current_time();
             self.execs_at_last_objective = *state.executions();
         }
@@ -613,6 +614,7 @@ where
             .hit_objectives()
             .contains(&Cow::Borrowed(TIMEOUT_FEEDBACK_NAME))
         {
+            self.saved_hangs += 1;
             self.last_hang = current_time();
             self.execs_at_last_objective = *state.executions();
         }
