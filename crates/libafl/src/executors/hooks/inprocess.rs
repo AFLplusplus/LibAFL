@@ -496,19 +496,19 @@ impl InProcessExecutorHandlerData {
 
                 log::error!("Target crashed!");
 
-                if std::env::var("LIBAFL_MINIBSOD").is_ok() {
-                    if let Some(bsod_info) = bsod_info {
-                        let bsod = generate_minibsod_to_vec(
-                            bsod_info.signal,
-                            &bsod_info.siginfo,
-                            bsod_info.ucontext.as_ref(),
-                        );
+                if std::env::var("LIBAFL_MINIBSOD").is_ok()
+                    && let Some(bsod_info) = bsod_info
+                {
+                    let bsod = generate_minibsod_to_vec(
+                        bsod_info.signal,
+                        &bsod_info.siginfo,
+                        bsod_info.ucontext.as_ref(),
+                    );
 
-                        if let Ok(bsod) = bsod
-                            && let Ok(r) = core::str::from_utf8(&bsod)
-                        {
-                            log::error!("{r}");
-                        }
+                    if let Ok(bsod) = bsod
+                        && let Ok(r) = core::str::from_utf8(&bsod)
+                    {
+                        log::error!("{r}");
                     }
                 }
 
