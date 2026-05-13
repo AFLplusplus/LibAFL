@@ -296,7 +296,7 @@ impl<'a> IntelPT<'a> {
     }
 
     /// Dump the raw trace used in the last decoding to the file
-    /// /// `./traces/trace_<unix epoch in micros>`
+    /// `./traces/trace_<unix epoch in micros>`
     #[cfg(feature = "export_raw")]
     pub fn dump_last_trace_to_file(&self) -> Result<(), Error> {
         use std::{fs, io::Write, path::Path, time};

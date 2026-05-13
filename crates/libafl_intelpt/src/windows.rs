@@ -1,14 +1,19 @@
 #![allow(dead_code)] // todo remove
 #![allow(unused_imports)] // todo remove
+// todo review all the pub
 
 use alloc::{string::String, vec::Vec};
-use core::ptr;
-use std::{io, mem::MaybeUninit, ops::RangeInclusive};
+use core::{fmt::Debug, ptr};
+use std::{
+    io, mem::MaybeUninit, ops::RangeInclusive, prelude::rust_2015::ToString,
+    ptr::slice_from_raw_parts_mut,
+};
 
 use arbitrary_int::{u3, u4, u36};
 use bitbybit::bitfield;
+use libafl_bolts::Error;
 pub use ptcov::PtCoverageDecoder;
-use ptcov::{PtCoverageDecoderBuilder, PtImage};
+use ptcov::{CoverageEntry, PtCoverageDecoderBuilder, PtDecoderError, PtImage};
 use raw_cpuid::CpuId;
 use windows::{
     Win32::{
@@ -20,8 +25,8 @@ use windows::{
         System::{
             IO::DeviceIoControl,
             Threading::{
-                GetCurrentThreadId, GetProcessIdOfThread, OpenProcess, OpenThread,
-                PROCESS_QUERY_INFORMATION, PROCESS_VM_READ, THREAD_GET_CONTEXT,
+                GetCurrentProcessId, GetCurrentThreadId, GetProcessIdOfThread, OpenProcess,
+                OpenThread, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ, THREAD_GET_CONTEXT,
                 THREAD_QUERY_LIMITED_INFORMATION,
             },
         },
@@ -68,7 +73,7 @@ enum IptFilterRangeSettings {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct ConfigureThreadAddressFilterRange {
-    thread_handle: u64,
+    thread_handle: HANDLE,
     range_index: u32,
     range_config: IptFilterRangeSettings,
     start_address: u64,
@@ -193,7 +198,6 @@ pub struct OutGetTraceSize {
 }
 
 #[repr(C)]
-
 union IptOutputBuffer {
     // pub get_trace_version: OutGetTraceVersion,
     pub get_trace_size: OutGetTraceSize,
@@ -203,12 +207,31 @@ union IptOutputBuffer {
     _pad: [u8; 24],
 }
 
+#[repr(C)]
+#[derive(Debug)]
+struct IptTraceData {
+    trace_version: u16,
+    valid_trace: u16,
+    trace_size: u32,
+}
+
+#[repr(C, packed(4))]
+#[derive(Debug)]
+struct IptTraceHeader {
+    thread_id: u64,
+    timing_settings: u32,
+    mtc_frequency: u32,
+    frequency_to_tsc_ratio: u32,
+    ring_buffer_offset: u32,
+    trace_size: u32,
+}
+
 /// Intel Processor Trace (PT)
 #[derive(Debug)]
 pub struct IntelPT<'a> {
     ipt_handle: PtHandle,
     target_process_handle: PtHandle,
-    target_thread_handle: PtHandle,
+    tid: Option<u32>,
     // previous_decode_head: u64,
     ptcov_decoder: PtCoverageDecoder<'a>,
     #[cfg(feature = "export_raw")]
@@ -224,13 +247,23 @@ impl<'a> IntelPT<'a> {
         IntelPTBuilder::default()
     }
 
+    pub fn set_tid(&mut self, tid: Option<u32>) {
+        self.tid = tid;
+    }
+
     /// Set filters based on Instruction Pointer (IP)
     ///
     /// Only instructions in `filters` ranges will be traced.
-    fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> windows::core::Result<()> {
+    pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> windows::core::Result<()> {
+        let thread_handle = if let Some(tid) = self.tid {
+            unsafe { OpenThread(THREAD_GET_CONTEXT, false, tid)? }
+        } else {
+            INVALID_HANDLE_VALUE // TODO apply to all threads?
+        };
+
         for (i, filter) in filters.iter().enumerate() {
             let ipt_payload = ConfigureThreadAddressFilterRange {
-                thread_handle: 0, // todo
+                thread_handle,
                 range_index: i.try_into()?,
                 range_config: IptFilterRangeSettings::IptFilterRangeIp,
                 start_address: *filter.start(),
@@ -240,14 +273,15 @@ impl<'a> IntelPT<'a> {
                 IptInputType::ConfigureThreadAddressFilterRange,
                 ipt_payload.into(),
             );
-            self.send_device_io_request(input)?;
+            let (_, out_size) = self.send_device_io_request(input)?;
+            debug_assert_eq!(out_size, 0);
         }
         Ok(())
     }
 
     pub fn enable_tracing(&mut self) -> windows::core::Result<()> {
         let options = IptOptions::builder()
-            .with_inherit(false)
+            .with_inherit(true) // todo: expose this param?
             .with_option_version(IPT_OPTION_VERSION)
             .with_mode_settings(u4::new(0)) // todo: better understand IPT_MODE_SETTINGS difference between Ctl and Reg
             .value;
@@ -263,12 +297,22 @@ impl<'a> IntelPT<'a> {
         Ok(())
     }
 
-    // todo: must not be public, or even exist?
-    pub fn get_raw_trace(&mut self) -> windows::core::Result<Vec<u8>> {
-        // todo: this looks pretty racy, size might increas ebetween get_trace_size and the actual
+    /// Fill the coverage map by decoding the PT traces
+    ///
+    /// This function consumes the traces.
+    pub fn decode_traces_into_map<T>(
+        &mut self,
+        // images: &[PtImage], todo: introduce support for JIT/ self modifying code ecc
+        map_ptr: *mut T,
+        map_len: usize,
+    ) -> Result<(), Error>
+    where
+        T: CoverageEntry,
+    {
+        // todo: this looks pretty racy, size might increase between get_trace_size and the actual
         // get trace
         let trace_size = self.get_trace_size()?;
-        let mut trace_buffer = Vec::with_capacity(trace_size as usize);
+        let mut trace_buffer: Vec<u8> = Vec::with_capacity(4096 + trace_size as usize);
 
         let ipt_payload = GetProcessTrace {
             trace_version: IPT_TRACE_VERSION,
@@ -296,12 +340,58 @@ impl<'a> IntelPT<'a> {
             )
         }?;
 
-        assert!((out_size as usize) <= trace_buffer.capacity());
-        unsafe{trace_buffer.set_len(out_size as usize);};
+        debug_assert!((out_size as usize) <= trace_buffer.capacity());
+        // SAFETY: Windows driver should not overflow user buffer
+        unsafe {
+            trace_buffer.set_len(out_size as usize);
+        };
 
-        //todo trace_buffer has a header in it
+        let trace_data = unsafe {
+            trace_buffer
+                .as_ptr()
+                .cast::<IptTraceData>()
+                .as_ref_unchecked()
+        };
+        assert!(trace_data.valid_trace > 0); // todo better error handling
+        assert_eq!(trace_data.trace_version, IPT_TRACE_VERSION);
 
-        Ok(trace_buffer)
+        let mut raw_traces = Vec::new();
+        let mut slice = &trace_buffer[size_of::<IptTraceData>()..];
+        while slice.len() >= size_of::<IptTraceHeader>() {
+            let inner_header =
+                unsafe { slice.as_ptr().cast::<IptTraceHeader>().as_ref_unchecked() };
+            println!("header: {:?}", inner_header);
+            slice = &slice[size_of::<IptTraceHeader>()..];
+            if self.tid.is_none()
+                || self
+                    .tid
+                    .is_some_and(|tid| tid as u64 == inner_header.thread_id)
+            {
+                raw_traces.push(&slice[..inner_header.ring_buffer_offset as usize]); //todo consider wrapping
+            }
+            slice = &slice[inner_header.trace_size as usize..];
+        }
+
+        if raw_traces.is_empty() {
+            return Err(Error::empty("no traces returned"));
+        }
+
+        #[cfg(feature = "export_raw")]
+        {
+            self.last_decode_trace = raw_traces[0].to_vec();
+            for i in 1..raw_traces.len() {
+                self.last_decode_trace.extend_from_slice(&raw_traces[i]);
+            }
+        }
+
+        let coverage = unsafe { &mut *slice_from_raw_parts_mut(map_ptr, map_len) };
+        // todo consider also other raw_traces[1..] probably there should be one decoder for thread
+        if let Err(e) = self.ptcov_decoder.coverage(raw_traces[0], coverage) {
+            log::warn!("PT trace decoding to coverage failed: {e:?}");
+            coverage.fill(0.into());
+        }
+
+        Ok(())
     }
 
     fn get_trace_size(&self) -> windows::core::Result<u64> {
@@ -344,22 +434,39 @@ impl<'a> IntelPT<'a> {
 
         Ok((unsafe { out.assume_init() }, out_size))
     }
+
+    #[cfg(feature = "export_raw")]
+    pub fn dump_last_trace_to_file(&self) -> Result<(), Error> {
+        use std::{fs, io::Write, path::Path, time};
+
+        let traces_dir = Path::new("traces");
+        fs::create_dir_all(traces_dir)?;
+        let timestamp = time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .map_err(|e| Error::unknown(e.to_string()))?
+            .as_micros();
+        let mut file = fs::File::create(traces_dir.join(format!("trace_{timestamp}")))?;
+        file.write_all(&self.last_decode_trace)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
 pub struct IntelPTBuilder<'a> {
     ip_filters: Vec<RangeInclusive<u64>>,
     images: &'a [PtImage<'a>],
-    target_thread_id: u32,
+    pid: u32,
+    tid: Option<u32>,
 }
 
 impl Default for IntelPTBuilder<'_> {
     fn default() -> Self {
-        let target_thread_id = unsafe { GetCurrentThreadId() };
+        let pid = unsafe { GetCurrentProcessId() };
         Self {
             ip_filters: Vec::new(),
             images: &[],
-            target_thread_id,
+            pid,
+            tid: None,
         }
     }
 }
@@ -368,22 +475,8 @@ impl<'a> IntelPTBuilder<'a> {
     pub fn build(self) -> Result<IntelPT<'a>, libafl_bolts::Error> {
         let ipt_handle = open_ipt_handle()?;
 
-        let target_thread_handle = unsafe {
-            OpenThread(
-                THREAD_GET_CONTEXT | THREAD_QUERY_LIMITED_INFORMATION,
-                false,
-                self.target_thread_id,
-            )
-        }
-        .map(|h| PtHandle { inner: h })
-        .map_err(|e| {
-            libafl_bolts::Error::os_error(e.into(), "Failed to get target thread handle")
-        })?;
-
-        let pid = unsafe { GetProcessIdOfThread(target_thread_handle.inner) };
-
         let target_process_handle =
-            unsafe { OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid) }
+            unsafe { OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, self.pid) }
                 .map(|h| PtHandle { inner: h })
                 .map_err(|e| {
                     libafl_bolts::Error::os_error(e.into(), "Failed to get target process handle")
@@ -397,8 +490,10 @@ impl<'a> IntelPTBuilder<'a> {
         let mut intel_pt = IntelPT {
             ipt_handle,
             target_process_handle,
-            target_thread_handle,
+            tid: self.tid,
             ptcov_decoder,
+            #[cfg(feature = "export_raw")]
+            last_decode_trace: Vec::new(),
         };
         intel_pt.set_ip_filters(&self.ip_filters).map_err(|e| {
             libafl_bolts::Error::os_error(e.into(), "Failed to set IntelPT ip filters")
@@ -407,8 +502,14 @@ impl<'a> IntelPTBuilder<'a> {
     }
 
     #[must_use]
-    pub fn thread_id(mut self, thread_id: u32) -> Self {
-        self.target_thread_id = thread_id;
+    pub fn thread_id(mut self, thread_id: Option<u32>) -> Self {
+        self.tid = thread_id;
+        self
+    }
+
+    #[must_use]
+    pub fn pid(mut self, pid: u32) -> Self {
+        self.pid = pid;
         self
     }
 
