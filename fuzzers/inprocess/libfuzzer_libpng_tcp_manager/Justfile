@@ -70,6 +70,8 @@ test: fuzzer
 [unix]
 test_prometheus: fuzzer
     #!/bin/bash
+    # Kill any leftover fuzzer processes to ensure clean port binding
+    pkill -9 -f {{ FUZZER_NAME }} || true
     # Purge any leaked System V shared memory segments owned by the current user
     for id in $(ipcs -m | grep $(whoami) | awk '{print $2}'); do ipcrm -m $id || true; done
     rm -f fuzz_*.log || true
