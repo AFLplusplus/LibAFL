@@ -49,8 +49,9 @@ use prometheus_client::{
     metrics::{family::Family, gauge::Gauge},
     registry::Registry,
 };
-// using tide for the HTTP server library (fast, async, simple)
-use tide::Request;
+// using trillium for the HTTP server library (fast, async, simple)
+use trillium::{Conn, State as TrilliumState};
+use trillium_router::Router;
 
 use crate::monitors::{
     Monitor,
@@ -446,22 +447,38 @@ pub(crate) async fn serve_metrics(
         client_stats.custom_stat,
     );
 
-    let mut app = tide::with_state(State {
+    let state = State {
         registry: Arc::new(registry),
-    });
+    };
 
-    app.at("/")
-        .get(|_| async { Ok("LibAFL Prometheus Monitor") });
-    app.at("/metrics").get(|req: Request<State>| async move {
-        let mut encoded = String::new();
-        encode(&mut encoded, &req.state().registry).unwrap();
-        let response = tide::Response::builder(200)
-            .body(encoded)
-            .content_type("application/openmetrics-text; version=1.0.0; charset=utf-8")
-            .build();
-        Ok(response)
-    });
-    app.listen(listener).await?;
+    let app = (
+        TrilliumState::new(state),
+        Router::new()
+            .get("/", |conn: Conn| async move {
+                conn.ok("LibAFL Prometheus Monitor")
+            })
+            .get("/metrics", |conn: Conn| async move {
+                let state = conn.state::<State>().unwrap();
+                let mut encoded = String::new();
+                encode(&mut encoded, &state.registry).unwrap();
+                conn.with_response_header(
+                    "content-type",
+                    "application/openmetrics-text; version=1.0.0; charset=utf-8",
+                )
+                .ok(encoded)
+            }),
+    );
+
+    let (host, port) = listener
+        .split_once(':')
+        .unwrap_or((listener.as_str(), "8080"));
+    let port: u16 = port.parse().unwrap_or(8080);
+
+    trillium_async_std::config()
+        .with_host(host)
+        .with_port(port)
+        .run_async(app)
+        .await;
 
     Ok(())
 }
@@ -479,4 +496,41 @@ pub struct Labels {
 #[derive(Clone)]
 struct State {
     registry: Arc<Registry>,
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::string::{String, ToString};
+    use std::{
+        io::{Read, Write},
+        net::TcpStream,
+        thread::sleep,
+        time::Duration,
+    };
+
+    use libafl_bolts::ClientId;
+
+    use crate::monitors::{Monitor, PrometheusMonitor, stats::ClientStatsManager};
+
+    #[test]
+    fn test_prometheus_monitor() {
+        let mut client_stats = ClientStatsManager::new();
+        let mut mon = PrometheusMonitor::new("127.0.0.1:18081".to_string(), |_msg| {});
+        mon.display(&mut client_stats, "test", ClientId(0)).unwrap();
+
+        // Give the server a moment to start up in the background thread
+        sleep(Duration::from_millis(500));
+
+        let mut stream =
+            TcpStream::connect("127.0.0.1:18081").expect("Failed to connect to prometheus monitor");
+        stream
+            .write_all(b"GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .unwrap();
+
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+
+        assert!(response.contains("global_executions_total"));
+        assert!(response.contains("execution_rate"));
+    }
 }

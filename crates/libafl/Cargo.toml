@@ -128,7 +128,9 @@ prometheus_monitor = [
   "std",
   "async-std",
   "prometheus-client",
-  "tide",
+  "trillium",
+  "trillium-async-std",
+  "trillium-router",
   "futures",
 ]
 
@@ -270,7 +272,9 @@ serde = { workspace = true, features = ["alloc", "derive"] }
 serde_json = { workspace = true, default-features = false, features = [
   "alloc",
 ], optional = true }
-tide = { version = "0.16.0", optional = true }
+trillium = { version = "1.1.0", optional = true }
+trillium-async-std = { version = "0.6.1", optional = true }
+trillium-router = { version = "0.5.0", optional = true }
 tokio = { version = "1.40.0", optional = true, features = [
   "sync",
   "net",
