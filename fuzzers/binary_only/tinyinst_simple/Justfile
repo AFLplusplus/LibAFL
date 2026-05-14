@@ -3,14 +3,14 @@ import "../../../just/libafl.just"
 FUZZER_NAME := "tinyinst_simple"
 
 set windows-shell := ["cmd.exe", "/c"]
-set unstable := true
 
-[linux]
 harness:
+    {{ if os() == "windows" { "just _harness_windows" } else { "just _harness_linux" } }}
+
+_harness_linux:
     clang test/test.cpp -o test.exe
 
-[windows]
-harness:
+_harness_windows:
     cl test\test.cpp -o test.exe
 
 fuzzer:
@@ -19,8 +19,10 @@ fuzzer:
 run: harness fuzzer
     cargo run --profile {{ PROFILE }}
 
-[linux]
 test: harness fuzzer
+    {{ if os() == "windows" { "just _test_windows" } else { "just _test_linux" } }}
+
+_test_linux:
     #!/bin/bash
     cp {{ TARGET_DIR }}/{{ PROFILE_DIR }}/tinyinst_simple .
     echo "Running tests"
@@ -32,9 +34,9 @@ test: harness fuzzer
         exit 1
     fi
 
-[windows]
-test: harness fuzzer
+_test_windows:
     copy .\target\{{ PROFILE_DIR }}\tinyinst_simple.exe .
     start .\tinyinst_simple.exe
     ping -n 10 127.0.0.1>NUL && taskkill /im tinyinst_simple.exe /F
     dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
+

@@ -3939,7 +3939,7 @@ mod tests {
     use super::{
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
-        Tag,
+        LlmpSharedMap, Tag,
     };
 
     #[test]
@@ -4000,7 +4000,7 @@ mod tests {
     fn test_llmp_assert_uninitialized_map() {
         let mut shmem_provider = StdShMemProvider::new().unwrap();
         let shmem = shmem_provider.new_shmem(1024).unwrap();
-        use super::LlmpSharedMap;
-        let _ = LlmpSharedMap::existing(shmem);
+        let map = LlmpSharedMap::existing(shmem);
+        drop(map);
     }
 }
