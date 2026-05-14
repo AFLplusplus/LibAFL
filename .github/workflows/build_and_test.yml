@@ -295,6 +295,7 @@ jobs:
           # - baby/backtrace_baby_fuzzers
           - baby/baby_fuzzer_unicode
           - baby/baby_fuzzer_minimizing
+          - baby/baby_fuzzer_redqueen
           - baby/backtrace_baby_fuzzers/c_code_with_fork_executor
           - baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor
           - baby/backtrace_baby_fuzzers/rust_code_with_fork_executor
