@@ -32,4 +32,3 @@ _test_unix:
     #!/bin/bash
     timeout 10s {{ FUZZER }} -H ./test-harness.so -l ./test-harness.so || true
     test -n "$(ls solutions)"
-

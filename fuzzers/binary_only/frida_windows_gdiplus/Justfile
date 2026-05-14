@@ -18,8 +18,8 @@ run: build harness
     .\{{ TARGET_DIR }}\{{ PROFILE }}\{{ FUZZER_NAME }} -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
 
 test_cmplog: build harness_cmplog_test
+    #!cmd
     @echo off
-
     for %%i in (t1 t2 t3 t4 t5 t6 t7) do (
       echo Testing %%i...
       rmdir /s /q output_%%i
@@ -27,7 +27,6 @@ test_cmplog: build harness_cmplog_test
       ping -n 3 127.0.0.1>NUL && taskkill /im {{ FUZZER }} /F
       dir /a-d "output_%%i" && (echo Files exist) || (exit /b 1337)
     )
-
     echo All tests done
 
 test_default: build harness
@@ -40,4 +39,3 @@ test: test_default test_cmplog
 clean:
     make -C libpng-1.6.37 clean
     cargo clean
-

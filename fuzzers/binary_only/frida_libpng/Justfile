@@ -89,4 +89,3 @@ _clean_unix:
     #!/bin/bash
     if [ -d libpng-1.6.37 ]; then make -C libpng-1.6.37 clean; fi
     cargo clean
-
