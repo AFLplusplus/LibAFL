@@ -599,6 +599,7 @@ where
             .hit_objectives()
             .contains(&Cow::Borrowed(CRASH_FEEDBACK_NAME))
         {
+            self.saved_crashes += 1;
             self.last_crash = current_time();
             self.execs_at_last_objective = *state.executions();
         }
@@ -613,6 +614,7 @@ where
             .hit_objectives()
             .contains(&Cow::Borrowed(TIMEOUT_FEEDBACK_NAME))
         {
+            self.saved_hangs += 1;
             self.last_hang = current_time();
             self.execs_at_last_objective = *state.executions();
         }
@@ -669,7 +671,7 @@ impl Display for AFLPlotData<'_> {
 }
 impl AFLPlotData<'_> {
     fn header() -> &'static str {
-        "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found"
+        "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found\n"
     }
 }
 impl Display for AflFuzzerStats<'_> {
