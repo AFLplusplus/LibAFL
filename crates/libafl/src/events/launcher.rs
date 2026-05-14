@@ -68,6 +68,15 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 #[cfg(unix)]
 const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
 
+/// Reasons why a child process exited/crashed
+#[derive(Debug, Clone, Copy)]
+pub enum LauncherExitReason {
+    /// Exited with status code
+    Exited(i32),
+    /// Killed by signal
+    Killed(i32),
+}
+
 /// Information about this client from the launcher
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientDescription {
@@ -172,7 +181,6 @@ pub struct Launcher<'a, CF, MT, SP> {
     /// Tell the manager to serialize or not the state on restart
     serialize_state: ShouldSaveState,
     /// If this launcher should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
-    #[cfg(unix)]
     fork: bool,
 }
 
@@ -204,7 +212,6 @@ pub struct LauncherBuilder<'a, CF, MT, SP> {
     multi_machine_node_descriptor: Option<NodeDescriptor<SocketAddr>>,
     spawn_broker: bool,
     serialize_state: ShouldSaveState,
-    #[cfg(unix)]
     fork: bool,
 }
 
@@ -232,7 +239,6 @@ impl LauncherBuilder<'_, (), (), ()> {
             ),
             spawn_broker: true,
             serialize_state: ShouldSaveState::OnRestart,
-            #[cfg(unix)]
             fork: true,
         }
     }
@@ -269,7 +275,6 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             multi_machine_node_descriptor: self.multi_machine_node_descriptor,
             spawn_broker: self.spawn_broker,
             serialize_state: self.serialize_state,
-            #[cfg(unix)]
             fork: self.fork,
         }
     }
@@ -295,7 +300,6 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             multi_machine_node_descriptor: self.multi_machine_node_descriptor,
             spawn_broker: self.spawn_broker,
             serialize_state: self.serialize_state,
-            #[cfg(unix)]
             fork: self.fork,
         }
     }
@@ -328,7 +332,6 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
             multi_machine_node_descriptor: self.multi_machine_node_descriptor,
             spawn_broker: self.spawn_broker,
             serialize_state: self.serialize_state,
-            #[cfg(unix)]
             fork: self.fork,
         }
     }
@@ -412,7 +415,6 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
     }
 
     /// If this launcher should use `fork` to spawn a new instance. Otherwise it will try to re-launch the current process with exactly the same parameters.
-    #[cfg(unix)]
     #[must_use]
     pub fn fork(mut self, fork: bool) -> Self {
         self.fork = fork;
@@ -445,7 +447,6 @@ impl<'a, CF, MT, SP> LauncherBuilder<'a, CF, MT, SP> {
                 .expect("multi_machine_node_descriptor not set"),
             spawn_broker: self.spawn_broker,
             serialize_state: self.serialize_state,
-            #[cfg(unix)]
             fork: self.fork,
         }
     }
@@ -527,7 +528,6 @@ where
             multi_machine_node_descriptor: self.multi_machine_node_descriptor,
             spawn_broker: self.spawn_broker,
             serialize_state: self.serialize_state,
-            #[cfg(unix)]
             fork: self.fork,
         }
     }
@@ -652,12 +652,7 @@ where
         F: FnMut(&Self, Option<ClientDescription>, Option<MT>) -> Result<(Option<S>, EM), Error>,
         CF: FnOnce(Option<S>, EM, ClientDescription) -> Result<(), Error>,
     {
-        #[cfg(unix)]
-        let use_fork = self.fork;
-        #[cfg(not(unix))]
-        let use_fork = false;
-
-        if use_fork {
+        if cfg!(unix) && self.fork {
             #[cfg(unix)]
             {
                 if self.cores.ids.is_empty() {
@@ -762,12 +757,9 @@ where
                     }
                 }
 
-                Self::wait_for_pids(&handles, self.spawn_broker)?;
-            }
-            // This is the fork part for unix
-            #[cfg(not(unix))]
-            {
-                unreachable!("Forking not supported");
+                if let Err(err) = Self::wait_for_pids(&handles, self.spawn_broker) {
+                    log::error!("Error waiting for client PIDs: {err:?}");
+                }
             }
         } else {
             // spawn logic
@@ -892,9 +884,11 @@ where
                 spawn_mgr(&self, None, monitor)?;
             }
 
-            Self::wait_for_child_processes(&mut handles, self.spawn_broker)?;
+            if let Err(err) = Self::wait_for_child_processes(&mut handles, self.spawn_broker) {
+                log::error!("Error waiting for child processes: {err:?}");
+            }
         }
-        Err(Error::shutting_down())
+        Ok(())
     }
 
     #[cfg(unix)]
@@ -931,7 +925,7 @@ where
                     } else {
                         log::info!("Client with pid {handle} exited with status {status}");
                         crash_count += 1;
-                        reasons.push(format!("Exited with status {status}"));
+                        reasons.push(LauncherExitReason::Exited(status));
                     }
                 }
             }
@@ -967,18 +961,18 @@ where
                         if let Some(sig) = ecode.signal() {
                             if sig != libc::SIGINT && sig != libc::SIGTERM {
                                 crash_count += 1;
-                                reasons.push(format!("Killed by signal {sig}"));
+                                reasons.push(LauncherExitReason::Killed(sig));
                             }
                         } else if let Some(code) = ecode.code() {
                             crash_count += 1;
-                            reasons.push(format!("Exited with code {code}"));
+                            reasons.push(LauncherExitReason::Exited(code));
                         }
                     }
                     #[cfg(not(unix))]
                     {
                         if let Some(code) = ecode.code() {
                             crash_count += 1;
-                            reasons.push(format!("Exited with code {code}"));
+                            reasons.push(LauncherExitReason::Exited(code));
                         }
                     }
                 }
