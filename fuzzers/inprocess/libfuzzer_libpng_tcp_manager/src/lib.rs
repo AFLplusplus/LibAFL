@@ -55,7 +55,7 @@ pub extern "C" fn libafl_main() {
 
     #[cfg(feature = "prometheus")]
     let monitor = (
-        libafl::monitors::PrometheusMonitor::new("127.0.0.1:8080", |s| eprintln!("{s}")),
+        libafl::monitors::PrometheusMonitor::new("127.0.0.1:8080"),
         libafl::monitors::SimpleMonitor::new(|s| eprintln!("{s}")),
     );
     #[cfg(not(feature = "prometheus"))]

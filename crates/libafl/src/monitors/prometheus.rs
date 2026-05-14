@@ -1,4 +1,4 @@
-//! The [`PrometheusMonitor`] logs fuzzer progress to a prometheus endpoint.
+//! The [`PrometheusMonitor`] exposes fuzzer progress as a prometheus endpoint.
 //!
 //! ## Overview
 //!
@@ -11,15 +11,19 @@
 //! ## How to use it
 //!
 //! Create a [`PrometheusMonitor`] and plug it into any fuzzer similar to other monitors.
+//! Pair it with a [`MultiMonitor`](crate::monitors::MultiMonitor) for console output.
 //! In your fuzzer:
 //!
 //! ```rust
 //! // First, include:
-//! use libafl::monitors::PrometheusMonitor;
+//! use libafl::monitors::{MultiMonitor, PrometheusMonitor};
 //!
 //! // Then, create the monitor:
-//! let listener = "127.0.0.1:8080".to_string(); // point prometheus to scrape here in your prometheus.yml
-//! let mon = PrometheusMonitor::new(listener, |s| log::info!("{s}"));
+//! let listener = "127.0.0.1:8080"; // point prometheus to scrape here in your prometheus.yml
+//! let mon = (
+//!     PrometheusMonitor::new(listener),
+//!     MultiMonitor::new(|s| log::info!("{s}")),
+//! );
 //!
 //! // and finally, like with any other monitor, pass it into the event manager like so:
 //! // let mgr = SimpleEventManager::new(mon);
@@ -32,12 +36,7 @@ use alloc::{
     string::{String, ToString},
     sync::Arc,
 };
-use core::{
-    fmt,
-    fmt::{Debug, Write},
-    sync::atomic::AtomicU64,
-    time::Duration,
-};
+use core::{fmt::Debug, sync::atomic::AtomicU64, time::Duration};
 use std::net::{SocketAddr, ToSocketAddrs};
 
 // using axum for the HTTP server library (fast, async, modular)
@@ -85,46 +84,29 @@ impl PrometheusStats {
 }
 
 /// Tracking monitor during fuzzing.
-#[derive(Clone)]
-pub struct PrometheusMonitor<F>
-where
-    F: FnMut(&str),
-{
-    print_fn: F,
+#[derive(Clone, Debug)]
+pub struct PrometheusMonitor {
     stats: PrometheusStats, // unified prometheus metrics
     listener: SocketAddr,   // server address
     runtime: Arc<std::sync::Mutex<Option<tokio::runtime::Runtime>>>, // background tokio runtime
 }
 
-impl<F> Debug for PrometheusMonitor<F>
-where
-    F: FnMut(&str),
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PrometheusMonitor")
-            .field("listener", &self.listener)
-            .field("runtime", &self.runtime)
-            .finish_non_exhaustive()
-    }
-}
-
-impl<F> Monitor for PrometheusMonitor<F>
-where
-    F: FnMut(&str),
-{
+impl Monitor for PrometheusMonitor {
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
     ) -> Result<(), Error> {
+        let _ = event_msg; // logging is handled by a paired monitor (e.g., MultiMonitor)
+
         let mut runtime_lock = self.runtime.lock().unwrap();
         if runtime_lock.is_none() {
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
                 .unwrap();
-            let listener = self.listener.clone();
+            let listener = self.listener;
             let stats = self.stats.clone();
             runtime.spawn(async move {
                 serve_metrics(listener, stats)
@@ -136,70 +118,45 @@ where
         }
         drop(runtime_lock);
 
-        // Update the prometheus metrics
-        // The gauges must take signed i64's, with max value of 2^63-1 so it is
-        // probably fair to error out at a count of nine quintillion across any
-        // of these counts.
-        // realistically many of these metrics should be counters but would
-        // require a fair bit of logic to handle "amount to increment given
-        // time since last observation"
-
         let global_stats = client_stats_manager.global_stats();
         let global = ClientLabels {
             client: Cow::from("global"),
         };
 
         // Global (aggregated) metrics
-        let corpus_size = global_stats.corpus_size;
         self.stats
             .corpus_count
             .get_or_create(&global)
-            .set(corpus_size.try_into().unwrap());
+            .set(global_stats.corpus_size.try_into().unwrap());
 
-        let objective_size = global_stats.objective_size;
         self.stats
             .objective_count
             .get_or_create(&global)
-            .set(objective_size.try_into().unwrap());
+            .set(global_stats.objective_size.try_into().unwrap());
 
-        let total_execs = global_stats.total_execs;
         self.stats
             .executions
             .get_or_create(&global)
-            .set(total_execs.try_into().unwrap());
+            .set(global_stats.total_execs.try_into().unwrap());
 
-        let execs_per_sec = global_stats.execs_per_sec;
         self.stats
             .exec_rate
             .get_or_create(&global)
-            .set(execs_per_sec);
+            .set(global_stats.execs_per_sec);
 
-        let run_time = global_stats.run_time.as_secs();
         self.stats
             .runtime
             .get_or_create(&global)
-            .set(run_time.try_into().unwrap()); // run time in seconds, which can be converted to a time format by Grafana or similar
+            .set(global_stats.run_time.as_secs().try_into().unwrap());
 
-        let total_clients = global_stats.client_stats_count.try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
+        let total_clients: i64 = global_stats.client_stats_count.try_into().unwrap();
         self.stats
             .clients_count
             .get_or_create(&global)
             .set(total_clients);
 
-        // display stats in a SimpleMonitor format
-        let mut global_fmt = format!(
-            "[Prometheus] [{} #GLOBAL] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
-            event_msg,
-            global_stats.run_time_pretty,
-            global_stats.client_stats_count,
-            global_stats.corpus_size,
-            global_stats.objective_size,
-            global_stats.total_execs,
-            global_stats.execs_per_sec_pretty
-        );
+        // Global aggregated custom stats
         for (key, val) in client_stats_manager.aggregated() {
-            // print global aggregated custom stats
-            write!(global_fmt, ", {key}: {val}").unwrap();
             #[expect(clippy::cast_precision_loss)]
             let value: f64 = match val {
                 UserStatsValue::Number(n) => *n as f64,
@@ -234,8 +191,6 @@ where
                 })
                 .set(value);
         }
-
-        (self.print_fn)(&global_fmt);
 
         // Client-specific metrics
 
@@ -280,21 +235,8 @@ where
             .get_or_create(&client_label)
             .set(total_clients);
 
-        let mut fmt = format!(
-            "[Prometheus] [{} #{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
-            event_msg,
-            sender_id.0,
-            client.corpus_size(),
-            client.objective_size(),
-            client.executions(),
-            cur_client_clone.execs_per_sec_pretty(current_time())
-        );
-
+        // Per-client custom stats
         for (key, val) in cur_client_clone.user_stats() {
-            // print the custom stats for each client
-            write!(fmt, ", {key}: {val}").unwrap();
-            // Update metrics added to the user_stats hashmap by feedback event-fires
-            // You can filter for each custom stat in promQL via labels of both the stat name and client id
             #[expect(clippy::cast_precision_loss)]
             let value: f64 = match val.value() {
                 UserStatsValue::Number(n) => *n as f64,
@@ -329,19 +271,15 @@ where
                 })
                 .set(value);
         }
-        (self.print_fn)(&fmt);
         Ok(())
     }
 }
 
-impl<F> PrometheusMonitor<F>
-where
-    F: FnMut(&str),
-{
+impl PrometheusMonitor {
     /// Create a new [`PrometheusMonitor`].
-    /// The `listener` is the address to send logs to.
-    /// The `print_fn` is the printing function that can output the logs otherwise.
-    pub fn new<T>(listener: T, print_fn: F) -> Self
+    /// The `listener` is the address to bind the metrics HTTP endpoint to.
+    /// Pair with a [`MultiMonitor`](crate::monitors::MultiMonitor) for console output.
+    pub fn new<T>(listener: T) -> Self
     where
         T: ToSocketAddrs,
     {
@@ -354,22 +292,22 @@ where
         stats.init_global();
 
         Self {
-            print_fn,
             stats,
             listener: addr,
             runtime: Arc::new(std::sync::Mutex::new(None)),
         }
     }
+
     /// Creates the monitor with a given `start_time`.
     #[deprecated(
         since = "0.16.0",
         note = "Please use new to create. start_time is useless here."
     )]
-    pub fn with_time<T>(listener: T, print_fn: F, _start_time: Duration) -> Self
+    pub fn with_time<T>(listener: T, _start_time: Duration) -> Self
     where
         T: ToSocketAddrs,
     {
-        Self::new(listener, print_fn)
+        Self::new(listener)
     }
 }
 
@@ -485,7 +423,7 @@ mod tests {
     #[test]
     fn test_prometheus_monitor() {
         let mut client_stats = ClientStatsManager::new();
-        let mut mon = PrometheusMonitor::new("127.0.0.1:18081", |_msg| {});
+        let mut mon = PrometheusMonitor::new("127.0.0.1:18081");
         mon.display(&mut client_stats, "test", ClientId(0)).unwrap();
 
         // Give the server a moment to start up in the background thread

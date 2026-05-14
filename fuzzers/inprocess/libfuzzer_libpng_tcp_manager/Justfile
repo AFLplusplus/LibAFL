@@ -73,6 +73,7 @@ test: fuzzer
         echo "Fuzzer does not generate any testcases or any crashes"
         exit 1
     fi
+    just test_prometheus
 
 [unix]
 test_prometheus: fuzzer
@@ -105,7 +106,7 @@ test_prometheus: fuzzer
     echo "Metrics response:"
     echo "$METRICS"
 
-    if echo "$METRICS" | grep -E -q 'executions_total\{client="global",.*\} [1-9]' && echo "$METRICS" | grep -E -q 'executions_total\{client="[0-9]+",.*\} [1-9]'; then
+    if echo "$METRICS" | grep -E -q 'executions_total\{client="global"\} [1-9]' && echo "$METRICS" | grep -E -q 'executions_total\{client="[0-9]+"\} [1-9]'; then
         echo "Success! Prometheus metrics are reporting both global and per-fuzzer stats successfully."
     else
         echo "ERROR: Fuzzer stats remained zero or were not reported for global/client!"

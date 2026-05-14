@@ -1832,7 +1832,7 @@ where
                     LLMP_TAG_UNSET => panic!(
                         "BUG: Read unallocated msg (tag was {:?} - msg header: {:?}",
                         LLMP_TAG_UNSET,
-                        &(*msg)
+                        (*msg)
                     ),
                     LLMP_TAG_EXITING => {
                         // The other side is done.
@@ -2084,7 +2084,7 @@ where
             assert!(
                 (*ret.page()).magic == PAGE_INITIALIZED_MAGIC,
                 "Map was not priviously initialized at {:?}",
-                &ret.shmem
+                ret.shmem
             );
             #[cfg(feature = "llmp_debug")]
             log::info!("PAGE: {:?}", &(*ret.page()));
@@ -3992,5 +3992,15 @@ mod tests {
 
         // We want at least the tcp and sender clients.
         assert_eq!(broker.inner.llmp_clients.len(), 2);
+    }
+
+    #[test]
+    #[serial]
+    #[should_panic(expected = "Map was not priviously initialized at")]
+    fn test_llmp_assert_uninitialized_map() {
+        let mut shmem_provider = StdShMemProvider::new().unwrap();
+        let shmem = shmem_provider.new_shmem(1024).unwrap();
+        use super::LlmpSharedMap;
+        let _ = LlmpSharedMap::existing(shmem);
     }
 }
