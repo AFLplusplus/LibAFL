@@ -25,7 +25,7 @@ libpng:
 [linux]
 [macos]
 cxx:
-    cargo build --profile {{ PROFILE }}
+    cargo build --profile {{ PROFILE }} --features prometheus
 
 [windows]
 cxx:
@@ -71,6 +71,44 @@ test: fuzzer
         echo "Fuzzer is working"
     else
         echo "Fuzzer does not generate any testcases or any crashes"
+        exit 1
+    fi
+
+[unix]
+test_prometheus: fuzzer
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    # Start broker in background
+    FUZZER_PORT=21337 CARGO_TARGET_DIR={{ PROJECT_DIR }}/target stdbuf -oL -eL ./{{ FUZZER_NAME }} --cores 0 --input ./corpus > fuzz_broker.log 2>&1 &
+    BROKER_PID=$!
+
+    sleep 3
+
+    # Start client in background
+    FUZZER_PORT=21337 CARGO_TARGET_DIR={{ PROJECT_DIR }}/target stdbuf -oL -eL ./{{ FUZZER_NAME }} --cores 0 --input ./corpus > fuzz_client.log 2>&1 &
+    CLIENT_PID=$!
+
+    echo "Waiting for fuzzer to start and execute test cases..."
+    sleep 5
+    echo "Checking fuzzer processes:"
+    ps aux | grep fuzzer || true
+    echo "Checking TCP connections on 21337:"
+    ss -tapn | grep 21337 || true
+    sleep 10
+
+    METRICS=$(curl -s http://127.0.0.1:8080/metrics)
+
+    kill $CLIENT_PID $BROKER_PID || true
+    pkill -9 -f {{ FUZZER_NAME }} || true
+    wait $CLIENT_PID $BROKER_PID 2>/dev/null || true
+
+    echo "Metrics response:"
+    echo "$METRICS"
+
+    if echo "$METRICS" | grep -E -q 'executions_total\{client="global",.*\} [1-9]' && echo "$METRICS" | grep -E -q 'executions_total\{client="[0-9]+",.*\} [1-9]'; then
+        echo "Success! Prometheus metrics are reporting both global and per-fuzzer stats successfully."
+    else
+        echo "ERROR: Fuzzer stats remained zero or were not reported for global/client!"
         exit 1
     fi
 
