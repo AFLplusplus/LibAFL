@@ -36,8 +36,8 @@ use alloc::{
     string::{String, ToString},
     sync::Arc,
 };
-use core::{fmt::Debug, sync::atomic::AtomicU64, time::Duration};
-use std::net::{SocketAddr, ToSocketAddrs};
+use core::{fmt::Debug, net::SocketAddr, sync::atomic::AtomicU64, time::Duration};
+use std::net::ToSocketAddrs;
 
 // using axum for the HTTP server library (fast, async, modular)
 use axum::{
@@ -380,7 +380,7 @@ pub struct ClientLabels {
 pub struct CustomStatLabels {
     /// The `sender_id` helps to differentiate between clients when multiple are spawned.
     client: Cow<'static, str>,
-    /// The name of the custom stat (e.g. "edges", "edges_hit", "edges_total").
+    /// The name of the custom stat (e.g. `edges`, `edges_hit`, `edges_total`).
     stat: Cow<'static, str>,
 }
 
@@ -409,11 +409,11 @@ async fn get_metrics(AxumState(state): AxumState<State>) -> impl IntoResponse {
 #[cfg(test)]
 mod tests {
     use alloc::string::String;
+    use core::time::Duration;
     use std::{
         io::{Read, Write},
         net::TcpStream,
         thread::sleep,
-        time::Duration,
     };
 
     use libafl_bolts::ClientId;
