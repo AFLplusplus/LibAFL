@@ -39,6 +39,10 @@ runs:
         components: clippy, rustfmt
     # -----------------------------------------
 
+    - name: Fix PATH for Cargo
+      shell: bash
+      run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
     - name: Install just
       uses: extractions/setup-just@v3
 
