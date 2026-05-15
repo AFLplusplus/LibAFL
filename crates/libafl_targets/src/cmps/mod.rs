@@ -224,8 +224,8 @@ impl AflppCmpLogOperands {
 #[repr(C, packed)]
 /// Comparison function operands, like for strcmp/memcmp, represented as two byte arrays.
 pub struct AflppCmpLogFnOperands {
-    v0: [u8; 32],
-    v1: [u8; 32],
+    v0: [u8; CMPLOG_RTN_LEN],
+    v1: [u8; CMPLOG_RTN_LEN],
     v0_len: u8,
     v1_len: u8,
     unused: [u8; 6],
@@ -235,14 +235,16 @@ impl AflppCmpLogFnOperands {
     #[must_use]
     /// Create a new AFL++ function operands comparison values from two byte slices
     pub fn new(v0: &[u8], v1: &[u8]) -> Self {
-        let v0_len = v0.len() as u8;
-        let v1_len = v1.len() as u8;
+        let v0_len = v0.len().min(CMPLOG_RTN_LEN) as u8;
+        let v0_truncated = &v0[..v0_len as usize];
+        let v1_len = v1.len().min(CMPLOG_RTN_LEN) as u8;
+        let v1_truncated = &v1[..v1_len as usize];
 
-        let mut v0_arr = [0; 32];
-        let mut v1_arr = [0; 32];
+        let mut v0_arr = [0; CMPLOG_RTN_LEN];
+        let mut v1_arr = [0; CMPLOG_RTN_LEN];
 
-        v0_arr.copy_from_slice(v0);
-        v1_arr.copy_from_slice(v1);
+        v0_arr[..v0_len as usize].copy_from_slice(v0_truncated);
+        v1_arr[..v1_len as usize].copy_from_slice(v1_truncated);
 
         Self {
             v0: v0_arr,
@@ -255,7 +257,7 @@ impl AflppCmpLogFnOperands {
 
     #[must_use]
     /// first rtn operand
-    pub fn v0(&self) -> &[u8; 32] {
+    pub fn v0(&self) -> &[u8; CMPLOG_RTN_LEN] {
         &self.v0
     }
 
@@ -267,7 +269,7 @@ impl AflppCmpLogFnOperands {
 
     #[must_use]
     /// first rtn operand len
-    pub fn v1(&self) -> &[u8; 32] {
+    pub fn v1(&self) -> &[u8; CMPLOG_RTN_LEN] {
         &self.v1
     }
 
@@ -279,14 +281,14 @@ impl AflppCmpLogFnOperands {
 
     /// Set the v0 (left) side of the comparison
     pub fn set_v0(&mut self, v0: &[u8]) {
-        self.v0_len = v0.len() as u8;
-        self.v0.copy_from_slice(v0);
+        self.v0_len = v0.len().min(CMPLOG_RTN_LEN) as u8;
+        self.v0[..self.v0_len as usize].copy_from_slice(&v0[..self.v0_len as usize]);
     }
 
     /// Set the v1 (right) side of the comparison
     pub fn set_v1(&mut self, v1: &[u8]) {
-        self.v1_len = v1.len() as u8;
-        self.v1.copy_from_slice(v1);
+        self.v1_len = v1.len().min(CMPLOG_RTN_LEN) as u8;
+        self.v1[..self.v1_len as usize].copy_from_slice(&v1[..self.v1_len as usize]);
     }
 }
 

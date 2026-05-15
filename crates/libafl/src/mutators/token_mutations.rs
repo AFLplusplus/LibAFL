@@ -1076,8 +1076,8 @@ impl AflppRedQueen {
 
                     if buf_16 == pattern as u16 && another_buf_16 == another_pattern as u16 {
                         let mut cloned = buf.to_vec();
-                        cloned[buf_idx + 1] = (repl & 0xff) as u8;
-                        cloned[buf_idx] = ((repl >> 8) & 0xff) as u8;
+                        cloned[buf_idx..(buf_idx + 2)]
+                            .copy_from_slice(&(repl as u16).to_be_bytes());
                         vec.push(cloned);
                         return Ok(true);
                     }
@@ -1091,12 +1091,9 @@ impl AflppRedQueen {
                     // println!("buf: {buf_32} {another_buf_32} {pattern} {another_pattern}");
                     if buf_32 == pattern as u32 && another_buf_32 == another_pattern as u32 {
                         let mut cloned = buf.to_vec();
-                        cloned[buf_idx + 3] = (repl & 0xff) as u8;
-                        cloned[buf_idx + 2] = ((repl >> 8) & 0xff) as u8;
-                        cloned[buf_idx + 1] = ((repl >> 16) & 0xff) as u8;
-                        cloned[buf_idx] = ((repl >> 24) & 0xff) as u8;
+                        cloned[buf_idx..(buf_idx + 4)]
+                            .copy_from_slice(&(repl as u32).to_be_bytes());
                         vec.push(cloned);
-
                         return Ok(true);
                     }
                 }
@@ -1109,16 +1106,7 @@ impl AflppRedQueen {
 
                     if buf_64 == pattern && another_buf_64 == another_pattern {
                         let mut cloned = buf.to_vec();
-
-                        cloned[buf_idx + 7] = (repl & 0xff) as u8;
-                        cloned[buf_idx + 6] = ((repl >> 8) & 0xff) as u8;
-                        cloned[buf_idx + 5] = ((repl >> 16) & 0xff) as u8;
-                        cloned[buf_idx + 4] = ((repl >> 24) & 0xff) as u8;
-                        cloned[buf_idx + 3] = ((repl >> 32) & 0xff) as u8;
-                        cloned[buf_idx + 2] = ((repl >> 32) & 0xff) as u8;
-                        cloned[buf_idx + 1] = ((repl >> 40) & 0xff) as u8;
-                        cloned[buf_idx] = ((repl >> 48) & 0xff) as u8;
-
+                        cloned[buf_idx..(buf_idx + 8)].copy_from_slice(&repl.to_be_bytes());
                         vec.push(cloned);
                         return Ok(true);
                     }
