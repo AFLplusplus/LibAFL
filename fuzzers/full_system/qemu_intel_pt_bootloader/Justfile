@@ -1,0 +1,39 @@
+import "../../../just/libafl.just"
+FUZZER_NAME := "qemu_intel_pt_bootloader"
+BIOS_DIR := TARGET_DIR / PROFILE_DIR / "qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu"
+
+run: build setcap convert_target_image
+    BIOS_DIR={{BIOS_DIR}} {{TARGET_DIR}}/{{PROFILE_DIR}}/{{FUZZER_NAME}}
+    sudo umount /mnt/libafl_qemu_tmpfs
+    sleep 1
+    sudo rm -r /mnt/libafl_qemu_tmpfs
+
+# Create target directory if it doesn't exist
+[private]
+target_dir:
+    @mkdir -p {{TARGET_DIR}}
+
+# Setup RAM disk to store the qcow2 disk
+ram_disk:
+    sudo mkdir -p /mnt/libafl_qemu_tmpfs
+    sudo mount -o size=128M -t tmpfs none /mnt/libafl_qemu_tmpfs
+    sudo chown $(id -u):$(id -g) "/mnt/libafl_qemu_tmpfs"
+
+# Build the bootloader
+build_target: target_dir
+    nasm -o {{TARGET_DIR}}/boot.bin ./src/boot.s
+
+build_fuzzer:
+    cargo build --profile {{PROFILE}}
+
+build: build_fuzzer build_target
+
+# Convert bootloader bin to qcow2 image
+convert_target_image: build_target ram_disk
+    qemu-img convert -O qcow2 {{TARGET_DIR}}/boot.bin /mnt/libafl_qemu_tmpfs/boot.qcow2
+
+# Set capabilities on the binary
+setcap: build_fuzzer
+    sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep {{TARGET_DIR}}/{{PROFILE_DIR}}/{{FUZZER_NAME}}
+
+test: build

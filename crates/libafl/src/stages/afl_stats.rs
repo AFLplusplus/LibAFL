@@ -671,7 +671,7 @@ impl Display for AFLPlotData<'_> {
 }
 impl AFLPlotData<'_> {
     fn header() -> &'static str {
-        "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found"
+        "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found\n"
     }
 }
 impl Display for AflFuzzerStats<'_> {
