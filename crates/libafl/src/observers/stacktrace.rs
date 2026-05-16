@@ -245,15 +245,18 @@ impl Named for BacktraceObserver<'_> {
     }
 }
 
-/// static variable of ASAN log path
-pub static ASAN_LOG_PATH: &str = "./asanlog"; // TODO make it unique
+/// returns the ASAN log path
+#[must_use]
+pub fn asan_log_path() -> String {
+    format!("./asanlog_{}", std::process::id())
+}
 
 /// returns the recommended ASAN runtime flags to capture the backtrace correctly with `log_path` set
 #[must_use]
 pub fn get_asan_runtime_flags_with_log_path() -> String {
     let mut flags = get_asan_runtime_flags();
     flags.push_str(":log_path=");
-    flags.push_str(ASAN_LOG_PATH);
+    flags.push_str(&asan_log_path());
     flags
 }
 
@@ -321,7 +324,7 @@ impl AsanBacktraceObserver {
 
     /// read ASAN output from the log file and parse it.
     pub fn parse_asan_output_from_asan_log_file(&mut self, pid: i32) -> Result<(), Error> {
-        let log_path = format!("{ASAN_LOG_PATH}.{pid}");
+        let log_path = format!("{}.{pid}", asan_log_path());
         let mut asan_output = File::open(Path::new(&log_path))?;
 
         let mut buf = String::new();
@@ -383,5 +386,25 @@ impl<I, S> Observer<I, S> for AsanBacktraceObserver {}
 impl Named for AsanBacktraceObserver {
     fn name(&self) -> &Cow<'static, str> {
         &self.observer_name
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_asan_log_path_uniqueness() {
+        let path1 = asan_log_path();
+        let path2 = asan_log_path();
+
+        // Since both calls are in the same process, they will have the same path.
+        // However, we verify it contains the process ID and is valid.
+        assert!(path1.starts_with("./asanlog_"));
+        assert_eq!(path1, path2);
+
+        // Let's verify it contains the actual process ID
+        let pid = std::process::id();
+        assert_eq!(path1, format!("./asanlog_{pid}"));
     }
 }
