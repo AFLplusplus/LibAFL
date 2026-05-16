@@ -553,6 +553,10 @@ impl SnapshotModule {
         qemu.set_brk(self.brk);
         qemu.set_mmap_start(self.mmap_start);
 
+        // PPC32 TCG keeps stale TBs across the snapshot's mprotect swaps, so flush
+        #[cfg(cpu_target = "ppc")]
+        qemu.flush_jit();
+
         #[cfg(feature = "paranoid_debug")]
         self.check_snapshot(qemu);
 
