@@ -178,6 +178,7 @@ impl CommandConfigurator<Child> for StdCommandConfigurator {
                 }
                 Ok(cmd.spawn()?)
             }
+            #[allow(clippy::std_instead_of_core)]
             InputLocation::StdIn { input_file: _ } => {
                 let mut handle = self.command.stdin(Stdio::piped()).spawn()?;
                 let mut stdin = handle.stdin.take().unwrap();
