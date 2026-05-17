@@ -43,8 +43,7 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
     for profile in &["DEV", "RELEASE"] {
         unsafe {
             env::set_var(format!("CARGO_PROFILE_{profile}_OPT_LEVEL"), "z");
-            env::set_var(format!("CARGO_PROFILE_{profile}_INCREMENTAL"), "false");
-            env::set_var(format!("CARGO_PROFILE_{profile}_DEBUG"), "1");
+            env::set_var(format!("CARGO_PROFILE_{profile}_INCREMENTAL"), "true");
         }
     }
 
