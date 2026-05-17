@@ -24,7 +24,7 @@ test_cmplog: build harness_cmplog_test
       echo Testing %%i...
       rmdir /s /q output_%%i
       start "" "{{ FUZZER_NAME }}" -H cmplog.dll -i corpus -o output_%%i --libs-to-instrument cmplog.dll -F %%i -C
-      ping -n 3 127.0.0.1>NUL && taskkill /im {{ FUZZER }} /F
+      ping -n 3 127.0.0.1>NUL && taskkill /im {{ FUZZER_NAME }} /F
       dir /a-d "output_%%i" && (echo Files exist) || (exit /b 1337)
     )
     echo All tests done
