@@ -85,7 +85,17 @@ setup:
 
 [linux]
 [macos]
-test: fuzzer setup test-statsd test-tcp-fork test-tcp-no-fork test-tui test-all
+test:
+    just test-default
+    just test-statsd
+    just test-tcp-fork
+    just test-tcp-no-fork
+    just test-tui
+    just test-all
+
+[linux]
+[macos]
+test-default: fuzzer setup
     #!/bin/bash
     echo "Testing default (no fork)..."
     timeout -k 35s 31s stdbuf -oL -eL ./{{ FUZZER_NAME }}.coverage --broker-port 21337 --cores 0 --input ./corpus  2>&1 | tee fuzz_stdout.log || true
