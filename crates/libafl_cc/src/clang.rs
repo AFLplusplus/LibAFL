@@ -260,7 +260,7 @@ impl ToolWrapper for ClangWrapper {
         // Libraries needed by libafl on Windows
         #[cfg(windows)]
         {
-            new_args.push("/MD".into());
+            new_args.push("-fms-runtime-lib=dll".into());
             if linking {
                 new_args.push("-lws2_32".into());
                 new_args.push("-lBcrypt".into());
