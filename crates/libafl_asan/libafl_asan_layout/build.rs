@@ -208,7 +208,7 @@ fn find_max_vaddr_bits<const NB_TRIES: usize>() -> usize {
                     map_addr as *mut libc::c_void,
                     page_size,
                     libc::PROT_READ,
-                    libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED,
+                    libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED_NOREPLACE,
                     -1,
                     0,
                 )
@@ -252,12 +252,14 @@ fn guess_vma(arch: &Arch) -> Option<Vma> {
             let host = env::var_os("HOST").unwrap();
             let target = env::var_os("TARGET").unwrap();
 
-            if host == target {
+            let host_is_linux = host.to_string_lossy().contains("linux");
+
+            if host == target && host_is_linux {
                 Some(get_host_vma())
             } else {
                 let default_vma = Vma::Vma48;
                 println!(
-                    "cargo:warning=Host and target triplets do not match. Using default VMA: {default_vma:?}"
+                    "cargo:warning=Host and target triplets do not match or host is not Linux. Using default VMA: {default_vma:?}"
                 );
                 Some(default_vma)
             }
