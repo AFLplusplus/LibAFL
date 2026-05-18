@@ -50,8 +50,8 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_memcmp(
             let k = k & (CMPLOG_MAP_W - 1);
             crate::__libafl_targets_cmplog_routines_len(
                 k,
-                s1 as *const u8,
-                s2 as *const u8,
+                s1.cast::<u8>(),
+                s2.cast::<u8>(),
                 cmp::min(n, 32),
             );
         }
@@ -88,8 +88,8 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strncmp(
             }
             crate::__libafl_targets_cmplog_routines_len(
                 k,
-                s1 as *const u8,
-                s2 as *const u8,
+                s1.cast::<u8>(),
+                s2.cast::<u8>(),
                 actual_len,
             );
         }
@@ -139,8 +139,8 @@ pub unsafe extern "C" fn __sanitizer_weak_hook_strcmp(
             }
             crate::__libafl_targets_cmplog_routines_len(
                 k,
-                s1 as *const u8,
-                s2 as *const u8,
+                s1.cast::<u8>(),
+                s2.cast::<u8>(),
                 actual_len,
             );
         }
