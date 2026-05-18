@@ -68,6 +68,7 @@ mod default {
     // || `[0x001200000000, 0x0411ffffffff]` || ShadowGap  || 4096GB
     // || `[0x001000000000, 0x0011ffffffff]` || LowShadow  || 8GB
     // || `[0x000000000000, 0x000fffffffff]` || LowMem     || 64GB
+    #[cfg(target_pointer_width = "64")]
     impl ShadowLayout for DefaultShadowLayout64 {
         const SHADOW_OFFSET: usize = 0x001000000000;
         const LOW_MEM_OFFSET: GuestAddr = 0x0;
