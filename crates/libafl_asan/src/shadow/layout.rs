@@ -18,20 +18,20 @@ pub trait ShadowLayout: Debug + Send {
     const ALLOC_ALIGN_SIZE: usize;
 }
 
+pub use default::{DefaultShadowLayout32, DefaultShadowLayout64};
 #[cfg(not(feature = "dynamic_layout"))]
-pub use default::{DefaultShadowLayout, DefaultShadowLayout32, DefaultShadowLayout64};
+pub use default::StaticDefaultShadowLayout as DefaultShadowLayout;
 #[cfg(feature = "dynamic_layout")]
 pub use generated::DefaultShadowLayout;
 
-#[cfg(not(feature = "dynamic_layout"))]
 mod default {
     use super::ShadowLayout;
     use crate::GuestAddr;
 
-    #[cfg(target_pointer_width = "32")]
-    pub type DefaultShadowLayout = DefaultShadowLayout32;
-    #[cfg(target_pointer_width = "64")]
-    pub type DefaultShadowLayout = DefaultShadowLayout64;
+    #[cfg(all(not(feature = "dynamic_layout"), target_pointer_width = "32"))]
+    pub type StaticDefaultShadowLayout = DefaultShadowLayout32;
+    #[cfg(all(not(feature = "dynamic_layout"), target_pointer_width = "64"))]
+    pub type StaticDefaultShadowLayout = DefaultShadowLayout64;
 
     #[derive(Debug)]
     pub struct DefaultShadowLayout32;
