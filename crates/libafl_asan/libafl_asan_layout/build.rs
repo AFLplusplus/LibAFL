@@ -3,6 +3,12 @@ use std::{collections::HashMap, env, fs, ops::RangeInclusive, path::Path, sync::
 use build_target::{Arch, Os, PointerWidth, target_arch, target_os, target_pointer_width};
 use rand::Rng;
 
+// Default Linux/i386 mapping on x86_64 machine:
+// || `[0x40000000, 0xffffffff]` || HighMem    ||
+// || `[0x28000000, 0x3fffffff]` || HighShadow ||
+// || `[0x24000000, 0x27ffffff]` || ShadowGap  ||
+// || `[0x20000000, 0x23ffffff]` || LowShadow  ||
+// || `[0x00000000, 0x1fffffff]` || LowMem     ||
 const DEFAULT_32B_LAYOUT: TargetShadowLayout = TargetShadowLayout {
     high_mem: 0x40000000..=0xffffffff,
     high_shadow: 0x28000000..=0x3fffffff,
@@ -11,6 +17,12 @@ const DEFAULT_32B_LAYOUT: TargetShadowLayout = TargetShadowLayout {
     low_mem: 0x00000000..=0x1fffffff,
 };
 
+// Typical shadow mapping on Linux/x86_64 with SHADOW_OFFSET == 0x00007fff8000:
+// || `[0x10007fff8000, 0x7fffffffffff]` || HighMem    ||
+// || `[0x02008fff7000, 0x10007fff7fff]` || HighShadow ||
+// || `[0x00008fff7000, 0x02008fff6fff]` || ShadowGap  ||
+// || `[0x00007fff8000, 0x00008fff6fff]` || LowShadow  ||
+// || `[0x000000000000, 0x00007fff7fff]` || LowMem     ||
 const DEFAULT_64B_LAYOUT: TargetShadowLayout = TargetShadowLayout {
     high_mem: 0x10007fff8000..=0x7fffffffffff,
     high_shadow: 0x02008fff7000..=0x10007fff7fff,
@@ -24,8 +36,20 @@ static SPECIFIC_LAYOUTS: LazyLock<HashMap<(Arch, Option<Vma>, Os), TargetShadowL
     LazyLock::new(|| {
         let mut layouts = HashMap::new();
 
+        // Typical shadow mapping on Linux/x86_64 with SHADOW_OFFSET == 0x00007fff8000:
+        // || `[0x10007fff8000, 0x7fffffffffff]` || HighMem    ||
+        // || `[0x02008fff7000, 0x10007fff7fff]` || HighShadow ||
+        // || `[0x00008fff7000, 0x02008fff6fff]` || ShadowGap  ||
+        // || `[0x00007fff8000, 0x00008fff6fff]` || LowShadow  ||
+        // || `[0x000000000000, 0x00007fff7fff]` || LowMem     ||
         layouts.insert((Arch::X86_64, None, Os::Linux), DEFAULT_64B_LAYOUT.clone());
 
+        // Default Linux/i386 mapping on x86_64 machine:
+        // || `[0x40000000, 0xffffffff]` || HighMem    ||
+        // || `[0x28000000, 0x3fffffff]` || HighShadow ||
+        // || `[0x24000000, 0x27ffffff]` || ShadowGap  ||
+        // || `[0x20000000, 0x23ffffff]` || LowShadow  ||
+        // || `[0x00000000, 0x1fffffff]` || LowMem     ||
         layouts.insert((Arch::X86, None, Os::Linux), DEFAULT_32B_LAYOUT.clone());
 
         // Default Linux/AArch64 (42-bit VMA) mapping:
