@@ -16,6 +16,7 @@ env:
   CARGO_NET_GIT_FETCH_WITH_CLI: true
   # FIXME: please unpin macos rust stable toolchain once LLVM is bumped to version 22
   MAIN_LLVM_VERSION: 21
+  RUST_BACKTRACE: full
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

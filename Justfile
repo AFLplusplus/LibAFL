@@ -68,6 +68,11 @@ clippy-thumbv6m-none-eabi:
 test-miri:
     RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
 
+# Tests deexit utility
+[unix]
+test-deexit:
+    cd utils/deexit && just test
+
 # Tests all code in docs (macos version)
 [macos]
 [private]
@@ -274,11 +279,11 @@ test-repro-qemu-tmin:
 
 # Tests everything (crates, fuzzers, docs, repro)
 [linux]
-test-all: test test-fuzzers test-docs test-repro-qemu-tmin doc
+test-all: test test-deexit test-fuzzers test-docs test-repro-qemu-tmin doc
 
 # Tests everything (crates, fuzzers, docs, repro)
 [macos]
-test-all: test test-fuzzers test-docs test-repro-qemu-tmin doc
+test-all: test test-deexit test-fuzzers test-docs test-repro-qemu-tmin doc
 
 # Tests everything (crates, fuzzers, docs)
 [windows]
