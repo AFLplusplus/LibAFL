@@ -118,7 +118,7 @@ libafl_bolts = { workspace = true, features = ["std", "derive"] }
 libafl_core = { workspace = true, features = ["std"] }
 libafl_targets = { workspace = true, default-features = true }
 libafl_qemu_sys = { workspace = true }
-libafl_asan = { path = "../libafl_asan", default-features = false }
+libafl_asan_layout = { path = "../libafl_asan/libafl_asan_layout" }
 libafl_derive = { workspace = true, default-features = true }
 libafl_intelpt = { workspace = true, default-features = true, optional = true }
 

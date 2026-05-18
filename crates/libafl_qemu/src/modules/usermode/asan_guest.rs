@@ -10,15 +10,15 @@ use std::{env, fmt::Debug, fs, ops::Range, path::PathBuf};
     cpu_target = "ppc",
     cpu_target = "riscv32",
 ))]
-use libafl_asan::shadow::layout::DefaultShadowLayout32;
+use libafl_asan_layout::DefaultShadowLayout32;
 #[cfg(any(
     cpu_target = "aarch64",
     cpu_target = "x86_64",
     cpu_target = "riscv64",
     feature = "clippy"
 ))]
-use libafl_asan::shadow::layout::DefaultShadowLayout64;
-use libafl_asan::shadow::layout::ShadowLayout;
+use libafl_asan_layout::DefaultShadowLayout64;
+use libafl_asan_layout::ShadowLayout;
 use libafl_qemu_sys::{GuestAddr, MapInfo};
 
 use super::IntervalSnapshotFilter;
