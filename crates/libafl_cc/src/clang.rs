@@ -268,6 +268,8 @@ impl ToolWrapper for ClangWrapper {
                 new_args.push("-luserenv".into());
                 new_args.push("-lntdll".into());
                 new_args.push("-Wl,-force:multiple".into());
+                new_args.push("-Wl,-nodefaultlib:libcmt".into());
+                new_args.push("-Wl,-nodefaultlib:libucrt".into());
             }
         }
         // required by timer API (timer_create, timer_settime)

@@ -48,6 +48,15 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
         }
     }
 
+    // Configure mimalloc in fuzzer test runs to aggressively purge freed arena pages back to the Linux kernel.
+    // Without this, mimalloc retains freed memory in thread-local caches, causing cgroup OOM kills in CI containers (7GB limit).
+    // # Safety
+    // This is executed single-threaded at the start of main() before any child processes or threads are spawned.
+    unsafe {
+        env::set_var("MIMALLOC_PURGE_DELAY", "0");
+        env::set_var("MIMALLOC_PAGE_RESET", "1");
+    }
+
     // 6) for each fuzzer
     for fuzzer in fuzzers_to_test {
         let fuzzer_name = fuzzer.to_string_lossy();
