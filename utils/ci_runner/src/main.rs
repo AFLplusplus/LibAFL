@@ -49,13 +49,13 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
     }
 
     // Configure mimalloc in fuzzer test runs to aggressively purge freed arena pages back to the Linux kernel.
-    // Note: We must set PURGE_DELAY=1 (and ARENA_PURGE_MULT=1) instead of 0, because mimalloc C source explicitly disables arena purging if arena_purge_delay <= 0.
+    // Note: We set PURGE_DELAY=10 and ARENA_PURGE_MULT=10 (so arena purging runs every 100ms). We must be >0 because mimalloc C source explicitly disables arena purging if arena_purge_delay <= 0.
     // Without this, mimalloc retains freed memory in thread-local caches, causing cgroup OOM kills in CI containers (7GB limit).
     // # Safety
     // This is executed single-threaded at the start of main() before any child processes or threads are spawned.
     unsafe {
-        env::set_var("MIMALLOC_PURGE_DELAY", "1");
-        env::set_var("MIMALLOC_ARENA_PURGE_MULT", "1");
+        env::set_var("MIMALLOC_PURGE_DELAY", "10");
+        env::set_var("MIMALLOC_ARENA_PURGE_MULT", "10");
         env::set_var("MIMALLOC_PAGE_RESET", "1");
     }
 
