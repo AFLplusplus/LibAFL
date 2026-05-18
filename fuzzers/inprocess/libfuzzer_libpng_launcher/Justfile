@@ -98,7 +98,23 @@ test:
 test-default: fuzzer setup
     #!/bin/bash
     echo "Testing default (no fork)..."
-    timeout -k 10s 5s stdbuf -oL -eL ./{{ FUZZER_NAME }}.coverage --broker-port 21337 --cores 0 --input ./corpus  2>&1 | tee fuzz_stdout.log || true
+    rm -f fuzz_stdout.log
+    # Run in background and kill as soon as we see the first corpus find.
+    # This caps memory usage: we only need to verify the fuzzer works, not let it
+    # accumulate hundreds of in-memory testcases for 5 seconds.
+    stdbuf -oL -eL ./{{ FUZZER_NAME }}.coverage --broker-port 21337 --cores 0 --input ./corpus > fuzz_stdout.log 2>&1 &
+    FUZZER_PID=$!
+    for i in $(seq 1 30); do
+        sleep 1
+        if grep -qa 'corpus: [1-9]' fuzz_stdout.log 2>/dev/null; then
+            break
+        fi
+        if ! kill -0 $FUZZER_PID 2>/dev/null; then
+            break
+        fi
+    done
+    kill -9 $FUZZER_PID 2>/dev/null || true
+    wait $FUZZER_PID 2>/dev/null || true
     if grep -qa "corpus: " fuzz_stdout.log; then
         echo "Fuzzer (no fork) is working"
     else
@@ -106,12 +122,24 @@ test-default: fuzzer setup
         # exit 1
     fi
 
-    # Kill orphaned background fuzzer clients from the previous test run
+    # Kill any remaining orphaned fuzzer processes
     pkill -9 -f {{ FUZZER_NAME }} || true
 
     echo "Testing with fork..."
-    rm -rf out_fork || true
-    timeout -k 10s 5s stdbuf -oL -eL ./{{ FUZZER_NAME }}.coverage --broker-port 21338 --cores 0 --input ./corpus --output ./out_fork --fork 2>&1 | tee fuzz_fork_stdout.log || true
+    rm -rf out_fork fuzz_fork_stdout.log || true
+    stdbuf -oL -eL ./{{ FUZZER_NAME }}.coverage --broker-port 21338 --cores 0 --input ./corpus --output ./out_fork --fork > fuzz_fork_stdout.log 2>&1 &
+    FUZZER_PID=$!
+    for i in $(seq 1 30); do
+        sleep 1
+        if grep -qa 'corpus: [1-9]' fuzz_fork_stdout.log 2>/dev/null; then
+            break
+        fi
+        if ! kill -0 $FUZZER_PID 2>/dev/null; then
+            break
+        fi
+    done
+    kill -9 $FUZZER_PID 2>/dev/null || true
+    wait $FUZZER_PID 2>/dev/null || true
     if grep -qa "corpus: " fuzz_fork_stdout.log; then
         echo "Fuzzer (fork) is working"
     else
