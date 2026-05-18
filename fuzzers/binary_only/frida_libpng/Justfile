@@ -4,7 +4,7 @@ FUZZER_NAME := "frida_fuzzer"
 FUZZER_NAME_WIN := "frida_fuzzer.exe"
 
 set windows-shell := ['cmd.exe', '/c']
-set unstable := true
+set unstable
 
 [unix]
 libpng:

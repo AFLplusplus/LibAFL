@@ -4,7 +4,7 @@ FUZZER_NAME := "libafl_libfuzzer_windows"
 FUZZER_NAME_WIN := "libafl_libfuzzer_windows.exe"
 
 set windows-shell := ['cmd.exe', '/c']
-set unstable := true
+set unstable
 
 [windows]
 libafl_libfuzzer:

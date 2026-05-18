@@ -3,7 +3,7 @@ import "../../../just/libafl.just"
 FUZZER_NAME := "frida_windows_gdiplus.exe"
 
 set windows-shell := ['cmd.exe', '/c']
-set unstable := true
+set unstable
 
 [windows]
 harness:

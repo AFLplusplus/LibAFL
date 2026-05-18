@@ -3,7 +3,7 @@ import "../../../just/libafl.just"
 FUZZER_NAME := "tinyinst_simple"
 
 set windows-shell := ["cmd.exe", "/c"]
-set unstable := true
+set unstable
 
 [linux]
 harness:

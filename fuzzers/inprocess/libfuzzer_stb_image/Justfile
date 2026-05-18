@@ -9,7 +9,7 @@ LIBAFL_CXX := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx" + EXTENSION
 FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME + EXTENSION
 
 set windows-shell := ['cmd.exe', '/c']
-set unstable := true
+set unstable
 
 alias cc := cxx
 
