@@ -177,6 +177,7 @@ impl TargetShadowLayout {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn find_max_vaddr_bits<const NB_TRIES: usize>() -> usize {
     let mut rng = rand::rng();
     let page_size = page_size::get();
@@ -233,6 +234,7 @@ fn find_max_vaddr_bits<const NB_TRIES: usize>() -> usize {
     bits_min
 }
 
+#[cfg(target_os = "linux")]
 fn get_host_vma() -> Vma {
     match find_max_vaddr_bits::<8>() {
         39 => Vma::Vma39,
@@ -246,23 +248,28 @@ fn get_host_vma() -> Vma {
     }
 }
 
+#[cfg(not(target_os = "linux"))]
+fn get_host_vma() -> Vma {
+    panic!("Host VMA inference only works in Linux for now.")
+}
+
 fn guess_vma(arch: &Arch) -> Option<Vma> {
     match arch {
         Arch::AArch64 => {
-            let host = env::var_os("HOST").unwrap();
-            let target = env::var_os("TARGET").unwrap();
-
-            let host_is_linux = host.to_string_lossy().contains("linux");
-
-            if host == target && host_is_linux {
-                Some(get_host_vma())
-            } else {
-                let default_vma = Vma::Vma48;
-                println!(
-                    "cargo:warning=Host and target triplets do not match or host is not Linux. Using default VMA: {default_vma:?}"
-                );
-                Some(default_vma)
+            #[cfg(target_os = "linux")]
+            {
+                let host = env::var_os("HOST").unwrap();
+                let target = env::var_os("TARGET").unwrap();
+                if host == target {
+                    return Some(get_host_vma());
+                }
             }
+
+            let default_vma = Vma::Vma48;
+            println!(
+                "cargo:warning=Host and target triplets do not match or host is not Linux. Using default VMA: {default_vma:?}"
+            );
+            Some(default_vma)
         }
         _ => None,
     }
