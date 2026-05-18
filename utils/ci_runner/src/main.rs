@@ -41,22 +41,13 @@ fn run() -> Result<(), Box<dyn core::error::Error>> {
 
     // 5) set cargo profile envs
     for profile in &["DEV", "RELEASE"] {
+        // # SAFETY
+        // It's just an env, relax.
         unsafe {
             env::set_var(format!("CARGO_PROFILE_{profile}_OPT_LEVEL"), "z");
-            env::set_var(format!("CARGO_PROFILE_{profile}_INCREMENTAL"), "false");
-            env::set_var(format!("CARGO_PROFILE_{profile}_DEBUG"), "1");
+            env::set_var(format!("CARGO_PROFILE_{profile}_INCREMENTAL"), "true");
+            env::set_var(format!("CARGO_PROFILE_{profile}_DEBUG"), "2");
         }
-    }
-
-    // Configure mimalloc in fuzzer test runs to aggressively purge freed arena pages back to the Linux kernel.
-    // Note: We set PURGE_DELAY=10 and ARENA_PURGE_MULT=10 (so arena purging runs every 100ms). We must be >0 because mimalloc C source explicitly disables arena purging if arena_purge_delay <= 0.
-    // Without this, mimalloc retains freed memory in thread-local caches, causing cgroup OOM kills in CI containers (7GB limit).
-    // # Safety
-    // This is executed single-threaded at the start of main() before any child processes or threads are spawned.
-    unsafe {
-        env::set_var("MIMALLOC_PURGE_DELAY", "10");
-        env::set_var("MIMALLOC_ARENA_PURGE_MULT", "10");
-        env::set_var("MIMALLOC_PAGE_RESET", "1");
     }
 
     // 6) for each fuzzer
