@@ -551,6 +551,8 @@ pub fn build(
             println!("cargo:rustc-link-lib={val}");
         }
 
+        println!("cargo:rustc-link-lib=atomic");
+
         for arg in linkinfo["rpath"].members() {
             let val = arg
                 .as_str()

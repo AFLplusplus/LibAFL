@@ -19,7 +19,7 @@ pub trait ShadowLayout: Debug + Send {
 }
 
 #[cfg(not(feature = "dynamic_layout"))]
-pub use default::DefaultShadowLayout;
+pub use default::{DefaultShadowLayout, DefaultShadowLayout32, DefaultShadowLayout64};
 #[cfg(feature = "dynamic_layout")]
 pub use generated::DefaultShadowLayout;
 
@@ -28,18 +28,25 @@ mod default {
     use super::ShadowLayout;
     use crate::GuestAddr;
 
-    #[derive(Debug)]
-    pub struct DefaultShadowLayout;
-
     #[cfg(target_pointer_width = "32")]
-    impl ShadowLayout for DefaultShadowLayout {
-        // https://github.com/llvm/llvm-project/blob/1deee91bf52ca15e47b59a2929e5e5a323f4864c/compiler-rt/lib/asan/asan_mapping.h#L45
-        // Default Linux/i386 mapping on x86_64 machine:
-        // || `[0x40000000, 0xffffffff]` || HighMem    ||
-        // || `[0x28000000, 0x3fffffff]` || HighShadow ||
-        // || `[0x24000000, 0x27ffffff]` || ShadowGap  ||
-        // || `[0x20000000, 0x23ffffff]` || LowShadow  ||
-        // || `[0x00000000, 0x1fffffff]` || LowMem     ||
+    pub type DefaultShadowLayout = DefaultShadowLayout32;
+    #[cfg(target_pointer_width = "64")]
+    pub type DefaultShadowLayout = DefaultShadowLayout64;
+
+    #[derive(Debug)]
+    pub struct DefaultShadowLayout32;
+
+    #[derive(Debug)]
+    pub struct DefaultShadowLayout64;
+
+    // https://github.com/llvm/llvm-project/blob/1deee91bf52ca15e47b59a2929e5e5a323f4864c/compiler-rt/lib/asan/asan_mapping.h#L45
+    // Default Linux/i386 mapping on x86_64 machine:
+    // || `[0x40000000, 0xffffffff]` || HighMem    ||
+    // || `[0x28000000, 0x3fffffff]` || HighShadow ||
+    // || `[0x24000000, 0x27ffffff]` || ShadowGap  ||
+    // || `[0x20000000, 0x23ffffff]` || LowShadow  ||
+    // || `[0x00000000, 0x1fffffff]` || LowMem     ||
+    impl ShadowLayout for DefaultShadowLayout32 {
         const SHADOW_OFFSET: usize = 0x20000000;
         const LOW_MEM_OFFSET: GuestAddr = 0x0;
         const LOW_MEM_SIZE: usize = 0x20000000;
@@ -54,15 +61,14 @@ mod default {
         const ALLOC_ALIGN_SIZE: usize = 1 << Self::ALLOC_ALIGN_POW;
     }
 
-    #[cfg(target_pointer_width = "64")]
-    impl ShadowLayout for DefaultShadowLayout {
-        // https://github.com/llvm/llvm-project/blob/1deee91bf52ca15e47b59a2929e5e5a323f4864c/compiler-rt/lib/asan/asan_mapping.h#L103
-        // Default Linux/AArch64 (48-bit VMA) mapping:
-        // || `[0x201000000000, 0xffffffffffff]` || HighMem    || 229312GB
-        // || `[0x041200000000, 0x200fffffffff]` || HighShadow || 28664GB
-        // || `[0x001200000000, 0x0411ffffffff]` || ShadowGap  || 4096GB
-        // || `[0x001000000000, 0x0011ffffffff]` || LowShadow  || 8GB
-        // || `[0x000000000000, 0x000fffffffff]` || LowMem     || 64GB
+    // https://github.com/llvm/llvm-project/blob/1deee91bf52ca15e47b59a2929e5e5a323f4864c/compiler-rt/lib/asan/asan_mapping.h#L103
+    // Default Linux/AArch64 (48-bit VMA) mapping:
+    // || `[0x201000000000, 0xffffffffffff]` || HighMem    || 229312GB
+    // || `[0x041200000000, 0x200fffffffff]` || HighShadow || 28664GB
+    // || `[0x001200000000, 0x0411ffffffff]` || ShadowGap  || 4096GB
+    // || `[0x001000000000, 0x0011ffffffff]` || LowShadow  || 8GB
+    // || `[0x000000000000, 0x000fffffffff]` || LowMem     || 64GB
+    impl ShadowLayout for DefaultShadowLayout64 {
         const SHADOW_OFFSET: usize = 0x001000000000;
         const LOW_MEM_OFFSET: GuestAddr = 0x0;
         const LOW_MEM_SIZE: usize = 0x1000000000;

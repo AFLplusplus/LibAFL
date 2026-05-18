@@ -3,6 +3,24 @@
 
 use std::{env, fmt::Debug, fs, ops::Range, path::PathBuf};
 
+#[cfg(any(
+    cpu_target = "arm",
+    cpu_target = "i386",
+    cpu_target = "mips",
+    cpu_target = "ppc",
+    cpu_target = "riscv32",
+))]
+use libafl_asan::shadow::layout::DefaultShadowLayout32;
+
+#[cfg(any(
+    cpu_target = "aarch64",
+    cpu_target = "x86_64",
+    cpu_target = "riscv64",
+    feature = "clippy"
+))]
+use libafl_asan::shadow::layout::DefaultShadowLayout64;
+
+use libafl_asan::shadow::layout::ShadowLayout;
 use libafl_qemu_sys::{GuestAddr, MapInfo};
 
 use super::IntervalSnapshotFilter;
@@ -34,12 +52,7 @@ pub struct AsanGuestModule<F> {
     cpu_target = "riscv64",
     feature = "clippy"
 ))]
-impl<F> AsanGuestModule<F> {
-    const HIGH_SHADOW_START: GuestAddr = 0x02008fff7000;
-    const HIGH_SHADOW_END: GuestAddr = 0x10007fff7fff;
-    const LOW_SHADOW_START: GuestAddr = 0x00007fff8000;
-    const LOW_SHADOW_END: GuestAddr = 0x00008fff6fff;
-}
+type GuestShadowLayout = DefaultShadowLayout64;
 
 #[cfg(any(
     cpu_target = "arm",
@@ -48,11 +61,17 @@ impl<F> AsanGuestModule<F> {
     cpu_target = "ppc",
     cpu_target = "riscv32",
 ))]
+type GuestShadowLayout = DefaultShadowLayout32;
+
 impl<F> AsanGuestModule<F> {
-    const HIGH_SHADOW_START: GuestAddr = 0x28000000;
-    const HIGH_SHADOW_END: GuestAddr = 0x3fffffff;
-    const LOW_SHADOW_START: GuestAddr = 0x20000000;
-    const LOW_SHADOW_END: GuestAddr = 0x23ffffff;
+    const LOW_SHADOW_START: GuestAddr = GuestShadowLayout::LOW_SHADOW_OFFSET as GuestAddr;
+    const LOW_SHADOW_END: GuestAddr = (GuestShadowLayout::LOW_SHADOW_OFFSET
+        + GuestShadowLayout::LOW_SHADOW_SIZE
+        - 1) as GuestAddr;
+    const HIGH_SHADOW_START: GuestAddr = GuestShadowLayout::HIGH_SHADOW_OFFSET as GuestAddr;
+    const HIGH_SHADOW_END: GuestAddr = (GuestShadowLayout::HIGH_SHADOW_OFFSET
+        + GuestShadowLayout::HIGH_SHADOW_SIZE
+        - 1) as GuestAddr;
 }
 
 impl AsanGuestModule<StdAddressFilter> {
