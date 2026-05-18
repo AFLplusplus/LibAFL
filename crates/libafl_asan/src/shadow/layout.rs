@@ -18,9 +18,9 @@ pub trait ShadowLayout: Debug + Send {
     const ALLOC_ALIGN_SIZE: usize;
 }
 
-pub use default::{DefaultShadowLayout32, DefaultShadowLayout64};
 #[cfg(not(feature = "dynamic_layout"))]
 pub use default::StaticDefaultShadowLayout as DefaultShadowLayout;
+pub use default::{DefaultShadowLayout32, DefaultShadowLayout64};
 #[cfg(feature = "dynamic_layout")]
 pub use generated::DefaultShadowLayout;
 
