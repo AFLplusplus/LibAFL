@@ -7,6 +7,7 @@ members = [
   "crates/fast_rands",
   "crates/libafl_asan",
   "crates/libafl_asan/libafl_asan_fuzz",
+  "crates/libafl_asan/libafl_asan_layout",
   "crates/libafl_asan/libafl_asan_libc",
   "crates/libafl_bolts",
   "crates/libafl_build",
@@ -125,9 +126,10 @@ ctor = "0.10.0"
 document-features = "0.2.11"
 erased-serde = { version = "0.4.5", default-features = false } # erased serde
 fastbloom = { version = "0.17.0", default-features = false }
+fishhook = "0.3"
 fs2 = "0.4.3" # Used by OnDisk Corpus for file locking
 glob = "0.3"
-hashbrown = { version = "0.16.1", default-features = false } # A faster hashmap, nostd compatible
+hashbrown = { version = "0.17.0", default-features = false } # A faster hashmap, nostd compatible
 just = "1.46.0"
 libc = "0.2.178" # For (*nix) libc
 libipt = { version = "0.4.0", features = ["libipt_master"] }

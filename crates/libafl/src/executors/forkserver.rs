@@ -9,7 +9,7 @@ use core::{
 use std::{
     env,
     ffi::OsString,
-    io::{self, ErrorKind, Read, Write},
+    io::{self, Read, Write},
     os::{
         fd::{AsRawFd, BorrowedFd},
         unix::{io::RawFd, process::CommandExt},
@@ -665,8 +665,12 @@ impl Forkserver {
     pub fn read_st_timed(&mut self, timeout: &TimeSpec) -> Result<Option<i32>, Error> {
         let mut buf: [u8; 4] = [0_u8; 4];
         let Some(st_read) = self.st_pipe.read_end() else {
+            #[allow(clippy::std_instead_of_core)]
             return Err(Error::os_error(
-                io::Error::new(ErrorKind::BrokenPipe, "Read pipe end was already closed"),
+                io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "Read pipe end was already closed",
+                ),
                 "read_st_timed failed",
             ));
         };
