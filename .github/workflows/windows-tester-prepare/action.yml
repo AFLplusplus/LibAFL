@@ -6,6 +6,9 @@ runs:
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: llvm-tools, clippy, rustfmt
+    - name: Fix PATH for Cargo
+      shell: bash
+      run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
     - name: Build docs

@@ -259,14 +259,20 @@ where
     }
 }
 
-impl<C, F, I, O, S> RemovableScheduler<I, S> for WeightedScheduler<C, F, O> {
+impl<C, F, I, O, S> RemovableScheduler<I, S> for WeightedScheduler<C, F, O>
+where
+    S: HasMetadata,
+{
     /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_remove(
         &mut self,
-        _state: &mut S,
+        state: &mut S,
         _id: CorpusId,
         _prev: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
+        if let Ok(wsmeta) = state.metadata_mut::<WeightedScheduleMetadata>() {
+            wsmeta.set_runs_current_cycle(wsmeta.runs_in_current_cycle().saturating_sub(1));
+        }
         self.table_invalidated = true;
         Ok(())
     }
@@ -346,7 +352,6 @@ where
 
             let runs_in_current_cycle = wsmeta.runs_in_current_cycle();
 
-            // TODO deal with corpus_counts decreasing due to removals
             if runs_in_current_cycle >= corpus_counts {
                 wsmeta.set_runs_current_cycle(0);
             } else {
