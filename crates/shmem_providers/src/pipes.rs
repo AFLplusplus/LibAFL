@@ -1,7 +1,7 @@
 //! Unix `pipe` wrapper for `LibAFL`
 #[cfg(feature = "std")]
 use std::{
-    io::{self, ErrorKind, PipeReader, PipeWriter, Read, Write},
+    io::{self, PipeReader, PipeWriter, Read, Write},
     os::unix::io::RawFd,
 };
 
@@ -85,7 +85,7 @@ impl Read for Pipe {
         match self.read_end.as_mut() {
             Some(read_end) => read_end.read(buf),
             None => Err(io::Error::new(
-                ErrorKind::BrokenPipe,
+                io::ErrorKind::BrokenPipe,
                 "Read pipe end was already closed",
             )),
         }
@@ -99,7 +99,7 @@ impl Write for Pipe {
         match self.write_end.as_mut() {
             Some(write_end) => Ok(write_end.write(buf)?),
             None => Err(io::Error::new(
-                ErrorKind::BrokenPipe,
+                io::ErrorKind::BrokenPipe,
                 "Write pipe end was already closed",
             )),
         }

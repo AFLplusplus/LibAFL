@@ -438,7 +438,7 @@ where
             stage_max: CAL_STAGE_START,
             track_stability: true,
             phantom: PhantomData,
-            name: Cow::Owned(CALIBRATION_STAGE_NAME.to_owned() + ":" + &map_name),
+            name: Cow::Owned(CALIBRATION_STAGE_NAME.to_owned() + ":" + map_name.as_ref()),
             stability_userstats_name: Cow::Owned(format!("{map_name}_stability")),
         }
     }
