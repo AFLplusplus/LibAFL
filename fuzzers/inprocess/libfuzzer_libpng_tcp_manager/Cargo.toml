@@ -12,6 +12,7 @@ default = ["std"]
 std = []
 # Forces a crash
 crash = []
+prometheus = ["libafl/prometheus_monitor"]
 
 [profile.release]
 lto = true

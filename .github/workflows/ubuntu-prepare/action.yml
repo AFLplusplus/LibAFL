@@ -15,7 +15,7 @@ runs:
     - name: Uninstall all currently installed Rust
       shell: bash
       run: |
-        sudo apt purge -y 'cargo*' 'rust*'
+        sudo apt purge -y 'cargo*' 'rust*' 'rustup*'
 
     - name: Install and cache deps
       shell: bash
@@ -38,6 +38,10 @@ runs:
       with:
         components: clippy, rustfmt
     # -----------------------------------------
+
+    - name: Fix PATH for Cargo
+      shell: bash
+      run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
     - name: Install just
       uses: extractions/setup-just@v3

@@ -538,6 +538,7 @@ mod tests {
 
     #[test]
     fn deterministic_splice() {
+        let _ = std::fs::create_dir_all("/tmp/outputs/chunks");
         let mut ctx = Context::new();
         let mut rand = StdRand::new();
         let mut cks = ChunkStore::new("/tmp/".to_string());
