@@ -11,12 +11,12 @@ pub fn main() {
             .unwrap()
             .to_str()
             .unwrap()
-            .replace(".exe", "");
+            .trim_end_matches(std::env::consts::EXE_SUFFIX);
 
         let is_cpp = match wrapper_name[wrapper_name.len()-2..].to_lowercase().as_str() {
             "cc" => false,
             "++" | "pp" | "xx" => true,
-            _ => panic!("Could not figure out if c or c++ warpper was called. Expected {:?} to end with c or cxx", dir),
+            _ => panic!("Could not figure out if c or c++ wrapper was called. Expected {:?} to end with c or cxx", dir),
         };
 
         dir.pop();

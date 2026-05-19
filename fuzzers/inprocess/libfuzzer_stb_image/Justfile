@@ -9,7 +9,6 @@ LIBAFL_CXX := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx" + EXTENSION
 FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME + EXTENSION
 
 set windows-shell := ['cmd.exe', '/c']
-set unstable := true
 
 alias cc := cxx
 
@@ -21,21 +20,19 @@ fuzzer: cxx
     cargo build --profile {{ PROFILE }}
     {{ LIBAFL_CC }} -o ./{{ FUZZER_NAME }} harness.cc
 
-[linux]
-[macos]
 run: fuzzer
+    {{ if os() == "windows" { "echo \"Not integrated into just yet.\"" } else { "just _run_unix" } }}
+
+_run_unix:
     #!/bin/bash
     ./{{ FUZZER_NAME }} &
     ./{{ FUZZER_NAME }}
     sleep 0.2
 
-[windows]
-run: fuzzer
-    echo "Not integrated into just yet."
-
-[linux]
-[macos]
 test: fuzzer
+    {{ if os() == "windows" { "cargo build --release" } else { "just _test_unix" } }}
+
+_test_unix:
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
     (timeout 31s ./{{ FUZZER_NAME }} | tee fuzz_stdout.log 2>/dev/null || true) &
@@ -47,11 +44,6 @@ test: fuzzer
         echo "Fuzzer does not generate any testcases or any crashes"
         exit 1
     fi
-
-[script("cmd.exe", "/c")]
-[windows]
-test:
-    cargo build --release
 
 clean:
     #!/bin/bash
