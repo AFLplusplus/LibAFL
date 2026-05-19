@@ -1,5 +1,6 @@
 #![cfg(feature = "std")]
 #![cfg(target_os = "linux")]
+#![cfg(target_arch = "x86_64")]
 
 extern crate alloc;
 use alloc::slice;

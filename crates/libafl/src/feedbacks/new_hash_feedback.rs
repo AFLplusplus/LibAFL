@@ -208,7 +208,7 @@ where
     #[must_use]
     pub fn with_capacity(observer: &O, capacity: usize) -> Self {
         Self {
-            name: Cow::from(NEWHASHFEEDBACK_PREFIX.to_string() + observer.name()),
+            name: Cow::from(NEWHASHFEEDBACK_PREFIX.to_string() + observer.name().as_ref()),
             o_ref: observer.handle(),
             capacity,
             #[cfg(feature = "track_hit_feedbacks")]

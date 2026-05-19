@@ -334,8 +334,8 @@ where
         {
             let meta = GeneralizedInputMetadata::generalized_from_options(&payload);
 
-            assert!(meta.generalized().first() == Some(&GeneralizedItem::Gap));
-            assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
+            assert_eq!(meta.generalized().first(), Some(&GeneralizedItem::Gap));
+            assert_eq!(meta.generalized().last(), Some(&GeneralizedItem::Gap));
 
             let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
             entry.metadata_map_mut().insert(meta);
