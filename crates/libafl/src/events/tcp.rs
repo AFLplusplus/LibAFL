@@ -174,7 +174,9 @@ where
                             return;
                         }
 
-                        let len = u32::from_le_bytes(len_buf);
+                        let mut len = u32::from_le_bytes(len_buf);
+                        // we forward the sender id as well, so we add 4 bytes to the message length
+                        len += 4;
                         log::debug!("TCP Manager - len = {len:?}");
 
                         let mut buf = vec![0; len as usize];
