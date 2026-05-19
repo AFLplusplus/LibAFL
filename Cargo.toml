@@ -7,6 +7,7 @@ members = [
   "crates/fast_rands",
   "crates/libafl_asan",
   "crates/libafl_asan/libafl_asan_fuzz",
+  "crates/libafl_asan/libafl_asan_layout",
   "crates/libafl_asan/libafl_asan_libc",
   "crates/libafl_bolts",
   "crates/libafl_build",
