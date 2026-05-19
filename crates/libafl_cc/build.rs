@@ -1,5 +1,3 @@
-#![allow(unused_imports)]
-
 use core::str;
 #[cfg(any(
     target_vendor = "apple",
