@@ -83,7 +83,6 @@ fn intel_pt_trace_thread() {
     let mut map = vec![0u16; 0x10_00];
     pt.decode_traces_into_map(map.as_mut_ptr(), map.len())
         .unwrap();
-    pt.dump_last_trace_to_file().unwrap();
 
     let assembly_jump_id = map.iter().position(|count| *count >= 254);
     assert!(
