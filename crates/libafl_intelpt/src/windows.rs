@@ -12,8 +12,8 @@ use std::{
 use arbitrary_int::{u3, u4, u36};
 use bitbybit::bitfield;
 use libafl_bolts::Error;
-pub use ptcov::PtCoverageDecoder;
-use ptcov::{CoverageEntry, PtCoverageDecoderBuilder, PtDecoderError, PtImage};
+pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtImage};
+use ptcov::{PtCoverageDecoderBuilder, PtDecoderError};
 use raw_cpuid::CpuId;
 use windows::{
     Win32::{
@@ -133,6 +133,12 @@ pub struct GetProcessTrace {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+struct PauseResumeThreadTrace {
+    thread_handle: HANDLE,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 struct IptBufferVersion {
     major: u32,
     minor: u32,
@@ -146,7 +152,7 @@ union IptInputPayload {
     // stop_trace: StopProcessTrace,
     configure_thread_address_filter_range: ConfigureThreadAddressFilterRange,
     // query_filter: QueryThreadFilter,
-    // pause_resume_thread: PauseResumeThreadTrace,
+    pause_resume_thread: PauseResumeThreadTrace,
     _pad: [u8; 32],
 }
 
@@ -167,6 +173,14 @@ impl From<StartProcessTrace> for IptInputPayload {
 impl From<GetProcessTrace> for IptInputPayload {
     fn from(value: GetProcessTrace) -> Self {
         Self { get_trace: value }
+    }
+}
+
+impl From<PauseResumeThreadTrace> for IptInputPayload {
+    fn from(value: PauseResumeThreadTrace) -> Self {
+        Self {
+            pause_resume_thread: value,
+        }
     }
 }
 
@@ -255,15 +269,17 @@ impl<'a> IntelPT<'a> {
     ///
     /// Only instructions in `filters` ranges will be traced.
     pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> windows::core::Result<()> {
-        let thread_handle = if let Some(tid) = self.tid {
-            unsafe { OpenThread(THREAD_GET_CONTEXT, false, tid)? }
-        } else {
-            INVALID_HANDLE_VALUE // TODO apply to all threads?
+        let thread_handle = PtHandle {
+            inner: if let Some(tid) = self.tid {
+                unsafe { OpenThread(THREAD_GET_CONTEXT, false, tid)? }
+            } else {
+                INVALID_HANDLE_VALUE // TODO apply to all threads?
+            },
         };
 
         for (i, filter) in filters.iter().enumerate() {
             let ipt_payload = ConfigureThreadAddressFilterRange {
-                thread_handle,
+                thread_handle: thread_handle.inner,
                 range_index: i.try_into()?,
                 range_config: IptFilterRangeSettings::IptFilterRangeIp,
                 start_address: *filter.start(),
@@ -280,19 +296,35 @@ impl<'a> IntelPT<'a> {
     }
 
     pub fn enable_tracing(&mut self) -> windows::core::Result<()> {
-        let options = IptOptions::builder()
-            .with_inherit(true) // todo: expose this param?
-            .with_option_version(IPT_OPTION_VERSION)
-            .with_mode_settings(u4::new(0)) // todo: better understand IPT_MODE_SETTINGS difference between Ctl and Reg
-            .value;
+        self.toggle_tracing(IptInputType::ResumeThreadTrace)
+    }
 
-        let ipt_payload = StartProcessTrace {
-            process_handle: self.target_process_handle.inner.0 as u64,
-            options,
+    pub fn disable_tracing(&mut self) -> windows::core::Result<()> {
+        self.toggle_tracing(IptInputType::PauseThreadTrace)
+    }
+
+    fn toggle_tracing(&mut self, input_type: IptInputType) -> windows::core::Result<()> {
+        let thread_handle = PtHandle {
+            inner: if let Some(tid) = self.tid {
+                unsafe { OpenThread(THREAD_GET_CONTEXT, false, tid)? }
+            } else {
+                INVALID_HANDLE_VALUE // TODO apply to all threads?
+            },
         };
-        let input = IptInputBuffer::new(IptInputType::StartProcessTrace, ipt_payload.into());
+
+        let ipt_payload = PauseResumeThreadTrace {
+            thread_handle: thread_handle.inner,
+        };
+        let input = IptInputBuffer::new(
+            input_type,
+            IptInputPayload {
+                pause_resume_thread: ipt_payload.into(),
+            },
+        );
+
+        // todo: this return the previous state, should we care?
         let (_, out_size) = self.send_device_io_request(input)?;
-        debug_assert_eq!(out_size, 0);
+        debug_assert_eq!(out_size, 24);
 
         Ok(())
     }
@@ -360,7 +392,6 @@ impl<'a> IntelPT<'a> {
         while slice.len() >= size_of::<IptTraceHeader>() {
             let inner_header =
                 unsafe { slice.as_ptr().cast::<IptTraceHeader>().as_ref_unchecked() };
-            println!("header: {:?}", inner_header);
             slice = &slice[size_of::<IptTraceHeader>()..];
             if self.tid.is_none()
                 || self
@@ -407,10 +438,6 @@ impl<'a> IntelPT<'a> {
 
         Ok(unsafe { out.get_trace_size.trace_size })
     }
-
-    // pub fn disable_tracing(&mut self) -> windows::core::Result<()> {
-    //
-    // }
 
     fn send_device_io_request(
         &self,
@@ -473,6 +500,7 @@ impl Default for IntelPTBuilder<'_> {
 
 impl<'a> IntelPTBuilder<'a> {
     pub fn build(self) -> Result<IntelPT<'a>, libafl_bolts::Error> {
+        // todo: is there a way to start this all set to trace but "paused" as in linux?
         let ipt_handle = open_ipt_handle()?;
 
         let target_process_handle =
@@ -495,9 +523,25 @@ impl<'a> IntelPTBuilder<'a> {
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
         };
-        intel_pt.set_ip_filters(&self.ip_filters).map_err(|e| {
-            libafl_bolts::Error::os_error(e.into(), "Failed to set IntelPT ip filters")
-        })?;
+
+        let options = IptOptions::builder()
+            .with_inherit(true) // todo: expose this param?
+            .with_option_version(IPT_OPTION_VERSION)
+            .with_mode_settings(u4::new(0)) // todo: better understand IPT_MODE_SETTINGS difference between Ctl and Reg
+            .value;
+
+        let ipt_payload = StartProcessTrace {
+            process_handle: intel_pt.target_process_handle.inner.0 as u64,
+            options,
+        };
+        let input = IptInputBuffer::new(IptInputType::StartProcessTrace, ipt_payload.into());
+        let (_, out_size) = intel_pt.send_device_io_request(input)?;
+        debug_assert_eq!(out_size, 0);
+
+        // todo: review this, since tid could be set later, filter setup can fail or be useless here
+        intel_pt
+            .set_ip_filters(&self.ip_filters)
+            .map_err(|e| Error::os_error(e.into(), "Failed to set IntelPT ip filters"))?;
         Ok(intel_pt)
     }
 
