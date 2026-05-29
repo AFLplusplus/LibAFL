@@ -1,37 +1,33 @@
 #![allow(dead_code)] // todo remove
-#![allow(unused_imports)] // todo remove
 // todo review all the pub
 
 use alloc::{string::String, vec::Vec};
-use core::{fmt::Debug, ptr};
-use std::{
-    io, mem::MaybeUninit, ops::RangeInclusive, prelude::rust_2015::ToString,
-    ptr::slice_from_raw_parts_mut,
-};
+use core::{fmt::Debug, mem::MaybeUninit, ops::RangeInclusive, ptr::slice_from_raw_parts_mut};
+#[cfg(feature = "export_raw")]
+use std::string::ToString;
 
-use arbitrary_int::{u3, u4, u36};
+use arbitrary_int::{u3, u4};
 use bitbybit::bitfield;
 use libafl_bolts::Error;
+use ptcov::PtCoverageDecoderBuilder;
 pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtImage};
-use ptcov::{PtCoverageDecoderBuilder, PtDecoderError};
 use raw_cpuid::CpuId;
 use windows::{
     Win32::{
         Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE},
         Storage::FileSystem::{
             CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_FLAG_NO_BUFFERING, FILE_FLAG_SEQUENTIAL_SCAN,
-            FILE_GENERIC_READ, FILE_SHARE_MODE, FILE_SHARE_READ, OPEN_EXISTING,
+            FILE_GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
         },
         System::{
             IO::DeviceIoControl,
             Threading::{
-                GetCurrentProcessId, GetCurrentThreadId, GetProcessIdOfThread, OpenProcess,
-                OpenThread, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ, THREAD_GET_CONTEXT,
-                THREAD_QUERY_LIMITED_INFORMATION,
+                GetCurrentProcessId, OpenProcess, OpenThread, PROCESS_QUERY_INFORMATION,
+                PROCESS_VM_READ, THREAD_GET_CONTEXT,
             },
         },
     },
-    core::{HSTRING, w},
+    core::w,
 };
 
 use crate::utils::current_cpu;
@@ -522,7 +518,7 @@ impl Default for IntelPTBuilder<'_> {
 }
 
 impl<'a> IntelPTBuilder<'a> {
-    pub fn build(self) -> Result<IntelPT<'a>, libafl_bolts::Error> {
+    pub fn build(self) -> Result<IntelPT<'a>, Error> {
         // todo: is there a way to start this all set to trace but "paused" as in linux?
         let ipt_handle = open_ipt_handle()?;
 
@@ -530,7 +526,7 @@ impl<'a> IntelPTBuilder<'a> {
             unsafe { OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, self.pid) }
                 .map(|h| PtHandle { inner: h })
                 .map_err(|e| {
-                    libafl_bolts::Error::os_error(e.into(), "Failed to get target process handle")
+                    Error::os_error(e.into(), "Failed to get target process handle")
                 })?;
 
         let ptcov_decoder = PtCoverageDecoderBuilder::new()
@@ -555,7 +551,7 @@ impl<'a> IntelPTBuilder<'a> {
             options,
         };
         let input = IptInputBuffer::new(IptInputType::StartProcessTrace, ipt_payload.into());
-        let (_, out_size) = intel_pt.send_device_io_request(&input)?;
+        let (_, out_size) = intel_pt.send_device_io_request(&input).unwrap();
         debug_assert_eq!(out_size, 0);
 
         // todo: review this, since tid could be set later, filter setup can fail or be useless here
