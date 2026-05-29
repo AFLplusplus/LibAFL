@@ -113,7 +113,7 @@ impl Default for IptOptions {
         Self::builder()
             .with_option_version(Self::VERSION)
             .with_topa_pages_pow2(u4::new(4)) // 64 kB
-            .with_inherit(true) // todo: expose this param?
+            .with_inherit(false)
             .with_mode_settings(u4::new(0)) // todo: better understand IPT_MODE_SETTINGS difference between Ctl and Reg
             .value
     }
@@ -331,7 +331,6 @@ impl<'a> IntelPT<'a> {
             },
         );
 
-        // todo: this return the previous state, should we care?
         let (_, out_size) = self.send_device_io_request(&input)?;
         debug_assert_eq!(out_size, 24);
 
@@ -397,8 +396,10 @@ impl<'a> IntelPT<'a> {
                 .cast::<IptTraceData>()
                 .as_ref_unchecked()
         };
-        assert!(trace_data.valid_trace > 0); // todo better error handling
-        assert_eq!(trace_data.trace_version, IPT_TRACE_VERSION);
+        debug_assert_eq!(trace_data.trace_version, IPT_TRACE_VERSION);
+        if trace_data.valid_trace == 0 {
+            return Err(Error::runtime("Intel PT: failed to get a valid trace from ipt.sys"));
+        }
 
         let mut slice = &trace_buffer[size_of::<IptTraceData>()..];
         while slice.len() >= size_of::<IptTraceHeader>() {
