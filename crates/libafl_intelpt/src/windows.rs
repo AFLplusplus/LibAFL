@@ -36,6 +36,7 @@ use windows::{
 
 use crate::utils::current_cpu;
 
+#[derive(Debug)]
 #[repr(u32)]
 enum IptIoctl {
     Request = 0x220004,
@@ -90,45 +91,60 @@ struct ConfigureThreadAddressFilterRange {
 /// - Inherit:         bit 23     (1 bit)  - Children will be automatically traced
 /// - ModeSettings:    bits 24-27 (4 bits) - IPT_MODE_SETTINGS
 /// - Reserved:        bits 28-63 (36 bits)
-#[bitfield(u64, default = 0)]
+#[bitfield(u64)]
 #[derive(Debug)]
-pub struct IptOptions {
+struct IptOptions {
     #[bits(0..=3, rw)]
-    pub option_version: u4,
+    option_version: u4,
     #[bits(4..=7, rw)]
-    pub timing_settings: u4,
+    timing_settings: u4,
     #[bits(8..=11, rw)]
-    pub mtc_frequency: u4,
+    mtc_frequency: u4,
     #[bits(12..=15, rw)]
-    pub cyc_threshold: u4,
+    cyc_threshold: u4,
     #[bits(16..=19, rw)]
-    pub topa_pages_pow2: u4,
+    topa_pages_pow2: u4,
     /// Not relevant when tracing by process handle
     #[bits(20..=22, rw)]
-    pub match_settings: u3,
+    match_settings: u3,
     #[bits(23..=23, rw)]
-    pub inherit: bool,
+    inherit: bool,
     #[bits(24..=27, rw)]
-    pub mode_settings: u4,
+    mode_settings: u4,
     #[bits(28..=63)]
     reserved: u36,
 }
-const IPT_OPTION_VERSION: u4 = u4::new(1);
+
+impl Default for IptOptions {
+    fn default() -> Self {
+        Self::builder()
+            .with_option_version(Self::VERSION)
+            .with_topa_pages_pow2(u4::new(4)) // 64 kB
+            .with_inherit(true) // todo: expose this param?
+            .with_mode_settings(u4::new(0)) // todo: better understand IPT_MODE_SETTINGS difference between Ctl and Reg
+            .value
+    }
+}
+
+impl IptOptions {
+    const VERSION: u4 = u4::new(1);
+}
+
 const IPT_TRACE_VERSION: u16 = 1;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct StartProcessTrace {
+struct StartProcessTrace {
     process_handle: u64,
     options: IptOptions,
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct GetProcessTrace {
-    pub trace_version: u16,
+struct GetProcessTrace {
+    trace_version: u16,
     _padding: [u8; 6],
-    pub process_handle: u64,
+    process_handle: u64,
 }
 
 #[repr(C)]
@@ -246,7 +262,7 @@ pub struct IntelPT<'a> {
     ipt_handle: PtHandle,
     target_process_handle: PtHandle,
     tid: Option<u32>,
-    // previous_decode_head: u64,
+    previous_decode_head: u32,
     ptcov_decoder: PtCoverageDecoder<'a>,
     #[cfg(feature = "export_raw")]
     last_decode_trace: Vec<u8>,
@@ -341,10 +357,9 @@ impl<'a> IntelPT<'a> {
     where
         T: CoverageEntry,
     {
-        // todo: this looks pretty racy, size might increase between get_trace_size and the actual
         // get trace
         let trace_size = self.get_trace_size()?;
-        let mut trace_buffer: Vec<u8> = Vec::with_capacity(4096 + trace_size as usize);
+        let mut trace_buffer: Vec<u8> = Vec::with_capacity(trace_size as usize);
 
         let ipt_payload = GetProcessTrace {
             trace_version: IPT_TRACE_VERSION,
@@ -387,7 +402,6 @@ impl<'a> IntelPT<'a> {
         assert!(trace_data.valid_trace > 0); // todo better error handling
         assert_eq!(trace_data.trace_version, IPT_TRACE_VERSION);
 
-        let mut raw_traces = Vec::new();
         let mut slice = &trace_buffer[size_of::<IptTraceData>()..];
         while slice.len() >= size_of::<IptTraceHeader>() {
             let inner_header =
@@ -398,28 +412,28 @@ impl<'a> IntelPT<'a> {
                     .tid
                     .is_some_and(|tid| tid as u64 == inner_header.thread_id)
             {
-                raw_traces.push(&slice[..inner_header.ring_buffer_offset as usize]); //todo consider wrapping
+                let mut split_buffer = Vec::new();
+                let trace= if inner_header.ring_buffer_offset >= self.previous_decode_head {
+                    &slice[self.previous_decode_head as usize..inner_header.ring_buffer_offset as usize]
+                } else {
+                    split_buffer.extend(&slice[self.previous_decode_head as usize..inner_header.trace_size as usize]);
+                    split_buffer.extend(&slice[0..inner_header.ring_buffer_offset as usize]);
+                    &split_buffer[..]
+                };
+                self.previous_decode_head = inner_header.ring_buffer_offset;
+
+                #[cfg(feature = "export_raw")]
+                {
+                    self.last_decode_trace.extend(slice);
+                }
+
+                let coverage = unsafe { &mut *slice_from_raw_parts_mut(map_ptr, map_len) };
+                // todo: there should be one decoder for thread?
+                if let Err(e) = self.ptcov_decoder.coverage(trace, coverage) {
+                    log::warn!("PT trace decoding to coverage failed: {e:?}");
+                }
             }
             slice = &slice[inner_header.trace_size as usize..];
-        }
-
-        if raw_traces.is_empty() {
-            return Err(Error::empty("no traces returned"));
-        }
-
-        #[cfg(feature = "export_raw")]
-        {
-            self.last_decode_trace = raw_traces[0].to_vec();
-            for i in 1..raw_traces.len() {
-                self.last_decode_trace.extend_from_slice(&raw_traces[i]);
-            }
-        }
-
-        let coverage = unsafe { &mut *slice_from_raw_parts_mut(map_ptr, map_len) };
-        // todo consider also other raw_traces[1..] probably there should be one decoder for thread
-        if let Err(e) = self.ptcov_decoder.coverage(raw_traces[0], coverage) {
-            log::warn!("PT trace decoding to coverage failed: {e:?}");
-            coverage.fill(0.into());
         }
 
         Ok(())
@@ -519,16 +533,13 @@ impl<'a> IntelPTBuilder<'a> {
             ipt_handle,
             target_process_handle,
             tid: self.tid,
+            previous_decode_head: 0,
             ptcov_decoder,
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
         };
 
-        let options = IptOptions::builder()
-            .with_inherit(true) // todo: expose this param?
-            .with_option_version(IPT_OPTION_VERSION)
-            .with_mode_settings(u4::new(0)) // todo: better understand IPT_MODE_SETTINGS difference between Ctl and Reg
-            .value;
+        let options = IptOptions::default();
 
         let ipt_payload = StartProcessTrace {
             process_handle: intel_pt.target_process_handle.inner.0 as u64,

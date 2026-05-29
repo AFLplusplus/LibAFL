@@ -3,7 +3,7 @@
 
 use std::{
     arch::asm,
-    slice,
+    process, slice,
     sync::{
         Arc, Barrier,
         mpsc::{Sender, channel},
@@ -15,7 +15,7 @@ use libafl_intelpt::{IntelPT, availability};
 use log::LevelFilter;
 use proc_maps::get_process_maps;
 use ptcov::PtImage;
-use windows::Win32::System::Threading::{GetCurrentProcessId, GetCurrentThreadId};
+use windows::Win32::System::Threading::GetCurrentThreadId;
 
 fn worker_main(thread_id_sender: Sender<u32>, barrier: Arc<Barrier>) -> u32 {
     let tid = unsafe { GetCurrentThreadId() };
@@ -52,14 +52,13 @@ fn intel_pt_trace_thread() {
         return;
     }
 
-    let pid = unsafe { GetCurrentProcessId() };
+    let pid = process::id();
 
     let maps = get_process_maps(pid).expect("failed to get process maps");
     let images = maps
         .iter()
-        .filter(|map| map.is_exec())// && map.filename().is_some())
+        .filter(|map| map.is_exec())
         .map(|pm| {
-            println!("map: {:?}", pm);
             let data = unsafe { slice::from_raw_parts(pm.start() as *const u8, pm.size()) };
             PtImage::new(data, pm.start() as u64)
         })
@@ -69,15 +68,14 @@ fn intel_pt_trace_thread() {
         .images(&images)
         .build()
         .expect("Failed to create IntelPT for worker thread");
-    pt.enable_tracing().expect("Failed to enable tracing");
 
     let (thread_id_sender, thread_id_receiver) = channel();
     let barrier = Arc::new(Barrier::new(2));
     let worker_barrier = barrier.clone();
     let worker = thread::spawn(|| worker_main(thread_id_sender, worker_barrier));
     let worker_tid = thread_id_receiver.recv().unwrap();
-    println!("Intel PT worker thread id: {}", worker_tid);
     pt.set_tid(Some(worker_tid));
+    pt.enable_tracing().unwrap();
     barrier.wait();
 
     let mut map = vec![0u16; 0x10_00];
