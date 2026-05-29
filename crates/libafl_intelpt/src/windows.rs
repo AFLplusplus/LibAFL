@@ -469,9 +469,9 @@ impl<'a> IntelPT<'a> {
             DeviceIoControl(
                 self.ipt_handle.inner,
                 IptIoctl::Request as u32,
-                Some(&raw const input as *const core::ffi::c_void),
+                Some((&raw const *input).cast()),
                 size_of::<IptInputBuffer>() as u32,
-                Some(out.as_mut_ptr() as *mut core::ffi::c_void),
+                Some(out.as_mut_ptr().cast()),
                 size_of::<IptOutputBuffer>() as u32,
                 Some(&raw mut out_size),
                 None,
