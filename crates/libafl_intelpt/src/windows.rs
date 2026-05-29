@@ -66,9 +66,9 @@ enum IptInputType {
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
 enum IptFilterRangeSettings {
-    IptFilterRangeDisable = 0,
-    IptFilterRangeIp = 1,
-    IptFilterRangeTraceStop = 2,
+    Disable = 0,
+    Ip = 1,
+    TraceStop = 2,
 }
 
 #[repr(C)]
@@ -82,14 +82,14 @@ struct ConfigureThreadAddressFilterRange {
 }
 
 /// Layout (from winipt):
-/// - OptionVersion:   bits 0-3   (4 bits) - Must be set to 1
-/// - TimingSettings:  bits 4-7   (4 bits) - IPT_TIMING_SETTINGS
-/// - MtcFrequency:    bits 8-11  (4 bits) - Bits 14:17 in IA32_RTIT_CTL
-/// - CycThreshold:    bits 12-15 (4 bits) - Bits 19:22 in IA32_RTIT_CTL
-/// - TopaPagesPow2:   bits 16-19 (4 bits) - Size of buffer as 4KB powers of 2 (4KB->128MB)
-/// - MatchSettings:   bits 20-22 (3 bits) - IPT_MATCH_SETTINGS
+/// - `OptionVersion`:   bits 0-3   (4 bits) - Must be set to 1
+/// - `TimingSettings`:  bits 4-7   (4 bits) - `IPT_TIMING_SETTINGS`
+/// - `MtcFrequency`:    bits 8-11  (4 bits) - Bits 14:17 in `IA32_RTIT_CTL`
+/// - `CycThreshold`:    bits 12-15 (4 bits) - Bits 19:22 in `IA32_RTIT_CTL`
+/// - `TopaPagesPow2`:   bits 16-19 (4 bits) - Size of buffer as 4KB powers of 2 (4KB->128MB)
+/// - `MatchSettings`:   bits 20-22 (3 bits) - `IPT_MATCH_SETTINGS`
 /// - Inherit:         bit 23     (1 bit)  - Children will be automatically traced
-/// - ModeSettings:    bits 24-27 (4 bits) - IPT_MODE_SETTINGS
+/// - `ModeSettings`:    bits 24-27 (4 bits) - `IPT_MODE_SETTINGS`
 /// - Reserved:        bits 28-63 (36 bits)
 #[bitfield(u64)]
 #[derive(Debug)]
@@ -221,16 +221,16 @@ impl IptInputBuffer {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct OutGetTraceSize {
-    pub trace_version: u16,
-    pub _padding: [u8; 6],
-    pub trace_size: u64,
+struct OutGetTraceSize {
+    trace_version: u16,
+    _padding: [u8; 6],
+    trace_size: u64,
 }
 
 #[repr(C)]
 union IptOutputBuffer {
     // pub get_trace_version: OutGetTraceVersion,
-    pub get_trace_size: OutGetTraceSize,
+    get_trace_size: OutGetTraceSize,
     // pub query_filter: OutQueryThreadFilter,
     // pub pause_trace: OutPauseResumeTrace,
     // pub resume_trace: OutPauseResumeTrace,
@@ -297,7 +297,7 @@ impl<'a> IntelPT<'a> {
             let ipt_payload = ConfigureThreadAddressFilterRange {
                 thread_handle: thread_handle.inner,
                 range_index: i.try_into()?,
-                range_config: IptFilterRangeSettings::IptFilterRangeIp,
+                range_config: IptFilterRangeSettings::Ip,
                 start_address: *filter.start(),
                 end_address: *filter.end(),
             };
@@ -305,7 +305,7 @@ impl<'a> IntelPT<'a> {
                 IptInputType::ConfigureThreadAddressFilterRange,
                 ipt_payload.into(),
             );
-            let (_, out_size) = self.send_device_io_request(input)?;
+            let (_, out_size) = self.send_device_io_request(&input)?;
             debug_assert_eq!(out_size, 0);
         }
         Ok(())
@@ -334,12 +334,12 @@ impl<'a> IntelPT<'a> {
         let input = IptInputBuffer::new(
             input_type,
             IptInputPayload {
-                pause_resume_thread: ipt_payload.into(),
+                pause_resume_thread: ipt_payload,
             },
         );
 
         // todo: this return the previous state, should we care?
-        let (_, out_size) = self.send_device_io_request(input)?;
+        let (_, out_size) = self.send_device_io_request(&input)?;
         debug_assert_eq!(out_size, 24);
 
         Ok(())
@@ -348,6 +348,10 @@ impl<'a> IntelPT<'a> {
     /// Fill the coverage map by decoding the PT traces
     ///
     /// This function consumes the traces.
+    #[expect(
+        clippy::cast_ptr_alignment,
+        reason = "Given the structure of the ipt buffer, casts to headers are always aligned"
+    )]
     pub fn decode_traces_into_map<T>(
         &mut self,
         // images: &[PtImage], todo: introduce support for JIT/ self modifying code ecc
@@ -369,7 +373,7 @@ impl<'a> IntelPT<'a> {
         let input = IptInputBuffer::new(
             IptInputType::GetProcessTrace,
             IptInputPayload {
-                get_trace: ipt_payload.into(),
+                get_trace: ipt_payload,
             },
         );
 
@@ -378,11 +382,11 @@ impl<'a> IntelPT<'a> {
             DeviceIoControl(
                 self.ipt_handle.inner,
                 IptIoctl::ReadTrace as u32,
-                Some(&raw const input as *const std::ffi::c_void),
+                Some(&raw const input as *const core::ffi::c_void),
                 size_of::<IptInputBuffer>() as u32,
-                Some(trace_buffer.as_mut_ptr() as *mut std::ffi::c_void),
+                Some(trace_buffer.as_mut_ptr() as *mut core::ffi::c_void),
                 trace_buffer.capacity() as u32,
-                Some(&mut out_size),
+                Some(&raw mut out_size),
                 None,
             )
         }?;
@@ -393,6 +397,7 @@ impl<'a> IntelPT<'a> {
             trace_buffer.set_len(out_size as usize);
         };
 
+        debug_assert!(trace_buffer.as_ptr().cast::<IptTraceData>().is_aligned());
         let trace_data = unsafe {
             trace_buffer
                 .as_ptr()
@@ -404,19 +409,23 @@ impl<'a> IntelPT<'a> {
 
         let mut slice = &trace_buffer[size_of::<IptTraceData>()..];
         while slice.len() >= size_of::<IptTraceHeader>() {
+            debug_assert!(slice.as_ptr().cast::<IptTraceHeader>().is_aligned());
             let inner_header =
                 unsafe { slice.as_ptr().cast::<IptTraceHeader>().as_ref_unchecked() };
             slice = &slice[size_of::<IptTraceHeader>()..];
-            if self.tid.is_none()
-                || self
-                    .tid
-                    .is_some_and(|tid| tid as u64 == inner_header.thread_id)
+            if self
+                .tid
+                .is_none_or(|tid| u64::from(tid) == inner_header.thread_id)
             {
                 let mut split_buffer = Vec::new();
-                let trace= if inner_header.ring_buffer_offset >= self.previous_decode_head {
-                    &slice[self.previous_decode_head as usize..inner_header.ring_buffer_offset as usize]
+                let trace = if inner_header.ring_buffer_offset >= self.previous_decode_head {
+                    &slice[self.previous_decode_head as usize
+                        ..inner_header.ring_buffer_offset as usize]
                 } else {
-                    split_buffer.extend(&slice[self.previous_decode_head as usize..inner_header.trace_size as usize]);
+                    split_buffer.extend(
+                        &slice
+                            [self.previous_decode_head as usize..inner_header.trace_size as usize],
+                    );
                     split_buffer.extend(&slice[0..inner_header.ring_buffer_offset as usize]);
                     &split_buffer[..]
                 };
@@ -446,7 +455,7 @@ impl<'a> IntelPT<'a> {
             process_handle: self.target_process_handle.inner.0 as u64,
         };
         let input = IptInputBuffer::new(IptInputType::GetProcessTraceSize, ipt_payload.into());
-        let (out, out_size) = self.send_device_io_request(input)?;
+        let (out, out_size) = self.send_device_io_request(&input)?;
 
         debug_assert_eq!(out_size, size_of::<IptOutputBuffer>() as u32);
 
@@ -455,7 +464,7 @@ impl<'a> IntelPT<'a> {
 
     fn send_device_io_request(
         &self,
-        input: IptInputBuffer,
+        input: &IptInputBuffer,
     ) -> windows::core::Result<(IptOutputBuffer, u32)> {
         let mut out = MaybeUninit::<IptOutputBuffer>::uninit();
         let mut out_size = 0;
@@ -464,11 +473,11 @@ impl<'a> IntelPT<'a> {
             DeviceIoControl(
                 self.ipt_handle.inner,
                 IptIoctl::Request as u32,
-                Some(&raw const input as *const std::ffi::c_void),
+                Some(&raw const input as *const core::ffi::c_void),
                 size_of::<IptInputBuffer>() as u32,
-                Some(out.as_mut_ptr() as *mut std::ffi::c_void),
+                Some(out.as_mut_ptr() as *mut core::ffi::c_void),
                 size_of::<IptOutputBuffer>() as u32,
-                Some(&mut out_size),
+                Some(&raw mut out_size),
                 None,
             )
         }?;
@@ -546,7 +555,7 @@ impl<'a> IntelPTBuilder<'a> {
             options,
         };
         let input = IptInputBuffer::new(IptInputType::StartProcessTrace, ipt_payload.into());
-        let (_, out_size) = intel_pt.send_device_io_request(input)?;
+        let (_, out_size) = intel_pt.send_device_io_request(&input)?;
         debug_assert_eq!(out_size, 0);
 
         // todo: review this, since tid could be set later, filter setup can fail or be useless here
@@ -590,7 +599,7 @@ struct PtHandle {
 impl Drop for PtHandle {
     fn drop(&mut self) {
         if let Err(err) = unsafe { CloseHandle(self.inner) } {
-            panic!("Failed to close handle: {}", err);
+            panic!("Failed to close handle: {err}");
         }
     }
 }
