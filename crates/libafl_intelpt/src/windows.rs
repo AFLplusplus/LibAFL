@@ -1,6 +1,3 @@
-#![allow(dead_code)] // todo remove
-// todo review all the pub
-
 use alloc::{string::String, vec::Vec};
 use core::{fmt::Debug, mem::MaybeUninit, ops::RangeInclusive, ptr::slice_from_raw_parts_mut};
 #[cfg(feature = "export_raw")]
@@ -11,7 +8,6 @@ use bitbybit::bitfield;
 use libafl_bolts::Error;
 use ptcov::PtCoverageDecoderBuilder;
 pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtImage};
-use raw_cpuid::CpuId;
 use windows::{
     Win32::{
         Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE},
@@ -41,6 +37,7 @@ enum IptIoctl {
 
 #[derive(Debug)]
 #[repr(u32)]
+#[expect(dead_code, reason = "Not all the commands are used")]
 enum IptInputType {
     GetTraceVersion = 0,
     GetProcessTraceSize,
@@ -62,9 +59,9 @@ enum IptInputType {
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
 enum IptFilterRangeSettings {
-    Disable = 0,
+    // Disable = 0,
     Ip = 1,
-    TraceStop = 2,
+    // TraceStop = 2,
 }
 
 #[repr(C)]
@@ -225,11 +222,11 @@ struct OutGetTraceSize {
 
 #[repr(C)]
 union IptOutputBuffer {
-    // pub get_trace_version: OutGetTraceVersion,
+    // get_trace_version: OutGetTraceVersion,
     get_trace_size: OutGetTraceSize,
-    // pub query_filter: OutQueryThreadFilter,
-    // pub pause_trace: OutPauseResumeTrace,
-    // pub resume_trace: OutPauseResumeTrace,
+    // query_filter: OutQueryThreadFilter,
+    // pause_trace: OutPauseResumeTrace,
+    // resume_trace: OutPauseResumeTrace,
     _pad: [u8; 24],
 }
 
@@ -618,14 +615,14 @@ pub(crate) fn availability_in_windows() -> Result<(), String> {
     }
 }
 
-/// Number of address filters available on the running CPU
-fn nr_addr_filters() -> Result<u8, &'static str> {
-    let cpuid = CpuId::new();
-    cpuid
-        .get_processor_trace_info()
-        .ok_or("Failed to read CPU Processor Trace Info")
-        .map(|pti| pti.configurable_address_ranges())
-}
+// /// Number of address filters available on the running CPU
+// fn nr_addr_filters() -> Result<u8, &'static str> {
+//     let cpuid = CpuId::new();
+//     cpuid
+//         .get_processor_trace_info()
+//         .ok_or("Failed to read CPU Processor Trace Info")
+//         .map(|pti| pti.configurable_address_ranges())
+// }
 
 fn open_ipt_handle() -> windows::core::Result<PtHandle> {
     let ipt_path = w!("\\??\\IPT\0");
