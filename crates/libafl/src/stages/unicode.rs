@@ -23,6 +23,14 @@ pub struct UnicodeIdentificationMetadata {
 impl_serdeany!(UnicodeIdentificationMetadata);
 
 impl UnicodeIdentificationMetadata {
+    /// Creates a new [`struct@UnicodeIdentificationMetadata`].
+    #[must_use]
+    pub fn new(bytes: &[u8]) -> Self {
+        Self {
+            ranges: Rc::new(extract_ranges(bytes)),
+        }
+    }
+
     /// The list of pre-computed string-like ranges in the input
     #[must_use]
     pub fn ranges(&self) -> &Vec<(usize, BitVec)> {
@@ -30,7 +38,7 @@ impl UnicodeIdentificationMetadata {
     }
 }
 
-pub(crate) fn extract_metadata(bytes: &[u8]) -> UnicodeIdentificationMetadata {
+fn extract_ranges(bytes: &[u8]) -> Vec<(usize, BitVec)> {
     let mut ranges = Vec::new();
 
     if !bytes.is_empty() {
@@ -63,9 +71,7 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> UnicodeIdentificationMetadata {
         }
     }
 
-    UnicodeIdentificationMetadata {
-        ranges: Rc::new(ranges),
-    }
+    ranges
 }
 
 /// Stage which identifies potential strings in the provided input
@@ -101,7 +107,7 @@ impl<I, S> UnicodeIdentificationStage<I, S> {
         let input = tc.load_input(state.corpus())?;
 
         let bytes = input.target_bytes();
-        let metadata = extract_metadata(&bytes);
+        let metadata = UnicodeIdentificationMetadata::new(&bytes);
         tc.add_metadata(metadata);
 
         Ok(())

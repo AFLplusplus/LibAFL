@@ -14,16 +14,16 @@ use crate::{
 #[derive(Debug, TypedBuilder)]
 pub struct IntelPTModule<T = u8> {
     #[builder(setter(skip), default)]
-    pt: Option<IntelPT>,
+    pt: Option<IntelPT<'static>>,
     #[builder(default = IntelPTModule::default_pt_builder())]
-    intel_pt_builder: IntelPTBuilder,
+    intel_pt_builder: IntelPTBuilder<'static>,
     map_ptr: *mut T,
     map_len: usize,
 }
 
 impl IntelPTModule {
     #[must_use]
-    pub fn default_pt_builder() -> IntelPTBuilder {
+    pub fn default_pt_builder() -> IntelPTBuilder<'static> {
         IntelPT::builder().exclude_kernel(false).exclude_hv(true)
     }
 }

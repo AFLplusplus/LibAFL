@@ -1,0 +1,65 @@
+FUZZER_NAME := 'baby_fuzzer_redqueen'
+PROJECT_DIR := absolute_path(".")
+PROFILE := 'release'
+PROFILE_DIR := 'release'
+CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
+FUZZER := absolute_path(CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME)
+
+alias build := fuzzer
+alias cc := cxx
+
+[linux]
+[macos]
+cxx:
+    cargo build --profile={{ PROFILE }}
+
+[windows]
+cxx:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+fuzz_o: cxx
+    {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/libafl_cc --libafl-no-link -O3 -g -c fuzz.c -o fuzz.o
+
+[windows]
+fuzz_o:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+fuzzer: cxx fuzz_o
+    {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/libafl_cxx --libafl fuzz.o -o {{ FUZZER }}
+
+[windows]
+fuzzer:
+    echo "Unsupported on this platform"
+
+run: fuzzer
+    {{ FUZZER }} -o out -i in
+
+[windows]
+run:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+test: fuzzer
+    #!/bin/bash
+    mkdir -p in
+    head -c 28 /dev/zero > in/zeros
+    timeout 120s {{ FUZZER }} -o out -i in | tee fuzz_stdout.log || true
+    if grep -qa "objectives: 1" fuzz_stdout.log; then
+        echo "Fuzzer is working"
+    else
+        echo "Fuzzer does not generate any crashes"
+        exit 1
+    fi
+    rm -rf out in
+
+[windows]
+test: fuzzer
+    echo "Unsupported on this platform"
+
+clean:
+    cargo clean

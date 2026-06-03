@@ -24,7 +24,7 @@ pub struct NautilusContext {
 
 impl Debug for NautilusContext {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "NautilusContext {{}}",)
+        write!(f, "NautilusContext {{}}")
     }
 }
 
@@ -38,7 +38,7 @@ impl NautilusContext {
         for rule in rules {
             ctx.add_rule(&rule[0], rule[1].as_bytes());
         }
-        let root = "{".to_string() + &rules[0][0] + "}";
+        let root = "{".to_string() + rules[0][0].as_str() + "}";
         ctx.add_rule("START", root.as_bytes());
         ctx.initialize(tree_depth);
         Self { ctx }
@@ -128,7 +128,7 @@ pub struct NautilusGenerator<'a> {
 
 impl Debug for NautilusGenerator<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "NautilusGenerator {{}}",)
+        write!(f, "NautilusGenerator {{}}")
     }
 }
 

@@ -1540,10 +1540,9 @@ where
         // No need to load the input again, it'll still be cached.
         let other_input = &mut other_testcase.input().as_ref().unwrap();
         let wrapped_mapped_other_input = (self.input_mapper)(other_input).map_to_option_bytes();
-        if wrapped_mapped_other_input.is_none() {
+        let Some(mapped_other_input) = wrapped_mapped_other_input else {
             return Ok(MutationResult::Skipped);
-        }
-        let mapped_other_input = wrapped_mapped_other_input.unwrap();
+        };
 
         Ok(CrossoverInsertMutator::crossover_insert(
             input,
@@ -1635,10 +1634,9 @@ where
         // No need to load the input again, it'll still be cached.
         let other_input = &mut other_testcase.input().as_ref().unwrap();
         let wrapped_mapped_other_input = (self.input_mapper)(other_input).map_to_option_bytes();
-        if wrapped_mapped_other_input.is_none() {
+        let Some(mapped_other_input) = wrapped_mapped_other_input else {
             return Ok(MutationResult::Skipped);
-        }
-        let mapped_other_input = wrapped_mapped_other_input.unwrap();
+        };
 
         Ok(CrossoverReplaceMutator::crossover_replace(
             input,

@@ -21,5 +21,4 @@ debug = true
 [dependencies]
 libafl = { path = "../../../crates/libafl" }
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
-log = { version = "0.4.22", features = ["release_max_level_info"] }
 serde = "1.0.210"

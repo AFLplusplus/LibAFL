@@ -11,7 +11,7 @@ runs:
           gcc-arm-linux-gnueabi g++-arm-linux-gnueabi cmake
     - name: Remove old rust
       shell: bash
-      run: sudo apt purge -y 'rust*' 'cargo*'
+      run: sudo apt purge -y 'rust*' 'cargo*' 'rustup*'
     - uses: dtolnay/rust-toolchain@stable
     - name: enable mult-thread for `make`
       shell: bash

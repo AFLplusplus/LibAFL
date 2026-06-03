@@ -17,7 +17,8 @@ use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{GuestAddr, GuestUlong, MapInfo};
 use libc::{
-    MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE, c_void,
+    MAP_ANON, MAP_FAILED, MAP_FIXED_NOREPLACE, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
+    c_void,
 };
 use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -207,7 +208,7 @@ impl Display for AsanError {
                 write!(fmt, "Invalid {len} bytes write at {addr:#x}")
             }
             AsanError::BadFree(addr, interval) => match interval {
-                Some(chunk) => write!(fmt, "Bad free at {addr:#x} in the allocated chunk {chunk}",),
+                Some(chunk) => write!(fmt, "Bad free at {addr:#x} in the allocated chunk {chunk}"),
                 None => write!(fmt, "Bad free at {addr:#x} (wild pointer)"),
             },
             AsanError::MemLeak(interval) => write!(fmt, "Memory leak of chunk {interval}"),
@@ -483,44 +484,38 @@ impl AsanHostModule {
 }
 
 impl AsanGiovese {
+    unsafe fn mmap(addr: *mut c_void, size: usize) {
+        let res = unsafe {
+            libc::mmap(
+                addr,
+                size,
+                PROT_READ | PROT_WRITE,
+                MAP_PRIVATE | MAP_FIXED_NOREPLACE | MAP_NORESERVE | MAP_ANON,
+                -1,
+                0,
+            )
+        };
+
+        assert_ne!(
+            res,
+            MAP_FAILED,
+            "Error: could not map asan host memory at {:#x} (size {:#x}): {}",
+            addr as usize,
+            size,
+            std::io::Error::last_os_error().raw_os_error().unwrap()
+        );
+    }
+
     unsafe fn init(self: &mut Pin<Box<Self>>, qemu_hooks: QemuHooks) {
         unsafe {
-            assert_ne!(
-                libc::mmap(
-                    HIGH_SHADOW_ADDR,
-                    HIGH_SHADOW_SIZE,
-                    PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
-                    -1,
-                    0
-                ),
-                MAP_FAILED
-            );
-            assert_ne!(
-                libc::mmap(
-                    LOW_SHADOW_ADDR,
-                    LOW_SHADOW_SIZE,
-                    PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
-                    -1,
-                    0
-                ),
-                MAP_FAILED
-            );
-            assert_ne!(
-                libc::mmap(
-                    GAP_SHADOW_ADDR,
-                    GAP_SHADOW_SIZE,
-                    PROT_READ | PROT_WRITE,
-                    MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
-                    -1,
-                    0
-                ),
-                MAP_FAILED
-            );
-
-            qemu_hooks.add_pre_syscall_hook(self.as_mut(), Self::fake_syscall);
+            // map shadow and gap memory
+            Self::mmap(HIGH_SHADOW_ADDR, HIGH_SHADOW_SIZE);
+            Self::mmap(LOW_SHADOW_ADDR, LOW_SHADOW_SIZE);
+            Self::mmap(GAP_SHADOW_ADDR, GAP_SHADOW_SIZE);
         }
+
+        // hook callback
+        qemu_hooks.add_pre_syscall_hook(self.as_mut(), Self::fake_syscall);
     }
 
     #[must_use]
@@ -569,10 +564,10 @@ impl AsanGiovese {
                 QasanAction::UnPoison => {
                     Self::unpoison(qemu, a1 as GuestAddr, a2 as usize);
                 }
-                QasanAction::IsPoison => {
-                    if Self::is_invalid_access_n(qemu, a1 as GuestAddr, a2 as usize) {
-                        r = 1;
-                    }
+                QasanAction::IsPoison
+                    if Self::is_invalid_access_n(qemu, a1 as GuestAddr, a2 as usize) =>
+                {
+                    r = 1;
                 }
                 QasanAction::Alloc => {
                     let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap() as GuestAddr;

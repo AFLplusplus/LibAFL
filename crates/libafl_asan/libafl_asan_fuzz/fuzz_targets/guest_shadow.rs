@@ -7,7 +7,8 @@ use libafl_asan::{
     mmap::libc::LibcMmap,
     shadow::{
         PoisonType, Shadow,
-        guest::{DefaultShadowLayout, GuestShadow, GuestShadowError},
+        guest::{GuestShadow, GuestShadowError},
+        layout::DefaultShadowLayout,
     },
     symbols::dlsym::{DlSymSymbols, LookupTypeNext},
 };

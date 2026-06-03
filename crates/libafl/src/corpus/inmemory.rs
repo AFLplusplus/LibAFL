@@ -339,6 +339,7 @@ impl<I> TestcaseStorage<I> {
                 "trying to insert a testcase with an id bigger than the internal Id counter",
             ));
         }
+        testcase.borrow_mut().set_corpus_id(Some(id));
         let corpus = if is_disabled {
             &mut self.disabled
         } else {
@@ -353,6 +354,7 @@ impl<I> TestcaseStorage<I> {
     #[cfg(feature = "corpus_btreemap")]
     fn insert_inner(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
         let id = CorpusId::from(self.progressive_id);
+        testcase.borrow_mut().set_corpus_id(Some(id));
         self.progressive_id += 1;
         let corpus = if is_disabled {
             &mut self.disabled
