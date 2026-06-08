@@ -496,11 +496,16 @@ impl Qemu {
         }
     }
 
+    /// Run a single, caller-selected CPU until the next exit.
+    ///
+    /// # Safety
+    ///
+    /// The provided [`CPU`] must belong to this QEMU instance and remain valid for the duration of
+    /// the run.
     #[allow(dead_code)]
-    pub unsafe fn run_single_cpu(self, cpu_index: i32) -> Result<QemuExitReason, QemuExitError> {
+    pub unsafe fn run_single_cpu(&self, cpu: CPU) -> Result<QemuExitReason, QemuExitError> {
         unsafe {
-            let cpu_state: CPU = self.cpu_from_index(cpu_index.try_into().unwrap()).unwrap();
-            libafl_qemu_run_single_cpu(cpu_state.raw_ptr());
+            libafl_qemu_run_single_cpu(cpu.raw_ptr());
         }
 
         let exit_reason = unsafe { libafl_get_exit_reason() };
