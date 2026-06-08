@@ -499,7 +499,8 @@ impl Qemu {
     #[allow(dead_code)]
     pub unsafe fn run_single_cpu(self, cpu_index: i32) -> Result<QemuExitReason, QemuExitError> {
         unsafe {
-            libafl_qemu_run_single_cpu(cpu_index);
+            let cpu_state: CPU = self.cpu_from_index(cpu_index.try_into().unwrap()).unwrap();
+            libafl_qemu_run_single_cpu(cpu_state.raw_ptr());
         }
 
         let exit_reason = unsafe { libafl_get_exit_reason() };
