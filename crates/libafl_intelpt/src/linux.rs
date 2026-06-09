@@ -32,8 +32,6 @@ use perf_event_open_sys::{
     perf_event_open,
 };
 pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtCoverageDecoderBuilder, PtImage};
-use ptcov::{PtCpu, PtCpuVendor};
-use raw_cpuid::CpuId;
 
 use super::{PAGE_SIZE, availability};
 use crate::utils::current_cpu;

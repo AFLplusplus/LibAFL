@@ -95,7 +95,6 @@ pub fn main() {
         .filter_map(|pm| {
             if pm.is_exec() {
                 let data = unsafe { slice::from_raw_parts(pm.start() as *const u8, pm.size()) };
-                println!("image: {:?}", pm);
                 Some(PtImage::new(data, pm.start() as u64))
             } else {
                 None
