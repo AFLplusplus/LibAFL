@@ -17,10 +17,6 @@ use windows::{
             FILE_GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
         },
         System::{
-            Diagnostics::ToolHelp::{
-                CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First,
-                Thread32Next,
-            },
             IO::DeviceIoControl,
             Threading::{
                 GetCurrentProcessId, OpenProcess, OpenThread, PROCESS_QUERY_INFORMATION,
@@ -265,10 +261,10 @@ struct ThreadCoverageDecoder<'a> {
 pub struct IntelPT<'a> {
     ipt_handle: Owned<HANDLE>,
     target_process_handle: Owned<HANDLE>,
-    pid: u32,
     thread_id: Option<u32>,
     ptcov_decoders: HashMap<u64, ThreadCoverageDecoder<'a>>,
     images: &'a [PtImage<'a>],
+    last_decode_threads: Vec<u32>,
     #[cfg(feature = "export_raw")]
     last_decode_trace: Vec<u8>,
 }
@@ -324,16 +320,24 @@ impl<'a> IntelPT<'a> {
         self.toggle_tracing(IptInputType::PauseThreadTrace)
     }
 
+    // If the target thread_id is not set, this function will be a best effort based on the threads
+    // seen in the last decoding. Enumerating the threads for every iteration kills performances.
+    // If a new thread is spawn it is traced by default. If a thread ends, the reativation will fail
+    // with a log message but without returning the error.
     fn toggle_tracing(&mut self, input_type: IptInputType) -> windows::core::Result<()> {
         if let Some(thread_id) = self.thread_id {
             let mut thread_handle =
                 unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, thread_id)?) };
             self.toggle_thread_tracing(input_type, &mut thread_handle)?;
         } else {
-            for thread_id in process_thread_ids(self.pid)? {
+            for thread_id in &self.last_decode_threads {
                 let mut thread_handle =
-                    unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, thread_id)?) };
-                self.toggle_thread_tracing(input_type, &mut thread_handle)?;
+                    unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, *thread_id)?) };
+                let _ = self
+                    .toggle_thread_tracing(input_type, &mut thread_handle)
+                    .inspect_err(|e| {
+                        log::info!("Failed to toggle tracing for thread {thread_id}: {}", e);
+                    });
             }
         }
 
@@ -377,6 +381,8 @@ impl<'a> IntelPT<'a> {
     where
         T: CoverageEntry,
     {
+        self.last_decode_threads.clear();
+
         // get trace
         let trace_size = self.get_trace_size()?;
         let mut trace_buffer: Vec<u8> = Vec::with_capacity(trace_size as usize);
@@ -433,6 +439,8 @@ impl<'a> IntelPT<'a> {
             let inner_header =
                 unsafe { slice.as_ptr().cast::<IptTraceHeader>().as_ref_unchecked() };
             slice = &slice[size_of::<IptTraceHeader>()..];
+            self.last_decode_threads.push(inner_header.thread_id as u32);
+
             if self
                 .thread_id
                 .is_none_or(|thread_id| u64::from(thread_id) == inner_header.thread_id)
@@ -565,10 +573,10 @@ impl<'a> IntelPTBuilder<'a> {
         let mut intel_pt = IntelPT {
             ipt_handle,
             target_process_handle,
-            pid: self.pid,
             thread_id: None,
             ptcov_decoders: HashMap::new(),
             images: self.images,
+            last_decode_threads: vec![],
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
         };
@@ -608,27 +616,6 @@ impl<'a> IntelPTBuilder<'a> {
         self.images = images;
         self
     }
-}
-
-fn process_thread_ids(pid: u32) -> windows::core::Result<Vec<u32>> {
-    let snapshot = unsafe { Owned::new(CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)?) };
-    let mut entry = THREADENTRY32 {
-        dwSize: size_of::<THREADENTRY32>() as u32,
-        ..Default::default()
-    };
-    unsafe { Thread32First(*snapshot, &raw mut entry)? };
-
-    let mut thread_ids = Vec::new();
-    loop {
-        if entry.th32OwnerProcessID == pid {
-            thread_ids.push(entry.th32ThreadID);
-        }
-        if unsafe { Thread32Next(*snapshot, &raw mut entry) }.is_err() {
-            break;
-        }
-    }
-
-    Ok(thread_ids)
 }
 
 pub(crate) fn availability_in_windows() -> Result<(), String> {
