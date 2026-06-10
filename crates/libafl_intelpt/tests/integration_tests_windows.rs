@@ -74,7 +74,7 @@ fn intel_pt_trace_thread() {
     let worker_barrier = barrier.clone();
     let worker = thread::spawn(|| worker_main(thread_id_sender, worker_barrier));
     let worker_tid = thread_id_receiver.recv().unwrap();
-    pt.set_tid(Some(worker_tid));
+    pt.set_thread_id(Some(worker_tid));
     pt.enable_tracing().unwrap();
     barrier.wait();
 
