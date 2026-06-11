@@ -1,10 +1,10 @@
+mod ipt;
+
 use alloc::{string::String, vec::Vec};
 use core::{fmt::Debug, mem::MaybeUninit, ops::RangeInclusive, ptr::slice_from_raw_parts_mut};
 #[cfg(feature = "export_raw")]
 use std::string::ToString;
 
-use arbitrary_int::{u3, u4};
-use bitbybit::bitfield;
 use hashbrown::HashMap;
 use libafl_bolts::Error;
 use ptcov::PtCoverageDecoderBuilder;
@@ -28,227 +28,6 @@ use windows::{
 };
 
 use crate::utils::current_cpu;
-
-#[derive(Debug)]
-#[repr(u32)]
-enum IptIoctl {
-    Request = 0x220004,
-    ReadTrace = 0x220006,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[repr(u32)]
-#[expect(dead_code, reason = "Not all the commands are used")]
-enum IptInputType {
-    GetTraceVersion = 0,
-    GetProcessTraceSize,
-    GetProcessTrace,
-    StartCoreTracing,
-    RegisterExtendedImageForTracing,
-    StartProcessTrace,
-    StopProcessTrace,
-    PauseThreadTrace,
-    ResumeThreadTrace,
-    QueryProcessTrace,
-    QueryCoreTrace,
-    StopTraceOnEachCore = 12,
-    ConfigureThreadAddressFilterRange,
-    QueryThreadAddressFilterRange,
-    QueryThreadTraceStopRangeEntered,
-}
-
-#[repr(u32)]
-#[derive(Debug, Clone, Copy)]
-enum IptFilterRangeSettings {
-    // Disable = 0,
-    Ip = 1,
-    // TraceStop = 2,
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-struct ConfigureThreadAddressFilterRange {
-    thread_handle: HANDLE,
-    range_index: u32,
-    range_config: IptFilterRangeSettings,
-    start_address: u64,
-    end_address: u64,
-}
-
-/// Layout (from winipt):
-/// - `OptionVersion`:   bits 0-3   (4 bits) - Must be set to 1
-/// - `TimingSettings`:  bits 4-7   (4 bits) - `IPT_TIMING_SETTINGS`
-/// - `MtcFrequency`:    bits 8-11  (4 bits) - Bits 14:17 in `IA32_RTIT_CTL`
-/// - `CycThreshold`:    bits 12-15 (4 bits) - Bits 19:22 in `IA32_RTIT_CTL`
-/// - `TopaPagesPow2`:   bits 16-19 (4 bits) - Size of buffer as 4KB powers of 2 (4KB->128MB)
-/// - `MatchSettings`:   bits 20-22 (3 bits) - `IPT_MATCH_SETTINGS`
-/// - Inherit:         bit 23     (1 bit)  - Children will be automatically traced
-/// - `ModeSettings`:    bits 24-27 (4 bits) - `IPT_MODE_SETTINGS`
-/// - Reserved:        bits 28-63 (36 bits)
-#[bitfield(u64)]
-#[derive(Debug)]
-struct IptOptions {
-    #[bits(0..=3, rw)]
-    option_version: u4,
-    #[bits(4..=7, rw)]
-    timing_settings: u4,
-    #[bits(8..=11, rw)]
-    mtc_frequency: u4,
-    #[bits(12..=15, rw)]
-    cyc_threshold: u4,
-    #[bits(16..=19, rw)]
-    topa_pages_pow2: u4,
-    /// Not relevant when tracing by process handle
-    #[bits(20..=22, rw)]
-    match_settings: u3,
-    #[bits(23..=23, rw)]
-    inherit: bool,
-    #[bits(24..=27, rw)]
-    mode_settings: u4,
-    #[bits(28..=63)]
-    reserved: u36,
-}
-
-impl Default for IptOptions {
-    fn default() -> Self {
-        Self::builder()
-            .with_option_version(Self::VERSION)
-            .with_topa_pages_pow2(u4::new(4)) // 64 kB
-            .with_inherit(false)
-            .with_mode_settings(u4::new(0)) // todo: better understand IPT_MODE_SETTINGS difference between Ctl and Reg
-            .value
-    }
-}
-
-impl IptOptions {
-    const VERSION: u4 = u4::new(1);
-}
-
-const IPT_TRACE_VERSION: u16 = 1;
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-struct StartProcessTrace {
-    process_handle: u64,
-    options: IptOptions,
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-struct GetProcessTrace {
-    trace_version: u16,
-    _padding: [u8; 6],
-    process_handle: u64,
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-struct PauseResumeThreadTrace {
-    thread_handle: HANDLE,
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-struct IptBufferVersion {
-    major: u32,
-    minor: u32,
-}
-const IPT_BUFFER_VERSION: IptBufferVersion = IptBufferVersion { major: 1, minor: 0 };
-
-#[repr(C)]
-union IptInputPayload {
-    get_trace: GetProcessTrace,
-    start_trace: StartProcessTrace,
-    // stop_trace: StopProcessTrace,
-    configure_thread_address_filter_range: ConfigureThreadAddressFilterRange,
-    // query_filter: QueryThreadFilter,
-    pause_resume_thread: PauseResumeThreadTrace,
-    _pad: [u8; 32],
-}
-
-impl From<ConfigureThreadAddressFilterRange> for IptInputPayload {
-    fn from(value: ConfigureThreadAddressFilterRange) -> Self {
-        Self {
-            configure_thread_address_filter_range: value,
-        }
-    }
-}
-
-impl From<StartProcessTrace> for IptInputPayload {
-    fn from(value: StartProcessTrace) -> Self {
-        Self { start_trace: value }
-    }
-}
-
-impl From<GetProcessTrace> for IptInputPayload {
-    fn from(value: GetProcessTrace) -> Self {
-        Self { get_trace: value }
-    }
-}
-
-impl From<PauseResumeThreadTrace> for IptInputPayload {
-    fn from(value: PauseResumeThreadTrace) -> Self {
-        Self {
-            pause_resume_thread: value,
-        }
-    }
-}
-
-#[repr(C)]
-struct IptInputBuffer {
-    version: IptBufferVersion,
-    input_type: IptInputType,
-    _padding: u32,
-    payload: IptInputPayload,
-}
-
-impl IptInputBuffer {
-    fn new(input_type: IptInputType, payload: IptInputPayload) -> Self {
-        IptInputBuffer {
-            version: IPT_BUFFER_VERSION,
-            input_type,
-            _padding: 0,
-            payload,
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-struct OutGetTraceSize {
-    trace_version: u16,
-    _padding: [u8; 6],
-    trace_size: u64,
-}
-
-#[repr(C)]
-union IptOutputBuffer {
-    // get_trace_version: OutGetTraceVersion,
-    get_trace_size: OutGetTraceSize,
-    // query_filter: OutQueryThreadFilter,
-    // pause_trace: OutPauseResumeTrace,
-    // resume_trace: OutPauseResumeTrace,
-    _pad: [u8; 24],
-}
-
-#[repr(C)]
-#[derive(Debug)]
-struct IptTraceData {
-    trace_version: u16,
-    valid_trace: u16,
-    trace_size: u32,
-}
-
-#[repr(C, packed(4))]
-#[derive(Debug)]
-struct IptTraceHeader {
-    thread_id: u64,
-    timing_settings: u32,
-    mtc_frequency: u32,
-    frequency_to_tsc_ratio: u32,
-    ring_buffer_offset: u32,
-    trace_size: u32,
-}
 
 #[derive(Debug)]
 struct ThreadCoverageDecoder<'a> {
@@ -295,17 +74,8 @@ impl<'a> IntelPT<'a> {
         };
 
         for (i, filter) in filters.iter().enumerate() {
-            let ipt_payload = ConfigureThreadAddressFilterRange {
-                thread_handle: *thread_handle,
-                range_index: i.try_into()?,
-                range_config: IptFilterRangeSettings::Ip,
-                start_address: *filter.start(),
-                end_address: *filter.end(),
-            };
-            let input = IptInputBuffer::new(
-                IptInputType::ConfigureThreadAddressFilterRange,
-                ipt_payload.into(),
-            );
+            let input =
+                ipt::InputBuffer::set_thread_ip_filter(*thread_handle, i.try_into()?, filter);
             let (_, out_size) = self.send_device_io_request(&input)?;
             debug_assert_eq!(out_size, 0);
         }
@@ -313,30 +83,30 @@ impl<'a> IntelPT<'a> {
     }
 
     pub fn enable_tracing(&mut self) -> windows::core::Result<()> {
-        self.toggle_tracing(IptInputType::ResumeThreadTrace)
+        self.toggle_tracing(true)
     }
 
     pub fn disable_tracing(&mut self) -> windows::core::Result<()> {
-        self.toggle_tracing(IptInputType::PauseThreadTrace)
+        self.toggle_tracing(false)
     }
 
     // If the target thread_id is not set, this function will be a best effort based on the threads
     // seen in the last decoding. Enumerating the threads for every iteration kills performances.
     // If a new thread is spawn it is traced by default. If a thread ends, the reativation will fail
     // with a log message but without returning the error.
-    fn toggle_tracing(&mut self, input_type: IptInputType) -> windows::core::Result<()> {
+    fn toggle_tracing(&mut self, enable: bool) -> windows::core::Result<()> {
         if let Some(thread_id) = self.thread_id {
             let mut thread_handle =
                 unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, thread_id)?) };
-            self.toggle_thread_tracing(input_type, &mut thread_handle)?;
+            self.toggle_thread_tracing(&mut thread_handle, enable)?;
         } else {
             for thread_id in &self.last_decode_threads {
                 let mut thread_handle =
                     unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, *thread_id)?) };
                 let _ = self
-                    .toggle_thread_tracing(input_type, &mut thread_handle)
+                    .toggle_thread_tracing(&mut thread_handle, enable)
                     .inspect_err(|e| {
-                        log::info!("Failed to toggle tracing for thread {thread_id}: {}", e);
+                        log::info!("Failed to toggle tracing for thread {thread_id}: {e}");
                     });
             }
         }
@@ -346,19 +116,14 @@ impl<'a> IntelPT<'a> {
 
     fn toggle_thread_tracing(
         &self,
-        input_type: IptInputType,
         thread_handle: &mut HANDLE,
+        enable: bool,
     ) -> windows::core::Result<()> {
-        let ipt_payload = PauseResumeThreadTrace {
-            thread_handle: *thread_handle,
+        let input = if enable {
+            ipt::InputBuffer::resume_thread_trace(*thread_handle)
+        } else {
+            ipt::InputBuffer::pause_thread_trace(*thread_handle)
         };
-        let input = IptInputBuffer::new(
-            input_type,
-            IptInputPayload {
-                pause_resume_thread: ipt_payload,
-            },
-        );
-
         let (_, out_size) = self.send_device_io_request(&input)?;
         debug_assert_eq!(out_size, 24);
 
@@ -387,25 +152,15 @@ impl<'a> IntelPT<'a> {
         let trace_size = self.get_trace_size()?;
         let mut trace_buffer: Vec<u8> = Vec::with_capacity(trace_size as usize);
 
-        let ipt_payload = GetProcessTrace {
-            trace_version: IPT_TRACE_VERSION,
-            _padding: [0u8; 6],
-            process_handle: self.target_process_handle.0 as u64,
-        };
-        let input = IptInputBuffer::new(
-            IptInputType::GetProcessTrace,
-            IptInputPayload {
-                get_trace: ipt_payload,
-            },
-        );
+        let input = ipt::InputBuffer::get_process_trace(*self.target_process_handle);
 
         let mut out_size = 0;
         unsafe {
             DeviceIoControl(
                 *self.ipt_handle,
-                IptIoctl::ReadTrace as u32,
+                ipt::Ioctl::ReadTrace as u32,
                 Some(&raw const input as *const core::ffi::c_void),
-                size_of::<IptInputBuffer>() as u32,
+                size_of::<ipt::InputBuffer>() as u32,
                 Some(trace_buffer.as_mut_ptr() as *mut core::ffi::c_void),
                 trace_buffer.capacity() as u32,
                 Some(&raw mut out_size),
@@ -419,26 +174,26 @@ impl<'a> IntelPT<'a> {
             trace_buffer.set_len(out_size as usize);
         };
 
-        debug_assert!(trace_buffer.as_ptr().cast::<IptTraceData>().is_aligned());
+        debug_assert!(trace_buffer.as_ptr().cast::<ipt::TraceData>().is_aligned());
         let trace_data = unsafe {
             trace_buffer
                 .as_ptr()
-                .cast::<IptTraceData>()
+                .cast::<ipt::TraceData>()
                 .as_ref_unchecked()
         };
-        debug_assert_eq!(trace_data.trace_version, IPT_TRACE_VERSION);
+        debug_assert_eq!(trace_data.trace_version, ipt::TRACE_VERSION);
         if trace_data.valid_trace == 0 {
             return Err(Error::runtime(
                 "Intel PT: failed to get a valid trace from ipt.sys",
             ));
         }
 
-        let mut slice = &trace_buffer[size_of::<IptTraceData>()..];
-        while slice.len() >= size_of::<IptTraceHeader>() {
-            debug_assert!(slice.as_ptr().cast::<IptTraceHeader>().is_aligned());
+        let mut slice = &trace_buffer[size_of::<ipt::TraceData>()..];
+        while slice.len() >= size_of::<ipt::TraceHeader>() {
+            debug_assert!(slice.as_ptr().cast::<ipt::TraceHeader>().is_aligned());
             let inner_header =
-                unsafe { slice.as_ptr().cast::<IptTraceHeader>().as_ref_unchecked() };
-            slice = &slice[size_of::<IptTraceHeader>()..];
+                unsafe { slice.as_ptr().cast::<ipt::TraceHeader>().as_ref_unchecked() };
+            slice = &slice[size_of::<ipt::TraceHeader>()..];
             self.last_decode_threads.push(inner_header.thread_id as u32);
 
             if self
@@ -488,34 +243,29 @@ impl<'a> IntelPT<'a> {
     }
 
     fn get_trace_size(&self) -> windows::core::Result<u64> {
-        let ipt_payload = GetProcessTrace {
-            trace_version: IPT_TRACE_VERSION,
-            _padding: [0; 6],
-            process_handle: self.target_process_handle.0 as u64,
-        };
-        let input = IptInputBuffer::new(IptInputType::GetProcessTraceSize, ipt_payload.into());
+        let input = ipt::InputBuffer::get_process_trace_size(*self.target_process_handle);
         let (out, out_size) = self.send_device_io_request(&input)?;
 
-        debug_assert_eq!(out_size, size_of::<IptOutputBuffer>() as u32);
+        debug_assert_eq!(out_size, size_of::<ipt::OutputBuffer>() as u32);
 
         Ok(unsafe { out.get_trace_size.trace_size })
     }
 
     fn send_device_io_request(
         &self,
-        input: &IptInputBuffer,
-    ) -> windows::core::Result<(IptOutputBuffer, u32)> {
-        let mut out = MaybeUninit::<IptOutputBuffer>::uninit();
+        input: &ipt::InputBuffer,
+    ) -> windows::core::Result<(ipt::OutputBuffer, u32)> {
+        let mut out = MaybeUninit::<ipt::OutputBuffer>::uninit();
         let mut out_size = 0;
 
         unsafe {
             DeviceIoControl(
                 *self.ipt_handle,
-                IptIoctl::Request as u32,
+                ipt::Ioctl::Request as u32,
                 Some((&raw const *input).cast()),
-                size_of::<IptInputBuffer>() as u32,
+                size_of::<ipt::InputBuffer>() as u32,
                 Some(out.as_mut_ptr().cast()),
-                size_of::<IptOutputBuffer>() as u32,
+                size_of::<ipt::OutputBuffer>() as u32,
                 Some(&raw mut out_size),
                 None,
             )
@@ -581,13 +331,9 @@ impl<'a> IntelPTBuilder<'a> {
             last_decode_trace: Vec::new(),
         };
 
-        let options = IptOptions::default();
+        let options = ipt::Options::default();
 
-        let ipt_payload = StartProcessTrace {
-            process_handle: intel_pt.target_process_handle.0 as u64,
-            options,
-        };
-        let input = IptInputBuffer::new(IptInputType::StartProcessTrace, ipt_payload.into());
+        let input = ipt::InputBuffer::start_process_trace(*intel_pt.target_process_handle, options);
         let (_, out_size) = intel_pt.send_device_io_request(&input)?;
         debug_assert_eq!(out_size, 0);
 
@@ -660,14 +406,4 @@ fn open_ipt_handle() -> windows::core::Result<Owned<HANDLE>> {
         )
     }
     .map(|h| unsafe { Owned::new(h) })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn ipt_input_buffer_size() {
-        assert_eq!(size_of::<IptInputBuffer>(), 0x30);
-    }
 }
