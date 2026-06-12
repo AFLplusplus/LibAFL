@@ -102,7 +102,14 @@ impl<'a> IntelPT<'a> {
         } else {
             for thread_id in &self.last_decode_threads {
                 let mut thread_handle =
-                    unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, *thread_id)?) };
+                    match unsafe { OpenThread(THREAD_GET_CONTEXT, false, *thread_id) } {
+                        Ok(handle) => unsafe { Owned::new(handle) },
+                        Err(e) => {
+                            log::info!("Failed to toggle tracing for thread {thread_id}: {e}");
+                            continue;
+                        }
+                    };
+
                 let _ = self
                     .toggle_thread_tracing(&mut thread_handle, enable)
                     .inspect_err(|e| {
@@ -234,6 +241,7 @@ impl<'a> IntelPT<'a> {
 
                 if let Err(e) = ptcov_decoder.decoder.coverage(trace, coverage) {
                     log::warn!("PT trace decoding to coverage failed: {e:?}");
+                    coverage.fill(0.into());
                 }
             }
             slice = &slice[inner_header.trace_size as usize..];
