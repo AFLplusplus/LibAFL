@@ -3,8 +3,8 @@
 
 extern crate alloc;
 
-use std::{arch::asm, process};
 use alloc::slice;
+use std::{arch::asm, process};
 
 use libafl_intelpt::{IntelPT, availability};
 use log::LevelFilter;
