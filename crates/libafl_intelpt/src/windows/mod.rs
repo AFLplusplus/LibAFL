@@ -1,3 +1,7 @@
+/// Intel Processor Trace code using the `ipt.sys` Windows driver.
+///
+/// This code is heavily inspired by `winipt` by Alex Ionescu and its other authors.
+/// Credits also go to Frederic Kah and Justin Avril, who drafted the initial implementation.
 mod ipt;
 
 use alloc::{string::String, vec::Vec};
@@ -11,7 +15,7 @@ use ptcov::PtCoverageDecoderBuilder;
 pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtImage};
 use windows::{
     Win32::{
-        Foundation::{HANDLE, INVALID_HANDLE_VALUE},
+        Foundation::HANDLE,
         Storage::FileSystem::{
             CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_FLAG_NO_BUFFERING, FILE_FLAG_SEQUENTIAL_SCAN,
             FILE_GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
@@ -65,12 +69,12 @@ impl<'a> IntelPT<'a> {
     ///
     /// Only instructions in `filters` ranges will be traced.
     pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> windows::core::Result<()> {
-        let thread_handle = unsafe {
-            Owned::new(if let Some(thread_id) = self.thread_id {
-                OpenThread(THREAD_GET_CONTEXT, false, thread_id)?
-            } else {
-                INVALID_HANDLE_VALUE // TODO apply to all threads?
-            })
+        let thread_handle = if let Some(thread_id) = self.thread_id {
+            unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, thread_id)?) }
+        } else {
+            todo!(
+                "Return a libafl error here? in general return libafl errors instead of windows err"
+            )
         };
 
         for (i, filter) in filters.iter().enumerate() {
@@ -300,7 +304,6 @@ impl<'a> IntelPT<'a> {
 
 #[derive(Debug)]
 pub struct IntelPTBuilder<'a> {
-    ip_filters: Vec<RangeInclusive<u64>>,
     images: &'a [PtImage<'a>],
     pid: u32,
 }
@@ -308,27 +311,21 @@ pub struct IntelPTBuilder<'a> {
 impl Default for IntelPTBuilder<'_> {
     fn default() -> Self {
         let pid = unsafe { GetCurrentProcessId() };
-        Self {
-            ip_filters: Vec::new(),
-            images: &[],
-            pid,
-        }
+        Self { images: &[], pid }
     }
 }
 
 impl<'a> IntelPTBuilder<'a> {
     pub fn build(self) -> Result<IntelPT<'a>, Error> {
-        // todo: is there a way to start this all set to trace but "paused" as in linux?
         // todo: better error suggesting to start the kernel driver
         let ipt_handle = open_ipt_handle()?;
 
         let target_process_handle = unsafe {
             OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, self.pid)
                 .map(|h| Owned::new(h))
-        }
-        .map_err(|e| Error::os_error(e.into(), "Failed to get target process handle"))?;
+        }?;
 
-        let mut intel_pt = IntelPT {
+        let intel_pt = IntelPT {
             ipt_handle,
             target_process_handle,
             thread_id: None,
@@ -345,23 +342,12 @@ impl<'a> IntelPTBuilder<'a> {
         let (_, out_size) = intel_pt.send_device_io_request(&input)?;
         debug_assert_eq!(out_size, 0);
 
-        // todo: review this, since thread_id could be set later, filter setup can fail or be useless here
-        intel_pt
-            .set_ip_filters(&self.ip_filters)
-            .map_err(|e| Error::os_error(e.into(), "Failed to set IntelPT ip filters"))?;
         Ok(intel_pt)
     }
 
     #[must_use]
     pub fn pid(mut self, pid: u32) -> Self {
         self.pid = pid;
-        self
-    }
-
-    #[must_use]
-    /// Set filters based on Instruction Pointer (IP)
-    pub fn ip_filters(mut self, filters: Vec<RangeInclusive<u64>>) -> Self {
-        self.ip_filters = filters;
         self
     }
 
