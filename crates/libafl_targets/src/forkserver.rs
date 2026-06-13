@@ -263,14 +263,32 @@ extern "C" fn std_handle_sigterm(_signal: libc::c_int) {
 }
 
 /// Forkserver parent that can handle both non-persistent and persistent mode
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct MaybePersistentForkserverParent {
     last_child_pid: Option<i32>,
     /// This field is only touched for persistent mode to indicating
     /// whether the child is temporarily stopped or terminated
     child_stopped: bool,
+    /// Whether the target is in persistent mode. When `true`, `waitpid`
+    /// uses `WUNTRACED` so that the child's `SIGSTOP` (issued at the end
+    /// of each persistent iteration) is detected and the child can be
+    /// resumed with `SIGCONT` instead of being re-forked.
+    is_persistent: bool,
     old_sigchld_handler: Option<SigHandler>,
     old_sigterm_handler: Option<SigHandler>,
+}
+
+impl Default for MaybePersistentForkserverParent {
+    fn default() -> Self {
+        let is_persistent = std::env::var("__AFL_PERSISTENT").is_ok_and(|v| v == "1");
+        Self {
+            last_child_pid: None,
+            child_stopped: false,
+            is_persistent,
+            old_sigchld_handler: None,
+            old_sigterm_handler: None,
+        }
+    }
 }
 
 impl MaybePersistentForkserverParent {
@@ -278,6 +296,11 @@ impl MaybePersistentForkserverParent {
     #[must_use]
     pub fn new() -> Self {
         MaybePersistentForkserverParent::default()
+    }
+
+    /// Set whether the target is in persistent mode.
+    pub fn set_persistent(&mut self, is_persistent: bool) {
+        self.is_persistent = is_persistent;
     }
 }
 
@@ -371,7 +394,11 @@ impl ForkserverParent for MaybePersistentForkserverParent {
             libc::waitpid(
                 *self.last_child_pid.as_ref().unwrap(),
                 &raw mut status,
-                libc::WUNTRACED,
+                if self.is_persistent {
+                    libc::WUNTRACED
+                } else {
+                    0
+                },
             ) < 0
         } {
             return Err(Error::illegal_state("waitpid"));
@@ -403,6 +430,7 @@ mod tests {
     #[test]
     fn test_maybe_persistent_forkserver_parent_persistent_mode() {
         let mut parent = MaybePersistentForkserverParent::new();
+        parent.set_persistent(true);
         parent.pre_fuzzing().unwrap();
 
         // First spawn: should fork
