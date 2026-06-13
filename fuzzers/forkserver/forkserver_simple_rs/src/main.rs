@@ -121,8 +121,13 @@ pub fn main() {
 
     let observer_ref = edges_observer.handle();
 
+    let target_bin = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("target");
     let mut executor = ForkserverExecutor::builder()
-        .program(env!("TARGET_BIN_PATH"))
+        .program(target_bin)
         .debug_child(opt.debug_child)
         .shmem_provider(&mut shmem_provider)
         .parse_afl_cmdline(opt.arguments)
