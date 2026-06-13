@@ -22,7 +22,9 @@ clap = { version = "4.5.18", features = ["derive"] }
 env_logger = "0.11.5"
 libafl = { path = "../../../crates/libafl", features = ["std", "derive"] }
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
-libafl_targets = { path = "../../../crates/libafl_targets", features = ["sancov_pcguard_hitcounts"] }
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
+  "sancov_pcguard_hitcounts",
+] }
 libc = "0.2"
 nix = { version = "0.31.2", features = ["signal"] }
 
