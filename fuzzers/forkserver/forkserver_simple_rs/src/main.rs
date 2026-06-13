@@ -11,17 +11,18 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::{HavocScheduledMutator, havoc_mutations},
+    mutators::{havoc_mutations, HavocScheduledMutator},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSliceMut, StdTargetArgs, Truncate, current_nanos,
+    current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{Handled, tuple_list},
+    tuples::{tuple_list, Handled},
+    AsSliceMut, StdTargetArgs, Truncate,
 };
 use nix::sys::signal::Signal;
 
@@ -141,12 +142,20 @@ pub fn main() {
     // Add some initial inputs so the fuzzer has something to mutate
     if state.must_load_initial_inputs() {
         state
-            .load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &[PathBuf::from("./corpus")])
+            .load_initial_inputs_forced(
+                &mut fuzzer,
+                &mut executor,
+                &mut mgr,
+                &[PathBuf::from("./corpus")],
+            )
             .expect("Failed to load initial inputs");
     }
     if state.must_load_initial_inputs() {
         // No inputs on disk, seed with a random byte
-        state.corpus_mut().add(BytesInput::new(vec![0x00]).into()).unwrap();
+        state
+            .corpus_mut()
+            .add(BytesInput::new(vec![0x00]).into())
+            .unwrap();
     }
 
     let mutator = HavocScheduledMutator::with_max_stack_pow(havoc_mutations(), 6);

@@ -1,11 +1,9 @@
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
-use libafl_targets::{
-    start_forkserver, map_shared_memory, EDGES_MAP_PTR, ForkserverState,
-    MaybePersistentForkserverParent,
-};
 #[cfg(feature = "shared_input_mem")]
+use libafl_targets::{map_input_shared_memory, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
 use libafl_targets::{
-    SHM_FUZZING, map_input_shared_memory, INPUT_LENGTH_PTR, INPUT_PTR,
+    map_shared_memory, start_forkserver, ForkserverState, MaybePersistentForkserverParent,
+    EDGES_MAP_PTR,
 };
 
 #[cfg(feature = "shared_input_mem")]
@@ -30,6 +28,7 @@ fn read_input() -> Vec<u8> {
 fn process_input(buf: &[u8]) {
     // Guide the fuzzer toward the "bad" string by setting coverage
     // as each successive character matches.
+    #[allow(clippy::len_zero)]
     if buf.len() > 0 && buf[0] == b'b' {
         unsafe { EDGES_MAP_PTR.add(0).write(1) };
     }
@@ -76,7 +75,7 @@ fn main() {
         },
         ForkserverState::Child => {
             process_input(&read_input());
-        },
+        }
         _ => {}
     }
 }
