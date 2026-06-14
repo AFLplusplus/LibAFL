@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
     feedback_and_fast, feedback_or,
@@ -32,6 +32,13 @@ use nix::sys::signal::Signal;
     about = "A simple forkserver fuzzer with a Rust target binary."
 )]
 struct Opt {
+    #[arg(
+        help = "The directory to read initial inputs from ('seeds')",
+        name = "INPUT_DIR",
+        required = true
+    )]
+    in_dir: PathBuf,
+
     #[arg(
         help = "Timeout for each individual execution, in milliseconds",
         short = 't',
@@ -80,6 +87,8 @@ pub fn main() {
 
     let opt = Opt::parse();
 
+    let corpus_dirs: Vec<PathBuf> = [opt.in_dir].to_vec();
+
     let mut shmem_provider = UnixShMemProvider::new().unwrap();
 
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
@@ -107,7 +116,7 @@ pub fn main() {
     let mut state = StdState::new(
         StdRand::with_seed(current_nanos()),
         InMemoryCorpus::<BytesInput>::new(),
-        InMemoryCorpus::new(),
+        OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         &mut feedback,
         &mut objective,
     )
@@ -144,26 +153,20 @@ pub fn main() {
             .truncate(dynamic_map_size);
     }
 
-    // Add some initial inputs so the fuzzer has something to mutate
+    // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
         state
-            .load_initial_inputs_forced(
-                &mut fuzzer,
-                &mut executor,
-                &mut mgr,
-                &[PathBuf::from("./corpus")],
-            )
-            .expect("Failed to load initial inputs");
-    }
-    if state.must_load_initial_inputs() {
-        // No inputs on disk, seed with a random byte
-        state
-            .corpus_mut()
-            .add(BytesInput::new(vec![0x00]).into())
-            .unwrap();
+            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
+            .unwrap_or_else(|err| {
+                panic!(
+                    "Failed to load initial corpus at {:?}: {:?}",
+                    &corpus_dirs, err
+                )
+            });
+        println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    let mutator = HavocScheduledMutator::with_max_stack_pow(havoc_mutations(), 6);
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer

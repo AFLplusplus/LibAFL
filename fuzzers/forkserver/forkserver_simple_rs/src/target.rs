@@ -1,28 +1,26 @@
+use libafl::executors::forkserver::MAX_INPUT_SIZE_DEFAULT;
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 #[cfg(feature = "shared_input_mem")]
-use libafl_targets::{map_input_shared_memory, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
+use libafl_targets::map_input_shared_memory;
 use libafl_targets::{
     map_shared_memory, start_forkserver, ForkserverState, MaybePersistentForkserverParent,
-    EDGES_MAP_PTR,
+    EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING,
 };
 
-#[cfg(feature = "shared_input_mem")]
-fn read_input() -> Vec<u8> {
-    let len = unsafe { *INPUT_LENGTH_PTR } as usize;
-    unsafe { core::slice::from_raw_parts(INPUT_PTR, len) }.to_vec()
-}
+static mut BUF: [u8; MAX_INPUT_SIZE_DEFAULT] = [0u8; MAX_INPUT_SIZE_DEFAULT];
 
-#[cfg(not(feature = "shared_input_mem"))]
-fn read_input() -> Vec<u8> {
-    // This is how AFL++ delivers input to the child in non-shmem mode:
-    // the forkserver parent rewrites the InputFile (a regular file dup2'd
-    // onto fd 0) between iterations. We read the raw fd to avoid Rust's
-    // buffered Stdin caching stale data across persistent-mode iterations.
-    let mut buf = vec![0u8; 1024 * 1024];
-    let n = unsafe { libc::read(0, buf.as_mut_ptr().cast(), buf.len()) };
+fn read_input() -> &'static [u8] {
+    if unsafe { SHM_FUZZING != 0 } {
+        let len = unsafe { *INPUT_LENGTH_PTR } as usize;
+        return unsafe { core::slice::from_raw_parts(INPUT_PTR, len) };
+    }
+    let n = unsafe { libc::read(0, &raw mut BUF as *mut libc::c_void, MAX_INPUT_SIZE_DEFAULT) };
     assert!(n >= 0);
-    buf.truncate(n as usize);
-    buf
+    unsafe {
+        INPUT_PTR = &raw mut BUF as *mut u8;
+        *INPUT_LENGTH_PTR = n as u32;
+    }
+    unsafe { core::slice::from_raw_parts(&raw const BUF as *const u8, n as usize) }
 }
 
 fn process_input(buf: &[u8]) {
@@ -68,13 +66,13 @@ fn main() {
     // instead of being re-forked for each input.
     match start_forkserver(&mut MaybePersistentForkserverParent::new()).unwrap() {
         ForkserverState::Child if is_persistent() => loop {
-            process_input(&read_input());
+            process_input(read_input());
             // SIGSTOP tells the parent we're done with this input
             // and ready for the next one. The parent resumes us with SIGCONT.
             unsafe { libc::raise(libc::SIGSTOP) };
         },
         ForkserverState::Child => {
-            process_input(&read_input());
+            process_input(read_input());
         }
         _ => {}
     }
