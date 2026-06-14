@@ -263,7 +263,7 @@ extern "C" fn std_handle_sigterm(_signal: libc::c_int) {
 }
 
 /// Forkserver parent that can handle both non-persistent and persistent mode
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MaybePersistentForkserverParent {
     last_child_pid: Option<i32>,
     /// This field is only touched for persistent mode to indicating
@@ -278,34 +278,17 @@ pub struct MaybePersistentForkserverParent {
     old_sigterm_handler: Option<SigHandler>,
 }
 
-impl Default for MaybePersistentForkserverParent {
-    fn default() -> Self {
-        let is_persistent = std::env::var("__AFL_PERSISTENT").is_ok_and(|v| v == "1");
-        Self {
-            last_child_pid: None,
-            child_stopped: false,
-            is_persistent,
-            old_sigchld_handler: None,
-            old_sigterm_handler: None,
-        }
-    }
-}
-
 impl MaybePersistentForkserverParent {
     /// Create a new forkserver parent.
     #[must_use]
     pub fn new() -> Self {
         MaybePersistentForkserverParent::default()
     }
-
-    /// Set whether the target is in persistent mode.
-    pub fn set_persistent(&mut self, is_persistent: bool) {
-        self.is_persistent = is_persistent;
-    }
 }
 
 impl ForkserverParent for MaybePersistentForkserverParent {
     fn pre_fuzzing(&mut self) -> Result<(), Error> {
+        self.is_persistent = std::env::var("__AFL_PERSISTENT").is_ok_and(|v| v == "1");
         let old_sigchld_handler =
             (unsafe { nix::sys::signal::signal(Signal::SIGCHLD, SigHandler::SigDfl) })
                 .inspect_err(|_| {
@@ -423,60 +406,6 @@ pub enum ForkserverState {
 /// Guard [`start_forkserver`] is invoked only once
 static FORKSERVER_GUARD: OnceLock<()> = OnceLock::new();
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_maybe_persistent_forkserver_parent_persistent_mode() {
-        let mut parent = MaybePersistentForkserverParent::new();
-        parent.set_persistent(true);
-        parent.pre_fuzzing().unwrap();
-
-        // First spawn: should fork
-        let result = parent.spawn_child(false).unwrap();
-
-        let first_pid = match result {
-            ForkResult::Child => {
-                // In child: signal handlers were restored by spawn_child.
-                // Stop ourselves so parent can detect via WUNTRACED.
-                unsafe { libc::raise(libc::SIGSTOP) };
-                // When resumed by SIGCONT from the persistent-mode parent, exit.
-                unsafe { libc::_exit(0) };
-            }
-            ForkResult::Parent(handle) => handle.pid,
-        };
-
-        // Parent: wait for child to stop. waitpid with WUNTRACED should catch the SIGSTOP.
-        let status = parent.handle_child_requests().unwrap();
-        assert!(
-            libc::WIFSTOPPED(status),
-            "handle_child_requests should detect stopped child in persistent mode"
-        );
-
-        // Second input: child_stopped == true, so this should SIGCONT (not fork a new child).
-        let result2 = parent.spawn_child(false).unwrap();
-        match result2 {
-            ForkResult::Parent(handle2) => {
-                assert_eq!(
-                    handle2.pid, first_pid,
-                    "persistent mode should resume the same child, not fork a new one"
-                );
-            }
-            ForkResult::Child => {
-                panic!("persistent-mode spawn_child should not fork");
-            }
-        }
-
-        // Wait for child to exit after being resumed by SIGCONT.
-        let status2 = parent.handle_child_requests().unwrap();
-        assert!(
-            libc::WIFEXITED(status2),
-            "child should exit after being resumed by SIGCONT"
-        );
-    }
-}
-
 /// Start a forkserver. This function will handle all communication
 /// with AFL forkserver end, and use `forkserver_parent` to interact
 /// with forked child.
@@ -584,5 +513,52 @@ fn start_forkserver_internal<P: ForkserverParent>(
         write_u32_to_forkserver(status as u32).inspect_err(|_| {
             log::error!("writing to afl-fuzz");
         })?;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_maybe_persistent_forkserver_parent_persistent_mode() {
+        unsafe { std::env::set_var("__AFL_PERSISTENT", "1") };
+        let mut parent = MaybePersistentForkserverParent::new();
+        parent.pre_fuzzing().unwrap();
+
+        let result = parent.spawn_child(false).unwrap();
+
+        let first_pid = match result {
+            ForkResult::Child => {
+                unsafe { libc::raise(libc::SIGSTOP) };
+                unsafe { libc::_exit(0) };
+            }
+            ForkResult::Parent(handle) => handle.pid,
+        };
+
+        let status = parent.handle_child_requests().unwrap();
+        assert!(
+            libc::WIFSTOPPED(status),
+            "handle_child_requests should detect stopped child in persistent mode"
+        );
+
+        let result2 = parent.spawn_child(false).unwrap();
+        match result2 {
+            ForkResult::Parent(handle2) => {
+                assert_eq!(
+                    handle2.pid, first_pid,
+                    "persistent mode should resume the same child, not fork a new one"
+                );
+            }
+            ForkResult::Child => {
+                panic!("persistent-mode spawn_child should not fork");
+            }
+        }
+
+        let status2 = parent.handle_child_requests().unwrap();
+        assert!(
+            libc::WIFEXITED(status2),
+            "child should exit after being resumed by SIGCONT"
+        );
     }
 }
