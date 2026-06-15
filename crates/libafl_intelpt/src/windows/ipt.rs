@@ -141,7 +141,7 @@ impl InputBuffer {
 union InputPayload {
     get_trace: GetProcessTrace,
     start_trace: StartProcessTrace,
-    // stop_trace: StopProcessTrace,
+    stop_trace: StopProcessTrace,
     configure_thread_address_filter_range: ConfigureThreadAddressFilterRange,
     // query_filter: QueryThreadFilter,
     pause_resume_thread: PauseResumeThreadTrace,
@@ -279,6 +279,12 @@ impl PauseResumeThreadTrace {
 struct StartProcessTrace {
     process_handle: u64,
     options: Options,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+struct StopProcessTrace {
+    process_handle: u64,
 }
 
 #[repr(C)]
