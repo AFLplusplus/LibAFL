@@ -21,7 +21,11 @@ pub mod inprocess;
 pub mod timer;
 
 /// Intel Processor Trace (PT)
-#[cfg(all(feature = "intel_pt", any(windows, target_os = "linux"), target_arch = "x86_64"))]
+#[cfg(all(
+    feature = "intel_pt",
+    any(windows, target_os = "linux"),
+    target_arch = "x86_64"
+))]
 pub mod intel_pt;
 
 /// The hook that runs before and after the executor runs the target
