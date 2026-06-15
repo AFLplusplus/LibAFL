@@ -41,7 +41,7 @@ caps = { version = "0.5.5" }
 perf-event-open-sys = { version = "5.0.0" }
 
 [target.'cfg(target_os = "windows" )'.dependencies]
-hashbrown = {workspace = true}
+hashbrown = { workspace = true }
 ptcov = { version = "0.1.1", features = ["retc"] }
 windows = { workspace = true, features = [
   "Win32_System_IO",
