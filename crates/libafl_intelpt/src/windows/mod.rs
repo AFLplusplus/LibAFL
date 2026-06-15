@@ -136,7 +136,7 @@ impl<'a> IntelPT<'a> {
             ipt::InputBuffer::pause_thread_trace(*thread_handle)
         };
         let (_, out_size) = self.send_device_io_request(&input)?;
-        debug_assert_eq!(out_size, 24);
+        debug_assert_eq!(out_size as usize, size_of::<ipt::OutputBuffer>());
 
         Ok(())
     }
@@ -238,7 +238,7 @@ impl<'a> IntelPT<'a> {
 
                 #[cfg(feature = "export_raw")]
                 {
-                    self.last_decode_trace.extend(slice);
+                    self.last_decode_trace.extend(trace);
                 }
 
                 let coverage = unsafe { &mut *slice_from_raw_parts_mut(map_ptr, map_len) };
@@ -315,6 +315,7 @@ impl Default for IntelPTBuilder<'_> {
     }
 }
 
+// todo Consider removing the builder entirely??
 impl<'a> IntelPTBuilder<'a> {
     pub fn build(self) -> Result<IntelPT<'a>, Error> {
         // todo: better error suggesting to start the kernel driver
