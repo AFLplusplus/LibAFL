@@ -1,4 +1,4 @@
-use std::{hint::black_box, num::NonZero, panic, path::PathBuf, process, slice, time::Duration};
+use std::{hint::black_box, num::NonZero, path::PathBuf, process, slice, time::Duration};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},

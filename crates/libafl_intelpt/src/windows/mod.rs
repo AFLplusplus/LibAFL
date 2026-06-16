@@ -13,6 +13,7 @@ use hashbrown::HashMap;
 use libafl_bolts::Error;
 use ptcov::PtCoverageDecoderBuilder;
 pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtImage};
+use raw_cpuid::CpuId;
 use windows::{
     Win32::{
         Foundation::HANDLE,
@@ -68,29 +69,36 @@ impl<'a> IntelPT<'a> {
     /// Set filters based on Instruction Pointer (IP)
     ///
     /// Only instructions in `filters` ranges will be traced.
-    pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> windows::core::Result<()> {
+    /// `thread_id` must be set in order to set the filters, otherwise this function will return an
+    /// error.
+    pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
         let thread_handle = if let Some(thread_id) = self.thread_id {
             unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, thread_id)?) }
         } else {
-            todo!(
-                "Return a libafl error here? in general return libafl errors instead of windows err"
-            )
+            return Err(Error::unsupported(
+                "IP filtering requires the `thread_id` to be set!",
+            ));
         };
 
         for (i, filter) in filters.iter().enumerate() {
             let input =
                 ipt::InputBuffer::set_thread_ip_filter(*thread_handle, i.try_into()?, filter);
-            let (_, out_size) = self.send_device_io_request(&input)?;
+            let (_, out_size) = self.send_device_io_request(&input).map_err(|e| {
+                Error::unsupported(format!(
+                    "Failed to set IP filters: {e}. Number of supported filters: {}",
+                    nr_addr_filters().unwrap_or_default()
+                ))
+            })?;
             debug_assert_eq!(out_size, 0);
         }
         Ok(())
     }
 
-    pub fn enable_tracing(&mut self) -> windows::core::Result<()> {
+    pub fn enable_tracing(&mut self) -> Result<(), Error> {
         self.toggle_tracing(true)
     }
 
-    pub fn disable_tracing(&mut self) -> windows::core::Result<()> {
+    pub fn disable_tracing(&mut self) -> Result<(), Error> {
         self.toggle_tracing(false)
     }
 
@@ -98,7 +106,7 @@ impl<'a> IntelPT<'a> {
     // seen in the last decoding. Enumerating the threads for every iteration kills performances.
     // If a new thread is spawn it is traced by default. If a thread ends, the reativation will fail
     // with a log message but without returning the error.
-    fn toggle_tracing(&mut self, enable: bool) -> windows::core::Result<()> {
+    fn toggle_tracing(&mut self, enable: bool) -> Result<(), Error> {
         if let Some(thread_id) = self.thread_id {
             let mut thread_handle =
                 unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, thread_id)?) };
@@ -125,11 +133,7 @@ impl<'a> IntelPT<'a> {
         Ok(())
     }
 
-    fn toggle_thread_tracing(
-        &self,
-        thread_handle: &mut HANDLE,
-        enable: bool,
-    ) -> windows::core::Result<()> {
+    fn toggle_thread_tracing(&self, thread_handle: &mut HANDLE, enable: bool) -> Result<(), Error> {
         let input = if enable {
             ipt::InputBuffer::resume_thread_trace(*thread_handle)
         } else {
@@ -318,8 +322,7 @@ impl Default for IntelPTBuilder<'_> {
 // todo Consider removing the builder entirely??
 impl<'a> IntelPTBuilder<'a> {
     pub fn build(self) -> Result<IntelPT<'a>, Error> {
-        // todo: better error suggesting to start the kernel driver
-        let ipt_handle = open_ipt_handle()?;
+        let ipt_handle = open_ipt_handle().map_err(Error::unsupported)?;
 
         let target_process_handle = unsafe {
             OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, self.pid)
@@ -363,11 +366,7 @@ pub(crate) fn availability_in_windows() -> Result<(), String> {
     let mut reasons = Vec::new();
 
     if let Err(e) = open_ipt_handle() {
-        let err = format!(
-            "Failed to open IPT device: {e}; \n\
-            Make sure the ipt service is running with `sc start ipt` from an admin shell."
-        );
-        reasons.push(err);
+        reasons.push(e);
     }
 
     if reasons.is_empty() {
@@ -377,16 +376,16 @@ pub(crate) fn availability_in_windows() -> Result<(), String> {
     }
 }
 
-// /// Number of address filters available on the running CPU
-// fn nr_addr_filters() -> Result<u8, &'static str> {
-//     let cpuid = CpuId::new();
-//     cpuid
-//         .get_processor_trace_info()
-//         .ok_or("Failed to read CPU Processor Trace Info")
-//         .map(|pti| pti.configurable_address_ranges())
-// }
+/// Number of address filters available on the running CPU
+fn nr_addr_filters() -> Result<u8, &'static str> {
+    let cpuid = CpuId::new();
+    cpuid
+        .get_processor_trace_info()
+        .ok_or("Failed to read CPU Processor Trace Info")
+        .map(|pti| pti.configurable_address_ranges())
+}
 
-fn open_ipt_handle() -> windows::core::Result<Owned<HANDLE>> {
+fn open_ipt_handle() -> Result<Owned<HANDLE>, String> {
     let ipt_path = w!("\\??\\IPT\0");
 
     unsafe {
@@ -401,4 +400,10 @@ fn open_ipt_handle() -> windows::core::Result<Owned<HANDLE>> {
         )
     }
     .map(|h| unsafe { Owned::new(h) })
+    .map_err(|e| {
+        format!(
+            "Failed to open IPT device: {e}; \n\
+            Make sure the ipt service is running with `sc start ipt` from an admin shell."
+        )
+    })
 }
