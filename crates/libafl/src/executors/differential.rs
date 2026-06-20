@@ -168,20 +168,6 @@ where
     ) -> Result<(), Error> {
         self.differential.post_exec_all(state, input, exit_kind)
     }
-
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.differential.pre_exec_child_all(state, input)
-    }
-
-    fn post_exec_child_all(
-        &mut self,
-        state: &mut S,
-        input: &I,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        self.differential
-            .post_exec_child_all(state, input, exit_kind)
-    }
 }
 
 impl<A, B, DOT> Deref for ProxyObserversTuple<A, B, DOT> {
