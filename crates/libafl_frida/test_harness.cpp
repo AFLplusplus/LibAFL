@@ -217,6 +217,37 @@ EXTERN int heap_oob_memcpy_write_avx(const uint8_t *_data, size_t _size) {
   return 0;
 }
 
+EXTERN int rep_movsb_overflow_check(const uint8_t *_data, size_t _size) {
+  (void)_data;
+  (void)_size;
+  
+  // source and destination buffers, with the destination buffer being
+  // smaller than the source buffer to trigger the overflow
+  const size_t DST_SIZE = 10;
+  const size_t SRC_SIZE = DST_SIZE + 1;
+
+  char *src = new char[SRC_SIZE];
+  char *dst = new char[DST_SIZE];
+  memset(src, 'A', SRC_SIZE);
+  memset(dst, 'B', DST_SIZE);
+
+  size_t n = SRC_SIZE; 
+  
+  asm volatile (
+      "mov %0, %%rcx\n"
+      "mov %1, %%rsi\n"
+      "mov %2, %%rdi\n"
+      "rep movsb\n" // use the rep movsb instruction to overflow dst
+      : 
+      : "r"(n), "r"(src), "r"(dst) 
+      : "rcx", "rsi", "rdi", "memory"
+  );
+  
+  delete[] src;
+  delete[] dst;
+  return 0;
+}
+
 EXTERN int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // abort();
   (void)data;
