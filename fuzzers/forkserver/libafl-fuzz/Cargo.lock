@@ -102,12 +102,6 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "arbitrary-int"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "825297538d77367557b912770ca3083f778a196054b3ee63b22673c4a3cae0a5"
-
-[[package]]
-name = "arbitrary-int"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "993a810118f8f37e9c4411c86f1c4c940a09a7ab34b7bf2d88d06f50c553fab7"
@@ -187,11 +181,10 @@ dependencies = [
 
 [[package]]
 name = "bitbybit"
-version = "1.4.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec187a89ab07e209270175faf9e07ceb2755d984954e58a2296e325ddece2762"
+checksum = "71d2a3353d70ac1091a33cbf31fc7e77b19091538a7e306e3740712af19807ca"
 dependencies = [
- "arbitrary-int 1.3.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -541,7 +534,7 @@ dependencies = [
  "libafl_core",
  "libc",
  "log",
- "nix 0.30.1",
+ "nix 0.31.3",
  "num_enum",
  "rustversion",
  "windows",
@@ -675,6 +668,12 @@ name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
+
+[[package]]
+name = "hashbrown"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "allocator-api2",
  "equivalent",
@@ -806,7 +805,7 @@ name = "libafl"
 version = "0.16.0"
 dependencies = [
  "ahash",
- "arbitrary-int 2.1.1",
+ "arbitrary-int",
  "backtrace",
  "bincode",
  "bitbybit",
@@ -815,7 +814,7 @@ dependencies = [
  "const_panic",
  "fastbloom",
  "fs2",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl_bolts",
  "libafl_core",
  "libafl_derive",
@@ -824,7 +823,7 @@ dependencies = [
  "ll_mp",
  "log",
  "meminterval",
- "nix 0.30.1",
+ "nix 0.31.3",
  "no_std_time",
  "num-traits",
  "postcard",
@@ -853,7 +852,7 @@ dependencies = [
  "libafl_nyx",
  "libafl_targets",
  "memmap2",
- "nix 0.30.1",
+ "nix 0.31.3",
  "regex",
  "serde",
 ]
@@ -870,7 +869,7 @@ dependencies = [
  "erased-serde",
  "exceptional",
  "fast_rands",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "hostname",
  "libafl_core",
  "libafl_derive",
@@ -880,7 +879,7 @@ dependencies = [
  "mach2",
  "minibsod",
  "miniz_oxide 0.9.1",
- "nix 0.30.1",
+ "nix 0.31.3",
  "no_std_time",
  "nonzero_macros",
  "ownedref",
@@ -906,7 +905,7 @@ name = "libafl_core"
 version = "0.16.0"
 dependencies = [
  "backtrace",
- "nix 0.30.1",
+ "nix 0.31.3",
  "nonzero_macros",
  "postcard",
  "rustversion",
@@ -931,7 +930,7 @@ dependencies = [
  "libafl_bolts",
  "libafl_targets",
  "libnyx",
- "nix 0.30.1",
+ "nix 0.31.3",
  "regex",
  "serde",
  "typed-builder",
@@ -944,13 +943,13 @@ dependencies = [
  "bindgen",
  "cc",
  "fast_rands",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl",
  "libafl_bolts",
  "libafl_core",
  "libc",
  "log",
- "nix 0.30.1",
+ "nix 0.31.3",
  "ownedref",
  "rangemap",
  "rustversion",
@@ -960,9 +959,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.184"
+version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48f5d2a454e16a5ea0f4ced81bd44e4cfc7bd3a507b61887c99fd3538b28e4af"
+checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
 name = "libloading"
@@ -1049,7 +1048,7 @@ dependencies = [
  "libafl_core",
  "log",
  "miniz_oxide 0.9.1",
- "nix 0.30.1",
+ "nix 0.31.3",
  "no_std_time",
  "postcard",
  "rustversion",
@@ -1173,9 +1172,9 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.30.1"
+version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
+checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
 dependencies = [
  "bitflags 2.11.0",
  "cfg-if",
@@ -1591,7 +1590,7 @@ version = "0.16.0"
 dependencies = [
  "ctor",
  "erased-serde",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl_core",
  "postcard",
  "rustversion",
@@ -1691,11 +1690,11 @@ name = "shmem_providers"
 version = "0.16.0"
 dependencies = [
  "fast_rands",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl_core",
  "libc",
  "log",
- "nix 0.30.1",
+ "nix 0.31.3",
  "postcard",
  "rustversion",
  "serde",
@@ -2192,9 +2191,9 @@ dependencies = [
 
 [[package]]
 name = "wide"
-version = "1.2.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "198f6abc41fab83526d10880fa5c17e2b4ee44e763949b4bb34e2fd1e8ca48e4"
+checksum = "dfdfe6a32973f2d1b268b8895845a8a96cac2f0191e72c27cc929036060dbf89"
 dependencies = [
  "bytemuck",
  "safe_arch",
