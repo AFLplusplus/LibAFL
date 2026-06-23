@@ -1,6 +1,6 @@
 //! Client statistics manager
 
-use alloc::{borrow::Cow, string::String};
+use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::time::Duration;
 
 use hashbrown::HashMap;
@@ -19,6 +19,7 @@ use super::{
 /// Manager of all client's statistics
 #[derive(Debug)]
 pub struct ClientStatsManager {
+    sorted_client_ids: Vec<ClientId>,
     client_stats: HashMap<ClientId, ClientStats>,
     /// Aggregated user stats value.
     ///
@@ -36,6 +37,7 @@ impl ClientStatsManager {
     #[must_use]
     pub fn new() -> Self {
         Self {
+            sorted_client_ids: Vec::new(),
             client_stats: HashMap::new(),
             cached_aggregated_user_stats: HashMap::new(),
             cached_global_stats: None,
@@ -47,6 +49,12 @@ impl ClientStatsManager {
     #[must_use]
     pub fn client_stats(&self) -> &HashMap<ClientId, ClientStats> {
         &self.client_stats
+    }
+
+    /// Get sorted client ids
+    #[must_use]
+    pub fn client_ids_sorted(&self) -> &[ClientId] {
+        &self.sorted_client_ids
     }
 
     /// Get client with `client_id`
@@ -68,6 +76,16 @@ impl ClientStatsManager {
             };
             self.client_stats.insert(client_id, stats);
             self.cached_global_stats = None;
+
+            if self
+                .sorted_client_ids
+                .last()
+                .map_or(true, |last| *last < client_id)
+            {
+                self.sorted_client_ids.push(client_id);
+            } else if let Err(idx) = self.sorted_client_ids.binary_search(&client_id) {
+                self.sorted_client_ids.insert(idx, client_id);
+            }
         }
 
         self.update_client_stats_for(client_id, |new_stat| {
@@ -110,6 +128,8 @@ impl ClientStatsManager {
     /// This will clear global stats cache.
     pub fn update_all_client_stats(&mut self, new_client_stats: HashMap<ClientId, ClientStats>) {
         self.client_stats = new_client_stats;
+        self.sorted_client_ids = self.client_stats.keys().copied().collect();
+        self.sorted_client_ids.sort_unstable();
         self.cached_global_stats = None;
     }
 
