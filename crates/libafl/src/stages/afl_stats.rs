@@ -541,7 +541,7 @@ where
             let tmp_file = stats_file_path.with_extension("tmp");
 
             std::fs::write(&tmp_file, stats.to_string())?;
-            _ = std::fs::rename(&tmp_file, stats_file_path)?;
+            std::fs::rename(&tmp_file, stats_file_path)?;
         }
         Ok(())
     }
