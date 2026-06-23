@@ -538,13 +538,10 @@ where
     /// Writes a stats file, if a `stats_file_path` is set.
     fn maybe_write_fuzzer_stats(&self, stats: &AflFuzzerStats) -> Result<(), Error> {
         if let Some(stats_file_path) = &self.stats_file_path {
-            let tmp_file = stats_file_path
-                .parent()
-                .expect("fuzzer_stats file must have a parent!")
-                .join(".fuzzer_stats_tmp");
+            let tmp_file = stats_file_path.with_extension("tmp");
+
             std::fs::write(&tmp_file, stats.to_string())?;
-            _ = std::fs::copy(&tmp_file, stats_file_path)?;
-            std::fs::remove_file(tmp_file)?;
+            _ = std::fs::rename(&tmp_file, stats_file_path)?;
         }
         Ok(())
     }
