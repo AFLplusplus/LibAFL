@@ -1,5 +1,5 @@
 use core::{cell::UnsafeCell, fmt::Debug};
-use std::collections::HashSet;
+use hashbrown::HashSet;
 
 use capstone::prelude::*;
 use libafl::{
