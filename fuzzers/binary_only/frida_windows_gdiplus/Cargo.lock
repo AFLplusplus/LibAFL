@@ -692,9 +692,9 @@ dependencies = [
 
 [[package]]
 name = "frida-build"
-version = "0.17.1"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9b2bfd0477ee2547fc2d570093195c296a450d14af4e425b8fda3bec16ab45e"
+checksum = "73009bffe34845c703c58387dc394c78e3d4234211c4ac8f30e55caa766da502"
 dependencies = [
  "reqwest",
  "tar",
@@ -703,9 +703,9 @@ dependencies = [
 
 [[package]]
 name = "frida-gum"
-version = "0.17.1"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd5efd85d460937270f47accc16c632b414e1b670d5172dbdafc837b9bcd589a"
+checksum = "4a4ffcfcc922bd2bfb5d26944358fa0d4b98953641f66f24f165d13b37c187ca"
 dependencies = [
  "bitflags",
  "cstr_core",
@@ -720,9 +720,9 @@ dependencies = [
 
 [[package]]
 name = "frida-gum-sys"
-version = "0.17.1"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d5f936b2f6290bede23c6424b69bff7b8adc949101aba7c57b95754d198e526"
+checksum = "60d15c21c07ff23c47c1348d074cd2f694787a192636e5160bb118c493041953"
 dependencies = [
  "bindgen",
  "cc",
@@ -875,6 +875,12 @@ name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
+
+[[package]]
+name = "hashbrown"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "allocator-api2",
  "equivalent",
@@ -1237,7 +1243,7 @@ dependencies = [
  "const_panic",
  "fastbloom",
  "fs2",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl_bolts",
  "libafl_core",
  "libafl_derive",
@@ -1276,7 +1282,7 @@ dependencies = [
  "erased-serde",
  "exceptional",
  "fast_rands",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "hostname",
  "libafl_core",
  "libafl_derive",
@@ -1341,7 +1347,7 @@ dependencies = [
  "errno",
  "frida-gum",
  "frida-gum-sys",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "iced-x86",
  "libafl",
  "libafl_bolts",
@@ -1370,7 +1376,7 @@ dependencies = [
  "bindgen",
  "cc",
  "fast_rands",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl",
  "libafl_bolts",
  "libafl_core",
@@ -2298,7 +2304,7 @@ version = "0.16.0"
 dependencies = [
  "ctor",
  "erased-serde",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl_core",
  "postcard",
  "rustversion",
@@ -2386,7 +2392,7 @@ name = "shmem_providers"
 version = "0.16.0"
 dependencies = [
  "fast_rands",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl_core",
  "libc",
  "log",
@@ -2542,9 +2548,9 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tar"
-version = "0.4.45"
+version = "0.4.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22692a6476a21fa75fdfc11d452fda482af402c008cdbaf3476414e122040973"
+checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
 dependencies = [
  "filetime",
  "libc",
