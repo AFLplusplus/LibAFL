@@ -56,6 +56,7 @@ libafl_core = { workspace = true }
 postcard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 static_assertions = { workspace = true }
+spin = { workspace = true, features = ["mutex"] }
 
 [lints]
 workspace = true
