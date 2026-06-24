@@ -73,7 +73,7 @@ frida-gum = { version = "0.17.2", features = [
   "script",
   "backtrace",
 ] }
-dynasmrt = "4.0.2"
+dynasmrt = "5.0.0"
 
 color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
 termcolor = "1.4.1"
