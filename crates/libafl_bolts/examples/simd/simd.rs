@@ -6,7 +6,7 @@ use libafl_bolts::simd::{
     SimdMinReducer, SimdOrReducer, SimdReducer, VectorType, covmap_is_interesting_naive,
     covmap_is_interesting_simd, simplify_map_naive, simplify_map_simd,
 };
-use rand::{RngCore, rngs::ThreadRng};
+use rand::{Rng, rngs::ThreadRng};
 
 fn default_map_size() -> usize {
     if std::env::var("CI").is_ok() {
