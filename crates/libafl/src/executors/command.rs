@@ -389,7 +389,6 @@ where
     ) -> Result<ExitKind, Error> {
         use wait_timeout::ChildExt;
 
-        self.observers_mut().pre_exec_all(state, input)?;
         *state.executions_mut() += 1;
         let mut child = self
             .configurator
@@ -428,8 +427,6 @@ where
             self.observers_mut().index_mut(&stdout_handle).observe(buf);
         }
 
-        self.observers_mut()
-            .post_exec_child_all(state, input, &exit_kind)?;
         Ok(exit_kind)
     }
 }
@@ -485,8 +482,8 @@ where
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`
     ///
-    /// Hooks' `pre_exec` and observers' `pre_exec_child` are called with the child process stopped
-    /// just before the `exec` return (after forking).
+    /// Hooks' `pre_exec` is called with the child process stopped just before the `exec` return
+    /// (after forking).
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
@@ -520,7 +517,6 @@ where
             )));
         }
 
-        self.observers.pre_exec_child_all(state, input)?;
         if *state.executions() == 1 {
             self.hooks.init_all(state);
         }
@@ -547,7 +543,6 @@ where
         };
 
         self.hooks.post_exec_all(state, input);
-        self.observers.post_exec_child_all(state, input, &res)?;
         Ok(res)
     }
 }
@@ -899,7 +894,10 @@ mod tests {
         state::NopState,
     };
     #[cfg(unix)]
-    use crate::{executors::StdChildArgs, observers::StdOutObserver};
+    use crate::{
+        executors::{HasObservers, StdChildArgs},
+        observers::{ObserversTuple, StdOutObserver},
+    };
 
     #[test]
     #[cfg_attr(miri, ignore)]
@@ -945,13 +943,19 @@ mod tests {
         let mut executor = executor.unwrap();
 
         let mut fuzzer: NopFuzzer = NopFuzzer::new();
+        let mut state = NopState::<NopInput>::new();
+        let input = BytesInput::new(b".".to_vec());
+
         executor
-            .run_target(
-                &mut fuzzer,
-                &mut NopState::<NopInput>::new(),
-                &mut mgr,
-                &BytesInput::new(b".".to_vec()),
-            )
+            .observers_mut()
+            .pre_exec_all(&mut state, &input)
+            .unwrap();
+        let exit_kind = executor
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
+            .unwrap();
+        executor
+            .observers_mut()
+            .post_exec_all(&mut state, &input, &exit_kind)
             .unwrap();
 
         assert!(executor.observers.0.output.is_some());

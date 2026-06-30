@@ -134,21 +134,6 @@ where
         classify_counts(&mut self.as_slice_mut());
         self.base.post_exec(state, input, exit_kind)
     }
-
-    #[inline]
-    fn pre_exec_child(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.base.pre_exec_child(state, input)
-    }
-
-    #[inline]
-    fn post_exec_child(
-        &mut self,
-        state: &mut S,
-        input: &I,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        self.base.post_exec_child(state, input, exit_kind)
-    }
 }
 
 impl<M> Named for HitcountsMapObserver<M>
@@ -369,21 +354,6 @@ where
         }
 
         self.base.post_exec(state, input, exit_kind)
-    }
-
-    #[inline]
-    fn pre_exec_child(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.base.pre_exec_child(state, input)
-    }
-
-    #[inline]
-    fn post_exec_child(
-        &mut self,
-        state: &mut S,
-        input: &I,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        self.base.post_exec_child(state, input, exit_kind)
     }
 }
 

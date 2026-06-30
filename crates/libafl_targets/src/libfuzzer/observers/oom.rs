@@ -112,19 +112,6 @@ impl<I, S> Observer<I, S> for OomObserver {
         self.oomed = OOMED.load(Ordering::Relaxed);
         Ok(())
     }
-
-    fn pre_exec_child(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.pre_exec(state, input)
-    }
-
-    fn post_exec_child(
-        &mut self,
-        state: &mut S,
-        input: &I,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        self.post_exec(state, input, exit_kind)
-    }
 }
 
 /// Feedback for the similarly named [`OomObserver`] to detect if the target crashed due to an observed OOM

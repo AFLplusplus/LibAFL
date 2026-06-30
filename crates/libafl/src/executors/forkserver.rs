@@ -1543,10 +1543,7 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let bytes = fuzzer.convert_to_target_bytes(state, input);
-        self.observers_mut().pre_exec_child_all(state, input)?;
         let exit = self.execute_input(state, bytes.as_slice())?;
-        self.observers_mut()
-            .post_exec_child_all(state, input, &exit)?;
         Ok(exit)
     }
 }
