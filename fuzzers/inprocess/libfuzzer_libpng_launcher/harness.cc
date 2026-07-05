@@ -74,6 +74,11 @@ void user_read_data(png_structp png_ptr, png_bytep data, size_t length) {
   buf_state->data += length;
 }
 
+static void silent_png_log(png_structp png_ptr, png_const_charp msg) {
+  // Suppress output text by doing nothing.
+  return;
+}
+
 static const int kPngHeaderSize = 8;
 
 // Entry point for LibFuzzer.
@@ -120,7 +125,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   png_handler.end_info_ptr = nullptr;
 
   png_handler.png_ptr =
-      png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+      png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, silent_png_log, silent_png_log);
   if (!png_handler.png_ptr) { return 0; }
 
   png_handler.info_ptr = png_create_info_struct(png_handler.png_ptr);

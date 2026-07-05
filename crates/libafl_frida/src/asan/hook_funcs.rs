@@ -13,11 +13,11 @@ use crate::{
 };
 
 #[cfg(windows)]
-unsafe extern "system" {
+unsafe extern "C" {
     fn memcpy(dst: *mut c_void, src: *const c_void, size: usize) -> *mut c_void;
 }
 #[cfg(windows)]
-unsafe extern "system" {
+unsafe extern "C" {
     fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
 }
 
@@ -278,7 +278,7 @@ impl AsanRuntime {
         };
 
         if flags & 8 == 8 {
-            unsafe extern "system" {
+            unsafe extern "C" {
                 fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
             }
             unsafe {
@@ -323,7 +323,7 @@ impl AsanRuntime {
         };
 
         if flags & 8 == 8 {
-            unsafe extern "system" {
+            unsafe extern "C" {
                 fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
             }
             unsafe {
@@ -619,7 +619,7 @@ impl AsanRuntime {
         let ret = unsafe { self.allocator_mut().alloc(size, 8) };
 
         if flags & 0x40 == 0x40 {
-            unsafe extern "system" {
+            unsafe extern "C" {
                 fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
             }
             unsafe {
@@ -930,7 +930,7 @@ impl AsanRuntime {
         nmemb: usize,
         size: usize,
     ) -> *mut c_void {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         log::trace!("hook_calloc");
@@ -954,7 +954,7 @@ impl AsanRuntime {
         nmemb: usize,
         size: usize,
     ) -> *mut c_void {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
         log::trace!("hook__o_calloc");
@@ -2080,8 +2080,7 @@ impl AsanRuntime {
         s: *mut c_char,
         c: i32,
     ) -> *mut c_char {
-        unsafe extern "system" {
-
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_strchr");
@@ -2108,7 +2107,7 @@ impl AsanRuntime {
         s: *mut c_char,
         c: i32,
     ) -> *mut c_char {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_strrchr");
@@ -2135,7 +2134,7 @@ impl AsanRuntime {
         s1: *const c_char,
         s2: *const c_char,
     ) -> i32 {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_strcasecmp");
@@ -2209,7 +2208,7 @@ impl AsanRuntime {
         s1: *mut c_char,
         s2: *const c_char,
     ) -> *mut c_char {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_strcat");
@@ -2249,7 +2248,7 @@ impl AsanRuntime {
         s1: *const c_char,
         s2: *const c_char,
     ) -> i32 {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_strcmp");
@@ -2330,7 +2329,7 @@ impl AsanRuntime {
         dest: *mut c_char,
         src: *const c_char,
     ) -> *mut c_char {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_strcpy");
@@ -2371,7 +2370,7 @@ impl AsanRuntime {
         src: *const c_char,
         n: usize,
     ) -> *mut c_char {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_strncpy");
@@ -2408,7 +2407,7 @@ impl AsanRuntime {
         dest: *mut c_char,
         src: *const c_char,
     ) -> *mut c_char {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_stpcpy");
@@ -2457,7 +2456,7 @@ impl AsanRuntime {
         _original: extern "C" fn(s: *const c_char) -> *mut c_char,
         s: *const c_char,
     ) -> *mut c_char {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
             fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
         }
@@ -2534,7 +2533,7 @@ impl AsanRuntime {
         haystack: *const c_char,
         needle: *const c_char,
     ) -> *mut c_char {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_strstr");
@@ -2574,7 +2573,7 @@ impl AsanRuntime {
         haystack: *const c_char,
         needle: *const c_char,
     ) -> *mut c_char {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_strcasestr");
@@ -2613,7 +2612,7 @@ impl AsanRuntime {
         original: extern "C" fn(s: *const c_char) -> i32,
         s: *const c_char,
     ) -> i32 {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_atoi");
@@ -2640,7 +2639,7 @@ impl AsanRuntime {
         original: extern "C" fn(s: *const c_char) -> i32,
         s: *const c_char,
     ) -> i32 {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_atol");
@@ -2667,7 +2666,7 @@ impl AsanRuntime {
         original: extern "C" fn(s: *const c_char) -> i64,
         s: *const c_char,
     ) -> i64 {
-        unsafe extern "system" {
+        unsafe extern "C" {
             fn strlen(s: *const c_char) -> usize;
         }
         log::trace!("hook_atoll");
