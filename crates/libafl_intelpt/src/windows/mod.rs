@@ -248,7 +248,7 @@ impl<'a> IntelPT<'a> {
                 let coverage = unsafe { &mut *slice_from_raw_parts_mut(map_ptr, map_len) };
 
                 if let Err(e) = ptcov_decoder.decoder.coverage(trace, coverage) {
-                    log::warn!("PT trace decoding to coverage failed: {e:?}");
+                    log::warn!("PT trace decoding to coverage failed: {e:x?}");
                     coverage.fill(0.into());
                 }
             }
