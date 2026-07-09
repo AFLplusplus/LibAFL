@@ -162,6 +162,10 @@ impl<'a> IntelPT<'a> {
         T: CoverageEntry,
     {
         self.last_decode_threads.clear();
+        #[cfg(feature = "export_raw")]
+        {
+            self.last_decode_trace.clear();
+        }
 
         // get trace
         let trace_size = self.get_trace_size()?;

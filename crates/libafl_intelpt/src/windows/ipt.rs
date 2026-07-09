@@ -237,7 +237,7 @@ impl Default for Options {
     fn default() -> Self {
         Self::builder()
             .with_option_version(Self::VERSION)
-            .with_topa_pages_pow2(u4::new(4)) // 64 kB
+            .with_topa_pages_pow2(u4::new(5)) // 128 kB
             .with_inherit(false)
             .with_mode_settings(u4::new(0)) // todo: better understand IPT_MODE_SETTINGS difference between Ctl and Reg
             .value

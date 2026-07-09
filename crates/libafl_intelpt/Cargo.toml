@@ -33,7 +33,7 @@ libc = { workspace = true }
 log = { workspace = true }
 num_enum = { workspace = true, default-features = false }
 num-traits = { workspace = true, default-features = false }
-ptcov = { version = "0.1.2" }
+ptcov = { git = "https://github.com/Marcondiro/ptcov", branch = "fix_pgd" }
 raw-cpuid = { version = "11.1.0" }
 
 [target.'cfg(target_os = "linux" )'.dependencies]
@@ -42,7 +42,9 @@ perf-event-open-sys = { version = "5.0.0" }
 
 [target.'cfg(target_os = "windows" )'.dependencies]
 hashbrown = { workspace = true }
-ptcov = { version = "0.1.2", features = ["retc"] }
+ptcov = { features = [
+  "retc",
+], git = "https://github.com/Marcondiro/ptcov", branch = "fix_pgd" }
 windows = { workspace = true, features = [
   "Win32_System_IO",
   "Win32_Storage_FileSystem",
