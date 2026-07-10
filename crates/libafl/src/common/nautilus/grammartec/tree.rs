@@ -1,3 +1,6 @@
+// core::io::Cursor is unstable (core_io), so we keep using std::io here.
+#![allow(clippy::std_instead_of_core)]
+
 use alloc::vec::Vec;
 use core::{cmp, marker::Sized};
 use std::io::{Cursor, Write, stdout};
@@ -360,9 +363,9 @@ impl Tree {
 
     /// Truncate the tree
     pub fn truncate(&mut self) {
-        self.rules.truncate(0);
-        self.sizes.truncate(0);
-        self.paren.truncate(0);
+        self.rules.clear();
+        self.sizes.clear();
+        self.paren.clear();
     }
 
     /// Generate a tree from a nonterminal

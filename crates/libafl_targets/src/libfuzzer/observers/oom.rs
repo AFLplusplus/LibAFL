@@ -61,7 +61,7 @@ pub unsafe extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = unsafe { libafl_check_malloc_size(ptr) };
         MALLOC_SIZE
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |existing| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |existing| {
                 Some(existing.saturating_sub(size))
             })
             .expect("must complete successfully");
