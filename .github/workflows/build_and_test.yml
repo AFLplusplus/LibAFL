@@ -927,7 +927,7 @@ jobs:
           - binary_only/tinyinst_simple
           # - inprocess/libfuzzer_windows_asan
       fail-fast: false
-    runs-on: windows-latest
+    runs-on: windows-2022
     needs:
       - fuzzers-preflight
       - common

@@ -56,12 +56,13 @@ pub unsafe extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize
 ///
 /// # Safety
 /// Is only safe to call with valid allocated pointers, about to be freed.
+#[allow(deprecated)] // `try_update` is unavailable on our MSRV.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = unsafe { libafl_check_malloc_size(ptr) };
         MALLOC_SIZE
-            .try_update(Ordering::Relaxed, Ordering::Relaxed, |existing| {
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |existing| {
                 Some(existing.saturating_sub(size))
             })
             .expect("must complete successfully");
