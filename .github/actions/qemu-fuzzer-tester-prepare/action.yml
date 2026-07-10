@@ -17,8 +17,8 @@ runs:
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - name: install just
-      uses: extractions/setup-just@v3
-    - uses: actions/checkout@v4
+      uses: extractions/setup-just@v4
+    - uses: actions/checkout@v5
       with:
         submodules: true
         fetch-depth: 0

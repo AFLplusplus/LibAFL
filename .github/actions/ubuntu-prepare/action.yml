@@ -44,7 +44,7 @@ runs:
       run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
     - name: Install just
-      uses: extractions/setup-just@v3
+      uses: extractions/setup-just@v4
 
     - uses: taiki-e/install-action@cargo-hack
 
