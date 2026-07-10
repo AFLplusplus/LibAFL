@@ -241,7 +241,7 @@ jobs:
   cargo-fmt:
     runs-on: ubuntu-24.04
     env:
-      MAIN_LLVM_VERSION: 21
+      MAIN_LLVM_VERSION: 22
     steps:
       - uses: actions/checkout@v5
       - uses: extractions/setup-just@v4
