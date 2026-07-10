@@ -78,6 +78,7 @@ _test_unix:
     fi
 
 _test_windows:
+    #!cmd
     start "" "{{ TARGET_DIR }}\{{ PROFILE }}\{{ FUZZER_NAME_WIN }}" -F LLVMFuzzerTestOneInput -H .\libpng-harness.dll -l .\libpng-harness.dll -l .\zlib.dll -l .\libpng16.dll --cores=0
     ping -n 10 127.0.0.1>NUL && taskkill /im frida_fuzzer.exe /F
     dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
