@@ -28,7 +28,7 @@ _lib_unix:
     make -j -C libpng-1.6.37
 
 _lib_windows:
-    powershell -Command Invoke-WebRequest -OutFile zlib-1.2.11.tar.gz https://zlib.net/fossils/zlib-1.2.11.tar.gz
+    powershell -Command Invoke-WebRequest -OutFile zlib-1.2.11.tar.gz https://github.com/madler/zlib/archive/refs/tags/v1.2.11.tar.gz
     tar -xvf zlib-1.2.11.tar.gz
     del /q zlib-1.2.11.tar.gz
     move zlib-1.2.11 zlib
