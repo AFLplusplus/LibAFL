@@ -38,13 +38,6 @@
 
 #include <nlohmann/json.hpp>
 
-#define FATAL(x...)               \
-  do {                            \
-    fprintf(stderr, "FATAL: " x); \
-    exit(1);                      \
-                                  \
-  } while (0)
-
 using namespace llvm;
 
 namespace {
