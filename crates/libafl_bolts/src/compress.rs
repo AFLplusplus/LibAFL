@@ -74,11 +74,11 @@ mod tests {
     #[test]
     fn test_compression() {
         let compressor = GzipCompressor::with_threshold(1);
-        assert!(
+        assert_eq!(
             compressor
                 .decompress(&compressor.maybe_compress(&[1u8; 1024]).unwrap())
-                .unwrap()
-                == vec![1u8; 1024]
+                .unwrap(),
+            vec![1u8; 1024]
         );
     }
 

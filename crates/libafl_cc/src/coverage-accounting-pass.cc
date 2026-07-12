@@ -232,8 +232,8 @@ PreservedAnalyses AFLCoverage::run(Module &M, ModuleAnalysisManager &MAM) {
      __afl_acc_prev_loc is thread-local. */
 
   GlobalVariable *AFLMemOpPtr = new GlobalVariable(
-      M, PointerType::get(Int32Ty, 0), false, GlobalValue::ExternalLinkage, 0,
-      "__afl_acc_memop_ptr");
+      M, PointerType::get(M.getContext(), 0), false,
+      GlobalValue::ExternalLinkage, 0, "__afl_acc_memop_ptr");
 
   GlobalVariable *AFLPrevLoc;
 
@@ -301,7 +301,7 @@ PreservedAnalyses AFLCoverage::run(Module &M, ModuleAnalysisManager &MAM) {
       /* Load SHM pointer */
 
       LoadInst *MemReadPtr =
-          IRB.CreateLoad(PointerType::get(Int32Ty, 0), AFLMemOpPtr);
+          IRB.CreateLoad(PointerType::get(M.getContext(), 0), AFLMemOpPtr);
       MemReadPtr->setMetadata(M.getMDKindID("nosanitize"),
                               MDNode::get(C, None));
       Value *MemReadPtrIdx =

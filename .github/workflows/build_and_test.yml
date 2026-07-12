@@ -14,8 +14,7 @@ env:
   AFL_PIZZA_MODE: "-1" # this is sad, I know, but it breaks on a certain spring day otherwise :(
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-  # FIXME: please unpin macos rust stable toolchain once LLVM is bumped to version 22
-  MAIN_LLVM_VERSION: 21
+  MAIN_LLVM_VERSION: 22
   RUST_BACKTRACE: full
 
 concurrency:
@@ -44,10 +43,10 @@ jobs:
           #       => https://github.com/Michael-F-Bryan/mdbook-linkcheck/pull/82#issuecomment-2241058491
           git: https://github.com/Michael-F-Bryan/mdbook-linkcheck.git
           rev: 8c783c5d754d83bcd50c28fb4174854b04ece990
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - if: runner.os == 'Linux'
-        uses: ./.github/workflows/ubuntu-prepare
+        uses: ./.github/actions/ubuntu-prepare
       - if: runner.os != 'Linux'
         uses: dtolnay/rust-toolchain@stable
       - name: Fix PATH for Cargo (non-Linux)
@@ -93,8 +92,8 @@ jobs:
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
       - name: Build Docs
@@ -103,8 +102,8 @@ jobs:
   ubuntu-doc-test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ubuntu-prepare
       - name: install mdbook
         uses: baptiste0928/cargo-install@v3
         with:
@@ -119,8 +118,8 @@ jobs:
     runs-on: ubuntu-24.04
     if: contains( github.event.pull_request.labels.*.name, 'pre-release')
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ubuntu-prepare
         with:
           use_nightly: "true"
       - name: Add miri
@@ -137,8 +136,8 @@ jobs:
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
@@ -161,8 +160,8 @@ jobs:
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: "ubuntu-clippy"
@@ -201,8 +200,8 @@ jobs:
           ]
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       # ---- build and feature check ----
@@ -211,7 +210,7 @@ jobs:
       # Tracking: https://github.com/CensoredUsername/dynasm-rs/issues/114
       # One dep of libafl_frida fails on `DOCS_RS` for stable toolchain. Therefore, we _only_ run nightly for that.
       # For the rest of other crates, we still use stable toolchain.
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
       - name: "Setup nightly"
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -230,8 +229,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y lsb-release wget software-properties-common gnupg libz3-dev
       - name: Install maturin
         run: cargo install --locked maturin
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Run a maturin build
@@ -242,16 +241,16 @@ jobs:
   cargo-fmt:
     runs-on: ubuntu-24.04
     env:
-      MAIN_LLVM_VERSION: 21
+      MAIN_LLVM_VERSION: 22
     steps:
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
       - name: Installing black
         run: python3 -m pip install black
       - name: Format Check
@@ -260,7 +259,7 @@ jobs:
   check-md-links:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run linkspector
         uses: umbrelladocs/action-linkspector@v1
         with:
@@ -270,8 +269,8 @@ jobs:
   msrv:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Fix PATH for Cargo
         shell: bash
@@ -283,8 +282,8 @@ jobs:
   fuzzers-preflight:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - name: Fuzzer in CI Check
         run: just fuzzers-preflight
 
@@ -386,9 +385,9 @@ jobs:
           fname=$(basename "${{ matrix.fuzzer }}")
           echo "fuzzer_name=$fname" >> $GITHUB_OUTPUT
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Prepare
-        uses: ./.github/workflows/fuzzer-tester-prepare
+        uses: ./.github/actions/fuzzer-tester-prepare
         with:
           fuzzer-name: ${{ matrix.fuzzer }}
       - name: Configure Cache
@@ -430,9 +429,9 @@ jobs:
       qemu: ${{ steps.filter.outputs.qemu }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -457,8 +456,8 @@ jobs:
         fuzzer:
           - fuzzers/full_system/unicorn
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/fuzzer-tester-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/fuzzer-tester-prepare
       - name: "Install dependencies"
         if: runner.os == 'Linux'
         shell: bash
@@ -495,9 +494,9 @@ jobs:
           fname=$(basename "${{ matrix.fuzzer }}")
           echo "fuzzer_name=$fname" >> $GITHUB_OUTPUT
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Prepare
-        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+        uses: ./.github/actions/qemu-fuzzer-tester-prepare
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -544,9 +543,9 @@ jobs:
           fname=$(basename "${{ matrix.fuzzer }}")
           echo "fuzzer_name=$fname" >> $GITHUB_OUTPUT
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Prepare
-        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+        uses: ./.github/actions/qemu-fuzzer-tester-prepare
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -591,9 +590,9 @@ jobs:
           fname=$(basename "${{ matrix.fuzzer }}")
           echo "fuzzer_name=$fname" >> $GITHUB_OUTPUT
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Prepare
-        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+        uses: ./.github/actions/qemu-fuzzer-tester-prepare
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -626,8 +625,8 @@ jobs:
 
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ubuntu-prepare
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y g++-powerpc-linux-gnu gcc-powerpc-linux-gnu gdb-multiarch
       - name: Add rust targets
@@ -657,9 +656,9 @@ jobs:
           - x86_64
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Prepare
-        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+        uses: ./.github/actions/qemu-fuzzer-tester-prepare
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
       # ---- build normal and examples ----
@@ -679,9 +678,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Prepare
-        uses: ./.github/workflows/qemu-fuzzer-tester-prepare
+        uses: ./.github/actions/qemu-fuzzer-tester-prepare
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
       # ---- build normal and examples ----
@@ -699,12 +698,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: true
           fetch-depth: 0
       - name: Prepare
-        uses: ./.github/workflows/asan-prepare
+        uses: ./.github/actions/asan-prepare
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -737,12 +736,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: true
           fetch-depth: 0
       - name: Prepare
-        uses: ./.github/workflows/asan-prepare
+        uses: ./.github/actions/asan-prepare
       - name: Configure Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -779,8 +778,8 @@ jobs:
         run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: no-std
@@ -803,8 +802,8 @@ jobs:
         run: rustup target add i686-unknown-linux-gnu
       - name: Install x86 build dependencies / multilib
         run: sudo apt update && sudo apt -y install gcc-multilib g++-multilib
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: x86-i686
@@ -822,8 +821,8 @@ jobs:
         run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: no-std-clippy
@@ -835,8 +834,8 @@ jobs:
     steps:
       - name: Install taplo
         run: curl -fsSL https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - name: Run taplo
         run: just check-toml
 
@@ -852,10 +851,10 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Check Dockerfile for changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -865,7 +864,7 @@ jobs:
 
       - name: Restore Docker build cache
         if: steps.filter.outputs.changed == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/.buildx-cache
           # We want to be able to update the cache if the Dockerfile is changed,
@@ -877,13 +876,13 @@ jobs:
 
       - name: Set up Docker Buildx
         if: steps.filter.outputs.changed == 'true'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           driver: docker-container
 
       - name: Log in to GitHub Container Registry
         if: steps.filter.outputs.changed == 'true' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -891,7 +890,7 @@ jobs:
 
       - name: Build Docker image
         if: steps.filter.outputs.changed == 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
@@ -906,7 +905,7 @@ jobs:
 
       - name: Save Docker build cache
         if: steps.filter.outputs.changed == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/.buildx-cache
           # We want to be able to update the cache if the Dockerfile is changed,
@@ -929,7 +928,7 @@ jobs:
           - binary_only/tinyinst_simple
           # - inprocess/libfuzzer_windows_asan
       fail-fast: false
-    runs-on: windows-latest
+    runs-on: windows-2022
     needs:
       - fuzzers-preflight
       - common
@@ -943,9 +942,9 @@ jobs:
           $fname = Split-Path -Leaf "${{ matrix.fuzzer }}"
           "fuzzer_name=$fname" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Prepare
-        uses: ./.github/workflows/windows-tester-prepare
+        uses: ./.github/actions/windows-tester-prepare
       - name: install cxx bridge
         # Needs to match version in tinyinst-rs
         run: cargo install cxxbridge-cmd@=1.0.190
@@ -983,8 +982,8 @@ jobs:
         uses: cda-tum/setup-z3@v1
         with:
           add_to_library_path: true
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/windows-tester-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/windows-tester-prepare
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: windows-clippy
@@ -995,7 +994,7 @@ jobs:
   macos:
     runs-on: macOS-latest
     steps:
-      - uses: dtolnay/rust-toolchain@1.94.1
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - name: Fix PATH for Cargo
@@ -1008,8 +1007,8 @@ jobs:
       - name: Install cxxbridge
         # Needs to match version in tinyinst-rs
         run: cargo install cxxbridge-cmd@=1.0.190
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - uses: Swatinem/rust-cache@v2
       - name: MacOS Build
         run: just build
@@ -1032,8 +1031,8 @@ jobs:
         run: rustup target add aarch64-linux-android
       - name: install cargo ndk
         run: cargo install cargo-ndk
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v3
+      - uses: actions/checkout@v5
+      - uses: extractions/setup-just@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build Android
         run: just build-android
@@ -1041,8 +1040,8 @@ jobs:
   ubuntu-cross-android-x86_64:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
       - uses: nttld/setup-ndk@v1
         id: setup-ndk

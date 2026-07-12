@@ -5,7 +5,7 @@ PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { 
 FUZZER_NAME := 'libafl-fuzz'
 FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 LLVM_CONFIG := env("LLVM_CONFIG", "llvm-config-18")
-AFL_VERSION := "e4857af6d9c95186c817c31261e6934eece94259"
+AFL_REV := "8b15597d69f91aa0e97562401e7d5410935e665f"
 AFL_DIR := PROJECT_DIR / "AFLplusplus"
 AFL_CC_PATH := AFL_DIR / "afl-clang-fast"
 CC := "clang"
@@ -15,7 +15,7 @@ build_afl:
     if [ ! -d {{ AFL_DIR }} ]; then
         git clone https://github.com/AFLplusplus/AFLplusplus.git
         cd {{ AFL_DIR }}
-        git checkout {{ AFL_VERSION }}
+        git checkout {{ AFL_REV }}
         LLVM_CONFIG={{ LLVM_CONFIG }} make
     fi
 

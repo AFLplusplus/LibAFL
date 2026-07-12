@@ -7,7 +7,7 @@ use core::{
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
-use std::{collections::HashMap, io::ErrorKind, process, sync::OnceLock};
+use std::{collections::HashMap, process, sync::OnceLock};
 
 use enumflags2::{BitFlags, bitflags};
 #[cfg(feature = "llmp_compression")]
@@ -363,7 +363,8 @@ where
 
         let n_read = match stream.try_read(&mut dummy_byte) {
             Ok(n) => n,
-            Err(e) if e.kind() == ErrorKind::WouldBlock => {
+            #[allow(clippy::std_instead_of_core)]
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 return Ok(None);
             }
             Err(e) => return Err(Error::os_error(e, "try read failed")),
