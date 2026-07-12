@@ -27,4 +27,5 @@ extern "C" int libafl_libfuzzer_test_one_input(
 
   #pragma comment(linker, "/export:LLVMFuzzerRunDriver")
   #pragma comment(linker, "/export:__sanitizer_cov_8bit_counters_init")
+  #pragma comment(linker, "/export:__sanitizer_cov_8bit_counters_cleanup")
 #endif  // _WIN32
