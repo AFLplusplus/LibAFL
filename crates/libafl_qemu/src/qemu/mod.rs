@@ -590,7 +590,7 @@ impl Qemu {
             .iter()
             .map(|x| CString::new(AsRef::<str>::as_ref(x)).unwrap())
             .collect();
-        let mut argv: Vec<*const u8> = args.iter().map(|x| x.as_ptr() as *const u8).collect();
+        let mut argv: Vec<*const u8> = args.iter().map(|x| x.as_ptr().cast::<u8>()).collect();
         argv.push(ptr::null()); // argv is always null terminated.
 
         unsafe {

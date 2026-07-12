@@ -45,7 +45,7 @@ runs:
           wget
     - uses: dtolnay/rust-toolchain@stable
     - name: install just
-      uses: extractions/setup-just@v3
+      uses: extractions/setup-just@v4
     - name: Install cargo-binstall
       shell: bash
       run: |
@@ -63,7 +63,7 @@ runs:
         rustup target add aarch64-unknown-linux-gnu && \
         rustup target add i686-unknown-linux-gnu && \
         rustup target add powerpc-unknown-linux-gnu
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: true
         fetch-depth: 0

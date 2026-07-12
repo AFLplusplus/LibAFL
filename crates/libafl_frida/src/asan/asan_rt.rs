@@ -2666,31 +2666,35 @@ impl AsanRuntime {
         //abuse the fact that the last operand is always the mem operand
         match instr.operands[operands_len - 1] {
             Operand::RegRegOffset(reg1, reg2, size, shift, shift_size) => {
-                let ret = Some((
+                // let ret =
+                Some((
                     reg1,
                     Some((reg2, size)),
                     0,
                     instruction_width(&instr),
                     Some((shift, shift_size)),
-                ));
+                ))
                 // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                ret
+                // ret
             }
             Operand::RegPreIndex(reg, disp, _) => {
-                let ret = Some((reg, None, disp, instruction_width(&instr), None));
+                // let ret =
+                Some((reg, None, disp, instruction_width(&instr), None))
                 // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                ret
+                // ret
             }
             Operand::RegPostIndex(reg, _) => {
                 //in post index the disp is applied after so it doesn't matter for this memory access
-                let ret = Some((reg, None, 0, instruction_width(&instr), None));
+                // let ret =
+                Some((reg, None, 0, instruction_width(&instr), None))
                 // log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                ret
+                // ret
             }
             Operand::RegPostIndexReg(reg, _) => {
-                let ret = Some((reg, None, 0, instruction_width(&instr), None));
+                // let ret =
+                Some((reg, None, 0, instruction_width(&instr), None))
                 //  log::trace!("Interesting instruction: {}, {:?}", instr.to_string(), ret);
-                ret
+                // ret
             }
             _ => None,
         }

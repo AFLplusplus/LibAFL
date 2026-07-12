@@ -1,5 +1,6 @@
+use std::env;
+
 fn main() {
-    //#[cfg(all(feature = "syscalls", not(target_os = "linux")))]
     println!("cargo:warning=The feature `linux` can only be used on Linux!");
 
     println!("cargo:rerun-if-changed=cc/include/hooks.h");
@@ -8,7 +9,7 @@ fn main() {
     println!("cargo:rerun-if-changed=cc/src/log.c");
     println!("cargo:rerun-if-changed=cc/src/vasprintf.c");
 
-    if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() != "windows" {
+    if env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() != "windows" {
         cc::Build::new()
             .define("_GNU_SOURCE", None)
             .opt_level(3)
