@@ -331,6 +331,7 @@ jobs:
           - forkserver/fuzzbench_forkserver_sand
           - forkserver/libafl-fuzz
           - forkserver/baby_fuzzer_with_forkexecutor
+          - forkserver/forkserver_simple_rs
 
           # Full-system
           - full_system/nyx_launcher
