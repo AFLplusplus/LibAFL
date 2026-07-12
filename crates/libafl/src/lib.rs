@@ -85,8 +85,8 @@ pub mod prelude {
     #![expect(ambiguous_glob_reexports)]
 
     pub use super::{
-        corpus::*, events::*, executors::*, feedbacks::*, fuzzer::*, generators::*, inputs::*,
-        monitors::*, mutators::*, observers::*, schedulers::*, stages::*, state::*, *,
+        corpus::*, events::*, executors::*, feedbacks::*, generators::*, inputs::*, monitors::*,
+        mutators::*, observers::*, schedulers::*, stages::*, state::*, *,
     };
 }
 

@@ -4,7 +4,7 @@ use alloc::{sync::Arc, vec::Vec};
 use core::{marker::PhantomData, net::SocketAddr, num::NonZeroUsize, time::Duration};
 use std::{
     env,
-    io::{ErrorKind, Read, Write},
+    io::{Read, Write},
     net::{TcpListener, TcpStream, ToSocketAddrs},
 };
 
@@ -177,8 +177,7 @@ where
                         let mut len = u32::from_le_bytes(len_buf);
                         // we forward the sender id as well, so we add 4 bytes to the message length
                         len += 4;
-
-                        log::debug!("TCP Manager - len +4 = {len:?}");
+                        log::debug!("TCP Manager - len = {len:?}");
 
                         let mut buf = vec![0; len as usize];
 
@@ -763,7 +762,8 @@ where
                         }
                     }
                 }
-                Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                #[allow(clippy::std_instead_of_core)]
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     // no new data on the socket
                     break;
                 }

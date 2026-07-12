@@ -85,7 +85,7 @@ impl Tokens {
         loop {
             if head >= size {
                 // Make double sure this is not completely off
-                assert!(head == size);
+                assert_eq!(head, size);
                 break;
             }
             let size = slice[head] as usize;
@@ -93,9 +93,8 @@ impl Tokens {
             if size > 0 {
                 self.add_token(&slice[head..head + size].to_vec());
                 log::info!(
-                    "Token size: {} content: {:x?}",
-                    size,
-                    &slice[head..head + size].to_vec()
+                    "Token size: {size} content: {:x?}",
+                    slice[head..head + size].to_vec()
                 );
                 head += size;
             }

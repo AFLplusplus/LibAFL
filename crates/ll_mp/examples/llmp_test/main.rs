@@ -43,10 +43,7 @@ fn adder_loop(port: u16) -> Result<(), Box<dyn core::error::Error>> {
     let mut current_result: u32 = 0;
     loop {
         let mut msg_counter = 0;
-        loop {
-            let Some((sender, tag, buf)) = client.recv_buf()? else {
-                break;
-            };
+        while let Some((sender, tag, buf)) = client.recv_buf()? {
             msg_counter += 1;
             match tag {
                 _TAG_SIMPLE_U32_V1 => {

@@ -147,12 +147,9 @@ impl Context {
     fn calc_min_len_for_rule(&self, r: RuleId) -> Option<usize> {
         let mut res = 1;
         for nt_id in self.get_rule(r).nonterms() {
-            if let Some(min) = self.nts_to_min_size.get(nt_id) {
-                //println!("Calculating length for Rule(calc_min_len_for_rule): {}, current: {}, adding: {}, because of rule: {}", self.nt_id_to_s(self.get_rule(r).nonterm().clone()), res, min, self.nt_id_to_s(nt_id.clone()));
-                res += *min;
-            } else {
-                return None;
-            }
+            let min = self.nts_to_min_size.get(nt_id)?;
+            //println!("Calculating length for Rule(calc_min_len_for_rule): {}, current: {}, adding: {}, because of rule: {}", self.nt_id_to_s(self.get_rule(r).nonterm().clone()), res, min, self.nt_id_to_s(nt_id.clone()));
+            res += *min;
         }
         //println!("Calculated length for Rule(calc_min_len_for_rule): {}, Length: {}", self.nt_id_to_s(self.get_rule(r).nonterm().clone()), res);
         Some(res)
