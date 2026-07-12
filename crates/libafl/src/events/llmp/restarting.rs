@@ -243,7 +243,7 @@ where
                 |mut broker: LlmpBroker<_, SP::ShMem, SP>,
                  remote_broker_addr: Option<SocketAddr>| {
                     if let Some(remote_broker_addr) = remote_broker_addr {
-                        log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
+                        log::info!("B2b: Connecting to {remote_broker_addr:?}");
                         broker.inner_mut().connect_b2b(remote_broker_addr)?;
                     }
 

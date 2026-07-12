@@ -144,11 +144,11 @@ where
 
         let mut out_dir = self.output_dir.clone();
         if fs::create_dir(&out_dir).is_err() {
-            log::info!("Out dir at {} already exists.", &out_dir.display());
+            log::info!("Out dir at {} already exists.", out_dir.display());
             assert!(
                 out_dir.is_dir(),
                 "Out dir at {} is not a valid directory!",
-                &out_dir.display()
+                out_dir.display()
             );
         }
         let mut crashes = out_dir.clone();
@@ -311,7 +311,7 @@ where
                             state.corpus().count()
                         );
                     } else {
-                        log::info!("Loading from {:?}", &self.input_dirs);
+                        log::info!("Loading from {:?}", self.input_dirs);
                         // Load from disk
                         state
                             .load_initial_inputs(
@@ -321,7 +321,7 @@ where
                                 self.input_dirs,
                             )
                             .unwrap_or_else(|_| {
-                                panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
+                                panic!("Failed to load initial corpus at {:?}", self.input_dirs);
                             });
                         log::info!("We imported {} inputs from disk.", state.corpus().count());
                     }
@@ -439,7 +439,7 @@ where
                             state.corpus().count()
                         );
                     } else {
-                        log::info!("Loading from {:?}", &self.input_dirs);
+                        log::info!("Loading from {:?}", self.input_dirs);
                         // Load from disk
                         state
                             .load_initial_inputs(
@@ -449,7 +449,7 @@ where
                                 self.input_dirs,
                             )
                             .unwrap_or_else(|_| {
-                                panic!("Failed to load initial corpus at {:?}", &self.input_dirs);
+                                panic!("Failed to load initial corpus at {:?}", self.input_dirs);
                             });
                         log::info!("We imported {} inputs from disk.", state.corpus().count());
                     }

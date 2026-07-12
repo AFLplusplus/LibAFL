@@ -344,12 +344,15 @@ pub extern "C" fn libafl_main() {
             ]));
         }
 
+        // filename needs to be unique per client
+        let stats_file = format!("fuzzer_stats{}", client_description.id());
+
         // Setup a basic mutator with a mutational stage
         let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
         let calibration = CalibrationStage::new(&map_feedback);
         let afl_stats = AflStatsStage::builder()
             .map_feedback(&map_feedback)
-            .stats_file(opt.output.join("fuzzer_stats"))
+            .stats_file(opt.output.join(stats_file))
             .report_interval(Duration::from_millis(1000))
             .core_id(core_id)
             .banner("libfuzzer_libpng".into())

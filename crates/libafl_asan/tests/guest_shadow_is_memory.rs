@@ -4,7 +4,7 @@ mod tests {
     use libafl_asan::{
         GuestAddr,
         mmap::{Mmap, MmapProt},
-        shadow::guest::{DefaultShadowLayout, GuestShadow},
+        shadow::{guest::GuestShadow, layout::DefaultShadowLayout},
     };
 
     #[derive(Ord, PartialOrd, PartialEq, Eq, Debug)]

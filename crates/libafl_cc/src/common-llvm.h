@@ -10,11 +10,6 @@
 #define HAVE_VECTOR_INTRINSICS 1
 
 #include <optional>
-#if LLVM_VERSION_MAJOR >= 16
-// None constant being deprecated for LLVM-16, it is recommended
-// to use the std::nullopt_t type instead. (#1010)
-constexpr std::nullopt_t None = std::nullopt;
-#endif
 
 // all llvm includes and friends
 #include "llvm/Support/CommandLine.h"
@@ -25,9 +20,30 @@ constexpr std::nullopt_t None = std::nullopt;
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IR/CFG.h"
-#include "llvm/Passes/PassPlugin.h"
+#if LLVM_VERSION_MAJOR >= 22
+  #include "llvm/Plugins/PassPlugin.h"
+#else
+  #include "llvm/Passes/PassPlugin.h"
+#endif
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/IR/PassManager.h"
+
+#if LLVM_VERSION_MAJOR >= 21
+  // None is only used in libafl_cc as the second parameter of MDNode::get()
+  // that param is an ArrayRef, which can no longer be constructed with a
+  // nullopt since LLVM 21+
+  //
+  // Keep these around to keep IWYU quiet
+  #include "llvm/ADT/ArrayRef.h"
+namespace llvm {
+class Metadata;
+}
+inline constexpr llvm::ArrayRef<llvm::Metadata *> None{};
+#elif LLVM_VERSION_MAJOR >= 16
+// None constant being deprecated for LLVM-16, it is recommended
+// to use the std::nullopt_t type instead. (#1010)
+constexpr std::nullopt_t None = std::nullopt;
+#endif
 
 #define FATAL(...)                          \
   do {                                      \
