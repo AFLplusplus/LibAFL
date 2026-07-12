@@ -1159,6 +1159,44 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     Ok(())
 }
 
+/// Collapses generic argument lists (`Foo<...>`) in the `Debug` output of a
+/// captured [`std::backtrace::Backtrace`] so that deeply-monomorphized frames
+/// (as produced by `LibAFL`'s heavily-generic types) stay readable instead of
+/// spanning thousands of characters each.
+#[cfg(any(unix, windows))]
+fn shorten_backtrace(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    let mut prev_ident = false;
+    let mut chars = raw.chars();
+    while let Some(c) = chars.next() {
+        // Only collapse a `<...>` that is a generic argument list, i.e. one that
+        // directly follows an identifier. A `<` preceded by anything else is the
+        // start of a `<Type as Trait>` qualified path, which we keep so its
+        // structure (and any nested `Ident<...>`) is still readable.
+        if c == '<' && prev_ident {
+            let mut depth = 1usize;
+            for c in chars.by_ref() {
+                match c {
+                    '<' => depth += 1,
+                    '>' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            out.push_str("<...>");
+            prev_ident = false;
+            continue;
+        }
+        prev_ident = c.is_alphanumeric() || c == '_';
+        out.push(c);
+    }
+    out
+}
+
 /// Generates a mini-BSOD given a signal and context.
 #[cfg(unix)]
 #[allow(clippy::non_ascii_literal)]
@@ -1181,7 +1219,8 @@ pub fn generate_minibsod<W: Write>(
         writeln!(writer, "Received signal {signal}")?;
     }
     writeln!(writer, "{:━^100}", " BACKTRACE ")?;
-    writeln!(writer, "{:?}", std::backtrace::Backtrace::force_capture())?;
+    let backtrace = std::backtrace::Backtrace::force_capture();
+    writeln!(writer, "{}", shorten_backtrace(&format!("{backtrace:?}")))?;
     writeln!(writer, "{:━^100}", " MAPS ")?;
     write_minibsod(writer)
 }
@@ -1218,7 +1257,8 @@ pub fn generate_minibsod<W: Write>(
         (*exception_pointers).ContextRecord.as_mut().unwrap()
     })?;
     writeln!(writer, "{:━^100}", " BACKTRACE ")?;
-    writeln!(writer, "{:?}", std::backtrace::Backtrace::force_capture())?;
+    let backtrace = std::backtrace::Backtrace::force_capture();
+    writeln!(writer, "{}", shorten_backtrace(&format!("{backtrace:?}")))?;
     writeln!(writer, "{:━^100}", " MAPS ")?;
     write_minibsod(writer)
 }

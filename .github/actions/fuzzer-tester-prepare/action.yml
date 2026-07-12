@@ -7,11 +7,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         submodules: true
         fetch-depth: 0
-    - uses: ./.github/workflows/ubuntu-prepare
+    - uses: ./.github/actions/ubuntu-prepare
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
@@ -33,7 +33,7 @@ runs:
       shell: bash
       run: sudo apt update && sudo apt install -y libgtk-3-dev pax-utils python3-msgpack python3-jinja2 libcapstone-dev
     - name: install just
-      uses: extractions/setup-just@v3
+      uses: extractions/setup-just@v4
     - name: Add wasm target
       if: ${{ inputs.fuzzer-name == 'fuzz_anything/baby_fuzzer_wasm' }}
       shell: bash
@@ -45,7 +45,7 @@ runs:
         crate: wasm-pack
     - name: install chrome
       if: ${{ inputs.fuzzer-name == 'fuzz_anything/baby_fuzzer_wasm' }}
-      uses: browser-actions/setup-chrome@v1
+      uses: browser-actions/setup-chrome@v2
       with:
         chrome-version: stable
     - name: install nasm

@@ -3,56 +3,35 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use libafl::{
-    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{
-        forkserver::{ForkserverExecutor, MAX_INPUT_SIZE_DEFAULT},
-        HasObservers, StdChildArgs,
-    },
+    executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations, tokens_mutations, HavocScheduledMutator, Tokens},
+    mutators::{havoc_mutations, HavocScheduledMutator},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
-    HasMetadata,
 };
 use libafl_bolts::{
+    current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Handled, Merge},
+    tuples::{tuple_list, Handled},
     AsSliceMut, StdTargetArgs, Truncate,
 };
-use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 use nix::sys::signal::Signal;
 
-/// The commandline args this fuzzer accepts
 #[derive(Debug, Parser)]
 #[command(
-    name = "forkserver_libafl_cc",
-    about = "This is a simple example fuzzer to fuzz a executable instrumented by libafl_cc.",
-    author = "ergrelet <ergrelet@users.noreply.github.com>"
+    name = "forkserver_simple_rs",
+    about = "A simple forkserver fuzzer with a Rust target binary."
 )]
 struct Opt {
-    #[arg(
-        help = "The instrumented binary we want to fuzz",
-        name = "EXEC",
-        required = true
-    )]
-    executable: String,
-
-    #[arg(
-        help = "set max length of generated fuzz input",
-        short = 'G',
-        long = "maxlen",
-        default_value_t = MAX_INPUT_SIZE_DEFAULT
-    )]
-    max_input_len: usize,
-
     #[arg(
         help = "The directory to read initial inputs from ('seeds')",
         name = "INPUT_DIR",
@@ -64,12 +43,12 @@ struct Opt {
         help = "Timeout for each individual execution, in milliseconds",
         short = 't',
         long = "timeout",
-        default_value = "3000"
+        default_value = "1200"
     )]
     timeout: u64,
 
     #[arg(
-        help = "If not set, the child's stdout and stderror will be redirected to /dev/null",
+        help = "If set, the child's stdout and stderr will be printed",
         short = 'd',
         long = "debug-child",
         default_value = "false"
@@ -92,112 +71,84 @@ struct Opt {
         default_value = "SIGKILL"
     )]
     signal: Signal,
+
+    #[arg(
+        help = "Run the target in persistent mode",
+        short = 'p',
+        long = "persistent",
+        default_value = "false"
+    )]
+    persistent: bool,
 }
 
 pub fn main() {
     env_logger::init();
+    const MAP_SIZE: usize = 65536;
 
-    const MAP_SIZE: usize = EDGES_MAP_DEFAULT_SIZE; //65536;
     let opt = Opt::parse();
 
     let corpus_dirs: Vec<PathBuf> = [opt.in_dir].to_vec();
 
-    // The unix shmem provider supported by LibAFL for shared memory
     let mut shmem_provider = UnixShMemProvider::new().unwrap();
 
-    // The coverage map shared between observer and executor
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
-    // let the forkserver know the shmid
     unsafe {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
     let shmem_buf = shmem.as_slice_mut();
-    // the next line is not needed
-    // unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
 
-    // Create an observation channel using the signals map
     let edges_observer = unsafe {
         HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf)).track_indices()
     };
 
-    // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    // Feedback to rate the interestingness of an input
-    // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
-        // New maximization map feedback linked to the edges observer and the feedback state
         MaxMapFeedback::new(&edges_observer),
-        // Time feedback, this one does not need a feedback state
         TimeFeedback::new(&time_observer)
     );
 
-    // A feedback to choose if an input is a solution or not
-    // We want to do the same crash deduplication that AFL does
     let mut objective = feedback_and_fast!(
-        // Must be a crash
         CrashFeedback::new(),
-        // Take it only if trigger new coverage over crashes
-        // Uses `with_name` to create a different history from the `MaxMapFeedback` in `feedback` above
         MaxMapFeedback::with_name("mapfeedback_metadata_objective", &edges_observer)
     );
 
-    // create a State from scratch
     let mut state = StdState::new(
-        // RNG
-        StdRand::new(),
-        // Corpus that will be evolved, keep on disk to ensure instrumentation is working
-        CachedOnDiskCorpus::<BytesInput>::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
-        // Corpus in which we store solutions (crashes in this example),
-        // on disk so the user can get them after stopping the fuzzer
+        StdRand::with_seed(current_nanos()),
+        InMemoryCorpus::<BytesInput>::new(),
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-        // States of the feedbacks.
-        // The feedbacks can report the data that should persist in the State.
         &mut feedback,
-        // Same for objective feedbacks
         &mut objective,
     )
     .unwrap();
 
-    // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::new(|s| {
-        println!("{s}");
-    });
-
-    // The event manager handle the various events generated during the fuzzing loop
-    // such as the notification of the addition of a new item to the corpus
+    let monitor = SimpleMonitor::new(|s| println!("{s}"));
     let mut mgr = SimpleEventManager::new(monitor);
 
-    // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
-
-    // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    // If we should debug the child
-    let debug_child = opt.debug_child;
+    let observer_ref = edges_observer.handle();
 
-    // Create the executor for the forkserver
-    let args = opt.arguments;
-
-    let observer_handle = edges_observer.handle();
-
-    let mut tokens = Tokens::new();
+    let target_bin = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("target");
     let mut executor = ForkserverExecutor::builder()
-        .program(opt.executable)
-        .debug_child(debug_child)
+        .program(target_bin)
+        .debug_child(opt.debug_child)
         .shmem_provider(&mut shmem_provider)
-        .autotokens(&mut tokens)
-        .parse_afl_cmdline(args)
+        .parse_afl_cmdline(opt.arguments)
         .coverage_map_size(MAP_SIZE)
         .timeout(Duration::from_millis(opt.timeout))
-        .max_input_size(opt.max_input_len)
         .kill_signal(opt.signal)
+        .is_persistent(opt.persistent)
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
-        executor.observers_mut()[&observer_handle]
+        executor.observers_mut()[&observer_ref]
             .as_mut()
             .truncate(dynamic_map_size);
     }
@@ -215,11 +166,7 @@ pub fn main() {
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    state.add_metadata(tokens);
-
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator =
-        HavocScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 6);
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
