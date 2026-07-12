@@ -1,0 +1,18 @@
+import "../../../just/libafl.just"
+
+FUZZER_NAME := "intel_pt_baby_fuzzer"
+
+run: build setcap
+    {{ FUZZER }}
+
+build:
+    cargo build --profile {{ PROFILE }}
+
+setcap:
+    sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep {{ FUZZER }}
+
+clean:
+    cargo clean
+
+test: build
+    echo "Build is successful."
