@@ -4,9 +4,6 @@
 use alloc::{vec, vec::Vec};
 use core::ops::{BitAnd, BitOr};
 
-#[cfg(feature = "wide")]
-use wide::CmpEq;
-
 /// Re-export our vector types
 #[cfg(feature = "wide")]
 pub mod vector {
@@ -228,6 +225,10 @@ pub trait VectorType {
     #[must_use]
     fn blend(self, lhs: Self, rhs: Self) -> Self;
 
+    /// Test lane-wise equality.
+    #[must_use]
+    fn simd_eq(self, rhs: Self) -> Self;
+
     /// Can't reuse [`crate::AsSlice`] due to [`wide`] might implement `Deref`
     fn as_slice(&self) -> &[u8];
 }
@@ -256,6 +257,10 @@ impl VectorType for wide::u8x16 {
 
     fn blend(self, lhs: Self, rhs: Self) -> Self {
         self.blend(lhs, rhs)
+    }
+
+    fn simd_eq(self, rhs: Self) -> Self {
+        self.simd_eq(rhs)
     }
 
     fn as_slice(&self) -> &[u8] {
@@ -299,6 +304,10 @@ impl VectorType for wide::u8x32 {
         self.blend(lhs, rhs)
     }
 
+    fn simd_eq(self, rhs: Self) -> Self {
+        self.simd_eq(rhs)
+    }
+
     fn as_slice(&self) -> &[u8] {
         self.as_array()
     }
@@ -316,7 +325,7 @@ pub fn simplify_map_naive(map: &mut [u8]) {
 #[cfg(feature = "wide")]
 pub fn simplify_map_simd<V>(map: &mut [u8])
 where
-    V: VectorType + Copy + Eq + CmpEq<Output = V>,
+    V: VectorType + Copy + Eq,
 {
     let size = map.len();
     let steps = size / V::N;

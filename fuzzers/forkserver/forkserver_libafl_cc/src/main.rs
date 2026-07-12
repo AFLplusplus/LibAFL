@@ -3,9 +3,12 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
+    executors::{
+        forkserver::{ForkserverExecutor, MAX_INPUT_SIZE_DEFAULT},
+        HasObservers, StdChildArgs,
+    },
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -43,6 +46,14 @@ struct Opt {
     executable: String,
 
     #[arg(
+        help = "set max length of generated fuzz input",
+        short = 'G',
+        long = "maxlen",
+        default_value_t = MAX_INPUT_SIZE_DEFAULT
+    )]
+    max_input_len: usize,
+
+    #[arg(
         help = "The directory to read initial inputs from ('seeds')",
         name = "INPUT_DIR",
         required = true
@@ -53,7 +64,7 @@ struct Opt {
         help = "Timeout for each individual execution, in milliseconds",
         short = 't',
         long = "timeout",
-        default_value = "1200"
+        default_value = "3000"
     )]
     timeout: u64,
 
@@ -135,8 +146,8 @@ pub fn main() {
     let mut state = StdState::new(
         // RNG
         StdRand::new(),
-        // Corpus that will be evolved, we keep it in memory for performance
-        InMemoryCorpus::<BytesInput>::new(),
+        // Corpus that will be evolved, keep on disk to ensure instrumentation is working
+        CachedOnDiskCorpus::<BytesInput>::new(PathBuf::from("./corpus_discovered"), 64).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
@@ -180,6 +191,7 @@ pub fn main() {
         .parse_afl_cmdline(args)
         .coverage_map_size(MAP_SIZE)
         .timeout(Duration::from_millis(opt.timeout))
+        .max_input_size(opt.max_input_len)
         .kill_signal(opt.signal)
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();

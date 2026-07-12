@@ -61,7 +61,7 @@ impl ChunkStore {
         let id = self.trees.len();
         let mut contains_new_chunk = false;
         for i in 0..tree.size() {
-            buffer.truncate(0);
+            buffer.clear();
             if tree.sizes[i] > 30 {
                 continue;
             }

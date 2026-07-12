@@ -299,13 +299,11 @@ PreservedAnalyses AutoTokensPass::run(Module &M, ModuleAnalysisManager &MAM) {
           isStrcmp &=
               FT->getNumParams() == 2 && FT->getReturnType()->isIntegerTy(32) &&
               FT->getParamType(0) == FT->getParamType(1) &&
-              FT->getParamType(0) ==
-                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0);
+              FT->getParamType(0) == PointerType::get(M.getContext(), 0);
           isStrcasecmp &=
               FT->getNumParams() == 2 && FT->getReturnType()->isIntegerTy(32) &&
               FT->getParamType(0) == FT->getParamType(1) &&
-              FT->getParamType(0) ==
-                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0);
+              FT->getParamType(0) == PointerType::get(M.getContext(), 0);
           isMemcmp &= FT->getNumParams() == 3 &&
                       FT->getReturnType()->isIntegerTy(32) &&
                       FT->getParamType(0)->isPointerTy() &&
@@ -314,14 +312,12 @@ PreservedAnalyses AutoTokensPass::run(Module &M, ModuleAnalysisManager &MAM) {
           isStrncmp &=
               FT->getNumParams() == 3 && FT->getReturnType()->isIntegerTy(32) &&
               FT->getParamType(0) == FT->getParamType(1) &&
-              FT->getParamType(0) ==
-                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0) &&
+              FT->getParamType(0) == PointerType::get(M.getContext(), 0) &&
               FT->getParamType(2)->isIntegerTy();
           isStrncasecmp &=
               FT->getNumParams() == 3 && FT->getReturnType()->isIntegerTy(32) &&
               FT->getParamType(0) == FT->getParamType(1) &&
-              FT->getParamType(0) ==
-                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0) &&
+              FT->getParamType(0) == PointerType::get(M.getContext(), 0) &&
               FT->getParamType(2)->isIntegerTy();
           isStdString &= FT->getNumParams() >= 2 &&
                          FT->getParamType(0)->isPointerTy() &&

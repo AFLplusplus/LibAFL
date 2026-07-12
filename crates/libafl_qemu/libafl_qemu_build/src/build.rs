@@ -11,7 +11,7 @@ use crate::cargo_add_rpath;
 
 pub const LIBAFL_QEMU_GIT_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 pub const LIBAFL_QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-pub const LIBAFL_QEMU_GIT_REV: &str = "c9c6db9127509e1eeaf10daad8fa6bc12cc54f56";
+pub const LIBAFL_QEMU_GIT_REV: &str = "d7a6067ffc94fbb4caad409d390e099630b71941";
 
 pub struct BuildResult {
     pub qemu_path: PathBuf,
@@ -550,6 +550,8 @@ pub fn build(
                 .expect("linkinfo.json `libs` values must be strings");
             println!("cargo:rustc-link-lib={val}");
         }
+
+        println!("cargo:rustc-link-lib=atomic");
 
         for arg in linkinfo["rpath"].members() {
             let val = arg
