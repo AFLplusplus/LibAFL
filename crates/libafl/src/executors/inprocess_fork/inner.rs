@@ -124,8 +124,8 @@ where
             self.hooks.pre_exec_all(state, input);
 
             self.observers
-                .pre_exec_child_all(state, input)
-                .expect("Failed to run post_exec on observers");
+                .pre_exec_all(state, input)
+                .expect("Failed to run pre_exec on observers");
 
             #[cfg(target_os = "linux")]
             {
@@ -156,7 +156,7 @@ where
     ) {
         unsafe {
             self.observers
-                .post_exec_child_all(state, input, &ExitKind::Ok)
+                .post_exec_all(state, input, &ExitKind::Ok)
                 .expect("Failed to run post_exec on observers");
 
             self.hooks.post_exec_all(state, input);
