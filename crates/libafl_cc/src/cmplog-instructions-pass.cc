@@ -158,7 +158,7 @@ bool CmpLogInstructions::hookInstrs(Module &M) {
   }
 #endif
 
-  Constant *Null = Constant::getNullValue(PointerType::get(Int8Ty, 0));
+  Constant *Null = Constant::getNullValue(PointerType::get(M.getContext(), 0));
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {

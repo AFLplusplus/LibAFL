@@ -77,6 +77,7 @@ pub fn waitpid_with_signals(pid: i32) -> i32 {
                 #[cfg(feature = "std")]
                 {
                     let err = std::io::Error::last_os_error();
+                    #[allow(clippy::std_instead_of_core)]
                     if err.kind() == std::io::ErrorKind::Interrupted {
                         continue;
                     }

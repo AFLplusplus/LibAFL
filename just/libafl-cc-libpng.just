@@ -8,8 +8,10 @@ LIBPNG_ROOT :=  DEPS_DIR /  "libpng-" + LIBPNG_VERSION
 LIBPNG_BUILD := TARGET_DIR / "build-png"
 LIBPNG_INCLUDE := LIBPNG_ROOT
 
-ZLIB_VERSION := "zlib-1.3.1"
-ZLIB_ROOT := DEPS_DIR / ZLIB_VERSION
+ZLIB_VERSION := "1.3.2"
+ZLIB_V_VERSION := "v" + ZLIB_VERSION
+ZLIB_TITLED_VERSION := "zlib-" + ZLIB_VERSION
+ZLIB_ROOT := DEPS_DIR / ZLIB_TITLED_VERSION
 ZLIB_BUILD := TARGET_DIR / "build-zlib"
 ZLIB_INCLUDE := ZLIB_BUILD / "zlib" / "include"
 ZLIB_LIB := ZLIB_BUILD / "zlib" / "lib"
@@ -26,9 +28,9 @@ deps_dir:
 
 [unix]
 zlib_wget: deps_dir
-    wget -O "{{ DEPS_DIR }}/{{ ZLIB_VERSION }}.tar.gz" https://zlib.net/fossils/{{ ZLIB_VERSION }}.tar.gz
+    wget -O "{{ DEPS_DIR }}/{{ ZLIB_TITLED_VERSION }}.tar.gz" https://github.com/madler/zlib/releases/download/{{ ZLIB_V_VERSION }}/{{ ZLIB_TITLED_VERSION }}.tar.gz
 
-    tar zxvf {{ DEPS_DIR }}/{{ ZLIB_VERSION }}.tar.gz -C {{ DEPS_DIR }}
+    tar zxvf {{ DEPS_DIR }}/{{ ZLIB_TITLED_VERSION }}.tar.gz -C {{ DEPS_DIR }}
 
 [unix]
 zlib feat: zlib_wget (cc feat)

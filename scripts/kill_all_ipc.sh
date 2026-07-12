@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 PATH="/bin:/usr/bin"
 
 IPCS_S=$(ipcs -s | grep -E "0x[0-9a-f]+ [0-9]+" | grep "${USER}" | cut -f2 -d" ")

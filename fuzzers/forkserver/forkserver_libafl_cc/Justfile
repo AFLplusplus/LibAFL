@@ -56,13 +56,24 @@ run: fuzzer
 [macos]
 test: fuzzer
     #!/bin/bash
-    timeout 30s {{ FORKSERVER }} ./{{ FUZZER_NAME }} ./corpus/ -t 1000 | tee fuzz_stdout.log || true
-    if grep -qa "objectives: 1" fuzz_stdout.log; then
-        echo "Fuzzer is working"
+    CRASH_DIR="crashes"
+    QUEUE_DIR="corpus_discovered"
+    timeout 30s {{ FORKSERVER }} -G 10 -t 5000 ./{{ FUZZER_NAME }} ./corpus/ || true
+
+    # Print off the crashes/queue for testing before we delete, but don't fail the job
+    find "${CRASH_DIR}" "${QUEUE_DIR}" -type f -name '[0-9a-f]*' -print -exec od -A x -t x1 -c {} \; 2>/dev/null || true
+
+    if find "${CRASH_DIR}" -type f -name '[0-9a-f]*' -printf '.' 2>/dev/null | grep -q .; then
+        echo "Good, Fuzzer found a crash"
     else
-        echo "Fuzzer does not generate any testcases or any crashes"
+        echo "Fuzzer did not find a crashing input, and should have"
         exit 1
     fi
+
+    # Cleanup the crashes/queue dirs so that subsequent tests don't pick up
+    # previous crashes/findings.
+    # already exited if failed, keep around to debug
+    rm -r "${CRASH_DIR}" "${QUEUE_DIR}"
 
 [windows]
 test: fuzzer
