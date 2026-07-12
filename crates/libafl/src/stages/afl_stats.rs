@@ -538,13 +538,10 @@ where
     /// Writes a stats file, if a `stats_file_path` is set.
     fn maybe_write_fuzzer_stats(&self, stats: &AflFuzzerStats) -> Result<(), Error> {
         if let Some(stats_file_path) = &self.stats_file_path {
-            let tmp_file = stats_file_path
-                .parent()
-                .expect("fuzzer_stats file must have a parent!")
-                .join(".fuzzer_stats_tmp");
+            let tmp_file = stats_file_path.with_extension("tmp");
+
             std::fs::write(&tmp_file, stats.to_string())?;
-            _ = std::fs::copy(&tmp_file, stats_file_path)?;
-            std::fs::remove_file(tmp_file)?;
+            std::fs::rename(&tmp_file, stats_file_path)?;
         }
         Ok(())
     }
@@ -671,55 +668,55 @@ impl Display for AFLPlotData<'_> {
 }
 impl AFLPlotData<'_> {
     fn header() -> &'static str {
-        "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found"
+        "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found\n"
     }
 }
 impl Display for AflFuzzerStats<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        writeln!(f, "start_time        : {}", &self.start_time)?;
-        writeln!(f, "start_time        : {}", &self.start_time)?;
-        writeln!(f, "last_update       : {}", &self.last_update)?;
-        writeln!(f, "run_time          : {}", &self.run_time)?;
-        writeln!(f, "fuzzer_pid        : {}", &self.fuzzer_pid)?;
-        writeln!(f, "cycles_done       : {}", &self.cycles_done)?;
-        writeln!(f, "cycles_wo_find    : {}", &self.cycles_wo_find)?;
-        writeln!(f, "time_wo_finds     : {}", &self.time_wo_finds)?;
-        writeln!(f, "fuzz_time         : {}", &self.fuzz_time)?;
-        writeln!(f, "calibration_time  : {}", &self.calibration_time)?;
-        writeln!(f, "sync_time         : {}", &self.sync_time)?;
-        writeln!(f, "trim_time         : {}", &self.trim_time)?;
-        writeln!(f, "execs_done        : {}", &self.execs_done)?;
-        writeln!(f, "execs_per_sec     : {}", &self.execs_per_sec)?;
-        writeln!(f, "execs_ps_last_min : {}", &self.execs_ps_last_min)?;
-        writeln!(f, "corpus_count      : {}", &self.corpus_count)?;
-        writeln!(f, "corpus_favored    : {}", &self.corpus_favored)?;
-        writeln!(f, "corpus_found      : {}", &self.corpus_found)?;
-        writeln!(f, "corpus_imported   : {}", &self.corpus_imported)?;
-        writeln!(f, "max_depth         : {}", &self.max_depth)?;
-        writeln!(f, "cur_item          : {}", &self.cur_item)?;
-        writeln!(f, "pending_favs      : {}", &self.pending_favs)?;
-        writeln!(f, "pending_total     : {}", &self.pending_total)?;
-        writeln!(f, "corpus_variable   : {}", &self.corpus_variable)?;
-        writeln!(f, "stability         : {:.2}%", &self.stability)?;
-        writeln!(f, "bitmap_cvg        : {:.2}%", &self.bitmap_cvg)?;
-        writeln!(f, "saved_crashes     : {}", &self.saved_crashes)?;
-        writeln!(f, "saved_hangs       : {}", &self.saved_hangs)?;
-        writeln!(f, "last_find         : {}", &self.last_find.as_secs())?;
-        writeln!(f, "last_crash        : {}", &self.last_crash.as_secs())?;
-        writeln!(f, "last_hang         : {}", &self.last_hang.as_secs())?;
-        writeln!(f, "execs_since_crash : {}", &self.execs_since_crash)?;
-        writeln!(f, "exec_timeout      : {}", &self.exec_timeout)?;
-        writeln!(f, "slowest_exec_ms   : {}", &self.slowest_exec_ms)?;
-        writeln!(f, "peak_rss_mb       : {}", &self.peak_rss_mb)?;
-        writeln!(f, "cpu_affinity      : {}", &self.cpu_affinity)?;
-        writeln!(f, "edges_found       : {}", &self.edges_found)?;
-        writeln!(f, "total_edges       : {}", &self.total_edges)?;
-        writeln!(f, "var_byte_count    : {}", &self.var_byte_count)?;
-        writeln!(f, "havoc_expansion   : {}", &self.havoc_expansion)?;
-        writeln!(f, "auto_dict_entries : {}", &self.auto_dict_entries)?;
-        writeln!(f, "testcache_size    : {}", &self.testcache_size)?;
-        writeln!(f, "testcache_count   : {}", &self.testcache_count)?;
-        writeln!(f, "testcache_evict   : {}", &self.testcache_evict)?;
+        writeln!(f, "start_time        : {}", self.start_time)?;
+        writeln!(f, "start_time        : {}", self.start_time)?;
+        writeln!(f, "last_update       : {}", self.last_update)?;
+        writeln!(f, "run_time          : {}", self.run_time)?;
+        writeln!(f, "fuzzer_pid        : {}", self.fuzzer_pid)?;
+        writeln!(f, "cycles_done       : {}", self.cycles_done)?;
+        writeln!(f, "cycles_wo_find    : {}", self.cycles_wo_find)?;
+        writeln!(f, "time_wo_finds     : {}", self.time_wo_finds)?;
+        writeln!(f, "fuzz_time         : {}", self.fuzz_time)?;
+        writeln!(f, "calibration_time  : {}", self.calibration_time)?;
+        writeln!(f, "sync_time         : {}", self.sync_time)?;
+        writeln!(f, "trim_time         : {}", self.trim_time)?;
+        writeln!(f, "execs_done        : {}", self.execs_done)?;
+        writeln!(f, "execs_per_sec     : {}", self.execs_per_sec)?;
+        writeln!(f, "execs_ps_last_min : {}", self.execs_ps_last_min)?;
+        writeln!(f, "corpus_count      : {}", self.corpus_count)?;
+        writeln!(f, "corpus_favored    : {}", self.corpus_favored)?;
+        writeln!(f, "corpus_found      : {}", self.corpus_found)?;
+        writeln!(f, "corpus_imported   : {}", self.corpus_imported)?;
+        writeln!(f, "max_depth         : {}", self.max_depth)?;
+        writeln!(f, "cur_item          : {}", self.cur_item)?;
+        writeln!(f, "pending_favs      : {}", self.pending_favs)?;
+        writeln!(f, "pending_total     : {}", self.pending_total)?;
+        writeln!(f, "corpus_variable   : {}", self.corpus_variable)?;
+        writeln!(f, "stability         : {:.2}%", self.stability)?;
+        writeln!(f, "bitmap_cvg        : {:.2}%", self.bitmap_cvg)?;
+        writeln!(f, "saved_crashes     : {}", self.saved_crashes)?;
+        writeln!(f, "saved_hangs       : {}", self.saved_hangs)?;
+        writeln!(f, "last_find         : {}", self.last_find.as_secs())?;
+        writeln!(f, "last_crash        : {}", self.last_crash.as_secs())?;
+        writeln!(f, "last_hang         : {}", self.last_hang.as_secs())?;
+        writeln!(f, "execs_since_crash : {}", self.execs_since_crash)?;
+        writeln!(f, "exec_timeout      : {}", self.exec_timeout)?;
+        writeln!(f, "slowest_exec_ms   : {}", self.slowest_exec_ms)?;
+        writeln!(f, "peak_rss_mb       : {}", self.peak_rss_mb)?;
+        writeln!(f, "cpu_affinity      : {}", self.cpu_affinity)?;
+        writeln!(f, "edges_found       : {}", self.edges_found)?;
+        writeln!(f, "total_edges       : {}", self.total_edges)?;
+        writeln!(f, "var_byte_count    : {}", self.var_byte_count)?;
+        writeln!(f, "havoc_expansion   : {}", self.havoc_expansion)?;
+        writeln!(f, "auto_dict_entries : {}", self.auto_dict_entries)?;
+        writeln!(f, "testcache_size    : {}", self.testcache_size)?;
+        writeln!(f, "testcache_count   : {}", self.testcache_count)?;
+        writeln!(f, "testcache_evict   : {}", self.testcache_evict)?;
         writeln!(f, "afl_banner        : {}", self.afl_banner)?;
         writeln!(f, "afl_version       : {}", self.afl_version)?;
         writeln!(f, "target_mode       : {}", self.target_mode)?;

@@ -232,7 +232,7 @@ where
             }
         };
         if self.eat_errors {
-            log::debug!("Mutation Errored: {}", &self.func);
+            log::debug!("Mutation Errored: {}", self.func);
             self.errored = true;
             if result.is_err() {
                 Ok(MutationResult::Skipped)
