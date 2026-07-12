@@ -378,13 +378,18 @@ impl Drop for Forkserver {
                 io::Error::last_os_error()
             );
             let _ = kill(forkserver_pid, Signal::SIGKILL);
-        } else if let Err(err) = waitpid(forkserver_pid, None) {
-            log::warn!(
-                "Waitpid on forkserver {} failed: {err} ({})",
-                forkserver_pid,
-                io::Error::last_os_error()
-            );
-            let _ = kill(forkserver_pid, Signal::SIGKILL);
+        } else {
+            self.ctl_pipe.close_write_end();
+            self.st_pipe.close_read_end();
+
+            if let Err(err) = waitpid(forkserver_pid, None) {
+                log::warn!(
+                    "Waitpid on forkserver {} failed: {err} ({})",
+                    forkserver_pid,
+                    io::Error::last_os_error()
+                );
+                let _ = kill(forkserver_pid, Signal::SIGKILL);
+            }
         }
     }
 }
@@ -1576,10 +1581,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::OsString;
+    use core::time::Duration;
+    use std::{ffi::OsString, path::Path, sync::mpsc, thread};
 
     use libafl_bolts::{
         AsSliceMut, StdTargetArgs,
+        rands::StdRand,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::tuple_list,
     };
@@ -1587,13 +1594,20 @@ mod tests {
 
     use crate::{
         Error,
-        corpus::NopCorpus,
+        corpus::{Corpus, InMemoryCorpus, NopCorpus, Testcase},
+        events::NopEventManager,
         executors::{
             StdChildArgs,
             forkserver::{FAILED_TO_START_FORKSERVER_MSG, ForkserverExecutor},
         },
+        feedbacks::{ConstFeedback, MaxMapFeedback},
+        fuzzer::{Fuzzer, StdFuzzer},
         inputs::BytesInput,
+        mutators::{HavocScheduledMutator, havoc_mutations},
         observers::{ConstMapObserver, HitcountsMapObserver},
+        schedulers::QueueScheduler,
+        stages::StdMutationalStage,
+        state::StdState,
     };
 
     #[test]
@@ -1640,5 +1654,93 @@ mod tests {
             }
         };
         assert!(result);
+    }
+
+    #[test]
+    #[serial]
+    #[cfg_attr(miri, ignore)]
+    fn test_forkserver_fuzz_loop_teardown_does_not_hang() {
+        const MAP_SIZE: usize = 65536;
+        const ITERS: u64 = 200;
+
+        let program = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fuzzers/forkserver/forkserver_libafl_cc/fuzzer_libafl_cc"
+        );
+        // TODO: Is there a better way to ensure this exists?
+        if !Path::new(program).is_file() {
+            eprintln!(
+                "skipping test_forkserver_fuzz_loop_teardown_does_not_hang: instrumented target not built at {program}"
+            );
+            return;
+        }
+
+        let mut shmem_provider = UnixShMemProvider::new().unwrap();
+
+        let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
+        // # Safety
+        // There's a slight chance this is racey but very unlikely in the normal use case
+        unsafe {
+            shmem.write_to_env("__AFL_SHM_ID").unwrap();
+        }
+        let shmem_buf: &mut [u8; MAP_SIZE] = shmem.as_slice_mut().try_into().unwrap();
+
+        let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
+            "shared_mem",
+            shmem_buf,
+        ));
+
+        let mut feedback = MaxMapFeedback::new(&edges_observer);
+        let mut objective = ConstFeedback::new(false);
+
+        let mut corpus = InMemoryCorpus::<BytesInput>::new();
+        corpus
+            .add(Testcase::new(BytesInput::new(b"seed".to_vec())))
+            .unwrap();
+
+        let mut state = StdState::new(
+            StdRand::with_seed(0),
+            corpus,
+            InMemoryCorpus::<BytesInput>::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
+
+        let mut mgr = NopEventManager::new();
+        let scheduler = QueueScheduler::new();
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
+        // Uses default kill signal (SIGTERM). This runtime's SIGTERM handler
+        // does not exit and does not interrupt the blocked read, so the
+        // forkserver's only option is to close the pipes in `Drop`.
+        let mut executor = ForkserverExecutor::builder()
+            .program(OsString::from(program))
+            .coverage_map_size(MAP_SIZE)
+            .shmem_provider(&mut shmem_provider)
+            .build::<BytesInput, _, _>(tuple_list!(edges_observer))
+            .expect("failed to start the forkserver against the instrumented target");
+
+        let mutator = HavocScheduledMutator::new(havoc_mutations());
+        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+
+        fuzzer
+            .fuzz_loop_for(&mut stages, &mut executor, &mut state, &mut mgr, ITERS)
+            .expect("error in the fuzzing loop");
+
+        // The teardown happens on this thread. A watchdog thread fails the
+        // whole test process if dropping the executor blocks in `waitpid`
+        // rather than returning.
+        let (tx, rx) = mpsc::channel();
+        let watchdog = thread::spawn(move || {
+            if rx.recv_timeout(Duration::from_secs(20)).is_err() {
+                eprintln!("Forkserver::drop hung");
+                std::process::exit(101); // 101 is the same as a panic.
+            }
+        });
+
+        drop(executor);
+        tx.send(()).unwrap();
+        watchdog.join().unwrap();
     }
 }

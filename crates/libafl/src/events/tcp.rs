@@ -4,7 +4,7 @@ use alloc::{sync::Arc, vec::Vec};
 use core::{marker::PhantomData, net::SocketAddr, num::NonZeroUsize, time::Duration};
 use std::{
     env,
-    io::{ErrorKind, Read, Write},
+    io::{Read, Write},
     net::{TcpListener, TcpStream, ToSocketAddrs},
 };
 
@@ -762,7 +762,8 @@ where
                         }
                     }
                 }
-                Err(e) if e.kind() == ErrorKind::WouldBlock => {
+                #[allow(clippy::std_instead_of_core)]
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     // no new data on the socket
                     break;
                 }

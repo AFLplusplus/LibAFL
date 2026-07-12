@@ -207,6 +207,7 @@ struct_field_names = "allow"        # ????
 too_many_lines = "allow"
 type_repetition_in_bounds = "allow"
 unreadable_literal = "allow"
+extra_unused_lifetimes = "allow"    # TypedBuilder derive generates unused lifetimes
 unsafe_derive_deserialize = "allow"
 used_underscore_binding = "allow"
 
