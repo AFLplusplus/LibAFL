@@ -71,7 +71,7 @@ impl SimplifyMapInput {
         }
     }
     fn measure_simplify_input(mut self) -> Vec<chrono::TimeDelta> {
-        println!("Running {}", &self.name);
+        println!("Running {}", self.name);
         let mut outs = vec![];
         println!("warm up...");
         for _ in 0..16 {
@@ -149,7 +149,7 @@ impl CovInput {
     }
 
     fn measure_cov(mut self) -> Vec<chrono::TimeDelta> {
-        println!("Running {}", &self.name);
+        println!("Running {}", self.name);
         let mut outs = vec![];
         println!("warm up...");
         for _ in 0..16 {

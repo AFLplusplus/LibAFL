@@ -16,10 +16,7 @@ use libafl_asan::{
     maps::{Maps, iterator::MapIterator},
     mmap::libc::LibcMmap,
     patch::{Patches, raw::RawPatch},
-    shadow::{
-        Shadow,
-        guest::{DefaultShadowLayout, GuestShadow},
-    },
+    shadow::{Shadow, guest::GuestShadow, layout::DefaultShadowLayout},
     symbols::{
         Symbols,
         dlsym::{DlSymSymbols, LookupTypeNext},

@@ -319,7 +319,7 @@ impl<SP: ShMemProvider> TinyInstExecutorBuilder<'_, SP> {
             return Err(Error::unknown("No input file or shmem provided"));
         }
 
-        log::info!("tinyinst args: {:#?}", &self.tinyinst_args);
+        log::info!("tinyinst args: {:#?}", self.tinyinst_args);
 
         let cur_input = InputFile::create(INPUTFILE_STD)?;
         let tinyinst = TinyInst::new(

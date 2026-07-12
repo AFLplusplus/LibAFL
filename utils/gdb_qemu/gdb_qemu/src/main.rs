@@ -30,7 +30,7 @@ fn main() -> Result<()> {
     // # Safety
     // Simple fork, not much to see.
     match unsafe { fork() } {
-        Ok(ForkResult::Parent { child: _, .. }) => {
+        Ok(ForkResult::Parent { .. }) => {
             // # Safety
             // Both fds are valid and we don't call the run fn twice.
             Parent::new(&args, a1, a2).run()?
