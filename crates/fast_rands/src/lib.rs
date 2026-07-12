@@ -195,6 +195,11 @@ pub trait Rand {
     #[inline]
     fn between(&mut self, lower_bound_incl: usize, upper_bound_incl: usize) -> usize {
         debug_assert!(lower_bound_incl <= upper_bound_incl);
+
+        if upper_bound_incl == usize::MAX && lower_bound_incl == 0 {
+            return self.next() as usize;
+        }
+
         // # Safety
         // We check that the upper_bound_incl <= lower_bound_incl above (alas only in debug), so the below is fine.
         // Even if we encounter a 0 in release here, the worst-case scenario should be an invalid return value.
