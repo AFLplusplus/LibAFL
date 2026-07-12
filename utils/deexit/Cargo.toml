@@ -24,6 +24,10 @@ categories = [
 
 [dependencies]
 
+[target.'cfg(target_os = "macos")'.dependencies]
+fishhook = { workspace = true }
+ctor = { workspace = true }
+
 [lib]
 name = "deexit"
 crate-type = ["cdylib"]

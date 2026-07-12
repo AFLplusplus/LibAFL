@@ -272,8 +272,7 @@ where
                 }
 
                 #[cfg(all(unix, feature = "std", not(miri)))]
-                if child_status == 139 {
-                    // SIGNAL_RECURSION_EXIT
+                if child_status == libafl_bolts::os::SIGNAL_RECURSION_EXIT {
                     return Err(Error::illegal_state(
                         "The fuzzer crashed inside a crash handler, this is likely a bug in fuzzer or libafl.",
                     ));

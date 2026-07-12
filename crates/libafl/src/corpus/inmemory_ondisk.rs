@@ -538,7 +538,7 @@ mod tests {
             Ok(None) => (),
             Ok(_) => panic!(
                 "File {} did not exist even though it should have?",
-                &path.display()
+                path.display()
             ),
             Err(e) => panic!("An unexpected error occurred: {e}"),
         }

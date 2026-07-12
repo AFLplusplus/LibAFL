@@ -42,7 +42,7 @@ impl NautilusChunksMetadata {
     /// Creates a new [`NautilusChunksMetadata`]
     #[must_use]
     pub fn new(work_dir: String) -> Self {
-        create_dir_all(format!("{}/outputs/chunks", &work_dir))
+        create_dir_all(format!("{work_dir}/outputs/chunks"))
             .expect("Could not create folder in workdir");
         Self {
             cks: ChunkStore::new(work_dir),

@@ -77,6 +77,26 @@ pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop
     }
 }
 
+/// De-initialize the sancov `8-bit-counters` - usually called by `llvm` when a module
+/// (e.g. a `DSO`) is unloaded. This is the counterpart to
+/// [`__sanitizer_cov_8bit_counters_init`] and removes any registered range that falls
+/// within `[start, stop)`.
+///
+/// # Safety
+/// Start and stop are being dereferenced.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_cleanup(start: *mut u8, stop: *mut u8) {
+    unsafe {
+        let counters_maps = &mut *counters_maps_ptr_mut();
+        counters_maps.retain(|existing| {
+            let existing_start = existing.as_slice().as_ptr().cast_mut();
+            let existing_stop = existing_start.add(existing.as_slice().len());
+            // keep every range that is not fully contained within the range being cleaned up
+            !(existing_start >= start && existing_stop <= stop)
+        });
+    }
+}
+
 #[cfg(feature = "observers")]
 pub use self::observers::{CountersMultiMapObserver, counters_maps_observer};
 
@@ -134,7 +154,7 @@ mod observers {
 
     /// The [`CountersMultiMapObserver`] observes all the counters that may be set by
     /// `SanitizerCoverage` in [`super::COUNTERS_MAPS`]
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
     #[expect(clippy::unsafe_derive_deserialize)]
     pub struct CountersMultiMapObserver<const DIFFERENTIAL: bool> {
         intervals: IntervalTree<usize, usize>,

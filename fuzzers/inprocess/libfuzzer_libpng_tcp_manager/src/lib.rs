@@ -53,13 +53,24 @@ pub extern "C" fn libafl_main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let monitor = libafl::monitors::SimpleMonitor::new(|s| println!("{s}"));
+    #[cfg(feature = "prometheus")]
+    let monitor = (
+        libafl::monitors::PrometheusMonitor::new("127.0.0.1:8080"),
+        libafl::monitors::SimpleMonitor::new(|s| eprintln!("{s}")),
+    );
+    #[cfg(not(feature = "prometheus"))]
+    let monitor = libafl::monitors::SimpleMonitor::new(|s| eprintln!("{s}"));
 
     libafl_bolts::SimpleStdoutLogger::set_logger().unwrap();
     log::set_max_level(log::LevelFilter::Info);
 
+    let broker_port = env::var("FUZZER_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1337);
+
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_tcp(monitor, 1337, EventConfig::AlwaysUnique) {
+        match setup_restarting_mgr_tcp(monitor, broker_port, EventConfig::AlwaysUnique) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {

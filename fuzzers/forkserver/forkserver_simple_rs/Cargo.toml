@@ -1,0 +1,33 @@
+[package]
+name = "forkserver_simple_rs"
+version = "0.16.0"
+authors = ["LibAFL team"]
+edition = "2021"
+
+[features]
+default = []
+shared_input_mem = []
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[dependencies]
+clap = { version = "4.5.18", features = ["derive"] }
+env_logger = "0.11.5"
+libafl = { path = "../../../crates/libafl", features = ["std", "derive"] }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
+  "sancov_pcguard_hitcounts",
+] }
+libc = "0.2"
+nix = { version = "0.31.2", features = ["signal"] }
+
+[[bin]]
+name = "target"
+path = "src/target.rs"

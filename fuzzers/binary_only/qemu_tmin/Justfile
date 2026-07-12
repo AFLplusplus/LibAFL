@@ -61,6 +61,8 @@ test_repro: build repro
 
 [unix]
 test:
+    #!/bin/bash
+
     ARCH=x86_64 just run_single
     ARCH=x86_64 just run_multi
     ARCH=arm just run_single

@@ -527,7 +527,7 @@ where
     fn try_from(value: EmulatorDriverResult<C>) -> Result<Self, Self::Error> {
         match value {
             EmulatorDriverResult::ReturnToClient(unhandled_qemu_exit) => {
-                Err(format!("Unhandled QEMU exit: {:?}", &unhandled_qemu_exit))
+                Err(format!("Unhandled QEMU exit: {unhandled_qemu_exit:?}"))
             }
             EmulatorDriverResult::EndOfRun(exit_kind) => Ok(exit_kind),
             EmulatorDriverResult::ShutdownRequest => {
