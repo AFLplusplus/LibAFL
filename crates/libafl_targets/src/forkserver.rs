@@ -269,6 +269,11 @@ pub struct MaybePersistentForkserverParent {
     /// This field is only touched for persistent mode to indicating
     /// whether the child is temporarily stopped or terminated
     child_stopped: bool,
+    /// Whether the target is in persistent mode. When `true`, `waitpid`
+    /// uses `WUNTRACED` so that the child's `SIGSTOP` (issued at the end
+    /// of each persistent iteration) is detected and the child can be
+    /// resumed with `SIGCONT` instead of being re-forked.
+    is_persistent: bool,
     old_sigchld_handler: Option<SigHandler>,
     old_sigterm_handler: Option<SigHandler>,
 }
@@ -283,6 +288,7 @@ impl MaybePersistentForkserverParent {
 
 impl ForkserverParent for MaybePersistentForkserverParent {
     fn pre_fuzzing(&mut self) -> Result<(), Error> {
+        self.is_persistent = std::env::var("__AFL_PERSISTENT").is_ok_and(|v| v == "1");
         let old_sigchld_handler =
             (unsafe { nix::sys::signal::signal(Signal::SIGCHLD, SigHandler::SigDfl) })
                 .inspect_err(|_| {
@@ -367,8 +373,17 @@ impl ForkserverParent for MaybePersistentForkserverParent {
     fn handle_child_requests(&mut self) -> Result<i32, Error> {
         let mut status = 0i32;
         // unwrap here: the field is assigned if we are parent process in `spawn_child`
-        if unsafe { libc::waitpid(*self.last_child_pid.as_ref().unwrap(), &raw mut status, 0) < 0 }
-        {
+        if unsafe {
+            libc::waitpid(
+                *self.last_child_pid.as_ref().unwrap(),
+                &raw mut status,
+                if self.is_persistent {
+                    libc::WUNTRACED
+                } else {
+                    0
+                },
+            ) < 0
+        } {
             return Err(Error::illegal_state("waitpid"));
         }
         if libc::WIFSTOPPED(status) {
@@ -498,5 +513,52 @@ fn start_forkserver_internal<P: ForkserverParent>(
         write_u32_to_forkserver(status as u32).inspect_err(|_| {
             log::error!("writing to afl-fuzz");
         })?;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_maybe_persistent_forkserver_parent_persistent_mode() {
+        unsafe { std::env::set_var("__AFL_PERSISTENT", "1") };
+        let mut parent = MaybePersistentForkserverParent::new();
+        parent.pre_fuzzing().unwrap();
+
+        let result = parent.spawn_child(false).unwrap();
+
+        let first_pid = match result {
+            ForkResult::Child => {
+                unsafe { libc::raise(libc::SIGSTOP) };
+                unsafe { libc::_exit(0) };
+            }
+            ForkResult::Parent(handle) => handle.pid,
+        };
+
+        let status = parent.handle_child_requests().unwrap();
+        assert!(
+            libc::WIFSTOPPED(status),
+            "handle_child_requests should detect stopped child in persistent mode"
+        );
+
+        let result2 = parent.spawn_child(false).unwrap();
+        match result2 {
+            ForkResult::Parent(handle2) => {
+                assert_eq!(
+                    handle2.pid, first_pid,
+                    "persistent mode should resume the same child, not fork a new one"
+                );
+            }
+            ForkResult::Child => {
+                panic!("persistent-mode spawn_child should not fork");
+            }
+        }
+
+        let status2 = parent.handle_child_requests().unwrap();
+        assert!(
+            libc::WIFEXITED(status2),
+            "child should exit after being resumed by SIGCONT"
+        );
     }
 }

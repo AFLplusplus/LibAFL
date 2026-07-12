@@ -69,14 +69,17 @@ pub struct TuiMonitorConfig {
 #[derive(Debug, Clone)]
 pub struct TuiMonitor {
     pub(crate) context: Arc<RwLock<TuiContext>>,
+    config: TuiMonitorConfig,
+    started: bool,
 }
 
 impl From<TuiMonitorConfig> for TuiMonitor {
     fn from(builder: TuiMonitorConfig) -> Self {
-        Self::with_time(
-            TuiUi::with_version(builder.title, builder.version, builder.enhanced_graphics),
-            current_time(),
-        )
+        Self {
+            context: Arc::new(RwLock::new(TuiContext::new(current_time()))),
+            started: false,
+            config: builder,
+        }
     }
 }
 
@@ -88,6 +91,8 @@ impl Monitor for TuiMonitor {
         event_msg: &str,
         sender_id: ClientId,
     ) -> Result<(), Error> {
+        self.ensure_started();
+
         let cur_time = current_time();
 
         // 1. Prepare global stats (no lock needed yet)
@@ -262,15 +267,23 @@ impl TuiMonitor {
         TuiMonitorConfig::builder()
     }
 
-    /// Creates the monitor with a given `start_time`.
-    #[must_use]
-    fn with_time(tui_ui: TuiUi, start_time: Duration) -> Self {
-        let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
+    /// Start the tui thread if it is not running already
+    pub fn ensure_started(&mut self) {
+        if self.started {
+            return;
+        }
 
         if let Err(e) = enable_raw_mode() {
             println!("Could not enable raw mode, TUI will be disabled: {e:?}");
-            return Self { context };
+            self.started = true;
+            return;
         }
+
+        let tui_ui = TuiUi::with_version(
+            self.config.title.clone(),
+            self.config.version.clone(),
+            self.config.enhanced_graphics,
+        );
 
         #[cfg(unix)]
         {
@@ -281,7 +294,7 @@ impl TuiMonitor {
             let stdout = unsafe { libc::dup(io::stdout().as_raw_fd()) };
             let stdout = unsafe { File::from_raw_fd(stdout) };
             run_tui_thread(
-                context.clone(),
+                self.context.clone(),
                 Duration::from_millis(250),
                 tui_ui,
                 move || stdout.try_clone().unwrap(),
@@ -290,13 +303,14 @@ impl TuiMonitor {
         #[cfg(not(unix))]
         {
             run_tui_thread(
-                context.clone(),
+                self.context.clone(),
                 Duration::from_millis(250),
                 tui_ui,
                 io::stdout,
             );
         }
-        Self { context }
+
+        self.started = true;
     }
 }
 

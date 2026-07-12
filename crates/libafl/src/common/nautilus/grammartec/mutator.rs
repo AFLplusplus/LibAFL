@@ -371,27 +371,27 @@ mod tests {
             println!("repl: {:?}", tree_mut.repl);
             println!("postfix: {:?}", tree_mut.postfix);
             println!("mutated tree: ");
-            assert!(
-                tree_mut.prefix
-                    == &[r1, r2, r3]
-                        .iter()
-                        .map(|x| RuleIdOrCustom::Rule(*x))
-                        .collect::<Vec<_>>()[..]
+            assert_eq!(
+                tree_mut.prefix,
+                &[r1, r2, r3]
+                    .iter()
+                    .map(|x| RuleIdOrCustom::Rule(*x))
+                    .collect::<Vec<_>>()[..]
             );
-            assert!(
-                tree_mut.postfix
-                    == &[r5]
-                        .iter()
-                        .map(|x| RuleIdOrCustom::Rule(*x))
-                        .collect::<Vec<_>>()[..]
+            assert_eq!(
+                tree_mut.postfix,
+                &[r5]
+                    .iter()
+                    .map(|x| RuleIdOrCustom::Rule(*x))
+                    .collect::<Vec<_>>()[..]
             );
 
-            assert!(
-                tree_mut.repl[0..3]
-                    == [r1, r2, r3]
-                        .iter()
-                        .map(|x| RuleIdOrCustom::Rule(*x))
-                        .collect::<Vec<_>>()[..]
+            assert_eq!(
+                tree_mut.repl[0..3],
+                [r1, r2, r3]
+                    .iter()
+                    .map(|x| RuleIdOrCustom::Rule(*x))
+                    .collect::<Vec<_>>()[..]
             );
             assert_eq!(tree_mut.repl.last(), Some(&RuleIdOrCustom::Rule(r5)));
             Ok(())
