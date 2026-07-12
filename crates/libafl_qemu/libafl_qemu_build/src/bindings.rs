@@ -179,12 +179,16 @@ pub fn generate(
 
     // arch specific functions
     let bindings = if cpu_target == "i386" || cpu_target == "x86_64" {
-        bindings
+        let b = bindings
             .allowlist_type("CPUX86State")
-            .allowlist_type("X86CPU")
-            // mmintrin.h has some errors, check llvm #137484.
-            // TODO: remove when fixed in llvm.
-            .clang_arg("-msse2")
+            .allowlist_type("X86CPU");
+        // mmintrin.h has some errors, check llvm #137484.
+        // TODO: remove when fixed in llvm.
+        if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
+            b.clang_arg("-msse2")
+        } else {
+            b
+        }
     } else if cpu_target == "arm" {
         bindings
             .allowlist_type("ARMCPU")

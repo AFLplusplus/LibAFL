@@ -1,12 +1,13 @@
 #!/bin/bash
 
-export AFL_DIR_NAME="./AFLplusplus-stable"
+export AFL_DIR_NAME="./AFLplusplus"
+export AFL_REV="8b15597d69f91aa0e97562401e7d5410935e665f"
 export AFL_CC_PATH="$AFL_DIR_NAME/afl-clang-fast"
 export LIBAFL_FUZZ_PATH="../target/release/libafl-fuzz"
 export LLVM_CONFIG="llvm-config-18"
 if [ ! -d "$AFL_DIR_NAME" ]; then
-	wget https://github.com/AFLplusplus/AFLplusplus/archive/refs/heads/stable.zip
-	unzip stable.zip
+	git clone https://github.com/AFLplusplus/AFLplusplus.git "$AFL_DIR_NAME"
+	git -C "$AFL_DIR_NAME" checkout "$AFL_REV"
 	cd $AFL_DIR_NAME
 	LLVM_CONFIG=$LLVM_CONFIG make 
 	cd ..

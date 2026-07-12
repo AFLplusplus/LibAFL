@@ -361,7 +361,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Serialize(s, b) => {
-                write!(f, "Error in Serialization: `{0}`", &s)?;
+                write!(f, "Error in Serialization: `{s}`")?;
                 display_error_backtrace(f, b)
             }
             Self::Compression(b) => {
@@ -369,65 +369,64 @@ impl Display for Error {
                 display_error_backtrace(f, b)
             }
             Self::EmptyOptional(s, b) => {
-                write!(f, "Optional value `{0}` was not set", &s)?;
+                write!(f, "Optional value `{s}` was not set")?;
                 display_error_backtrace(f, b)
             }
             Self::KeyNotFound(s, b) => {
-                write!(f, "Key: `{0}` - not found", &s)?;
+                write!(f, "Key: `{s}` - not found")?;
                 display_error_backtrace(f, b)
             }
             Self::KeyExists(s, b) => {
-                write!(f, "Key: `{0}` - already exists", &s)?;
+                write!(f, "Key: `{s}` - already exists")?;
                 display_error_backtrace(f, b)
             }
             Self::Empty(s, b) => {
-                write!(f, "No items in {0}", &s)?;
+                write!(f, "No items in {s}")?;
                 display_error_backtrace(f, b)
             }
             Self::IteratorEnd(s, b) => {
-                write!(f, "All elements have been processed in {0} iterator", &s)?;
+                write!(f, "All elements have been processed in {s} iterator")?;
                 display_error_backtrace(f, b)
             }
             Self::NotImplemented(s, b) => {
-                write!(f, "Not implemented: {0}", &s)?;
+                write!(f, "Not implemented: {s}")?;
                 display_error_backtrace(f, b)
             }
             Self::IllegalState(s, b) => {
-                write!(f, "Illegal state: {0}", &s)?;
+                write!(f, "Illegal state: {s}")?;
                 display_error_backtrace(f, b)
             }
             Self::IllegalArgument(s, b) => {
-                write!(f, "Illegal argument: {0}", &s)?;
+                write!(f, "Illegal argument: {s}")?;
                 display_error_backtrace(f, b)
             }
             Self::Unsupported(s, b) => {
                 write!(
                     f,
-                    "The operation is not supported on the current platform: {0}",
-                    &s
+                    "The operation is not supported on the current platform: {s}"
                 )?;
                 display_error_backtrace(f, b)
             }
             Self::ShuttingDown => write!(f, "Shutting down!"),
             #[cfg(feature = "std")]
             Self::OsError(err, s, b) => {
-                write!(f, "OS error: {0}: {1}", &s, err)?;
+                write!(f, "OS error: {s}: {err}")?;
                 display_error_backtrace(f, b)
             }
             Self::Unknown(s, b) => {
-                write!(f, "Unknown error: {0}", &s)?;
+                write!(f, "Unknown error: {s}")?;
                 display_error_backtrace(f, b)
             }
             Self::InvalidCorpus(s, b) => {
-                write!(f, "Invalid corpus: {0}", &s)?;
+                write!(f, "Invalid corpus: {s}")?;
                 display_error_backtrace(f, b)
             }
             Self::Runtime(s, b) => {
-                write!(f, "Runtime error: {0}", &s)?;
+                write!(f, "Runtime error: {s}")?;
                 display_error_backtrace(f, b)
             }
             Self::InvalidInput(s, b) => {
-                write!(f, "Encountered an invalid input: {0}", &s)?;
+                write!(f, "Encountered an invalid input: {s}")?;
                 display_error_backtrace(f, b)
             }
             Self::SkipRemainingStages => write!(f, "Skip remaining stages"),
@@ -820,5 +819,37 @@ impl<T> Truncate for &mut [T] {
             .get_mut(..len)
             .expect("Truncate with len <= len() should always work");
         let _: &mut [T] = core::mem::replace(self, truncated);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate alloc;
+    use alloc::string::ToString;
+
+    use super::*;
+
+    #[test]
+    fn test_error_display() {
+        let err = Error::serialize("test_error");
+        assert!(
+            err.to_string()
+                .starts_with("Error in Serialization: `test_error`")
+        );
+
+        let err = Error::empty_optional("test_opt");
+        assert!(
+            err.to_string()
+                .starts_with("Optional value `test_opt` was not set")
+        );
+
+        let err = Error::key_not_found("test_key");
+        assert!(err.to_string().starts_with("Key: `test_key` - not found"));
+
+        let err = Error::illegal_state("bad_state");
+        assert!(err.to_string().starts_with("Illegal state: bad_state"));
+
+        let err = Error::illegal_argument("bad_arg");
+        assert!(err.to_string().starts_with("Illegal argument: bad_arg"));
     }
 }

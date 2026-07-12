@@ -280,8 +280,7 @@ where
             File::open(tmpfile)?.read_to_end(&mut file_content)?;
             if file_content.is_empty() {
                 return Err(Error::illegal_state(format!(
-                    "Could not restore state from file {}",
-                    &filename
+                    "Could not restore state from file {filename}"
                 )));
             }
             state = &file_content;
