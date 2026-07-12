@@ -80,7 +80,7 @@ impl ClientStatsManager {
             if self
                 .sorted_client_ids
                 .last()
-                .map_or(true, |last| *last < client_id)
+                .is_none_or(|last| *last < client_id)
             {
                 self.sorted_client_ids.push(client_id);
             } else if let Err(idx) = self.sorted_client_ids.binary_search(&client_id) {

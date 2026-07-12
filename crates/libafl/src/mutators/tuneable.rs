@@ -458,6 +458,6 @@ mod test {
                 .set_mutation_probabilities(&mut state, vec![0.5, 0.0, 0.5])
                 .is_ok()
         );
-        assert!(tuneable.schedule(&mut state, &input) != 1.into());
+        assert_ne!(tuneable.schedule(&mut state, &input), 1.into());
     }
 }

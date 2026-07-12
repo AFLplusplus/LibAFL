@@ -13,7 +13,7 @@ alias cc := cxx
 [linux]
 [macos]
 libpng:
-    #!/bin/bash
+    #!/usr/bin/env bash
     if [ ! -f v1.6.37.tar.gz ]; then
         wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
     fi
@@ -35,7 +35,7 @@ cxx:
 [linux]
 [macos]
 lib: libpng cxx
-    #!/bin/bash
+    #!/usr/bin/env bash
     if [ ! -f libpng-1.6.37/.libs/libpng16.a ]; then
         cd libpng-1.6.37 && CC={{ LIBAFL_CC }} CXX={{ LIBAFL_CXX }} ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=no
     else
@@ -77,8 +77,8 @@ run: fuzzer
 
 [unix]
 setup:
-    #!/bin/bash
-    pkill -9 -f {{ FUZZER_NAME }} || true
+    #!/usr/bin/env bash
+    pkill -9 -f '(^|/){{ FUZZER_NAME }}(\.coverage|-(all|statsd|tcp|tui))?( |$)' || true
     for id in $(ipcs -m | grep $(whoami) | awk '{print $2}'); do ipcrm -m $id || true; done
     rm -rf libafl_unix_shmem_server || true
     rm -f fuzz_*.log statsd_out.log fuzzer_*.log || true
@@ -96,7 +96,7 @@ test:
 [linux]
 [macos]
 test-default: fuzzer setup
-    #!/bin/bash
+    #!/usr/bin/env bash
     echo "Testing default (no fork)..."
     rm -f fuzz_stdout.log
     # Run in background and kill as soon as we see the first corpus find.
@@ -123,7 +123,7 @@ test-default: fuzzer setup
     fi
 
     # Kill any remaining orphaned fuzzer processes
-    pkill -9 -f {{ FUZZER_NAME }} || true
+    pkill -9 -f '(^|/){{ FUZZER_NAME }}(\.coverage|-(all|statsd|tcp|tui))?( |$)' || true
 
     echo "Testing with fork..."
     rm -rf out_fork fuzz_fork_stdout.log || true
@@ -148,7 +148,7 @@ test-default: fuzzer setup
     fi
 
     # Kill orphaned background fuzzer clients from the previous test run
-    pkill -9 -f {{ FUZZER_NAME }} || true
+    pkill -9 -f '(^|/){{ FUZZER_NAME }}(\.coverage|-(all|statsd|tcp|tui))?( |$)' || true
 
     echo "Testing with fork and crash..."
     rm -rf out_fork_crash || true
@@ -226,7 +226,7 @@ fuzzer-tcp: lib cxx-tcp
 [linux]
 [macos]
 test-statsd: fuzzer-statsd setup
-    #!/bin/bash
+    #!/usr/bin/env bash
     rm -f statsd_out.log
     # Start python listener in background
     python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(('127.0.0.1', 8126)); s.settimeout(125); d=s.recv(1024); print(d)" > statsd_out.log &
@@ -248,7 +248,7 @@ test-statsd: fuzzer-statsd setup
 [linux]
 [macos]
 test-tcp-fork: fuzzer-tcp setup
-    #!/bin/bash
+    #!/usr/bin/env bash
     echo "Testing with TCP (fork)..."
     rm -rf out_tcp_fork || true
     timeout -k 10s 5s stdbuf -oL -eL ./{{ FUZZER_NAME }}-tcp --broker-port 21340 --cores 0 --input ./corpus --output ./out_tcp_fork --tcp --fork > fuzz_tcp_fork.log 2>&1 || true
@@ -262,7 +262,7 @@ test-tcp-fork: fuzzer-tcp setup
 [linux]
 [macos]
 test-tcp-no-fork: fuzzer-tcp setup
-    #!/bin/bash
+    #!/usr/bin/env bash
     echo "Testing with TCP (no fork)..."
     rm -rf out_tcp_no_fork || true
     timeout -k 10s 5s stdbuf -oL -eL ./{{ FUZZER_NAME }}-tcp --broker-port 21341 --cores 0 --input ./corpus --output ./out_tcp_no_fork --tcp > fuzz_tcp_no_fork.log 2>&1 || true
@@ -291,7 +291,7 @@ fuzzer-tui: lib cxx-tui
 [linux]
 [macos]
 test-tui: fuzzer-tui setup
-    #!/bin/bash
+    #!/usr/bin/env bash
     # Run fuzzer with TUI for a few seconds
     # verify it doesn't crash immediately
     timeout -k 10s 5s stdbuf -oL -eL ./{{ FUZZER_NAME }}-tui --broker-port 21344 --cores 0 --input ./corpus --tui > fuzzer_tui.log 2>&1 || true
@@ -320,7 +320,7 @@ fuzzer-all: lib cxx-all
 [linux]
 [macos]
 test-all: fuzzer-all setup
-    #!/bin/bash
+    #!/usr/bin/env bash
     echo "Testing all features (TCP mode)..."
     rm -rf out_all_tcp || true
     timeout -k 25s 20s stdbuf -oL -eL ./{{ FUZZER_NAME }}-all --broker-port 21350 --cores 0 --input ./corpus --output ./out_all_tcp --tcp > fuzzer_all_tcp.log 2>&1 || true
@@ -331,7 +331,7 @@ test-all: fuzzer-all setup
         exit 1
     fi
     # Kill orphaned background fuzzer clients from the TCP test run
-    pkill -9 -f {{ FUZZER_NAME }} || true
+    pkill -9 -f '(^|/){{ FUZZER_NAME }}(\.coverage|-(all|statsd|tcp|tui))?( |$)' || true
     echo "Testing all features (TUI mode)..."
     timeout -k 10s 5s stdbuf -oL -eL ./{{ FUZZER_NAME }}-all --broker-port 21351 --cores 0 --input ./corpus --tui > fuzzer_all_tui.log 2>&1 || true
     if grep -q "panic" fuzzer_all_tui.log; then
