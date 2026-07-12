@@ -5,6 +5,7 @@ use std::{
 };
 
 const AFL_URL: &str = "https://github.com/AFLplusplus/AFLplusplus";
+const AFL_REV: &str = "8b15597d69f91aa0e97562401e7d5410935e665f";
 
 fn main() {
     if cfg!(windows) {
@@ -26,6 +27,13 @@ fn main() {
         Command::new("git")
             .arg("clone")
             .arg(AFL_URL)
+            .status()
+            .unwrap();
+        Command::new("git")
+            .arg("-C")
+            .arg(&afl)
+            .arg("checkout")
+            .arg(AFL_REV)
             .status()
             .unwrap();
     }

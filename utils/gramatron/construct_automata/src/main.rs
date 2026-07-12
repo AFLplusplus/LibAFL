@@ -199,12 +199,12 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
     let mut num_transition = 0;
     let (states, finals, initial) = get_states(pda);
 
-    assert!(initial.len() == 1);
+    assert_eq!(initial.len(), 1);
 
     println!("# transitions: {}", pda.len());
     println!("# states: {}", states.len());
-    println!("initial state: {:?}", &initial);
-    println!("final states: {:?}", &finals);
+    println!("initial state: {initial:?}");
+    println!("final states: {finals:?}");
 
     let mut memoized = Vec::with_capacity(states.len());
     //let mut memoized_unique = Vec::with_capacity(states.len());
@@ -229,7 +229,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
         // log::trace!("culled_pda size: {} pda size: {}", culled_pda.len(), pda.len());
 
         let culled_finals: HashSet<usize> = finals.difference(&blocklist).copied().collect();
-        assert!(culled_finals.len() == 1);
+        assert_eq!(culled_finals.len(), 1);
 
         let culled_pda_len = culled_pda.len();
 
