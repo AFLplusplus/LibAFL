@@ -1,0 +1,30 @@
+[package]
+name = "baby_fuzzer_redqueen"
+version = "0.16.0"
+authors = ["Andrew Barbarello <andrew.barbarello@outlook.com>"]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+libafl = { path = "../../../crates/libafl/" }
+libafl_bolts = { path = "../../../crates/libafl_bolts/" }
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
+  "sancov_pcguard_edges",
+  "libfuzzer",
+  "cmplog_extended_instrumentation",
+] }
+libafl_cc = { path = "../../../crates/libafl_cc" }
+clap = { version = "4.5.18", features = ["default"] }
+
+[lib]
+name = "baby_fuzzer_redqueen"
+crate-type = ["staticlib"]

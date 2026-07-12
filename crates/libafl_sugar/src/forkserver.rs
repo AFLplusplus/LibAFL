@@ -250,14 +250,14 @@ impl ForkserverBytesCoverageSugar<'_> {
                         state.corpus().count()
                     );
                 } else {
-                    log::info!("Loading from {:?}", &self.input_dirs);
+                    log::info!("Loading from {:?}", self.input_dirs);
                     // Load from disk
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, self.input_dirs)
                         .unwrap_or_else(|err| {
                             panic!(
                                 "Failed to load initial corpus at {:?}: {err:?}",
-                                &self.input_dirs
+                                self.input_dirs
                             );
                         });
                     log::info!("We imported {} inputs from disk.", state.corpus().count());

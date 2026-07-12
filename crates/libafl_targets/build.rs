@@ -320,7 +320,7 @@ fn main() {
         libfuzzer_interceptors.cpp(true).compile("interceptors");
     }
 
-    println!("cargo:rustc-link-search=native={}", &out_dir);
+    println!("cargo:rustc-link-search=native={out_dir}");
 
     println!("cargo:rerun-if-changed=build.rs");
 }

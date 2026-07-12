@@ -479,7 +479,7 @@ mod tests {
               tests:
                 - input_value: "*)(FUZZ=*))(|"
                   match_value: "*)(FUZZ=*))(|"
-            
+
             # XSS injection tests
             # This is a minimal example that only checks for libxml2
             - name: "xss"
