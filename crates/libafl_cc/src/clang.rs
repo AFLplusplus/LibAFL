@@ -259,10 +259,18 @@ impl ToolWrapper for ClangWrapper {
 
         // Libraries needed by libafl on Windows
         #[cfg(windows)]
-        if linking {
-            new_args.push("-lws2_32".into());
-            new_args.push("-lBcrypt".into());
-            new_args.push("-lAdvapi32".into());
+        {
+            new_args.push("-fms-runtime-lib=dll".into());
+            if linking {
+                new_args.push("-lws2_32".into());
+                new_args.push("-lBcrypt".into());
+                new_args.push("-lAdvapi32".into());
+                new_args.push("-luserenv".into());
+                new_args.push("-lntdll".into());
+                new_args.push("-Wl,-force:multiple".into());
+                new_args.push("-Wl,-nodefaultlib:libcmt".into());
+                new_args.push("-Wl,-nodefaultlib:libucrt".into());
+            }
         }
         // required by timer API (timer_create, timer_settime)
         #[cfg(target_os = "linux")]

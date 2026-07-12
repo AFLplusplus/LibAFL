@@ -4,28 +4,31 @@ FUZZER_NAME := "frida_crash_repro"
 FUZZER_NAME_WIN := "frida_fuzzer.exe"
 
 set windows-shell := ['cmd.exe', '/c']
-set unstable := true
 
-[unix]
 harness:
+    {{ if os() == "windows" { "just _harness_windows" } else { "just _harness_unix" } }}
+
+_harness_unix:
     clang++ -O3 -c -fPIC harness.cc -o harness.o
     clang++ -O3 harness.o -shared -o test-harness.so
 
-[windows]
-harness:
+_harness_windows:
     cl /O2 /c harness.cc /Fo:harness.obj
     link /DLL /OUT:test-harness.dll harness.obj
 
-[unix]
-[windows]
 build:
     cargo build --profile {{ PROFILE }}
 
-[unix]
 run: build harness
+    {{ if os() == "windows" { "echo 'Windows run not implemented'" } else { "just _run_unix" } }}
+
+_run_unix:
     {{ FUZZER }} -i ./corpus -H ./test-harness.so -l ./test-harness.so
 
-[unix]
 test: build harness
+    {{ if os() == "windows" { "echo 'Windows test not implemented'" } else { "just _test_unix" } }}
+
+_test_unix:
+    #!/bin/bash
     timeout 10s {{ FUZZER }} -H ./test-harness.so -l ./test-harness.so || true
     test -n "$(ls solutions)"

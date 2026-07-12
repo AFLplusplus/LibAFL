@@ -66,8 +66,8 @@ where
                 }
                 items.extend_from_slice(&generalized[min_idx..=max_idx]);
 
-                debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
-                debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
+                debug_assert_eq!(items.first(), Some(&GeneralizedItem::Gap));
+                debug_assert_eq!(items.last(), Some(&GeneralizedItem::Gap));
 
                 return Ok(MutationResult::Mutated);
             }
@@ -85,8 +85,8 @@ where
             items.push(GeneralizedItem::Bytes(tok.clone()));
             items.push(GeneralizedItem::Gap);
 
-            debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
-            debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
+            debug_assert_eq!(items.first(), Some(&GeneralizedItem::Gap));
+            debug_assert_eq!(items.last(), Some(&GeneralizedItem::Gap));
 
             return Ok(MutationResult::Mutated);
         }
@@ -108,8 +108,8 @@ where
                 items.extend_from_slice(generalized);
             }
 
-            debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
-            debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
+            debug_assert_eq!(items.first(), Some(&GeneralizedItem::Gap));
+            debug_assert_eq!(items.last(), Some(&GeneralizedItem::Gap));
 
             Ok(MutationResult::Mutated)
         }

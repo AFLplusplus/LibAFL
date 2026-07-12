@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 LIBAFL_DIR=$(realpath "$SCRIPT_DIR/..")
@@ -48,7 +48,7 @@ if command -v just > /dev/null; then
     else
       just -q --justfile "$JUSTFILE" _check || just --unstable --fmt --justfile "$JUSTFILE" || exit 1
     fi
-  done
+  done || exit 1
 fi
 
 echo "[*] Done :)"

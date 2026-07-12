@@ -132,7 +132,7 @@ use std::backtrace::Backtrace;
 #[cfg(feature = "std")]
 use std::{
     env,
-    io::{ErrorKind, Read, Write},
+    io::{self, Read, Write},
     net::{TcpListener, TcpStream, ToSocketAddrs},
     sync::mpsc::channel,
     thread,
@@ -595,11 +595,11 @@ fn next_shmem_size(max_alloc: usize) -> usize {
 unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow_reinit: bool) {
     unsafe {
         #[cfg(feature = "llmp_debug")]
-        log::trace!("llmp_page_init: shmem {:?}", &shmem);
+        log::trace!("llmp_page_init: shmem {shmem:?}");
         let map_size = shmem.len();
         let page = shmem2page_mut(shmem);
         #[cfg(feature = "llmp_debug")]
-        log::trace!("llmp_page_init: page {:?}", &(*page));
+        log::trace!("llmp_page_init: page {:?}", *page);
 
         if !allow_reinit {
             assert!(
@@ -814,7 +814,7 @@ where
                     .launch_listener(Listener::Tcp(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
-            Err(Error::OsError(e, ..)) if e.kind() == ErrorKind::AddrInUse => {
+            Err(Error::OsError(e, ..)) if e.kind() == io::ErrorKind::AddrInUse => {
                 // We are the client :)
                 log::info!("We're the client (internal port already bound by broker, {e:#?})");
                 let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
@@ -1035,7 +1035,7 @@ where
         log::info!(
             "PID: {:#?} Initializing LlmpSender from on_existing_from_env {:#?}",
             std::process::id(),
-            &ret.id
+            ret.id
         );
         Ok(ret)
     }
@@ -1059,7 +1059,7 @@ where
         log::info!(
             "PID: {:#?} Initializing LlmpSender from on_existing_shmem {:#?}",
             std::process::id(),
-            &client_id
+            client_id
         );
         Ok(Self {
             id: client_id,
@@ -1209,7 +1209,7 @@ where
             let next_min_shmem_size = next_shmem_size((*old_map).max_alloc_size);
 
             #[cfg(feature = "llmp_debug")]
-            log::info!("Next min ShMem Size {next_min_shmem_size}",);
+            log::info!("Next min ShMem Size {next_min_shmem_size}");
 
             // Get a new shared page, or reuse an old one, if available.
             let mut new_map_shmem =
@@ -1571,7 +1571,7 @@ where
                 "Allocating {} bytes on page {:?} / map {:?} (last msg: {:?})",
                 buf_len,
                 page,
-                &map.shmem.id().as_str(),
+                map.shmem.id().as_str(),
                 last_msg
             );
 
@@ -1585,7 +1585,7 @@ where
             #[cfg(feature = "llmp_debug")]
             log::trace!(
                 "{page:?} {:?} size_used={:x} buf_len_padded={:x} EOP_MSG_SIZE={:x} size_total={}",
-                &(*page),
+                *page,
                 (*page).size_used,
                 buf_len_padded,
                 EOP_MSG_SIZE,
@@ -1832,7 +1832,7 @@ where
                     LLMP_TAG_UNSET => panic!(
                         "BUG: Read unallocated msg (tag was {:?} - msg header: {:?}",
                         LLMP_TAG_UNSET,
-                        &(*msg)
+                        (*msg)
                     ),
                     LLMP_TAG_EXITING => {
                         // The other side is done.
@@ -2084,10 +2084,10 @@ where
             assert!(
                 (*ret.page()).magic == PAGE_INITIALIZED_MAGIC,
                 "Map was not priviously initialized at {:?}",
-                &ret.shmem
+                ret.shmem
             );
             #[cfg(feature = "llmp_debug")]
-            log::info!("PAGE: {:?}", &(*ret.page()));
+            log::info!("PAGE: {:?}", *ret.page());
         }
         ret
     }
@@ -3388,7 +3388,7 @@ where
                     }
                     Err(e) => {
                         if let Error::OsError(e, ..) = e
-                            && e.kind() == ErrorKind::UnexpectedEof
+                            && e.kind() == io::ErrorKind::UnexpectedEof
                         {
                             log::info!("Broker {peer_address} seems to have disconnected, exiting");
                             return;
@@ -3779,7 +3779,7 @@ where
             Ok(stream) => stream,
             Err(e) => {
                 match e.kind() {
-                    ErrorKind::ConnectionRefused => {
+                    io::ErrorKind::ConnectionRefused => {
                         //connection refused. loop till the broker is up
                         loop {
                             if let Ok(stream) = TcpStream::connect((IP_LOCALHOST, port)) {
@@ -3939,7 +3939,7 @@ mod tests {
     use super::{
         LlmpClient,
         LlmpConnection::{self, IsBroker, IsClient},
-        Tag,
+        LlmpSharedMap, Tag,
     };
 
     #[test]
@@ -3992,5 +3992,15 @@ mod tests {
 
         // We want at least the tcp and sender clients.
         assert_eq!(broker.inner.llmp_clients.len(), 2);
+    }
+
+    #[test]
+    #[serial]
+    #[should_panic(expected = "Map was not priviously initialized at")]
+    fn test_llmp_assert_uninitialized_map() {
+        let mut shmem_provider = StdShMemProvider::new().unwrap();
+        let shmem = shmem_provider.new_shmem(1024).unwrap();
+        let map = LlmpSharedMap::existing(shmem);
+        drop(map);
     }
 }

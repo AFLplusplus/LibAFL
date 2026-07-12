@@ -1,0 +1,32 @@
+[package]
+name = "libafl_asan_layout"
+description = "Shadow memory layout definitions for LibAFL asan"
+edition = "2024"
+rust-version = "1.89"
+keywords = ["fuzzing", "address", "sanitizer", "asan"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[lib]
+name = "libafl_asan_layout"
+
+[features]
+default = []
+dynamic_layout = []
+
+[dependencies]
+
+[build-dependencies]
+build-target = "0.8.0"
+libc = "0.2.179"
+page_size = "0.6.0"
+rand = "0.9.2"
