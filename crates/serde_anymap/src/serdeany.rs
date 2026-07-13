@@ -113,12 +113,11 @@ where
 /// Creates the [`serde`] registry for serialization and deserialization of [`SerdeAny`].
 /// Each element needs to be registered so that it can be deserialized.
 pub mod serdeany_registry {
-
     use alloc::{
         boxed::Box,
         string::{String, ToString},
     };
-    use core::{any::TypeId, fmt};
+    use core::{any::TypeId, cell::RefCell, fmt};
 
     use hashbrown::{
         DefaultHashBuilder, HashMap,
@@ -126,6 +125,7 @@ pub mod serdeany_registry {
     };
     use libafl_core::{Error, format};
     use serde::{Deserialize, Serialize, de};
+    use spin::Mutex;
 
     use crate::serdeany::{
         DeserializeCallback, DeserializeCallbackSeed, SerdeAny, TypeRepr, type_repr,
@@ -153,17 +153,16 @@ pub mod serdeany_registry {
         {
             let id: TypeRepr = visitor.next_element()?.unwrap();
 
-            let registry = &raw const REGISTRY;
-            let cb = unsafe {
-                (*registry)
+            let cb = REGISTRY
+                    .lock()
+                    .borrow()
                     .deserializers
                     .as_ref()
                     .ok_or_else(||
                         de::Error::custom(super::ERR_EMPTY_TYPES_REGISTER))?
                     .get(&id)
                     .ok_or_else(|| de::Error::custom(format_args!("Cannot deserialize the unregistered type with id {id}. Enable the `serde_autoreg` feature in libafl_bolts or register all requried types manually.")))?
-                    .0
-            };
+                    .0;
             let seed = DeserializeCallbackSeed::<dyn crate::serdeany::SerdeAny> { cb };
             let obj: Self::Value = visitor.next_element_seed(seed)?.unwrap();
             Ok(obj)
@@ -208,10 +207,10 @@ pub mod serdeany_registry {
         }
     }
 
-    static mut REGISTRY: Registry = Registry {
+    static REGISTRY: Mutex<RefCell<Registry>> = Mutex::new(RefCell::new(Registry {
         deserializers: None,
         finalized: false,
-    };
+    }));
 
     /// This sugar must be used to register all the structs which
     /// have trait objects that can be serialized and deserialized in the program
@@ -221,30 +220,16 @@ pub mod serdeany_registry {
     #[expect(unused_qualifications)]
     impl RegistryBuilder {
         /// Register a given struct type for trait object (de)serialization
-        ///
-        /// # Safety
-        /// This may never be called concurrently or at the same time as `finalize`.
-        /// It dereferences the `REGISTRY` hashmap and adds the given type to it.
-        pub unsafe fn register<T>()
+        pub fn register<T>()
         where
             T: crate::serdeany::SerdeAny + Serialize + serde::de::DeserializeOwned,
         {
-            let registry = &raw mut REGISTRY;
-            unsafe {
-                (*registry).register::<T>();
-            }
+            REGISTRY.lock().borrow_mut().register::<T>();
         }
 
         /// Finalize the registry, no more registrations are allowed after this call
-        ///
-        /// # Safety
-        /// This may never be called concurrently or at the same time as `register`.
-        /// It dereferences the `REGISTRY` hashmap and adds the given type to it.
-        pub unsafe fn finalize() {
-            let registry = &raw mut REGISTRY;
-            unsafe {
-                (*registry).finalize();
-            }
+        pub fn finalize() {
+            REGISTRY.lock().borrow_mut().finalize();
         }
     }
 
@@ -380,16 +365,15 @@ pub mod serdeany_registry {
             #[cfg(not(feature = "stable_anymap"))]
             let type_repr = &type_repr;
 
-            let registry = &raw const REGISTRY;
             assert!(
-                unsafe {
-                    (*registry)
-                        .deserializers
-                        .as_ref()
-                        .expect(super::ERR_EMPTY_TYPES_REGISTER)
-                        .get(type_repr)
-                        .is_some()
-                },
+                REGISTRY
+                    .lock()
+                    .borrow()
+                    .deserializers
+                    .as_ref()
+                    .expect(super::ERR_EMPTY_TYPES_REGISTER)
+                    .get(type_repr)
+                    .is_some(),
                 "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serdeany_autoreg.",
                 core::any::type_name::<T>(),
                 core::any::type_name::<T>()
@@ -667,16 +651,15 @@ pub mod serdeany_registry {
             let type_repr = type_repr::<T>();
             #[cfg(not(feature = "stable_anymap"))]
             let type_repr = &type_repr;
-            let registry = &raw const REGISTRY;
             assert!(
-                unsafe {
-                    (*registry)
-                        .deserializers
-                        .as_ref()
-                        .expect(super::ERR_EMPTY_TYPES_REGISTER)
-                        .get(type_repr)
-                        .is_some()
-                },
+                REGISTRY
+                    .lock()
+                    .borrow()
+                    .deserializers
+                    .as_ref()
+                    .expect(super::ERR_EMPTY_TYPES_REGISTER)
+                    .get(type_repr)
+                    .is_some(),
                 "Type {} was inserted without registration! Call RegistryBuilder::register::<{}>() or use serdeany_autoreg.",
                 core::any::type_name::<T>(),
                 core::any::type_name::<T>()
@@ -852,12 +835,8 @@ macro_rules! create_register {
         $crate::ctor::declarative::ctor! {
             /// Automatically register this type
             #[ctor(anonymous)]
-            unsafe fn register() {
-                // # Safety
-                // This `register` call will always run at startup and never in parallel.
-                unsafe {
-                    $crate::serdeany::RegistryBuilder::register::<$struct_type>();
-                }
+            fn register() {
+                $crate::serdeany::RegistryBuilder::register::<$struct_type>();
             }
         }
     };
@@ -889,9 +868,7 @@ macro_rules! create_manual_register {
 #[macro_export]
 macro_rules! create_manual_register {
     ($struct_type:ty) => {
-        unsafe {
-            $crate::serdeany::RegistryBuilder::register::<$struct_type>();
-        }
+        $crate::serdeany::RegistryBuilder::register::<$struct_type>();
     };
 }
 
@@ -926,10 +903,7 @@ macro_rules! impl_serdeany {
         impl< $( $lt $( : $clt $(+ $dlt )* )? ),+ > $struct_name < $( $lt ),+ > {
 
             /// Manually register this type at a later point in time
-            ///
-            /// # Safety
-            /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
-            pub unsafe fn register() {
+            pub fn register() {
                 $(
                     $crate::create_manual_register!($struct_name < $( $opt ),+ >);
                 )*
@@ -971,7 +945,7 @@ macro_rules! impl_serdeany {
             /// # Safety
             /// This may never be called concurrently as it dereferences the `RegistryBuilder` without acquiring a lock.
             #[expect(unused)]
-            pub unsafe fn register() {
+            pub fn register() {
                 $crate::create_manual_register!($struct_name);
             }
         }
@@ -1000,10 +974,8 @@ mod tests {
 
     #[test]
     fn test_deserialize_serialize() {
-        unsafe {
-            RegistryBuilder::register::<MyType>();
-            RegistryBuilder::register::<inner::MyType>();
-        }
+        RegistryBuilder::register::<MyType>();
+        RegistryBuilder::register::<inner::MyType>();
 
         let val = MyType(1);
         let serialized = postcard::to_allocvec(&val).unwrap();
