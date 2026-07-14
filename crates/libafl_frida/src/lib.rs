@@ -432,6 +432,7 @@ mod tests {
                 ),
                 ("malloc_heap_uaf_write", Some("heap use-after-free write")),
                 ("malloc_heap_uaf_read", Some("heap use-after-free read")),
+                ("rep_movsb_overflow_check", Some("heap out-of-bounds read")),
                 (
                     "heap_oob_memcpy_read",
                     Some("function arg resulting in bad read"),
