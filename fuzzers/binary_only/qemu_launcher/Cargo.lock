@@ -8,11 +8,20 @@ version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5d307320b3181d6d7954e663bd7c774a838b8220fe0593c86d9fb09f498b4b"
 dependencies = [
+ "gimli 0.32.3",
+]
+
+[[package]]
+name = "addr2line"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59317f77929f0e679d39364702289274de2f0f0b22cbf50b2b8cff2169a0b27a"
+dependencies = [
  "cpp_demangle",
  "fallible-iterator",
- "gimli",
+ "gimli 0.33.0",
  "memmap2",
- "object 0.37.3",
+ "object 0.39.1",
  "rustc-demangle",
  "smallvec",
  "typed-arena",
@@ -127,12 +136,6 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "arbitrary-int"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "825297538d77367557b912770ca3083f778a196054b3ee63b22673c4a3cae0a5"
-
-[[package]]
-name = "arbitrary-int"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "993a810118f8f37e9c4411c86f1c4c940a09a7ab34b7bf2d88d06f50c553fab7"
@@ -161,7 +164,7 @@ version = "0.3.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb531853791a215d7c62a30daf0dde835f381ab5de4589cfe7c649d2cbe92bd6"
 dependencies = [
- "addr2line",
+ "addr2line 0.25.1",
  "cfg-if",
  "libc",
  "miniz_oxide 0.8.9",
@@ -212,11 +215,10 @@ dependencies = [
 
 [[package]]
 name = "bitbybit"
-version = "1.4.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec187a89ab07e209270175faf9e07ceb2755d984954e58a2296e325ddece2762"
+checksum = "71d2a3353d70ac1091a33cbf31fc7e77b19091538a7e306e3740712af19807ca"
 dependencies = [
- "arbitrary-int 1.3.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -293,22 +295,6 @@ name = "bytemuck"
 version = "1.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec"
-
-[[package]]
-name = "bytes"
-version = "1.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
-
-[[package]]
-name = "bytes-utils"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dafe3a8757b027e2be6e4e5601ed563c55989fcf1546e933c66c8eb3a058d35"
-dependencies = [
- "bytes",
- "either",
-]
 
 [[package]]
 name = "camino"
@@ -603,9 +589,9 @@ dependencies = [
 
 [[package]]
 name = "cpp_demangle"
-version = "0.4.5"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2bb79cb74d735044c972aae58ed0aaa9a837e85b01106a54c39e42e97f62253"
+checksum = "0667304c32ea56cb4cd6d2d7c0cfe9a2f8041229db8c033af7f8d69492429def"
 dependencies = [
  "cfg-if",
 ]
@@ -701,19 +687,20 @@ dependencies = [
 
 [[package]]
 name = "ctor"
-version = "0.6.3"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "424e0138278faeb2b401f174ad17e715c829512d74f3d1e81eb43365c2e0590e"
+checksum = "83cf0d42651b16c6dfe68685716d18480d18a9c39c62d76e8cf3eb6ed5d8bcbf"
 dependencies = [
  "ctor-proc-macro",
  "dtor",
+ "link-section",
 ]
 
 [[package]]
 name = "ctor-proc-macro"
-version = "0.0.7"
+version = "0.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52560adf09603e58c9a7ee1fe1dcb95a16927b17c127f0ac02d6e768a0e25bc1"
+checksum = "7a949c44fcacbbbb7ada007dc7acb34603dd97cd47de5d054f2b6493ecebb483"
 
 [[package]]
 name = "ctrlc"
@@ -722,7 +709,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0b1fab2ae45819af2d0731d60f2afe17227ebb1a1538a236da84c93e9a60162"
 dependencies = [
  "dispatch2",
- "nix 0.31.2",
+ "nix",
  "windows-sys 0.61.2",
 ]
 
@@ -939,18 +926,18 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "dtor"
-version = "0.1.1"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "404d02eeb088a82cfd873006cb713fe411306c7d182c344905e101fb1167d301"
+checksum = "edf234dd1594d6dd434a8fb8cada51ddbbc593e40e4a01556a0b31c62da2775b"
 dependencies = [
  "dtor-proc-macro",
 ]
 
 [[package]]
 name = "dtor-proc-macro"
-version = "0.0.6"
+version = "0.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f678cf4a922c215c63e0de95eb1ff08a958a81d47e485cf9da1e27bf6305cfa5"
+checksum = "2647271c92754afcb174e758003cfd1cbf1e43e5a7853d7b1813e63e19e39a73"
 
 [[package]]
 name = "edit-distance"
@@ -1053,7 +1040,7 @@ dependencies = [
  "libafl_core",
  "libc",
  "log",
- "nix 0.30.1",
+ "nix",
  "num_enum",
  "rustversion",
  "windows 0.62.2",
@@ -1077,12 +1064,13 @@ dependencies = [
 
 [[package]]
 name = "fastbloom"
-version = "0.14.1"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e7f34442dbe69c60fe8eaf58a8cafff81a1f278816d8ab4db255b3bef4ac3c4"
+checksum = "ef975e30683b2d965054bb0a836f8973857c4ebf6acf274fe46617cd285060d8"
 dependencies = [
- "getrandom 0.3.4",
+ "foldhash 0.2.0",
  "libm",
+ "portable-atomic",
  "siphasher",
 ]
 
@@ -1209,8 +1197,13 @@ name = "gimli"
 version = "0.32.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
+
+[[package]]
+name = "gimli"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bf7f043f89559805f8c7cacc432749b2fa0d0a0a9ee46ce47164ed5ba7f126c"
 dependencies = [
- "fallible-iterator",
  "stable_deref_trait",
 ]
 
@@ -1258,6 +1251,17 @@ name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
+dependencies = [
+ "allocator-api2",
+ "equivalent",
+ "foldhash 0.2.0",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "allocator-api2",
  "equivalent",
@@ -1573,7 +1577,7 @@ dependencies = [
  "is_executable",
  "lexiclean",
  "libc",
- "nix 0.31.2",
+ "nix",
  "num_cpus",
  "percent-encoding",
  "rand",
@@ -1622,7 +1626,7 @@ name = "libafl"
 version = "0.16.0"
 dependencies = [
  "ahash",
- "arbitrary-int 2.1.1",
+ "arbitrary-int",
  "backtrace",
  "bincode",
  "bitbybit",
@@ -1631,7 +1635,7 @@ dependencies = [
  "crossterm",
  "fastbloom",
  "fs2",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl_bolts",
  "libafl_core",
  "libafl_derive",
@@ -1640,7 +1644,7 @@ dependencies = [
  "ll_mp",
  "log",
  "meminterval",
- "nix 0.30.1",
+ "nix",
  "no_std_time",
  "num-traits",
  "postcard",
@@ -1670,7 +1674,7 @@ dependencies = [
  "erased-serde",
  "exceptional",
  "fast_rands",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "hostname",
  "libafl_core",
  "libafl_derive",
@@ -1680,10 +1684,9 @@ dependencies = [
  "mach2",
  "minibsod",
  "miniz_oxide 0.9.1",
- "nix 0.30.1",
+ "nix",
  "no_std_time",
  "nonzero_macros",
- "num_enum",
  "ownedref",
  "postcard",
  "rustversion",
@@ -1694,7 +1697,6 @@ dependencies = [
  "static_assertions",
  "tuple_list",
  "tuple_list_ex",
- "typeid",
  "uds",
  "wide",
  "winapi",
@@ -1708,7 +1710,7 @@ name = "libafl_core"
 version = "0.16.0"
 dependencies = [
  "backtrace",
- "nix 0.30.1",
+ "nix",
  "nonzero_macros",
  "postcard",
  "rustversion",
@@ -1729,13 +1731,12 @@ dependencies = [
 name = "libafl_qemu"
 version = "0.16.0"
 dependencies = [
- "addr2line",
- "bytes-utils",
+ "addr2line 0.26.1",
  "capstone",
  "enum-map",
  "getset",
  "goblin",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "just",
  "libafl",
  "libafl_bolts",
@@ -1755,8 +1756,8 @@ dependencies = [
  "rustversion",
  "serde",
  "serde_yaml",
- "strum 0.27.2",
- "strum_macros 0.27.2",
+ "strum 0.28.0",
+ "strum_macros 0.28.0",
  "syscall-numbers",
  "thread_local",
  "toml",
@@ -1785,8 +1786,8 @@ dependencies = [
  "num_enum",
  "paste",
  "rustversion",
- "strum 0.27.2",
- "strum_macros 0.27.2",
+ "strum 0.28.0",
+ "strum_macros 0.28.0",
 ]
 
 [[package]]
@@ -1796,13 +1797,13 @@ dependencies = [
  "bindgen",
  "cc",
  "fast_rands",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl",
  "libafl_bolts",
  "libafl_core",
  "libc",
  "log",
- "nix 0.30.1",
+ "nix",
  "ownedref",
  "rangemap",
  "rustversion",
@@ -1845,16 +1846,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
-name = "libmimalloc-sys"
-version = "0.1.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "667f4fec20f29dfc6bc7357c582d91796c169ad7e2fce709468aefeb2c099870"
-dependencies = [
- "cc",
- "libc",
-]
-
-[[package]]
 name = "libredox"
 version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1893,6 +1884,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "link-section"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b685d66585d646efe09fec763d796c291049c8b6bf84e04954bffc8748341f0d"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1919,7 +1916,7 @@ dependencies = [
  "libafl_core",
  "log",
  "miniz_oxide 0.9.1",
- "nix 0.30.1",
+ "nix",
  "no_std_time",
  "postcard",
  "rustversion",
@@ -1994,15 +1991,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mimalloc"
-version = "0.1.48"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1ee66a4b64c74f4ef288bcbb9192ad9c3feaad75193129ac8509af543894fd8"
-dependencies = [
- "libmimalloc-sys",
-]
-
-[[package]]
 name = "minibsod"
 version = "0.16.0"
 dependencies = [
@@ -2052,19 +2040,6 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.30.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
-dependencies = [
- "bitflags",
- "cfg-if",
- "cfg_aliases",
- "libc",
- "memoffset",
-]
-
-[[package]]
-name = "nix"
 version = "0.31.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d6d0705320c1e6ba1d912b5e37cf18071b6c2e9b7fa8215a1e8a7651966f5d3"
@@ -2073,6 +2048,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -2201,9 +2177,7 @@ version = "0.37.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff76201f031d8863c38aa7f905eca4f53abbfa15f609db4277d44cd8938f33fe"
 dependencies = [
- "flate2",
  "memchr",
- "ruzstd",
 ]
 
 [[package]]
@@ -2211,6 +2185,17 @@ name = "object"
 version = "0.38.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "271638cd5fa9cca89c4c304675ca658efc4e64a66c716b7cfe1afb4b9611dbbc"
+dependencies = [
+ "flate2",
+ "memchr",
+ "ruzstd",
+]
+
+[[package]]
+name = "object"
+version = "0.39.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e5a6c098c7a3b6547378093f5cc30bc54fd361ce711e05293a5cc589562739b"
 dependencies = [
  "flate2",
  "memchr",
@@ -2394,12 +2379,10 @@ dependencies = [
  "libafl_qemu",
  "libafl_targets",
  "log",
- "mimalloc",
  "rangemap",
  "readonly",
  "scudo",
  "typed-builder 0.20.1",
- "vergen",
  "vergen-git2",
 ]
 
@@ -2753,10 +2736,9 @@ dependencies = [
 name = "serde_anymap"
 version = "0.16.0"
 dependencies = [
- "ahash",
  "ctor",
  "erased-serde",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl_core",
  "postcard",
  "rustversion",
@@ -2880,11 +2862,11 @@ name = "shmem_providers"
 version = "0.16.0"
 dependencies = [
  "fast_rands",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "libafl_core",
  "libc",
  "log",
- "nix 0.30.1",
+ "nix",
  "postcard",
  "rustversion",
  "serde",

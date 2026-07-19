@@ -11,17 +11,17 @@ runs:
           gcc-arm-linux-gnueabi g++-arm-linux-gnueabi cmake
     - name: Remove old rust
       shell: bash
-      run: sudo apt purge -y 'rust*' 'cargo*'
+      run: sudo apt purge -y 'rust*' 'cargo*' 'rustup*'
     - uses: dtolnay/rust-toolchain@stable
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - name: install just
-      uses: extractions/setup-just@v3
-    - uses: actions/checkout@v4
+      uses: extractions/setup-just@v4
+    - uses: actions/checkout@v5
       with:
         submodules: true
         fetch-depth: 0
-    - uses: ./.github/workflows/ubuntu-prepare
+    - uses: ./.github/actions/ubuntu-prepare
     - uses: Swatinem/rust-cache@v2
       with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }

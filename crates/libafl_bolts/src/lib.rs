@@ -252,7 +252,7 @@ pub fn format_big_number(val: u64) -> String {
         .rev()
         .enumerate()
         .fold(String::new(), |mut acc, (i, c)| {
-            if i > 0 && i % 3 == 0 {
+            if i > 0 && i.is_multiple_of(3) {
                 acc.push(',');
             }
             acc.push(c);
