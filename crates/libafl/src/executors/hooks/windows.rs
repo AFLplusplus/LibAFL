@@ -462,7 +462,7 @@ pub mod windows_exception_handler {
                     event_mgr,
                     ExitKind::Crash,
                 );
-                {
+                if unsafe { GLOBAL_STATE.crashdump } {
                     let mut bsod = Vec::new();
                     {
                         let mut writer = std::io::BufWriter::new(&mut bsod);

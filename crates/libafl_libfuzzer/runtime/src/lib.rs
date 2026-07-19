@@ -466,6 +466,7 @@ macro_rules! fuzz_with {
                     &mut state,
                     &mut mgr,
                     $options.timeout(),
+                    false,
                 )?;
 
             // In case the corpus is empty (on first run) or crashed while loading, reset

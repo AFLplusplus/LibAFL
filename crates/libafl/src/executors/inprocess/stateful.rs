@@ -185,6 +185,7 @@ where
             state,
             event_mgr,
             timeout,
+            true,
         )?;
 
         Ok(Self {
@@ -272,7 +273,7 @@ where
         Z: HasObjective<Objective = OF>,
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
-            user_hooks, observers, fuzzer, state, event_mgr, timeout,
+            user_hooks, observers, fuzzer, state, event_mgr, timeout, true,
         )?;
 
         Ok(Self {
