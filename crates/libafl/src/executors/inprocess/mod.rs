@@ -152,6 +152,7 @@ where
             state,
             event_mgr,
             Duration::from_secs(5),
+            true,
         )
     }
 
@@ -170,6 +171,7 @@ where
         state: &mut S,
         event_mgr: &mut EM,
         timeout: Duration,
+        crashdump: bool,
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
@@ -183,6 +185,7 @@ where
             state,
             event_mgr,
             timeout,
+            crashdump,
         )?;
 
         Ok(Self {
@@ -224,6 +227,7 @@ where
             state,
             event_mgr,
             Duration::from_secs(5),
+            true,
         )
     }
 
@@ -235,6 +239,7 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
+    #[allow(clippy::too_many_arguments)]
     pub fn with_timeout_generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
@@ -243,6 +248,7 @@ where
         state: &mut S,
         event_mgr: &mut EM,
         timeout: Duration,
+        crashdump: bool,
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I, S> + EventRestarter<S>,
@@ -250,7 +256,7 @@ where
         Z: HasObjective<Objective = OF>,
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
-            user_hooks, observers, fuzzer, state, event_mgr, timeout,
+            user_hooks, observers, fuzzer, state, event_mgr, timeout, crashdump,
         )?;
 
         Ok(Self {

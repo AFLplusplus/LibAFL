@@ -157,6 +157,7 @@ where
             state,
             event_mgr,
             Duration::from_secs(5),
+            true,
         )
     }
 
@@ -175,6 +176,7 @@ where
         state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
+        crashdump: bool,
     ) -> Result<Self, Error>
     where
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
@@ -188,6 +190,12 @@ where
         let default = InProcessHooks::new::<E, EM, OF, Z>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
         hooks.init_all(state);
+
+        // # Safety
+        // No other threads should be accessing GLOBAL_STATE at construction time.
+        unsafe {
+            GLOBAL_STATE.crashdump = crashdump;
+        }
 
         #[cfg(windows)]
         // Some initialization necessary for windows.
