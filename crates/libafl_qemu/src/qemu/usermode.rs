@@ -5,26 +5,26 @@ use std::{
     str::from_utf8_unchecked_mut,
 };
 
-use crate::{QemuExitError, QemuExitReason, QemuShutdownCause};
-use crate::qemu::transmute;
-
 use libafl_bolts::{Error, os::unix_signals::Signal};
 #[cfg(not(feature = "systemmode"))]
 use libafl_qemu_sys::libafl_qemu_run;
 use libafl_qemu_sys::{
     GuestAbiUlong, GuestAddr, IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
-    libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_set_brk,
-    mmap_next_start, pageflags_get_root, read_self_maps,
+    libafl_get_exit_reason, libafl_get_initial_brk, libafl_load_addr, libafl_maps_first,
+    libafl_maps_next, libafl_qemu_run_single_cpu, libafl_set_brk, mmap_next_start,
+    pageflags_get_root, read_self_maps,
 };
-use libafl_qemu_sys::{libafl_get_exit_reason, libafl_qemu_run_single_cpu};
 use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
 use pyo3::{IntoPyObject, Py, PyRef, PyRefMut, Python, pyclass, pymethods};
 
 #[cfg(all(doc, not(feature = "hexagon")))]
 use crate::modules::SnapshotModule;
-use crate::{CPU, Qemu, qemu::QEMU_IS_RUNNING};
+use crate::{
+    CPU, Qemu, QemuExitError, QemuExitReason, QemuShutdownCause,
+    qemu::{QEMU_IS_RUNNING, transmute},
+};
 
 /// Choose how QEMU target signals should be handled.
 /// It's main use is to describe how crashes and timeouts should be treated.
@@ -517,34 +517,55 @@ impl Qemu {
             let exit_reason: &mut libafl_qemu_sys::libafl_exit_reason =
                 unsafe { transmute(&mut *exit_reason) };
             Ok(match exit_reason.kind {
-                  libafl_qemu_sys::libafl_exit_reason_kind_INTERNAL => unsafe {
-                      let qemu_shutdown_cause: QemuShutdownCause = match exit_reason.data.internal.cause {
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_NONE => QemuShutdownCause::None,
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_ERROR => QemuShutdownCause::HostError,
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_QMP_QUIT => QemuShutdownCause::HostQmpQuit,
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_QMP_SYSTEM_RESET => QemuShutdownCause::HostQmpSystemReset,
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_SIGNAL => {
-                              QemuShutdownCause::HostSignal(
-                                  Signal::try_from(exit_reason.data.internal.signal).unwrap(),
-                              )
-                          }
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_UI => QemuShutdownCause::HostUi,
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_GUEST_SHUTDOWN => QemuShutdownCause::GuestShutdown,
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_GUEST_RESET => QemuShutdownCause::GuestReset,
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_GUEST_PANIC => QemuShutdownCause::GuestPanic,
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_SUBSYSTEM_RESET => QemuShutdownCause::SubsystemReset,
-                          libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_SNAPSHOT_LOAD => QemuShutdownCause::SnapshotLoad,
-                          _ => panic!("shutdown cause not handled."),
-                      };
-                      QemuExitReason::End(qemu_shutdown_cause)
-                  },
-                  libafl_qemu_sys::libafl_exit_reason_kind_BREAKPOINT => unsafe {
-                      let bp_addr = exit_reason.data.breakpoint.addr;
-                      QemuExitReason::Breakpoint(bp_addr)
-                  },
-                  libafl_qemu_sys::libafl_exit_reason_kind_CUSTOM_INSN => QemuExitReason::SyncExit,
-                  libafl_qemu_sys::libafl_exit_reason_kind_CRASH => QemuExitReason::Crash,
-                  _ => return Err(QemuExitError::UnknownKind),
+                libafl_qemu_sys::libafl_exit_reason_kind_INTERNAL => unsafe {
+                    let qemu_shutdown_cause: QemuShutdownCause =
+                        match exit_reason.data.internal.cause {
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_NONE => {
+                                QemuShutdownCause::None
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_ERROR => {
+                                QemuShutdownCause::HostError
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_QMP_QUIT => {
+                                QemuShutdownCause::HostQmpQuit
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_QMP_SYSTEM_RESET => {
+                                QemuShutdownCause::HostQmpSystemReset
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_SIGNAL => {
+                                QemuShutdownCause::HostSignal(
+                                    Signal::try_from(exit_reason.data.internal.signal).unwrap(),
+                                )
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_HOST_UI => {
+                                QemuShutdownCause::HostUi
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_GUEST_SHUTDOWN => {
+                                QemuShutdownCause::GuestShutdown
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_GUEST_RESET => {
+                                QemuShutdownCause::GuestReset
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_GUEST_PANIC => {
+                                QemuShutdownCause::GuestPanic
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_SUBSYSTEM_RESET => {
+                                QemuShutdownCause::SubsystemReset
+                            }
+                            libafl_qemu_sys::ShutdownCause_SHUTDOWN_CAUSE_SNAPSHOT_LOAD => {
+                                QemuShutdownCause::SnapshotLoad
+                            }
+                            _ => panic!("shutdown cause not handled."),
+                        };
+                    QemuExitReason::End(qemu_shutdown_cause)
+                },
+                libafl_qemu_sys::libafl_exit_reason_kind_BREAKPOINT => unsafe {
+                    let bp_addr = exit_reason.data.breakpoint.addr;
+                    QemuExitReason::Breakpoint(bp_addr)
+                },
+                libafl_qemu_sys::libafl_exit_reason_kind_CUSTOM_INSN => QemuExitReason::SyncExit,
+                libafl_qemu_sys::libafl_exit_reason_kind_CRASH => QemuExitReason::Crash,
+                _ => return Err(QemuExitError::UnknownKind),
             })
         }
     }
