@@ -505,7 +505,9 @@ impl Qemu {
     #[allow(dead_code)]
     pub unsafe fn run_single_cpu(&self, cpu: CPU) -> Result<QemuExitReason, QemuExitError> {
         unsafe {
+            QEMU_IS_RUNNING = true;
             libafl_qemu_run_single_cpu(cpu.raw_ptr());
+            QEMU_IS_RUNNING = false;
         }
 
         let exit_reason = unsafe { libafl_get_exit_reason() };
