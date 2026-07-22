@@ -595,16 +595,18 @@ pub mod pybind {
 
     extern "C" fn py_syscall_hook_wrapper(
         _data: u64,
-        sys_num: i32,
-        a0: GuestUlong,
-        a1: GuestUlong,
-        a2: GuestUlong,
-        a3: GuestUlong,
-        a4: GuestUlong,
-        a5: GuestUlong,
-        a6: GuestUlong,
-        a7: GuestUlong,
+        sys_num: *mut i32,
+        a0: *mut GuestUlong,
+        a1: *mut GuestUlong,
+        a2: *mut GuestUlong,
+        a3: *mut GuestUlong,
+        a4: *mut GuestUlong,
+        a5: *mut GuestUlong,
+        a6: *mut GuestUlong,
+        a7: *mut GuestUlong,
     ) -> hooks::SyscallHookResult {
+        let (sys_num, a0, a1, a2, a3, a4, a5, a6, a7) =
+            unsafe { (*sys_num, *a0, *a1, *a2, *a3, *a4, *a5, *a6, *a7) };
         unsafe { (&raw const PY_SYSCALL_HOOK).read() }.map_or_else(
             || hooks::SyscallHookResult::Run,
             |obj| {
