@@ -176,7 +176,9 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        Self::with_timeout_and_crashdump::<OF>(harness_fn, observers, fuzzer, state, event_mgr, timeout, true)
+        Self::with_timeout_and_crashdump::<OF>(
+            harness_fn, observers, fuzzer, state, event_mgr, timeout, true,
+        )
     }
 
     /// Create a new in mem executor, explicitly choosing whether a crash dump
