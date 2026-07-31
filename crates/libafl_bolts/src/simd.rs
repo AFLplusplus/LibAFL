@@ -221,9 +221,9 @@ pub trait VectorType {
     /// Collect novelties. We pass in base to avoid redo calculate for novelties indice.
     fn novelties(hist: &[u8], map: &[u8], base: usize, novelties: &mut Vec<usize>);
 
-    /// Do blending
+    /// Do select
     #[must_use]
-    fn blend(self, lhs: Self, rhs: Self) -> Self;
+    fn select(self, lhs: Self, rhs: Self) -> Self;
 
     /// Test lane-wise equality.
     #[must_use]
@@ -255,9 +255,8 @@ impl VectorType for wide::u8x16 {
         }
     }
 
-    fn blend(self, lhs: Self, rhs: Self) -> Self {
-        #[allow(deprecated)]
-        self.blend(lhs, rhs)
+    fn select(self, lhs: Self, rhs: Self) -> Self {
+        self.select(lhs, rhs)
     }
 
     fn simd_eq(self, rhs: Self) -> Self {
@@ -301,9 +300,8 @@ impl VectorType for wide::u8x32 {
         }
     }
 
-    fn blend(self, lhs: Self, rhs: Self) -> Self {
-        #[allow(deprecated)]
-        self.blend(lhs, rhs)
+    fn select(self, lhs: Self, rhs: Self) -> Self {
+        self.select(lhs, rhs)
     }
 
     fn simd_eq(self, rhs: Self) -> Self {
@@ -340,7 +338,7 @@ where
         let mp = V::from_slice(&map[i..]);
 
         let mask = mp.simd_eq(V::ZERO);
-        let out = mask.blend(lhs, rhs);
+        let out = mask.select(lhs, rhs);
         map[i..i + V::N].copy_from_slice(out.as_slice());
     }
 
