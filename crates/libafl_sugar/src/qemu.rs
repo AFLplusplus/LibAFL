@@ -355,6 +355,7 @@ where
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
                     }
+
                     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
                     // Setup a basic mutator
@@ -375,6 +376,7 @@ where
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
                     }
+
                     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             } else {
@@ -473,6 +475,7 @@ where
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
                     }
+
                     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
                     // Setup a basic mutator
@@ -493,6 +496,7 @@ where
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
                     }
+
                     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             }
