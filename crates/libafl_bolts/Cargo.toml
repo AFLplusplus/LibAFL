@@ -146,10 +146,10 @@ simd = ["alloc", "wide"]
 rustversion = { workspace = true }
 
 [dev-dependencies]
-clap = { version = "4.5", features = ["derive", "env"] }
-rand = "0.9.0"
-chrono = "0.4.43"
-itertools = "0.14.0"
+clap = { version = "4.6", features = ["derive", "env"] }
+rand = "0.10.2"
+chrono = "0.4.45"
+itertools = "0.15.0"
 
 [dependencies]
 build_id2 = { workspace = true, optional = true }
@@ -180,7 +180,7 @@ hashbrown = { workspace = true, features = [
   "default-hasher",
   "raw-entry",
 ], default-features = false, optional = true } # A faster hashmap, nostd compatible
-xxhash-rust = { version = "0.8.12", features = [
+xxhash-rust = { version = "0.8.18", features = [
   "xxh3",
 ], optional = true } # xxh3 hashing for rust
 serde = { workspace = true, default-features = false, features = [
@@ -188,8 +188,8 @@ serde = { workspace = true, default-features = false, features = [
 ] } # serialization lib
 postcard = { workspace = true, optional = true } # no_std compatible serde serialization format
 
-ctor = { optional = true, version = "0.10.0" }
-miniz_oxide = { version = "0.9.0", optional = true }
+ctor = { optional = true, version = "1.0.12" }
+miniz_oxide = { version = "0.9.1", optional = true }
 hostname = { version = "0.4.2", optional = true } # Is there really no gethostname in the stdlib?
 log = { workspace = true }
 nix = { workspace = true, optional = true, default-features = false, features = [

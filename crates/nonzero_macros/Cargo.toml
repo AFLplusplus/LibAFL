@@ -22,4 +22,4 @@ workspace = true
 document-features = ["dep:document-features"]
 
 [dependencies]
-document-features = { version = "0.2.11", optional = true }
+document-features = { version = "0.2.12", optional = true }

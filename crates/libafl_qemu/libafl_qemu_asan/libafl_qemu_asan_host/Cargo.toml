@@ -24,11 +24,11 @@ libafl_asan = { path = "../../../libafl_asan", default-features = false, feature
   "nostd",
 ] }
 libafl_asan_libc = { path = "../../../libafl_asan/libafl_asan_libc", default-features = false }
-libc = { version = "0.2.169", default-features = false }
-log = { version = "0.4.22", default-features = false, features = [
+libc = { version = "0.2.189", default-features = false }
+log = { version = "0.4.33", default-features = false, features = [
   "release_max_level_info",
 ] }
-spin = { version = "0.9.8", default-features = false, features = [
+spin = { version = "0.12.2", default-features = false, features = [
   "lazy",
   "mutex",
   "spin_mutex",

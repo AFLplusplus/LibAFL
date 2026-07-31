@@ -22,10 +22,10 @@ include = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-cc = "1.2.53"
-rustversion = "1.0.22"
-toml = { version = "0.9.10", features = ["preserve_order"] }
-which = "8.0.2"
+cc = "1.4.0"
+rustversion = "1.0.23"
+toml = { version = "1.1.4", features = ["preserve_order"] }
+which = "8.0.5"
 libafl_build = { workspace = true }
 
 [features]
@@ -52,7 +52,7 @@ rabbit = []
 libafl-libfuzzer-use-version = []
 
 [dependencies]
-libfuzzer-sys = { version = "0.4.7", default-features = false }
+libfuzzer-sys = { version = "0.4.13", default-features = false }
 document-features = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]

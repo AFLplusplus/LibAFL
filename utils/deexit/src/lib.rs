@@ -3,12 +3,12 @@
 //! On Linux, use `LD_PRELOAD="path/to/target/release/libdeexit.so" tool`.
 
 unsafe extern "C" {
-    fn abort();
+    fn abort() -> !;
 }
 
 /// Hooked `exit` function
 #[unsafe(no_mangle)]
-pub extern "C" fn exit(status: i32) {
+pub extern "C" fn exit(status: i32) -> ! {
     println!("DeExit: The target called exit with status code {status}");
     unsafe {
         abort();

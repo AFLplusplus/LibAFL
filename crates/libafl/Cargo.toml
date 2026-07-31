@@ -198,14 +198,14 @@ path = "./examples/tui_mock/main.rs"
 required-features = ["std", "tui_monitor"]
 
 [build-dependencies]
-rustversion = "1.0.22"
+rustversion = "1.0.23"
 
 [dev-dependencies]
 serde_json = { workspace = true, default-features = false, features = [
   "alloc",
 ] }
 # clippy-suggested optimised byte counter
-bytecount = "0.6.8"
+bytecount = "0.6.9"
 static_assertions = { workspace = true }
 
 [dependencies]
@@ -219,19 +219,19 @@ tuple_list_ex = { workspace = true }
 
 ahash = { workspace = true } # The hash function already used in hashbrown
 arbitrary-int = { workspace = true }
-arrayvec = { version = "0.7.6", optional = true, default-features = false } # used for fixed-len collects
+arrayvec = { version = "0.7.8", optional = true, default-features = false } # used for fixed-len collects
 backtrace = { workspace = true, optional = true } # Used to get the stacktrace in StacktraceObserver
 bincode = { version = "2.0.1", optional = true, features = ["serde"] }
 bitbybit = { workspace = true }
-bitvec = { version = "1.0.1", optional = true, features = [
+bitvec = { version = "1.1.1", optional = true, features = [
   "serde",
 ] } # used for string range storage
-cadence = { version = "1.5.0", optional = true } # For the statsd monitor
+cadence = { version = "1.8.0", optional = true } # For the statsd monitor
 clap = { workspace = true, optional = true }
-const_format = "0.2.33" # used for providing helpful compiler output
-const_panic = { version = "0.2.9", default-features = false } # similarly, for formatting const panic output
+const_format = "0.2.36" # used for providing helpful compiler output
+const_panic = { version = "0.2.15", default-features = false } # similarly, for formatting const panic output
 crossterm = { version = "0.29.0", optional = true }
-enumflags2 = { version = "0.7.10", optional = true }
+enumflags2 = { version = "0.7.12", optional = true }
 fastbloom = { workspace = true, optional = true }
 fs2 = { workspace = true, optional = true } # used by OnDisk Corpus for file locking
 hashbrown = { workspace = true, features = [
@@ -239,8 +239,8 @@ hashbrown = { workspace = true, features = [
   "default-hasher",
   "raw-entry",
 ], default-features = false } # A faster hashmap, nostd compatible
-libcasr = { version = "2.12.1", optional = true }
-libm = "0.2.8"
+libcasr = { version = "2.13.1", optional = true }
+libm = "0.2.16"
 log = { workspace = true }
 meminterval = { workspace = true, features = ["serde"] }
 nix = { workspace = true, optional = true, features = [
@@ -252,9 +252,9 @@ nix = { workspace = true, optional = true, features = [
 num_enum = { workspace = true, optional = true }
 num-traits = { workspace = true, default-features = false }
 postcard = { workspace = true } # no_std compatible serde serialization format
-prometheus-client = { version = "0.24.0", optional = true } # For the prometheus monitor
+prometheus-client = { version = "0.25.0", optional = true } # For the prometheus monitor
 pyo3 = { workspace = true, optional = true }
-ratatui = { version = "0.30.0", default-features = false, features = [
+ratatui = { version = "0.30.2", default-features = false, features = [
   'crossterm',
 ], optional = true } # Commandline rendering, for TUI Monitor
 send_wrapper = { version = "0.6.0", optional = true } # To move data between threads
@@ -263,7 +263,7 @@ serde_json = { workspace = true, default-features = false, features = [
   "alloc",
 ], optional = true }
 axum = { version = "0.8.9", optional = true }
-tokio = { version = "1.40.0", optional = true, features = [
+tokio = { version = "1.53.1", optional = true, features = [
   "sync",
   "net",
   "rt",
@@ -275,10 +275,10 @@ tokio = { version = "1.40.0", optional = true, features = [
 tuple_list = { workspace = true }
 typed-builder = { workspace = true, optional = true } # Implement the builder pattern at compiletime
 uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
-wait-timeout = { version = "0.2.0", optional = true } # used by CommandExecutor to wait for child process
+wait-timeout = { version = "0.2.1", optional = true } # used by CommandExecutor to wait for child process
 
 regex = { workspace = true, optional = true }
-regex-syntax = { version = "0.8.4", optional = true } # For nautilus
+regex-syntax = { version = "0.8.11", optional = true } # For nautilus
 
 z3 = { workspace = true, optional = true } # for corpus minimization
 
@@ -292,7 +292,7 @@ document-features = { workspace = true, optional = true }
 # Optional
 # For Lua Mutators
 # TODO: macros is not needed/ a temporary fix for docsrs, see <https://github.com/mlua-rs/mlua/issues/579>
-mlua = { version = "0.11.5", features = [
+mlua = { version = "0.12.0", features = [
   "lua54",
   "vendored",
   "macros",

@@ -58,14 +58,14 @@ ppc = ["libafl_qemu/ppc", "be"]
 hexagon = ["libafl_qemu/hexagon"]
 
 [build-dependencies]
-vergen = { version = "9.0.1", features = ["build", "cargo", "rustc", "si"] }
-vergen-git2 = "9.1.0"
+vergen = { version = "10.0.1", features = ["build", "cargo", "rustc", "si"] }
+vergen-git2 = "10.0.1"
 
 [dependencies]
-clap = { version = "4.5.52", features = ["derive", "string"] }
-env_logger = { version = "0.11.5" }
-log = { version = "0.4.29", features = ["release_max_level_info"] }
-readonly = { version = "0.2.12" }
+clap = { version = "4.6.4", features = ["derive", "string"] }
+env_logger = { version = "0.11.11" }
+log = { version = "0.4.33", features = ["release_max_level_info"] }
+readonly = { version = "0.2.14" }
 libafl_bolts = { path = "../../libafl_bolts" }
 libafl_qemu = { path = "../" }
-thiserror = { version = "2.0.16" }
+thiserror = { version = "2.0.19" }

@@ -46,7 +46,7 @@ libafl_build = { workspace = true }
 which = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.build-dependencies]
-glob = "0.3.3"
+glob = "0.3.4"
 
 [dependencies]
 serde = { workspace = true, default-features = false, features = [

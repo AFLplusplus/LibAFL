@@ -31,7 +31,7 @@ use std::{env, fs::File, io::Write, path::Path};
     feature = "ctx",
     feature = "dump-cfg",
 ))]
-#[expect(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, clippy::manual_assert)]
 fn build_pass(
     bindir_path: &Path,
     out_dir: &Path,
@@ -94,11 +94,10 @@ fn build_pass(
                         panic!(
                             "Failed to compile required compiler pass src/{src_file} - Exit status: {s}"
                         );
-                    } else {
-                        println!(
-                            "cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}. You can ignore this error unless you want this compiler pass."
-                        );
                     }
+                    println!(
+                        "cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}. You can ignore this error unless you want this compiler pass."
+                    );
                 }
             }
             Err(err) => {
@@ -106,11 +105,10 @@ fn build_pass(
                     panic!(
                         "Failed to compile required compiler pass src/{src_file} - Exit status: {err}"
                     );
-                } else {
-                    println!(
-                        "cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {err}. You can ignore this error unless you want this compiler pass."
-                    );
                 }
+                println!(
+                    "cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {err}. You can ignore this error unless you want this compiler pass."
+                );
             }
         },
         None => {
@@ -185,19 +183,19 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
             .expect("Could not execute llvm-config --bindir")
     };
 
-    let clang;
-    let clangcpp;
-    let llvm_ar;
-
-    if cfg!(windows) {
-        clang = bindir_path.join("clang.exe");
-        clangcpp = bindir_path.join("clang++.exe");
-        llvm_ar = Path::new(&llvm_ar_path).join("llvm-ar.exe");
+    let (clang, clangcpp, llvm_ar) = if cfg!(windows) {
+        (
+            bindir_path.join("clang.exe"),
+            bindir_path.join("clang++.exe"),
+            Path::new(&llvm_ar_path).join("llvm-ar.exe"),
+        )
     } else {
-        clang = bindir_path.join("clang");
-        clangcpp = bindir_path.join("clang++");
-        llvm_ar = Path::new(&llvm_ar_path).join("llvm-ar");
-    }
+        (
+            bindir_path.join("clang"),
+            bindir_path.join("clang++"),
+            Path::new(&llvm_ar_path).join("llvm-ar"),
+        )
+    };
 
     let mut found = true;
 

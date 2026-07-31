@@ -11,9 +11,9 @@ mod tests {
             guest::{GuestTracking, GuestTrackingError},
         },
     };
-    use spin::Lazy;
+    use spin::LazyLock;
 
-    static INIT_ONCE: Lazy<Mutex<()>> = Lazy::new(|| {
+    static INIT_ONCE: LazyLock<Mutex<()>> = LazyLock::new(|| {
         {
             env_logger::init();
         };

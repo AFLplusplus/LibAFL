@@ -6,7 +6,7 @@ use libafl_bolts::simd::{
     SimdMinReducer, SimdOrReducer, SimdReducer, VectorType, covmap_is_interesting_naive,
     covmap_is_interesting_simd, simplify_map_naive, simplify_map_simd,
 };
-use rand::{RngCore, rngs::ThreadRng};
+use rand::{RngExt, rngs::ThreadRng};
 
 fn default_map_size() -> usize {
     if std::env::var("CI").is_ok() {
@@ -38,7 +38,7 @@ struct Cli {
 
 fn random_bits(map: &mut [u8], rng: &mut ThreadRng) {
     // randomly set a bit since coverage map is usually sparse enough
-    let rng = rng.next_u64() as usize;
+    let rng = rng.random::<u64>() as usize;
     let bytes_idx = (rng / 8) % map.len();
     let bits_idx = rng % 8;
     map[bytes_idx] |= 1 << bits_idx;
