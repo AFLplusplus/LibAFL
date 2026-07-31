@@ -296,9 +296,8 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
                     let mut stages = tuple_list!(calibration, mutational);
                     if let Some(iters) = self.iterations {
@@ -311,9 +310,8 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             } else {
                 // Setup a basic mutator
@@ -333,9 +331,8 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
                     let mut stages = tuple_list!(calibration, mutational);
                     if let Some(iters) = self.iterations {
@@ -348,9 +345,8 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             }
 

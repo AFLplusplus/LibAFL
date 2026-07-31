@@ -7,8 +7,12 @@ unsafe extern "C" {
 }
 
 /// Hooked `exit` function
+///
+/// # Safety
+///
+/// This function is unsafe because it overrides the standard C `exit` symbol.
 #[unsafe(no_mangle)]
-pub extern "C" fn exit(status: i32) -> ! {
+pub unsafe extern "C" fn exit(status: i32) -> ! {
     println!("DeExit: The target called exit with status code {status}");
     unsafe {
         abort();

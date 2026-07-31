@@ -354,9 +354,8 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
                     // Setup a basic mutator
                     let mutator = HavocScheduledMutator::new(havoc_mutations());
@@ -375,9 +374,8 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             } else {
                 let modules = tuple_list!(
@@ -474,9 +472,8 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
                     // Setup a basic mutator
                     let mutator = HavocScheduledMutator::new(havoc_mutations());
@@ -495,9 +492,8 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             }
             Ok(())
