@@ -32,10 +32,9 @@ use perf_event_open_sys::{
     perf_event_open,
 };
 pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtCoverageDecoderBuilder, PtImage};
-use ptcov::{PtCpu, PtCpuVendor};
-use raw_cpuid::CpuId;
 
 use super::{PAGE_SIZE, availability};
+use crate::utils::current_cpu;
 
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
@@ -107,7 +106,6 @@ impl<'a> IntelPT<'a> {
     /// Set filters based on Instruction Pointer (IP)
     ///
     /// Only instructions in `filters` ranges will be traced.
-    /// NOTE: only filters of type `AddrFilterType::FILTER` are supported.
     fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
         let str_filter = filters
             .iter()
@@ -296,7 +294,7 @@ impl<'a> IntelPT<'a> {
     }
 
     /// Dump the raw trace used in the last decoding to the file
-    /// /// `./traces/trace_<unix epoch in micros>`
+    /// `./traces/trace_<unix epoch in micros>`
     #[cfg(feature = "export_raw")]
     pub fn dump_last_trace_to_file(&self) -> Result<(), Error> {
         use std::{fs, io::Write, path::Path, time};
@@ -759,18 +757,6 @@ fn smp_rmb() {
 
 const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
     ptr & (perf_aux_buffer_size as u64 - 1)
-}
-
-fn current_cpu() -> Option<PtCpu> {
-    let cpuid = CpuId::new();
-    cpuid.get_feature_info().map(|fi| {
-        PtCpu::new(
-            PtCpuVendor::Intel,
-            fi.family_id().into(),
-            fi.model_id(),
-            fi.stepping_id(),
-        )
-    })
 }
 
 #[cfg(test)]
