@@ -23,7 +23,7 @@ pub unsafe extern "C" fn exit(status: i32) -> ! {
 use ctor::ctor;
 
 #[cfg(target_os = "macos")]
-#[ctor]
+#[ctor(unsafe)]
 fn init() {
     unsafe {
         fishhook::register(vec![fishhook::Rebinding {

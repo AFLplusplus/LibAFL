@@ -256,6 +256,7 @@ impl VectorType for wide::u8x16 {
     }
 
     fn blend(self, lhs: Self, rhs: Self) -> Self {
+        #[allow(deprecated)]
         self.blend(lhs, rhs)
     }
 
@@ -301,6 +302,7 @@ impl VectorType for wide::u8x32 {
     }
 
     fn blend(self, lhs: Self, rhs: Self) -> Self {
+        #[allow(deprecated)]
         self.blend(lhs, rhs)
     }
 
