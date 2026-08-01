@@ -152,7 +152,7 @@ rustversion = "1.0.23"
 serde = { version = "1.0.229", default-features = false } # serialization lib
 serde_json = { version = "1.0.151", default-features = false }
 serde_yaml = { version = "0.9.34" } # For parsing the injections yaml file
-serial_test = { version = "3.5.0", default-features = false }
+serial_test = { version = "4.0.1", default-features = false }
 static_assertions = "1.1.0"
 strum = "0.28.0"
 strum_macros = "0.28.0"
@@ -164,8 +164,8 @@ typeid = "1.0.3" # Safe type_eq that doesn't rely on std specialization
 unicorn-engine = "2.1.5" # Used in libafl_unicorn
 uuid = { version = "1.24.0", features = ["serde", "v4"] }
 which = "8.0.5"
-windows = "0.62.1"
-windows-core = "0.62.1"
+windows = "0.62.2"
+windows-core = "0.62.2"
 z3 = { version = "0.20.2", default-features = false }
 
 [workspace.lints.rust]
