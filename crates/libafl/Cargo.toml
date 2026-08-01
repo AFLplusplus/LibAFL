@@ -12,7 +12,7 @@ readme = "../../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.93.1"
 categories = [
   "development-tools::testing",
   "emulators",
