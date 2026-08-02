@@ -63,16 +63,6 @@ runs:
       with:
         version: latest
 
-    - name: Export Z3 Environment Variables
-      shell: bash
-      run: |
-        echo "LIBRARY_PATH=$Z3_DIR/lib:$LIBRARY_PATH" >> "$GITHUB_ENV"
-        echo "LD_LIBRARY_PATH=$Z3_DIR/lib:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
-        echo "CPATH=$Z3_DIR/include:$CPATH" >> "$GITHUB_ENV"
-        echo "C_INCLUDE_PATH=$Z3_DIR/include:$C_INCLUDE_PATH" >> "$GITHUB_ENV"
-        echo "CPLUS_INCLUDE_PATH=$Z3_DIR/include:$CPLUS_INCLUDE_PATH" >> "$GITHUB_ENV"
-        echo "PKG_CONFIG_PATH=$Z3_DIR/lib/pkgconfig:$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
-
     - name: Symlink headers
       shell: bash
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
