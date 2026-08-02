@@ -150,19 +150,6 @@ where
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         self.0.post_exec(state, input, exit_kind)
     }
-
-    fn pre_exec_child(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.0.pre_exec_child(state, input)
-    }
-
-    fn post_exec_child(
-        &mut self,
-        state: &mut S,
-        input: &I,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        self.0.post_exec_child(state, input, exit_kind)
-    }
 }
 
 impl<T, OTA, OTB, I, S, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB, I, S>
