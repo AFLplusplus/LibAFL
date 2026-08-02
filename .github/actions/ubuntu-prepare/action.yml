@@ -61,7 +61,7 @@ runs:
     - name: Install Z3
       uses: cda-tum/setup-z3@v1
       with:
-        version: 4.13.0
+        version: latest
 
     - name: Symlink headers
       shell: bash

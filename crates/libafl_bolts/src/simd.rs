@@ -481,7 +481,7 @@ where
     (interesting, novelties)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "wide"))]
 mod tests {
     use super::*;
 
