@@ -31,7 +31,7 @@ use std::{env, fs::File, io::Write, path::Path};
     feature = "ctx",
     feature = "dump-cfg",
 ))]
-#[expect(clippy::too_many_arguments, clippy::manual_assert)]
+#[expect(clippy::too_many_arguments)]
 fn build_pass(
     bindir_path: &Path,
     out_dir: &Path,
@@ -90,22 +90,20 @@ fn build_pass(
         Some(res) => match res {
             Ok(s) => {
                 if !s.success() {
-                    if required {
-                        panic!(
-                            "Failed to compile required compiler pass src/{src_file} - Exit status: {s}"
-                        );
-                    }
+                    assert!(
+                        !required,
+                        "Failed to compile required compiler pass src/{src_file} - Exit status: {s}"
+                    );
                     println!(
                         "cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}. You can ignore this error unless you want this compiler pass."
                     );
                 }
             }
             Err(err) => {
-                if required {
-                    panic!(
-                        "Failed to compile required compiler pass src/{src_file} - Exit status: {err}"
-                    );
-                }
+                assert!(
+                    !required,
+                    "Failed to compile required compiler pass src/{src_file} - Exit status: {err}"
+                );
                 println!(
                     "cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {err}. You can ignore this error unless you want this compiler pass."
                 );

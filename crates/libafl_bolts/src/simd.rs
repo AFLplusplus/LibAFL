@@ -480,3 +480,22 @@ where
 
     (interesting, novelties)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "wide")]
+    fn test_simplify_map() {
+        let mut map_naive = vec![0u8, 1u8, 0u8, 5u8, 0u8, 0u8, 255u8, 0u8];
+        map_naive.resize(64, 0);
+        map_naive[33] = 42;
+        let mut map_simd = map_naive.clone();
+
+        simplify_map_naive(&mut map_naive);
+        std_simplify_map(&mut map_simd);
+
+        assert_eq!(map_naive, map_simd);
+    }
+}

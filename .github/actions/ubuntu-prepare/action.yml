@@ -58,6 +58,11 @@ runs:
         echo "LLVM_CONFIG_PATH=$(which llvm-config-${{ env.MAIN_LLVM_VERSION }})" >> "$GITHUB_ENV"
         echo "LIBCLANG_PATH=/usr/lib/llvm-${{ env.MAIN_LLVM_VERSION }}/lib" >> "$GITHUB_ENV"
 
+    - name: Install Z3
+      uses: cda-tum/setup-z3@v1
+      with:
+        version: 4.13.0
+
     - name: Symlink headers
       shell: bash
       run: sudo ln -s /usr/include/asm-generic /usr/include/asm
