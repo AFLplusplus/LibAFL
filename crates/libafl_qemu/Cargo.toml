@@ -130,25 +130,25 @@ hashbrown = { workspace = true, default-features = true, features = [
 ] } # A faster hashmap, nostd compatible
 num-traits = { workspace = true, default-features = true }
 num_enum = { workspace = true, default-features = true }
-goblin = "0.10.4"
+goblin = "0.10.7"
 libc = { workspace = true }
 strum = "0.28.0"
 strum_macros = "0.28.0"
-syscall-numbers = "4.0.2"
+syscall-numbers = "4.0.3"
 meminterval = { workspace = true }
-thread_local = "1.1.9"
+thread_local = "1.1.10"
 capstone = "0.14.0"
 rangemap = { workspace = true }
 log = { workspace = true }
-object = "0.38.0"
-addr2line = "0.26.1"
+object = "0.39.1"
+addr2line = "0.27.0"
 paste = { workspace = true }
-enum-map = "2.7.3"
+enum-map = "3.1.0"
 serde_yaml = { workspace = true, optional = true } # For parsing the injections yaml file
 toml = { workspace = true, optional = true } # For parsing the injections toml file
 pyo3 = { workspace = true, optional = true, features = ["multiple-pymethods"] }
 typed-builder = { workspace = true }
-getset = "0.1.6"
+getset = "0.1.7"
 libvharness_sys = { workspace = true }
 
 # Document all features of this crate (for `cargo doc`)

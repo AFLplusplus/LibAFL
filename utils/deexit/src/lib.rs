@@ -3,12 +3,16 @@
 //! On Linux, use `LD_PRELOAD="path/to/target/release/libdeexit.so" tool`.
 
 unsafe extern "C" {
-    fn abort();
+    fn abort() -> !;
 }
 
 /// Hooked `exit` function
+///
+/// # Safety
+///
+/// This function is unsafe because it overrides the standard C `exit` symbol.
 #[unsafe(no_mangle)]
-pub extern "C" fn exit(status: i32) {
+pub unsafe extern "C" fn exit(status: i32) -> ! {
     println!("DeExit: The target called exit with status code {status}");
     unsafe {
         abort();
@@ -19,7 +23,7 @@ pub extern "C" fn exit(status: i32) {
 use ctor::ctor;
 
 #[cfg(target_os = "macos")]
-#[ctor]
+#[ctor(unsafe)]
 fn init() {
     unsafe {
         fishhook::register(vec![fishhook::Rebinding {

@@ -412,11 +412,9 @@ mod test {
             meta.count += 1;
             if meta.count == 1 {
                 return Err(Error::shutting_down());
-            } else if meta.count > 2 {
-                panic!("Resume was somehow corrupted?")
-            } else {
-                self.completed.replace(true);
             }
+            assert!(meta.count <= 2, "Resume was somehow corrupted?");
+            self.completed.replace(true);
             Ok(())
         }
     }

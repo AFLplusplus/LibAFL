@@ -221,9 +221,9 @@ pub trait VectorType {
     /// Collect novelties. We pass in base to avoid redo calculate for novelties indice.
     fn novelties(hist: &[u8], map: &[u8], base: usize, novelties: &mut Vec<usize>);
 
-    /// Do blending
+    /// Do select
     #[must_use]
-    fn blend(self, lhs: Self, rhs: Self) -> Self;
+    fn select(self, lhs: Self, rhs: Self) -> Self;
 
     /// Test lane-wise equality.
     #[must_use]
@@ -255,8 +255,8 @@ impl VectorType for wide::u8x16 {
         }
     }
 
-    fn blend(self, lhs: Self, rhs: Self) -> Self {
-        self.blend(lhs, rhs)
+    fn select(self, lhs: Self, rhs: Self) -> Self {
+        self.select(lhs, rhs)
     }
 
     fn simd_eq(self, rhs: Self) -> Self {
@@ -300,8 +300,8 @@ impl VectorType for wide::u8x32 {
         }
     }
 
-    fn blend(self, lhs: Self, rhs: Self) -> Self {
-        self.blend(lhs, rhs)
+    fn select(self, lhs: Self, rhs: Self) -> Self {
+        self.select(lhs, rhs)
     }
 
     fn simd_eq(self, rhs: Self) -> Self {
@@ -338,7 +338,7 @@ where
         let mp = V::from_slice(&map[i..]);
 
         let mask = mp.simd_eq(V::ZERO);
-        let out = mask.blend(lhs, rhs);
+        let out = mask.select(lhs, rhs);
         map[i..i + V::N].copy_from_slice(out.as_slice());
     }
 
@@ -479,4 +479,23 @@ where
     }
 
     (interesting, novelties)
+}
+
+#[cfg(all(test, feature = "wide"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "wide")]
+    fn test_simplify_map() {
+        let mut map_naive = vec![0u8, 1u8, 0u8, 5u8, 0u8, 0u8, 255u8, 0u8];
+        map_naive.resize(64, 0);
+        map_naive[33] = 42;
+        let mut map_simd = map_naive.clone();
+
+        simplify_map_naive(&mut map_naive);
+        std_simplify_map(&mut map_simd);
+
+        assert_eq!(map_naive, map_simd);
+    }
 }
