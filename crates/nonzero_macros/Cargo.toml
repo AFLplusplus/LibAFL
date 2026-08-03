@@ -12,7 +12,7 @@ readme = "./README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["macros", "no_std", "const", "safety"]
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.93.1"
 categories = ["no-std", "development-tools"]
 
 [lints]
@@ -22,4 +22,4 @@ workspace = true
 document-features = ["dep:document-features"]
 
 [dependencies]
-document-features = { version = "0.2.11", optional = true }
+document-features = { version = "0.2.12", optional = true }

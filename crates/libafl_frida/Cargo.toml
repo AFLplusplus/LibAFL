@@ -73,9 +73,9 @@ frida-gum = { version = "0.17.2", features = [
   "script",
   "backtrace",
 ] }
-dynasmrt = "4.0.2"
+dynasmrt = "5.1.0"
 
-color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
+color-backtrace = { version = "0.7.2", features = ["resolve-modules"] }
 termcolor = "1.4.1"
 serde = { workspace = true, default-features = true }
 backtrace = { workspace = true, default-features = false, features = [
@@ -106,7 +106,7 @@ workspace = true
 yaxpeax-arm = "0.4.0"
 
 [target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
-yaxpeax-x86 = "2.0.0"
+yaxpeax-x86 = "2.2.0"
 iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
 
 [target.'cfg(windows)'.dependencies]

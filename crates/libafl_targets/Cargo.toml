@@ -9,7 +9,7 @@ readme = "./README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing"]
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.93.1"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -197,8 +197,8 @@ document-features = ["dep:document-features"]
 
 [build-dependencies]
 bindgen = "0.72.1"
-cc = { version = "1.2.53", features = ["parallel"] }
-rustversion = "1.0.22"
+cc = { version = "1.4.0", features = ["parallel"] }
+rustversion = "1.0.23"
 
 [dependencies]
 document-features = { workspace = true, optional = true }

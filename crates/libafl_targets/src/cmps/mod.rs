@@ -533,13 +533,11 @@ impl AflppCmpLogMap {
         }
     }
 
-    #[must_use]
     /// Handle the headers for the map
     pub fn headers(&self) -> &[AflppCmpLogHeader] {
         &self.headers
     }
 
-    #[must_use]
     /// Mutably reference the headers for the map
     pub fn headers_mut(&mut self) -> &mut [AflppCmpLogHeader] {
         &mut self.headers

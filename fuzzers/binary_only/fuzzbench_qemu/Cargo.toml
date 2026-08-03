@@ -31,7 +31,7 @@ libafl_qemu = { path = "../../../crates/libafl_qemu", features = [
 ] }
 libafl_targets = { path = "../../../crates/libafl_targets", version = "0.16.0" }
 
-env_logger = "0.11.5"
-clap = { version = "4.5.18", features = ["default"] }
-mimalloc = "0.1.48"
+env_logger = "0.11.11"
+clap = { version = "4.6.4", features = ["default"] }
+mimalloc = "0.1.52"
 scudo = "0.1.3"
