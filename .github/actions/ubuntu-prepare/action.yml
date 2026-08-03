@@ -71,12 +71,22 @@ runs:
         Z3_PATH="${{ steps.z3.outputs.z3-root }}"
         Z3_PATH="${Z3_PATH:-$Z3_ROOT}"
         if [ -n "$Z3_PATH" ]; then
+          sudo cp -r "$Z3_PATH/include/"* /usr/include/ 2>/dev/null || true
           sudo cp -r "$Z3_PATH/include/"* /usr/local/include/ 2>/dev/null || true
-          if [ -d "$Z3_PATH/lib" ]; then
-            sudo cp -r "$Z3_PATH/lib/"* /usr/local/lib/ 2>/dev/null || true
+          # Install to architecture-specific multiarch dir on Linux if it exists, otherwise /usr/local/lib
+          ARCH_DIR="/usr/lib/$(uname -m)-linux-gnu"
+          if [ -d "$ARCH_DIR" ]; then
+            sudo cp -d "$Z3_PATH/bin/libz3"* "$ARCH_DIR/" 2>/dev/null || true
+            if [ -d "$Z3_PATH/lib" ]; then
+              sudo cp -d "$Z3_PATH/lib/libz3"* "$ARCH_DIR/" 2>/dev/null || true
+            fi
+          else
+            sudo cp -d "$Z3_PATH/bin/libz3"* /usr/local/lib/ 2>/dev/null || true
+            if [ -d "$Z3_PATH/lib" ]; then
+              sudo cp -d "$Z3_PATH/lib/libz3"* /usr/local/lib/ 2>/dev/null || true
+            fi
           fi
-          sudo cp -r "$Z3_PATH/bin/libz3"* /usr/local/lib/ 2>/dev/null || true
-          sudo ldconfig
+          sudo ldconfig 2>/dev/null || true
         fi
 
     - name: Symlink headers
