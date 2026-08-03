@@ -64,12 +64,16 @@ runs:
       with:
         version: latest
 
-    - name: Export Z3 Environment Variables
+    - name: Install Z3 to system
       shell: bash
       run: |
         Z3_PATH="${{ steps.z3.outputs.z3-dir }}"
-        echo "LIBRARY_PATH=$Z3_PATH/lib:$LIBRARY_PATH" >> "$GITHUB_ENV"
-        echo "LD_LIBRARY_PATH=$Z3_PATH/lib:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
+        sudo cp -r "$Z3_PATH/include/"* /usr/local/include/ 2>/dev/null || true
+        if [ -d "$Z3_PATH/lib" ]; then
+          sudo cp -r "$Z3_PATH/lib/"* /usr/local/lib/ 2>/dev/null || true
+        fi
+        sudo cp "$Z3_PATH/bin/libz3".* /usr/local/lib/ 2>/dev/null || true
+        sudo ldconfig
 
     - name: Symlink headers
       shell: bash
