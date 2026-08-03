@@ -4,14 +4,8 @@ version = "0.16.0"
 edition = "2024"
 
 [build-dependencies]
-vergen = { version = "8.1.1", features = [
-  "build",
-  "cargo",
-  "git",
-  "gitcl",
-  "rustc",
-  "si",
-] }
+vergen = { version = "10.0.1", features = ["build", "cargo", "rustc", "si"] }
+vergen-git2 = "10.0.1"
 
 [dependencies]
 anyhow = { version = "1.0", default-features = false }

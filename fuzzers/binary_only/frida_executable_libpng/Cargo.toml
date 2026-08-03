@@ -35,6 +35,6 @@ libafl_frida = { path = "../../../crates/libafl_frida", features = ["cmplog"] }
 libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_cmplog",
 ] }
-libc = "0.2.159"
-mimalloc = { version = "0.1.43", default-features = false }
-color-backtrace = "0.6.1"
+libc = "0.2.189"
+mimalloc = { version = "0.1.52", default-features = false }
+color-backtrace = "0.7.2"

@@ -12,7 +12,7 @@ readme = "./README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["os", "shmem", "no-std"]
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.93.1"
 categories = ["embedded", "os", "no-std"]
 
 [package.metadata.docs.rs]
@@ -50,7 +50,7 @@ serde = { workspace = true, default-features = false, features = [
 ] } # serialization lib
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
-rand_core = { version = "0.9.5", optional = true }
+rand_core = { version = "0.10.1", optional = true }
 pyo3 = { workspace = true, optional = true, features = ["serde", "macros"] }
 
 [lints]

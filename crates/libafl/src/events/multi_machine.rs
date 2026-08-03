@@ -134,7 +134,7 @@ pub struct NodeDescriptor<A> {
     #[builder(default = Some(50000))]
     pub node_listening_port: Option<u16>,
 
-    #[builder(default = Duration::from_secs(60))]
+    #[builder(default = Duration::from_mins(1))]
     /// The timeout for connecting to parent
     pub timeout: Duration,
 

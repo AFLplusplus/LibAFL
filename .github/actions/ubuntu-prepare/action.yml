@@ -23,7 +23,7 @@ runs:
         sudo apt-get update
         sudo apt-get install -y \
           curl lsb-release wget software-properties-common gnupg shellcheck pax-utils \
-          libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev meson
+          libsqlite3-dev libpixman-1-dev libc6-dev gcc g++ build-essential libglib2.0-dev meson nlohmann-json3-dev
 
     # ---------- toolchain selection ----------
     - name: Install Rust (stable)
@@ -57,6 +57,44 @@ runs:
         sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ env.MAIN_LLVM_VERSION }} 200
         echo "LLVM_CONFIG_PATH=$(which llvm-config-${{ env.MAIN_LLVM_VERSION }})" >> "$GITHUB_ENV"
         echo "LIBCLANG_PATH=/usr/lib/llvm-${{ env.MAIN_LLVM_VERSION }}/lib" >> "$GITHUB_ENV"
+
+    - name: Install Z3
+      id: z3
+      uses: cda-tum/setup-z3@v1
+      with:
+        version: latest
+        add_to_library_path: true
+
+    - name: Install Z3 to system
+      shell: bash
+      run: |
+        # Replace Ubuntu's outdated libz3 (v4.8) in the host multiarch directory (/usr/lib/x86_64-linux-gnu/)
+        # with the latest Z3 installed by setup-z3, symlinking libz3.so.4 to libz3.so.
+        # Using ARCH_DIR=/usr/lib/$(uname -m)-linux-gnu ensures cross-compilation target paths are unaffected.
+        Z3_PATH="${{ steps.z3.outputs.z3-root }}"
+        Z3_PATH="${Z3_PATH:-$Z3_ROOT}"
+        if [ -n "$Z3_PATH" ]; then
+          sudo cp -r "$Z3_PATH/include/"* /usr/include/ 2>/dev/null || true
+          sudo cp -r "$Z3_PATH/include/"* /usr/local/include/ 2>/dev/null || true
+          ARCH_DIR="/usr/lib/$(uname -m)-linux-gnu"
+          if [ -d "$ARCH_DIR" ]; then
+            sudo rm -f "$ARCH_DIR/libz3"*
+            sudo cp -f "$Z3_PATH/bin/libz3"* "$ARCH_DIR/" 2>/dev/null || true
+            if [ -d "$Z3_PATH/lib" ]; then
+              sudo cp -f "$Z3_PATH/lib/libz3"* "$ARCH_DIR/" 2>/dev/null || true
+            fi
+            sudo ln -sf "$ARCH_DIR/libz3.so" "$ARCH_DIR/libz3.so.4" 2>/dev/null || true
+            sudo ln -sf "$ARCH_DIR/libz3.so" "$ARCH_DIR/libz3.so.4.8" 2>/dev/null || true
+            sudo ln -sf "$ARCH_DIR/libz3.so" "$ARCH_DIR/libz3.so.4.8.12" 2>/dev/null || true
+          else
+            sudo rm -f /usr/local/lib/libz3*
+            sudo cp -f "$Z3_PATH/bin/libz3"* /usr/local/lib/ 2>/dev/null || true
+            if [ -d "$Z3_PATH/lib" ]; then
+              sudo cp -f "$Z3_PATH/lib/libz3"* /usr/local/lib/ 2>/dev/null || true
+            fi
+          fi
+          sudo ldconfig 2>/dev/null || true
+        fi
 
     - name: Symlink headers
       shell: bash

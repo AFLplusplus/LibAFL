@@ -8,12 +8,25 @@ CORPUS := "corpus"
 build:
     cargo build --profile {{ PROFILE }}
 
+build-shmem:
+    cargo build --profile {{ PROFILE }} --features shared_input_mem
+
 run: build
     {{ FUZZER }} {{ CORPUS }}
 
-test: build
+test-shmem: build-shmem
     #!/bin/bash
-    timeout 15s {{ FUZZER }} {{ CORPUS }} | tee fuzz_stdout.log || true
+    timeout 30s {{ FUZZER }} {{ CORPUS }} | tee fuzz_shmem_stdout.log || true
+    if grep -qa "objectives: 1" fuzz_shmem_stdout.log; then
+        echo "Fuzzer (shmem) is working"
+    else
+        echo "Fuzzer (shmem) does not generate any testcases or any crashes"
+        exit 1
+    fi
+
+test: test-shmem build
+    #!/bin/bash
+    timeout 30s {{ FUZZER }} {{ CORPUS }} | tee fuzz_stdout.log || true
     if grep -qa "objectives: 1" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else

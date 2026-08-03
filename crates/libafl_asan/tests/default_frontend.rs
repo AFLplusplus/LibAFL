@@ -10,11 +10,11 @@ mod tests {
         shadow::{Shadow, guest::GuestShadow, layout::DefaultShadowLayout},
         tracking::guest::GuestTracking,
     };
-    use spin::{Lazy, Mutex, MutexGuard};
+    use spin::{LazyLock, Mutex, MutexGuard};
 
     const PAGE_SIZE: usize = 4096;
 
-    static INIT_ONCE: Lazy<Mutex<DF>> = Lazy::new(|| {
+    static INIT_ONCE: LazyLock<Mutex<DF>> = LazyLock::new(|| {
         Mutex::new({
             env_logger::init();
             let backend = DlmallocBackend::<MmapRegion>::new(PAGE_SIZE);

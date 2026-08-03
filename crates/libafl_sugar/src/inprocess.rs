@@ -262,8 +262,11 @@ where
                     // Load from disk
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, self.input_dirs)
-                        .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", self.input_dirs);
+                        .unwrap_or_else(|err| {
+                            panic!(
+                                "Failed to load initial corpus at {:?}: {err}",
+                                self.input_dirs
+                            );
                         });
                     log::info!("We imported {} inputs from disk.", state.corpus().count());
                 }
@@ -296,9 +299,9 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
                     let mut stages = tuple_list!(calibration, mutational);
                     if let Some(iters) = self.iterations {
@@ -311,9 +314,9 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             } else {
                 // Setup a basic mutator
@@ -333,9 +336,9 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
                     let mut stages = tuple_list!(calibration, mutational);
                     if let Some(iters) = self.iterations {
@@ -348,9 +351,9 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             }
 
