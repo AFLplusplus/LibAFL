@@ -320,8 +320,11 @@ where
                                 &mut mgr,
                                 self.input_dirs,
                             )
-                            .unwrap_or_else(|_| {
-                                panic!("Failed to load initial corpus at {:?}", self.input_dirs);
+                            .unwrap_or_else(|err| {
+                                panic!(
+                                    "Failed to load initial corpus at {:?}: {err}",
+                                    self.input_dirs
+                                );
                             });
                         log::info!("We imported {} inputs from disk.", state.corpus().count());
                     }
@@ -448,8 +451,11 @@ where
                                 &mut mgr,
                                 self.input_dirs,
                             )
-                            .unwrap_or_else(|_| {
-                                panic!("Failed to load initial corpus at {:?}", self.input_dirs);
+                            .unwrap_or_else(|err| {
+                                panic!(
+                                    "Failed to load initial corpus at {:?}: {err}",
+                                    self.input_dirs
+                                );
                             });
                         log::info!("We imported {} inputs from disk.", state.corpus().count());
                     }
