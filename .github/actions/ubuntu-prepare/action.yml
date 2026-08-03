@@ -68,12 +68,14 @@ runs:
     - name: Install Z3 to system
       shell: bash
       run: |
+        # Replace Ubuntu's outdated libz3 (v4.8) in the host multiarch directory (/usr/lib/x86_64-linux-gnu/)
+        # with the latest Z3 installed by setup-z3, symlinking libz3.so.4 to libz3.so.
+        # Using ARCH_DIR=/usr/lib/$(uname -m)-linux-gnu ensures cross-compilation target paths are unaffected.
         Z3_PATH="${{ steps.z3.outputs.z3-root }}"
         Z3_PATH="${Z3_PATH:-$Z3_ROOT}"
         if [ -n "$Z3_PATH" ]; then
           sudo cp -r "$Z3_PATH/include/"* /usr/include/ 2>/dev/null || true
           sudo cp -r "$Z3_PATH/include/"* /usr/local/include/ 2>/dev/null || true
-          # Install to architecture-specific multiarch dir on Linux if it exists, otherwise /usr/local/lib
           ARCH_DIR="/usr/lib/$(uname -m)-linux-gnu"
           if [ -d "$ARCH_DIR" ]; then
             sudo rm -f "$ARCH_DIR/libz3"*
