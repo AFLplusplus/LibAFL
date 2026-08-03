@@ -148,7 +148,7 @@ fn decode_hex_and_jmp(hex_string: &str) -> ! {
 mod test {
 
     unsafe extern "C" {
-        fn exit(ret: i32);
+        fn exit(ret: i32) -> !;
     }
 
     use crate::libafl_jmp;

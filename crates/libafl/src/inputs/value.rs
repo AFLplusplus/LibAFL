@@ -183,6 +183,10 @@ where
     fn randomize<R: Rand>(&mut self, rand: &mut R) {
         self.as_mut().randomize(rand);
     }
+
+    fn bits(&self) -> usize {
+        self.as_ref().bits()
+    }
 }
 
 #[cfg(test)]
@@ -230,9 +234,10 @@ mod tests {
 
             $prep
             let mut j = $value;
-            j.flip_bit_at(size_of::<T>() * 8 - 1);
+            assert_eq!(j.bits(), size_of::<T>() * 8);
+            j.flip_bit_at(j.bits() - 1);
             $prep
-            assert_ne!(j, $value, "{:?}.flip_bit_at({}) for {}", j, size_of::<T>() * 8 - 1, type_name::<$type>());
+            assert_ne!(j, $value, "{:?}.flip_bit_at({}) for {}", j, j.bits() - 1, type_name::<$type>());
         }};
     }
 

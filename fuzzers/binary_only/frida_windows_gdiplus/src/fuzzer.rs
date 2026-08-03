@@ -213,7 +213,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
                         .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &options.input)
+                            panic!("Failed to load initial corpus at {:?}", options.input)
                         });
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
@@ -335,7 +335,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
                         .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &options.input)
+                            panic!("Failed to load initial corpus at {:?}", options.input)
                         });
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
@@ -477,7 +477,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
                         .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &options.input)
+                            panic!("Failed to load initial corpus at {:?}", options.input)
                         });
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
@@ -505,7 +505,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
     #[cfg(all(unix, feature = "std"))]
     {
-        return builder.stdout_file(Some(&options.stdout)).build().launch();
+        builder.stdout_file(Some(&options.stdout)).build().launch()
     }
 
     #[cfg(not(all(unix, feature = "std")))]

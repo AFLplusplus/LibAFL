@@ -21,9 +21,9 @@ pub trait TestcaseScore<I, S> {
     fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error>;
 }
 
-/// Compute the favor factor of a [`Testcase`]. Lower  is better.
+/// Compute the favor factor of a [`Testcase`]. Lower is better.
 pub trait TestcasePenalty<I, S> {
-    /// Computes the favor factor of a [`Testcase`]. Higher is better.
+    /// Computes the favor factor of a [`Testcase`]. Lower is better.
     fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error>;
 }
 

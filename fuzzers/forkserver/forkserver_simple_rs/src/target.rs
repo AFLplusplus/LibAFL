@@ -14,6 +14,9 @@ fn read_input() -> &'static [u8] {
         let len = unsafe { *INPUT_LENGTH_PTR } as usize;
         return unsafe { core::slice::from_raw_parts(INPUT_PTR, len) };
     }
+    unsafe {
+        libc::lseek(0, 0, libc::SEEK_SET);
+    }
     let n = unsafe { libc::read(0, &raw mut BUF as *mut libc::c_void, MAX_INPUT_SIZE_DEFAULT) };
     assert!(n >= 0);
     unsafe {
@@ -24,17 +27,17 @@ fn read_input() -> &'static [u8] {
 }
 
 fn process_input(buf: &[u8]) {
-    // Guide the fuzzer toward the "bad" string by setting coverage
-    // as each successive character matches.
-    #[allow(clippy::len_zero)]
-    if buf.len() > 0 && buf[0] == b'b' {
+    // Record entrypoint execution coverage so initial corpus seeds are accepted
+    unsafe { EDGES_MAP_PTR.add(100).write(1) };
+
+    if !buf.is_empty() && buf[0] == b'b' {
         unsafe { EDGES_MAP_PTR.add(0).write(1) };
-    }
-    if buf.len() > 1 && buf[1] == b'a' {
-        unsafe { EDGES_MAP_PTR.add(1).write(1) };
-    }
-    if buf.len() > 2 && buf[2] == b'd' {
-        unsafe { EDGES_MAP_PTR.add(2).write(1) };
+        if buf.len() > 1 && buf[1] == b'a' {
+            unsafe { EDGES_MAP_PTR.add(1).write(1) };
+            if buf.len() > 2 && buf[2] == b'd' {
+                unsafe { EDGES_MAP_PTR.add(2).write(1) };
+            }
+        }
     }
 
     if buf.starts_with(b"bad") {

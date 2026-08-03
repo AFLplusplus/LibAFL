@@ -23,7 +23,7 @@ libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "cmplog_extended_instrumentation",
 ] }
 libafl_cc = { path = "../../../crates/libafl_cc" }
-clap = { version = "4.5.18", features = ["default"] }
+clap = { version = "4.6.4", features = ["default"] }
 
 [lib]
 name = "baby_fuzzer_redqueen"

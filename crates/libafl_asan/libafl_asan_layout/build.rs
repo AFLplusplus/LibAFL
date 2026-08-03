@@ -1,7 +1,7 @@
 use std::{collections::HashMap, env, fs, ops::RangeInclusive, path::Path, sync::LazyLock};
 
 use build_target::{Arch, Os, PointerWidth, target_arch, target_os, target_pointer_width};
-use rand::Rng;
+use rand::RngExt;
 
 // Default Linux/i386 mapping on x86_64 machine:
 // || `[0x40000000, 0xffffffff]` || HighMem    ||
@@ -310,10 +310,7 @@ fn main() {
 
     let layout = get_layout();
 
-    println!(
-        "cargo:warning=shadow_base = {}",
-        &layout.low_shadow_offset()
-    );
+    println!("cargo:warning=shadow_base = {}", layout.low_shadow_offset());
 
     let gen_layout = LAYOUT_TEMPLATE
         .to_string()

@@ -228,15 +228,6 @@ impl<I, S> Observer<I, S> for BacktraceObserver<'_> {
         }
         Ok(())
     }
-
-    fn post_exec_child(
-        &mut self,
-        state: &mut S,
-        input: &I,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        self.post_exec(state, input, exit_kind)
-    }
 }
 
 impl Named for BacktraceObserver<'_> {

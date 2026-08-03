@@ -452,7 +452,7 @@ where
         let qemu = emulator.qemu();
 
         // Check if QEMU existed because of an error or to handle some request
-        let mut exit_reason = match exit_reason {
+        let exit_reason = match exit_reason {
             Ok(exit_reason) => exit_reason,
             Err(exit_error) => match exit_error {
                 EmulatorExitError::UnexpectedExit => {
@@ -471,7 +471,7 @@ where
         };
 
         // If QEMU stopped because of a request, handle it here
-        let (command, ret_reg): (Option<C>, Option<Regs>) = match &mut exit_reason {
+        let (command, ret_reg): (Option<C>, Option<Regs>) = match exit_reason {
             EmulatorExitResult::QemuExit(shutdown_cause) => match shutdown_cause {
                 QemuShutdownCause::HostSignal(signal) => {
                     signal.handle();
