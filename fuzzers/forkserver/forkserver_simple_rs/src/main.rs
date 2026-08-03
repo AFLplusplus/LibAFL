@@ -160,13 +160,13 @@ pub fn main() {
             .unwrap_or_else(|err| {
                 panic!(
                     "Failed to load initial corpus at {:?}: {:?}",
-                    &corpus_dirs, err
+                    corpus_dirs, err
                 )
             });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let mutator = HavocScheduledMutator::with_max_stack_pow(havoc_mutations(), 6);
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer

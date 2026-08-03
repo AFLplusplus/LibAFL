@@ -7,9 +7,9 @@ mod tests {
     };
 
     use libafl_asan::{allocator::backend::dlmalloc::DlmallocBackend, mmap::unix::MmapRegion};
-    use spin::Lazy;
+    use spin::LazyLock;
 
-    static INIT_ONCE: Lazy<Mutex<()>> = Lazy::new(|| {
+    static INIT_ONCE: LazyLock<Mutex<()>> = LazyLock::new(|| {
         {
             env_logger::init();
         };

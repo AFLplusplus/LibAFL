@@ -8,11 +8,11 @@ mod tests {
         shadow::{PoisonType, Shadow, guest::GuestShadow, layout::DefaultShadowLayout},
         symbols::dlsym::{DlSymSymbols, LookupTypeNext},
     };
-    use spin::Lazy;
+    use spin::LazyLock;
 
     type GS = GuestShadow<LibcMmap<DlSymSymbols<LookupTypeNext>>, DefaultShadowLayout>;
 
-    static INIT_ONCE: Lazy<Mutex<()>> = Lazy::new(|| {
+    static INIT_ONCE: LazyLock<Mutex<()>> = LazyLock::new(|| {
         {
             env_logger::init();
         };

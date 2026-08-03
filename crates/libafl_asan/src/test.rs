@@ -4,7 +4,7 @@ use core::{
 };
 
 use log::{Level, error, trace};
-use spin::{Lazy, Mutex};
+use spin::{LazyLock, Mutex};
 
 use crate::{
     GuestAddr,
@@ -64,7 +64,7 @@ pub type TestFrontend = DefaultFrontend<DlmallocBackend<TestMap>, TestShadow, Te
 
 const PAGE_SIZE: usize = 4096;
 
-static FRONTEND: Lazy<Mutex<TestFrontend>> = Lazy::new(|| {
+static FRONTEND: LazyLock<Mutex<TestFrontend>> = LazyLock::new(|| {
     #[cfg(all(feature = "syscalls", target_os = "linux", not(feature = "libc")))]
     LinuxLogger::initialize(Level::Info);
     #[cfg(feature = "libc")]

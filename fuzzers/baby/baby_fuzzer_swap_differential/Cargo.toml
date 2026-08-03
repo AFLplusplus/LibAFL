@@ -20,9 +20,9 @@ opt-level = 3
 debug = true
 
 [build-dependencies]
-anyhow = "1.0.89"
+anyhow = "1.0.104"
 bindgen = "0.72.1"
-cc = "1.2.40"
+cc = "1.4.0"
 
 [dependencies]
 libafl = { path = "../../../crates/libafl", features = ["tui_monitor"] }
@@ -33,7 +33,7 @@ libafl_targets = { path = "../../../crates/libafl_targets", features = [
   "sancov_cmplog",
   "pointer_maps",
 ] }
-mimalloc = { version = "0.1.43", default-features = false }
+mimalloc = { version = "0.1.52", default-features = false }
 
 libafl_cc = { path = "../../../crates/libafl_cc" }
 

@@ -320,8 +320,11 @@ where
                                 &mut mgr,
                                 self.input_dirs,
                             )
-                            .unwrap_or_else(|_| {
-                                panic!("Failed to load initial corpus at {:?}", self.input_dirs);
+                            .unwrap_or_else(|err| {
+                                panic!(
+                                    "Failed to load initial corpus at {:?}: {err}",
+                                    self.input_dirs
+                                );
                             });
                         log::info!("We imported {} inputs from disk.", state.corpus().count());
                     }
@@ -354,9 +357,9 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
                     // Setup a basic mutator
                     let mutator = HavocScheduledMutator::new(havoc_mutations());
@@ -375,9 +378,9 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             } else {
                 let modules = tuple_list!(
@@ -448,8 +451,11 @@ where
                                 &mut mgr,
                                 self.input_dirs,
                             )
-                            .unwrap_or_else(|_| {
-                                panic!("Failed to load initial corpus at {:?}", self.input_dirs);
+                            .unwrap_or_else(|err| {
+                                panic!(
+                                    "Failed to load initial corpus at {:?}: {err}",
+                                    self.input_dirs
+                                );
                             });
                         log::info!("We imported {} inputs from disk.", state.corpus().count());
                     }
@@ -474,9 +480,9 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 } else {
                     // Setup a basic mutator
                     let mutator = HavocScheduledMutator::new(havoc_mutations());
@@ -495,9 +501,9 @@ where
                         )?;
                         mgr.on_restart(&mut state)?;
                         std::process::exit(0);
-                    } else {
-                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
+
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
             }
             Ok(())

@@ -60,23 +60,6 @@ pub trait Observer<I, S>: Named {
     ) -> Result<(), Error> {
         Ok(())
     }
-
-    /// Called right before execution starts in the child process, if any.
-    #[inline]
-    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        Ok(())
-    }
-
-    /// Called right after execution finishes in the child process, if any.
-    #[inline]
-    fn post_exec_child(
-        &mut self,
-        _state: &mut S,
-        _input: &I,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
 }
 
 /// A haskell-style tuple of observers
@@ -91,17 +74,6 @@ pub trait ObserversTuple<I, S>: MatchName {
         input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
-
-    /// This is called right before the next execution in the child process, if any.
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
-
-    /// This is called right after the last execution in the child process, if any.
-    fn post_exec_child_all(
-        &mut self,
-        state: &mut S,
-        input: &I,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error>;
 }
 
 impl<I, S> ObserversTuple<I, S> for () {
@@ -110,19 +82,6 @@ impl<I, S> ObserversTuple<I, S> for () {
     }
 
     fn post_exec_all(
-        &mut self,
-        _state: &mut S,
-        _input: &I,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn pre_exec_child_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn post_exec_child_all(
         &mut self,
         _state: &mut S,
         _input: &I,
@@ -150,21 +109,6 @@ where
     ) -> Result<(), Error> {
         self.0.post_exec(state, input, exit_kind)?;
         self.1.post_exec_all(state, input, exit_kind)
-    }
-
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.0.pre_exec_child(state, input)?;
-        self.1.pre_exec_child_all(state, input)
-    }
-
-    fn post_exec_child_all(
-        &mut self,
-        state: &mut S,
-        input: &I,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        self.0.post_exec_child(state, input, exit_kind)?;
-        self.1.post_exec_child_all(state, input, exit_kind)
     }
 }
 

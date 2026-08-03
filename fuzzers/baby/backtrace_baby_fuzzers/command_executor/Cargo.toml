@@ -14,7 +14,7 @@ opt-level = 3
 debug = true
 
 [build-dependencies]
-cc = "1.1.21"
+cc = "1.4.0"
 
 [dependencies]
 libafl = { path = "../../../../crates/libafl" }
