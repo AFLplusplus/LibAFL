@@ -76,14 +76,19 @@ runs:
           # Install to architecture-specific multiarch dir on Linux if it exists, otherwise /usr/local/lib
           ARCH_DIR="/usr/lib/$(uname -m)-linux-gnu"
           if [ -d "$ARCH_DIR" ]; then
-            sudo cp -d "$Z3_PATH/bin/libz3"* "$ARCH_DIR/" 2>/dev/null || true
+            sudo rm -f "$ARCH_DIR/libz3"*
+            sudo cp -f "$Z3_PATH/bin/libz3"* "$ARCH_DIR/" 2>/dev/null || true
             if [ -d "$Z3_PATH/lib" ]; then
-              sudo cp -d "$Z3_PATH/lib/libz3"* "$ARCH_DIR/" 2>/dev/null || true
+              sudo cp -f "$Z3_PATH/lib/libz3"* "$ARCH_DIR/" 2>/dev/null || true
             fi
+            sudo ln -sf "$ARCH_DIR/libz3.so" "$ARCH_DIR/libz3.so.4" 2>/dev/null || true
+            sudo ln -sf "$ARCH_DIR/libz3.so" "$ARCH_DIR/libz3.so.4.8" 2>/dev/null || true
+            sudo ln -sf "$ARCH_DIR/libz3.so" "$ARCH_DIR/libz3.so.4.8.12" 2>/dev/null || true
           else
-            sudo cp -d "$Z3_PATH/bin/libz3"* /usr/local/lib/ 2>/dev/null || true
+            sudo rm -f /usr/local/lib/libz3*
+            sudo cp -f "$Z3_PATH/bin/libz3"* /usr/local/lib/ 2>/dev/null || true
             if [ -d "$Z3_PATH/lib" ]; then
-              sudo cp -d "$Z3_PATH/lib/libz3"* /usr/local/lib/ 2>/dev/null || true
+              sudo cp -f "$Z3_PATH/lib/libz3"* /usr/local/lib/ 2>/dev/null || true
             fi
           fi
           sudo ldconfig 2>/dev/null || true
