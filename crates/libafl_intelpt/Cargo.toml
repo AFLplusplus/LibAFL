@@ -22,7 +22,7 @@ static_assertions = { workspace = true }
 
 [target.'cfg(target_os = "linux" )'.dev-dependencies]
 nix = { workspace = true }
-proc-maps = "0.4.0"
+proc-maps = "0.5.0"
 
 [dependencies]
 arbitrary-int = { workspace = true }
