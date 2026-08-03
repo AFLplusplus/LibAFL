@@ -59,6 +59,7 @@ runs:
         echo "LIBCLANG_PATH=/usr/lib/llvm-${{ env.MAIN_LLVM_VERSION }}/lib" >> "$GITHUB_ENV"
 
     - name: Install Z3
+      id: z3
       uses: cda-tum/setup-z3@v1
       with:
         version: latest
@@ -66,8 +67,9 @@ runs:
     - name: Export Z3 Environment Variables
       shell: bash
       run: |
-        echo "LIBRARY_PATH=$Z3_DIR/lib:$LIBRARY_PATH" >> "$GITHUB_ENV"
-        echo "LD_LIBRARY_PATH=$Z3_DIR/lib:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
+        Z3_PATH="${{ steps.z3.outputs.z3-dir }}"
+        echo "LIBRARY_PATH=$Z3_PATH/lib:$LIBRARY_PATH" >> "$GITHUB_ENV"
+        echo "LD_LIBRARY_PATH=$Z3_PATH/lib:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
 
     - name: Symlink headers
       shell: bash
