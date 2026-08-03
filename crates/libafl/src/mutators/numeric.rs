@@ -148,6 +148,9 @@ pub trait Numeric {
 
     /// Randomizes the value using the provided random number generator.
     fn randomize<R: Rand>(&mut self, rand: &mut R);
+
+    /// Returns the number of bits in the type.
+    fn bits(&self) -> usize;
 }
 
 // Macro to implement the Numeric trait for multiple integer types a u64 can be cast to
@@ -185,6 +188,10 @@ macro_rules! impl_numeric_cast_randomize {
                 *self = rand.next() as $t;
             }
 
+            #[inline]
+            fn bits(&self) -> usize {
+                <$t>::BITS as usize
+            }
         }
     )*)
 }
@@ -226,6 +233,10 @@ macro_rules! impl_numeric_128_bits_randomize {
                 *self = (u128::from(rand.next()) << 64 | u128::from(rand.next())) as $t;
             }
 
+            #[inline]
+            fn bits(&self) -> usize {
+                <$t>::BITS as usize
+            }
         }
     )*)
 }
@@ -257,6 +268,10 @@ impl<I: Numeric> Numeric for &mut I {
     fn randomize<R: Rand>(&mut self, rand: &mut R) {
         (*self).randomize(rand);
     }
+
+    fn bits(&self) -> usize {
+        (**self).bits()
+    }
 }
 
 /// Bitflip mutation for integer-like inputs
@@ -269,7 +284,7 @@ where
     I: Numeric,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let offset = state.rand_mut().choose(0..size_of::<I>()).unwrap();
+        let offset = state.rand_mut().choose(0..input.bits()).unwrap();
         input.flip_bit_at(offset);
         Ok(MutationResult::Mutated)
     }
@@ -522,18 +537,63 @@ impl<F, I> Named for MappedCrossoverMutator<F, I> {
 mod tests {
 
     use libafl_bolts::{
-        rands::{Rand, XkcdRand},
+        rands::{Rand, StdRand, XkcdRand},
         tuples::IntoVec as _,
     };
     use serde::{Deserialize, Serialize};
 
-    use super::{Numeric, int_mutators};
+    use super::{BitFlipMutator, Mutator, Numeric, int_mutators};
     use crate::{
         corpus::{Corpus as _, InMemoryCorpus, Testcase},
-        inputs::value::I16Input,
+        inputs::value::{I16Input, U32Input},
         mutators::MutationResult,
         state::StdState,
     };
+
+    #[test]
+    fn test_numeric_bits() {
+        assert_eq!(0_u8.bits(), 8);
+        assert_eq!(0_u16.bits(), 16);
+        assert_eq!(0_u32.bits(), 32);
+        assert_eq!(0_u64.bits(), 64);
+        assert_eq!(0_u128.bits(), 128);
+        assert_eq!(0_i8.bits(), 8);
+        assert_eq!(0_i16.bits(), 16);
+        assert_eq!(0_i32.bits(), 32);
+        assert_eq!(0_i64.bits(), 64);
+        assert_eq!(0_i128.bits(), 128);
+    }
+
+    #[test]
+    fn test_bit_flip_mutator_upper_bits() {
+        let mut corpus = InMemoryCorpus::new();
+        corpus.add(Testcase::new(U32Input::new(0_u32))).unwrap();
+        let mut state = StdState::new(
+            StdRand::with_seed(0),
+            corpus,
+            InMemoryCorpus::new(),
+            &mut (),
+            &mut (),
+        )
+        .unwrap();
+
+        let mut mutator = BitFlipMutator;
+        let mut flipped_above_byte = false;
+
+        for _ in 0..100 {
+            let mut input = U32Input::new(0_u32);
+            mutator.mutate(&mut state, &mut input).unwrap();
+            if input.into_inner() >= 16 {
+                flipped_above_byte = true;
+                break;
+            }
+        }
+
+        assert!(
+            flipped_above_byte,
+            "BitFlipMutator never flipped a bit >= 4, check upper bound"
+        );
+    }
 
     #[test]
     fn randomized() {

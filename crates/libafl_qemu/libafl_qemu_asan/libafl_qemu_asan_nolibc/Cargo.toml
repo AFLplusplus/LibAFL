@@ -23,10 +23,10 @@ libafl_asan = { path = "../../../libafl_asan", default-features = false, feature
   "tracking",
   "nostd",
 ] }
-log = { version = "0.4.22", default-features = false, features = [
+log = { version = "0.4.33", default-features = false, features = [
   "release_max_level_info",
 ] }
-spin = { version = "0.9.8", default-features = false, features = [
+spin = { version = "0.12.2", default-features = false, features = [
   "lazy",
   "mutex",
   "spin_mutex",

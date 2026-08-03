@@ -416,6 +416,7 @@ impl AflppCmpValuesMetadata {
 /// - attribute: OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
 /// - overflow:  Whether the comparison overflows
 /// - reserved:  Reserved for future use
+#[must_use]
 #[bitfield(u16)]
 #[derive(Debug)]
 pub struct AflppCmpLogHeader {

@@ -217,7 +217,7 @@ pub mod child_signal_handlers {
         observers::ObserversTuple,
     };
 
-    /// invokes the `post_exec_child` hook on all observer in case the child process panics
+    /// invokes the `post_exec` hook on all observer in case the child process panics
     pub fn setup_child_panic_hook<E, I, S>()
     where
         E: HasObservers,
@@ -234,7 +234,7 @@ pub mod child_signal_handlers {
                 // Invalidate data to not execute again the observer hooks in the crash handler
                 let input = (*data).take_current_input::<I>();
                 observers
-                    .post_exec_child_all(state, input, &ExitKind::Crash)
+                    .post_exec_all(state, input, &ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
 
                 // std::process::abort();
@@ -266,7 +266,7 @@ pub mod child_signal_handlers {
                 let state = data.state_mut::<S>();
                 let input = data.take_current_input::<I>();
                 observers
-                    .post_exec_child_all(state, input, &ExitKind::Crash)
+                    .post_exec_all(state, input, &ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
             }
 
@@ -292,7 +292,7 @@ pub mod child_signal_handlers {
                 let state = data.state_mut::<S>();
                 let input = data.take_current_input::<I>();
                 observers
-                    .post_exec_child_all(state, input, &ExitKind::Timeout)
+                    .post_exec_all(state, input, &ExitKind::Timeout)
                     .expect("Failed to run post_exec on observers");
             }
             libc::_exit(128 + (_signal as i32));

@@ -178,7 +178,7 @@ macro_rules! fuzz_with {
         };
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OomFeedback, OomObserver, CMP_MAP};
         use libafl_bolts::nonzero;
-        use rand::{thread_rng, RngCore};
+        use rand::{rng, RngExt};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
         use crate::{
             CustomMutationStatus,
@@ -270,11 +270,11 @@ macro_rules! fuzz_with {
             let corpus_dir = if let Some(main) = $options.dirs().first() {
                 main.clone()
             } else {
-                let mut rng = thread_rng();
+                let mut rng = rng();
                 let mut dir = PathBuf::new();
                 let mut last = Ok(());
                 for _ in 0..8 {
-                    dir = temp_dir().join(format!("libafl-corpus-{}", rng.next_u64()));
+                    dir = temp_dir().join(format!("libafl-corpus-{}", rng.random::<u64>()));
                     last = create_dir(&dir);
                     if last.is_ok() {
                         break;

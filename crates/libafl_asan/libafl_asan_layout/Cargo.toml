@@ -2,7 +2,7 @@
 name = "libafl_asan_layout"
 description = "Shadow memory layout definitions for LibAFL asan"
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.93.1"
 keywords = ["fuzzing", "address", "sanitizer", "asan"]
 categories = [
   "development-tools::testing",
@@ -27,6 +27,6 @@ dynamic_layout = []
 
 [build-dependencies]
 build-target = "0.8.0"
-libc = "0.2.179"
+libc = "0.2.189"
 page_size = "0.6.0"
-rand = "0.9.2"
+rand = "0.10.2"
