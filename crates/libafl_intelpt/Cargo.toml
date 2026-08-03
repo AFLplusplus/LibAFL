@@ -45,7 +45,7 @@ windows = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_System_Threading",
 ] }
-ipt = { version = "0.1.0" }
+ipt = { version = "0.1.2" }
 
 [lints]
 workspace = true

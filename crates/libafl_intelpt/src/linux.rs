@@ -31,7 +31,8 @@ use perf_event_open_sys::{
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
-pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtCoverageDecoderBuilder, PtImage};
+use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder};
+pub use ptcov::{CoverageEntry, PtImage};
 
 use super::{PAGE_SIZE, availability};
 use crate::utils::current_cpu;
@@ -106,7 +107,7 @@ impl<'a> IntelPT<'a> {
     /// Set filters based on Instruction Pointer (IP)
     ///
     /// Only instructions in `filters` ranges will be traced.
-    fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
+    pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
         let str_filter = filters
             .iter()
             .map(|filter| {
@@ -325,7 +326,7 @@ impl Drop for IntelPT<'_> {
 /// Builder for [`IntelPT`]
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntelPTBuilder<'a> {
-    pid: Option<i32>,
+    pid: i32,
     cpu: i32,
     exclude_kernel: bool,
     exclude_hv: bool,
@@ -343,7 +344,9 @@ impl Default for IntelPTBuilder<'_> {
     /// ```rust
     /// use libafl_intelpt::{IntelPTBuilder, PAGE_SIZE};
     /// let builder = IntelPTBuilder::default()
-    ///     .pid(None)
+    ///     // 0 means "Current process" ONLY on Linux!
+    ///     // Prefer not setting the pid at all if you want a cross-platform "Current process"
+    ///     .pid(0)
     ///     .all_cpus()
     ///     .exclude_kernel(true)
     ///     .exclude_hv(false)
@@ -358,7 +361,7 @@ impl Default for IntelPTBuilder<'_> {
     /// ```
     fn default() -> Self {
         Self {
-            pid: None,
+            pid: 0,
             cpu: -1,
             exclude_kernel: true,
             exclude_hv: false,
@@ -384,7 +387,7 @@ impl<'a> IntelPTBuilder<'a> {
         let fd = match unsafe {
             perf_event_open(
                 ptr::from_mut(&mut perf_event_attr),
-                self.pid.unwrap_or(0),
+                self.pid,
                 self.cpu,
                 -1,
                 PERF_FLAG_FD_CLOEXEC.into(),
@@ -464,8 +467,10 @@ impl<'a> IntelPTBuilder<'a> {
     }
 
     #[must_use]
-    /// Set the process to be traced via its `PID`. Set to `None` to trace the current process.
-    pub const fn pid(mut self, pid: Option<i32>) -> Self {
+    /// Set the process to be traced via its `PID`.
+    ///
+    /// Not calling this function will default to the current process.
+    pub const fn pid(mut self, pid: i32) -> Self {
         self.pid = pid;
         self
     }

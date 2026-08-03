@@ -3,19 +3,15 @@
 //! This code is heavily inspired by `winipt` by Alex Ionescu and its other authors.
 //! Credits also go to Frederic Kah and Justin Avril, who drafted the initial implementation.
 
-// todo: Cross-platform API divergence
-//
-// lib.rs glob-re-exports both modules, so IntelPT/IntelPTBuilder are the "same" type by name but not by API: pid(u32) vs pid(Option<i32>), set_thread_id + pub set_ip_filters (Windows) vs builder .ip_filters() and private set_ip_filters (Linux), no PtCoverageDecoderBuilder or last_decode_trace() re-export on Windows, IntelPTBuilder derives Clone + PartialEq only on Linux. The example fuzzer already pays for this with #[cfg(windows)] and #[cfg_attr(not(windows), expect(unused_mut))]. Converging pid() and moving thread_id/ip_filters onto the builder would also make the "must set thread_id before filters" ordering unrepresentable rather than a runtime Error::unsupported.
-
+#[cfg(feature = "export_raw")]
+use alloc::string::ToString;
 use alloc::{string::String, vec::Vec};
 use core::{fmt::Debug, ops::RangeInclusive, ptr::slice_from_raw_parts_mut};
-#[cfg(feature = "export_raw")]
-use std::string::ToString;
 
 use ::ipt::{AddressFilterMode, Ipt, TraceBuffer};
 use libafl_bolts::Error;
-use ptcov::PtCoverageDecoderBuilder;
-pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtImage};
+use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder};
+pub use ptcov::{CoverageEntry, PtImage};
 use raw_cpuid::CpuId;
 use windows::{
     Win32::{
@@ -29,6 +25,10 @@ use windows::{
 };
 
 use crate::utils::current_cpu;
+
+/// According to Intel's SDM this is the maximun number of IP filters available on any CPU.
+/// The actual number on a CPU might be lower (2 seems to be a common value).
+const MAX_NUM_IP_FILTERS: u32 = 4;
 
 /// Intel Processor Trace (PT)
 #[derive(Debug)]
@@ -53,26 +53,40 @@ impl<'a> IntelPT<'a> {
     /// Set filters based on Instruction Pointer (IP)
     ///
     /// Only instructions in `filters` ranges will be traced.
-    // todo set_ip_filters leaves stale ranges armed — windows.rs:80-95. It only programs 0..filters.len(); ranges from a previous call keep filtering. Linux replaces the entire filter string, so behavior diverges. Also i.try_into().unwrap() panics instead of erroring, and there's no upfront filters.len() <= nr_addr_filters() check — that only surfaces as a warning after the ioctl already failed.
     pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
         let thread_handle =
             unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, self.thread_id)?) };
+        let mut i = 0;
+        let mut filters_iter = filters.iter();
 
-        for (i, filter) in filters.iter().enumerate() {
-            self.ipt
-                .configure_thread_address_filter_range(
-                    *thread_handle,
-                    i.try_into().unwrap(),
-                    AddressFilterMode::Filter,
-                    *filter.start(),
-                    *filter.end(),
-                )
-                .inspect_err(|_| {
-                    log::warn!(
-                        "Available IP filters on the CPU: {}",
-                        nr_addr_filters().unwrap_or(0)
-                    );
-                })?;
+        // Iter over all IP filters available in the CPU
+        while self
+            .ipt
+            .query_thread_address_filter_range(*thread_handle, i)
+            .is_ok()
+            && i < MAX_NUM_IP_FILTERS
+        {
+            let (filter_mode, filter_range) = filters_iter
+                .next()
+                .map_or((AddressFilterMode::Disabled, &(0..=0)), |f| {
+                    (AddressFilterMode::Filter, f)
+                });
+            self.ipt.configure_thread_address_filter_range(
+                *thread_handle,
+                i,
+                filter_mode,
+                *filter_range.start(),
+                *filter_range.end(),
+            )?;
+            i += 1;
+        }
+
+        if filters_iter.next().is_some() {
+            return Err(Error::unsupported(format!(
+                "Failed to set IP filters, number of available IP filters reported by the CPU: {},\
+                available filters reported by the ipt.sys driver: {i}",
+                nr_addr_filters().unwrap_or(0)
+            )));
         }
         log::debug!("PT filtering for IP in {filters:x?}");
         Ok(())
@@ -156,6 +170,13 @@ impl<'a> IntelPT<'a> {
         Ok(())
     }
 
+    /// Get the raw trace used in the last decoding
+    #[cfg(feature = "export_raw")]
+    #[must_use]
+    pub fn last_decode_trace(&self) -> Vec<u8> {
+        self.last_decode_trace.clone()
+    }
+
     /// Dump the raw trace used in the last decoding to the file
     /// `./traces/trace_<unix epoch in micros>`
     #[cfg(feature = "export_raw")]
@@ -178,12 +199,13 @@ impl<'a> IntelPT<'a> {
 }
 
 /// Builder for [`IntelPT`]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct IntelPTBuilder<'a> {
     images: &'a [PtImage<'a>],
     ipt: Option<(Ipt, Owned<HANDLE>)>,
     pid: u32,
     tid: u32,
+    ip_filters: Vec<RangeInclusive<u64>>,
 }
 
 impl Default for IntelPTBuilder<'_> {
@@ -196,6 +218,7 @@ impl Default for IntelPTBuilder<'_> {
             ipt: None,
             pid,
             tid,
+            ip_filters: Vec::new(),
         }
     }
 }
@@ -217,7 +240,7 @@ impl<'a> IntelPTBuilder<'a> {
         let (ipt, target_process_handle) = self.ipt.take().unwrap();
 
         // todo - OpenThread + CloseHandle on every enable_tracing/disable_tracing — two handle round-trips per execution. Cache the Owned<HANDLE>.
-        let intel_pt = IntelPT {
+        let mut intel_pt = IntelPT {
             ipt,
             target_process_handle,
             thread_id: self.tid,
@@ -227,9 +250,14 @@ impl<'a> IntelPTBuilder<'a> {
             last_decode_trace: Vec::new(),
         };
 
+        if !self.ip_filters.is_empty() {
+            intel_pt.set_ip_filters(&self.ip_filters)?;
+        }
         Ok(intel_pt)
     }
 
+    /// Not calling this function will default to the current process.
+    ///
     /// # Panics
     /// Panics if tracing already started
     #[must_use]
@@ -275,6 +303,13 @@ impl<'a> IntelPTBuilder<'a> {
     #[must_use]
     pub fn thread_id(mut self, tid: u32) -> Self {
         self.tid = tid;
+        self
+    }
+
+    #[must_use]
+    /// Set filters based on Instruction Pointer (IP)
+    pub fn ip_filters(mut self, filters: Vec<RangeInclusive<u64>>) -> Self {
+        self.ip_filters = filters;
         self
     }
 }
