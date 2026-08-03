@@ -21,8 +21,6 @@ use libafl::{
 };
 use libafl_bolts::{current_nanos, nonnull_raw_mut, rands::StdRand, tuples::tuple_list};
 use proc_maps::get_process_maps;
-#[cfg(windows)]
-use windows::Win32::System::Threading::GetCurrentThreadId;
 
 // Edge coverage map.
 const MAP_SIZE: usize = 4096;
@@ -104,10 +102,7 @@ pub fn main() {
         .collect::<Vec<_>>();
 
     // Pass the executable memory to the code responsible for Intel PT trace decoding
-    #[cfg_attr(not(windows), expect(unused_mut))]
-    let mut pt = IntelPT::builder().images(&images).build().unwrap();
-    #[cfg(windows)]
-    pt.set_thread_id(Some(unsafe { GetCurrentThreadId() }));
+    let pt = IntelPT::builder().images(&images).build().unwrap();
 
     // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
     let pt_hook = unsafe {

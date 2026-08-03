@@ -1,14 +1,18 @@
-/// Intel Processor Trace code using the `ipt.sys` Windows driver.
-///
-/// This code is heavily inspired by `winipt` by Alex Ionescu and its other authors.
-/// Credits also go to Frederic Kah and Justin Avril, who drafted the initial implementation.
+//! Intel Processor Trace code using the `ipt.sys` Windows driver.
+//!
+//! This code is heavily inspired by `winipt` by Alex Ionescu and its other authors.
+//! Credits also go to Frederic Kah and Justin Avril, who drafted the initial implementation.
+
+// todo: Cross-platform API divergence
+//
+// lib.rs glob-re-exports both modules, so IntelPT/IntelPTBuilder are the "same" type by name but not by API: pid(u32) vs pid(Option<i32>), set_thread_id + pub set_ip_filters (Windows) vs builder .ip_filters() and private set_ip_filters (Linux), no PtCoverageDecoderBuilder or last_decode_trace() re-export on Windows, IntelPTBuilder derives Clone + PartialEq only on Linux. The example fuzzer already pays for this with #[cfg(windows)] and #[cfg_attr(not(windows), expect(unused_mut))]. Converging pid() and moving thread_id/ip_filters onto the builder would also make the "must set thread_id before filters" ordering unrepresentable rather than a runtime Error::unsupported.
+
 use alloc::{string::String, vec::Vec};
 use core::{fmt::Debug, ops::RangeInclusive, ptr::slice_from_raw_parts_mut};
 #[cfg(feature = "export_raw")]
 use std::string::ToString;
 
 use ::ipt::{AddressFilterMode, Ipt, TraceBuffer};
-use hashbrown::HashMap;
 use libafl_bolts::Error;
 use ptcov::PtCoverageDecoderBuilder;
 pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtImage};
@@ -17,8 +21,8 @@ use windows::{
     Win32::{
         Foundation::HANDLE,
         System::Threading::{
-            GetCurrentProcessId, OpenProcess, OpenThread, PROCESS_QUERY_INFORMATION,
-            PROCESS_VM_READ, THREAD_GET_CONTEXT,
+            GetCurrentProcessId, GetCurrentThreadId, OpenProcess, OpenThread,
+            PROCESS_QUERY_INFORMATION, PROCESS_VM_READ, THREAD_GET_CONTEXT,
         },
     },
     core::Owned,
@@ -26,21 +30,14 @@ use windows::{
 
 use crate::utils::current_cpu;
 
-#[derive(Debug)]
-struct ThreadCoverageDecoder<'a> {
-    decoder: PtCoverageDecoder<'a>,
-    previous_decode_head: u32,
-}
-
 /// Intel Processor Trace (PT)
 #[derive(Debug)]
 pub struct IntelPT<'a> {
     ipt: Ipt,
     target_process_handle: Owned<HANDLE>,
-    thread_id: Option<u32>,
-    ptcov_decoders: HashMap<u64, ThreadCoverageDecoder<'a>>,
-    images: &'a [PtImage<'a>],
-    last_decode_threads: Vec<u32>,
+    thread_id: u32,
+    decoder: PtCoverageDecoder<'a>,
+    previous_decode_head: u32,
     #[cfg(feature = "export_raw")]
     last_decode_trace: Vec<u8>,
 }
@@ -53,29 +50,13 @@ impl<'a> IntelPT<'a> {
         IntelPTBuilder::default()
     }
 
-    pub fn set_thread_id(&mut self, thread_id: Option<u32>) {
-        if let Some(thread_id) = thread_id {
-            log::debug!("PT filtering for thread {thread_id}");
-        } else {
-            log::debug!("PT filtering for thread disabled");
-        }
-
-        self.thread_id = thread_id;
-    }
-
     /// Set filters based on Instruction Pointer (IP)
     ///
     /// Only instructions in `filters` ranges will be traced.
-    /// `thread_id` must be set in order to set the filters, otherwise this function will return an
-    /// error.
+    // todo set_ip_filters leaves stale ranges armed — windows.rs:80-95. It only programs 0..filters.len(); ranges from a previous call keep filtering. Linux replaces the entire filter string, so behavior diverges. Also i.try_into().unwrap() panics instead of erroring, and there's no upfront filters.len() <= nr_addr_filters() check — that only surfaces as a warning after the ioctl already failed.
     pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
-        let thread_handle = if let Some(thread_id) = self.thread_id {
-            unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, thread_id)?) }
-        } else {
-            return Err(Error::unsupported(
-                "IP filtering requires the `thread_id` to be set!",
-            ));
-        };
+        let thread_handle =
+            unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, self.thread_id)?) };
 
         for (i, filter) in filters.iter().enumerate() {
             self.ipt
@@ -97,48 +78,21 @@ impl<'a> IntelPT<'a> {
         Ok(())
     }
 
+    /// Resume tracing of the traced thread
     pub fn enable_tracing(&mut self) -> Result<(), Error> {
-        self.toggle_tracing(true)
+        let thread_handle =
+            unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, self.thread_id)?) };
+        self.ipt.resume_thread_trace(*thread_handle)?;
+        Ok(())
     }
 
+    /// Pause tracing of the traced thread
+    ///
+    /// This doesn't drop [`IntelPT`], the configuration will be preserved.
     pub fn disable_tracing(&mut self) -> Result<(), Error> {
-        self.toggle_tracing(false)
-    }
-
-    // If the target thread_id is not set, this function will be a best effort based on the threads
-    // seen in the last decoding. Enumerating the threads for every iteration kills performances.
-    // If a new thread is spawn it is traced by default. If a thread ends, the reativation will fail
-    // with a log message but without returning the error.
-    fn toggle_tracing(&mut self, enable: bool) -> Result<(), Error> {
-        if let Some(thread_id) = self.thread_id {
-            let thread_handle =
-                unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, thread_id)?) };
-            if enable {
-                self.ipt.resume_thread_trace(*thread_handle).map(|_| ())?;
-            } else {
-                self.ipt.pause_thread_trace(*thread_handle).map(|_| ())?;
-            }
-        } else {
-            for thread_id in &self.last_decode_threads {
-                let thread_handle =
-                    match unsafe { OpenThread(THREAD_GET_CONTEXT, false, *thread_id) } {
-                        Ok(handle) => unsafe { Owned::new(handle) },
-                        Err(e) => {
-                            log::info!("Failed to toggle tracing for thread {thread_id}: {e}");
-                            continue;
-                        }
-                    };
-
-                let res = if enable {
-                    self.ipt.resume_thread_trace(*thread_handle)
-                } else {
-                    self.ipt.pause_thread_trace(*thread_handle)
-                };
-                let _ = res.inspect_err(|e| {
-                    log::info!("Failed to toggle tracing for thread {thread_id}: {e}");
-                });
-            }
-        }
+        let thread_handle =
+            unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, self.thread_id)?) };
+        self.ipt.pause_thread_trace(*thread_handle)?;
         Ok(())
     }
 
@@ -154,53 +108,36 @@ impl<'a> IntelPT<'a> {
     where
         T: CoverageEntry,
     {
-        self.last_decode_threads.clear();
         #[cfg(feature = "export_raw")]
         {
             self.last_decode_trace.clear();
         }
 
+        //todo TOCTOU on the trace buffer size — windows.rs:164-169. A thread created between get_trace_buffer_size and get_trace_buffer makes the buffer too small; per the ipt docs that's STATUS_BUFFER_OVERFLOW/STATUS_BUFFER_TOO_SMALL. Worth one retry.
         // get trace
         let trace_size = self
             .ipt
             .get_trace_buffer_size(*self.target_process_handle)?;
+        // todo - TraceBuffer::with_capacity(trace_size) allocates a fresh ~1 MiB × n_threads buffer on every post_exec, and split_buffer allocates per record. Both should live in IntelPT and be reused/grown. Linux is zero-copy off the mmap here, so the Windows path is meaningfully more expensive.
         let mut trace_buffer = TraceBuffer::with_capacity(trace_size);
         self.ipt
             .get_trace_buffer(*self.target_process_handle, &mut trace_buffer)?;
 
         for (header, data) in &trace_buffer {
-            self.last_decode_threads.push(header.thread_id as u32);
-
-            if self
-                .thread_id
-                .is_none_or(|thread_id| u64::from(thread_id) == header.thread_id)
-            {
-                let ptcov_decoder =
-                    self.ptcov_decoders
-                        .entry(header.thread_id)
-                        .or_insert(ThreadCoverageDecoder {
-                            decoder: PtCoverageDecoderBuilder::new()
-                                .cpu(current_cpu())
-                                .images(self.images)
-                                .build(),
-                            previous_decode_head: 0,
-                        });
-
-                log::trace!(
-                    "PT previous_decode_head: {}",
-                    ptcov_decoder.previous_decode_head
-                );
+            if u64::from(self.thread_id) == header.thread_id {
+                log::trace!("PT previous_decode_head: {}", self.previous_decode_head);
                 let mut split_buffer = Vec::new();
-                let trace = if header.output_offset >= ptcov_decoder.previous_decode_head {
-                    &data
-                        [ptcov_decoder.previous_decode_head as usize..header.output_offset as usize]
+                // Both offsets index the thread's trace buffer, whose size is fixed when tracing
+                // starts, hence they can never be out of `data`'s bounds.
+                let trace = if header.output_offset >= self.previous_decode_head {
+                    &data[self.previous_decode_head as usize..header.output_offset as usize]
                 } else {
                     log::trace!("PT ring buffer wrapped, handling split trace");
-                    split_buffer.extend(&data[ptcov_decoder.previous_decode_head as usize..]);
+                    split_buffer.extend(&data[self.previous_decode_head as usize..]);
                     split_buffer.extend(&data[0..header.output_offset as usize]);
                     &split_buffer
                 };
-                ptcov_decoder.previous_decode_head = header.output_offset;
+                self.previous_decode_head = header.output_offset;
 
                 #[cfg(feature = "export_raw")]
                 {
@@ -209,7 +146,7 @@ impl<'a> IntelPT<'a> {
 
                 let coverage = unsafe { &mut *slice_from_raw_parts_mut(map_ptr, map_len) };
 
-                if let Err(e) = ptcov_decoder.decoder.coverage(trace, coverage) {
+                if let Err(e) = self.decoder.coverage(trace, coverage) {
                     log::warn!("PT trace decoding to coverage failed: {e:x?}");
                     coverage.fill(0.into());
                 }
@@ -219,6 +156,8 @@ impl<'a> IntelPT<'a> {
         Ok(())
     }
 
+    /// Dump the raw trace used in the last decoding to the file
+    /// `./traces/trace_<unix epoch in micros>`
     #[cfg(feature = "export_raw")]
     pub fn dump_last_trace_to_file(&self) -> Result<(), Error> {
         use std::{fs, io::Write, path::Path, time};
@@ -238,58 +177,104 @@ impl<'a> IntelPT<'a> {
     }
 }
 
+/// Builder for [`IntelPT`]
 #[derive(Debug)]
 pub struct IntelPTBuilder<'a> {
     images: &'a [PtImage<'a>],
+    ipt: Option<(Ipt, Owned<HANDLE>)>,
     pid: u32,
+    tid: u32,
 }
 
 impl Default for IntelPTBuilder<'_> {
+    /// Trace the calling thread of the current process, with no images and no tracing started
     fn default() -> Self {
         let pid = unsafe { GetCurrentProcessId() };
-        Self { images: &[], pid }
+        let tid = unsafe { GetCurrentThreadId() };
+        Self {
+            images: &[],
+            ipt: None,
+            pid,
+            tid,
+        }
     }
 }
 
 impl<'a> IntelPTBuilder<'a> {
-    pub fn build(self) -> Result<IntelPT<'a>, Error> {
-        let ipt = Ipt::open()?;
+    /// Build the [`IntelPT`] struct, starting tracing if [`IntelPTBuilder::start_tracing`] was not
+    /// called yet
+    pub fn build(mut self) -> Result<IntelPT<'a>, Error> {
+        let decoder = PtCoverageDecoderBuilder::new()
+            .cpu(current_cpu())
+            .images(self.images)
+            .build();
 
-        let target_process_handle = unsafe {
-            OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, self.pid)
-                .map(|h| Owned::new(h))
-        }?;
+        // todo: Double check if is possible to start tracing as "paused", as we need to start
+        // tracing in order to set IP filters, but this can lead to trace pollution.
+        if self.ipt.is_none() {
+            self = self.start_tracing()?;
+        }
+        let (ipt, target_process_handle) = self.ipt.take().unwrap();
 
-        let options = ipt::IptOption::default();
-        ipt.start_process_trace(*target_process_handle, options)?;
-
-        let mut intel_pt = IntelPT {
+        // todo - OpenThread + CloseHandle on every enable_tracing/disable_tracing — two handle round-trips per execution. Cache the Owned<HANDLE>.
+        let intel_pt = IntelPT {
             ipt,
             target_process_handle,
-            thread_id: None,
-            ptcov_decoders: HashMap::new(),
-            images: self.images,
-            last_decode_threads: vec![],
+            thread_id: self.tid,
+            decoder,
+            previous_decode_head: 0,
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
         };
-        // Pause tracing ASAP to avoid too much trace pollution, unfortunately is not passible to
-        // start tracing as "paused", and we need to start tracing in order to set IP filters.
-        // todo: double check previous statement.
-        let _ = intel_pt.disable_tracing();
 
         Ok(intel_pt)
     }
 
+    /// # Panics
+    /// Panics if tracing already started
     #[must_use]
     pub fn pid(mut self, pid: u32) -> Self {
+        assert!(
+            self.ipt.is_none(),
+            "Tracing already started, set the PID before starting tracing!"
+        );
         self.pid = pid;
         self
     }
 
+    /// Set the executable memory used to decode the traces
     #[must_use]
     pub fn images(mut self, images: &'a [PtImage<'_>]) -> Self {
         self.images = images;
+        self
+    }
+
+    /// Start tracing the target process
+    ///
+    /// Call this before creating the traced thread to avoid losing its first traces, otherwise
+    /// [`IntelPTBuilder::build`] takes care of it. Returns an error if tracing is already started.
+    pub fn start_tracing(mut self) -> Result<Self, Error> {
+        if self.ipt.is_some() {
+            return Err(Error::illegal_state("Tracing already started"));
+        }
+
+        // todo: - build() doesn't enrich failures with availability() the way Linux does, so an Ipt::open() failure surfaces as a bare windows::core::Error. (The ipt crate's own log feature is on by default and logs the sc start ipt hint, so this is mitigated but inconsistent.)
+        let ipt = Ipt::open()?;
+        let target_process_handle = unsafe {
+            OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, self.pid)
+                .map(|h| Owned::new(h))
+        }?;
+        let options = ipt::IptOption::default();
+        ipt.start_process_trace(*target_process_handle, options)?;
+
+        self.ipt = Some((ipt, target_process_handle));
+        Ok(self)
+    }
+
+    /// Set the thread to be traced via its `TID`. Defaults to the thread creating the builder.
+    #[must_use]
+    pub fn thread_id(mut self, tid: u32) -> Self {
+        self.tid = tid;
         self
     }
 }

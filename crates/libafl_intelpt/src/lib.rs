@@ -1,7 +1,7 @@
 //! Intel Processor Trace (PT) low level code
 //!
-//! This crate interacts with the linux kernel (specifically with perf) and therefore it only works
-//! on linux hosts
+//! This crate interacts with the host kernel to drive Intel PT: on Linux through perf, on Windows
+//! through the `ipt.sys` driver. Other hosts are not supported.
 #![doc = include_str!("../README.md")]
 // Just in case this crate will have real `no_std` support in the future
 #![no_std]

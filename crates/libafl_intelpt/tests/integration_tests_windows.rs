@@ -10,7 +10,6 @@ use libafl_intelpt::{IntelPT, availability};
 use log::LevelFilter;
 use proc_maps::get_process_maps;
 use ptcov::PtImage;
-use windows::Win32::System::Threading::GetCurrentThreadId;
 
 #[test]
 fn intel_pt_trace_loop() {
@@ -41,8 +40,6 @@ fn intel_pt_trace_loop() {
         .images(&images)
         .build()
         .expect("Failed to create IntelPT");
-    let tid = unsafe { GetCurrentThreadId() };
-    pt.set_thread_id(Some(tid));
     pt.enable_tracing().unwrap();
 
     let mut count = 0;
