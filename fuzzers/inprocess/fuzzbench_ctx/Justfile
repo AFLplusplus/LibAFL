@@ -56,7 +56,7 @@ test: fuzzer
     mkdir in || true
     echo a > in/a
     # Allow sigterm as exit code 
-    timeout 31s ./{{ FUZZER_NAME }} -o out -i in | tee fuzz_stdout.log || true
+    timeout 31s stdbuf -oL -eL ./{{ FUZZER_NAME }} -o out -i in | stdbuf -oL tee fuzz_stdout.log || true
     if grep -qa "objectives: 1" fuzz_stdout.log; then
     	echo "Fuzzer is working"
     else

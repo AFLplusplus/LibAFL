@@ -132,10 +132,10 @@ where
 
             let original = input.clone();
             let meta = entry.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
-                    Error::key_not_found(format!(
-                        "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_id} (check the arguments of MapFeedback::new(...))"
-                    ))
-                })?;
+                Error::key_not_found(format!(
+                    "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_id} (check the arguments of MapFeedback::new(...))"
+                ))
+            })?;
             if meta.is_empty() {
                 return Ok(()); // don't generalise inputs which don't have novelties
             }
