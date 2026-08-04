@@ -58,7 +58,7 @@ test_instr: build_afl build_libafl_fuzz
     export AFL_CORES=0
     export AFL_STATS_INTERVAL=1
 
-    timeout 5 {{ FUZZER }} -i ./test/seeds -o ./test/output ./test/out-instr || true
+    AFL_BROKER_PORT=13379 timeout 5 {{ FUZZER }} -i ./test/seeds -o ./test/output ./test/out-instr || true
     test -n "$( ls ./test/output/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
         echo "No new corpus entries found"
         exit 1

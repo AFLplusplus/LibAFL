@@ -18,7 +18,6 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{havoc_mutations, token_mutations::AflppRedQueen, HavocScheduledMutator},
-    nonzero,
     observers::{CanTrack, HitcountsMapObserver},
     schedulers::QueueScheduler,
     stages::{mutational::MultiMutationalStage, ColorizationStage, IfStage, StdMutationalStage},
@@ -160,7 +159,7 @@ fn run_fuzzer(
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mutational_stage = StdMutationalStage::with_max_iterations(mutator, nonzero!(16));
+    let mutational_stage = StdMutationalStage::new(mutator);
 
     // queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();
