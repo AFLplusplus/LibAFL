@@ -75,7 +75,7 @@ frida-gum = { version = "0.17.2", features = [
 ] }
 dynasmrt = "5.1.0"
 
-color-backtrace = { version = "0.7.2", features = ["resolve-modules"] }
+color-backtrace = { version = "0.7.4", features = ["resolve-modules"] }
 termcolor = "1.4.1"
 serde = { workspace = true, default-features = true }
 backtrace = { workspace = true, default-features = false, features = [
