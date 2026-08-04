@@ -229,7 +229,7 @@ impl Tokens {
 
     /// Returns an iterator over the tokens.
     pub fn iter(&self) -> Iter<'_, Vec<u8>> {
-        <&Self as IntoIterator>::into_iter(self)
+        self.tokens_vec.iter()
     }
 }
 
