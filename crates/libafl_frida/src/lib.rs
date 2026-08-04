@@ -373,7 +373,7 @@ mod tests {
         state::{HasSolutions, StdState},
     };
     use libafl_bolts::{
-        AsSlice, SimpleStdoutLogger, cli::FuzzerOptions, rands::StdRand, tuples::tuple_list,
+        SimpleStdoutLogger, cli::FuzzerOptions, rands::StdRand, tuples::tuple_list,
     };
     use mimalloc::MiMalloc;
     use serial_test::serial;
@@ -525,7 +525,7 @@ mod tests {
 
                     let mut harness = |input: &BytesInput| {
                         let target = input.target_bytes();
-                        let buf = target.as_slice();
+                        let buf = &target;
                         (target_func)(buf.as_ptr(), buf.len());
                         ExitKind::Ok
                     };

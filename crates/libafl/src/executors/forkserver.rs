@@ -21,7 +21,7 @@ use std::{
 #[cfg(feature = "regex")]
 use libafl_bolts::tuples::{Handle, Handled};
 use libafl_bolts::{
-    AsSlice, AsSliceMut, InputLocation, StdTargetArgs, StdTargetArgsInner, Truncate,
+    InputLocation, StdTargetArgs, StdTargetArgsInner, Truncate,
     core_affinity::CoreId,
     fs::{InputFile, get_unique_std_input_file},
     os::{dup2, last_error_str, pipes::Pipe},
@@ -815,9 +815,8 @@ where
             // Struct can never be created when uses_shmem_testcase is true and map is none.
             let map = unsafe { self.map.as_mut().unwrap_unchecked() };
             // The first four bytes declares the size of the shmem.
-            map.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
-                .copy_from_slice(&input_size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
-            map.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + input_size)]
+            map[..SHMEM_FUZZ_HDR_SIZE].copy_from_slice(&input_size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
+            map[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + input_size)]
                 .copy_from_slice(&input[..input_size]);
         } else {
             self.input_file.write_buf(&input[..input_size])?;
@@ -840,8 +839,8 @@ where
         } else if input_size < self.min_input_size {
             // Extend like AFL++ does
             input_size = self.min_input_size;
-            let mut input_bytes_copy = Vec::with_capacity(input_size);
-            input_bytes_copy.as_slice_mut().copy_from_slice(input);
+            let mut input_bytes_copy = input.to_vec();
+            input_bytes_copy.resize(input_size, 0);
             self.map_input_to_shmem(&input_bytes_copy, input_size)?;
         } else {
             self.map_input_to_shmem(input, input_size)?;
@@ -1111,7 +1110,7 @@ where
                 }
 
                 let size_in_bytes = (self.max_input_size + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-                shmem.as_slice_mut()[..4].clone_from_slice(&size_in_bytes[..4]);
+                shmem[..4].clone_from_slice(&size_in_bytes[..4]);
                 Some(shmem)
             }
         };
@@ -1543,7 +1542,7 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let bytes = fuzzer.convert_to_target_bytes(state, input);
-        let exit = self.execute_input(state, bytes.as_slice())?;
+        let exit = self.execute_input(state, &bytes)?;
         Ok(exit)
     }
 }
@@ -1585,7 +1584,7 @@ mod tests {
     use std::{ffi::OsString, path::Path, sync::mpsc, thread};
 
     use libafl_bolts::{
-        AsSliceMut, StdTargetArgs,
+        StdTargetArgs,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::tuple_list,
@@ -1627,7 +1626,7 @@ mod tests {
         unsafe {
             shmem.write_to_env("__AFL_SHM_ID").unwrap();
         }
-        let shmem_buf: &mut [u8; MAP_SIZE] = shmem.as_slice_mut().try_into().unwrap();
+        let shmem_buf: &mut [u8; MAP_SIZE] = (&mut *shmem).try_into().unwrap();
 
         let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
             "shared_mem",
@@ -1683,7 +1682,7 @@ mod tests {
         unsafe {
             shmem.write_to_env("__AFL_SHM_ID").unwrap();
         }
-        let shmem_buf: &mut [u8; MAP_SIZE] = shmem.as_slice_mut().try_into().unwrap();
+        let shmem_buf: &mut [u8; MAP_SIZE] = (&mut *shmem).try_into().unwrap();
 
         let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
             "shared_mem",

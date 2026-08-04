@@ -1855,8 +1855,7 @@ impl<SHM> ShMemCursor<SHM> {
     where
         SHM: DerefMut<Target = [u8]>,
     {
-        use libafl_core::AsSliceMut;
-        &mut (self.inner.as_slice_mut()[self.pos..])
+        &mut self.inner[self.pos..]
     }
 }
 
@@ -1910,8 +1909,7 @@ where
         let effective_new_pos = match pos {
             std::io::SeekFrom::Start(s) => s,
             std::io::SeekFrom::End(offset) => {
-                use libafl_core::AsSlice;
-                let map_len = self.inner.as_slice().len();
+                let map_len = self.inner.len();
                 let signed_pos = i64::try_from(map_len).unwrap();
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
@@ -1935,7 +1933,7 @@ where
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 #[cfg(test)]
 mod tests {
-    use libafl_core::{AsSlice, AsSliceMut, Error};
+    use libafl_core::Error;
     use serial_test::serial;
 
     use crate::{ShMemProvider, StdShMemProvider};
@@ -1946,8 +1944,8 @@ mod tests {
     fn test_shmem_service() -> Result<(), Error> {
         let mut provider = StdShMemProvider::new()?;
         let mut map = provider.new_shmem(1024)?;
-        map.as_slice_mut()[0] = 1;
-        assert_eq!(1, map.as_slice()[0]);
+        map[0] = 1;
+        assert_eq!(1, map[0]);
         Ok(())
     }
 

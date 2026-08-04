@@ -55,7 +55,7 @@ pub use systemmode::*;
 
 mod hooks;
 pub use hooks::*;
-use libafl_core::{AsSliceMut, vec_init};
+use libafl_core::vec_init;
 
 static mut QEMU_IS_INITIALIZED: bool = false;
 static mut QEMU_IS_RUNNING: bool = false;
@@ -400,7 +400,7 @@ impl CPU {
         // This is safe because we read exactly `len` bytes from QEMU.
         unsafe {
             vec_init(len, |buf| {
-                self.read_mem(addr, buf.as_slice_mut())?;
+                self.read_mem(addr, &mut buf[..])?;
 
                 Ok::<(), QemuRWError>(())
             })
@@ -1258,7 +1258,7 @@ impl QemuMemoryChunk {
         // This is safe because we read exactly `self.size` bytes from QEMU.
         unsafe {
             vec_init(self.size as usize, |buf| {
-                self.read(qemu, buf.as_slice_mut())?;
+                self.read(qemu, &mut buf[..])?;
 
                 Ok::<(), QemuRWError>(())
             })

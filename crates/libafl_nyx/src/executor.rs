@@ -11,10 +11,7 @@ use libafl::{
     observers::{ObserversTuple, StdOutObserver},
     state::HasExecutions,
 };
-use libafl_bolts::{
-    AsSlice,
-    tuples::{Handle, RefIndexable},
-};
+use libafl_bolts::tuples::{Handle, RefIndexable};
 use libnyx::NyxReturnValue;
 
 use crate::{cmplog::CMPLOG_ENABLED, helper::NyxHelper};
@@ -57,7 +54,7 @@ where
         *state.executions_mut() += 1;
 
         let bytes = input.target_bytes();
-        let buffer = bytes.as_slice();
+        let buffer = &bytes;
 
         if buffer.len() > self.helper.nyx_process.input_buffer_size() {
             return Err(Error::illegal_state(format!(

@@ -7,7 +7,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use libafl_bolts::{AsSlice, AsSliceMut, HasLen, Named, Truncate, ownedref::OwnedMutSlice};
+use libafl_bolts::{HasLen, Named, ToSlice, Truncate, ownedref::OwnedMutSlice};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
@@ -453,7 +453,7 @@ impl<T, const DIFFERENTIAL: bool> Named for StdMapObserver<'_, T, DIFFERENTIAL> 
 impl<T, const DIFFERENTIAL: bool> HasLen for StdMapObserver<'_, T, DIFFERENTIAL> {
     #[inline]
     fn len(&self) -> usize {
-        self.map.as_slice().len()
+        self.map.len()
     }
 }
 
@@ -463,7 +463,7 @@ where
 {
     #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        self.as_slice().hash(hasher);
+        (**self).hash(hasher);
     }
 }
 
@@ -487,18 +487,18 @@ where
 
     #[inline]
     fn get(&self, pos: usize) -> T {
-        self.as_slice()[pos]
+        self[pos]
     }
 
     fn set(&mut self, pos: usize, val: T) {
-        self.map.as_slice_mut()[pos] = val;
+        self[pos] = val;
     }
 
     /// Count the set bytes in the map
     fn count_bytes(&self) -> u64 {
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_slice();
+        let map = &**self;
         let mut res = 0;
         for x in &map[0..cnt] {
             if *x != initial {
@@ -510,7 +510,7 @@ where
 
     #[inline]
     fn usable_count(&self) -> usize {
-        self.as_slice().len()
+        self.len()
     }
 
     #[inline]
@@ -519,7 +519,7 @@ where
     }
 
     fn to_vec(&self) -> Vec<T> {
-        self.as_slice().to_vec()
+        self.to_slice().to_vec()
     }
 
     /// Reset the map
@@ -528,7 +528,7 @@ where
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_slice_mut();
+        let map = &mut **self;
         for x in &mut map[0..cnt] {
             *x = initial;
         }
@@ -538,7 +538,7 @@ where
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_slice();
+        let map = &**self;
         let mut res = 0;
         for i in indexes {
             if *i < cnt && map[*i] != initial {

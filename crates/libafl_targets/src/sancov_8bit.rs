@@ -1,7 +1,6 @@
 //! [`LLVM` `8-bit-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
 
-use libafl_core::{AsSlice, AsSliceMut};
 use ownedref::OwnedMutSlice;
 
 /// A [`Vec`] of `8-bit-counters` maps for multiple modules.
@@ -35,10 +34,7 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
     counters_maps
         .iter()
         .map(|counters| unsafe {
-            OwnedMutSlice::from_raw_parts_mut(
-                counters.as_slice().as_ptr().cast_mut(),
-                counters.as_slice().len(),
-            )
+            OwnedMutSlice::from_raw_parts_mut(counters.as_ptr().cast_mut(), counters.len())
         })
         .collect()
 }
@@ -53,11 +49,7 @@ pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop
     unsafe {
         let counters_maps = &mut *counters_maps_ptr_mut();
         for existing in counters_maps {
-            let range = existing.as_slice_mut().as_mut_ptr()
-                ..=existing
-                    .as_slice_mut()
-                    .as_mut_ptr()
-                    .add(existing.as_slice().len());
+            let range = existing.as_mut_ptr()..=existing.as_mut_ptr().add(existing.len());
             if range.contains(&start) || range.contains(&stop) {
                 // we have overlapping or touching ranges; merge them
                 let &start = range.start().min(&start);
@@ -89,8 +81,8 @@ pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_cleanup(start: *mut u8, s
     unsafe {
         let counters_maps = &mut *counters_maps_ptr_mut();
         counters_maps.retain(|existing| {
-            let existing_start = existing.as_slice().as_ptr().cast_mut();
-            let existing_stop = existing_start.add(existing.as_slice().len());
+            let existing_start = existing.as_ptr().cast_mut();
+            let existing_stop = existing_start.add(existing.len());
             // keep every range that is not fully contained within the range being cleaned up
             !(existing_start >= start && existing_stop <= stop)
         });
@@ -115,9 +107,7 @@ mod observers {
         Error,
         observers::{DifferentialObserver, MapObserver, Observer},
     };
-    use libafl_bolts::{
-        AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, ownedref::OwnedMutSlice,
-    };
+    use libafl_bolts::{AsIter, AsIterMut, HasLen, Named, ownedref::OwnedMutSlice};
     use meminterval::IntervalTree;
     use serde::{Deserialize, Serialize};
 
@@ -198,7 +188,7 @@ mod observers {
     impl<const DIFFERENTIAL: bool> Hash for CountersMultiMapObserver<DIFFERENTIAL> {
         fn hash<H: Hasher>(&self, hasher: &mut H) {
             for map in unsafe { &*counters_maps_ptr() } {
-                let slice = map.as_slice();
+                let slice = &**map;
                 let ptr = slice.as_ptr();
                 let map_size = slice.len() / size_of::<u8>();
                 unsafe {
@@ -228,7 +218,7 @@ mod observers {
             let elem = self.intervals.query(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { (&(*counters_maps_ptr()))[*i].as_slice()[j] }
+            unsafe { (&(*counters_maps_ptr()))[*i][j] }
         }
 
         #[inline]
@@ -236,7 +226,7 @@ mod observers {
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { (&mut (*counters_maps_ptr_mut()))[*i].as_slice_mut()[j] = val };
+            unsafe { (&mut (*counters_maps_ptr_mut()))[*i][j] = val };
         }
 
         #[inline]
@@ -248,7 +238,7 @@ mod observers {
             let initial = self.initial();
             let mut res = 0;
             for map in unsafe { &*counters_maps_ptr() } {
-                for x in map.as_slice() {
+                for x in &**map {
                     if *x != initial {
                         res += 1;
                     }
@@ -260,7 +250,7 @@ mod observers {
         fn reset_map(&mut self) -> Result<(), Error> {
             let initial = self.initial();
             for map in unsafe { &mut *counters_maps_ptr_mut() } {
-                for x in map.as_slice_mut() {
+                for x in &mut **map {
                     *x = initial;
                 }
             }
@@ -301,7 +291,7 @@ mod observers {
             let mut idx = 0;
             let mut intervals = IntervalTree::new();
             for (v, x) in unsafe { &*counters_maps_ptr() }.iter().enumerate() {
-                let l = x.as_slice().len();
+                let l = x.len();
                 intervals.insert(idx..(idx + l), v);
                 idx += l;
             }
@@ -339,7 +329,7 @@ mod observers {
             unsafe { &mut *counters_maps_ptr_mut() }
                 .iter_mut()
                 .for_each(|m| {
-                    let l = m.as_slice_mut().len();
+                    let l = m.len();
                     intervals.insert(idx..(idx + l), v);
                     idx += l;
                     v += 1;

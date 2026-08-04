@@ -30,7 +30,6 @@ use libafl::{
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSlice,
     core_affinity::Cores,
     nonzero,
     ownedref::OwnedMutSlice,
@@ -219,7 +218,7 @@ where
             // The wrapped harness function, calling out to the LLVM-style harness
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
-                let buf = target.as_slice();
+                let buf = &target;
                 (harness_bytes)(buf);
                 ExitKind::Ok
             };

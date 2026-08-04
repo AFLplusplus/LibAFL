@@ -20,7 +20,6 @@ use libafl::{
     state::{HasCorpus, HasRand, StdState},
 };
 use libafl_bolts::{
-    AsSlice,
     rands::{Rand, StdRand},
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
@@ -160,7 +159,7 @@ pub fn merge(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective); // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
 
         let result = unsafe {
             crate::libafl_libfuzzer_test_one_input(Some(*harness), buf.as_ptr(), buf.len())

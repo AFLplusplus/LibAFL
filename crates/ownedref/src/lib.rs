@@ -60,7 +60,7 @@ use core::{
     slice::{Iter, IterMut, SliceIndex},
 };
 
-use libafl_core::{AsSizedSlice, AsSizedSliceMut, AsSlice, AsSliceMut, IntoOwned, Truncate};
+use libafl_core::{IntoOwned, ToSizedSlice, ToSizedSliceMut, ToSlice, ToSliceMut, Truncate};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Constant size array visitor for serde deserialization.
@@ -457,7 +457,7 @@ pub struct OwnedSlice<'a, T: 'a + Sized> {
 impl<'a, T: 'a + Clone> Clone for OwnedSlice<'a, T> {
     fn clone(&self) -> Self {
         Self {
-            inner: OwnedSliceInner::Owned(self.as_slice().to_vec()),
+            inner: OwnedSliceInner::Owned(self.to_vec()),
         }
     }
 }
@@ -533,7 +533,7 @@ impl<'it, T> IntoIterator for &'it OwnedSlice<'_, T> {
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
+        self.to_slice().iter()
     }
 }
 
@@ -683,7 +683,7 @@ impl<'it, T> IntoIterator for &'it mut OwnedMutSlice<'_, T> {
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice_mut().iter_mut()
+        self.to_slice_mut().iter_mut()
     }
 }
 
@@ -692,7 +692,7 @@ impl<'it, T> IntoIterator for &'it OwnedMutSlice<'_, T> {
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
+        self.to_slice().iter()
     }
 }
 
@@ -781,7 +781,7 @@ impl<T: Sized> DerefMut for OwnedMutSlice<'_, T> {
                 slice::from_raw_parts_mut(*rr, *len)
             },
             OwnedMutSliceInner::Ref(r) => r,
-            OwnedMutSliceInner::Owned(v) => v.as_slice_mut(),
+            OwnedMutSliceInner::Owned(v) => v.as_mut_slice(),
         }
     }
 }
@@ -814,7 +814,7 @@ where
 impl<'a, T: 'a + Clone> Clone for OwnedMutSlice<'a, T> {
     fn clone(&self) -> Self {
         Self {
-            inner: OwnedMutSliceInner::Owned(self.as_slice().to_vec()),
+            inner: OwnedMutSliceInner::Owned(self.to_vec()),
         }
     }
 }
@@ -924,7 +924,7 @@ impl<'it, T, const N: usize> IntoIterator for &'it mut OwnedMutSizedSlice<'_, T,
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_sized_slice_mut().iter_mut()
+        self.to_sized_slice_mut().iter_mut()
     }
 }
 
@@ -933,7 +933,7 @@ impl<'it, T, const N: usize> IntoIterator for &'it OwnedMutSizedSlice<'_, T, N> 
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_sized_slice().iter()
+        self.to_sized_slice().iter()
     }
 }
 

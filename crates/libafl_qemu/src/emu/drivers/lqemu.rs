@@ -1,7 +1,6 @@
 use std::cell::OnceCell;
 
 use libafl::inputs::HasTargetBytes;
-use libafl_bolts::AsSlice;
 
 #[cfg(not(feature = "systemmode"))]
 use crate::InputLocation;
@@ -25,7 +24,7 @@ where
         input: &I,
     ) -> Result<(), crate::emu::drivers::EmulatorDriverError> {
         if let Some(input_location) = self.input_location.get_mut() {
-            let ret_value = input_location.write(input.target_bytes().as_slice());
+            let ret_value = input_location.write(&input.target_bytes());
 
             if let Some(reg) = input_location.ret_register() {
                 input_location

@@ -8,7 +8,7 @@ use core::{
     slice,
 };
 
-use libafl_bolts::{AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, Truncate};
+use libafl_bolts::{AsIter, AsIterMut, HasLen, Named, ToSlice, ToSliceMut, Truncate};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -117,7 +117,7 @@ impl<M> DerefMut for HitcountsMapObserver<M> {
 
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<Entry = u8> + Observer<I, S> + for<'a> AsSliceMut<'a, Entry = u8>,
+    M: MapObserver<Entry = u8> + Observer<I, S> + for<'a> ToSliceMut<'a, Entry = u8>,
 {
     #[inline]
     fn flush(&mut self) -> Result<(), Error> {
@@ -131,7 +131,7 @@ where
 
     #[inline]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
-        classify_counts(&mut self.as_slice_mut());
+        classify_counts(&mut self.to_slice_mut());
         self.base.post_exec(state, input, exit_kind)
     }
 }
@@ -264,27 +264,27 @@ where
     }
 }
 
-impl<'a, M> AsSlice<'a> for HitcountsMapObserver<M>
+impl<'a, M> ToSlice<'a> for HitcountsMapObserver<M>
 where
-    M: AsSlice<'a>,
+    M: ToSlice<'a>,
 {
-    type Entry = <M as AsSlice<'a>>::Entry;
-    type SliceRef = <M as AsSlice<'a>>::SliceRef;
+    type Entry = <M as ToSlice<'a>>::Entry;
+    type SliceRef = <M as ToSlice<'a>>::SliceRef;
 
     #[inline]
-    fn as_slice(&'a self) -> Self::SliceRef {
-        self.base.as_slice()
+    fn to_slice(&'a self) -> Self::SliceRef {
+        self.base.to_slice()
     }
 }
 
-impl<'a, M> AsSliceMut<'a> for HitcountsMapObserver<M>
+impl<'a, M> ToSliceMut<'a> for HitcountsMapObserver<M>
 where
-    M: AsSliceMut<'a>,
+    M: ToSliceMut<'a>,
 {
-    type SliceRefMut = <M as AsSliceMut<'a>>::SliceRefMut;
+    type SliceRefMut = <M as ToSliceMut<'a>>::SliceRefMut;
     #[inline]
-    fn as_slice_mut(&'a mut self) -> Self::SliceRefMut {
-        self.base.as_slice_mut()
+    fn to_slice_mut(&'a mut self) -> Self::SliceRefMut {
+        self.base.to_slice_mut()
     }
 }
 
@@ -292,7 +292,7 @@ impl<M, OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for HitcountsMapObs
 where
     M: DifferentialObserver<OTA, OTB, I, S>
         + MapObserver<Entry = u8>
-        + for<'a> AsSliceMut<'a, Entry = u8>,
+        + for<'a> ToSliceMut<'a, Entry = u8>,
 {
     fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
         self.base.pre_observe_first(observers)

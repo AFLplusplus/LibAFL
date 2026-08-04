@@ -272,8 +272,6 @@ impl<S> crate::inputs::FromTargetBytesConverter<NautilusInput, S> for NautilusBy
 mod tests {
     use alloc::string::ToString;
 
-    use libafl_bolts::AsSlice;
-
     use super::{NautilusBytesConverter, NautilusContext};
     use crate::inputs::{FromTargetBytesConverter, ToTargetBytesConverter};
 
@@ -296,7 +294,7 @@ mod tests {
             .expect("Failed to parse");
 
         let out_bytes = converter.convert_to_target_bytes(&mut (), &input);
-        assert_eq!(out_bytes.as_slice(), bytes.as_slice());
+        assert_eq!(&*out_bytes, bytes);
 
         // Test invalid
         let bytes = b"aac";

@@ -17,7 +17,7 @@ use std::{
 };
 
 use ahash::RandomState;
-use libafl_core::{AsSlice, Error};
+use libafl_core::Error;
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::shmem::{ShMem, ShMemProvider};
@@ -221,7 +221,7 @@ where
     }
 
     fn content_mut(&mut self) -> &mut StateShMemContent {
-        let ptr = self.shmem.as_slice().as_ptr();
+        let ptr = self.shmem.as_ptr();
         debug_assert_eq!(
             ptr.align_offset(size_of::<StateShMemContent>()),
             0,
@@ -236,7 +236,7 @@ where
     /// The content is either the name of the tmpfile, or the serialized bytes directly, if they fit on a single page.
     fn content(&self) -> &StateShMemContent {
         #[expect(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
-        let ptr = self.shmem.as_slice().as_ptr() as *const StateShMemContent;
+        let ptr = self.shmem.as_ptr() as *const StateShMemContent;
         unsafe { &*(ptr) }
     }
 

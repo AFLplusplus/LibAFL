@@ -29,7 +29,6 @@ use libafl::{
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSlice,
     core_affinity::Cores,
     nonzero,
     ownedref::OwnedMutSlice,
@@ -262,7 +261,7 @@ where
                                    _state: &mut _,
                                    input: &BytesInput| {
                     let target = input.target_bytes();
-                    let buf = target.as_slice();
+                    let buf = &target;
                     harness_bytes(buf);
                     ExitKind::Ok
                 };
@@ -394,7 +393,7 @@ where
                                    _state: &mut _,
                                    input: &BytesInput| {
                     let target = input.target_bytes();
-                    let buf = target.as_slice();
+                    let buf = &target;
                     harness_bytes(buf);
                     ExitKind::Ok
                 };
