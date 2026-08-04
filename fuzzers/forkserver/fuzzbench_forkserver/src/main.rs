@@ -40,7 +40,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Merge},
-    StdTargetArgs, ToSliceMut,
+    StdTargetArgs,
 };
 use libafl_targets::cmps::AflppCmpLogMap;
 use nix::sys::signal::Signal;
@@ -247,7 +247,7 @@ fn fuzz(
     unsafe {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
-    let shmem_buf = shmem.to_slice_mut();
+    let shmem_buf = &mut shmem[..];
     // To let know the AFL++ binary that we have a big map
     std::env::set_var(AFL_MAP_SIZE_ENV_VAR, format!("{}", MAP_SIZE));
 

@@ -3,7 +3,6 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     Error,
 };
-use libafl_bolts::ToSlice;
 use libafl_qemu::{elf::EasyElf, ArchExtras, GuestAddr, GuestReg, MmapPerms, Qemu, Regs};
 
 pub struct Harness {
@@ -86,7 +85,7 @@ impl Harness {
 
     fn reset(&self, input: &BytesInput) -> Result<(), Error> {
         let target = input.target_bytes();
-        let mut buf = target.to_slice();
+        let mut buf = &target[..];
         let mut len = buf.len();
         if len > MAX_INPUT_SIZE {
             buf = &buf[0..MAX_INPUT_SIZE];

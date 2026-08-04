@@ -25,7 +25,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    ToSlice, ToSliceMut,
 };
 #[cfg(feature = "snapshot")]
 use libafl_qemu::modules::SnapshotModule;
@@ -128,7 +127,7 @@ pub fn fuzz() -> Result<(), Error> {
     // so we use it in both cases.
     let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
-    let edges = edges_shmem.to_slice_mut();
+    let edges = &mut edges_shmem[..];
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
     // We use a HitcountsMapObserver to observe the coverage map
@@ -211,7 +210,7 @@ pub fn fuzz() -> Result<(), Error> {
     let mut harness =
         |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
             let target = input.target_bytes();
-            let mut buf = target.to_slice();
+            let mut buf = &target[..];
             let mut len = buf.len();
             if len > MAX_INPUT_SIZE {
                 buf = &buf[0..MAX_INPUT_SIZE];

@@ -7,16 +7,12 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{
-        tcp::setup_restarting_mgr_tcp, EventConfig, EventRestarter, RestartingEventManager,
-        ShouldSaveState,
-    },
+    events::{tcp::setup_restarting_mgr_tcp, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
         scheduled::{tokens_mutations, HavocScheduledMutator},
@@ -33,7 +29,6 @@ use libafl::{
 use libafl_bolts::{
     rands::StdRand,
     tuples::{tuple_list, Merge},
-    ToSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_FOUND};
 use mimalloc::MiMalloc;
@@ -154,7 +149,7 @@ pub extern "C" fn libafl_main() {
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.to_slice();
+        let buf = &target;
         #[cfg(feature = "crash")]
         if buf.len() > 4 && buf[4] == 0 {
             unsafe {

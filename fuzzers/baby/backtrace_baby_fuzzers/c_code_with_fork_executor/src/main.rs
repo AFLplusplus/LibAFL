@@ -21,7 +21,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    ToSlice,
 };
 use libc::{c_int, c_uchar};
 extern crate libc;
@@ -39,7 +38,7 @@ pub fn main() {
     let map_ptr = unsafe { get_ptr() };
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.to_slice();
+        let buf = &target;
         unsafe { c_harness(buf.as_ptr()) }
         libafl::executors::ExitKind::Ok
     };

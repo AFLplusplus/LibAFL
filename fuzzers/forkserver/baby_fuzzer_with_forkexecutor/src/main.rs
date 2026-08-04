@@ -22,15 +22,14 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{unix_shmem, ShMemProvider},
     tuples::tuple_list,
-    ToSlice, ToSliceMut,
 };
 
 pub fn main() {
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
     let mut signals = shmem_provider.new_shmem(16).unwrap();
 
-    let signals_len = signals.to_slice().len();
-    let signals_ptr = signals.to_slice_mut().as_mut_ptr();
+    let signals_len = &signals[..].len();
+    let signals_ptr = &mut signals[..].as_mut_ptr();
 
     let signals_set = |idx: usize| {
         unsafe { write(signals_ptr.add(idx), 1) };
@@ -39,7 +38,7 @@ pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.to_slice();
+        let buf = &target;
         signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             signals_set(1);

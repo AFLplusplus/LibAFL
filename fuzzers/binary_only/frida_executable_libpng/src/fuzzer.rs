@@ -32,7 +32,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    ToSlice,
 };
 #[cfg(unix)]
 use libafl_frida::asan::{
@@ -59,7 +58,7 @@ pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -
 
     let frida_harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.to_slice();
+        let buf = &target;
         let len = buf.len().to_string();
 
         let argv: [*const u8; 3] = [
@@ -232,7 +231,7 @@ unsafe fn fuzz(
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
                         .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &options.input)
+                            panic!("Failed to load initial corpus at {:?}", options.input)
                         });
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
@@ -362,7 +361,7 @@ unsafe fn fuzz(
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
                         .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &options.input)
+                            panic!("Failed to load initial corpus at {:?}", options.input)
                         });
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
@@ -507,7 +506,7 @@ unsafe fn fuzz(
                     state
                         .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
                         .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &options.input)
+                            panic!("Failed to load initial corpus at {:?}", options.input)
                         });
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }

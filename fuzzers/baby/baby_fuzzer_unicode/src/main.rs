@@ -25,7 +25,7 @@ use libafl::{
     state::StdState,
     Evaluator,
 };
-use libafl_bolts::{nonnull_raw_mut, rands::StdRand, tuples::tuple_list, ToSlice};
+use libafl_bolts::{nonnull_raw_mut, rands::StdRand, tuples::tuple_list};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 const SIGNALS_LEN: usize = 64;
@@ -41,7 +41,7 @@ pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.to_slice();
+        let buf = &target;
         let goal = b"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz";
         let mut i = 0;
         for _ in buf.iter().zip(goal).take_while(|(b, c)| b == c) {

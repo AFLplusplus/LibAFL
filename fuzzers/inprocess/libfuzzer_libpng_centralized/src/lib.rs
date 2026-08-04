@@ -34,7 +34,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    ToSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 use mimalloc::MiMalloc;
@@ -209,7 +208,7 @@ pub extern "C" fn libafl_main() {
             // The wrapped harness function, calling out to the LLVM-style harness
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
-                let buf = target.to_slice();
+                let buf = &target;
                 unsafe {
                     libfuzzer_test_one_input(buf);
                 }

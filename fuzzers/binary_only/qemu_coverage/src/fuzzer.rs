@@ -24,7 +24,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    ToSlice,
 };
 use libafl_qemu::{
     elf::EasyElf,
@@ -207,7 +206,7 @@ pub fn fuzz() {
                 let qemu = emulator.qemu();
 
                 let target = input.target_bytes();
-                let mut buf = target.to_slice();
+                let mut buf = &target[..];
                 let mut len = buf.len();
                 if len > MAX_INPUT_SIZE {
                     buf = &buf[0..MAX_INPUT_SIZE];
@@ -270,7 +269,7 @@ pub fn fuzz() {
             state
                 .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
                 .unwrap_or_else(|_| {
-                    println!("Failed to load initial corpus at {:?}", &options.input_dir);
+                    println!("Failed to load initial corpus at {:?}", options.input_dir);
                     process::exit(0);
                 });
             log::info!("We imported {} inputs from disk.", state.corpus().count());

@@ -40,7 +40,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    ToSlice,
 };
 use libafl_frida::{
     asan::{
@@ -92,7 +91,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         let mut frida_harness = |input: &BytesInput| {
             let target = input.target_bytes();
-            let buf = target.to_slice();
+            let buf = &target;
             (target_func)(buf.as_ptr(), buf.len());
             ExitKind::Ok
         };

@@ -22,7 +22,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled},
-    StdTargetArgs, ToSliceMut, Truncate,
+    StdTargetArgs, Truncate,
 };
 use nix::sys::signal::Signal;
 
@@ -95,7 +95,7 @@ pub fn main() {
     unsafe {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
-    let shmem_buf = shmem.to_slice_mut();
+    let shmem_buf = &mut shmem[..];
 
     let edges_observer = unsafe {
         HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf)).track_indices()

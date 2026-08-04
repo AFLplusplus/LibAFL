@@ -54,7 +54,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    ToSlice,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
@@ -163,9 +162,9 @@ pub extern "C" fn libafl_main(
             .to_string(),
     );
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", &out_dir);
+        println!("Out dir at {out_dir:?} already exists.");
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            println!("Out dir at {out_dir:?} is not a valid directory!");
             return 1;
         }
     }
@@ -179,7 +178,7 @@ pub extern "C" fn libafl_main(
             .to_string(),
     );
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        println!("In dir at {in_dir:?} is not a valid directory!");
         return 1;
     }
 
@@ -226,10 +225,10 @@ fn count_textual_inputs(dir: &Path) -> (usize, usize) {
             file.read_to_end(&mut buffer).expect("Buffer overflow");
 
             if inspect(&buffer).is_text() {
-                println!("Testcase {:?} is text", &path);
+                println!("Testcase {path:?} is text");
                 textuals += 1;
             } else {
-                println!("Testcase {:?} is binary", &path);
+                println!("Testcase {path:?} is binary");
             }
             total += 1;
         }
@@ -296,7 +295,7 @@ fn run_testcases(filenames: &[&str], _dump_coverage_dir: Option<PathBuf>) {
 
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.to_slice();
+        let buf = &target;
         unsafe {
             libfuzzer_test_one_input(buf);
         }
@@ -480,7 +479,7 @@ fn fuzz_binary(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.to_slice();
+        let buf = &target;
         unsafe {
             libfuzzer_test_one_input(buf);
         }
@@ -724,7 +723,7 @@ fn fuzz_text(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.to_slice();
+        let buf = &target;
         unsafe {
             libfuzzer_test_one_input(buf);
         }

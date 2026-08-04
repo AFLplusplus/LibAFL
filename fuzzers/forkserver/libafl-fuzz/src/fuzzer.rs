@@ -53,7 +53,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    StdTargetArgs, ToSliceMut,
+    StdTargetArgs,
 };
 #[cfg(feature = "nyx")]
 use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
@@ -127,7 +127,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     unsafe {
         shmem.write_to_env(SHMEM_ENV_VAR).unwrap();
     }
-    let shmem_buf = shmem.to_slice_mut();
+    let shmem_buf = &mut shmem[..];
 
     // If we are in Nyx Mode, we need to use a different map observer.
     #[cfg(feature = "nyx")]

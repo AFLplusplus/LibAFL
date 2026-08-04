@@ -41,7 +41,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    StdTargetArgs, ToSliceMut,
+    StdTargetArgs,
 };
 use libafl_targets::cmps::AflppCmpLogMap;
 use nix::sys::signal::Signal;
@@ -142,9 +142,9 @@ pub fn main() {
             .to_string(),
     );
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", &out_dir);
+        println!("Out dir at {out_dir:?} already exists.");
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            println!("Out dir at {out_dir:?} is not a valid directory!");
             return;
         }
     }
@@ -158,7 +158,7 @@ pub fn main() {
             .to_string(),
     );
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        println!("In dir at {in_dir:?} is not a valid directory!");
         return;
     }
 
@@ -261,7 +261,7 @@ fn fuzz(
     unsafe {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
-    let shmem_buf = shmem.to_slice_mut();
+    let shmem_buf = &mut shmem[..];
     // To let know the AFL++ binary that we have a big map
     std::env::set_var(AFL_MAP_SIZE_ENV_VAR, format!("{}", MAP_SIZE));
 
@@ -363,7 +363,7 @@ fn fuzz(
             std::slice::from_ref(seed_dir),
         )
         .unwrap_or_else(|_| {
-            println!("Failed to load initial corpus at {:?}", &seed_dir);
+            println!("Failed to load initial corpus at {seed_dir:?}");
             process::exit(0);
         });
     println!("We imported {} inputs from disk.", state.corpus().count());

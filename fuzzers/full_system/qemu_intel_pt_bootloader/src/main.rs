@@ -26,7 +26,7 @@ use libafl::{
     stages::StdMutationalStage,
     state::{HasSolutions, StdState},
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, ToSlice};
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list};
 use libafl_qemu::{
     config,
     config::{Accelerator, DriveCache, KvmProperties, QemuConfig},
@@ -130,7 +130,7 @@ fn main() {
     let mut harness = |emulator: &mut Emulator<_, _, _, _, _, _, _>,
                        _: &mut StdState<_, _, _, _>,
                        input: &BytesInput| unsafe {
-        let mut fixed_len_input = input.target_bytes().to_slice().to_vec();
+        let mut fixed_len_input = &input.target_bytes()[..].to_vec();
         fixed_len_input.resize(3, 0);
 
         qemu.load_snapshot("bootloader_start", true);
