@@ -113,9 +113,10 @@ test_instr_fuzzbench: build_afl build_libafl_fuzz_fuzzbench
 test_cmplog: build_afl build_libafl_fuzz
     #!/bin/bash
     # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
+    rm -rf {{ PROJECT_DIR }}/test/output-cmplog || true
     AFL_LLVM_CMPLOG=1 AFL_PATH={{ AFL_DIR }} {{ AFL_CC_PATH }} ./test/test-cmplog.c -o ./test/out-cmplog
     LIBAFL_DEBUG_OUTPUT=1 AFL_CORES=0 timeout 15 {{ FUZZER }} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
-    test -n "$( ls {{ PROJECT_DIR }}/test/output-cmplog/fuzzer_main/hangs/id:0000* {{ PROJECT_DIR }}/test/output-cmplog/fuzzer_main/crashes/id:0000*)" || {
+    test -n "$( ls {{ PROJECT_DIR }}/test/output-cmplog/fuzzer_main/hangs/id:0000* {{ PROJECT_DIR }}/test/output-cmplog/fuzzer_main/crashes/id:0000* 2>/dev/null )" || {
         echo "No crashes found"
         exit 1
     }
