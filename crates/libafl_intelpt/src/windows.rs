@@ -38,6 +38,7 @@ pub struct IntelPT<'a> {
     thread_id: u32,
     decoder: PtCoverageDecoder<'a>,
     previous_decode_head: u32,
+    trace_buffer: TraceBuffer,
     #[cfg(feature = "export_raw")]
     last_decode_trace: Vec<u8>,
 }
@@ -132,12 +133,11 @@ impl<'a> IntelPT<'a> {
         let trace_size = self
             .ipt
             .get_trace_buffer_size(*self.target_process_handle)?;
-        // todo - TraceBuffer::with_capacity(trace_size) allocates a fresh ~1 MiB × n_threads buffer on every post_exec, and split_buffer allocates per record. Both should live in IntelPT and be reused/grown. Linux is zero-copy off the mmap here, so the Windows path is meaningfully more expensive.
-        let mut trace_buffer = TraceBuffer::with_capacity(trace_size);
+        self.trace_buffer.reserve(trace_size.saturating_sub(self.trace_buffer.capacity()));
         self.ipt
-            .get_trace_buffer(*self.target_process_handle, &mut trace_buffer)?;
+            .get_trace_buffer(*self.target_process_handle, &mut self.trace_buffer)?;
 
-        for (header, data) in &trace_buffer {
+        for (header, data) in &self.trace_buffer {
             if u64::from(self.thread_id) == header.thread_id {
                 log::trace!("PT previous_decode_head: {}", self.previous_decode_head);
                 let mut split_buffer = Vec::new();
@@ -246,6 +246,7 @@ impl<'a> IntelPTBuilder<'a> {
             thread_id: self.tid,
             decoder,
             previous_decode_head: 0,
+            trace_buffer: TraceBuffer::new(),
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
         };
