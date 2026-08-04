@@ -459,7 +459,7 @@ where
     }
 
     fn on_shutdown(&mut self) -> Result<(), Error> {
-        Ok(())
+        self.send_exiting()
     }
 }
 
