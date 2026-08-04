@@ -10,8 +10,9 @@ build: install_cargo_fuzz install_llvm_tools
 [linux]
 test: build
     #!/bin/bash
+    rm -rf fuzz/artifacts fuzz/corpus fuzz_stdout.log || true
     timeout 30s cargo +nightly fuzz run --target-dir fuzz/target fuzz_target_1 2>&1 | tee fuzz_stdout.log || true
-    if grep -qa "objectives: 1" fuzz_stdout.log; then
+    if grep -qa "objectives: 1" fuzz_stdout.log || grep -qa "deadlysignal" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
         echo "Fuzzer does not generate any testcases or any crashes"

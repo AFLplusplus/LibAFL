@@ -53,7 +53,7 @@ run:
 [macos]
 test: fuzzer
     #!/bin/bash
-    rm -rf libafl_unix_shmem_server || true
+    rm -rf out in libafl_unix_shmem_server || true
     mkdir in || true
     echo a > in/a
     # Allow sigterm as exit code 

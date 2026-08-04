@@ -46,6 +46,7 @@ run:
 [macos]
 test: fuzzer
     #!/bin/bash
+    rm -rf out in fuzz_stdout.log || true
     mkdir -p in
     head -c 28 /dev/zero > in/zeros
     timeout 120s {{ FUZZER }} -o out -i in | tee fuzz_stdout.log || true
