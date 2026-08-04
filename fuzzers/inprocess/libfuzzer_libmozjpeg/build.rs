@@ -15,7 +15,7 @@ fn main() {
         .file("./hook_allocs.c")
         .compile("hook_allocs");
 
-    println!("cargo:rustc-link-search=native={}", &out_dir);
+    println!("cargo:rustc-link-search=native={out_dir}");
 
     println!("cargo:rerun-if-changed=build.rs");
 }

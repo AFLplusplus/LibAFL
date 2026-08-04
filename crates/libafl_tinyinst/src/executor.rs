@@ -12,7 +12,6 @@ use libafl::{
     state::HasExecutions,
 };
 use libafl_bolts::{
-    AsSlice, AsSliceMut,
     fs::{INPUTFILE_STD, InputFile},
     shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
     tuples::RefIndexable,
@@ -75,14 +74,12 @@ where
 
         if let Some(shmem) = &mut self.map {
             let target_bytes = input.target_bytes();
-            let size = target_bytes.as_slice().len();
+            let size = target_bytes.len();
             let size_in_bytes = size.to_ne_bytes();
-            shmem.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
-                .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
-            shmem.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                .copy_from_slice(target_bytes.as_slice());
+            shmem[..SHMEM_FUZZ_HDR_SIZE].copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
+            shmem[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)].copy_from_slice(&target_bytes);
         } else {
-            self.cur_input.write_buf(input.target_bytes().as_slice())?;
+            self.cur_input.write_buf(&input.target_bytes())?;
         }
 
         // SAFETY: coverage_ptr is validated as non-null in the builder.
@@ -292,7 +289,7 @@ impl<SP: ShMemProvider> TinyInstExecutorBuilder<'_, SP> {
                 let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
                 let shmem_id = shmem.id();
                 let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-                shmem.as_slice_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
+                shmem[..4].copy_from_slice(&size_in_bytes[..4]);
                 (Some(shmem), Some(shmem_id))
             }
             None => (None, None),

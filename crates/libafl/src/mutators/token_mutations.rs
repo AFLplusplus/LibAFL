@@ -18,7 +18,7 @@ use std::{
 };
 
 use hashbrown::HashSet;
-use libafl_bolts::{AsSlice, HasLen, rands::Rand};
+use libafl_bolts::{HasLen, ToSlice, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -229,7 +229,7 @@ impl Tokens {
 
     /// Returns an iterator over the tokens.
     pub fn iter(&self) -> Iter<'_, Vec<u8>> {
-        <&Self as IntoIterator>::into_iter(self)
+        self.tokens_vec.iter()
     }
 }
 
@@ -296,7 +296,7 @@ impl<'it> IntoIterator for &'it Tokens {
     type IntoIter = Iter<'it, Vec<u8>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
+        self.iter()
     }
 }
 
@@ -580,9 +580,9 @@ where
                 'outer: for i in off..len {
                     let mut size = core::cmp::min(v.0.len(), len - i);
                     while size != 0 {
-                        if v.0.as_slice()[0..size] == input.mutator_bytes()[i..i + size] {
+                        if v.0.to_slice()[0..size] == input.mutator_bytes()[i..i + size] {
                             unsafe {
-                                buffer_copy(input.mutator_bytes_mut(), v.1.as_slice(), 0, i, size);
+                                buffer_copy(input.mutator_bytes_mut(), v.1.to_slice(), 0, i, size);
                             }
                             result = MutationResult::Mutated;
                             break 'outer;
@@ -591,9 +591,9 @@ where
                     }
                     size = core::cmp::min(v.1.len(), len - i);
                     while size != 0 {
-                        if v.1.as_slice()[0..size] == input.mutator_bytes()[i..i + size] {
+                        if v.1.to_slice()[0..size] == input.mutator_bytes()[i..i + size] {
                             unsafe {
-                                buffer_copy(input.mutator_bytes_mut(), v.0.as_slice(), 0, i, size);
+                                buffer_copy(input.mutator_bytes_mut(), v.0.to_slice(), 0, i, size);
                             }
                             result = MutationResult::Mutated;
                             break 'outer;
@@ -792,9 +792,9 @@ where
                 'outer: for i in off..len {
                     let mut size = core::cmp::min(v.0.len(), len - i);
                     while size != 0 {
-                        if v.0.as_slice()[0..size] == input.mutator_bytes()[i..i + size] {
+                        if v.0.to_slice()[0..size] == input.mutator_bytes()[i..i + size] {
                             unsafe {
-                                buffer_copy(input.mutator_bytes_mut(), v.1.as_slice(), 0, i, size);
+                                buffer_copy(input.mutator_bytes_mut(), v.1.to_slice(), 0, i, size);
                             }
                             result = MutationResult::Mutated;
                             break 'outer;
@@ -803,9 +803,9 @@ where
                     }
                     size = core::cmp::min(v.1.len(), len - i);
                     while size != 0 {
-                        if v.1.as_slice()[0..size] == input.mutator_bytes()[i..i + size] {
+                        if v.1.to_slice()[0..size] == input.mutator_bytes()[i..i + size] {
                             unsafe {
-                                buffer_copy(input.mutator_bytes_mut(), v.0.as_slice(), 0, i, size);
+                                buffer_copy(input.mutator_bytes_mut(), v.0.to_slice(), 0, i, size);
                             }
                             result = MutationResult::Mutated;
                             break 'outer;
@@ -1792,10 +1792,10 @@ where
                             let mut rtn_found = false;
                             // Compare v0 against v1
                             rtn_found |= self.rtn_extend_encoding(
-                                orig_v0.as_slice(),
-                                orig_v1.as_slice(),
-                                new_v0.as_slice(),
-                                new_v1.as_slice(),
+                                orig_v0.to_slice(),
+                                orig_v1.to_slice(),
+                                new_v0.to_slice(),
+                                new_v1.to_slice(),
                                 new_bytes,
                                 orig_bytes,
                                 cmp_buf_idx,
@@ -1807,10 +1807,10 @@ where
 
                             // Compare v1 against v0
                             rtn_found |= self.rtn_extend_encoding(
-                                orig_v1.as_slice(),
-                                orig_v0.as_slice(),
-                                new_v1.as_slice(),
-                                new_v0.as_slice(),
+                                orig_v1.to_slice(),
+                                orig_v0.to_slice(),
+                                new_v1.to_slice(),
+                                new_v0.to_slice(),
                                 new_bytes,
                                 orig_bytes,
                                 cmp_buf_idx,
@@ -1825,10 +1825,10 @@ where
                             let mut v1_len = orig_v1.len();
                             if v0_len > 0
                                 && (is_ascii_or_utf8
-                                    || check_if_text(orig_v0.as_slice(), v0_len).size() == hshape)
+                                    || check_if_text(orig_v0.to_slice(), v0_len).size() == hshape)
                             {
                                 // this is not utf8.
-                                let v = strlen(orig_v0.as_slice());
+                                let v = strlen(orig_v0.to_slice());
                                 if v > 0 {
                                     v0_len = v;
                                 }
@@ -1836,10 +1836,10 @@ where
 
                             if v1_len > 0
                                 && (is_ascii_or_utf8
-                                    || check_if_text(orig_v1.as_slice(), v1_len).size() == hshape)
+                                    || check_if_text(orig_v1.to_slice(), v1_len).size() == hshape)
                             {
                                 // this is not utf8.
-                                let v = strlen(orig_v1.as_slice());
+                                let v = strlen(orig_v1.to_slice());
                                 if v > 0 {
                                     v1_len = v;
                                 }
@@ -1848,11 +1848,11 @@ where
                             if v0_len > 0
                                 && orig_v0 == new_v0
                                 && (!rtn_found
-                                    || check_if_text(orig_v0.as_slice(), v0_len).size() == v0_len)
+                                    || check_if_text(orig_v0.to_slice(), v0_len).size() == v0_len)
                             {
                                 Self::try_add_autotokens(
                                     &mut gathered_tokens,
-                                    orig_v0.as_slice(),
+                                    orig_v0.to_slice(),
                                     v0_len,
                                 );
                             }
@@ -1860,11 +1860,11 @@ where
                             if v1_len > 0
                                 && orig_v1 == new_v1
                                 && (!rtn_found
-                                    || check_if_text(orig_v1.as_slice(), v1_len).size() == v1_len)
+                                    || check_if_text(orig_v1.to_slice(), v1_len).size() == v1_len)
                             {
                                 Self::try_add_autotokens(
                                     &mut gathered_tokens,
-                                    orig_v1.as_slice(),
+                                    orig_v1.to_slice(),
                                     v1_len,
                                 );
                             }

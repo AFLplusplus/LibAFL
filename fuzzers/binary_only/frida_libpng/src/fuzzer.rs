@@ -30,7 +30,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
 };
 use libafl_frida::{
     asan::{
@@ -90,7 +89,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         let mut frida_harness = |input: &BytesInput| {
             let target = input.target_bytes();
-            let buf = target.as_slice();
+            let buf = &target;
             unsafe { (target_func)(buf.as_ptr(), buf.len()) };
             ExitKind::Ok
         };
@@ -236,8 +235,11 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     &client_description.core_id(),
                     &options.cores,
                 )
-                .unwrap_or_else(|_| {
-                    panic!("Failed to load initial corpus at {:?}", &options.input)
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Failed to load initial corpus at {:?}: {err}",
+                        options.input
+                    )
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());
         }

@@ -16,8 +16,8 @@ fn main() {
     env::remove_var("DEBUG");
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
 
-    let afl = format!("{}/AFLplusplus", &cwd);
-    let afl_cc = format!("{}/AFLplusplus/afl-cc", &cwd);
+    let afl = format!("{cwd}/AFLplusplus");
+    let afl_cc = format!("{cwd}/AFLplusplus/afl-cc");
 
     let afl_path = Path::new(&afl);
     let afl_cc_path = Path::new(&afl_cc);

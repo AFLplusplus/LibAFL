@@ -35,7 +35,7 @@ let mut shmem = StdShMemProvider::new().unwrap().new_shmem(MAP_SIZE).unwrap();
 unsafe {
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
 }
-let mut shmem_buf = shmem.as_slice_mut();
+let mut shmem_buf = shmem.to_slice_mut();
 ```
 
 Here we make a shared memory region; `shmem`, and write this to environmental variable `__AFL_SHM_ID`. Then the instrumented binary, or the forkserver, finds this shared memory region (from the aforementioned env var) to record its coverage. On your fuzzer side, you can pass this shmem map to your `Observer` to obtain coverage feedbacks combined with any `Feedback`.
@@ -63,7 +63,7 @@ let mut shmem;
 unsafe{
     shmem = StdShMemProvider::new().unwrap().new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
 }
-let shmem_buf = shmem.as_slice_mut();
+let shmem_buf = shmem.to_slice_mut();
 unsafe{
     EDGES_PTR = shmem_buf.as_ptr();
 }

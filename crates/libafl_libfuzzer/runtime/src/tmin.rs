@@ -22,7 +22,7 @@ use libafl::{
 #[cfg(unix)]
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{
-    AsSlice, HasLen,
+    HasLen,
     rands::{RomuDuoJrRand, StdRand},
     tuples::tuple_list,
 };
@@ -52,7 +52,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
 
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
 
         let result = unsafe {
             crate::libafl_libfuzzer_test_one_input(Some(harness), buf.as_ptr(), buf.len())

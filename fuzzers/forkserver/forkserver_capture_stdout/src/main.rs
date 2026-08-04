@@ -21,7 +21,7 @@ use libafl::{
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSliceMut, StdTargetArgs, Truncate, current_nanos,
+    StdTargetArgs, Truncate, current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{Handled, Merge, tuple_list},
@@ -107,7 +107,7 @@ pub fn main() {
     unsafe {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
-    let shmem_buf = shmem.as_slice_mut();
+    let shmem_buf = &mut shmem[..];
 
     // Create an observation channel using the signals map
     let edges_observer = unsafe {
@@ -214,10 +214,7 @@ pub fn main() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
             .unwrap_or_else(|err| {
-                panic!(
-                    "Failed to load initial corpus at {:?}: {:?}",
-                    &corpus_dirs, err
-                )
+                panic!("Failed to load initial corpus at {corpus_dirs:?}: {err:?}")
             });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
@@ -241,10 +238,7 @@ pub fn main() {
             .clone()
             .expect("no stdout");
         let out: ProgramOutput = serde_json::from_slice(&stdout).unwrap();
-        println!(
-            "Program output from Forkserver after serde_json::from_slice is {:?}",
-            &out
-        );
+        println!("Program output from Forkserver after serde_json::from_slice is {out:?}");
 
         let cmd_stdout = executor
             .observers()
@@ -253,9 +247,6 @@ pub fn main() {
             .clone()
             .expect("no stdout");
         let out: ProgramOutput = serde_json::from_slice(&cmd_stdout).unwrap();
-        println!(
-            "Program output from CommandExecutor after serde_json::from_slice is {:?}",
-            &out
-        );
+        println!("Program output from CommandExecutor after serde_json::from_slice is {out:?}");
     }
 }

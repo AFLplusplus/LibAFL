@@ -8,9 +8,7 @@ use core::{
     slice::{Iter, IterMut},
 };
 
-use libafl_bolts::{
-    AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, ownedref::OwnedMutSlice,
-};
+use libafl_bolts::{AsIter, AsIterMut, HasLen, Named, ownedref::OwnedMutSlice};
 use meminterval::IntervalTree;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
@@ -64,7 +62,7 @@ where
 {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         for map in &self.maps {
-            let slice = map.as_slice();
+            let slice = &**map;
 
             slice.hash(hasher);
         }
@@ -94,7 +92,7 @@ where
         let elem = self.intervals.query(idx..=idx).next().unwrap();
         let i = *elem.value;
         let j = idx - elem.interval.start;
-        self.maps[i].as_slice()[j]
+        self.maps[i][j]
     }
 
     #[inline]
@@ -102,7 +100,7 @@ where
         let elem = self.intervals.query(idx..=idx).next().unwrap();
         let i = *elem.value;
         let j = idx - elem.interval.start;
-        self.maps[i].as_slice_mut()[j] = val;
+        self.maps[i][j] = val;
     }
 
     #[inline]
@@ -114,7 +112,7 @@ where
         let initial = self.initial();
         let mut res = 0;
         for map in &self.maps {
-            for x in map.as_slice() {
+            for x in &**map {
                 if *x != initial {
                     res += 1;
                 }
@@ -126,7 +124,7 @@ where
     fn reset_map(&mut self) -> Result<(), Error> {
         let initial = self.initial();
         for map in &mut self.maps {
-            for x in map.as_slice_mut() {
+            for x in &mut **map {
                 *x = initial;
             }
         }
@@ -170,7 +168,7 @@ where
         let mut idx = 0;
         let mut intervals = IntervalTree::new();
         for (v, x) in maps.iter().enumerate() {
-            let l = x.as_slice().len();
+            let l = x.len();
             intervals.insert(idx..(idx + l), v);
             idx += l;
         }

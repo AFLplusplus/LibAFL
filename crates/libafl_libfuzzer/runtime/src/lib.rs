@@ -79,7 +79,6 @@ use libafl::{
     Error,
     inputs::{BytesInput, HasTargetBytes, Input},
 };
-use libafl_bolts::AsSlice;
 use libc::_exit;
 use mimalloc::MiMalloc;
 
@@ -148,7 +147,6 @@ macro_rules! fuzz_with {
         use libafl_bolts::{
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
-                AsSlice,
                 nonnull_raw_mut,
         };
         use libafl::{
@@ -440,9 +438,8 @@ macro_rules! fuzz_with {
             // The wrapped harness function, calling out to the LLVM-style harness
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
-                let buf = target.as_slice();
 
-                let result = unsafe { crate::libafl_libfuzzer_test_one_input(Some(*$harness), buf.as_ptr(), buf.len()) };
+                let result = unsafe { crate::libafl_libfuzzer_test_one_input(Some(*$harness), target.as_ptr(), target.len()) };
                 match result {
                     -2 => ExitKind::Crash,
                     _ => {
@@ -686,9 +683,7 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
                 )
             });
             unsafe {
-                libafl_targets::libfuzzer::libfuzzer_test_one_input(
-                    input.target_bytes().as_slice(),
-                );
+                libafl_targets::libfuzzer::libfuzzer_test_one_input(&input.target_bytes());
             }
         }
         return 0;

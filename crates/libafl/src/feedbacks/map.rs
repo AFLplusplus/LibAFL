@@ -548,7 +548,7 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
-        let history_map = map_state.history_map.as_slice();
+        let history_map = &map_state.history_map;
 
         let initial = observer.initial();
 

@@ -31,7 +31,7 @@ use libafl::{
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSliceMut, StdTargetArgs,
+    StdTargetArgs,
     core_affinity::Cores,
     nonzero,
     rands::StdRand,
@@ -132,7 +132,7 @@ impl ForkserverBytesCoverageSugar<'_> {
             unsafe {
                 shmem.write_to_env("__AFL_SHM_ID").unwrap();
             }
-            let shmem_map = shmem.as_slice_mut();
+            let shmem_map = &mut *shmem;
 
             // To let know the AFL++ binary that we have a big map
             unsafe {

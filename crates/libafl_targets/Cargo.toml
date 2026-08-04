@@ -198,7 +198,7 @@ document-features = ["dep:document-features"]
 [build-dependencies]
 bindgen = "0.72.1"
 cc = { version = "1.4.0", features = ["parallel"] }
-rustversion = "1.0.23"
+rustversion = { workspace = true }
 
 [dependencies]
 document-features = { workspace = true, optional = true }

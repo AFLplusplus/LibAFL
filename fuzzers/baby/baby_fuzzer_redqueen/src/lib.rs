@@ -28,7 +28,6 @@ use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
     tuples::{tuple_list, Handled},
-    AsSlice,
 };
 use libafl_targets::{
     cmps::{observers::AflppCmpLogObserver, stages::AflppCmplogTracingStage},
@@ -84,9 +83,9 @@ pub extern "C" fn libafl_main(
             .to_string(),
     );
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", &out_dir);
+        println!("Out dir at {:?} already exists.", out_dir);
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            println!("Out dir at {:?} is not a valid directory!", out_dir);
             return 1;
         }
     }
@@ -100,7 +99,7 @@ pub extern "C" fn libafl_main(
             .to_string(),
     );
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        println!("In dir at {:?} is not a valid directory!", in_dir);
         return 1;
     }
 
@@ -171,7 +170,7 @@ fn run_fuzzer(
     // The wrapped harness function, calling out to the LLVM-style harness
     fn harness(input: &BytesInput) -> ExitKind {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         unsafe {
             libfuzzer_test_one_input(buf);
         }

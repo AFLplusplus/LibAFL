@@ -4,12 +4,11 @@ use libafl::{
     executors::ExitKind,
     inputs::{BytesInput, HasTargetBytes},
 };
-use libafl_bolts::AsSlice;
 
 fn main() {
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         if buf.len() > 0 && buf[0] == b'a' {
             if buf.len() > 1 && buf[1] == b'b' {
                 if buf.len() > 2 && buf[2] == b'c' {

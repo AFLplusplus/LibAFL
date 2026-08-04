@@ -29,7 +29,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
     tuples::tuple_list,
-    AsSliceMut,
 };
 
 pub fn main() {
@@ -38,7 +37,7 @@ pub fn main() {
     let shmem_id = signals.id();
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", signals.as_slice_mut()) };
+    let observer = unsafe { StdMapObserver::new("signals", &mut signals[..]) };
     // Create a stacktrace observer
     let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 

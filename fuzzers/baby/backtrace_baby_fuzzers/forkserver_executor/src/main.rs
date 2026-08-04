@@ -25,7 +25,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider},
     tuples::tuple_list,
-    AsSliceMut, StdTargetArgs,
+    StdTargetArgs,
 };
 
 pub fn main() {
@@ -43,8 +43,7 @@ pub fn main() {
     unsafe {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
-    let shmem_map: &mut [u8; MAP_SIZE] = shmem
-        .as_slice_mut()
+    let shmem_map: &mut [u8; MAP_SIZE] = (&mut shmem[..])
         .try_into()
         .expect("could not convert slice to sized slice.");
 

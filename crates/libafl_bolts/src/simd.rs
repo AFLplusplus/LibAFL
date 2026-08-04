@@ -229,8 +229,14 @@ pub trait VectorType {
     #[must_use]
     fn simd_eq(self, rhs: Self) -> Self;
 
-    /// Can't reuse [`crate::AsSlice`] due to [`wide`] might implement `Deref`
-    fn as_slice(&self) -> &[u8];
+    /// Can't reuse [`crate::ToSlice`] due to [`wide`] might implement `Deref`
+    fn to_slice(&self) -> &[u8];
+
+    /// Deprecated fallback for [`Self::to_slice`]
+    #[deprecated(note = "Use to_slice instead")]
+    fn as_slice(&self) -> &[u8] {
+        self.to_slice()
+    }
 }
 
 #[cfg(feature = "wide")]
@@ -263,7 +269,7 @@ impl VectorType for wide::u8x16 {
         self.simd_eq(rhs)
     }
 
-    fn as_slice(&self) -> &[u8] {
+    fn to_slice(&self) -> &[u8] {
         self.as_array()
     }
 }
@@ -308,7 +314,7 @@ impl VectorType for wide::u8x32 {
         self.simd_eq(rhs)
     }
 
-    fn as_slice(&self) -> &[u8] {
+    fn to_slice(&self) -> &[u8] {
         self.as_array()
     }
 }
@@ -339,7 +345,7 @@ where
 
         let mask = mp.simd_eq(V::ZERO);
         let out = mask.select(lhs, rhs);
-        map[i..i + V::N].copy_from_slice(out.as_slice());
+        map[i..i + V::N].copy_from_slice(out.to_slice());
     }
 
     #[allow(clippy::needless_range_loop)]

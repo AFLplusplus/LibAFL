@@ -235,8 +235,8 @@ where
         if state.must_load_initial_inputs() {
             state
                 .load_initial_inputs(fuzzer, executor, &mut self.mgr, &corpus_dirs)
-                .unwrap_or_else(|_| {
-                    println!("Failed to load initial corpus at {corpus_dirs:?}");
+                .unwrap_or_else(|err| {
+                    println!("Failed to load initial corpus at {corpus_dirs:?}: {err:?}");
                     process::exit(0);
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());

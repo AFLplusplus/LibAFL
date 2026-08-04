@@ -21,7 +21,7 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error, Fuzzer,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
 mod input;
@@ -58,7 +58,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &PacketData| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         // # Safety
         // We're looking for crashes in there!
         unsafe {
@@ -167,7 +167,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
+            .unwrap_or_else(|err| {
+                panic!("Failed to load initial corpus at {corpus_dirs:?}: {err}")
+            });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 

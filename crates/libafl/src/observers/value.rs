@@ -9,7 +9,7 @@ use core::{
 };
 
 use ahash::RandomState;
-use libafl_bolts::{AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, ownedref::OwnedRef};
+use libafl_bolts::{AsIter, AsIterMut, HasLen, Named, ToSlice, ToSliceMut, ownedref::OwnedRef};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
@@ -169,19 +169,19 @@ pub struct RefCellValueObserverIter<'it, T> {
     v: Ref<'it, [T]>,
 }
 
-impl<'it, T: 'it, A: Deref<Target = [T]>> AsSlice<'it> for RefCellValueObserver<'_, A> {
+impl<'it, T: 'it, A: Deref<Target = [T]>> ToSlice<'it> for RefCellValueObserver<'_, A> {
     type Entry = T;
     type SliceRef = Ref<'it, [T]>;
 
-    fn as_slice(&'it self) -> Self::SliceRef {
+    fn to_slice(&'it self) -> Self::SliceRef {
         Ref::map(self.value.as_ref().borrow(), |s| &**s)
     }
 }
 
-impl<'it, T: 'it, A: DerefMut<Target = [T]>> AsSliceMut<'it> for RefCellValueObserver<'_, A> {
+impl<'it, T: 'it, A: DerefMut<Target = [T]>> ToSliceMut<'it> for RefCellValueObserver<'_, A> {
     type SliceRefMut = RefMut<'it, [T]>;
 
-    fn as_slice_mut(&'it mut self) -> Self::SliceRefMut {
+    fn to_slice_mut(&'it mut self) -> Self::SliceRefMut {
         RefMut::map(self.value.as_ref().borrow_mut(), |s| &mut **s)
     }
 }

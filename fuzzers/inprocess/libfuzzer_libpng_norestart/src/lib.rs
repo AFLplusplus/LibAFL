@@ -35,7 +35,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{MmapShMemProvider, ShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 use mimalloc::MiMalloc;
@@ -228,7 +227,7 @@ pub extern "C" fn libafl_main() {
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
-            let buf = target.as_slice();
+            let buf = &target;
             unsafe {
                 libfuzzer_test_one_input(buf);
             }
@@ -262,7 +261,12 @@ pub extern "C" fn libafl_main() {
                     &client_description.core_id(),
                     &cores,
                 )
-                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Failed to load initial corpus at {:?}: {:?}",
+                        opt.input, err
+                    )
+                });
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 

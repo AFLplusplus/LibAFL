@@ -16,8 +16,8 @@ fn main() {
     env::remove_var("DEBUG");
     let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
 
-    let afl = format!("{}/AFLplusplus", &cwd);
-    let afl_gcc = format!("{}/AFLplusplus/afl-cc", &cwd);
+    let afl = format!("{cwd}/AFLplusplus");
+    let afl_gcc = format!("{cwd}/AFLplusplus/afl-cc");
 
     let afl_path = Path::new(&afl);
     let afl_gcc_path = Path::new(&afl_gcc);
@@ -48,7 +48,7 @@ fn main() {
 
     Command::new(afl_gcc_path)
         .args(["src/program.c", "-o"])
-        .arg(format!("{}/target/release/program", &cwd))
+        .arg(format!("{cwd}/target/release/program"))
         .arg("-fsanitize=address")
         .status()
         .unwrap();
