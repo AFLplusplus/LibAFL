@@ -56,7 +56,7 @@ use libafl_targets::{
     EDGES_MAP_DEFAULT_SIZE,
 };
 #[rustversion::nightly]
-fn get_ctx_hooks<I, S>() -> (libafl_targets::sancov_pcguard::CtxHook<I, S>,) {
+fn get_ctx_hooks<I, S>() -> (libafl_targets::sancov_pcguard::CtxHook<I, S>, ()) {
     tuple_list!(libafl_targets::sancov_pcguard::CtxHook::new())
 }
 

@@ -231,6 +231,12 @@ pub trait VectorType {
 
     /// Can't reuse [`crate::ToSlice`] due to [`wide`] might implement `Deref`
     fn to_slice(&self) -> &[u8];
+
+    /// Deprecated fallback for [`Self::to_slice`]
+    #[deprecated(note = "Use to_slice instead")]
+    fn as_slice(&self) -> &[u8] {
+        self.to_slice()
+    }
 }
 
 #[cfg(feature = "wide")]
