@@ -141,7 +141,7 @@ capstone = "0.14.0"
 rangemap = { workspace = true }
 log = { workspace = true }
 object = "0.40.0"
-addr2line = "0.27.0"
+addr2line = "0.27.1"
 paste = { workspace = true }
 enum-map = "3.1.0"
 serde_yaml = { workspace = true, optional = true } # For parsing the injections yaml file
