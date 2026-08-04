@@ -42,7 +42,7 @@ use libafl::{
 #[cfg(unix)]
 use libafl_bolts::os::dup_and_mute_outputs;
 use libafl_bolts::{
-    AsSlice, current_time,
+    ToSlice, current_time,
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -343,7 +343,7 @@ fn fuzz(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = target.to_slice();
         unsafe {
             libfuzzer_test_one_input(buf);
         }

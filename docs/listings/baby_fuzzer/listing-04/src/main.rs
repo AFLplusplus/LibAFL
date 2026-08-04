@@ -15,13 +15,13 @@ use libafl::{
     schedulers::QueueScheduler,
     state::StdState,
 };
-use libafl_bolts::{AsSlice, nonzero, rands::StdRand};
+use libafl_bolts::{ToSlice, nonzero, rands::StdRand};
 /* ANCHOR_END: use */
 
 fn main() {
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = target.to_slice();
         if buf.len() > 0 && buf[0] == b'a' {
             if buf.len() > 1 && buf[1] == b'b' {
                 if buf.len() > 2 && buf[2] == b'c' {

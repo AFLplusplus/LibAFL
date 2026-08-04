@@ -30,7 +30,7 @@ use libafl::{
 use libafl_bolts::{
     rands::StdRand,
     tuples::{tuple_list, Merge},
-    AsSlice,
+    ToSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_FOUND};
 use mimalloc::MiMalloc;
@@ -165,7 +165,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = target.to_slice();
         #[cfg(feature = "crash")]
         if buf.len() > 4 && buf[4] == 0 {
             unsafe {

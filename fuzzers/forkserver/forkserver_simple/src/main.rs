@@ -19,7 +19,7 @@ use libafl::{
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
-    AsSliceMut, StdTargetArgs, Truncate, current_nanos,
+    StdTargetArgs, ToSliceMut, Truncate, current_nanos,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{Handled, Merge, tuple_list},
@@ -99,7 +99,7 @@ pub fn main() {
     unsafe {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
-    let shmem_buf = shmem.as_slice_mut();
+    let shmem_buf = shmem.to_slice_mut();
 
     // Create an observation channel using the signals map
     let edges_observer = unsafe {

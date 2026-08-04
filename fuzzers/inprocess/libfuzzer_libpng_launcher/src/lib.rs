@@ -43,7 +43,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
+    ToSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 use mimalloc::MiMalloc;
@@ -276,8 +276,8 @@ pub extern "C" fn libafl_main() {
 
         // Create an observation channel using the signals map
         let map_observer = unsafe { std_edges_map_observer("edges") };
-        let map_ptr = map_observer.as_slice().as_ptr();
-        let map_len = map_observer.as_slice().len();
+        let map_ptr = map_observer.to_slice().as_ptr();
+        let map_len = map_observer.to_slice().len();
         println!("DEBUG: Edges map ptr: {:p}, len: {}", map_ptr, map_len);
         let edges_observer = HitcountsMapObserver::new(map_observer).track_indices();
         // Create an observation channel to keep track of the execution time
@@ -373,7 +373,7 @@ pub extern "C" fn libafl_main() {
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
-            let buf = target.as_slice();
+            let buf = target.to_slice();
             unsafe {
                 libfuzzer_test_one_input(buf);
             }

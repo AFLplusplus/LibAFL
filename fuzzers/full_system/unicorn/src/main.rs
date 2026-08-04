@@ -28,7 +28,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsSlice, AsSliceMut,
+    ToSlice, ToSliceMut,
 };
 use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 pub use libafl_targets::EDGES_MAP_PTR;
@@ -157,7 +157,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
         .new_shmem(EDGES_MAP_DEFAULT_SIZE)
         .unwrap();
 
-    let shmem_buf = shmem.as_slice_mut();
+    let shmem_buf = shmem.to_slice_mut();
     unsafe {
         EDGES_MAP_PTR = shmem_buf.as_mut_ptr();
     }
@@ -181,7 +181,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
         emu.context_restore(&context).unwrap();
 
         let target = input.target_bytes();
-        let mut buf = target.as_slice();
+        let mut buf = target.to_slice();
         let len = buf.len();
         if len > MAX_INPUT_SIZE {
             buf = &buf[0..MAX_INPUT_SIZE];

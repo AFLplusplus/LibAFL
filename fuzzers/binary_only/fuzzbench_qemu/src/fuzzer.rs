@@ -44,7 +44,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
+    ToSlice,
 };
 use libafl_qemu::{
     elf::EasyElf,
@@ -357,7 +357,7 @@ fn fuzz(
     let mut harness =
         |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
             let target = input.target_bytes();
-            let mut buf = target.as_slice();
+            let mut buf = target.to_slice();
             let mut len = buf.len();
             if len > MAX_INPUT_SIZE {
                 buf = &buf[0..MAX_INPUT_SIZE];

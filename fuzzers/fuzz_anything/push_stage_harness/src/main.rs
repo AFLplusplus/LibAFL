@@ -21,7 +21,7 @@ use libafl::{
     stages::push::{PushStageSharedState, StdMutationalPushStage},
     state::{HasCorpus, StdState},
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, ToSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -108,7 +108,7 @@ pub fn main() {
     for input in push_stage {
         let input = input.unwrap();
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = target.to_slice();
         signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             signals_set(1);

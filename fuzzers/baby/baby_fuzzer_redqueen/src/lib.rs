@@ -28,7 +28,7 @@ use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
     tuples::{tuple_list, Handled},
-    AsSlice,
+    ToSlice,
 };
 use libafl_targets::{
     cmps::{observers::AflppCmpLogObserver, stages::AflppCmplogTracingStage},
@@ -171,7 +171,7 @@ fn run_fuzzer(
     // The wrapped harness function, calling out to the LLVM-style harness
     fn harness(input: &BytesInput) -> ExitKind {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = target.to_slice();
         unsafe {
             libfuzzer_test_one_input(buf);
         }

@@ -22,7 +22,7 @@ use libafl::{
     Evaluator,
 };
 use libafl_bolts::{
-    nonnull_raw_mut, rands::StdRand, simd::MinReducer, tuples::tuple_list, AsSlice,
+    nonnull_raw_mut, rands::StdRand, simd::MinReducer, tuples::tuple_list, ToSlice,
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -49,7 +49,7 @@ pub fn main() {
         let mut count = input.len();
         for (i, (_name, input)) in input.parts().iter().enumerate() {
             let target = input.target_bytes();
-            let buf = target.as_slice();
+            let buf = target.to_slice();
             signals_set(i * 8);
             if !buf.is_empty() && buf[0] == b'a' {
                 signals_set(1 + i * 8);

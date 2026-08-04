@@ -17,7 +17,7 @@ pub fn main() -> Result<(), Error> {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = target.to_slice();
         signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             signals_set(1);

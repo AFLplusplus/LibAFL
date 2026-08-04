@@ -25,7 +25,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, StdTargetArgs, Truncate,
+    StdTargetArgs, ToSliceMut, Truncate,
 };
 use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 use nix::sys::signal::Signal;
@@ -111,7 +111,7 @@ pub fn main() {
     unsafe {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
-    let shmem_buf = shmem.as_slice_mut();
+    let shmem_buf = shmem.to_slice_mut();
     // the next line is not needed
     // unsafe { EDGES_MAP_PTR = shmem_buf.as_mut_ptr() };
 

@@ -19,7 +19,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{AsSlice, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list};
+use libafl_bolts::{ToSlice, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list};
 /* ANCHOR_END: use */
 
 // Coverage map with explicit assignments due to the lack of instrumentation
@@ -33,7 +33,7 @@ fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = target.to_slice();
         signals_set(0); // set SIGNALS[0]
         if buf.len() > 0 && buf[0] == b'a' {
             signals_set(1); // set SIGNALS[1]

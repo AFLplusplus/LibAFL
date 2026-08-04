@@ -32,7 +32,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
+    ToSlice,
 };
 #[cfg(unix)]
 use libafl_frida::asan::{
@@ -59,7 +59,7 @@ pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -
 
     let frida_harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = target.to_slice();
         let len = buf.len().to_string();
 
         let argv: [*const u8; 3] = [

@@ -45,7 +45,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice, AsSliceMut,
+    ToSlice, ToSliceMut,
 };
 use libafl_qemu::{
     elf::EasyElf,
@@ -163,7 +163,7 @@ fn fuzz(
     let mut shmem_provider = StdShMemProvider::new()?;
 
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
-    let edges = edges_shmem.as_slice_mut();
+    let edges = edges_shmem.to_slice_mut();
 
     // Create an observation channel using the coverage map
     let mut edges_observer = unsafe {
@@ -252,7 +252,7 @@ fn fuzz(
     });
 
     let mut cmp_shmem = shmem_provider.uninit_on_shmem::<CmpLogMap>().unwrap();
-    let cmplog = cmp_shmem.as_slice_mut();
+    let cmplog = cmp_shmem.to_slice_mut();
 
     // Beginning of a page should be properly aligned.
     #[expect(clippy::cast_ptr_alignment)]
@@ -346,7 +346,7 @@ fn fuzz(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
-        let mut buf = target.as_slice();
+        let mut buf = target.to_slice();
         let mut len = buf.len();
         if len > 4096 {
             buf = &buf[0..4096];

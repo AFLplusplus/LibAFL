@@ -25,7 +25,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsSlice, AsSliceMut,
+    ToSlice, ToSliceMut,
 };
 #[cfg(feature = "fork")]
 use libafl_qemu::QemuForkExecutor;
@@ -129,7 +129,7 @@ pub fn fuzz() -> Result<(), Error> {
     let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
-    let edges = edges_shmem.as_slice_mut();
+    let edges = edges_shmem.to_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
     let mut edges_observer = unsafe {
@@ -240,7 +240,7 @@ pub fn fuzz() -> Result<(), Error> {
     #[cfg(feature = "fork")]
     let mut harness = |_emulator: &mut _, input: &BytesInput| {
         let target = input.target_bytes();
-        let mut buf = target.as_slice();
+        let mut buf = target.to_slice();
         let mut len = buf.len();
         if len > MAX_INPUT_SIZE {
             buf = &buf[0..MAX_INPUT_SIZE];
@@ -276,7 +276,7 @@ pub fn fuzz() -> Result<(), Error> {
     let mut harness =
         |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
             let target = input.target_bytes();
-            let mut buf = target.as_slice();
+            let mut buf = target.to_slice();
             let mut len = buf.len();
             if len > MAX_INPUT_SIZE {
                 buf = &buf[0..MAX_INPUT_SIZE];

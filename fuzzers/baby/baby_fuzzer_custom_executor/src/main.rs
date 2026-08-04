@@ -22,7 +22,7 @@ use libafl::{
     state::{HasCorpus, HasExecutions, StdState},
 };
 use libafl_bolts::{
-    current_nanos, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list, AsSlice,
+    current_nanos, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list, ToSlice,
 };
 /// Coverage map with explicit assignments due to the lack of instrumentation
 const SIGNALS_LEN: usize = 16;
@@ -62,7 +62,7 @@ where
         *state.executions_mut() += 1;
 
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = target.to_slice();
         signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             signals_set(1);

@@ -30,7 +30,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled},
-    AsSliceMut, StdTargetArgs, Truncate,
+    StdTargetArgs, ToSliceMut, Truncate,
 };
 use nix::sys::signal::Signal;
 
@@ -110,7 +110,7 @@ pub fn main() {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
 
-    let shmem_buf = shmem.as_slice_mut();
+    let shmem_buf = shmem.to_slice_mut();
 
     // Create an observation channel using the signals map
     let edges_observer = unsafe {
