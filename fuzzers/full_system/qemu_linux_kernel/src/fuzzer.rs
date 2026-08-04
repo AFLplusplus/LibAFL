@@ -49,6 +49,7 @@ use libafl_qemu::{
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 #[cfg(feature = "nyx")]
+#[expect(clippy::type_complexity)]
 fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     modules: ET,
@@ -71,6 +72,7 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
+#[expect(clippy::type_complexity)]
 fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     mut modules: ET,
@@ -224,8 +226,8 @@ pub fn fuzz() {
         if state.must_load_initial_inputs() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
-                .unwrap_or_else(|_| {
-                    println!("Failed to load initial corpus at {:?}", &corpus_dirs);
+                .unwrap_or_else(|err| {
+                    println!("Failed to load initial corpus at {corpus_dirs:?}: {err:?}");
                     process::exit(0);
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());
@@ -243,7 +245,7 @@ pub fn fuzz() {
 
         match fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(_) | Err(Error::ShuttingDown) => Ok(()),
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
         }
     };
 

@@ -261,7 +261,12 @@ pub extern "C" fn libafl_main() {
                     &client_description.core_id(),
                     &cores,
                 )
-                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Failed to load initial corpus at {:?}: {:?}",
+                        opt.input, err
+                    )
+                });
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 

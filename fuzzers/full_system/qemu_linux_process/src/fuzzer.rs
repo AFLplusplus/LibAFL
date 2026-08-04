@@ -43,11 +43,12 @@ use libafl_qemu::{
         cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
         utils::filters::HasAddressFilterTuple, CmpLogModule, EmulatorModuleTuple,
     },
-    FastSnapshotManager, NopSnapshotManager, QemuInitError, QemuSnapshotManager,
+    FastSnapshotManager, QemuInitError,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 #[cfg(feature = "nyx")]
+#[expect(clippy::type_complexity)]
 fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     modules: ET,
@@ -70,6 +71,7 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
+#[expect(clippy::type_complexity)]
 fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     mut modules: ET,
@@ -148,14 +150,9 @@ pub fn fuzz() {
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |emulator: &mut Emulator<_, _, _, _, _, _, _>,
-                           state: &mut _,
+                           _state: &mut _,
                            input: &BytesInput| unsafe {
-            match emulator.run(state, input) {
-                Ok(res) => res.try_into().unwrap(),
-                Err(e) => match e {
-                    _ => panic!("{e:?}"),
-                },
-            }
+            emulator.run(input).unwrap().try_into().unwrap()
         };
 
         // Create an observation channel to keep track of the execution time
@@ -187,7 +184,7 @@ pub fn fuzz() {
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
-                InMemoryOnDiskCorpus::new("corpus_gen").unwrap(),
+                InMemoryOnDiskCorpus::<BytesInput>::new("corpus_gen").unwrap(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(objective_dir.clone()).unwrap(),
@@ -226,8 +223,8 @@ pub fn fuzz() {
         if state.must_load_initial_inputs() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &corpus_dirs)
-                .unwrap_or_else(|_| {
-                    println!("Failed to load initial corpus at {:?}", &corpus_dirs);
+                .unwrap_or_else(|err| {
+                    println!("Failed to load initial corpus at {corpus_dirs:?}: {err:?}");
                     process::exit(0);
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());
@@ -245,7 +242,7 @@ pub fn fuzz() {
 
         match fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr) {
             Ok(_) | Err(Error::ShuttingDown) => Ok(()),
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
         }
     };
 

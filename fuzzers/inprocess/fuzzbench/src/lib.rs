@@ -133,9 +133,9 @@ pub extern "C" fn libafl_main() {
             .to_string(),
     );
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", &out_dir);
+        println!("Out dir at {:?} already exists.", out_dir);
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            println!("Out dir at {:?} is not a valid directory!", out_dir);
             return;
         }
     }
@@ -149,7 +149,7 @@ pub extern "C" fn libafl_main() {
             .to_string(),
     );
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        println!("In dir at {:?} is not a valid directory!", in_dir);
         return;
     }
 
@@ -387,9 +387,14 @@ fn fuzz(
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
         state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
-            .unwrap_or_else(|_| {
-                println!("Failed to load initial corpus at {:?}", &seed_dir);
+            .load_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut mgr,
+                std::slice::from_ref(seed_dir),
+            )
+            .unwrap_or_else(|err| {
+                println!("Failed to load initial corpus at {seed_dir:?}: {err:?}");
                 process::exit(0);
             });
         println!("We imported {} inputs from disk.", state.corpus().count());

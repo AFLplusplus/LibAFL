@@ -275,8 +275,8 @@ pub extern "C" fn libafl_main() {
 
         // Create an observation channel using the signals map
         let map_observer = unsafe { std_edges_map_observer("edges") };
-        let map_ptr = map_observer.to_slice().as_ptr();
-        let map_len = map_observer.to_slice().len();
+        let map_ptr = map_observer[..].as_ptr();
+        let map_len = map_observer.len();
         println!("DEBUG: Edges map ptr: {:p}, len: {}", map_ptr, map_len);
         let edges_observer = HitcountsMapObserver::new(map_observer).track_indices();
         // Create an observation channel to keep track of the execution time
@@ -398,7 +398,9 @@ pub extern "C" fn libafl_main() {
         if state.must_load_initial_inputs() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
-                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", opt.input));
+                .unwrap_or_else(|err| {
+                    panic!("Failed to load initial corpus at {:?}: {err}", opt.input)
+                });
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 

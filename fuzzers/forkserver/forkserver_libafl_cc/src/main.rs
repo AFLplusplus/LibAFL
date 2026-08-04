@@ -209,7 +209,7 @@ pub fn main() {
             .unwrap_or_else(|err| {
                 panic!(
                     "Failed to load initial corpus at {:?}: {:?}",
-                    &corpus_dirs, err
+                    corpus_dirs, err
                 )
             });
         println!("We imported {} inputs from disk.", state.corpus().count());

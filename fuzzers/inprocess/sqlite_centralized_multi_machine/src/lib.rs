@@ -251,8 +251,8 @@ pub extern "C" fn libafl_main() {
             if state.must_load_initial_inputs() {
                 state
                     .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &opt.input)
-                    .unwrap_or_else(|_| {
-                        panic!("Failed to load initial corpus at {:?}", &opt.input)
+                    .unwrap_or_else(|err| {
+                        panic!("Failed to load initial corpus at {:?}: {err}", opt.input)
                     });
                 println!("We imported {} inputs from disk.", state.corpus().count());
             }
@@ -288,9 +288,8 @@ pub extern "C" fn libafl_main() {
         .centralized_broker_port(broker_port + 1)
         .remote_broker_addr(opt.remote_broker_addr)
         .multi_machine_node_descriptor(node_description)
-        // .stdout_file(Some("/dev/null"))
         .build()
-        .launch()
+        .launch_centralized()
     {
         Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),

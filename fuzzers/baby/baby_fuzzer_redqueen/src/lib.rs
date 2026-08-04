@@ -83,9 +83,9 @@ pub extern "C" fn libafl_main(
             .to_string(),
     );
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", &out_dir);
+        println!("Out dir at {:?} already exists.", out_dir);
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            println!("Out dir at {:?} is not a valid directory!", out_dir);
             return 1;
         }
     }
@@ -99,7 +99,7 @@ pub extern "C" fn libafl_main(
             .to_string(),
     );
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        println!("In dir at {:?} is not a valid directory!", in_dir);
         return 1;
     }
 

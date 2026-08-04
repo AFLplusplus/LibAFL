@@ -239,7 +239,7 @@ pub extern "C" fn libafl_main() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
                 .unwrap_or_else(|e| {
-                    panic!("Failed to load initial corpus at {:?} {:?}", &opt.input, e)
+                    panic!("Failed to load initial corpus at {:?}: {e:?}", opt.input)
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());
         }

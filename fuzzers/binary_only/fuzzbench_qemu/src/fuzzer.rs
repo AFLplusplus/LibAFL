@@ -129,9 +129,9 @@ pub fn main() {
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
     let mut out_dir = PathBuf::from(res.get_one::<String>("out").unwrap().to_string());
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", &out_dir);
+        println!("Out dir at {:?} already exists.", out_dir);
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            println!("Out dir at {:?} is not a valid directory!", out_dir);
             return;
         }
     }
@@ -141,7 +141,7 @@ pub fn main() {
 
     let in_dir = PathBuf::from(res.get_one::<String>("in").unwrap().to_string());
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        println!("In dir at {:?} is not a valid directory!", in_dir);
         return;
     }
 
@@ -419,8 +419,8 @@ fn fuzz(
                 &mut mgr,
                 std::slice::from_ref(&seed_dir),
             )
-            .unwrap_or_else(|_| {
-                println!("Failed to load initial corpus at {:?}", &seed_dir);
+            .unwrap_or_else(|err| {
+                println!("Failed to load initial corpus at {seed_dir:?}: {err:?}");
                 process::exit(0);
             });
         println!("We imported {} input(s) from disk.", state.corpus().count());

@@ -362,8 +362,8 @@ fn fuzz(
             &mut mgr,
             std::slice::from_ref(seed_dir),
         )
-        .unwrap_or_else(|_| {
-            println!("Failed to load initial corpus at {seed_dir:?}");
+        .unwrap_or_else(|err| {
+            println!("Failed to load initial corpus at {seed_dir:?}: {err:?}");
             process::exit(0);
         });
     println!("We imported {} inputs from disk.", state.corpus().count());

@@ -43,7 +43,7 @@ pub fn main() {
     unsafe {
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
     }
-    let shmem_map: &mut [u8; MAP_SIZE] = shmem
+    let shmem_map: &mut [u8; MAP_SIZE] = (&mut shmem[..])
         .try_into()
         .expect("could not convert slice to sized slice.");
 

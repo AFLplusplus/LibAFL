@@ -191,7 +191,7 @@ pub extern "C" fn libafl_main() {
                 &mut restarting_mgr,
                 &[PathBuf::from("./corpus")],
             )
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus"));
+            .unwrap_or_else(|err| panic!("Failed to load initial corpus: {err}"));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 

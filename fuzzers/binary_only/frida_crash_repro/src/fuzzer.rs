@@ -200,8 +200,11 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     &client_description.core_id(),
                     &options.cores,
                 )
-                .unwrap_or_else(|_| {
-                    panic!("Failed to load initial corpus at {:?}", &options.input)
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Failed to load initial corpus at {:?}: {err}",
+                        options.input
+                    )
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());
         }

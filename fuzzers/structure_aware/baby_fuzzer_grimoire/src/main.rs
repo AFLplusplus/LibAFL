@@ -57,7 +57,7 @@ pub fn main() {
         let attr = attr.unwrap();
 
         if attr.is_file() && attr.len() > 0 {
-            println!("Loading file {:?} ...", &path);
+            println!("Loading file {:?} ...", path);
             let mut file = fs::File::open(path).expect("no file found");
             let mut buffer = vec![];
             file.read_to_end(&mut buffer).expect("buffer overflow");

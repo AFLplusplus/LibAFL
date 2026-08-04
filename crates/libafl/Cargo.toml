@@ -198,7 +198,7 @@ path = "./examples/tui_mock/main.rs"
 required-features = ["std", "tui_monitor"]
 
 [build-dependencies]
-rustversion = "1.0.23"
+rustversion = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true, default-features = false, features = [

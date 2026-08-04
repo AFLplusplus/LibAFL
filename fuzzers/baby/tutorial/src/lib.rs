@@ -167,7 +167,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus at {corpus_dirs:?}"));
+            .unwrap_or_else(|err| {
+                panic!("Failed to load initial corpus at {corpus_dirs:?}: {err}")
+            });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
