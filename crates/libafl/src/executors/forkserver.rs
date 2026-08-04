@@ -839,8 +839,8 @@ where
         } else if input_size < self.min_input_size {
             // Extend like AFL++ does
             input_size = self.min_input_size;
-            let mut input_bytes_copy = input.to_vec();
-            input_bytes_copy.resize(input_size, 0);
+            let mut input_bytes_copy = vec![0u8; input_size];
+            input_bytes_copy[..input.len()].copy_from_slice(input);
             self.map_input_to_shmem(&input_bytes_copy, input_size)?;
         } else {
             self.map_input_to_shmem(input, input_size)?;
