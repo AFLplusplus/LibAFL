@@ -30,7 +30,7 @@ pub fn is_pie(file: object::File<'_>) -> bool {
             if let Ok(Some(d)) = dyn_sec {
                 let arr = d.0;
                 for v in arr {
-                    if v.d_tag.get(elf.endian()) as u64 == DT_FLAGS_1
+                    if v.d_tag.get(elf.endian()).0 as u64 == DT_FLAGS_1
                         && v.d_val.get(elf.endian()) & DF_1_PIE == DF_1_PIE
                     {
                         is_pie = true;

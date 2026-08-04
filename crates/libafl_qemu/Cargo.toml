@@ -140,7 +140,7 @@ thread_local = "1.1.10"
 capstone = "0.14.0"
 rangemap = { workspace = true }
 log = { workspace = true }
-object = "0.39.1"
+object = "0.40.0"
 addr2line = "0.27.0"
 paste = { workspace = true }
 enum-map = "3.1.0"

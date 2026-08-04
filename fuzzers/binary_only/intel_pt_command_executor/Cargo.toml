@@ -9,7 +9,7 @@ env_logger = "0.11.11"
 libafl = { path = "../../../crates/libafl", features = ["intel_pt"] }
 libafl_bolts = { path = "../../../crates/libafl_bolts" }
 log = { version = "0.4.33" }
-object = "0.39.1"
+object = "0.40.0"
 
 [profile.release]
 lto = true
