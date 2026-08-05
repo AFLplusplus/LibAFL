@@ -282,7 +282,15 @@ impl Display for ShMemId {
 ///
 /// They are the backbone of `llmp` for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
-pub trait ShMem: Sized + Debug + DerefMut<Target = [u8]> {
+///
+/// # Safety
+/// Implementors of [`ShMem`] **must** ensure that the start address of the underlying memory buffer
+/// (`self.as_ptr()`) is aligned to at least 8 bytes (preferably page-aligned).
+///
+/// Higher-level messaging layers like LLMP place C-repr headers containing 64-bit atomic types
+/// (`LlmpPage`, `LlmpMsg`) directly at the start of the shared memory page. Unaligned buffers
+/// will lead to Undefined Behavior and hardware alignment faults on architectures like ARM.
+pub unsafe trait ShMem: Sized + Debug + DerefMut<Target = [u8]> {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
@@ -334,6 +342,10 @@ pub trait ShMem: Sized + Debug + DerefMut<Target = [u8]> {
 ///
 /// They are the backbone of `llmp` for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
+///
+/// # Alignment Guarantee
+/// Implementations of [`ShMemProvider`] must produce [`ShMem`] maps whose base pointers are aligned
+/// to at least 8 bytes.
 pub trait ShMemProvider: Clone + Default + Debug {
     /// The actual shared map handed out by this [`ShMemProvider`].
     type ShMem: ShMem;
@@ -438,23 +450,26 @@ impl ShMemProvider for NopShMemProvider {
         id: ShMemId,
         map_size: usize,
     ) -> Result<Self::ShMem, Error> {
+        let u64_count = map_size.div_ceil(size_of::<u64>());
         Ok(NopShMem {
             id,
-            buf: vec![0; map_size],
+            buf: vec![0; u64_count],
         })
     }
 }
 
-/// An [`ShMem]`] that does not have any mem nor share anything.
+/// An [`ShMem`] that does not have any mem nor share anything.
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
 pub struct NopShMem {
     id: ShMemId,
-    buf: Vec<u8>,
+    buf: Vec<u64>,
 }
 
+// # Safety
+// `NopShMem` allocates an 8-byte aligned `Vec<u64>` buffer internally, fulfilling the alignment guarantee required by `ShMem`.
 #[cfg(feature = "alloc")]
-impl ShMem for NopShMem {
+unsafe impl ShMem for NopShMem {
     fn id(&self) -> ShMemId {
         self.id
     }
@@ -463,7 +478,9 @@ impl ShMem for NopShMem {
 #[cfg(feature = "alloc")]
 impl DerefMut for NopShMem {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.buf
+        let ptr = self.buf.as_mut_ptr().cast::<u8>();
+        let len = self.buf.len() * size_of::<u64>();
+        unsafe { core::slice::from_raw_parts_mut(ptr, len) }
     }
 }
 
@@ -472,7 +489,9 @@ impl Deref for NopShMem {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        &self.buf
+        let ptr = self.buf.as_ptr().cast::<u8>();
+        let len = self.buf.len() * size_of::<u64>();
+        unsafe { core::slice::from_raw_parts(ptr, len) }
     }
 }
 
@@ -490,8 +509,10 @@ where
     provider: Rc<RefCell<SP>>,
 }
 
+// # Safety
+// `RcShMem` delegates memory access to the underlying `SHM: ShMem` instance, which guarantees 8-byte alignment.
 #[cfg(feature = "alloc")]
-impl<SP> ShMem for RcShMem<SP::ShMem, SP>
+unsafe impl<SP> ShMem for RcShMem<SP::ShMem, SP>
 where
     SP: ShMemProvider,
 {
@@ -969,7 +990,9 @@ pub mod unix_shmem {
             }
         }
 
-        impl ShMem for MmapShMem {
+        // # Safety
+        // `MmapShMem` is backed by OS `mmap`, which returns page-aligned memory addresses (4096-byte aligned).
+        unsafe impl ShMem for MmapShMem {
             fn id(&self) -> ShMemId {
                 self.id
             }
@@ -1163,8 +1186,10 @@ pub mod unix_shmem {
             }
         }
 
+        // # Safety
+        // `CommonUnixShMem` is backed by OS `shmat`/`mmap`, which returns page-aligned memory addresses (4096-byte aligned).
         #[cfg(unix)]
-        impl ShMem for CommonUnixShMem {
+        unsafe impl ShMem for CommonUnixShMem {
             fn id(&self) -> ShMemId {
                 self.id
             }
@@ -1371,7 +1396,9 @@ pub mod unix_shmem {
             }
         }
 
-        impl ShMem for AshmemShMem {
+        // # Safety
+        // `AshmemShMem` is backed by Android ashmem `mmap`, which returns page-aligned memory addresses (4096-byte aligned).
+        unsafe impl ShMem for AshmemShMem {
             fn id(&self) -> ShMemId {
                 self.id
             }
@@ -1554,8 +1581,10 @@ pub mod unix_shmem {
             }
         }
 
+        // # Safety
+        // `MemfdShMem` is backed by Linux memfd `mmap`, which returns page-aligned memory addresses (4096-byte aligned).
         #[cfg(unix)]
-        impl ShMem for MemfdShMem {
+        unsafe impl ShMem for MemfdShMem {
             fn id(&self) -> ShMemId {
                 self.id
             }
@@ -1749,7 +1778,9 @@ pub mod win32_shmem {
         }
     }
 
-    impl ShMem for Win32ShMem {
+    // # Safety
+    // `Win32ShMem` is backed by Windows `MapViewOfFile`, which returns page-aligned memory addresses (4096-byte aligned).
+    unsafe impl ShMem for Win32ShMem {
         fn id(&self) -> ShMemId {
             self.id
         }

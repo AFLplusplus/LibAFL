@@ -100,7 +100,9 @@ where
     }
 }
 
-impl<SHM> ShMem for ServedShMem<SHM>
+// # Safety
+// `ServedShMem` wraps an inner `SHM: ShMem` served via IPC socket, inheriting the underlying 8-byte/page alignment.
+unsafe impl<SHM> ShMem for ServedShMem<SHM>
 where
     SHM: ShMem,
 {
