@@ -393,14 +393,14 @@ mod tests {
             .objective(objective)
             .build();
 
-        let mut executor = InProcessExecutor::new(
-            &mut harness_fn,
-            tuple_list!(true_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut event_mgr,
-        )
-        .unwrap();
+        let mut executor = InProcessExecutor::builder()
+            .harness(&mut harness_fn)
+            .observers(tuple_list!(true_observer))
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut event_mgr)
+            .build()
+            .unwrap();
 
         fuzzer
             .add_input(&mut state, &mut executor, &mut event_mgr, input)

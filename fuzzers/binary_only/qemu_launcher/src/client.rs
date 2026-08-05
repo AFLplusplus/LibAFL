@@ -110,7 +110,7 @@ impl Client<'_> {
 
         let instance_builder = Instance::builder()
             .options(self.options)
-            .mgr(mgr)
+            .event_mgr(mgr)
             .client_description(client_description)
             .extra_tokens(extra_tokens);
 

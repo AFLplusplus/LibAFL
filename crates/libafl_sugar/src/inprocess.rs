@@ -225,14 +225,14 @@ where
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = ShadowExecutor::new(
-                InProcessExecutor::with_timeout(
-                    &mut harness,
-                    tuple_list!(edges_observer, time_observer),
-                    &mut fuzzer,
-                    &mut state,
-                    &mut mgr,
-                    timeout,
-                )?,
+                InProcessExecutor::builder()
+                    .timeout(timeout)
+                    .harness(&mut harness)
+                    .observers(tuple_list!(edges_observer, time_observer))
+                    .fuzzer(&mut fuzzer)
+                    .state(&mut state)
+                    .event_mgr(&mut mgr)
+                    .build()?,
                 tuple_list!(cmplog_observer),
             );
 

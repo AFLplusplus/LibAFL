@@ -180,14 +180,14 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut restarting_mgr,
-        Duration::new(10, 0),
-    )?;
+    let mut executor = InProcessExecutor::builder()
+        .timeout(Duration::from_secs(10))
+        .harness(&mut harness)
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut restarting_mgr)
+        .build()?;
     // 10 seconds timeout
 
     // The actual target run starts here.

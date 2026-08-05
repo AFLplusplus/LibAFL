@@ -423,14 +423,14 @@ mod tests {
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
-        let mut executor = InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(time),
-            &mut fuzzer,
-            &mut state,
-            &mut llmp_mgr,
-        )
-        .unwrap();
+        let mut executor = InProcessExecutor::builder()
+            .harness(&mut harness)
+            .observers(tuple_list!(time))
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut llmp_mgr)
+            .build()
+            .unwrap();
 
         let mutator = BitFlipMutator::new();
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));

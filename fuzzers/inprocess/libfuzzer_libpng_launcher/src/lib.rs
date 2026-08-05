@@ -379,14 +379,14 @@ pub extern "C" fn libafl_main() {
             ExitKind::Ok
         };
 
-        let mut executor = InProcessExecutor::with_timeout(
-            &mut harness,
-            tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut restarting_mgr,
-            opt.timeout,
-        )?;
+        let mut executor = InProcessExecutor::builder()
+            .timeout(opt.timeout)
+            .harness(&mut harness)
+            .observers(tuple_list!(edges_observer, time_observer))
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut restarting_mgr)
+            .build()?;
 
         // The actual target run starts here.
         // Call LLVMFUzzerInitialize() if present.
