@@ -31,8 +31,8 @@ use perf_event_open_sys::{
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
-use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder};
 pub use ptcov::{CoverageEntry, PtImage};
+use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder};
 
 use super::{PAGE_SIZE, availability};
 use crate::utils::current_cpu;

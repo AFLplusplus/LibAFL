@@ -10,8 +10,8 @@ use core::{fmt::Debug, ops::RangeInclusive, ptr::slice_from_raw_parts_mut};
 
 use ::ipt::{AddressFilterMode, Ipt, TraceBuffer};
 use libafl_bolts::Error;
-use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder};
 pub use ptcov::{CoverageEntry, PtImage};
+use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder};
 use raw_cpuid::CpuId;
 use windows::{
     Win32::{
@@ -24,6 +24,7 @@ use windows::{
     core::Owned,
 };
 
+use super::availability;
 use crate::utils::current_cpu;
 
 /// According to Intel's SDM this is the maximun number of IP filters available on any CPU.
@@ -36,6 +37,7 @@ pub struct IntelPT<'a> {
     ipt: Ipt,
     target_process_handle: Owned<HANDLE>,
     thread_id: u32,
+    thread_handle: Owned<HANDLE>,
     decoder: PtCoverageDecoder<'a>,
     previous_decode_head: u32,
     trace_buffer: TraceBuffer,
@@ -55,15 +57,13 @@ impl<'a> IntelPT<'a> {
     ///
     /// Only instructions in `filters` ranges will be traced.
     pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
-        let thread_handle =
-            unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, self.thread_id)?) };
         let mut i = 0;
         let mut filters_iter = filters.iter();
 
         // Iter over all IP filters available in the CPU
         while self
             .ipt
-            .query_thread_address_filter_range(*thread_handle, i)
+            .query_thread_address_filter_range(*self.thread_handle, i)
             .is_ok()
             && i < MAX_NUM_IP_FILTERS
         {
@@ -73,7 +73,7 @@ impl<'a> IntelPT<'a> {
                     (AddressFilterMode::Filter, f)
                 });
             self.ipt.configure_thread_address_filter_range(
-                *thread_handle,
+                *self.thread_handle,
                 i,
                 filter_mode,
                 *filter_range.start(),
@@ -95,9 +95,7 @@ impl<'a> IntelPT<'a> {
 
     /// Resume tracing of the traced thread
     pub fn enable_tracing(&mut self) -> Result<(), Error> {
-        let thread_handle =
-            unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, self.thread_id)?) };
-        self.ipt.resume_thread_trace(*thread_handle)?;
+        self.ipt.resume_thread_trace(*self.thread_handle)?;
         Ok(())
     }
 
@@ -105,9 +103,7 @@ impl<'a> IntelPT<'a> {
     ///
     /// This doesn't drop [`IntelPT`], the configuration will be preserved.
     pub fn disable_tracing(&mut self) -> Result<(), Error> {
-        let thread_handle =
-            unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, self.thread_id)?) };
-        self.ipt.pause_thread_trace(*thread_handle)?;
+        self.ipt.pause_thread_trace(*self.thread_handle)?;
         Ok(())
     }
 
@@ -123,19 +119,31 @@ impl<'a> IntelPT<'a> {
     where
         T: CoverageEntry,
     {
+        /// A thread created between `get_trace_buffer_size` and `get_trace_buffer` makes the
+        /// buffer too small; This race condition comes from driver design, worth one retry.
+        const MAX_RETRY: usize = 2;
+
         #[cfg(feature = "export_raw")]
         {
             self.last_decode_trace.clear();
         }
 
-        //todo TOCTOU on the trace buffer size — windows.rs:164-169. A thread created between get_trace_buffer_size and get_trace_buffer makes the buffer too small; per the ipt docs that's STATUS_BUFFER_OVERFLOW/STATUS_BUFFER_TOO_SMALL. Worth one retry.
-        // get trace
-        let trace_size = self
-            .ipt
-            .get_trace_buffer_size(*self.target_process_handle)?;
-        self.trace_buffer.reserve(trace_size.saturating_sub(self.trace_buffer.capacity()));
-        self.ipt
-            .get_trace_buffer(*self.target_process_handle, &mut self.trace_buffer)?;
+        // Get the trace
+        for retry in 0..MAX_RETRY {
+            let trace_size = self
+                .ipt
+                .get_trace_buffer_size(*self.target_process_handle)?;
+            self.trace_buffer.clear();
+            self.trace_buffer.reserve(trace_size);
+            match self
+                .ipt
+                .get_trace_buffer(*self.target_process_handle, &mut self.trace_buffer)
+            {
+                Ok(()) => break,
+                Err(e) if retry + 1 == MAX_RETRY => return Err(e.into()),
+                Err(e) => log::debug!("PT trace buffer was too small, retrying. Error: {e}"),
+            }
+        }
 
         for (header, data) in &self.trace_buffer {
             if u64::from(self.thread_id) == header.thread_id {
@@ -232,18 +240,17 @@ impl<'a> IntelPTBuilder<'a> {
             .images(self.images)
             .build();
 
-        // todo: Double check if is possible to start tracing as "paused", as we need to start
-        // tracing in order to set IP filters, but this can lead to trace pollution.
         if self.ipt.is_none() {
             self = self.start_tracing()?;
         }
         let (ipt, target_process_handle) = self.ipt.take().unwrap();
+        let thread_handle = unsafe { Owned::new(OpenThread(THREAD_GET_CONTEXT, false, self.tid)?) };
 
-        // todo - OpenThread + CloseHandle on every enable_tracing/disable_tracing — two handle round-trips per execution. Cache the Owned<HANDLE>.
         let mut intel_pt = IntelPT {
             ipt,
             target_process_handle,
             thread_id: self.tid,
+            thread_handle,
             decoder,
             previous_decode_head: 0,
             trace_buffer: TraceBuffer::new(),
@@ -287,14 +294,24 @@ impl<'a> IntelPTBuilder<'a> {
             return Err(Error::illegal_state("Tracing already started"));
         }
 
-        // todo: - build() doesn't enrich failures with availability() the way Linux does, so an Ipt::open() failure surfaces as a bare windows::core::Error. (The ipt crate's own log feature is on by default and logs the sc start ipt hint, so this is mitigated but inconsistent.)
-        let ipt = Ipt::open()?;
+        let ipt = Ipt::open().map_err(|e| {
+            Error::unknown(format!(
+                "Failed to open the IPT device: {e}.{}",
+                availability_reasons()
+            ))
+        })?;
         let target_process_handle = unsafe {
             OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, self.pid)
                 .map(|h| Owned::new(h))
         }?;
         let options = ipt::IptOption::default();
-        ipt.start_process_trace(*target_process_handle, options)?;
+        ipt.start_process_trace(*target_process_handle, options)
+            .map_err(|e| {
+                Error::unknown(format!(
+                    "Failed to start tracing the process: {e}.{}",
+                    availability_reasons()
+                ))
+            })?;
 
         self.ipt = Some((ipt, target_process_handle));
         Ok(self)
@@ -312,6 +329,15 @@ impl<'a> IntelPTBuilder<'a> {
     pub fn ip_filters(mut self, filters: Vec<RangeInclusive<u64>>) -> Self {
         self.ip_filters = filters;
         self
+    }
+}
+
+/// Human readable explanation of why Intel PT might be unavailable, to be appended to error
+/// messages. Empty if no problem was detected.
+fn availability_reasons() -> String {
+    match availability() {
+        Ok(()) => String::new(),
+        Err(reasons) => format!(" Possible reasons: {reasons}"),
     }
 }
 
