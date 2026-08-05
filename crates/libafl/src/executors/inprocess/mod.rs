@@ -203,10 +203,7 @@ impl<E, F, H, OT, S> InProcessExecutorBuilder<E, F, H, OT, S> {
 
     /// Set the fuzzer for the executor.
     #[must_use]
-    pub fn fuzzer<'a, Z>(
-        self,
-        fuzzer: &'a mut Z,
-    ) -> InProcessExecutorBuilder<E, &'a mut Z, H, OT, S> {
+    pub fn fuzzer<Z>(self, fuzzer: &mut Z) -> InProcessExecutorBuilder<E, &mut Z, H, OT, S> {
         InProcessExecutorBuilder {
             timeout: self.timeout,
             crashdump: self.crashdump,
@@ -220,10 +217,7 @@ impl<E, F, H, OT, S> InProcessExecutorBuilder<E, F, H, OT, S> {
 
     /// Set the state for the executor.
     #[must_use]
-    pub fn state<'a, S2>(
-        self,
-        state: &'a mut S2,
-    ) -> InProcessExecutorBuilder<E, F, H, OT, &'a mut S2> {
+    pub fn state<S2>(self, state: &mut S2) -> InProcessExecutorBuilder<E, F, H, OT, &mut S2> {
         InProcessExecutorBuilder {
             timeout: self.timeout,
             crashdump: self.crashdump,
@@ -237,10 +231,10 @@ impl<E, F, H, OT, S> InProcessExecutorBuilder<E, F, H, OT, S> {
 
     /// Set the event manager for the executor.
     #[must_use]
-    pub fn event_mgr<'a, EM>(
+    pub fn event_mgr<EM>(
         self,
-        event_mgr: &'a mut EM,
-    ) -> InProcessExecutorBuilder<&'a mut EM, F, H, OT, S> {
+        event_mgr: &mut EM,
+    ) -> InProcessExecutorBuilder<&mut EM, F, H, OT, S> {
         InProcessExecutorBuilder {
             timeout: self.timeout,
             crashdump: self.crashdump,
@@ -316,9 +310,7 @@ impl GenericInProcessExecutorBuilder<(), (), (), (), (), ()> {
     }
 }
 
-impl<EOld, FOld, HbOld, HtOld, OtOld, StOld>
-    GenericInProcessExecutorBuilder<EOld, FOld, HbOld, HtOld, OtOld, StOld>
-{
+impl<E, F, HB, HT, OT, S> GenericInProcessExecutorBuilder<E, F, HB, HT, OT, S> {
     /// Set the timeout for the executor.
     #[must_use]
     pub fn timeout(mut self, timeout: Duration) -> Self {
@@ -335,10 +327,10 @@ impl<EOld, FOld, HbOld, HtOld, OtOld, StOld>
 
     /// Set the harness function for the executor.
     #[must_use]
-    pub fn harness<HB>(
+    pub fn harness<HB2>(
         self,
-        harness_fn: HB,
-    ) -> GenericInProcessExecutorBuilder<EOld, FOld, HB, HtOld, OtOld, StOld> {
+        harness_fn: HB2,
+    ) -> GenericInProcessExecutorBuilder<E, F, HB2, HT, OT, S> {
         GenericInProcessExecutorBuilder {
             timeout: self.timeout,
             crashdump: self.crashdump,
@@ -353,10 +345,10 @@ impl<EOld, FOld, HbOld, HtOld, OtOld, StOld>
 
     /// Set the user hooks for the executor.
     #[must_use]
-    pub fn user_hooks<HT>(
+    pub fn user_hooks<HT2>(
         self,
-        user_hooks: HT,
-    ) -> GenericInProcessExecutorBuilder<EOld, FOld, HbOld, HT, OtOld, StOld> {
+        user_hooks: HT2,
+    ) -> GenericInProcessExecutorBuilder<E, F, HB, HT2, OT, S> {
         GenericInProcessExecutorBuilder {
             timeout: self.timeout,
             crashdump: self.crashdump,
@@ -371,10 +363,10 @@ impl<EOld, FOld, HbOld, HtOld, OtOld, StOld>
 
     /// Set the observers for the executor.
     #[must_use]
-    pub fn observers<OT>(
+    pub fn observers<OT2>(
         self,
-        observers: OT,
-    ) -> GenericInProcessExecutorBuilder<EOld, FOld, HbOld, HtOld, OT, StOld> {
+        observers: OT2,
+    ) -> GenericInProcessExecutorBuilder<E, F, HB, HT, OT2, S> {
         GenericInProcessExecutorBuilder {
             timeout: self.timeout,
             crashdump: self.crashdump,
@@ -389,10 +381,10 @@ impl<EOld, FOld, HbOld, HtOld, OtOld, StOld>
 
     /// Set the fuzzer for the executor.
     #[must_use]
-    pub fn fuzzer<'a, Z>(
+    pub fn fuzzer<Z>(
         self,
-        fuzzer: &'a mut Z,
-    ) -> GenericInProcessExecutorBuilder<EOld, &'a mut Z, HbOld, HtOld, OtOld, StOld> {
+        fuzzer: &mut Z,
+    ) -> GenericInProcessExecutorBuilder<E, &mut Z, HB, HT, OT, S> {
         GenericInProcessExecutorBuilder {
             timeout: self.timeout,
             crashdump: self.crashdump,
@@ -407,10 +399,10 @@ impl<EOld, FOld, HbOld, HtOld, OtOld, StOld>
 
     /// Set the state for the executor.
     #[must_use]
-    pub fn state<'a, S>(
+    pub fn state<S2>(
         self,
-        state: &'a mut S,
-    ) -> GenericInProcessExecutorBuilder<EOld, FOld, HbOld, HtOld, OtOld, &'a mut S> {
+        state: &mut S2,
+    ) -> GenericInProcessExecutorBuilder<E, F, HB, HT, OT, &mut S2> {
         GenericInProcessExecutorBuilder {
             timeout: self.timeout,
             crashdump: self.crashdump,
@@ -425,10 +417,10 @@ impl<EOld, FOld, HbOld, HtOld, OtOld, StOld>
 
     /// Set the event manager for the executor.
     #[must_use]
-    pub fn event_mgr<'a, EM>(
+    pub fn event_mgr<EM>(
         self,
-        event_mgr: &'a mut EM,
-    ) -> GenericInProcessExecutorBuilder<&'a mut EM, FOld, HbOld, HtOld, OtOld, StOld> {
+        event_mgr: &mut EM,
+    ) -> GenericInProcessExecutorBuilder<&mut EM, F, HB, HT, OT, S> {
         GenericInProcessExecutorBuilder {
             timeout: self.timeout,
             crashdump: self.crashdump,
