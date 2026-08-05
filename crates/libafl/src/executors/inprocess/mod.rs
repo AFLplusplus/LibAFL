@@ -500,6 +500,14 @@ impl InProcessExecutor<(), (), (), (), (), ()> {
     }
 }
 
+impl GenericInProcessExecutor<(), (), (), (), (), (), (), ()> {
+    /// Create a builder for a [`GenericInProcessExecutor`].
+    #[must_use]
+    pub fn builder_generic() -> GenericInProcessExecutorBuilder<(), (), (), (), (), ()> {
+        GenericInProcessExecutorBuilder::new()
+    }
+}
+
 impl<EM, H, I, OT, S, Z> InProcessExecutor<EM, H, I, OT, S, Z>
 where
     H: FnMut(&I) -> ExitKind + Sized,
@@ -560,14 +568,6 @@ where
             .state(state)
             .event_mgr(event_mgr)
             .build()
-    }
-}
-
-impl GenericInProcessExecutor<(), (), (), (), (), (), (), ()> {
-    /// Create a builder for a [`GenericInProcessExecutor`].
-    #[must_use]
-    pub fn builder_generic() -> GenericInProcessExecutorBuilder<(), (), (), (), (), ()> {
-        GenericInProcessExecutorBuilder::new()
     }
 }
 

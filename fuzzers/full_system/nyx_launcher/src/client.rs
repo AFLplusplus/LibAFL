@@ -38,7 +38,7 @@ impl Client<'_> {
     {
         let instance = Instance::builder()
             .options(self.options)
-            .event_mgr(mgr)
+            .mgr(mgr)
             .client_description(client_description);
 
         instance.build().run(state)

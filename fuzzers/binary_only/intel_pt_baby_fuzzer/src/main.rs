@@ -112,7 +112,7 @@ pub fn main() {
     type PTInProcessExecutor<'a, 'b, EM, H, I, OT, S, T, Z> =
         GenericInProcessExecutor<EM, H, &'a mut H, (IntelPTHook<'b, T>, ()), I, OT, S, Z>;
     // Create the executor for an in-process function with just one observer
-    let mut executor = PTInProcessExecutor::builder_generic()
+    let mut executor = GenericInProcessExecutor::builder_generic()
         .timeout(Duration::from_millis(5000))
         .harness(&mut harness)
         .user_hooks(tuple_list!(pt_hook))

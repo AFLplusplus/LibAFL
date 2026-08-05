@@ -567,6 +567,15 @@ impl StatefulInProcessExecutor<(), (), (), (), (), (), ()> {
     }
 }
 
+impl StatefulGenericInProcessExecutor<(), (), (), (), (), (), (), (), ()> {
+    /// Create a builder for a [`StatefulGenericInProcessExecutor`].
+    #[must_use]
+    pub fn builder_generic() -> StatefulGenericInProcessExecutorBuilder<(), (), (), (), (), (), ()>
+    {
+        StatefulGenericInProcessExecutorBuilder::new()
+    }
+}
+
 impl<EM, ES, H, I, OT, S, Z> StatefulInProcessExecutor<EM, ES, H, I, OT, S, Z>
 where
     H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
@@ -651,15 +660,6 @@ impl<EM, ES, H, HB, HT, I, OT, S, Z>
     /// The mutable executor state given to the harness
     pub fn executor_state_mut(&mut self) -> &mut ES {
         &mut self.executor_state
-    }
-}
-
-impl StatefulGenericInProcessExecutor<(), (), (), (), (), (), (), (), ()> {
-    /// Create a builder for a [`StatefulGenericInProcessExecutor`].
-    #[must_use]
-    pub fn builder_generic() -> StatefulGenericInProcessExecutorBuilder<(), (), (), (), (), (), ()>
-    {
-        StatefulGenericInProcessExecutorBuilder::new()
     }
 }
 
