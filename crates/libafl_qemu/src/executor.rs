@@ -251,9 +251,15 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF> + ExecutionProcessor<EM, I, OT, S>,
     {
-        let mut inner = StatefulInProcessExecutor::with_timeout(
-            harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,
-        )?;
+        let mut inner = StatefulInProcessExecutor::builder()
+            .timeout(timeout)
+            .harness(harness_fn)
+            .executor_state(emulator)
+            .observers(observers)
+            .fuzzer(fuzzer)
+            .state(state)
+            .event_mgr(event_mgr)
+            .build()?;
 
         // rewrite the crash handler pointer
         #[cfg(feature = "usermode")]
@@ -324,17 +330,15 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         if self.first_exec {
-            self.inner.exposed_executor_state_mut().first_exec(state);
+            self.inner.executor_state_mut().first_exec(state);
             self.first_exec = false;
         }
 
-        self.inner
-            .exposed_executor_state_mut()
-            .pre_exec(state, input);
+        self.inner.executor_state_mut().pre_exec(state, input);
 
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
 
-        self.inner.exposed_executor_state.post_exec(
+        self.inner.executor_state.post_exec(
             input,
             &mut *self.inner.inner.observers_mut(),
             state,
@@ -391,7 +395,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuForkExecutor")
             .field("inner", &self.inner)
-            .field("emulator", &self.inner.exposed_executor_state)
+            .field("emulator", &self.inner.executor_state)
             .field("first_exec", &self.first_exec)
             .finish()
     }
@@ -456,12 +460,12 @@ where
 
     #[must_use]
     pub fn emulator(&self) -> &Emulator<C, CM, ED, ET, I, S, SM> {
-        &self.inner.exposed_executor_state
+        &self.inner.executor_state
     }
 
     #[must_use]
     pub fn emulator_mut(&mut self) -> &Emulator<C, CM, ED, ET, I, S, SM> {
-        &mut self.inner.exposed_executor_state
+        &mut self.inner.executor_state
     }
 
     /// Retrieve the emulator, consuming the executor.
@@ -497,15 +501,15 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         if self.first_exec {
-            self.inner.exposed_executor_state.first_exec(state);
+            self.inner.executor_state.first_exec(state);
             self.first_exec = false;
         }
 
-        self.inner.exposed_executor_state.pre_exec(state, input);
+        self.inner.executor_state.pre_exec(state, input);
 
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
 
-        self.inner.exposed_executor_state.post_exec(
+        self.inner.executor_state.post_exec(
             input,
             &mut *self.inner.inner.observers_mut(),
             state,

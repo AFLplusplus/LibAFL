@@ -36,7 +36,7 @@ where
     /// The constructor for `InProcessForkExecutor`
     pub fn new(
         harness_fn: H,
-        exposed_executor_state: ES,
+        executor_state: ES,
         observers: OT,
         fuzzer: &mut Z,
         state: &mut S,
@@ -47,7 +47,7 @@ where
         Self::with_hooks(
             tuple_list!(),
             harness_fn,
-            exposed_executor_state,
+            executor_state,
             observers,
             fuzzer,
             state,
@@ -63,7 +63,7 @@ pub struct StatefulGenericInProcessForkExecutor<EM, ES, H, HT, I, OT, S, SP, Z> 
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: H,
     /// The state used as argument of the harness
-    pub exposed_executor_state: ES,
+    pub executor_state: ES,
     /// Inner state of the executor
     pub inner: GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>,
 }
@@ -117,7 +117,7 @@ where
                 Ok(ForkResult::Child) => {
                     // Child
                     self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
-                    (self.harness_fn)(&mut self.exposed_executor_state, input);
+                    (self.harness_fn)(&mut self.executor_state, input);
                     self.inner.post_run_target_child(fuzzer, state, mgr, input);
 
                     unreachable!(
@@ -145,7 +145,7 @@ where
     pub fn with_hooks(
         userhooks: HT,
         harness_fn: H,
-        exposed_executor_state: ES,
+        executor_state: ES,
         observers: OT,
         fuzzer: &mut Z,
         state: &mut S,
@@ -155,7 +155,7 @@ where
     ) -> Result<Self, Error> {
         Ok(Self {
             harness_fn,
-            exposed_executor_state,
+            executor_state,
             inner: GenericInProcessForkExecutorInner::with_hooks(
                 userhooks,
                 observers,
@@ -186,7 +186,7 @@ where
     #[inline]
     #[must_use]
     pub fn into_state(self) -> ES {
-        self.exposed_executor_state
+        self.executor_state
     }
 }
 

@@ -185,14 +185,14 @@ fn run_fuzzer(
     let colorization = ColorizationStage::new(&edges_observer);
 
     // Create the executor for an in-process function with one observer for edge coverage
-    let mut executor = InProcessExecutor::with_timeout(
-        &mut harness_main,
-        tuple_list!(edges_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let mut executor = InProcessExecutor::builder()
+        .timeout(timeout)
+        .harness(&mut harness_main)
+        .observers(tuple_list!(edges_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     // Now, we'll setup the rest of the RedQueen stages. We need the cmplog map,
     // an executor that populates it, and observer for it, and the
@@ -201,14 +201,14 @@ fn run_fuzzer(
     let cmpmap_ref = unsafe { OwnedRefMut::from_mut_ptr(&raw mut CMPLOG_MAP_EXTENDED) };
     let cmplog_observer = AflppCmpLogObserver::new("cmplog", cmpmap_ref, true);
     let cmplog_ref = cmplog_observer.handle();
-    let cmplog_executor = InProcessExecutor::with_timeout(
-        &mut harness_cmplog,
-        tuple_list!(cmplog_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let cmplog_executor = InProcessExecutor::builder()
+        .timeout(timeout)
+        .harness(&mut harness_cmplog)
+        .observers(tuple_list!(cmplog_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     let tracing = AflppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 

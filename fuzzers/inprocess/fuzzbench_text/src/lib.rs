@@ -483,14 +483,14 @@ fn fuzz_binary(
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let executor = InProcessExecutor::builder()
+        .timeout(timeout)
+        .harness(&mut harness)
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     // Setup a tracing stage in which we log comparisons
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
@@ -727,14 +727,14 @@ fn fuzz_text(
     let generalization = GeneralizationStage::new(&edges_observer);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let executor = InProcessExecutor::builder()
+        .timeout(timeout)
+        .harness(&mut harness)
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
     // Setup a tracing stage in which we log comparisons
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
     let tracing = ShadowTracingStage::new();

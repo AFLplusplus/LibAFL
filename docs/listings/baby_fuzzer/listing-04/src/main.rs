@@ -71,7 +71,13 @@ fn main() {
 
     /* ANCHOR: executor */
     // Create the executor for an in-process function
-    let mut executor = InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut mgr)
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(())
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
         .expect("Failed to create the Executor");
     /* ANCHOR_END: executor */
 

@@ -124,6 +124,390 @@ impl<EM, H, HB, HT, I, OT, S, Z> HasObservers
     }
 }
 
+/// The builder for an [`InProcessExecutor`]
+#[derive(Debug, Clone)]
+pub struct InProcessExecutorBuilder<E, F, H, OT, St> {
+    timeout: Duration,
+    crashdump: bool,
+    harness_fn: H,
+    observers: OT,
+    fuzzer: F,
+    state: St,
+    event_mgr: E,
+}
+
+impl Default for InProcessExecutorBuilder<(), (), (), (), ()> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl InProcessExecutorBuilder<(), (), (), (), ()> {
+    /// Create a new builder with default timeout (5s) and crashdump enabled.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            timeout: Duration::from_secs(5),
+            crashdump: true,
+            harness_fn: (),
+            observers: tuple_list!(),
+            fuzzer: (),
+            state: (),
+            event_mgr: (),
+        }
+    }
+}
+
+impl<E, F, H, OT, S> InProcessExecutorBuilder<E, F, H, OT, S> {
+    /// Set the timeout for the executor.
+    #[must_use]
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
+    /// Enable or disable minibsod crashdumps on crash.
+    #[must_use]
+    pub fn crashdump(mut self, crashdump: bool) -> Self {
+        self.crashdump = crashdump;
+        self
+    }
+
+    /// Set the harness function for the executor.
+    #[must_use]
+    pub fn harness<H2>(self, harness_fn: H2) -> InProcessExecutorBuilder<E, F, H2, OT, S> {
+        InProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn,
+            observers: self.observers,
+            fuzzer: self.fuzzer,
+            state: self.state,
+            event_mgr: self.event_mgr,
+        }
+    }
+
+    /// Set the observers for the executor.
+    #[must_use]
+    pub fn observers<OT2>(self, observers: OT2) -> InProcessExecutorBuilder<E, F, H, OT2, S> {
+        InProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn: self.harness_fn,
+            observers,
+            fuzzer: self.fuzzer,
+            state: self.state,
+            event_mgr: self.event_mgr,
+        }
+    }
+
+    /// Set the fuzzer for the executor.
+    #[must_use]
+    pub fn fuzzer<Z>(self, fuzzer: &mut Z) -> InProcessExecutorBuilder<E, &mut Z, H, OT, S> {
+        InProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn: self.harness_fn,
+            observers: self.observers,
+            fuzzer,
+            state: self.state,
+            event_mgr: self.event_mgr,
+        }
+    }
+
+    /// Set the state for the executor.
+    #[must_use]
+    pub fn state<S2>(self, state: &mut S2) -> InProcessExecutorBuilder<E, F, H, OT, &mut S2> {
+        InProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn: self.harness_fn,
+            observers: self.observers,
+            fuzzer: self.fuzzer,
+            state,
+            event_mgr: self.event_mgr,
+        }
+    }
+
+    /// Set the event manager for the executor.
+    #[must_use]
+    pub fn event_mgr<EM>(
+        self,
+        event_mgr: &mut EM,
+    ) -> InProcessExecutorBuilder<&mut EM, F, H, OT, S> {
+        InProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn: self.harness_fn,
+            observers: self.observers,
+            fuzzer: self.fuzzer,
+            state: self.state,
+            event_mgr,
+        }
+    }
+}
+
+impl<'a, EM, H, OT, S, Z> InProcessExecutorBuilder<&'a mut EM, &'a mut Z, H, OT, &'a mut S> {
+    /// Build the [`InProcessExecutor`].
+    #[allow(clippy::type_complexity)]
+    pub fn build<I, OF>(self) -> Result<InProcessExecutor<EM, H, I, OT, S, Z>, Error>
+    where
+        H: FnMut(&I) -> ExitKind + Sized,
+        OT: ObserversTuple<I, S>,
+        S: HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
+        I: Input,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        OF: Feedback<EM, I, OT, S>,
+        Z: HasObjective<Objective = OF>,
+    {
+        GenericInProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            user_hooks: tuple_list!(),
+            harness_fn: self.harness_fn,
+            observers: self.observers,
+            fuzzer: self.fuzzer,
+            state: self.state,
+            event_mgr: self.event_mgr,
+        }
+        .build::<I, OF>()
+    }
+}
+
+/// The builder for a [`GenericInProcessExecutor`]
+#[derive(Debug, Clone)]
+pub struct GenericInProcessExecutorBuilder<E, F, HB, HT, OT, St> {
+    timeout: Duration,
+    crashdump: bool,
+    harness_fn: HB,
+    user_hooks: HT,
+    observers: OT,
+    fuzzer: F,
+    state: St,
+    event_mgr: E,
+}
+
+impl Default for GenericInProcessExecutorBuilder<(), (), (), (), (), ()> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl GenericInProcessExecutorBuilder<(), (), (), (), (), ()> {
+    /// Create a new builder with default timeout (5s) and crashdump enabled.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            timeout: Duration::from_secs(5),
+            crashdump: true,
+            harness_fn: (),
+            user_hooks: tuple_list!(),
+            observers: tuple_list!(),
+            fuzzer: (),
+            state: (),
+            event_mgr: (),
+        }
+    }
+}
+
+impl<E, F, HB, HT, OT, S> GenericInProcessExecutorBuilder<E, F, HB, HT, OT, S> {
+    /// Set the timeout for the executor.
+    #[must_use]
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
+    /// Enable or disable minibsod crashdumps on crash.
+    #[must_use]
+    pub fn crashdump(mut self, crashdump: bool) -> Self {
+        self.crashdump = crashdump;
+        self
+    }
+
+    /// Set the harness function for the executor.
+    #[must_use]
+    pub fn harness<HB2>(
+        self,
+        harness_fn: HB2,
+    ) -> GenericInProcessExecutorBuilder<E, F, HB2, HT, OT, S> {
+        GenericInProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn,
+            user_hooks: self.user_hooks,
+            observers: self.observers,
+            fuzzer: self.fuzzer,
+            state: self.state,
+            event_mgr: self.event_mgr,
+        }
+    }
+
+    /// Set the user hooks for the executor.
+    #[must_use]
+    pub fn user_hooks<HT2>(
+        self,
+        user_hooks: HT2,
+    ) -> GenericInProcessExecutorBuilder<E, F, HB, HT2, OT, S> {
+        GenericInProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn: self.harness_fn,
+            user_hooks,
+            observers: self.observers,
+            fuzzer: self.fuzzer,
+            state: self.state,
+            event_mgr: self.event_mgr,
+        }
+    }
+
+    /// Set the observers for the executor.
+    #[must_use]
+    pub fn observers<OT2>(
+        self,
+        observers: OT2,
+    ) -> GenericInProcessExecutorBuilder<E, F, HB, HT, OT2, S> {
+        GenericInProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn: self.harness_fn,
+            user_hooks: self.user_hooks,
+            observers,
+            fuzzer: self.fuzzer,
+            state: self.state,
+            event_mgr: self.event_mgr,
+        }
+    }
+
+    /// Set the fuzzer for the executor.
+    #[must_use]
+    pub fn fuzzer<Z>(
+        self,
+        fuzzer: &mut Z,
+    ) -> GenericInProcessExecutorBuilder<E, &mut Z, HB, HT, OT, S> {
+        GenericInProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn: self.harness_fn,
+            user_hooks: self.user_hooks,
+            observers: self.observers,
+            fuzzer,
+            state: self.state,
+            event_mgr: self.event_mgr,
+        }
+    }
+
+    /// Set the state for the executor.
+    #[must_use]
+    pub fn state<S2>(
+        self,
+        state: &mut S2,
+    ) -> GenericInProcessExecutorBuilder<E, F, HB, HT, OT, &mut S2> {
+        GenericInProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn: self.harness_fn,
+            user_hooks: self.user_hooks,
+            observers: self.observers,
+            fuzzer: self.fuzzer,
+            state,
+            event_mgr: self.event_mgr,
+        }
+    }
+
+    /// Set the event manager for the executor.
+    #[must_use]
+    pub fn event_mgr<EM>(
+        self,
+        event_mgr: &mut EM,
+    ) -> GenericInProcessExecutorBuilder<&mut EM, F, HB, HT, OT, S> {
+        GenericInProcessExecutorBuilder {
+            timeout: self.timeout,
+            crashdump: self.crashdump,
+            harness_fn: self.harness_fn,
+            user_hooks: self.user_hooks,
+            observers: self.observers,
+            fuzzer: self.fuzzer,
+            state: self.state,
+            event_mgr,
+        }
+    }
+}
+
+impl<'a, EM, HB, HT, OT, S, Z>
+    GenericInProcessExecutorBuilder<&'a mut EM, &'a mut Z, HB, HT, OT, &'a mut S>
+{
+    /// Build the [`GenericInProcessExecutor`].
+    #[allow(clippy::type_complexity)]
+    pub fn build<I, OF>(
+        self,
+    ) -> Result<GenericInProcessExecutor<EM, HB, HB, HT, I, OT, S, Z>, Error>
+    where
+        HB: FnMut(&I) -> ExitKind + Sized,
+        HT: ExecutorHooksTuple<I, S>,
+        OT: ObserversTuple<I, S>,
+        S: HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
+        I: Input,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        OF: Feedback<EM, I, OT, S>,
+        Z: HasObjective<Objective = OF>,
+    {
+        self.build_custom::<HB, I, OF>()
+    }
+
+    /// Build the [`GenericInProcessExecutor`] with a custom harness type `H`.
+    #[allow(clippy::type_complexity)]
+    pub fn build_custom<H, I, OF>(
+        self,
+    ) -> Result<GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z>, Error>
+    where
+        H: FnMut(&I) -> ExitKind + Sized,
+        HB: BorrowMut<H>,
+        HT: ExecutorHooksTuple<I, S>,
+        OT: ObserversTuple<I, S>,
+        S: HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
+        I: Input,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        OF: Feedback<EM, I, OT, S>,
+        Z: HasObjective<Objective = OF>,
+    {
+        let inner = GenericInProcessExecutorInner::with_timeout_generic::<
+            GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z>,
+            OF,
+        >(
+            self.user_hooks,
+            self.observers,
+            self.fuzzer,
+            self.state,
+            self.event_mgr,
+            self.timeout,
+            self.crashdump,
+        )?;
+
+        Ok(GenericInProcessExecutor {
+            harness_fn: self.harness_fn,
+            inner,
+            phantom: PhantomData,
+        })
+    }
+}
+
+impl InProcessExecutor<(), (), (), (), (), ()> {
+    /// Create a builder for an [`InProcessExecutor`].
+    #[must_use]
+    pub fn builder() -> InProcessExecutorBuilder<(), (), (), (), ()> {
+        InProcessExecutorBuilder::new()
+    }
+}
+
+impl GenericInProcessExecutor<(), (), (), (), (), (), (), ()> {
+    /// Create a builder for a [`GenericInProcessExecutor`].
+    #[must_use]
+    pub fn builder_generic() -> GenericInProcessExecutorBuilder<(), (), (), (), (), ()> {
+        GenericInProcessExecutorBuilder::new()
+    }
+}
+
 impl<EM, H, I, OT, S, Z> InProcessExecutor<EM, H, I, OT, S, Z>
 where
     H: FnMut(&I) -> ExitKind + Sized,
@@ -132,6 +516,7 @@ where
     I: Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
+    #[deprecated(since = "0.16.0", note = "Use InProcessExecutor::builder() instead")]
     pub fn new<OF>(
         harness_fn: H,
         observers: OT,
@@ -144,15 +529,13 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        Self::with_timeout_generic::<OF>(
-            tuple_list!(),
-            harness_fn,
-            observers,
-            fuzzer,
-            state,
-            event_mgr,
-            Duration::from_secs(5),
-        )
+        InProcessExecutor::builder()
+            .harness(harness_fn)
+            .observers(observers)
+            .fuzzer(fuzzer)
+            .state(state)
+            .event_mgr(event_mgr)
+            .build()
     }
 
     /// Create a new in mem executor.
@@ -163,6 +546,7 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
+    #[deprecated(since = "0.16.0", note = "Use InProcessExecutor::builder() instead")]
     pub fn with_timeout<OF>(
         harness_fn: H,
         observers: OT,
@@ -176,49 +560,14 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        Self::with_timeout_and_crashdump::<OF>(
-            harness_fn, observers, fuzzer, state, event_mgr, timeout, true,
-        )
-    }
-
-    /// Create a new in mem executor, explicitly choosing whether a crash dump
-    /// (minibsod) is generated when the target crashes.
-    /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
-    /// depending on different corpus or state.
-    /// * `user_hooks` - the hooks run before and after the harness's execution
-    /// * `harness_fn` - the harness, executing the function
-    /// * `observers` - the observers observing the target during execution
-    ///
-    /// This may return an error on unix, if signal handler setup fails
-    pub fn with_timeout_and_crashdump<OF>(
-        harness_fn: H,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        timeout: Duration,
-        crashdump: bool,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF>,
-    {
-        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
-            tuple_list!(),
-            observers,
-            fuzzer,
-            state,
-            event_mgr,
-            timeout,
-            crashdump,
-        )?;
-
-        Ok(Self {
-            harness_fn,
-            inner,
-            phantom: PhantomData,
-        })
+        InProcessExecutor::builder()
+            .timeout(timeout)
+            .harness(harness_fn)
+            .observers(observers)
+            .fuzzer(fuzzer)
+            .state(state)
+            .event_mgr(event_mgr)
+            .build()
     }
 }
 
@@ -232,6 +581,10 @@ where
     I: Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
+    #[deprecated(
+        since = "0.16.0",
+        note = "Use GenericInProcessExecutor::builder_generic() instead"
+    )]
     pub fn generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
@@ -245,15 +598,14 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        Self::with_timeout_generic::<OF>(
-            user_hooks,
-            harness_fn,
-            observers,
-            fuzzer,
-            state,
-            event_mgr,
-            Duration::from_secs(5),
-        )
+        GenericInProcessExecutor::builder_generic()
+            .user_hooks(user_hooks)
+            .harness(harness_fn)
+            .observers(observers)
+            .fuzzer(fuzzer)
+            .state(state)
+            .event_mgr(event_mgr)
+            .build_custom::<H, I, OF>()
     }
 
     /// Create a new [`InProcessExecutor`].
@@ -264,6 +616,10 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
+    #[deprecated(
+        since = "0.16.0",
+        note = "Use GenericInProcessExecutor::builder_generic() instead"
+    )]
     pub fn with_timeout_generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
@@ -278,43 +634,15 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        Self::with_timeout_generic_and_crashdump::<OF>(
-            user_hooks, harness_fn, observers, fuzzer, state, event_mgr, timeout, true,
-        )
-    }
-
-    /// Create a new [`InProcessExecutor`], explicitly choosing whether a crash dump
-    /// (minibsod) is generated when the target crashes.
-    /// * `user_hooks` - the hooks run before and after the harness's execution
-    /// * `harness_fn` - the harness, executing the function
-    /// * `observers` - the observers observing the target during execution
-    ///
-    /// This may return an error on unix, if signal handler setup fails
-    #[allow(clippy::too_many_arguments)]
-    pub fn with_timeout_generic_and_crashdump<OF>(
-        user_hooks: HT,
-        harness_fn: HB,
-        observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        event_mgr: &mut EM,
-        timeout: Duration,
-        crashdump: bool,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        OF: Feedback<EM, I, OT, S>,
-        Z: HasObjective<Objective = OF>,
-    {
-        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
-            user_hooks, observers, fuzzer, state, event_mgr, timeout, crashdump,
-        )?;
-
-        Ok(Self {
-            harness_fn,
-            inner,
-            phantom: PhantomData,
-        })
+        GenericInProcessExecutor::builder_generic()
+            .timeout(timeout)
+            .user_hooks(user_hooks)
+            .harness(harness_fn)
+            .observers(observers)
+            .fuzzer(fuzzer)
+            .state(state)
+            .event_mgr(event_mgr)
+            .build_custom::<H, I, OF>()
     }
 
     /// Retrieve the harness function.
@@ -471,14 +799,14 @@ mod tests {
             StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
         let mut fuzzer = StdFuzzer::new(sche, feedback, objective);
 
-        let mut in_process_executor = InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )
-        .unwrap();
+        let mut in_process_executor = InProcessExecutor::builder()
+            .harness(&mut harness)
+            .observers(tuple_list!())
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut mgr)
+            .build()
+            .unwrap();
         let input = NopInput {};
         in_process_executor
             .run_target(&mut fuzzer, &mut state, &mut mgr, &input)

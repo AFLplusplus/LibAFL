@@ -80,14 +80,15 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     };
 
     #[cfg(windows)]
-    let mut executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        (),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        options.timeout(),
-    )?;
+    let mut executor = InProcessExecutor::builder()
+        .timeout(options.timeout())
+        .crashdump(false)
+        .harness(&mut harness)
+        .observers(())
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     let exit_kind = fuzzer.execute_input(&mut state, &mut executor, &mut mgr, &input)?;
 

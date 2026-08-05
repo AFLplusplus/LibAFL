@@ -401,7 +401,7 @@ where
     {
         if let Some(m) = executor
             .inner_mut()
-            .exposed_executor_state_mut()
+            .executor_state_mut()
             .modules_mut()
             .modules_mut()
             .0
@@ -435,7 +435,7 @@ where
         if let Some(m) = executor
             .executor_mut()
             .inner_mut()
-            .exposed_executor_state_mut()
+            .executor_state_mut()
             .modules_mut()
             .modules_mut()
             .0
