@@ -205,6 +205,9 @@ where
         assert!(size_of::<StateShMemContent>() + len <= self.shmem.len());
 
         let shmem_content = self.content_mut();
+        // # Safety
+        // `buf` is large enough to hold `[u8; 16]` and is properly aligned (u8 alignment is 1),
+        // and `buf_len` points to a valid field in shared memory.
         unsafe {
             ptr::write_volatile(
                 shmem_content.buf.as_mut_ptr().cast::<[u8; 16]>(),
@@ -220,10 +223,14 @@ where
         let len = EXITING_MAGIC.len();
         assert!(size_of::<StateShMemContent>() + len <= self.shmem.len());
         let content = self.content();
+        // # Safety
+        // `content.buf_len` points to a valid field in the shared memory map.
         let buf_len = unsafe { read_volatile(&raw const content.buf_len) };
         if buf_len != len {
             return false;
         }
+        // # Safety
+        // `content.buf` is checked above to contain at least 16 bytes and is properly aligned (u8 alignment is 1).
         let magic = unsafe { read_volatile(content.buf.as_ptr().cast::<[u8; 16]>()) };
         magic == *EXITING_MAGIC
     }
