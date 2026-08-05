@@ -456,13 +456,14 @@ macro_rules! fuzz_with {
             );
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-            let mut executor = InProcessExecutor::with_timeout(
+            let mut executor = InProcessExecutor::with_timeout_and_crashdump(
                     &mut harness,
                     observers,
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
                     $options.timeout(),
+                    false,
                 )?;
 
             // In case the corpus is empty (on first run) or crashed while loading, reset

@@ -176,6 +176,34 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
+        Self::with_timeout_and_crashdump::<OF>(
+            harness_fn, observers, fuzzer, state, event_mgr, timeout, true,
+        )
+    }
+
+    /// Create a new in mem executor, explicitly choosing whether a crash dump
+    /// (minibsod) is generated when the target crashes.
+    /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
+    /// depending on different corpus or state.
+    /// * `user_hooks` - the hooks run before and after the harness's execution
+    /// * `harness_fn` - the harness, executing the function
+    /// * `observers` - the observers observing the target during execution
+    ///
+    /// This may return an error on unix, if signal handler setup fails
+    pub fn with_timeout_and_crashdump<OF>(
+        harness_fn: H,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        timeout: Duration,
+        crashdump: bool,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        OF: Feedback<EM, I, OT, S>,
+        Z: HasObjective<Objective = OF>,
+    {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
             tuple_list!(),
             observers,
@@ -183,6 +211,7 @@ where
             state,
             event_mgr,
             timeout,
+            crashdump,
         )?;
 
         Ok(Self {
@@ -249,8 +278,36 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
+        Self::with_timeout_generic_and_crashdump::<OF>(
+            user_hooks, harness_fn, observers, fuzzer, state, event_mgr, timeout, true,
+        )
+    }
+
+    /// Create a new [`InProcessExecutor`], explicitly choosing whether a crash dump
+    /// (minibsod) is generated when the target crashes.
+    /// * `user_hooks` - the hooks run before and after the harness's execution
+    /// * `harness_fn` - the harness, executing the function
+    /// * `observers` - the observers observing the target during execution
+    ///
+    /// This may return an error on unix, if signal handler setup fails
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_timeout_generic_and_crashdump<OF>(
+        user_hooks: HT,
+        harness_fn: HB,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        timeout: Duration,
+        crashdump: bool,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        OF: Feedback<EM, I, OT, S>,
+        Z: HasObjective<Objective = OF>,
+    {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
-            user_hooks, observers, fuzzer, state, event_mgr, timeout,
+            user_hooks, observers, fuzzer, state, event_mgr, timeout, crashdump,
         )?;
 
         Ok(Self {
