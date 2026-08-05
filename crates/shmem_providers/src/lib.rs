@@ -2060,4 +2060,17 @@ mod tests {
         drop(shmem);
         Ok(())
     }
+
+    #[test]
+    #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
+    #[cfg_attr(miri, ignore)]
+    fn test_rc_shmem_release() -> Result<(), Error> {
+        use crate::RcShMemProvider;
+
+        let mut provider = RcShMemProvider::<StdShMemProvider>::new()?;
+        let shmem = provider.new_shmem(1024)?;
+        assert_eq!(shmem.len(), 1024);
+        drop(shmem);
+        Ok(())
+    }
 }
