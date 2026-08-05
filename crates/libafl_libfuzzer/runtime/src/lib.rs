@@ -79,6 +79,7 @@ use libafl::{
     Error,
     inputs::{BytesInput, HasTargetBytes, Input},
 };
+use libafl_bolts::AsSlice;
 use libc::_exit;
 use mimalloc::MiMalloc;
 
@@ -147,6 +148,7 @@ macro_rules! fuzz_with {
         use libafl_bolts::{
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
+                AsSlice,
                 nonnull_raw_mut,
         };
         use libafl::{
@@ -438,8 +440,9 @@ macro_rules! fuzz_with {
             // The wrapped harness function, calling out to the LLVM-style harness
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
+                let buf = target.as_slice();
 
-                let result = unsafe { crate::libafl_libfuzzer_test_one_input(Some(*$harness), target.as_ptr(), target.len()) };
+                let result = unsafe { crate::libafl_libfuzzer_test_one_input(Some(*$harness), buf.as_ptr(), buf.len()) };
                 match result {
                     -2 => ExitKind::Crash,
                     _ => {
@@ -455,16 +458,15 @@ macro_rules! fuzz_with {
                 value_profile_observer
             );
 
-            // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-            let mut executor = InProcessExecutor::with_timeout_and_crashdump(
-                    &mut harness,
-                    observers,
-                    &mut fuzzer,
-                    &mut state,
-                    &mut mgr,
-                    $options.timeout(),
-                    false,
-                )?;
+            let mut executor = InProcessExecutor::builder()
+                .timeout($options.timeout())
+                .crashdump(false)
+                .harness(&mut harness)
+                .observers(observers)
+                .fuzzer(&mut fuzzer)
+                .state(&mut state)
+                .event_mgr(&mut mgr)
+                .build()?;
 
             // In case the corpus is empty (on first run) or crashed while loading, reset
             if state.must_load_initial_inputs() {
@@ -684,7 +686,9 @@ pub unsafe extern "C" fn LLVMFuzzerRunDriver(
                 )
             });
             unsafe {
-                libafl_targets::libfuzzer::libfuzzer_test_one_input(&input.target_bytes());
+                libafl_targets::libfuzzer::libfuzzer_test_one_input(
+                    input.target_bytes().as_slice(),
+                );
             }
         }
         return 0;

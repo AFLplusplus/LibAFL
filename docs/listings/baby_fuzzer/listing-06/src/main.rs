@@ -88,14 +88,14 @@ fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor");
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(tuple_list!(observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(nonzero!(32));

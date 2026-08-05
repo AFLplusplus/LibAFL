@@ -532,14 +532,14 @@ mod tests {
 
                     let mut executor = FridaInProcessExecutor::new(
                         GUM.get().expect("Gum uninitialized"),
-                        InProcessExecutor::new(
-                            &mut harness,
-                            observers, // tuple_list!(),
-                            &mut fuzzer,
-                            &mut state,
-                            &mut event_manager,
-                        )
-                        .unwrap(),
+                        InProcessExecutor::builder()
+                            .harness(&mut harness)
+                            .observers(observers)
+                            .fuzzer(&mut fuzzer)
+                            .state(&mut state)
+                            .event_mgr(&mut event_manager)
+                            .build()
+                            .unwrap(),
                         // &mut frida_helper,
                         Rc::clone(&frida_helper),
                     );

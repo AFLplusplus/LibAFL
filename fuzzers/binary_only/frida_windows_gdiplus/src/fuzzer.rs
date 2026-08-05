@@ -196,14 +196,14 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
-                    InProcessExecutor::with_timeout(
-                        &mut frida_harness,
-                        observers,
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                        options.timeout,
-                    )?,
+                    InProcessExecutor::builder()
+                        .timeout(options.timeout)
+                        .harness(&mut frida_harness)
+                        .observers(observers)
+                        .fuzzer(&mut fuzzer)
+                        .state(&mut state)
+                        .event_mgr(&mut mgr)
+                        .build()?,
                     Rc::clone(&frida_helper),
                 );
 
@@ -466,14 +466,14 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
-                    InProcessExecutor::with_timeout(
-                        &mut frida_harness,
-                        observers,
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                        options.timeout,
-                    )?,
+                    InProcessExecutor::builder()
+                        .timeout(options.timeout)
+                        .harness(&mut frida_harness)
+                        .observers(observers)
+                        .fuzzer(&mut fuzzer)
+                        .state(&mut state)
+                        .event_mgr(&mut mgr)
+                        .build()?,
                     Rc::clone(&frida_helper),
                 );
 

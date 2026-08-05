@@ -412,9 +412,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.6.7"
+version = "4.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db8b397918185f0161ff3d6fcaa9e4bfc09b8367caf6e1d4a2848e5477ed027b"
+checksum = "b1f84a88507dbd05c695f2cb5e8558e747179134005e9893882dec964190ed89"
 dependencies = [
  "clap",
  "clap_lex",
@@ -1156,9 +1156,9 @@ checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
 name = "just"
-version = "1.57.0"
+version = "1.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f93f7969e91091594324f5afc0fb1f4e81d45418437c61ebf6a8895b71b9362"
+checksum = "37997f0dfb8eacdef28ba4648987a619dcee7832c4e14ac268e1908022f55e79"
 dependencies = [
  "blake3",
  "camino",
@@ -1349,7 +1349,7 @@ dependencies = [
  "meminterval",
  "num-traits",
  "num_enum",
- "object 0.39.1",
+ "object 0.40.0",
  "paste",
  "rangemap",
  "rustversion",
@@ -1705,24 +1705,13 @@ dependencies = [
 
 [[package]]
 name = "object"
-version = "0.39.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e5a6c098c7a3b6547378093f5cc30bc54fd361ce711e05293a5cc589562739b"
-dependencies = [
- "flate2",
- "memchr",
- "ruzstd 0.8.3",
-]
-
-[[package]]
-name = "object"
 version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd229a0361b9d0d4396176e02d65897f487eebeab7caa6d443855ee152ca0b9c"
 dependencies = [
  "flate2",
  "memchr",
- "ruzstd 0.9.0",
+ "ruzstd",
 ]
 
 [[package]]
@@ -2017,15 +2006,6 @@ name = "rustversion"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
-
-[[package]]
-name = "ruzstd"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7c1c839d570d835527c9a5e4db7cb2198683a988cb9d7293fc8674e6bd58fc8"
-dependencies = [
- "twox-hash",
-]
 
 [[package]]
 name = "ruzstd"

@@ -112,16 +112,16 @@ pub fn main() {
     type PTInProcessExecutor<'a, 'b, EM, H, I, OT, S, T, Z> =
         GenericInProcessExecutor<EM, H, &'a mut H, (IntelPTHook<'b, T>, ()), I, OT, S, Z>;
     // Create the executor for an in-process function with just one observer
-    let mut executor = PTInProcessExecutor::with_timeout_generic(
-        tuple_list!(pt_hook),
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        Duration::from_millis(5000),
-    )
-    .expect("Failed to create the Executor");
+    let mut executor = GenericInProcessExecutor::builder_generic()
+        .timeout(Duration::from_millis(5000))
+        .harness(&mut harness)
+        .user_hooks(tuple_list!(pt_hook))
+        .observers(tuple_list!(observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());

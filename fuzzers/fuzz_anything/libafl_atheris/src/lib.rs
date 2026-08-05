@@ -28,7 +28,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{ShadowTracingStage, StdMutationalStage},
+    stages::{ShadowTracingStage, StdMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
@@ -38,6 +38,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
+    AsSlice,
 };
 use libafl_targets::{extra_counters, CmpLogObserver};
 
@@ -192,20 +193,28 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
-            let buf = &target;
+            let buf = target.as_slice();
             harness_fn(buf.as_ptr(), buf.len());
             ExitKind::Ok
         };
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        let executor = InProcessExecutor::with_timeout(
-            &mut harness,
-            tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            Duration::from_millis(timeout_ms),
-        )?;
+        let executor = InProcessExecutor::builder()
+            .timeout(Duration::from_millis(timeout_ms))
+            .harness(&mut harness)
+            .observers(tuple_list!(edges_observer, time_observer))
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut mgr)
+            .build()?;
+
+        // Secondary harness due to mut ownership
+        let mut harness = |input: &BytesInput| {
+            let target = input.target_bytes();
+            let buf = target.as_slice();
+            harness_fn(buf.as_ptr(), buf.len());
+            ExitKind::Ok
+        };
 
         let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
         // Setup a tracing stage in which we log comparisons
@@ -244,13 +253,13 @@ pub extern "C" fn LLVMFuzzerRunDriver(
                     state.corpus().count()
                 );
             } else {
-                println!("Loading from {:?}", input_dirs);
+                println!("Loading from {:?}", &input_dirs);
                 // Load from disk
                 // we used _forced since some Atheris testcases don't touch the map at all, hence, would not load any data.
                 state
                     .load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &input_dirs)
-                    .unwrap_or_else(|err| {
-                        panic!("Failed to load initial corpus at {input_dirs:?}: {err}")
+                    .unwrap_or_else(|_| {
+                        panic!("Failed to load initial corpus at {:?}", &input_dirs)
                     });
                 println!("We imported {} inputs from disk.", state.corpus().count());
             }

@@ -48,23 +48,14 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
+    AsSlice,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    edges_map_mut_ptr, libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver,
+    edges_map_mut_ptr, libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CtxHook,
     EDGES_MAP_DEFAULT_SIZE,
 };
-#[rustversion::nightly]
-fn get_ctx_hooks<I, S>() -> (libafl_targets::sancov_pcguard::CtxHook<I, S>, ()) {
-    tuple_list!(libafl_targets::sancov_pcguard::CtxHook::new())
-}
-
-#[rustversion::not(nightly)]
-#[expect(clippy::unused_unit)]
-fn get_ctx_hooks() -> () {
-    tuple_list!()
-}
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -145,9 +136,9 @@ pub extern "C" fn libafl_main() {
             .to_string(),
     );
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", out_dir);
+        println!("Out dir at {:?} already exists.", &out_dir);
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", out_dir);
+            println!("Out dir at {:?} is not a valid directory!", &out_dir);
             return;
         }
     }
@@ -161,7 +152,7 @@ pub extern "C" fn libafl_main() {
             .to_string(),
     );
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", in_dir);
+        println!("In dir at {:?} is not a valid directory!", &in_dir);
         return;
     }
 
@@ -361,26 +352,24 @@ fn fuzz(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = &target;
+        let buf = target.as_slice();
         unsafe {
             libfuzzer_test_one_input(buf);
         }
         ExitKind::Ok
     };
 
-    #[expect(clippy::let_unit_value)]
-    let ctx_hooks = get_ctx_hooks();
+    let ctx_hook = CtxHook::new();
 
-    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = HookableInProcessExecutor::with_timeout_generic(
-        ctx_hooks,
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let executor = HookableInProcessExecutor::builder_generic()
+        .timeout(timeout)
+        .harness(&mut harness)
+        .user_hooks(tuple_list!(ctx_hook))
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
     // Setup a tracing stage in which we log comparisons
@@ -414,8 +403,8 @@ fn fuzz(
                 &mut mgr,
                 slice::from_ref(seed_dir),
             )
-            .unwrap_or_else(|err| {
-                println!("Failed to load initial corpus at {seed_dir:?}: {err:?}");
+            .unwrap_or_else(|_| {
+                println!("Failed to load initial corpus at {:?}", &seed_dir);
                 process::exit(0);
             });
         println!("We imported {} inputs from disk.", state.corpus().count());
