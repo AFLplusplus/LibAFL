@@ -947,15 +947,33 @@ pub struct LlmpPage {
 
 impl LlmpPage {
     #[inline]
-    fn receiver_joined(&mut self) {
-        let receivers_joined_count = &mut self.receivers_joined_count;
-        receivers_joined_count.fetch_add(1, Ordering::Relaxed);
+    fn receiver_joined(&self) {
+        #[cfg(target_has_atomic = "16")]
+        {
+            let receivers_joined_count = &self.receivers_joined_count;
+            receivers_joined_count.fetch_add(1, Ordering::Relaxed);
+        }
+        #[cfg(not(target_has_atomic = "16"))]
+        {
+            let receivers_joined_count = &self.receivers_joined_count;
+            let val = receivers_joined_count.load(Ordering::Relaxed);
+            receivers_joined_count.store(val.wrapping_add(1), Ordering::Relaxed);
+        }
     }
 
     #[inline]
-    fn receiver_left(&mut self) {
-        let receivers_left_count = &mut self.receivers_left_count;
-        receivers_left_count.fetch_add(1, Ordering::Relaxed);
+    fn receiver_left(&self) {
+        #[cfg(target_has_atomic = "16")]
+        {
+            let receivers_left_count = &self.receivers_left_count;
+            receivers_left_count.fetch_add(1, Ordering::Relaxed);
+        }
+        #[cfg(not(target_has_atomic = "16"))]
+        {
+            let receivers_left_count = &self.receivers_left_count;
+            let val = receivers_left_count.load(Ordering::Relaxed);
+            receivers_left_count.store(val.wrapping_add(1), Ordering::Relaxed);
+        }
     }
 }
 
@@ -4083,6 +4101,7 @@ mod tests {
         let page_ptr = unsafe { map.page().cast_mut().cast::<u8>() };
 
         // Valid message header right after page header
+        #[expect(clippy::cast_ptr_alignment)]
         let valid_msg_ptr = unsafe { page_ptr.add(size_of::<LlmpPage>()).cast::<LlmpMsg>() };
         let valid_msg = unsafe { &mut *valid_msg_ptr };
         valid_msg.buf_len_padded = 64;
@@ -4103,6 +4122,7 @@ mod tests {
         assert!(!valid_msg.in_shmem(&mut map));
 
         // Header positioned inside the page header region (must be REJECTED)
+        #[expect(clippy::cast_ptr_alignment)]
         let invalid_header_ptr = unsafe { page_ptr.add(16).cast::<LlmpMsg>() };
         let invalid_msg = unsafe { &mut *invalid_header_ptr };
         invalid_msg.buf_len_padded = 16;
@@ -4125,6 +4145,7 @@ mod tests {
         let page_ptr = unsafe { map.page_mut().cast::<u8>() };
 
         // 1. Valid message header right after page header (offset = 48)
+        #[expect(clippy::cast_ptr_alignment)]
         let valid_msg_ptr = unsafe { page_ptr.add(size_of::<LlmpPage>()).cast::<LlmpMsg>() };
         unsafe { (*valid_msg_ptr).buf_len_padded = 64 };
         assert!(unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
@@ -4146,6 +4167,7 @@ mod tests {
         assert!(!unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
 
         // 5. Header positioned inside page header region (offset = 16, must be REJECTED)
+        #[expect(clippy::cast_ptr_alignment)]
         let invalid_header_ptr = unsafe { page_ptr.add(16).cast::<LlmpMsg>() };
         unsafe { (*invalid_header_ptr).buf_len_padded = 16 };
         assert!(!unsafe { (*invalid_header_ptr).in_shmem(&mut map) });
@@ -4186,7 +4208,7 @@ mod tests {
 
         for _ in 0..10 {
             handles.push(thread::spawn(move || {
-                let page = unsafe { &mut *(page_addr as *mut LlmpPage) };
+                let page = unsafe { &*(page_addr as *const LlmpPage) };
                 for _ in 0..100 {
                     page.receiver_joined();
                     page.receiver_left();
