@@ -120,7 +120,7 @@ where
     let pt = intel_pt_module
         .intel_pt_builder
         .clone()
-        .pid(Some(tid.try_into().unwrap()))
+        .pid(tid.try_into().unwrap())
         .build()
         .unwrap();
 

@@ -1066,6 +1066,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipt"
+version = "0.2.0-beta3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dea84d7c4834bff515ec275060373f961dd6f985780007f22f94cfbab6de09c"
+dependencies = [
+ "arbitrary-int",
+ "bitbybit",
+ "log",
+ "windows",
+]
+
+[[package]]
 name = "is_executable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1342,6 +1354,7 @@ dependencies = [
  "arbitrary-int",
  "bitbybit",
  "caps",
+ "ipt",
  "libafl_bolts",
  "libc",
  "log",
@@ -1350,6 +1363,7 @@ dependencies = [
  "perf-event-open-sys",
  "ptcov",
  "raw-cpuid",
+ "windows",
 ]
 
 [[package]]
