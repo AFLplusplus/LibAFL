@@ -775,14 +775,6 @@ impl LlmpMsg {
         let page_addr = unsafe { map.page() } as usize;
         let map_size = map.shmem.len();
 
-        let Ok(buf_len) = usize::try_from(self.buf_len_padded) else {
-            return false;
-        };
-
-        let Some(msg_size) = size_of::<LlmpMsg>().checked_add(buf_len) else {
-            return false;
-        };
-
         if msg_addr < page_addr {
             return false;
         }
@@ -792,11 +784,17 @@ impl LlmpMsg {
             return false;
         }
 
-        let Some(end_offset) = offset.checked_add(msg_size) else {
+        let Some(header_end) = offset.checked_add(size_of::<LlmpMsg>()) else {
             return false;
         };
 
-        end_offset <= map_size
+        if header_end > map_size {
+            return false;
+        }
+
+        let max_buf_len = (map_size - header_end) as u64;
+
+        self.buf_len <= self.buf_len_padded && self.buf_len_padded <= max_buf_len
     }
 }
 
@@ -4127,6 +4125,13 @@ mod tests {
         let invalid_msg = unsafe { &mut *invalid_header_ptr };
         invalid_msg.buf_len_padded = 16;
         assert!(!invalid_msg.in_shmem(&mut map));
+
+        // buf_len exceeding buf_len_padded (must be REJECTED)
+        valid_msg.buf_len_padded = 64;
+        valid_msg.buf_len = 65;
+        assert!(!valid_msg.in_shmem(&mut map));
+        valid_msg.buf_len = 64;
+        assert!(valid_msg.in_shmem(&mut map));
     }
 
     #[test]
@@ -4147,12 +4152,23 @@ mod tests {
         // 1. Valid message header right after page header (offset = 48)
         #[expect(clippy::cast_ptr_alignment)]
         let valid_msg_ptr = unsafe { page_ptr.add(size_of::<LlmpPage>()).cast::<LlmpMsg>() };
-        unsafe { (*valid_msg_ptr).buf_len_padded = 64 };
+        unsafe {
+            (*valid_msg_ptr).buf_len = 64;
+            (*valid_msg_ptr).buf_len_padded = 64;
+        };
         assert!(unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
+
+        // buf_len exceeding buf_len_padded (must be REJECTED)
+        unsafe { (*valid_msg_ptr).buf_len = 65 };
+        assert!(!unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
+        unsafe { (*valid_msg_ptr).buf_len = 64 };
 
         // 2. Message that extends exactly up to map_size
         let exact_fit_len = map_size - size_of::<LlmpPage>() - size_of::<LlmpMsg>();
-        unsafe { (*valid_msg_ptr).buf_len_padded = exact_fit_len as u64 };
+        unsafe {
+            (*valid_msg_ptr).buf_len = exact_fit_len as u64;
+            (*valid_msg_ptr).buf_len_padded = exact_fit_len as u64;
+        };
         assert!(unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
 
         // 3. Message that extends 1 byte past map_size (must be REJECTED)
