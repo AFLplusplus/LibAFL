@@ -737,7 +737,7 @@ impl LlmpMsg {
 
     /// Gets the buffer from this message as slice, with the correct length.
     #[inline]
-    pub fn try_as_slice<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
+    pub fn try_as_slice<SHM: ShMem>(&self, map: &LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
         // # Safety
         // Safe because we check if we're in a valid shmem region first.
         unsafe {
@@ -770,7 +770,7 @@ impl LlmpMsg {
 
     /// Returns `true`, if the pointer is, indeed, in the page of this shared map.
     #[inline]
-    pub fn in_shmem<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
+    pub fn in_shmem<SHM: ShMem>(&self, map: &LlmpSharedMap<SHM>) -> bool {
         let msg_addr = ptr::from_ref(self) as usize;
         let page_addr = unsafe { map.page() } as usize;
         let map_size = map.shmem.len();
@@ -1853,7 +1853,7 @@ where
 
             // Let's see what we got.
             if let Some(msg) = ret {
-                if !(*msg).in_shmem(&mut self.current_recv_shmem) {
+                if !(*msg).in_shmem(&self.current_recv_shmem) {
                     return Err(Error::illegal_state(
                         "Unexpected message in map (out of map bounds) - buggy client or tampered shared map detected!",
                     ));
@@ -1985,7 +1985,7 @@ where
                     (*msg).sender,
                     (*msg).tag,
                     (*msg).flags,
-                    (*msg).try_as_slice(&mut self.current_recv_shmem)?,
+                    (*msg).try_as_slice(&self.current_recv_shmem)?,
                 )),
                 None => None,
             })
@@ -2003,7 +2003,7 @@ where
                 (*msg).sender,
                 (*msg).tag,
                 (*msg).flags,
-                (*msg).try_as_slice(&mut self.current_recv_shmem)?,
+                (*msg).try_as_slice(&self.current_recv_shmem)?,
             ))
         }
     }
@@ -2018,7 +2018,7 @@ where
             Ok((
                 (*msg).sender,
                 (*msg).tag,
-                (*msg).try_as_slice(&mut self.current_recv_shmem)?,
+                (*msg).try_as_slice(&self.current_recv_shmem)?,
             ))
         }
     }
@@ -4094,7 +4094,7 @@ mod tests {
         let mut shmem_provider = StdShMemProvider::new().unwrap();
         let map_size = 1024;
         let shmem = shmem_provider.new_shmem(map_size).unwrap();
-        let mut map = LlmpSharedMap::new(ClientId(0), shmem);
+        let map = LlmpSharedMap::new(ClientId(0), shmem);
 
         let page_ptr = unsafe { map.page().cast_mut().cast::<u8>() };
 
@@ -4104,34 +4104,34 @@ mod tests {
         let valid_msg = unsafe { &mut *valid_msg_ptr };
         valid_msg.buf_len_padded = 64;
 
-        assert!(valid_msg.in_shmem(&mut map));
+        assert!(valid_msg.in_shmem(&map));
 
         // Message that extends exactly up to map_size
         let exact_fit_len = map_size - size_of::<LlmpPage>() - size_of::<LlmpMsg>();
         valid_msg.buf_len_padded = exact_fit_len as u64;
-        assert!(valid_msg.in_shmem(&mut map));
+        assert!(valid_msg.in_shmem(&map));
 
         // Message that extends 1 byte past map_size (must be REJECTED)
         valid_msg.buf_len_padded = (exact_fit_len + 1) as u64;
-        assert!(!valid_msg.in_shmem(&mut map));
+        assert!(!valid_msg.in_shmem(&map));
 
         // Malicious huge buf_len_padded causing usize overflow (must be REJECTED)
         valid_msg.buf_len_padded = u64::MAX;
-        assert!(!valid_msg.in_shmem(&mut map));
+        assert!(!valid_msg.in_shmem(&map));
 
         // Header positioned inside the page header region (must be REJECTED)
         #[expect(clippy::cast_ptr_alignment)]
         let invalid_header_ptr = unsafe { page_ptr.add(16).cast::<LlmpMsg>() };
         let invalid_msg = unsafe { &mut *invalid_header_ptr };
         invalid_msg.buf_len_padded = 16;
-        assert!(!invalid_msg.in_shmem(&mut map));
+        assert!(!invalid_msg.in_shmem(&map));
 
         // buf_len exceeding buf_len_padded (must be REJECTED)
         valid_msg.buf_len_padded = 64;
         valid_msg.buf_len = 65;
-        assert!(!valid_msg.in_shmem(&mut map));
+        assert!(!valid_msg.in_shmem(&map));
         valid_msg.buf_len = 64;
-        assert!(valid_msg.in_shmem(&mut map));
+        assert!(valid_msg.in_shmem(&map));
     }
 
     #[test]
@@ -4156,11 +4156,11 @@ mod tests {
             (*valid_msg_ptr).buf_len = 64;
             (*valid_msg_ptr).buf_len_padded = 64;
         };
-        assert!(unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
+        assert!(unsafe { (*valid_msg_ptr).in_shmem(&map) });
 
         // buf_len exceeding buf_len_padded (must be REJECTED)
         unsafe { (*valid_msg_ptr).buf_len = 65 };
-        assert!(!unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
+        assert!(!unsafe { (*valid_msg_ptr).in_shmem(&map) });
         unsafe { (*valid_msg_ptr).buf_len = 64 };
 
         // 2. Message that extends exactly up to map_size
@@ -4169,24 +4169,24 @@ mod tests {
             (*valid_msg_ptr).buf_len = exact_fit_len as u64;
             (*valid_msg_ptr).buf_len_padded = exact_fit_len as u64;
         };
-        assert!(unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
+        assert!(unsafe { (*valid_msg_ptr).in_shmem(&map) });
 
         // 3. Message that extends 1 byte past map_size (must be REJECTED)
         unsafe { (*valid_msg_ptr).buf_len_padded = (exact_fit_len + 1) as u64 };
-        assert!(!unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
+        assert!(!unsafe { (*valid_msg_ptr).in_shmem(&map) });
 
         // 4. Malicious huge buf_len_padded causing u64/usize overflow (must be REJECTED)
         unsafe { (*valid_msg_ptr).buf_len_padded = u64::MAX };
-        assert!(!unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
+        assert!(!unsafe { (*valid_msg_ptr).in_shmem(&map) });
 
         unsafe { (*valid_msg_ptr).buf_len_padded = (usize::MAX - size_of::<LlmpMsg>()) as u64 };
-        assert!(!unsafe { (*valid_msg_ptr).in_shmem(&mut map) });
+        assert!(!unsafe { (*valid_msg_ptr).in_shmem(&map) });
 
         // 5. Header positioned inside page header region (offset = 16, must be REJECTED)
         #[expect(clippy::cast_ptr_alignment)]
         let invalid_header_ptr = unsafe { page_ptr.add(16).cast::<LlmpMsg>() };
         unsafe { (*invalid_header_ptr).buf_len_padded = 16 };
-        assert!(!unsafe { (*invalid_header_ptr).in_shmem(&mut map) });
+        assert!(!unsafe { (*invalid_header_ptr).in_shmem(&map) });
 
         // 6. Address before page_start (must be REJECTED)
         let before_page_dummy = LlmpMsg {
@@ -4199,7 +4199,7 @@ mod tests {
             buf_len_padded: 16,
             buf: [],
         };
-        assert!(!before_page_dummy.in_shmem(&mut map));
+        assert!(!before_page_dummy.in_shmem(&map));
     }
 
     #[test]
