@@ -361,16 +361,15 @@ fn fuzz(
 
     let ctx_hook = CtxHook::new();
 
-    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = HookableInProcessExecutor::with_timeout_generic(
-        tuple_list!(ctx_hook),
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let executor = HookableInProcessExecutor::builder_generic()
+        .timeout(timeout)
+        .harness(&mut harness)
+        .user_hooks(tuple_list!(ctx_hook))
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
     // Setup a tracing stage in which we log comparisons

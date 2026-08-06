@@ -34,7 +34,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 use mimalloc::MiMalloc;
@@ -209,21 +208,21 @@ pub extern "C" fn libafl_main() {
             // The wrapped harness function, calling out to the LLVM-style harness
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
-                let buf = target.as_slice();
+                let buf = &target;
                 unsafe {
                     libfuzzer_test_one_input(buf);
                 }
                 ExitKind::Ok
             };
 
-            let mut executor = InProcessExecutor::with_timeout(
-                &mut harness,
-                tuple_list!(edges_observer, time_observer),
-                &mut fuzzer,
-                &mut state,
-                &mut mgr,
-                opt.timeout,
-            )?;
+            let mut executor = InProcessExecutor::builder()
+                .timeout(opt.timeout)
+                .harness(&mut harness)
+                .observers(tuple_list!(edges_observer, time_observer))
+                .fuzzer(&mut fuzzer)
+                .state(&mut state)
+                .event_mgr(&mut mgr)
+                .build()?;
 
             // The actual target run starts here.
             // Call LLVMFUzzerInitialize() if present.
@@ -236,9 +235,7 @@ pub extern "C" fn libafl_main() {
             if state.must_load_initial_inputs() {
                 state
                     .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &opt.input)
-                    .unwrap_or_else(|_| {
-                        panic!("Failed to load initial corpus at {:?}", &opt.input)
-                    });
+                    .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", opt.input));
                 println!("We imported {} inputs from disk.", state.corpus().count());
             }
             if !mgr.is_main() {

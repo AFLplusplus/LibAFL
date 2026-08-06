@@ -199,14 +199,14 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         };
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        let mut executor = InProcessExecutor::with_timeout(
-            &mut harness,
-            tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            Duration::from_millis(timeout_ms),
-        )?;
+        let executor = InProcessExecutor::builder()
+            .timeout(Duration::from_millis(timeout_ms))
+            .harness(&mut harness)
+            .observers(tuple_list!(edges_observer, time_observer))
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut mgr)
+            .build()?;
 
         // Secondary harness due to mut ownership
         let mut harness = |input: &BytesInput| {

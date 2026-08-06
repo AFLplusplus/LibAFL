@@ -16,7 +16,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{nonzero, rands::StdRand, tuples::tuple_list};
 use libc::c_uchar;
 extern crate libc;
 
@@ -29,7 +29,7 @@ extern "C" {
 pub fn main() {
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         unsafe { c_harness(buf.as_ptr()) }
         libafl::executors::ExitKind::Ok
     };

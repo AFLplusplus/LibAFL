@@ -58,7 +58,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Note: this simple example target has just one range of executable memory, in real world binaries
     // there are likely multiple ranges.
     let executable_segments = target_parsed.segments().filter(|s| match s.flags() {
-        SegmentFlags::Elf { p_flags } => (p_flags & PF_X) > 0,
+        SegmentFlags::Elf { p_flags, .. } => (p_flags.0 & PF_X.0) > 0,
         _ => panic!("target binary is not an ELF file."),
     });
     let executable_segment = executable_segments

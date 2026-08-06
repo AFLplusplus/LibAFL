@@ -25,7 +25,6 @@ use libafl::{
 use libafl_bolts::{
     rands::StdRand,
     tuples::{tuple_list, Merge},
-    AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 #[no_mangle]
@@ -131,7 +130,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         unsafe {
             libfuzzer_test_one_input(buf);
         }
@@ -139,14 +138,14 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut restarting_mgr,
-        Duration::new(10, 0),
-    )?;
+    let mut executor = InProcessExecutor::builder()
+        .timeout(Duration::from_secs(10))
+        .harness(&mut harness)
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut restarting_mgr)
+        .build()?;
 
     // Initialize ASAN, call this before any ASAN crashes can occur (directly after initializing executor e.g.)
     #[cfg(windows)]
@@ -165,7 +164,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     if state.must_load_initial_inputs() {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &corpus_dirs));
+            .unwrap_or_else(|err| {
+                panic!("Failed to load initial corpus at {corpus_dirs:?}: {err}")
+            });
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 

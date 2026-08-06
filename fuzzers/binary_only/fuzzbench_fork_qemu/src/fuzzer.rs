@@ -45,7 +45,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
     elf::EasyElf,
@@ -125,9 +124,9 @@ pub fn main() {
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
     let mut out_dir = PathBuf::from(res.get_one::<String>("out").unwrap().to_string());
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", &out_dir);
+        println!("Out dir at {out_dir:?} already exists.");
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            println!("Out dir at {out_dir:?} is not a valid directory!");
             return;
         }
     }
@@ -137,7 +136,7 @@ pub fn main() {
 
     let in_dir = PathBuf::from(res.get_one::<String>("in").unwrap().to_string());
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        println!("In dir at {in_dir:?} is not a valid directory!");
         return;
     }
 
@@ -163,7 +162,7 @@ fn fuzz(
     let mut shmem_provider = StdShMemProvider::new()?;
 
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
-    let edges = edges_shmem.as_slice_mut();
+    let edges = &mut edges_shmem[..];
 
     // Create an observation channel using the coverage map
     let mut edges_observer = unsafe {
@@ -252,7 +251,7 @@ fn fuzz(
     });
 
     let mut cmp_shmem = shmem_provider.uninit_on_shmem::<CmpLogMap>().unwrap();
-    let cmplog = cmp_shmem.as_slice_mut();
+    let cmplog = &mut cmp_shmem[..];
 
     // Beginning of a page should be properly aligned.
     #[expect(clippy::cast_ptr_alignment)]
@@ -346,7 +345,7 @@ fn fuzz(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
-        let mut buf = target.as_slice();
+        let mut buf = &target[..];
         let mut len = buf.len();
         if len > 4096 {
             buf = &buf[0..4096];
@@ -408,8 +407,8 @@ fn fuzz(
                 &mut mgr,
                 std::slice::from_ref(&seed_dir),
             )
-            .unwrap_or_else(|_| {
-                println!("Failed to load initial corpus at {:?}", &seed_dir);
+            .unwrap_or_else(|err| {
+                println!("Failed to load initial corpus at {seed_dir:?}: {err:?}");
                 process::exit(0);
             });
         println!("We imported {} inputs from disk.", state.corpus().count());

@@ -42,7 +42,7 @@ use libafl::{
 #[cfg(unix)]
 use libafl_bolts::os::dup_and_mute_outputs;
 use libafl_bolts::{
-    AsSlice, current_time,
+    current_time,
     os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -133,9 +133,9 @@ pub extern "C" fn libafl_main() {
             .to_string(),
     );
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", &out_dir);
+        println!("Out dir at {:?} already exists.", out_dir);
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            println!("Out dir at {:?} is not a valid directory!", out_dir);
             return;
         }
     }
@@ -149,7 +149,7 @@ pub extern "C" fn libafl_main() {
             .to_string(),
     );
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        println!("In dir at {:?} is not a valid directory!", in_dir);
         return;
     }
 
@@ -343,7 +343,7 @@ fn fuzz(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         unsafe {
             libfuzzer_test_one_input(buf);
         }
@@ -351,14 +351,14 @@ fn fuzz(
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let executor = InProcessExecutor::builder()
+        .timeout(timeout)
+        .harness(&mut harness)
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
@@ -387,9 +387,14 @@ fn fuzz(
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
         state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
-            .unwrap_or_else(|_| {
-                println!("Failed to load initial corpus at {:?}", &seed_dir);
+            .load_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut mgr,
+                std::slice::from_ref(seed_dir),
+            )
+            .unwrap_or_else(|err| {
+                println!("Failed to load initial corpus at {seed_dir:?}: {err:?}");
                 process::exit(0);
             });
         println!("We imported {} inputs from disk.", state.corpus().count());

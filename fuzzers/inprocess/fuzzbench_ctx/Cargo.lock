@@ -473,6 +473,7 @@ dependencies = [
  "libafl_cc",
  "libafl_targets",
  "mimalloc",
+ "rustversion",
  "which 6.0.3",
 ]
 

@@ -8,7 +8,7 @@ use core::{
 use arbitrary_int::{u1, u4, u5, u6};
 use bitbybit::bitfield;
 use hashbrown::HashMap;
-use libafl_bolts::{AsSlice, HasLen, Named, ownedref::OwnedRefMut};
+use libafl_bolts::{HasLen, Named, ToSlice, ownedref::OwnedRefMut};
 use serde::{Deserialize, Serialize};
 
 use crate::{Error, HasMetadata, executors::ExitKind, observers::Observer};
@@ -30,12 +30,12 @@ impl CmplogBytes {
     }
 }
 
-impl<'a> AsSlice<'a> for CmplogBytes {
+impl<'a> ToSlice<'a> for CmplogBytes {
     type Entry = u8;
 
     type SliceRef = &'a [u8];
 
-    fn as_slice(&'a self) -> Self::SliceRef {
+    fn to_slice(&'a self) -> Self::SliceRef {
         &self.buf[0..(self.len as usize)]
     }
 }

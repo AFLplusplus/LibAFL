@@ -1464,9 +1464,14 @@ mod tests {
             *execution_count.borrow_mut() += 1;
             ExitKind::Ok
         };
-        let mut executor =
-            InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut manager)
-                .unwrap();
+        let mut executor = InProcessExecutor::builder()
+            .harness(&mut harness)
+            .observers(())
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut manager)
+            .build()
+            .unwrap();
         let input = BytesInput::new(vec![1, 2, 3]);
         assert!(
             fuzzer

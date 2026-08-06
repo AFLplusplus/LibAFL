@@ -17,7 +17,7 @@ use std::{
 };
 
 use ahash::RandomState;
-use libafl_core::{AsSlice, Error};
+use libafl_core::Error;
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::shmem::{ShMem, ShMemProvider};
@@ -205,10 +205,16 @@ where
         assert!(size_of::<StateShMemContent>() + len <= self.shmem.len());
 
         let shmem_content = self.content_mut();
+        // # Safety
+        // `buf` is large enough to hold `[u8; 16]` and is properly aligned (u8 alignment is 1),
+        // and `buf_len` points to a valid field in shared memory.
         unsafe {
-            ptr::copy_nonoverlapping(EXITING_MAGIC.as_ptr(), shmem_content.buf.as_mut_ptr(), len);
+            ptr::write_volatile(
+                shmem_content.buf.as_mut_ptr().cast::<[u8; 16]>(),
+                *EXITING_MAGIC,
+            );
+            ptr::write_volatile(&raw mut shmem_content.buf_len, len);
         }
-        shmem_content.buf_len = EXITING_MAGIC.len();
     }
 
     /// Returns true, if [`Self::send_exiting`] was called on this [`StateRestorer`] last.
@@ -216,12 +222,21 @@ where
     pub fn wants_to_exit(&self) -> bool {
         let len = EXITING_MAGIC.len();
         assert!(size_of::<StateShMemContent>() + len <= self.shmem.len());
-        let bytes = unsafe { slice::from_raw_parts(self.content().buf.as_ptr(), len) };
-        bytes == EXITING_MAGIC
+        let content = self.content();
+        // # Safety
+        // `content.buf_len` points to a valid field in the shared memory map.
+        let buf_len = unsafe { read_volatile(&raw const content.buf_len) };
+        if buf_len != len {
+            return false;
+        }
+        // # Safety
+        // `content.buf` is checked above to contain at least 16 bytes and is properly aligned (u8 alignment is 1).
+        let magic = unsafe { read_volatile(content.buf.as_ptr().cast::<[u8; 16]>()) };
+        magic == *EXITING_MAGIC
     }
 
     fn content_mut(&mut self) -> &mut StateShMemContent {
-        let ptr = self.shmem.as_slice().as_ptr();
+        let ptr = self.shmem.as_ptr();
         debug_assert_eq!(
             ptr.align_offset(size_of::<StateShMemContent>()),
             0,
@@ -236,7 +251,7 @@ where
     /// The content is either the name of the tmpfile, or the serialized bytes directly, if they fit on a single page.
     fn content(&self) -> &StateShMemContent {
         #[expect(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
-        let ptr = self.shmem.as_slice().as_ptr() as *const StateShMemContent;
+        let ptr = self.shmem.as_ptr() as *const StateShMemContent;
         unsafe { &*(ptr) }
     }
 
@@ -356,5 +371,32 @@ mod tests {
         state_restorer.reset();
         assert!(!state_restorer.has_content());
         assert!(!tmpfile.exists());
+    }
+
+    #[test]
+    #[serial]
+    #[cfg_attr(miri, ignore)]
+    #[cfg(not(target_os = "haiku"))]
+    fn test_state_restore_exiting() {
+        use crate::{
+            shmem::{ShMemProvider, StdShMem, StdShMemProvider},
+            staterestore::StateRestorer,
+        };
+
+        const TESTMAP_SIZE: usize = 1024;
+
+        let mut shmem_provider = StdShMemProvider::new().unwrap();
+        let shmem = shmem_provider.new_shmem(TESTMAP_SIZE).unwrap();
+        let mut state_restorer = StateRestorer::<StdShMem, StdShMemProvider>::new(shmem);
+
+        assert!(!state_restorer.wants_to_exit());
+
+        state_restorer.send_exiting();
+        assert!(state_restorer.wants_to_exit());
+        assert!(state_restorer.has_content());
+
+        state_restorer.reset();
+        assert!(!state_restorer.wants_to_exit());
+        assert!(!state_restorer.has_content());
     }
 }

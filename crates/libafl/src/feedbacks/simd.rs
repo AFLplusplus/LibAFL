@@ -10,7 +10,7 @@ use core::{
 };
 
 use libafl_bolts::{
-    AsIter, AsSlice, Error, Named,
+    AsIter, Error, Named, ToSlice,
     simd::{Reducer, SimdReducer, VectorType, covmap_is_interesting_simd},
     tuples::{Handle, MatchName, MatchNameRef},
 };
@@ -42,7 +42,7 @@ where
 
 impl<C, O, R, V> SimdMapFeedback<C, O, R, V>
 where
-    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
+    O: MapObserver<Entry = u8> + for<'a> ToSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     C: CanTrack + AsRef<O>,
     R: SimdReducer<V>,
     V: VectorType + Copy + Eq,
@@ -65,10 +65,10 @@ where
             map_state.history_map.resize(len, u8::default());
         }
 
-        let map = observer.as_slice();
+        let map = observer.to_slice();
         debug_assert!(map.len() >= size);
 
-        let history_map = map_state.history_map.as_slice();
+        let history_map = &map_state.history_map;
 
         let (interesting, novelties) = unsafe {
             covmap_is_interesting_simd::<R, V>(history_map, &map, self.map.novelties.is_some())
@@ -108,7 +108,7 @@ impl<C, O, R, V> SimdMapFeedback<C, O, R, V>
 where
     R: SimdReducer<V>,
     C: CanTrack + AsRef<O> + Named,
-    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
+    O: MapObserver<Entry = u8> + for<'a> ToSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
 {
     /// Mock [`MapFeedback::new`]. If you are getting bound errors, your entry is probably not
     /// `u8` and you should use [`MapFeedback`] instead.
@@ -191,7 +191,7 @@ impl<C, O, EM, I, OT, S, R, V> Feedback<EM, I, OT, S> for SimdMapFeedback<C, O, 
 where
     C: CanTrack + AsRef<O>,
     EM: EventFirer<I, S>,
-    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
+    O: MapObserver<Entry = u8> + for<'a> ToSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     OT: MatchName,
     S: HasNamedMetadata + HasExecutions,
     R: SimdReducer<V>,

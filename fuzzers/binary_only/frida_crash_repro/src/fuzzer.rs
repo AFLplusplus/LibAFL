@@ -26,7 +26,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsSlice,
 };
 use libafl_frida::{
     asan::{
@@ -84,7 +83,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         let mut frida_harness = |input: &BytesInput| {
             let target = input.target_bytes();
-            let buf = target.as_slice();
+            let buf = &target;
             unsafe { (target_func)(buf.as_ptr(), buf.len()) };
             ExitKind::Ok
         };
@@ -179,14 +178,14 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // Create the executor for an in-process function with just one observer for edge coverage
         let mut executor = FridaInProcessExecutor::new(
             &gum,
-            InProcessExecutor::with_timeout(
-                &mut frida_harness,
-                observers,
-                &mut fuzzer,
-                &mut state,
-                &mut mgr,
-                options.timeout,
-            )?,
+            InProcessExecutor::builder()
+                .timeout(options.timeout)
+                .harness(&mut frida_harness)
+                .observers(observers)
+                .fuzzer(&mut fuzzer)
+                .state(&mut state)
+                .event_mgr(&mut mgr)
+                .build()?,
             Rc::clone(&frida_helper),
         );
 
@@ -201,8 +200,11 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     &client_description.core_id(),
                     &options.cores,
                 )
-                .unwrap_or_else(|_| {
-                    panic!("Failed to load initial corpus at {:?}", &options.input)
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Failed to load initial corpus at {:?}: {err}",
+                        options.input
+                    )
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());
         }

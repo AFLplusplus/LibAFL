@@ -7,16 +7,12 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{
-        tcp::setup_restarting_mgr_tcp, EventConfig, EventRestarter, RestartingEventManager,
-        ShouldSaveState,
-    },
+    events::{tcp::setup_restarting_mgr_tcp, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    monitors::MultiMonitor,
     mutators::{
         havoc_mutations::havoc_mutations,
         scheduled::{tokens_mutations, HavocScheduledMutator},
@@ -33,7 +29,6 @@ use libafl::{
 use libafl_bolts::{
     rands::StdRand,
     tuples::{tuple_list, Merge},
-    AsSlice,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_FOUND};
 use mimalloc::MiMalloc;
@@ -154,7 +149,7 @@ pub extern "C" fn libafl_main() {
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         #[cfg(feature = "crash")]
         if buf.len() > 4 && buf[4] == 0 {
             unsafe {
@@ -170,15 +165,15 @@ pub extern "C" fn libafl_main() {
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut restarting_mgr,
-        Duration::new(10, 0),
-    )
-    .expect("Failed to create executor");
+    let mut executor = InProcessExecutor::builder()
+        .timeout(Duration::from_secs(10))
+        .harness(&mut harness)
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut restarting_mgr)
+        .build()
+        .expect("Failed to create executor");
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
@@ -196,7 +191,7 @@ pub extern "C" fn libafl_main() {
                 &mut restarting_mgr,
                 &[PathBuf::from("./corpus")],
             )
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus"));
+            .unwrap_or_else(|err| panic!("Failed to load initial corpus: {err}"));
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 

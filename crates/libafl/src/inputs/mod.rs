@@ -48,7 +48,7 @@ use std::{fs::File, io::Read, path::Path};
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
 use libafl_bolts::{
-    AsSlice, Error, HasLen, generic_hash_std,
+    Error, HasLen, generic_hash_std,
     ownedref::{OwnedMutSlice, OwnedSlice},
     subrange::{SubRangeMutSlice, SubRangeSlice},
 };
@@ -448,7 +448,7 @@ where
 
     fn convert(&mut self, state: &mut S, input: Self::From) -> Result<Self::To, Error> {
         self.from_bytes_converter
-            .convert_from_target_bytes(state, input.target_bytes().as_slice())
+            .convert_from_target_bytes(state, &input.target_bytes())
     }
 }
 
@@ -489,8 +489,6 @@ impl<I, T> From<T> for FromBytesInputConverter<I, T> {
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::AsSlice;
-
     use crate::inputs::{
         BytesInput, BytesInputConverter, FromBytesInputConverter, FromTargetBytesConverter,
         HasTargetBytes, InputConverter,
@@ -501,10 +499,10 @@ mod tests {
         let bytes = vec![1, 2, 3, 4];
         let mut nop = FromBytesInputConverter::new(BytesInputConverter::new());
         let res: BytesInput = nop.convert_from_target_bytes(&mut (), &bytes).unwrap();
-        assert_eq!(res.target_bytes().as_slice(), &bytes);
+        assert_eq!(&*res.target_bytes(), &bytes);
 
         let start_input = BytesInput::new(bytes.clone());
         let res2 = nop.convert(&mut (), start_input).unwrap();
-        assert_eq!(res2.target_bytes().as_slice(), &bytes);
+        assert_eq!(&*res2.target_bytes(), &bytes);
     }
 }

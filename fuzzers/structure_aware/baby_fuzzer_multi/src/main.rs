@@ -21,9 +21,7 @@ use libafl::{
     state::StdState,
     Evaluator,
 };
-use libafl_bolts::{
-    nonnull_raw_mut, rands::StdRand, simd::MinReducer, tuples::tuple_list, AsSlice,
-};
+use libafl_bolts::{nonnull_raw_mut, rands::StdRand, simd::MinReducer, tuples::tuple_list};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 128] = [0; 128];
@@ -49,7 +47,7 @@ pub fn main() {
         let mut count = input.len();
         for (i, (_name, input)) in input.parts().iter().enumerate() {
             let target = input.target_bytes();
-            let buf = target.as_slice();
+            let buf = &target;
             signals_set(i * 8);
             if !buf.is_empty() && buf[0] == b'a' {
                 signals_set(1 + i * 8);
@@ -145,9 +143,10 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // a generator here is not generalisable
-    let initial = MultipartInput::from(
-        iter::repeat(("part".to_string(), BytesInput::from(&b"hello"[..]))).take(4),
-    );
+    let initial = MultipartInput::from(iter::repeat_n(
+        ("part".to_string(), BytesInput::from(&b"hello"[..])),
+        4,
+    ));
 
     fuzzer
         .evaluate_input(&mut state, &mut executor, &mut mgr, &initial)

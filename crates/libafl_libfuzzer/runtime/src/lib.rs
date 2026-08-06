@@ -458,15 +458,15 @@ macro_rules! fuzz_with {
                 value_profile_observer
             );
 
-            // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-            let mut executor = InProcessExecutor::with_timeout(
-                    &mut harness,
-                    observers,
-                    &mut fuzzer,
-                    &mut state,
-                    &mut mgr,
-                    $options.timeout(),
-                )?;
+            let mut executor = InProcessExecutor::builder()
+                .timeout($options.timeout())
+                .crashdump(false)
+                .harness(&mut harness)
+                .observers(observers)
+                .fuzzer(&mut fuzzer)
+                .state(&mut state)
+                .event_mgr(&mut mgr)
+                .build()?;
 
             // In case the corpus is empty (on first run) or crashed while loading, reset
             if state.must_load_initial_inputs() {

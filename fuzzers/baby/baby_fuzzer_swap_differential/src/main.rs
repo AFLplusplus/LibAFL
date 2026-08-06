@@ -21,7 +21,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasSolutions, StdState},
 };
-use libafl_bolts::{nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{nonzero, rands::StdRand, tuples::tuple_list};
 use libafl_targets::{edges_max_num, DifferentialAFLMapSwapObserver};
 #[cfg(not(miri))]
 use mimalloc::MiMalloc;
@@ -64,7 +64,7 @@ pub fn main() {
     // The closure that we want to fuzz
     let mut first_harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         if unsafe { inspect_first(buf.as_ptr(), buf.len()) } {
             ExitKind::Crash
         } else {
@@ -73,7 +73,7 @@ pub fn main() {
     };
     let mut second_harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         if unsafe { inspect_second(buf.as_ptr(), buf.len()) } {
             ExitKind::Crash
         } else {

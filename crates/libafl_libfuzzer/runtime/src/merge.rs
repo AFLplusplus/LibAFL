@@ -20,7 +20,6 @@ use libafl::{
     state::{HasCorpus, HasRand, StdState},
 };
 use libafl_bolts::{
-    AsSlice,
     rands::{Rand, StdRand},
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
@@ -160,7 +159,7 @@ pub fn merge(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective); // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
 
         let result = unsafe {
             crate::libafl_libfuzzer_test_one_input(Some(*harness), buf.as_ptr(), buf.len())
@@ -174,14 +173,15 @@ pub fn merge(
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        observers,
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        options.timeout(),
-    )?;
+    let mut executor = InProcessExecutor::builder()
+        .timeout(options.timeout())
+        .crashdump(false)
+        .harness(&mut harness)
+        .observers(observers)
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     // In case the corpus is empty (on first run) or crashed while loading, reset
     if state.must_load_initial_inputs() && !options.dirs().is_empty() {

@@ -399,6 +399,8 @@ pub struct InProcessExecutorHandlerData {
     pub(crate) in_target: u64,
     #[cfg(all(windows, feature = "std"))]
     pub(crate) critical: *mut c_void,
+    /// Whether to generate a crash dump (minibsod) on crash. Defaults to true.
+    pub(crate) crashdump: bool,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
@@ -496,7 +498,9 @@ impl InProcessExecutorHandlerData {
 
                 log::error!("Target crashed!");
 
-                if let Some(bsod_info) = bsod_info {
+                if GLOBAL_STATE.crashdump
+                    && let Some(bsod_info) = bsod_info
+                {
                     let bsod = generate_minibsod_to_vec(
                         bsod_info.signal,
                         &bsod_info.siginfo,
@@ -555,6 +559,7 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     in_target: 0,
     #[cfg(all(windows, feature = "std"))]
     critical: null_mut(),
+    crashdump: true,
 };
 
 /// Get the inprocess State

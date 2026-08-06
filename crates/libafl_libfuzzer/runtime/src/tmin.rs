@@ -22,7 +22,7 @@ use libafl::{
 #[cfg(unix)]
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{
-    AsSlice, HasLen,
+    HasLen,
     rands::{RomuDuoJrRand, StdRand},
     tuples::tuple_list,
 };
@@ -52,7 +52,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
 
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
 
         let result = unsafe {
             crate::libafl_libfuzzer_test_one_input(Some(harness), buf.as_ptr(), buf.len())
@@ -80,14 +80,15 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     };
 
     #[cfg(windows)]
-    let mut executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        (),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        options.timeout(),
-    )?;
+    let mut executor = InProcessExecutor::builder()
+        .timeout(options.timeout())
+        .crashdump(false)
+        .harness(&mut harness)
+        .observers(())
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     let exit_kind = fuzzer.execute_input(&mut state, &mut executor, &mut mgr, &input)?;
 

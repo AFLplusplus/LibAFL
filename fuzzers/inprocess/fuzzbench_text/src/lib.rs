@@ -54,14 +54,11 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 #[cfg(feature = "dump_cov")]
-use libafl_targets::sancov_pcguard_dump_cov::{
-    pcguard_enable_coverage_collection, CoverageDumpHook,
-};
+use libafl_targets::sancov_pcguard_dump_cov::CoverageDumpHook;
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
@@ -163,9 +160,9 @@ pub extern "C" fn libafl_main(
             .to_string(),
     );
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", &out_dir);
+        println!("Out dir at {out_dir:?} already exists.");
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            println!("Out dir at {out_dir:?} is not a valid directory!");
             return 1;
         }
     }
@@ -179,7 +176,7 @@ pub extern "C" fn libafl_main(
             .to_string(),
     );
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        println!("In dir at {in_dir:?} is not a valid directory!");
         return 1;
     }
 
@@ -226,10 +223,10 @@ fn count_textual_inputs(dir: &Path) -> (usize, usize) {
             file.read_to_end(&mut buffer).expect("Buffer overflow");
 
             if inspect(&buffer).is_text() {
-                println!("Testcase {:?} is text", &path);
+                println!("Testcase {path:?} is text");
                 textuals += 1;
             } else {
-                println!("Testcase {:?} is binary", &path);
+                println!("Testcase {path:?} is binary");
             }
             total += 1;
         }
@@ -296,7 +293,7 @@ fn run_testcases(filenames: &[&str], _dump_coverage_dir: Option<PathBuf>) {
 
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         unsafe {
             libfuzzer_test_one_input(buf);
         }
@@ -333,8 +330,6 @@ fn fuzz_binary(
     logfile: &PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
-    #[cfg(feature = "dump_cov")]
-    pcguard_enable_coverage_collection();
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]
@@ -480,7 +475,7 @@ fn fuzz_binary(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         unsafe {
             libfuzzer_test_one_input(buf);
         }
@@ -488,14 +483,14 @@ fn fuzz_binary(
     };
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let executor = InProcessExecutor::builder()
+        .timeout(timeout)
+        .harness(&mut harness)
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     // Setup a tracing stage in which we log comparisons
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
@@ -556,8 +551,6 @@ fn fuzz_text(
     logfile: &PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
-    #[cfg(feature = "dump_cov")]
-    pcguard_enable_coverage_collection();
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]
@@ -724,7 +717,7 @@ fn fuzz_text(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         unsafe {
             libfuzzer_test_one_input(buf);
         }
@@ -734,14 +727,14 @@ fn fuzz_text(
     let generalization = GeneralizationStage::new(&edges_observer);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = InProcessExecutor::with_timeout(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let executor = InProcessExecutor::builder()
+        .timeout(timeout)
+        .harness(&mut harness)
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
     // Setup a tracing stage in which we log comparisons
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
     let tracing = ShadowTracingStage::new();

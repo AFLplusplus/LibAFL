@@ -22,7 +22,7 @@ use libafl::{
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
 };
-use libafl_bolts::{AsSlice, tuples::RefIndexable};
+use libafl_bolts::tuples::RefIndexable;
 
 #[cfg(not(test))]
 use crate::asan::errors::AsanErrors;
@@ -76,7 +76,7 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let target_bytes = fuzzer.convert_to_target_bytes(state, input);
-        self.helper.borrow_mut().pre_exec(target_bytes.as_slice())?;
+        self.helper.borrow_mut().pre_exec(&target_bytes)?;
         if self.helper.borrow_mut().stalker_enabled() {
             if !(self.followed) {
                 self.followed = true;
@@ -115,9 +115,7 @@ where
                 abort();
             }
         }
-        self.helper
-            .borrow_mut()
-            .post_exec(target_bytes.as_slice())?;
+        self.helper.borrow_mut().post_exec(&target_bytes)?;
         res
     }
 }

@@ -31,7 +31,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
 };
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, ACCOUNTING_MEMOP_MAP, EDGES_MAP,
@@ -211,7 +210,7 @@ pub extern "C" fn libafl_main() {
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
-            let buf = target.as_slice();
+            let buf = &target;
             unsafe {
                 libfuzzer_test_one_input(buf);
             }
@@ -219,14 +218,14 @@ pub extern "C" fn libafl_main() {
         };
 
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-        let mut executor = InProcessExecutor::with_timeout(
-            &mut harness,
-            tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut restarting_mgr,
-            opt.timeout,
-        )?;
+        let mut executor = InProcessExecutor::builder()
+            .timeout(opt.timeout)
+            .harness(&mut harness)
+            .observers(tuple_list!(edges_observer, time_observer))
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut restarting_mgr)
+            .build()?;
 
         // The actual target run starts here.
         // Call LLVMFUzzerInitialize() if present.
@@ -240,7 +239,7 @@ pub extern "C" fn libafl_main() {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
                 .unwrap_or_else(|e| {
-                    panic!("Failed to load initial corpus at {:?} {:?}", &opt.input, e)
+                    panic!("Failed to load initial corpus at {:?}: {e:?}", opt.input)
                 });
             println!("We imported {} inputs from disk.", state.corpus().count());
         }

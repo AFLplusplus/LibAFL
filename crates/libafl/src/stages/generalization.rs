@@ -7,7 +7,7 @@ use alloc::{
 use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::{
-    AsSlice, Named,
+    Named,
     tuples::{Handle, Handled},
 };
 
@@ -132,14 +132,14 @@ where
 
             let original = input.clone();
             let meta = entry.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
-                    Error::key_not_found(format!(
-                        "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_id} (check the arguments of MapFeedback::new(...))"
-                    ))
-                })?;
-            if meta.as_slice().is_empty() {
+                Error::key_not_found(format!(
+                    "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_id} (check the arguments of MapFeedback::new(...))"
+                ))
+            })?;
+            if meta.is_empty() {
                 return Ok(()); // don't generalise inputs which don't have novelties
             }
-            (payload, original, meta.as_slice().to_vec())
+            (payload, original, meta.to_vec())
         };
 
         // Do not generalized unstable inputs

@@ -17,7 +17,7 @@ use libafl::{
     schedulers::QueueScheduler,
     state::StdState,
 };
-use libafl_bolts::{AsSlice, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list};
+use libafl_bolts::{nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list};
 /* ANCHOR_END: use */
 
 /* ANCHOR: signals */
@@ -32,7 +32,7 @@ fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         signals_set(0); // set SIGNALS[0]
         if buf.len() > 0 && buf[0] == b'a' {
             signals_set(1); // set SIGNALS[1]
@@ -95,14 +95,14 @@ fn main() {
 
     /* ANCHOR: executor_with_observer */
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor");
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(tuple_list!(observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the Executor");
     /* ANCHOR_END: executor_with_observer */
 
     // Generator of printable bytearrays of max size 32

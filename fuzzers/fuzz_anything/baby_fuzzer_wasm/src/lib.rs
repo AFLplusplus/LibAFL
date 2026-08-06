@@ -16,9 +16,7 @@ use libafl::{
     state::{HasSolutions, StdState},
     Fuzzer, StdFuzzer,
 };
-use libafl_bolts::{
-    nonzero, rands::StdRand, serdeany::RegistryBuilder, tuples::tuple_list, AsSlice,
-};
+use libafl_bolts::{nonzero, rands::StdRand, serdeany::RegistryBuilder, tuples::tuple_list};
 use wasm_bindgen::prelude::*;
 use web_sys::{Performance, Window};
 
@@ -64,7 +62,7 @@ pub fn fuzz() {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             signals_set(1);

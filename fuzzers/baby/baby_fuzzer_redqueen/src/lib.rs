@@ -28,7 +28,6 @@ use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
     tuples::{tuple_list, Handled},
-    AsSlice,
 };
 use libafl_targets::{
     cmps::{observers::AflppCmpLogObserver, stages::AflppCmplogTracingStage},
@@ -84,9 +83,9 @@ pub extern "C" fn libafl_main(
             .to_string(),
     );
     if fs::create_dir(&out_dir).is_err() {
-        println!("Out dir at {:?} already exists.", &out_dir);
+        println!("Out dir at {:?} already exists.", out_dir);
         if !out_dir.is_dir() {
-            println!("Out dir at {:?} is not a valid directory!", &out_dir);
+            println!("Out dir at {:?} is not a valid directory!", out_dir);
             return 1;
         }
     }
@@ -100,7 +99,7 @@ pub extern "C" fn libafl_main(
             .to_string(),
     );
     if !in_dir.is_dir() {
-        println!("In dir at {:?} is not a valid directory!", &in_dir);
+        println!("In dir at {:?} is not a valid directory!", in_dir);
         return 1;
     }
 
@@ -171,7 +170,7 @@ fn run_fuzzer(
     // The wrapped harness function, calling out to the LLVM-style harness
     fn harness(input: &BytesInput) -> ExitKind {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = &target;
         unsafe {
             libfuzzer_test_one_input(buf);
         }
@@ -186,14 +185,14 @@ fn run_fuzzer(
     let colorization = ColorizationStage::new(&edges_observer);
 
     // Create the executor for an in-process function with one observer for edge coverage
-    let mut executor = InProcessExecutor::with_timeout(
-        &mut harness_main,
-        tuple_list!(edges_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let mut executor = InProcessExecutor::builder()
+        .timeout(timeout)
+        .harness(&mut harness_main)
+        .observers(tuple_list!(edges_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     // Now, we'll setup the rest of the RedQueen stages. We need the cmplog map,
     // an executor that populates it, and observer for it, and the
@@ -202,14 +201,14 @@ fn run_fuzzer(
     let cmpmap_ref = unsafe { OwnedRefMut::from_mut_ptr(&raw mut CMPLOG_MAP_EXTENDED) };
     let cmplog_observer = AflppCmpLogObserver::new("cmplog", cmpmap_ref, true);
     let cmplog_ref = cmplog_observer.handle();
-    let cmplog_executor = InProcessExecutor::with_timeout(
-        &mut harness_cmplog,
-        tuple_list!(cmplog_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-        timeout,
-    )?;
+    let cmplog_executor = InProcessExecutor::builder()
+        .timeout(timeout)
+        .harness(&mut harness_cmplog)
+        .observers(tuple_list!(cmplog_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()?;
 
     let tracing = AflppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 

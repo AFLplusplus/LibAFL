@@ -27,7 +27,7 @@ use std::{
 };
 
 #[cfg(unix)]
-use libafl_bolts::{AsSlice, tuples::MatchNameRef};
+use libafl_bolts::tuples::MatchNameRef;
 use libafl_bolts::{
     InputLocation, StdTargetArgs, StdTargetArgsInner,
     ownedref::OwnedSlice,
@@ -157,7 +157,7 @@ impl CommandConfigurator<Child> for StdCommandConfigurator {
                     if i == *argnum {
                         debug_assert_eq!(arg, "PLACEHOLDER");
                         #[cfg(unix)]
-                        cmd.arg(OsStr::from_bytes(target_bytes.as_slice()));
+                        cmd.arg(OsStr::from_bytes(&target_bytes));
                         // There is an issue here that the chars on Windows are 16 bit wide.
                         // I can't really test it. Please open a PR if this goes wrong.
                         #[cfg(not(unix))]
@@ -274,7 +274,7 @@ impl CommandConfigurator<Pid> for PTraceCommandConfigurator {
                             *argnum <= self.args.len(),
                             "If you want to fuzz arg {argnum}, you have to specify the other {argnum} (static) args."
                         );
-                        let terminated_input = [target_bytes.as_slice() as &[u8], &[0]].concat();
+                        let terminated_input = [&target_bytes as &[u8], &[0]].concat();
                         let cstring_input =
                             CString::from(CStr::from_bytes_until_nul(&terminated_input).unwrap());
                         if *argnum == self.args.len() {
