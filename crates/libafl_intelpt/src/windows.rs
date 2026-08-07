@@ -268,7 +268,8 @@ impl<'a> IntelPTBuilder<'a> {
         Ok(intel_pt)
     }
 
-    /// Not calling this function will default to the current process.
+    /// By default, this will trace the current process. Set a `pid` to trace another process
+    /// instead.
     ///
     /// # Panics
     /// Panics if tracing already started

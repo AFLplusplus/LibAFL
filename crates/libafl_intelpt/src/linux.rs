@@ -464,9 +464,8 @@ impl<'a> IntelPTBuilder<'a> {
     }
 
     #[must_use]
-    /// Set the process to be traced via its `PID`.
-    ///
-    /// Not calling this function will default to the current process.
+    /// By default, this will trace the current process. Set a `pid` to trace another process
+    /// instead.
     ///
     /// Calling this with `pid: 0` means "Current process" ONLY on Linux!
     /// Prefer not setting the pid at all if you want a cross-platform "Current process".
