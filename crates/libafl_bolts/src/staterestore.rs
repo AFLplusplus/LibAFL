@@ -292,12 +292,13 @@ where
             let filename: String = postcard::from_bytes(bytes)?;
             let tmpfile = temp_dir().join(&filename);
             file_content = vec![];
-            File::open(tmpfile)?.read_to_end(&mut file_content)?;
+            File::open(&tmpfile)?.read_to_end(&mut file_content)?;
             if file_content.is_empty() {
                 return Err(Error::illegal_state(format!(
                     "Could not restore state from file {filename}"
                 )));
             }
+            drop(fs::remove_file(&tmpfile));
             state = &file_content;
         }
         let deserialized = postcard::from_bytes(state)?;
@@ -360,17 +361,29 @@ mod tests {
         assert!(state_restorer.content().is_disk);
         assert_ne!(state_restorer.content().buf_len, 0);
 
-        // Check if file removal works.
+        // Check if file removal works on restore.
         let state_shmem_content = state_restorer.content();
         let tmpfile = state_shmem_content
             .tmpfile(state_restorer.mapsize())
             .unwrap()
             .unwrap();
-        assert!(tmpfile.exists());
+        assert!(!tmpfile.exists());
 
         state_restorer.reset();
         assert!(!state_restorer.has_content());
         assert!(!tmpfile.exists());
+
+        // Check if file removal works on reset without restore.
+        state_restorer.save(&too_large).unwrap();
+        let tmpfile2 = state_restorer
+            .content()
+            .tmpfile(state_restorer.mapsize())
+            .unwrap()
+            .unwrap();
+        assert!(tmpfile2.exists());
+        state_restorer.reset();
+        assert!(!state_restorer.has_content());
+        assert!(!tmpfile2.exists());
     }
 
     #[test]
