@@ -14,6 +14,6 @@ You can then run this example using `cargo run`.
 As an alternative, simply run `just` to build and run the fuzzer (requires `just`).
 
 On `Windows`, make sure the `ipt` service is running (`sc start ipt` from an admin shell), then run this example with
-`cargo run`. The `just` recipes are `Linux`-only, as they rely on `setcap`.
+`cargo run`, or simply `just` to build and run it.
 
 This fuzzer is compatible with `Linux` and `Windows` hosts having an Intel PT compatible CPU.

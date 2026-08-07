@@ -2,14 +2,21 @@ import "../../../just/libafl.just"
 
 FUZZER_NAME := "intel_pt_baby_fuzzer"
 
+set windows-shell := ['cmd.exe', '/c']
+
 run: build setcap
     {{ FUZZER }}
 
 build:
     cargo build --profile {{ PROFILE }}
 
+[unix]
 setcap:
     sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep {{ FUZZER }}
+
+[windows]
+setcap:
+    @echo Make sure the 'ipt' service is running, start it with 'sc start ipt' from an admin shell
 
 clean:
     cargo clean

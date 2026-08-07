@@ -926,6 +926,7 @@ jobs:
           - inprocess/libfuzzer_stb_image
           - binary_only/frida_windows_gdiplus
           - binary_only/tinyinst_simple
+          - binary_only/intel_pt_baby_fuzzer
           # - inprocess/libfuzzer_windows_asan
       fail-fast: false
     runs-on: windows-2022
