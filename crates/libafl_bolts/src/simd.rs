@@ -221,7 +221,7 @@ pub trait VectorType {
     /// Collect novelties. We pass in base to avoid redo calculate for novelties indice.
     fn novelties(hist: &[u8], map: &[u8], base: usize, novelties: &mut Vec<usize>);
 
-    /// Do select
+    /// Elementwise selection assuming `self` is a mask (all 0s or all 1s per element).
     #[must_use]
     fn select(self, lhs: Self, rhs: Self) -> Self;
 
@@ -246,6 +246,7 @@ impl VectorType for wide::u8x16 {
     const ONE: Self = Self::new([0x1u8; Self::N]);
     const EIGHTY: Self = Self::new([0x80u8; Self::N]);
 
+    #[inline]
     fn from_slice(arr: &[u8]) -> Self {
         Self::new(arr[0..Self::N].try_into().unwrap())
     }
@@ -261,14 +262,18 @@ impl VectorType for wide::u8x16 {
         }
     }
 
+    #[inline]
+    #[allow(deprecated)]
     fn select(self, lhs: Self, rhs: Self) -> Self {
-        self.select(lhs, rhs)
+        self.blend(lhs, rhs)
     }
 
+    #[inline]
     fn simd_eq(self, rhs: Self) -> Self {
         self.simd_eq(rhs)
     }
 
+    #[inline]
     fn to_slice(&self) -> &[u8] {
         self.as_array()
     }
@@ -281,6 +286,7 @@ impl VectorType for wide::u8x32 {
     const ONE: Self = Self::new([0x1u8; Self::N]);
     const EIGHTY: Self = Self::new([0x80u8; Self::N]);
 
+    #[inline]
     fn from_slice(arr: &[u8]) -> Self {
         Self::new(arr[0..Self::N].try_into().unwrap())
     }
@@ -306,14 +312,18 @@ impl VectorType for wide::u8x32 {
         }
     }
 
+    #[inline]
+    #[allow(deprecated)]
     fn select(self, lhs: Self, rhs: Self) -> Self {
-        self.select(lhs, rhs)
+        self.blend(lhs, rhs)
     }
 
+    #[inline]
     fn simd_eq(self, rhs: Self) -> Self {
         self.simd_eq(rhs)
     }
 
+    #[inline]
     fn to_slice(&self) -> &[u8] {
         self.as_array()
     }

@@ -88,7 +88,6 @@ Check out the `llmp_test` example in ./examples, or build it with `cargo run --e
         dead_code,
         improper_ctypes,
         non_shorthand_field_patterns,
-        no_mangle_generic_items,
         overflowing_literals,
         path_statements,
         patterns_in_fns_without_body,
@@ -440,14 +439,11 @@ pub enum ListenerStream {
 
 #[cfg(feature = "std")]
 impl Listener {
-    fn accept(&self) -> ListenerStream {
+    fn accept(&self) -> Result<ListenerStream, io::Error> {
         match self {
             Listener::Tcp(inner) => match inner.accept() {
-                Ok(res) => ListenerStream::Tcp(res.0, res.1),
-                Err(err) => {
-                    log::warn!("Ignoring failed accept: {err:?}");
-                    ListenerStream::Empty()
-                }
+                Ok(res) => Ok(ListenerStream::Tcp(res.0, res.1)),
+                Err(err) => Err(err),
             },
         }
     }
@@ -3565,11 +3561,11 @@ where
 
             loop {
                 match listener.accept() {
-                    ListenerStream::Tcp(mut stream, addr) => {
+                    Ok(ListenerStream::Tcp(mut stream, addr)) => {
                         log::info!(
                             "New connection: {:?}/{:?}",
                             addr,
-                            stream.peer_addr().unwrap()
+                            stream.peer_addr().unwrap_or(addr)
                         );
 
                         // Send initial information, without anyone asking.
@@ -3607,7 +3603,14 @@ where
                             &broker_shmem_description,
                         );
                     }
-                    ListenerStream::Empty() => {}
+                    Ok(ListenerStream::Empty()) => {}
+                    Err(err) if err.kind() == io::ErrorKind::Interrupted => {}
+                    Err(err) => {
+                        log::error!(
+                            "Fatal accept error on listener: {err:?}, terminating listener thread."
+                        );
+                        break;
+                    }
                 }
             }
         });

@@ -32,7 +32,6 @@
         dead_code,
         improper_ctypes,
         non_shorthand_field_patterns,
-        no_mangle_generic_items,
         overflowing_literals,
         path_statements,
         patterns_in_fns_without_body,
@@ -1120,12 +1119,28 @@ pub mod unix_shmem {
             }
         }
 
-        /// The default sharedmap impl for unix using shmctl & shmget
+        /// The default shared memory implementation for Unix using System V IPC (`shmctl`, `shmget`, `shmat`).
+        ///
+        /// # Ownership & Drop Behavior
+        ///
+        /// - **Linux**: The kernel tracks attachment reference counts (`shm_nattch`). Calling `shmctl(IPC_RMID)`
+        ///   marks the segment for destruction, and the kernel automatically frees the memory once the last
+        ///   attached process detaches (`shmdt`). Note that once `IPC_RMID` is marked, new processes cannot attach
+        ///   via `shmat`.
+        /// - **macOS / Darwin**: Drops the segment prematurely upon `shmctl(IPC_RMID)` instead of waiting for all
+        ///   attached processes to detach.
+        ///
+        /// The `owner` flag ensures that only the creating process (`owner: true`) issues `IPC_RMID` on [`Drop`],
+        /// while attached clients (`owner: false`) only detach (`shmdt`), avoiding premature destruction on macOS.
+        ///
+        /// Note that due to these kernel differences, System V IPC will still not work reliably for general `LibAFL`
+        /// use on macOS; [`crate::ServedShMemProvider`] (or [`crate::StdShMemProvider`]) should be used instead.
         #[derive(Debug)]
         pub struct CommonUnixShMem {
             id: ShMemId,
             map: *mut u8,
             map_size: usize,
+            owner: bool,
         }
 
         unsafe impl Send for CommonUnixShMem {}
@@ -1165,6 +1180,7 @@ pub mod unix_shmem {
                         id: ShMemId::from_int(os_id),
                         map,
                         map_size,
+                        owner: true,
                     })
                 }
             }
@@ -1181,8 +1197,20 @@ pub mod unix_shmem {
                         )));
                     }
 
-                    Ok(Self { id, map, map_size })
+                    Ok(Self {
+                        id,
+                        map,
+                        map_size,
+                        owner: false,
+                    })
                 }
+            }
+
+            /// Returns `true` if this instance is the owner/creator of the underlying shared memory segment.
+            #[must_use]
+            #[inline]
+            pub fn is_owner(&self) -> bool {
+                self.owner
             }
         }
 
@@ -1209,13 +1237,15 @@ pub mod unix_shmem {
             }
         }
 
-        /// [`Drop`] implementation for [`CommonUnixShMem`], which detaches the memory and cleans up the mapping.
+        /// [`Drop`] implementation for [`CommonUnixShMem`], which detaches the memory and cleans up the mapping if owner.
         #[cfg(unix)]
         impl Drop for CommonUnixShMem {
             fn drop(&mut self) {
                 unsafe {
-                    let id_int: i32 = self.id.into();
-                    shmctl(id_int, libc::IPC_RMID, ptr::null_mut());
+                    if self.owner {
+                        let id_int: i32 = self.id.into();
+                        shmctl(id_int, libc::IPC_RMID, ptr::null_mut());
+                    }
 
                     shmdt(self.map as *mut _);
                 }
@@ -2071,6 +2101,32 @@ mod tests {
         let shmem = provider.new_shmem(1024)?;
         assert_eq!(shmem.len(), 1024);
         drop(shmem);
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(all(
+        unix,
+        feature = "std",
+        not(any(target_os = "android", target_os = "haiku"))
+    ))]
+    #[cfg_attr(miri, ignore)]
+    fn test_common_unix_shmem_owner() -> Result<(), Error> {
+        use crate::{ShMem, ShMemProvider, UnixShMemProvider};
+
+        let mut provider = UnixShMemProvider::new()?;
+        let owner_shmem = provider.new_shmem(1024)?;
+        assert!(owner_shmem.is_owner());
+
+        let attached_shmem = provider.shmem_from_id_and_size(owner_shmem.id(), 1024)?;
+        assert!(!attached_shmem.is_owner());
+
+        // Dropping attached non-owner must not destroy the segment
+        drop(attached_shmem);
+        assert_eq!(owner_shmem.len(), 1024);
+
+        // Dropping owner cleans up the segment
+        drop(owner_shmem);
         Ok(())
     }
 }
