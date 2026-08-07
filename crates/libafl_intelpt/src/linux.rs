@@ -340,13 +340,10 @@ pub struct IntelPTBuilder<'a> {
 impl Default for IntelPTBuilder<'_> {
     /// Create a default builder for [`IntelPT`]
     ///
-    /// The default configuration corresponds to:
+    /// The default configuration traces the current process with the following settings:
     /// ```rust
     /// use libafl_intelpt::{IntelPTBuilder, PAGE_SIZE};
     /// let builder = IntelPTBuilder::default()
-    ///     // 0 means "Current process" ONLY on Linux!
-    ///     // Prefer not setting the pid at all if you want a cross-platform "Current process"
-    ///     .pid(0)
     ///     .all_cpus()
     ///     .exclude_kernel(true)
     ///     .exclude_hv(false)
@@ -470,6 +467,9 @@ impl<'a> IntelPTBuilder<'a> {
     /// Set the process to be traced via its `PID`.
     ///
     /// Not calling this function will default to the current process.
+    ///
+    /// Calling this with `pid: 0` means "Current process" ONLY on Linux!
+    /// Prefer not setting the pid at all if you want a cross-platform "Current process".
     pub const fn pid(mut self, pid: i32) -> Self {
         self.pid = pid;
         self
