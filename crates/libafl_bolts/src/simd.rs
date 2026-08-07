@@ -263,8 +263,9 @@ impl VectorType for wide::u8x16 {
     }
 
     #[inline]
+    #[allow(deprecated)]
     fn select(self, lhs: Self, rhs: Self) -> Self {
-        wide::u8x16::select(self, lhs, rhs)
+        self.blend(lhs, rhs)
     }
 
     #[inline]
@@ -312,8 +313,9 @@ impl VectorType for wide::u8x32 {
     }
 
     #[inline]
+    #[allow(deprecated)]
     fn select(self, lhs: Self, rhs: Self) -> Self {
-        wide::u8x32::select(self, lhs, rhs)
+        self.blend(lhs, rhs)
     }
 
     #[inline]
