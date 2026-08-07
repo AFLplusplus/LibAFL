@@ -350,7 +350,7 @@ impl Default for IntelPTBuilder<'_> {
     ///     .inherit(false)
     ///     .perf_buffer_size(128 * PAGE_SIZE + PAGE_SIZE)
     ///     .unwrap()
-    ///     .perf_aux_buffer_size(16 * 1024 * 1024)
+    ///     .pt_buffer_size(16 * 1024 * 1024)
     ///     .unwrap()
     ///     .images(&[])
     ///     .ip_filters(Default::default());
@@ -531,20 +531,22 @@ impl<'a> IntelPTBuilder<'a> {
         Ok(self)
     }
 
-    /// Set the size of the perf aux buffer (actual PT traces buffer)
-    pub fn perf_aux_buffer_size(mut self, perf_aux_buffer_size: usize) -> Result<Self, Error> {
-        if !perf_aux_buffer_size.is_multiple_of(PAGE_SIZE) {
+    /// Set the size of PT traces buffer (perf aux buffer)
+    ///
+    /// It must be page aligned and a power of 2
+    pub fn pt_buffer_size(mut self, pt_buffer_size: usize) -> Result<Self, Error> {
+        if !pt_buffer_size.is_multiple_of(PAGE_SIZE) {
             return Err(Error::illegal_argument(
-                "IntelPT perf_aux_buffer must be page aligned",
+                "IntelPT buffer size must be page aligned",
             ));
         }
-        if !perf_aux_buffer_size.is_power_of_two() {
+        if !pt_buffer_size.is_power_of_two() {
             return Err(Error::illegal_argument(
-                "IntelPT perf_aux_buffer must be a power of two",
+                "IntelPT buffer size must be a power of two",
             ));
         }
 
-        self.perf_aux_buffer_size = perf_aux_buffer_size;
+        self.perf_aux_buffer_size = pt_buffer_size;
         Ok(self)
     }
 
@@ -789,7 +791,7 @@ mod test {
             .perf_buffer_size(default.perf_buffer_size)
             .unwrap();
         IntelPT::builder()
-            .perf_aux_buffer_size(default.perf_aux_buffer_size)
+            .pt_buffer_size(default.perf_aux_buffer_size)
             .unwrap();
     }
 

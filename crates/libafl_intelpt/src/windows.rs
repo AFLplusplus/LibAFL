@@ -3,12 +3,14 @@
 //! This code is heavily inspired by `winipt` by Alex Ionescu and its other authors.
 //! Credits also go to Frederic Kah and Justin Avril, who drafted the initial implementation.
 
-#[cfg(feature = "export_raw")]
-use alloc::string::ToString;
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt::Debug, ops::RangeInclusive, ptr::slice_from_raw_parts_mut};
 
 use ::ipt::{AddressFilterMode, Ipt, TraceBuffer};
+use ipt::IptOption;
 use libafl_bolts::Error;
 pub use ptcov::{CoverageEntry, PtImage};
 use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder};
@@ -24,7 +26,7 @@ use windows::{
     core::Owned,
 };
 
-use super::availability;
+use super::{PAGE_SIZE, availability};
 use crate::utils::current_cpu;
 
 /// According to Intel's SDM this is the maximun number of IP filters available on any CPU.
@@ -213,6 +215,7 @@ pub struct IntelPTBuilder<'a> {
     ipt: Option<(Ipt, Owned<HANDLE>)>,
     pid: u32,
     tid: u32,
+    ipt_option: IptOption,
     ip_filters: Vec<RangeInclusive<u64>>,
 }
 
@@ -226,6 +229,7 @@ impl Default for IntelPTBuilder<'_> {
             ipt: None,
             pid,
             tid,
+            ipt_option: IptOption::default(),
             ip_filters: Vec::new(),
         }
     }
@@ -304,8 +308,7 @@ impl<'a> IntelPTBuilder<'a> {
             OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, self.pid)
                 .map(|h| Owned::new(h))
         }?;
-        let options = ipt::IptOption::default();
-        ipt.start_process_trace(*target_process_handle, options)
+        ipt.start_process_trace(*target_process_handle, self.ipt_option)
             .map_err(|e| {
                 Error::unknown(format!(
                     "Failed to start tracing the process: {e}.{}",
@@ -322,6 +325,30 @@ impl<'a> IntelPTBuilder<'a> {
     pub fn thread_id(mut self, tid: u32) -> Self {
         self.tid = tid;
         self
+    }
+
+    /// Set the size of PT traces buffer
+    ///
+    /// It must be page aligned and a power of 2 and at most 128 MiB
+    pub fn pt_buffer_size(mut self, pt_buffer_size: usize) -> Result<Self, Error> {
+        if !pt_buffer_size.is_multiple_of(PAGE_SIZE) {
+            return Err(Error::illegal_argument(
+                "IntelPT buffer size must be page aligned",
+            ));
+        }
+        if !pt_buffer_size.is_power_of_two() {
+            return Err(Error::illegal_argument(
+                "IntelPT buffer size must be a power of two",
+            ));
+        }
+        if let Ok(exp) = pt_buffer_size.ilog2().try_into()
+            && let Some(option) = self.ipt_option.with_buffer_size_exp(exp)
+        {
+            self.ipt_option = option;
+            Ok(self)
+        } else {
+            Err(Error::illegal_argument("IntelPT buffer size is too large"))
+        }
     }
 
     #[must_use]
@@ -359,11 +386,11 @@ pub(crate) fn availability_in_windows() -> Result<(), String> {
 }
 
 /// Number of address filters available on the running CPU
-fn nr_addr_filters() -> Result<u8, &'static str> {
+pub fn nr_addr_filters() -> Result<u32, String> {
     let cpuid = CpuId::new();
     cpuid
         .get_processor_trace_info()
-        .ok_or("Failed to read CPU Processor Trace Info")
-        .map(|pti| pti.configurable_address_ranges())
+        .ok_or("Failed to read CPU Processor Trace Info".to_string())
+        .map(|pti| pti.configurable_address_ranges().into())
         .inspect(|nr_filters| log::trace!("PT number of available IP filters: {nr_filters:?}"))
 }
