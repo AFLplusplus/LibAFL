@@ -1,7 +1,7 @@
 //! Intel Processor Trace (PT) low level code
 //!
-//! This crate interacts with the linux kernel (specifically with perf) and therefore it only works
-//! on linux hosts
+//! This crate interacts with the host kernel to drive Intel PT: on Linux through perf, on Windows
+//! through the `ipt.sys` driver. Other hosts are not supported.
 #![doc = include_str!("../README.md")]
 // Just in case this crate will have real `no_std` support in the future
 #![no_std]
@@ -23,6 +23,14 @@ use raw_cpuid::CpuId;
 mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::*;
+
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
+pub use windows::*;
+
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+mod utils;
 
 /// Size of a memory page
 pub const PAGE_SIZE: usize = 4096;
@@ -57,12 +65,27 @@ pub fn availability() -> Result<(), String> {
         reasons.push("Failed to read CPU Extended Features".to_owned());
     }
 
+    if let Some(pti) = cpuid.get_processor_trace_info() {
+        if pti.configurable_address_ranges() == 0 {
+            reasons.push(
+                "The current CPU does not support Intel PT filtering: no address filters available"
+                    .to_owned(),
+            );
+        }
+    } else {
+        reasons.push("Failed to read CPU Processor Trace Info".to_owned());
+    }
+
     #[cfg(target_os = "linux")]
     if let Err(r) = availability_in_linux() {
         reasons.push(r);
     }
-    #[cfg(not(target_os = "linux"))]
-    reasons.push("Only linux hosts are supported at the moment".to_owned());
+    #[cfg(target_os = "windows")]
+    if let Err(r) = availability_in_windows() {
+        reasons.push(r);
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    reasons.push("Only linux and Windows hosts are supported at the moment".to_owned());
 
     if reasons.is_empty() {
         Ok(())

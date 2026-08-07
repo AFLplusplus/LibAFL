@@ -63,7 +63,7 @@ fn intel_pt_trace_fork() {
         })
         .collect::<Vec<_>>();
 
-    let pt_builder = IntelPT::builder().pid(Some(pid.as_raw())).images(&images);
+    let pt_builder = IntelPT::builder().pid(pid.as_raw()).images(&images);
     let mut pt = pt_builder.build().expect("Failed to create IntelPT");
     pt.enable_tracing().expect("Failed to enable tracing");
 

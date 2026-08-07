@@ -28,6 +28,8 @@ static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
 static mut MAP_PTR: *mut u8 = &raw mut MAP as _;
 
 pub fn main() {
+    env_logger::init();
+
     // The function that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let buf = input.target_bytes();
@@ -84,12 +86,13 @@ pub fn main() {
 
     // Get the memory map of the current process, copy the executable memory that will be
     // disassembled and used for Intel PT trace decoding
-    let my_pid = i32::try_from(process::id()).unwrap();
-    let process_maps = get_process_maps(my_pid).unwrap();
+    let my_pid = process::id();
+    #[cfg_attr(windows, expect(clippy::useless_conversion))]
+    let process_maps = get_process_maps(my_pid.try_into().unwrap()).unwrap();
     let images = process_maps
         .iter()
         .filter_map(|pm| {
-            if pm.is_exec() && pm.filename().is_some() && pm.inode != 0 {
+            if pm.is_exec() {
                 let data = unsafe { slice::from_raw_parts(pm.start() as *const u8, pm.size()) };
                 Some(PtImage::new(data, pm.start() as u64))
             } else {
@@ -100,6 +103,7 @@ pub fn main() {
 
     // Pass the executable memory to the code responsible for Intel PT trace decoding
     let pt = IntelPT::builder().images(&images).build().unwrap();
+
     // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
     let pt_hook = unsafe {
         IntelPTHook::builder()
@@ -109,8 +113,6 @@ pub fn main() {
     }
     .build();
 
-    type PTInProcessExecutor<'a, 'b, EM, H, I, OT, S, T, Z> =
-        GenericInProcessExecutor<EM, H, &'a mut H, (IntelPTHook<'b, T>, ()), I, OT, S, Z>;
     // Create the executor for an in-process function with just one observer
     let mut executor = GenericInProcessExecutor::builder_generic()
         .timeout(Duration::from_millis(5000))

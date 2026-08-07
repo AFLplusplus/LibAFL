@@ -31,11 +31,11 @@ use perf_event_open_sys::{
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
-pub use ptcov::{CoverageEntry, PtCoverageDecoder, PtCoverageDecoderBuilder, PtImage};
-use ptcov::{PtCpu, PtCpuVendor};
-use raw_cpuid::CpuId;
+pub use ptcov::{CoverageEntry, PtImage};
+use ptcov::{PtCoverageDecoder, PtCoverageDecoderBuilder};
 
 use super::{PAGE_SIZE, availability};
+use crate::utils::current_cpu;
 
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
@@ -107,8 +107,7 @@ impl<'a> IntelPT<'a> {
     /// Set filters based on Instruction Pointer (IP)
     ///
     /// Only instructions in `filters` ranges will be traced.
-    /// NOTE: only filters of type `AddrFilterType::FILTER` are supported.
-    fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
+    pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<u64>]) -> Result<(), Error> {
         let str_filter = filters
             .iter()
             .map(|filter| {
@@ -296,7 +295,7 @@ impl<'a> IntelPT<'a> {
     }
 
     /// Dump the raw trace used in the last decoding to the file
-    /// /// `./traces/trace_<unix epoch in micros>`
+    /// `./traces/trace_<unix epoch in micros>`
     #[cfg(feature = "export_raw")]
     pub fn dump_last_trace_to_file(&self) -> Result<(), Error> {
         use std::{fs, io::Write, path::Path, time};
@@ -327,7 +326,7 @@ impl Drop for IntelPT<'_> {
 /// Builder for [`IntelPT`]
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntelPTBuilder<'a> {
-    pid: Option<i32>,
+    pid: i32,
     cpu: i32,
     exclude_kernel: bool,
     exclude_hv: bool,
@@ -341,18 +340,17 @@ pub struct IntelPTBuilder<'a> {
 impl Default for IntelPTBuilder<'_> {
     /// Create a default builder for [`IntelPT`]
     ///
-    /// The default configuration corresponds to:
+    /// The default configuration traces the current process with the following settings:
     /// ```rust
     /// use libafl_intelpt::{IntelPTBuilder, PAGE_SIZE};
     /// let builder = IntelPTBuilder::default()
-    ///     .pid(None)
     ///     .all_cpus()
     ///     .exclude_kernel(true)
     ///     .exclude_hv(false)
     ///     .inherit(false)
     ///     .perf_buffer_size(128 * PAGE_SIZE + PAGE_SIZE)
     ///     .unwrap()
-    ///     .perf_aux_buffer_size(16 * 1024 * 1024)
+    ///     .pt_buffer_size(16 * 1024 * 1024)
     ///     .unwrap()
     ///     .images(&[])
     ///     .ip_filters(Default::default());
@@ -360,7 +358,7 @@ impl Default for IntelPTBuilder<'_> {
     /// ```
     fn default() -> Self {
         Self {
-            pid: None,
+            pid: 0,
             cpu: -1,
             exclude_kernel: true,
             exclude_hv: false,
@@ -386,7 +384,7 @@ impl<'a> IntelPTBuilder<'a> {
         let fd = match unsafe {
             perf_event_open(
                 ptr::from_mut(&mut perf_event_attr),
-                self.pid.unwrap_or(0),
+                self.pid,
                 self.cpu,
                 -1,
                 PERF_FLAG_FD_CLOEXEC.into(),
@@ -466,8 +464,12 @@ impl<'a> IntelPTBuilder<'a> {
     }
 
     #[must_use]
-    /// Set the process to be traced via its `PID`. Set to `None` to trace the current process.
-    pub const fn pid(mut self, pid: Option<i32>) -> Self {
+    /// By default, this will trace the current process. Set a `pid` to trace another process
+    /// instead.
+    ///
+    /// Calling this with `pid: 0` means "Current process" ONLY on Linux!
+    /// Prefer not setting the pid at all if you want a cross-platform "Current process".
+    pub const fn pid(mut self, pid: i32) -> Self {
         self.pid = pid;
         self
     }
@@ -528,20 +530,22 @@ impl<'a> IntelPTBuilder<'a> {
         Ok(self)
     }
 
-    /// Set the size of the perf aux buffer (actual PT traces buffer)
-    pub fn perf_aux_buffer_size(mut self, perf_aux_buffer_size: usize) -> Result<Self, Error> {
-        if !perf_aux_buffer_size.is_multiple_of(PAGE_SIZE) {
+    /// Set the size of PT traces buffer (perf aux buffer)
+    ///
+    /// It must be page aligned and a power of 2
+    pub fn pt_buffer_size(mut self, pt_buffer_size: usize) -> Result<Self, Error> {
+        if !pt_buffer_size.is_multiple_of(PAGE_SIZE) {
             return Err(Error::illegal_argument(
-                "IntelPT perf_aux_buffer must be page aligned",
+                "IntelPT buffer size must be page aligned",
             ));
         }
-        if !perf_aux_buffer_size.is_power_of_two() {
+        if !pt_buffer_size.is_power_of_two() {
             return Err(Error::illegal_argument(
-                "IntelPT perf_aux_buffer must be a power of two",
+                "IntelPT buffer size must be a power of two",
             ));
         }
 
-        self.perf_aux_buffer_size = perf_aux_buffer_size;
+        self.perf_aux_buffer_size = pt_buffer_size;
         Ok(self)
     }
 
@@ -761,18 +765,6 @@ const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
     ptr & (perf_aux_buffer_size as u64 - 1)
 }
 
-fn current_cpu() -> Option<PtCpu> {
-    let cpuid = CpuId::new();
-    cpuid.get_feature_info().map(|fi| {
-        PtCpu::new(
-            PtCpuVendor::Intel,
-            fi.family_id().into(),
-            fi.model_id(),
-            fi.stepping_id(),
-        )
-    })
-}
-
 #[cfg(test)]
 mod test {
     use std::path::PathBuf;
@@ -798,7 +790,7 @@ mod test {
             .perf_buffer_size(default.perf_buffer_size)
             .unwrap();
         IntelPT::builder()
-            .perf_aux_buffer_size(default.perf_aux_buffer_size)
+            .pt_buffer_size(default.perf_aux_buffer_size)
             .unwrap();
     }
 
