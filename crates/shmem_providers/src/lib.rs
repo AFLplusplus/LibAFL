@@ -32,7 +32,6 @@
         dead_code,
         improper_ctypes,
         non_shorthand_field_patterns,
-        no_mangle_generic_items,
         overflowing_literals,
         path_statements,
         patterns_in_fns_without_body,
@@ -1209,6 +1208,7 @@ pub mod unix_shmem {
 
             /// Returns `true` if this instance is the owner/creator of the underlying shared memory segment.
             #[must_use]
+            #[inline]
             pub fn is_owner(&self) -> bool {
                 self.owner
             }

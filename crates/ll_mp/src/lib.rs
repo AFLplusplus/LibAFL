@@ -88,7 +88,6 @@ Check out the `llmp_test` example in ./examples, or build it with `cargo run --e
         dead_code,
         improper_ctypes,
         non_shorthand_field_patterns,
-        no_mangle_generic_items,
         overflowing_literals,
         path_statements,
         patterns_in_fns_without_body,
