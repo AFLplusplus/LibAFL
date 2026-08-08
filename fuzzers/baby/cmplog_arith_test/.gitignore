@@ -1,0 +1,10 @@
+libpng-*
+fuzzer
+fuzzbench
+in/
+out/
+target/
+*.o
+cmplog_arith_test
+fuzz_stdout.log
+libafl_unix_shmem_server

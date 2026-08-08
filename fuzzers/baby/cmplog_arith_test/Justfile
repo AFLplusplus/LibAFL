@@ -1,0 +1,42 @@
+FUZZER_NAME := 'cmplog_arith_test'
+PROJECT_DIR := absolute_path(".")
+PROFILE := env("PROFILE", "release")
+PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
+CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
+FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
+
+alias build := fuzzer
+alias cc := cxx
+
+cxx:
+    cargo build --profile={{ PROFILE }}
+
+fuzz_o: cxx
+    {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/libafl_cc --libafl-no-link -O3 -c fuzz.c -o fuzz.o
+
+fuzzer: cxx fuzz_o
+    {{ CARGO_TARGET_DIR }}/{{ PROFILE_DIR }}/libafl_cxx --libafl fuzz.o -o {{ FUZZER_NAME }}
+
+run: fuzzer
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    mkdir -p in
+    printf '\x00\x00\x00\x00\x00\x00\x00\x00' > in/zeros
+    ./{{ FUZZER_NAME }} -o out -i in
+
+test: fuzzer
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    mkdir -p in
+    printf '\x00\x00\x00\x00\x00\x00\x00\x00' > in/zeros
+    timeout 120s ./{{ FUZZER_NAME }} -o out -i in | tee fuzz_stdout.log || true
+    if grep -qa "objectives: 1" fuzz_stdout.log; then
+        echo "SOLVED: Fuzzer found the solution!"
+    else
+        echo "NOT SOLVED: No crash found in 120 seconds"
+        exit 1
+    fi
+    rm -rf out in
+
+clean:
+    cargo clean

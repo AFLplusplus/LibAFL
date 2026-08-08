@@ -1,0 +1,44 @@
+[package]
+name = "cmplog_arith_test"
+version = "0.16.0"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
+edition = "2024"
+
+[features]
+default = ["std"]
+std = []
+no_link_main = ["libafl_targets/libfuzzer_no_link_main"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[profile.release-fuzzbench]
+inherits = "release"
+debug = false
+strip = true
+
+[build-dependencies]
+cc = { version = "1.0.106", features = ["parallel"] }
+which = "6.0.3"
+
+[dependencies]
+libafl = { path = "../../../crates/libafl" }
+libafl_bolts = { path = "../../../crates/libafl_bolts" }
+libafl_targets = { path = "../../../crates/libafl_targets", features = [
+  "sancov_pcguard_hitcounts",
+  "sancov_cmplog",
+  "libfuzzer",
+] }
+libafl_cc = { path = "../../../crates/libafl_cc" }
+clap = { version = "4.5.18", features = ["default"] }
+mimalloc = { version = "0.1.43", default-features = false }
+
+[lib]
+name = "cmplog_arith_test"
+crate-type = ["staticlib"]
