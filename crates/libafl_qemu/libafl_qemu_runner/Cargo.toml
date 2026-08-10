@@ -67,5 +67,5 @@ env_logger = { version = "0.11.11" }
 log = { version = "0.4.33", features = ["release_max_level_info"] }
 readonly = { version = "0.2.14" }
 libafl_bolts = { workspace = true }
-libafl_qemu = { workspace = true }
+libafl_qemu = { workspace = true, default-features = true }
 thiserror = { version = "2.0.19" }
