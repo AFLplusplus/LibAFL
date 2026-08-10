@@ -61,6 +61,9 @@ jobs:
         run: just check-blobs
       - name: Check for conflicting versions
         run: cargo tree -d --workspace
+      - name: Dry-run publish check
+        if: runner.os == 'Linux'
+        run: just publish-dry-run
       - name: Build libafl debug
         run: just build-libafl
       - name: Test the book (Linux)

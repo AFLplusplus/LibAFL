@@ -237,8 +237,13 @@ test-librasan:
 
 # Publish all crates
 [unix]
-publish:
-    cd {{ ROOT_DIR }} && cargo publish --workspace --publish-as-is --no-remove-dev-deps --token $CRATES_IO_TOKEN
+publish *args:
+    {{ SCRIPTS_DIR }}/publish.sh {{ args }}
+
+# Dry run publish of all crates
+[unix]
+publish-dry-run *args:
+    {{ SCRIPTS_DIR }}/publish.sh --dry-run --allow-dirty --no-verify {{ args }}
 
 [unix]
 autofix:

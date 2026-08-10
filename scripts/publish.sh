@@ -4,11 +4,6 @@ set -euo pipefail
 # Go to the repo root
 cd "$(dirname "$0")/.."
 
-DRY_RUN_FLAG=""
-if [[ "$*" == *"--dry-run"* ]]; then
-  DRY_RUN_FLAG="--dry-run"
-fi
-
 PACKAGES_TO_EXCLUDE=()
 mapfile -t PACKAGES_TO_EXCLUDE < <(
   cargo metadata --no-deps --format-version 1 |
@@ -32,5 +27,5 @@ if [ ${#EXCLUDE_ARGS[@]} -gt 0 ]; then
   echo ""
 fi
 
-echo "Running: cargo publish --workspace ${DRY_RUN_FLAG} ${EXCLUDE_ARGS[*]}"
-cargo publish --workspace ${DRY_RUN_FLAG} "${EXCLUDE_ARGS[@]}"
+echo "Running: cargo publish --workspace $* ${EXCLUDE_ARGS[*]}"
+cargo publish --workspace "$@" "${EXCLUDE_ARGS[@]}"

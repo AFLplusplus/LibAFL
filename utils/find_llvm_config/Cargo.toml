@@ -10,4 +10,4 @@ keywords = ["fuzzing", "testing", "llvm"]
 categories = ["development-tools::testing"]
 
 [dependencies]
-libafl_build = { path = "../../crates/libafl_build" }
+libafl_build = { workspace = true }
