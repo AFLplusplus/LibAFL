@@ -42,7 +42,7 @@ fi
 
 if command -v just > /dev/null; then
   echo "[*] Formatting Justfiles"
-  find . -type f -name "Justfile" | while read -r JUSTFILE; do
+  find . -path "./target" -prune -o -type f -name "Justfile" -print | while read -r JUSTFILE; do
     if [ "$1" = "check" ]; then
       just --unstable --fmt --check --justfile "$JUSTFILE" || exit 1
     else
