@@ -74,9 +74,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         .arg(std::env::var_os("TARGET").unwrap());
 
     // detect if we are a version or path/git dep, or testing version-based behavior
-    if fs::exists("../libafl_libfuzzer_runtime")? && !cfg!(feature = "libafl-libfuzzer-use-version")
+    let runtime_path = if fs::exists("../libafl_libfuzzer_runtime")? {
+        Some(PathBuf::from("../libafl_libfuzzer_runtime"))
+    } else if fs::exists("../../../crates/libafl_libfuzzer_runtime")? {
+        Some(PathBuf::from("../../../crates/libafl_libfuzzer_runtime"))
+    } else if fs::exists("../../crates/libafl_libfuzzer_runtime")? {
+        Some(PathBuf::from("../../crates/libafl_libfuzzer_runtime"))
+    } else {
+        None
+    };
+
+    if let Some(runtime_dir) =
+        runtime_path.filter(|_| !cfg!(feature = "libafl-libfuzzer-use-version"))
     {
-        command.current_dir("../libafl_libfuzzer_runtime");
+        command.current_dir(runtime_dir);
     } else {
         // we are being used as a version dep; we need to create the package virtually
 
