@@ -6,7 +6,7 @@ use libafl::{
     inputs::{BytesInputConverter, Input, ToTargetBytesConverter},
     observers::Observer,
 };
-use libafl_bolts::{Error, Named, AsSlice};
+use libafl_bolts::{Error, Named};
 use serde::{
     Serialize,
     de::{self, Deserialize, Deserializer, MapAccess, Visitor},
@@ -29,7 +29,7 @@ impl<'a, RT> FridaHelperObserver<'a, RT, BytesInputConverter>
 where
     RT: FridaRuntimeTuple + 'a,
 {
-    /// Creates a new FridaHelperObserver with a default byte converter
+    /// Creates a new `FridaHelperObserver` with a default byte converter
     #[must_use]
     pub fn new(helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>) -> Self {
         Self {
@@ -43,7 +43,7 @@ impl<'a, RT, Z> FridaHelperObserver<'a, RT, Z>
 where
     RT: FridaRuntimeTuple + 'a,
 {
-    /// Creates a new FridaHelperObserver with a custom converter
+    /// Creates a new `FridaHelperObserver` with a custom converter
     #[must_use]
     pub fn with_converter(
         helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
@@ -57,7 +57,6 @@ impl<'a, I, S, RT, Z> Observer<I, S> for FridaHelperObserver<'a, RT, Z>
 where
     // S: UsesInput,
     // S::Input: HasTargetBytes,
-    
     I: Input,
     RT: FridaRuntimeTuple + 'a,
     Z: ToTargetBytesConverter<I, S>,
@@ -68,7 +67,7 @@ where
             log::error!("Custom post_exec called for FridaInProcessExecutorHelper");
             // Add any custom logic specific to FridaInProcessExecutor
             let target_bytes = self.converter.convert_to_target_bytes(state, input);
-            return self.helper.borrow_mut().post_exec(target_bytes.as_slice());
+            return self.helper.borrow_mut().post_exec(target_bytes.as_ref());
         }
         Ok(())
     }

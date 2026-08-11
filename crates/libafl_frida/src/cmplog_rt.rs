@@ -479,27 +479,15 @@ impl CmpLogRuntime {
                     }
                 }
                 CmplogOperandType::Mem(reg_base, reg_index, disp, scale, mem_size) => {
-                    let size;
-                    let inst;
-                    match *mem_size {
-                        MemorySize::UInt64 | MemorySize::Int64 => {
-                            size = 8;
-                            inst = Code::Mov_r64_rm64;
-                        }
-                        MemorySize::UInt32 | MemorySize::Int32 => {
-                            size = 4;
-                            inst = Code::Mov_r32_rm32;
-                        }
-                        MemorySize::UInt16 | MemorySize::Int16 => {
-                            size = 2;
-                            inst = Code::Mov_r16_rm16;
-                        }
+                    let (size, inst) = match *mem_size {
+                        MemorySize::UInt64 | MemorySize::Int64 => (8, Code::Mov_r64_rm64),
+                        MemorySize::UInt32 | MemorySize::Int32 => (4, Code::Mov_r32_rm32),
+                        MemorySize::UInt16 | MemorySize::Int16 => (2, Code::Mov_r16_rm16),
                         _ => {
                             println!("Invalid memory size");
-                            size = 4;
-                            inst = Code::Push_rm32;
+                            (4, Code::Push_rm32)
                         }
-                    }
+                    };
                     set_size(size);
                     let mut disp_adjusted = *disp;
                     let mut reg_base = *reg_base;

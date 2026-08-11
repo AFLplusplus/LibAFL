@@ -716,49 +716,51 @@ where
                     let other_client_id = ClientId(u32::from_le_bytes(client_id_buf));
 
                     self.tcp.set_nonblocking(true).expect("set to non-blocking");
-                    if self_id == other_client_id {
-                        panic!("Own ID should never have been sent by the broker");
-                    } else {
-                        let buf = &buf[4..];
-                        #[cfg(feature = "tcp_compression")]
-                        let buf = &self.compressor.decompress(buf)?;
 
-                        // make decompressed vec and slice compatible
-                        let event: EventWithStats<I> = postcard::from_bytes(buf)?;
+                    assert_ne!(
+                        self_id, other_client_id,
+                        "Own ID should never have been sent by the broker"
+                    );
 
-                        if !self.hooks.pre_receive_all(state, other_client_id, &event)? {
-                            continue;
+                    let buf = &buf[4..];
+                    #[cfg(feature = "tcp_compression")]
+                    let buf = &self.compressor.decompress(buf)?;
+
+                    // make decompressed vec and slice compatible
+                    let event: EventWithStats<I> = postcard::from_bytes(buf)?;
+
+                    if !self.hooks.pre_receive_all(state, other_client_id, &event)? {
+                        continue;
+                    }
+                    match event.event() {
+                        Event::NewTestcase {
+                            client_config,
+                            observers_buf,
+                            forward_id,
+                            ..
+                        } => {
+                            log::info!(
+                                "Received new Testcase from {other_client_id:?} ({client_config:?}, forward {forward_id:?})"
+                            );
+                            if client_config.match_with(&self.configuration)
+                                && observers_buf.is_some()
+                            {
+                                return Ok(Some((event, true)));
+                            }
+                            return Ok(Some((event, false)));
                         }
-                        match event.event() {
-                            Event::NewTestcase {
-                                client_config,
-                                observers_buf,
-                                forward_id,
-                                ..
-                            } => {
-                                log::info!(
-                                    "Received new Testcase from {other_client_id:?} ({client_config:?}, forward {forward_id:?})"
-                                );
-                                if client_config.match_with(&self.configuration)
-                                    && observers_buf.is_some()
-                                {
-                                    return Ok(Some((event, true)));
-                                }
-                                return Ok(Some((event, false)));
-                            }
-                            Event::Objective { .. } => {
-                                log::info!("Received new Objective");
-                                return Ok(Some((event, false)));
-                            }
-                            Event::Stop => {
-                                state.request_stop();
-                            }
-                            _ => {
-                                return Err(Error::unknown(format!(
-                                    "Received illegal message that message should not have arrived: {:?}.",
-                                    event.event().name()
-                                )));
-                            }
+                        Event::Objective { .. } => {
+                            log::info!("Received new Objective");
+                            return Ok(Some((event, false)));
+                        }
+                        Event::Stop => {
+                            state.request_stop();
+                        }
+                        _ => {
+                            return Err(Error::unknown(format!(
+                                "Received illegal message that message should not have arrived: {:?}.",
+                                event.event().name()
+                            )));
                         }
                     }
                 }

@@ -190,8 +190,8 @@ where
     }
 
     /// Unparse the tree to a writer
-    fn unparse<W: Write>(&self, id: NodeId, ctx: &Context, mut w: &mut W) {
-        Unparser::new(id, &mut w, self, ctx).unparse();
+    fn unparse<W: Write>(&self, id: NodeId, ctx: &Context, w: &mut W) {
+        Unparser::new(id, w, self, ctx).unparse();
     }
 
     /// Unparse the tree to a writer (from root)
@@ -339,9 +339,7 @@ impl Tree {
 
     fn calc_sizes(&mut self) {
         //Initiate with 1
-        for size in &mut self.sizes {
-            *size = 1;
-        }
+        self.sizes.fill(1);
         for i in (1..self.size()).rev() {
             self.sizes[self.paren[i].to_i()] += self.sizes[i];
         }
