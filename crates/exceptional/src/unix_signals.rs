@@ -436,16 +436,24 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 #[cfg(feature = "alloc")]
 unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
     unsafe {
-        let signal = &Signal::try_from(sig).unwrap();
+        let signal = match Signal::try_from(sig) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
         let handler = {
-            match &SIGNAL_HANDLERS[*signal as usize] {
+            match &SIGNAL_HANDLERS[signal as usize] {
                 Some(handler_holder) => &mut **handler_holder.handler.get(),
                 None => return,
             }
         };
+        let mut info_val = if info.is_null() {
+            mem::zeroed()
+        } else {
+            ptr::read_unaligned(info)
+        };
         handler.handle(
-            *signal,
-            &mut ptr::read_unaligned(info),
+            signal,
+            &mut info_val,
             (void as *mut ucontext_t).as_mut(),
         );
     }
@@ -542,5 +550,21 @@ pub fn ucontext() -> Result<ucontext_t, Error> {
         }
     } else {
         Ok(ucontext)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::ptr;
+
+    use super::handle_signal;
+
+    #[test]
+    fn test_handle_signal_null_info_and_unknown() {
+        unsafe {
+            // Should gracefully return without panicking or dereferencing null
+            handle_signal(999, ptr::null_mut(), ptr::null_mut());
+            handle_signal(1, ptr::null_mut(), ptr::null_mut());
+        }
     }
 }
