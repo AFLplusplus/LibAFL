@@ -1,2 +1,3 @@
 libpng-*
 libfuzzer_stb_image
+libfuzzer_stb_image_sugar
