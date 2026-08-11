@@ -1,4 +1,6 @@
 use core::error::Error;
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
 use std::{
     fs,
     fs::File,
@@ -15,18 +17,8 @@ const NAMESPACE_LEN: usize = NAMESPACE.len();
 const RUNTIME_CRATE_NAME: &str = "libafl_libfuzzer_runtime";
 
 #[expect(clippy::too_many_lines)]
-fn main() -> Result<(), Box<dyn Error>> {
-    if cfg!(any(clippy, docsrs)) {
-        return Ok(()); // skip when clippy or docs is running
-    }
-
-    if cfg!(not(any(target_os = "linux", target_os = "macos"))) {
-        println!(
-            "cargo:warning=The libafl_libfuzzer runtime may only be built for linux or macos; failing fast."
-        );
-        return Ok(());
-    }
-
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn build() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/src");
     println!("cargo:rerun-if-changed=libafl_libfuzzer_runtime/build.rs");
 
@@ -97,55 +89,44 @@ fn main() -> Result<(), Box<dyn Error>> {
         let _ = fs::remove_file(custom_lib_dir.join("build.rs"));
         let _ = fs::remove_file(custom_lib_dir.join("Cargo.toml"));
 
-        #[cfg(unix)]
-        {
-            // create symlinks for all the source files
-            use std::os::unix::fs::symlink;
+        // create symlinks for all the source files
+        // canonicalize can theoretically fail if we are within a non-executable directory?
+        symlink(fs::canonicalize("runtime/src")?, custom_lib_dir.join("src"))?;
+        symlink(
+            fs::canonicalize("runtime/build.rs")?,
+            custom_lib_dir.join("build.rs"),
+        )?;
 
-            // canonicalize can theoretically fail if we are within a non-executable directory?
-            symlink(fs::canonicalize("runtime/src")?, custom_lib_dir.join("src"))?;
-            symlink(
-                fs::canonicalize("runtime/build.rs")?,
-                custom_lib_dir.join("build.rs"),
-            )?;
-        }
-        #[cfg(not(unix))]
-        {
-            todo!("copy all the source files"); // we don't support libafl_libfuzzer for others rn
-        }
-        #[cfg(unix)]
-        {
-            let mut template: toml::Value =
-                toml::from_str(&fs::read_to_string("runtime/Cargo.toml.template")?)?;
-            let toml::Value::Table(root) = &mut template else {
-                unreachable!("Invalid Cargo.toml");
-            };
-            root.insert(
-                "workspace".to_string(),
-                toml::Value::Table(toml::Table::new()),
-            );
-            let Some(toml::Value::Table(deps)) = root.get_mut("dependencies") else {
-                unreachable!("Invalid Cargo.toml");
-            };
-            let version = env!("CARGO_PKG_VERSION");
-            for (_name, spec) in deps {
-                if let toml::Value::Table(spec) = spec {
-                    // replace all path deps with version deps
-                    if spec.remove("path").is_some() {
-                        spec.insert(
-                            "version".to_string(),
-                            toml::Value::String(version.to_string()),
-                        );
-                    }
+        let mut template: toml::Value =
+            toml::from_str(&fs::read_to_string("runtime/Cargo.toml.template")?)?;
+        let toml::Value::Table(root) = &mut template else {
+            unreachable!("Invalid Cargo.toml");
+        };
+        root.insert(
+            "workspace".to_string(),
+            toml::Value::Table(toml::Table::new()),
+        );
+        let Some(toml::Value::Table(deps)) = root.get_mut("dependencies") else {
+            unreachable!("Invalid Cargo.toml");
+        };
+        let version = env!("CARGO_PKG_VERSION");
+        for (_name, spec) in deps {
+            if let toml::Value::Table(spec) = spec {
+                // replace all path deps with version deps
+                if spec.remove("path").is_some() {
+                    spec.insert(
+                        "version".to_string(),
+                        toml::Value::String(version.to_string()),
+                    );
                 }
             }
-
-            let serialized = toml::to_string(&template)?;
-            fs::write(custom_lib_dir.join("Cargo.toml"), serialized)?;
-
-            // build in this filled out template
-            command.current_dir(custom_lib_dir);
         }
+
+        let serialized = toml::to_string(&template)?;
+        fs::write(custom_lib_dir.join("Cargo.toml"), serialized)?;
+
+        // build in this filled out template
+        command.current_dir(custom_lib_dir);
     }
 
     assert!(
@@ -179,8 +160,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn main() {
+    if cfg!(any(clippy, docsrs)) {
+        return; // skip when clippy or docs is running
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    println!(
+        "cargo:warning=The libafl_libfuzzer runtime may only be built for linux or macos; failing fast."
+    );
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    build().expect("Failed to build libafl_libfuzzer runtime");
+}
+
 /// This function creates a copy of the libfuzzer runtime with all the symbols renamed to avoid
 /// a conflict with whatever we link to. It should be compatible with legacy and v0 mangling.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn rename_symbols(custom_lib_target: &Path) -> PathBuf {
     let mut archive_path = custom_lib_target.join(std::env::var_os("TARGET").unwrap());
     archive_path.push("release");
