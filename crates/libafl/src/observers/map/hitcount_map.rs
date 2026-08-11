@@ -3,9 +3,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
     hash::Hash,
-    mem::size_of,
     ops::{Deref, DerefMut},
-    slice,
 };
 
 use libafl_bolts::{AsIter, AsIterMut, HasLen, Named, ToSlice, ToSliceMut, Truncate};
@@ -54,40 +52,22 @@ static COUNT_CLASS_LOOKUP_16: [u16; 256 * 256] = {
 
 /// AFL-style classify counts
 #[inline]
-#[expect(clippy::cast_ptr_alignment)]
 pub(crate) fn classify_counts(map: &mut [u8]) {
-    let mut len = map.len();
-    let align_offset = map.as_ptr().align_offset(size_of::<u16>());
+    let (prefix, middle, suffix) = unsafe { map.align_to_mut::<u16>() };
 
-    // if len == 1, the next branch will already do this lookup
-    if len > 1 && align_offset != 0 {
-        debug_assert_eq!(
-            align_offset, 1,
-            "Aligning u8 to u16 should always be offset of 1?"
-        );
+    for b in prefix {
         unsafe {
-            *map.get_unchecked_mut(0) =
-                *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(0) as usize);
-        }
-        len -= 1;
-    }
-
-    // Fix the last element
-    if (len & 1) != 0 {
-        unsafe {
-            *map.get_unchecked_mut(len - 1) =
-                *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(len - 1) as usize);
+            *b = *COUNT_CLASS_LOOKUP.get_unchecked(*b as usize);
         }
     }
-
-    let cnt = len / 2;
-
-    let map16 =
-        unsafe { slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt) };
-
-    for item in &mut map16[0..cnt] {
+    for item in middle {
         unsafe {
-            *item = *(COUNT_CLASS_LOOKUP_16).get_unchecked(*item as usize);
+            *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);
+        }
+    }
+    for b in suffix {
+        unsafe {
+            *b = *COUNT_CLASS_LOOKUP.get_unchecked(*b as usize);
         }
     }
 }
@@ -496,5 +476,27 @@ where
 
     fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         self.base.as_iter_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::classify_counts;
+
+    #[test]
+    fn test_classify_counts_various_lengths_and_alignments() {
+        for len in 0..64 {
+            let mut data = vec![0u8; len + 1];
+            for offset in 0..=1 {
+                if offset + len > data.len() {
+                    continue;
+                }
+                let slice = &mut data[offset..offset + len];
+                for (i, b) in slice.iter_mut().enumerate() {
+                    *b = (i as u8).wrapping_add(1);
+                }
+                classify_counts(slice);
+            }
+        }
     }
 }
