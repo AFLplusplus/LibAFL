@@ -129,13 +129,15 @@ unsafe extern "C" {
 #[cfg(all(
     feature = "embed-runtime",
     target_family = "unix",
-    // Disable when building with clippy, as it will complain about the missing environment
-    // variable which is set by the build script, which is not run under clippy.
-    not(clippy)
+    not(any(clippy, docsrs))
 ))]
 /// The raw bytes of the `libafl_libfuzzer` runtime library
 pub const LIBAFL_LIBFUZZER_RUNTIME_LIBRARY: &'static [u8] =
     include_bytes!(env!("LIBAFL_LIBFUZZER_RUNTIME_PATH"));
+
+#[cfg(all(feature = "embed-runtime", target_family = "unix", any(clippy, docsrs)))]
+/// The raw bytes of the `libafl_libfuzzer` runtime library
+pub const LIBAFL_LIBFUZZER_RUNTIME_LIBRARY: &'static [u8] = &[];
 
 #[cfg(test)]
 mod tests {

@@ -61,9 +61,11 @@ clippy:
     #!/bin/sh
     cargo clippy -F test
 
-doc:
+doc_asan:
     #!/bin/sh
     cargo doc --no-deps --all-features
+
+doc: doc_asan doc_libc doc_fuzz
 
 all: fix pretty build test clippy doc
 

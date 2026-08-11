@@ -308,7 +308,7 @@ mod unix {
 }
 
 fn main() {
-    if cfg!(any(clippy, docsrs)) {
+    if std::env::var_os("DOCS_RS").is_some() || cfg!(any(clippy, docsrs)) {
         return; // skip when clippy or docs is running
     }
 

@@ -297,7 +297,7 @@ impl Error {
         Error::OsError(err, msg.into(), ErrorBacktrace::capture())
     }
 
-    /// OS error from [`io::Error::last_os_error`] with additional message
+    /// OS error from `io::Error::last_os_error` with additional message
     #[cfg(feature = "std")]
     #[must_use]
     pub fn last_os_error<S>(msg: S) -> Self

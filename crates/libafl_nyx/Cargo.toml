@@ -17,6 +17,13 @@ categories = [
   "no-std",
 ]
 
+# `libafl_nyx` and its `libnyx` dependency are linux-only, and `libnyx`'s build script
+# requires network access, which is unavailable in the offline docs.rs sandbox. Build the
+# documentation on a non-linux target so the crate-level docs (README) are generated
+# successfully; the linux-only API is `cfg`-gated and therefore not shown on docs.rs.
+[package.metadata.docs.rs]
+default-target = "x86_64-apple-darwin"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [target.'cfg(target_os = "linux")'.dependencies]

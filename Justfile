@@ -104,6 +104,10 @@ test-docs: test-docs-internal
 doc:
     ./scripts/doc_all.py
 
+# Build documentation simulating docs.rs
+doc-docsrs:
+    ./scripts/doc_docsrs.py
+
 # Runs clippy on all crates
 [private]
 clippy-inner feature='':
