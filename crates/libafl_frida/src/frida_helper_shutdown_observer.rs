@@ -6,7 +6,7 @@ use libafl::{
     inputs::{BytesInputConverter, Input, ToTargetBytesConverter},
     observers::Observer,
 };
-use libafl_bolts::{Error, Named, AsSlice};
+use libafl_bolts::{AsSlice, Error, Named};
 use serde::{
     Serialize,
     de::{self, Deserialize, Deserializer, MapAccess, Visitor},
@@ -57,7 +57,6 @@ impl<'a, I, S, RT, Z> Observer<I, S> for FridaHelperObserver<'a, RT, Z>
 where
     // S: UsesInput,
     // S::Input: HasTargetBytes,
-    
     I: Input,
     RT: FridaRuntimeTuple + 'a,
     Z: ToTargetBytesConverter<I, S>,

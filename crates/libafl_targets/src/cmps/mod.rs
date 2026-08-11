@@ -533,6 +533,7 @@ impl AflppCmpLogMap {
         }
     }
 
+    #[must_use]
     /// Handle the headers for the map
     pub fn headers(&self) -> &[AflppCmpLogHeader] {
         &self.headers
