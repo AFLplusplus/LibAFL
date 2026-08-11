@@ -149,11 +149,11 @@ clippy:
 
 # Check the format of all code
 check-fmt:
-    PATH="/usr/bin:$PATH" {{ SCRIPTS_DIR }}/fmt_all.sh check
+    {{ SCRIPTS_DIR }}/fmt_all.sh check
 
 # Format everything
 fmt params="":
-    PATH="/usr/bin:$PATH" {{ SCRIPTS_DIR }}/fmt_all.sh {{ params }}
+    {{ SCRIPTS_DIR }}/fmt_all.sh {{ params }}
 
 # : We currently only specify minimum rust versions for the default workspace members
 msrv:
