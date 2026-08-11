@@ -11,7 +11,7 @@ To use `libafl_qemu` in your project, add it as a dependency in your `Cargo.toml
 ```toml
 [dependencies]
 # Set this to the latest version
-libafl_qemu = { version = "0.16.0", features = ["usermode", "x86_64"] }
+libafl_qemu = { version = "0.16.1", features = ["usermode", "x86_64"] }
 ```
 
 `libafl_qemu` offers several feature flags to customize its build for different use cases. These flags are typically enabled in your `Cargo.toml`.

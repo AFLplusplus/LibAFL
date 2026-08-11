@@ -391,15 +391,20 @@ mod observers {
         }
     }
 
+    /// Iterator over the [`CountersMultiMapObserver`] entries
+    pub type CountersMultiMapIter<'a> = Flatten<Iter<'a, OwnedMutSlice<'static, u8>>>;
+    /// Mutable iterator over the [`CountersMultiMapObserver`] entries
+    pub type CountersMultiMapIterMut<'a> = Flatten<IterMut<'a, OwnedMutSlice<'static, u8>>>;
+
     impl<const DIFFERENTIAL: bool> CountersMultiMapObserver<DIFFERENTIAL> {
         /// Returns an iterator over the map.
-        pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
-            <&Self as IntoIterator>::into_iter(self)
+        pub fn iter(&self) -> CountersMultiMapIter<'_> {
+            self.into_iter()
         }
 
         /// Returns a mutable iterator over the map.
-        pub fn iter_mut(&mut self) -> <&mut Self as IntoIterator>::IntoIter {
-            <&mut Self as IntoIterator>::into_iter(self)
+        pub fn iter_mut(&mut self) -> CountersMultiMapIterMut<'_> {
+            self.into_iter()
         }
     }
 

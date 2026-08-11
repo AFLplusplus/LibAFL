@@ -1,6 +1,6 @@
 [package]
 name = "baby_fuzzer_redqueen"
-version = "0.16.0"
+version = "0.16.1"
 authors = ["Andrew Barbarello <andrew.barbarello@outlook.com>"]
 edition = "2021"
 

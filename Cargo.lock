@@ -479,7 +479,7 @@ checksum = "78e2ceaf91e22593e194211930aea78a41af58e49e872474ebf4335bf649aad1"
 
 [[package]]
 name = "build_and_test_fuzzers"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "cargo_toml",
  "walkdir",
@@ -487,7 +487,7 @@ dependencies = [
 
 [[package]]
 name = "build_id2"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "rustversion",
@@ -683,11 +683,11 @@ dependencies = [
 
 [[package]]
 name = "ci_runner"
-version = "0.16.0"
+version = "0.16.1"
 
 [[package]]
 name = "ci_splitter"
-version = "0.16.0"
+version = "0.16.1"
 
 [[package]]
 name = "ciborium"
@@ -920,7 +920,7 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
 name = "construct_automata"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "clap",
  "libafl",
@@ -946,7 +946,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core_affinity2"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
  "libafl_core",
@@ -1279,7 +1279,7 @@ dependencies = [
 
 [[package]]
 name = "deexit"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ctor",
  "fishhook",
@@ -1476,7 +1476,7 @@ checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
 
 [[package]]
 name = "drcov_utils"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "clap",
  "env_logger",
@@ -1645,7 +1645,7 @@ dependencies = [
 
 [[package]]
 name = "exceptional"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
  "libafl_core",
@@ -1666,7 +1666,7 @@ checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
 
 [[package]]
 name = "fast_rands"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
  "pyo3",
@@ -2591,7 +2591,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libafl"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -2652,7 +2652,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_asan"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "baby-mimalloc",
@@ -2679,7 +2679,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_asan_fuzz"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "env_logger",
  "libafl_asan",
@@ -2691,7 +2691,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_asan_layout"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "build-target",
  "libc",
@@ -2701,11 +2701,11 @@ dependencies = [
 
 [[package]]
 name = "libafl_asan_libc"
-version = "0.16.0"
+version = "0.16.1"
 
 [[package]]
 name = "libafl_benches"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "criterion",
@@ -2716,7 +2716,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_bolts"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "backtrace",
@@ -2765,7 +2765,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_build"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "glob",
  "which",
@@ -2773,7 +2773,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_cc"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "cc",
  "glob",
@@ -2784,7 +2784,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_core"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "backtrace",
  "document-features",
@@ -2799,7 +2799,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_derive"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2808,7 +2808,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_frida"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "backtrace",
@@ -2847,7 +2847,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_intelpt"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "arbitrary-int",
  "bitbybit",
@@ -2870,14 +2870,14 @@ dependencies = [
 
 [[package]]
 name = "libafl_jumper"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "cc",
 ]
 
 [[package]]
 name = "libafl_libfuzzer"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "cc",
  "document-features",
@@ -2890,7 +2890,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_nyx"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "libafl",
  "libafl_bolts",
@@ -2904,7 +2904,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "addr2line 0.27.1",
  "capstone",
@@ -2946,7 +2946,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu_build"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "bindgen 0.72.1",
  "cc",
@@ -2959,7 +2959,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu_runner"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "clap",
  "env_logger",
@@ -2974,7 +2974,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_qemu_sys"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "libafl_qemu_build",
  "libc",
@@ -2989,7 +2989,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_sugar"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
  "libafl",
@@ -3004,7 +3004,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_targets"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "backtrace",
  "bindgen 0.72.1",
@@ -3028,7 +3028,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_tinyinst"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "cmake",
  "libafl",
@@ -3039,7 +3039,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_unicorn"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "capstone",
  "libafl_targets",
@@ -3209,7 +3209,7 @@ dependencies = [
 
 [[package]]
 name = "libvharness_sys"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "bindgen 0.72.1",
  "cmake",
@@ -3277,7 +3277,7 @@ checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 
 [[package]]
 name = "ll_mp"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
  "exceptional",
@@ -3445,7 +3445,7 @@ checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
 
 [[package]]
 name = "minibsod"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
  "exceptional",
@@ -3629,7 +3629,7 @@ dependencies = [
 
 [[package]]
 name = "no_std_time"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
  "rustversion",
@@ -3647,7 +3647,7 @@ dependencies = [
 
 [[package]]
 name = "nonzero_macros"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
 ]
@@ -3931,7 +3931,7 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ownedref"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
  "libafl_core",
@@ -4920,7 +4920,7 @@ dependencies = [
 
 [[package]]
 name = "serde_anymap"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ctor",
  "document-features",
@@ -5099,7 +5099,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "shmem_providers"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
  "fast_rands",
@@ -5916,7 +5916,7 @@ checksum = "141fb9f71ee586d956d7d6e4d5a9ef8e946061188520140f7591b668841d502e"
 
 [[package]]
 name = "tuple_list_ex"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "document-features",
  "libafl_core",

@@ -214,7 +214,7 @@ dependencies = [
 
 [[package]]
 name = "build_id2"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "rustversion",
@@ -373,7 +373,7 @@ dependencies = [
 
 [[package]]
 name = "core_affinity2"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "libafl_core",
  "libc",
@@ -600,7 +600,7 @@ dependencies = [
 
 [[package]]
 name = "exceptional"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "libafl_core",
  "libc",
@@ -614,7 +614,7 @@ dependencies = [
 
 [[package]]
 name = "fast_rands"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "rand_core",
  "rustversion",
@@ -893,7 +893,7 @@ checksum = "a4933f3f57a8e9d9da04db23fb153356ecaf00cbd14aee46279c33dc80925c37"
 
 [[package]]
 name = "libafl"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -936,7 +936,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_bolts"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "backtrace",
@@ -977,7 +977,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_core"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "backtrace",
  "nix",
@@ -990,7 +990,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_derive"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -999,7 +999,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_libfuzzer_runtime"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "bindgen",
  "cc",
@@ -1019,7 +1019,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_targets"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "bindgen",
  "cc",
@@ -1104,7 +1104,7 @@ checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 
 [[package]]
 name = "ll_mp"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "exceptional",
  "hostname",
@@ -1187,7 +1187,7 @@ dependencies = [
 
 [[package]]
 name = "minibsod"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "exceptional",
  "libc",
@@ -1247,7 +1247,7 @@ dependencies = [
 
 [[package]]
 name = "no_std_time"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "rustversion",
 ]
@@ -1264,7 +1264,7 @@ dependencies = [
 
 [[package]]
 name = "nonzero_macros"
-version = "0.16.0"
+version = "0.16.1"
 
 [[package]]
 name = "num-conv"
@@ -1334,7 +1334,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "ownedref"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "libafl_core",
  "rustversion",
@@ -1682,7 +1682,7 @@ dependencies = [
 
 [[package]]
 name = "serde_anymap"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ctor",
  "erased-serde",
@@ -1764,7 +1764,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "shmem_providers"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "fast_rands",
  "hashbrown 0.17.1",
@@ -1940,7 +1940,7 @@ checksum = "141fb9f71ee586d956d7d6e4d5a9ef8e946061188520140f7591b668841d502e"
 
 [[package]]
 name = "tuple_list_ex"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "libafl_core",
  "ownedref",
