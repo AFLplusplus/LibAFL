@@ -713,13 +713,39 @@ pub struct LlmpMsg {
 
 /// The message we receive
 impl LlmpMsg {
+    /// Gets the buffer from a raw pointer to a message as a slice, with the correct length.
+    ///
+    /// # Safety
+    /// `this` must be a valid pointer to a message followed by `buf_len` bytes.
+    #[must_use]
+    pub unsafe fn as_slice_raw<'a>(this: *const Self) -> &'a [u8] {
+        unsafe {
+            let ptr = (this as *const u8).add(size_of::<Self>());
+            let len = (*this).buf_len as usize;
+            slice::from_raw_parts(ptr, len)
+        }
+    }
+
+    /// Gets the buffer from a raw pointer to a message as a mutable slice, with the correct length.
+    ///
+    /// # Safety
+    /// `this` must be a valid pointer to a message followed by `buf_len` bytes.
+    #[must_use]
+    pub unsafe fn as_slice_mut_raw<'a>(this: *mut Self) -> &'a mut [u8] {
+        unsafe {
+            let ptr = (this as *mut u8).add(size_of::<Self>());
+            let len = (*this).buf_len as usize;
+            slice::from_raw_parts_mut(ptr, len)
+        }
+    }
+
     /// Gets the buffer from this message as slice, with the correct length.
     ///
     /// # Safety
     /// This is unsafe if somebody has access to shared mem pages on the system.
     #[must_use]
     pub unsafe fn as_slice_unsafe(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self.buf.as_ptr(), self.buf_len as usize) }
+        unsafe { Self::as_slice_raw(ptr::from_ref(self)) }
     }
 
     /// Gets the buffer from this message as a mutable slice, with the correct length.
@@ -728,22 +754,21 @@ impl LlmpMsg {
     /// This is unsafe if somebody has access to shared mem pages on the system.
     #[must_use]
     pub unsafe fn as_slice_mut_unsafe(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.buf_len as usize) }
+        unsafe { Self::as_slice_mut_raw(ptr::from_mut(self)) }
     }
 
     /// Gets the buffer from this message as slice, with the correct length.
     #[inline]
     pub fn try_as_slice<SHM: ShMem>(&self, map: &LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
-        // # Safety
-        // Safe because we check if we're in a valid shmem region first.
-        unsafe {
-            if self.in_shmem(map) {
-                Ok(self.as_slice_unsafe())
-            } else {
-                Err(Error::illegal_state(
-                    "Current message not in page. The sharedmap get tampered with or we have a BUG.",
-                ))
-            }
+        if self.in_shmem(map) {
+            let offset = (ptr::from_ref(self) as usize) - (unsafe { map.page() } as usize) + size_of::<Self>();
+            let map_ptr = map.shmem.as_ptr();
+            let slice = unsafe { slice::from_raw_parts(map_ptr.add(offset), self.buf_len as usize) };
+            Ok(slice)
+        } else {
+            Err(Error::illegal_state(
+                "Current message not in page. The sharedmap get tampered with or we have a BUG.",
+            ))
         }
     }
 
@@ -753,14 +778,15 @@ impl LlmpMsg {
         &mut self,
         map: &mut LlmpSharedMap<SHM>,
     ) -> Result<&mut [u8], Error> {
-        unsafe {
-            if self.in_shmem(map) {
-                Ok(self.as_slice_mut_unsafe())
-            } else {
-                Err(Error::illegal_state(
-                    "Current message not in page. The sharedmap get tampered with or we have a BUG.",
-                ))
-            }
+        if self.in_shmem(map) {
+            let offset = (ptr::from_ref(self) as usize) - (unsafe { map.page() } as usize) + size_of::<Self>();
+            let map_ptr = map.shmem.as_mut_ptr();
+            let slice = unsafe { slice::from_raw_parts_mut(map_ptr.add(offset), self.buf_len as usize) };
+            Ok(slice)
+        } else {
+            Err(Error::illegal_state(
+                "Current message not in page. The sharedmap get tampered with or we have a BUG.",
+            ))
         }
     }
 
@@ -4203,6 +4229,34 @@ mod tests {
             buf: [],
         };
         assert!(!before_page_dummy.in_shmem(&map));
+    }
+
+    #[test]
+    fn test_llmp_msg_as_slice_provenance() {
+        use core::mem::size_of;
+
+        use shmem_providers::NopShMemProvider;
+
+        use super::{LlmpMsg, LlmpPage};
+
+        let mut shmem_provider = NopShMemProvider::new().unwrap();
+        let map_size = 1024;
+        let shmem = shmem_provider.new_shmem(map_size).unwrap();
+        let mut map = LlmpSharedMap::new(ClientId(0), shmem);
+
+        let page_ptr = unsafe { map.page_mut().cast::<u8>() };
+        #[expect(clippy::cast_ptr_alignment)]
+        let valid_msg_ptr = unsafe { page_ptr.add(size_of::<LlmpPage>()).cast::<LlmpMsg>() };
+        unsafe {
+            (*valid_msg_ptr).tag = Tag(1);
+            (*valid_msg_ptr).buf_len = 16;
+            (*valid_msg_ptr).buf_len_padded = 16;
+            let slice = LlmpMsg::as_slice_mut_raw(valid_msg_ptr);
+            slice[0] = 42;
+            assert_eq!(slice[0], 42);
+            let slice_ref = LlmpMsg::as_slice_raw(valid_msg_ptr);
+            assert_eq!(slice_ref[0], 42);
+        }
     }
 
     #[test]
