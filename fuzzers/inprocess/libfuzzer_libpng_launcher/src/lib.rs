@@ -355,7 +355,7 @@ pub extern "C" fn libafl_main() {
             .report_interval(Duration::from_millis(1000))
             .core_id(core_id)
             .banner("libfuzzer_libpng".into())
-            .version("0.16.0".into())
+            .version(env!("CARGO_PKG_VERSION").into())
             .target_mode("LibFuzzer".into())
             .build()
             .unwrap();

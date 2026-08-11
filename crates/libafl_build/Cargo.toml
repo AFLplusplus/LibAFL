@@ -1,6 +1,6 @@
 [package]
 name = "libafl_build"
-version = "0.16.0"
+version = "0.16.1"
 edition = "2021"
 description = "Build-time utilities for LibAFL"
 license = "MIT OR Apache-2.0"
