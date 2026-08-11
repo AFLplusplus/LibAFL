@@ -34,6 +34,10 @@ pub unsafe extern "C" fn fgets(buf: *mut c_char, n: c_int, stream: *mut FILE) ->
             asan_panic(c"fgets - stream is null".as_ptr() as *const c_char);
         }
 
+        if n <= 0 {
+            return core::ptr::null_mut();
+        }
+
         asan_store(buf as *const c_void, n as usize);
         asan_load(stream as *const c_void, size_of::<FILE>());
         let addr = FGETS_ADDR.get_or_insert_with(|| {
