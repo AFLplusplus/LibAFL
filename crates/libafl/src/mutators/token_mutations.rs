@@ -178,14 +178,12 @@ impl Tokens {
             let Some(pos_quote) = line.find('\"') else {
                 return Err(Error::illegal_argument(format!("Illegal line: {line}")));
             };
-            if line.chars().nth(line.len() - 1) != Some('"') {
+            if !line.ends_with('\"') || pos_quote == line.len() - 1 {
                 return Err(Error::illegal_argument(format!("Illegal line: {line}")));
             }
 
             // extract item
-            let Some(item) = line.get(pos_quote + 1..line.len() - 1) else {
-                return Err(Error::illegal_argument(format!("Illegal line: {line}")));
-            };
+            let item = &line[pos_quote + 1..line.len() - 1];
             if item.is_empty() {
                 continue;
             }
@@ -2092,7 +2090,7 @@ fn check_if_text(buf: &[u8], max_len: usize) -> TextType {
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "std")]
-    use std::fs;
+    use std::{fs, path::Path};
 
     #[cfg(feature = "std")]
     use super::{AflppRedQueen, Tokens};
@@ -2100,19 +2098,27 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_read_tokens() {
-        let _res = fs::remove_file("test.tkns");
+        if Path::new("test.tkns").exists() {
+            fs::remove_file("test.tkns").unwrap();
+        }
         let data = r#"
 # comment
 token1@123="AAA"
 token1="A\x41A"
 "A\AA"
 token2="B"
+token3="café"
+token4="🚀"
+token5="€"
         "#;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
         let tokens = Tokens::from_file("test.tkns").unwrap();
         log::info!("Token file entries: {:?}", tokens.tokens());
-        assert_eq!(tokens.tokens().len(), 2);
-        let _res = fs::remove_file("test.tkns");
+        assert_eq!(tokens.tokens().len(), 5);
+        assert!(tokens.tokens().contains(&"café".as_bytes().to_vec()));
+        assert!(tokens.tokens().contains(&"🚀".as_bytes().to_vec()));
+        assert!(tokens.tokens().contains(&"€".as_bytes().to_vec()));
+        fs::remove_file("test.tkns").unwrap();
     }
 
     #[cfg(feature = "std")]
@@ -2132,7 +2138,7 @@ token2="B"
         let hshape = 0;
         let mut vec = alloc::vec::Vec::new();
 
-        let _res = rq.cmp_extend_encoding(
+        let res = rq.cmp_extend_encoding(
             pattern,
             repl,
             another_pattern,
@@ -2146,5 +2152,45 @@ token2="B"
             hshape,
             &mut vec,
         );
+        assert!(res.is_ok());
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_utf8_token_mutations() {
+        use libafl_bolts::rands::StdRand;
+
+        use crate::{
+            HasMetadata,
+            corpus::InMemoryCorpus,
+            feedbacks::ConstFeedback,
+            inputs::BytesInput,
+            mutators::{Mutator, TokenInsert},
+            state::StdState,
+        };
+
+        let mut state = StdState::new(
+            StdRand::with_seed(1234),
+            InMemoryCorpus::<BytesInput>::new(),
+            InMemoryCorpus::new(),
+            &mut ConstFeedback::new(false),
+            &mut ConstFeedback::new(false),
+        )
+        .unwrap();
+
+        let mut tokens = Tokens::new();
+        tokens.add_token(&"café".as_bytes().to_vec());
+        tokens.add_token(&"🚀".as_bytes().to_vec());
+        state.add_metadata(tokens);
+
+        let mut mutator = TokenInsert::new();
+        let mut input = BytesInput::new(b"hello world".to_vec());
+        let res = mutator.mutate(&mut state, &mut input).unwrap();
+        assert_eq!(res, crate::mutators::MutationResult::Mutated);
+
+        let bytes = input.as_ref();
+        let contains_cafe = bytes.windows(5).any(|w| w == "café".as_bytes());
+        let contains_rocket = bytes.windows(4).any(|w| w == "🚀".as_bytes());
+        assert!(contains_cafe || contains_rocket);
     }
 }
