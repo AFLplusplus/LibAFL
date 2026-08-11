@@ -16,7 +16,6 @@ rust-version = "1.93.1"
 categories = ["os"]
 
 [package.metadata.docs.rs]
-features = ["document-features"]
 all-features = true
 
 [features]

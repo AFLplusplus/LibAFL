@@ -104,6 +104,10 @@ test-docs: test-docs-internal
 doc:
     ./scripts/doc_all.py
 
+# Build documentation simulating docs.rs
+doc-docsrs:
+    ./scripts/doc_docsrs.py
+
 # Runs clippy on all crates
 [private]
 clippy-inner feature='':
@@ -145,11 +149,11 @@ clippy:
 
 # Check the format of all code
 check-fmt:
-    PATH="/usr/bin:$PATH" {{ SCRIPTS_DIR }}/fmt_all.sh check
+    {{ SCRIPTS_DIR }}/fmt_all.sh check
 
 # Format everything
 fmt params="":
-    PATH="/usr/bin:$PATH" {{ SCRIPTS_DIR }}/fmt_all.sh {{ params }}
+    {{ SCRIPTS_DIR }}/fmt_all.sh {{ params }}
 
 # : We currently only specify minimum rust versions for the default workspace members
 msrv:

@@ -41,6 +41,10 @@ name = "runner-ppc"
 path = "src/ppc.rs"
 required-features = ["ppc"]
 
+[package.metadata.docs.rs]
+features = ["x86_64"]
+rustdoc-args = ["--cfg", "docsrs"]
+
 [features]
 default = ["std"]
 std = []

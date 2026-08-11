@@ -46,6 +46,7 @@ rustversion = { workspace = true }
 
 [dependencies]
 serde = { workspace = true, default-features = false, features = [
+  "alloc",
   "derive",
 ] } # serialization lib
 # Document all features of this crate (for `cargo doc`)
