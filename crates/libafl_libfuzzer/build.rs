@@ -12,6 +12,7 @@ const NAMESPACE: &str = "🐇";
 #[cfg(not(feature = "rabbit"))]
 const NAMESPACE: &str = "__libafl";
 const NAMESPACE_LEN: usize = NAMESPACE.len();
+const RUNTIME_CRATE_NAME: &str = "libafl_libfuzzer_runtime";
 
 #[expect(clippy::too_many_lines)]
 fn main() -> Result<(), Box<dyn Error>> {
@@ -35,7 +36,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(&custom_lib_target)
         .expect("Couldn't create the output directory for the fuzzer runtime build");
 
-    const RUNTIME_CRATE_NAME: &str = "libafl_libfuzzer_runtime";
     let manifest_dir = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
 
     let mut command = Command::new(std::env::var_os("CARGO").unwrap());
