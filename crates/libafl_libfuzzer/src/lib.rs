@@ -132,12 +132,12 @@ unsafe extern "C" {
     not(any(clippy, docsrs))
 ))]
 /// The raw bytes of the `libafl_libfuzzer` runtime library
-pub const LIBAFL_LIBFUZZER_RUNTIME_LIBRARY: &'static [u8] =
+pub const LIBAFL_LIBFUZZER_RUNTIME_LIBRARY: &[u8] =
     include_bytes!(env!("LIBAFL_LIBFUZZER_RUNTIME_PATH"));
 
 #[cfg(all(feature = "embed-runtime", target_family = "unix", any(clippy, docsrs)))]
 /// The raw bytes of the `libafl_libfuzzer` runtime library
-pub const LIBAFL_LIBFUZZER_RUNTIME_LIBRARY: &'static [u8] = &[];
+pub const LIBAFL_LIBFUZZER_RUNTIME_LIBRARY: &[u8] = &[];
 
 #[cfg(test)]
 mod tests {
