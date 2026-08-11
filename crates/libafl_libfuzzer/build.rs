@@ -35,8 +35,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(&custom_lib_target)
         .expect("Couldn't create the output directory for the fuzzer runtime build");
 
-    let lib_src: PathBuf = AsRef::<Path>::as_ref(&std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
-        .join("libafl_libfuzzer_runtime");
+    const RUNTIME_CRATE_NAME: &str = "libafl_libfuzzer_runtime";
+    let manifest_dir = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
 
     let mut command = Command::new(std::env::var_os("CARGO").unwrap());
     command
@@ -49,9 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    command
-        .env("PATH", std::env::var_os("PATH").unwrap())
-        .current_dir(&lib_src);
+    command.env("PATH", std::env::var_os("PATH").unwrap());
 
     command.arg("build");
 
@@ -74,18 +72,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         .arg(std::env::var_os("TARGET").unwrap());
 
     // detect if we are a version or path/git dep, or testing version-based behavior
-    let runtime_path = if fs::exists("../libafl_libfuzzer_runtime")? {
-        Some(PathBuf::from("../libafl_libfuzzer_runtime"))
-    } else if fs::exists("../../../crates/libafl_libfuzzer_runtime")? {
-        Some(PathBuf::from("../../../crates/libafl_libfuzzer_runtime"))
-    } else if fs::exists("../../crates/libafl_libfuzzer_runtime")? {
-        Some(PathBuf::from("../../crates/libafl_libfuzzer_runtime"))
-    } else {
+    let runtime_dir = manifest_dir.ancestors().find_map(|ancestor| {
+        let direct = ancestor.join(RUNTIME_CRATE_NAME);
+        if fs::exists(&direct).unwrap_or(false) {
+            return Some(direct);
+        }
+        let under_crates = ancestor.join("crates").join(RUNTIME_CRATE_NAME);
+        if fs::exists(&under_crates).unwrap_or(false) {
+            return Some(under_crates);
+        }
         None
-    };
+    });
 
     if let Some(runtime_dir) =
-        runtime_path.filter(|_| !cfg!(feature = "libafl-libfuzzer-use-version"))
+        runtime_dir.filter(|_| !cfg!(feature = "libafl-libfuzzer-use-version"))
     {
         command.current_dir(runtime_dir);
     } else {
