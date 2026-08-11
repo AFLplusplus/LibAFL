@@ -61,6 +61,9 @@ runs:
     - name: Install Z3
       id: z3
       uses: cda-tum/setup-z3@v1
+      env:
+        NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
+        NODE_OPTIONS: --use-system-ca
       with:
         version: latest
         add_to_library_path: true
