@@ -533,7 +533,7 @@ impl AflppCmpLogMap {
         }
     }
 
-    #[must_use]
+    #[must_use = "the map headers slice should not be ignored"]
     /// Handle the headers for the map
     pub fn headers(&self) -> &[AflppCmpLogHeader] {
         &self.headers
