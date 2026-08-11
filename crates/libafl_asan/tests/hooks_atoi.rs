@@ -110,4 +110,10 @@ mod tests {
         unsafe { atoi(c"-2147483649".as_ptr() as *const c_char) };
         unreachable!();
     }
+
+    #[test]
+    fn atoi_test_empty() {
+        let ret = unsafe { atoi(c"".as_ptr() as *const c_char) };
+        assert_eq!(ret, 0);
+    }
 }
