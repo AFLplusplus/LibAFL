@@ -32,8 +32,8 @@ impl NautilusContext {
     /// Returns a new [`NautilusGenerator`]
     #[must_use]
     pub fn new(tree_depth: usize, rules: &[Vec<String>]) -> Self {
-        assert!(!rules.is_empty());
-        assert!(!rules[0].is_empty());
+        assert_ne!(rules.len(), 0);
+        assert_ne!(rules[0].len(), 0);
         let mut ctx = Context::new();
         for rule in rules {
             ctx.add_rule(&rule[0], rule[1].as_bytes());

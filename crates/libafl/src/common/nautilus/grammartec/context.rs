@@ -453,7 +453,7 @@ mod tests {
             let mut tree = Tree::from_rule_vec(vec![], &ctx);
             tree.generate_from_nt(&mut rand, ctx.nt_id("E"), 9, &ctx);
             assert!(tree.rules.len() < 10);
-            assert!(!tree.rules.is_empty());
+            assert_ne!(tree.rules.len(), 0);
         }
 
         let rules = [r0, r1, r4, r4, r4]
