@@ -345,7 +345,7 @@ pub fn get_thread_id() -> u64 {
 pub fn get_thread_id() -> u64 {
     // Fallback for other platforms
     let thread_id = std::thread::current().id();
-    unsafe { mem::transmute::<_, u64>(thread_id) }
+    thread_id.as_u64().get()
 }
 
 #[cfg(feature = "std")]
