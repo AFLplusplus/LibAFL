@@ -473,7 +473,7 @@ mod unix {
         fn test_unix_set_for_current() {
             let ids = get_core_ids().unwrap();
 
-            assert!(!ids.is_empty());
+            assert_ne!(ids.len(), 0);
 
             ids[0].set_affinity().unwrap();
 
@@ -1157,7 +1157,7 @@ mod tests {
     fn test_set_affinity() {
         let ids = get_core_ids().unwrap();
 
-        assert!(!ids.is_empty());
+        assert_ne!(ids.len(), 0);
 
         ids[0].set_affinity().unwrap();
     }
@@ -1166,7 +1166,7 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn test_set_get_affinity() {
         let ids = get_core_ids().unwrap();
-        assert!(!ids.is_empty());
+        assert_ne!(ids.len(), 0);
 
         ids[0].set_affinity().expect("Failed to set affinity");
         let affinity = get_affinity()

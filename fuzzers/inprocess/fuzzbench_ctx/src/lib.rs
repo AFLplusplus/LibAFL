@@ -352,9 +352,9 @@ fn fuzz(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
-        let buf = target.as_slice();
+        let buf = target.to_slice();
         unsafe {
-            libfuzzer_test_one_input(buf);
+            libfuzzer_test_one_input(buf.as_slice());
         }
         ExitKind::Ok
     };
