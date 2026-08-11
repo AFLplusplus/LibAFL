@@ -38,7 +38,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    ToSlice,
 };
 use libafl_targets::{extra_counters, CmpLogObserver};
 
@@ -193,8 +192,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
-            let buf = target.to_slice();
-            harness_fn(buf.as_ptr(), buf.len());
+            harness_fn(target.as_ptr(), target.len());
             ExitKind::Ok
         };
 
@@ -211,8 +209,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         // Secondary harness due to mut ownership
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
-            let buf = target.to_slice();
-            harness_fn(buf.as_ptr(), buf.len());
+            harness_fn(target.as_ptr(), target.len());
             ExitKind::Ok
         };
 

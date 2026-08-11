@@ -6,7 +6,7 @@ use libafl::{
     inputs::{BytesInputConverter, Input, ToTargetBytesConverter},
     observers::Observer,
 };
-use libafl_bolts::{Error, Named, ToSlice};
+use libafl_bolts::{Error, Named};
 use serde::{
     Serialize,
     de::{self, Deserialize, Deserializer, MapAccess, Visitor},
@@ -67,7 +67,7 @@ where
             log::error!("Custom post_exec called for FridaInProcessExecutorHelper");
             // Add any custom logic specific to FridaInProcessExecutor
             let target_bytes = self.converter.convert_to_target_bytes(state, input);
-            return self.helper.borrow_mut().post_exec(target_bytes.to_slice());
+            return self.helper.borrow_mut().post_exec(target_bytes.as_ref());
         }
         Ok(())
     }
