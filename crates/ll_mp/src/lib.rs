@@ -549,6 +549,7 @@ where
 /// Maximum size, in bytes, we are willing to allocate for a single incoming
 /// TCP message. Guards against a peer sending a bogus/huge size prefix and
 /// forcing an oversized allocation before any real data has been validated.
+#[cfg(feature = "std")]
 const LLMP_TCP_MAX_MSG_LEN: u32 = 128 * 1024 * 1024;
 
 /// Receive one message of `u32` len and `[u8; len]` bytes
