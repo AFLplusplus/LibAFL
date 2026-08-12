@@ -192,9 +192,12 @@ where
                             return;
                         }
 
-                        let mut len = u32::from_le_bytes(len_buf);
+                        let len = u32::from_le_bytes(len_buf);
                         // we forward the sender id as well, so we add 4 bytes to the message length
-                        len += 4;
+                        let Some(len) = len.checked_add(4) else {
+                            log::error!("TCP message length overflow");
+                            return;
+                        };
                         log::debug!("TCP Manager - len = {len:?}");
 
                         if len > TCP_MAX_MSG_LEN {
