@@ -546,6 +546,11 @@ where
     Ok(())
 }
 
+/// Maximum size, in bytes, we are willing to allocate for a single incoming
+/// TCP message. Guards against a peer sending a bogus/huge size prefix and
+/// forcing an oversized allocation before any real data has been validated.
+const LLMP_TCP_MAX_MSG_LEN: u32 = 128 * 1024 * 1024;
+
 /// Receive one message of `u32` len and `[u8; len]` bytes
 #[cfg(feature = "std")]
 pub fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
@@ -560,14 +565,19 @@ pub fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
     let mut size_bytes = [0_u8; 4];
     stream.read_exact(&mut size_bytes)?;
     let size = u32::from_be_bytes(size_bytes);
-    let mut bytes = vec![0; size.try_into().unwrap()];
+
+    if size > LLMP_TCP_MAX_MSG_LEN {
+        return Err(Error::illegal_state(format!(
+            "Refusing to allocate {size} bytes for an incoming TCP message (max {LLMP_TCP_MAX_MSG_LEN})"
+        )));
+    }
+
+    let mut bytes = vec![0; size as usize];
 
     #[cfg(feature = "llmp_debug")]
     log::trace!("LLMP TCP: Receiving payload of size {size}");
 
-    stream
-        .read_exact(&mut bytes)
-        .expect("Failed to read message body");
+    stream.read_exact(&mut bytes)?;
     Ok(bytes)
 }
 
@@ -4035,7 +4045,65 @@ mod tests {
         // We want at least the tcp and sender clients.
         assert_eq!(broker.inner.llmp_clients.len(), 2);
     }
+    #[test]
+    fn test_recv_tcp_msg_truncated_does_not_panic() {
+        use std::{
+            io::Write,
+            net::{TcpListener, TcpStream},
+        };
 
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+
+            let result = super::recv_tcp_msg(&mut stream);
+
+            assert!(
+                result.is_err(),
+                "expected an Err, not a panic, on a truncated message"
+            );
+        });
+
+        let mut client = TcpStream::connect(addr).unwrap();
+
+        // Claim a 100-byte body...
+        client.write_all(&100u32.to_be_bytes()).unwrap();
+
+        // ...but disconnect before sending it.
+        drop(client);
+
+        handle
+            .join()
+            .expect("recv_tcp_msg must not panic on a truncated message");
+    }
+
+    #[test]
+    fn test_recv_tcp_msg_rejects_oversized_len() {
+        use std::{
+            io::Write,
+            net::{TcpListener, TcpStream},
+        };
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let result = super::recv_tcp_msg(&mut stream);
+            assert!(
+                result.is_err(),
+                "a bogus u32::MAX length prefix must be rejected before allocating"
+            );
+        });
+
+        let mut client = TcpStream::connect(addr).unwrap();
+        client.write_all(&u32::MAX.to_be_bytes()).unwrap();
+        // No body sent at all - the size cap should reject before trying to read it.
+
+        handle.join().unwrap();
+    }
     #[test]
     #[serial]
     #[should_panic(expected = "Map was not priviously initialized at")]
