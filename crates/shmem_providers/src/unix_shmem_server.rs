@@ -597,17 +597,27 @@ where
     }
 
     fn read_request(&mut self, client_id: RawFd) -> Result<ServedShMemRequest, Error> {
+        // Maximum size, in bytes, we are willing to allocate for a single
+        // incoming request. Guards against a peer sending a bogus/huge size
+        // prefix and forcing an oversized allocation before any real data
+        // has been validated.
+        const MAX_REQUEST_LEN: u32 = 128 * 1024 * 1024;
+
         let client = self.clients.get_mut(&client_id).unwrap();
 
         // Always receive one be u32 of size, then the command.
         let mut size_bytes = [0_u8; 4];
         client.stream.read_exact(&mut size_bytes)?;
         let size = u32::from_be_bytes(size_bytes);
-        let mut bytes = vec![0; size.try_into().unwrap()];
-        client
-            .stream
-            .read_exact(&mut bytes)
-            .expect("Failed to read message body");
+
+        if size > MAX_REQUEST_LEN {
+            return Err(Error::illegal_state(format!(
+                "Refusing to allocate {size} bytes for an incoming shmem service request (max {MAX_REQUEST_LEN})"
+            )));
+        }
+
+        let mut bytes = vec![0; size as usize];
+        client.stream.read_exact(&mut bytes)?;
         let request: ServedShMemRequest = postcard::from_bytes(&bytes)?;
 
         Ok(request)
