@@ -50,6 +50,10 @@ slirp = [
   "systemmode",
   "libafl_qemu_build/slirp",
 ] # build qemu with host libslirp (for user networking)
+virtfs = [
+  "systemmode",
+  "libafl_qemu_build/virtfs",
+] # build qemu with virtfs support (for host directory sharing)
 shared = ["libafl_qemu_build/shared"]
 
 # special feature for clippy, don't use in normal projects
