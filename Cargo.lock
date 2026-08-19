@@ -905,9 +905,9 @@ dependencies = [
 
 [[package]]
 name = "const_panic"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e262cdaac42494e3ae34c43969f9cdeb7da178bdb4b66fa6a1ea2edb4c8ae652"
+checksum = "5e684de8c3d7be678f6cc5a68820a2e4e2f69ded7dc55d878687ebfe167f4d95"
 dependencies = [
  "typewit",
 ]
@@ -5502,7 +5502,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
