@@ -1,4 +1,5 @@
 use core::{cell::UnsafeCell, fmt::Debug};
+use hashbrown::HashSet;
 
 use capstone::prelude::*;
 use libafl::{
@@ -235,6 +236,8 @@ where
     filter: StdAddressFilter,
     cs: Capstone,
     collectors: Option<T>,
+    registered_call_addrs: HashSet<GuestAddr>,
+    registered_ret_addrs: HashSet<GuestAddr>,
 }
 
 impl<T> CallTracerModule<T>
@@ -247,6 +250,8 @@ where
             filter,
             cs: capstone().detail(true).build().unwrap(),
             collectors: Some(collectors),
+            registered_call_addrs: HashSet::new(),
+            registered_ret_addrs: HashSet::new(),
         }
     }
 
@@ -379,6 +384,14 @@ where
         }
 
         for (call_addr, call_len) in call_addrs {
+            // Skip registration if we already have a hook at this address.
+            if !emulator_modules
+                .get_mut::<Self>()
+                .is_none_or(|h| h.registered_call_addrs.insert(call_addr))
+            {
+                continue;
+            }
+
             // TODO do not use a closure, find a more efficient way to pass call_len
             let call_cb = Box::new(
                 move |_qemu: Qemu,
@@ -405,6 +418,13 @@ where
         }
 
         for ret_addr in ret_addrs {
+            // Skip registration if we already have a hook at this address.
+            if !emulator_modules
+                .get_mut::<Self>()
+                .is_none_or(|h| h.registered_ret_addrs.insert(ret_addr))
+            {
+                continue;
+            }
             emulator_modules.instruction_function(ret_addr, Self::on_ret, false);
         }
 
