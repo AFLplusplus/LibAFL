@@ -33,7 +33,7 @@ libc = { workspace = true }
 log = { workspace = true }
 num_enum = { workspace = true, default-features = false }
 num-traits = { workspace = true, default-features = false }
-ptcov = { version = "0.1.3" }
+ptcov = { version = "0.2.0" }
 raw-cpuid = { version = "11.6.0" }
 
 [target.'cfg(target_os = "linux" )'.dependencies]
