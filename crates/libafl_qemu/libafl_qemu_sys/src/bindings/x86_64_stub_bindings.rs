@@ -8238,6 +8238,9 @@ unsafe extern "C" {
     pub fn libafl_qemu_run() -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    pub fn libafl_qemu_run_single_cpu(cpu_index: *mut CPUState) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
     pub fn libafl_set_qemu_env(env: *mut CPUArchState);
 }
 #[repr(C)]
@@ -9221,15 +9224,15 @@ impl ::std::fmt::Debug for libafl_syshook_ret {
 pub type libafl_pre_syscall_cb = ::std::option::Option<
     unsafe extern "C" fn(
         data: u64,
-        sys_num: ::std::os::raw::c_int,
-        arg0: target_ulong,
-        arg1: target_ulong,
-        arg2: target_ulong,
-        arg3: target_ulong,
-        arg4: target_ulong,
-        arg5: target_ulong,
-        arg6: target_ulong,
-        arg7: target_ulong,
+        sys_num: *mut ::std::os::raw::c_int,
+        arg0: *mut target_ulong,
+        arg1: *mut target_ulong,
+        arg2: *mut target_ulong,
+        arg3: *mut target_ulong,
+        arg4: *mut target_ulong,
+        arg5: *mut target_ulong,
+        arg6: *mut target_ulong,
+        arg7: *mut target_ulong,
     ) -> libafl_syshook_ret,
 >;
 pub type libafl_post_syscall_cb = ::std::option::Option<
