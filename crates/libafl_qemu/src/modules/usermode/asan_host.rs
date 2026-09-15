@@ -536,16 +536,17 @@ impl AsanGiovese {
     #[allow(dead_code)]
     extern "C" fn fake_syscall(
         mut self: Pin<&mut Self>,
-        sys_num: i32,
-        a0: GuestUlong,
-        a1: GuestUlong,
-        a2: GuestUlong,
-        a3: GuestUlong,
-        _a4: GuestUlong,
-        _a5: GuestUlong,
-        _a6: GuestUlong,
-        _a7: GuestUlong,
+        sys_num: *mut i32,
+        a0: *mut GuestUlong,
+        a1: *mut GuestUlong,
+        a2: *mut GuestUlong,
+        a3: *mut GuestUlong,
+        _a4: *mut GuestUlong,
+        _a5: *mut GuestUlong,
+        _a6: *mut GuestUlong,
+        _a7: *mut GuestUlong,
     ) -> SyscallHookResult {
+        let (sys_num, a0, a1, a2, a3) = unsafe { (*sys_num, *a0, *a1, *a2, *a3) };
         if sys_num == QASAN_FAKESYS_NR {
             let mut r = 0;
             let qemu = Qemu::get().unwrap();
