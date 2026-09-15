@@ -49,13 +49,23 @@ impl ToolWrapper for LibtoolWrapper {
             ));
         }
 
-        self.name = args[0].as_ref().to_string();
+        // Expand any `@file` response-file arguments up front so the
+        // per-`Configuration` filename rewriting below sees the real
+        // arguments instead of an opaque `@file` token. The wrapper's own
+        // name (args[0]) is passed through untouched.
+        let expanded_tail = crate::response_file::expand_response_files(&args[1..])?;
+        let mut expanded: Vec<String> = Vec::with_capacity(1 + expanded_tail.len());
+        expanded.push(args[0].as_ref().to_string());
+        expanded.extend(expanded_tail);
+        let args = expanded;
+
+        self.name.clone_from(&args[0]);
 
         let mut linking = true;
         // Detect stray -v calls from ./configure scripts.
-        if args.len() > 1 && args[1].as_ref() == "-v" {
+        if args.len() > 1 && args[1].as_str() == "-v" {
             if args.len() == 2 {
-                self.base_args.push(args[1].as_ref().into());
+                self.base_args.push(args[1].clone());
                 return Ok(self);
             }
             linking = false;
@@ -92,7 +102,6 @@ impl ToolWrapper for LibtoolWrapper {
                 "--libafl-configurations" if i + 1 < args.len() => {
                     self.configurations.extend(
                         args[i + 1]
-                            .as_ref()
                             .split(',')
                             .map(|x| crate::Configuration::from_str(x).unwrap()),
                     );
@@ -100,13 +109,13 @@ impl ToolWrapper for LibtoolWrapper {
                     continue;
                 }
                 "-o" if i + 1 < args.len() => {
-                    self.output = Some(PathBuf::from(args[i + 1].as_ref()));
+                    self.output = Some(PathBuf::from(args[i + 1].as_str()));
                     i += 2;
                     continue;
                 }
                 _ => (),
             }
-            new_args.push(args[i].as_ref().to_string());
+            new_args.push(args[i].clone());
             i += 1;
         }
         if linking
