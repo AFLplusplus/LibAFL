@@ -37,12 +37,12 @@ fn main() {
     let mut constants_file = File::create(dest_path).expect("Could not create file");
 
     let edges_map_allocated_size: usize = option_env!("LIBAFL_EDGES_MAP_ALLOCATED_SIZE")
-        .or(option_env!("LIBAFL_EDGES_MAP_ALLOCATED_SIZE")) // keep old env for retrocompatibility
+        .or(option_env!("LIBAFL_EDGES_MAP_SIZE_MAX")) // keep old env for retrocompatibility
         .map_or(Ok(TWO_MIB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_ALLOCATED_SIZE");
 
     let edges_map_default_size: usize = option_env!("LIBAFL_EDGES_MAP_DEFAULT_SIZE")
-        .or(option_env!("LIBAFL_EDGES_MAP_DEFAULT_SIZE")) // keep old env for retrocompatibility
+        .or(option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")) // keep old env for retrocompatibility
         .map_or(Ok(SIXTY_FOUR_KIB), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_DEFAULT_SIZE");
 
@@ -86,9 +86,9 @@ fn main() {
     .expect("Could not write file");
 
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_DEFAULT_SIZE");
-    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_DEFAULT_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE_IN_USE");
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_ALLOCATED_SIZE");
-    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_ALLOCATED_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE_MAX");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMP_MAP_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
